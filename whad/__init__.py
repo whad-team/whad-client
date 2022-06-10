@@ -22,6 +22,7 @@ class WhadCapability(object):
     """
     Capabilities wrappers (mask protocol).
     """
+    Scan = Capability.Scan
     Sniff = Capability.Sniff
     Inject = Capability.Inject
     Jam = Capability.Jam

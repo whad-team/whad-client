@@ -11,6 +11,22 @@ class RequiredImplementation(Exception):
         super().__init__()
 
 
-class ResultUnsupportedDomain(Exception):
+class UnsupportedDomain(Exception):
+    def __init__(self):
+        super().__init__()
+
+
+class UnsupportedCapability(Exception):
+    def __init__(self, capability):
+        super().__init__()
+        self.__capability = capability
+
+    def __str__(self):
+        return 'UnsupportedCapability(%s)' % self.__capability
+
+    def __repr__(self):
+        return str(self)
+
+class WhadDeviceNotReady(Exception):
     def __init__(self):
         super().__init__()

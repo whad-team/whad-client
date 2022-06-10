@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x15protocol/device.proto\x12\tdiscovery\"\x9b\x01\n\x0e\x44\x65viceInfoResp\x12\x0c\n\x04type\x18\x01 \x01(\r\x12\x15\n\rproto_min_ver\x18\x02 \x01(\r\x12\x18\n\x10\x66w_version_major\x18\x03 \x01(\r\x12\x18\n\x10\x66w_version_minor\x18\x04 \x01(\r\x12\x16\n\x0e\x66w_version_rev\x18\x05 \x01(\r\x12\x18\n\x0c\x63\x61pabilities\x18\x06 \x03(\rB\x02\x10\x01\"B\n\x14\x44\x65viceDomainInfoResp\x12\x0e\n\x06\x64omain\x18\x01 \x01(\r\x12\x1a\n\x12supported_commands\x18\x02 \x01(\x04\"$\n\x0f\x44\x65viceInfoQuery\x12\x11\n\tproto_ver\x18\x01 \x01(\r\"\'\n\x15\x44\x65viceDomainInfoQuery\x12\x0e\n\x06\x64omain\x18\x01 \x01(\r\"\xe4\x01\n\x07Message\x12\x30\n\ninfo_query\x18\x01 \x01(\x0b\x32\x1a.discovery.DeviceInfoQueryH\x00\x12.\n\tinfo_resp\x18\x02 \x01(\x0b\x32\x19.discovery.DeviceInfoRespH\x00\x12\x38\n\x0c\x64omain_query\x18\x03 \x01(\x0b\x32 .discovery.DeviceDomainInfoQueryH\x00\x12\x36\n\x0b\x64omain_resp\x18\x04 \x01(\x0b\x32\x1f.discovery.DeviceDomainInfoRespH\x00\x42\x05\n\x03msg*\xc9\x01\n\x06\x44omain\x12\x0f\n\x0b_DomainNone\x10\x00\x12\x0e\n\x07Generic\x10\x80\x80\x80\x08\x12\x10\n\tBtClassic\x10\x80\x80\x80\x10\x12\x0b\n\x04\x42tLE\x10\x80\x80\x80\x18\x12\r\n\x06Zigbee\x10\x80\x80\x80 \x12\x10\n\tSixLowPan\x10\x80\x80\x80(\x12\n\n\x03\x45sb\x10\x80\x80\x80\x30\x12\x17\n\x10LogitechUnifying\x10\x80\x80\x80\x38\x12\r\n\x06Mosart\x10\x80\x80\x80@\x12\n\n\x03\x41NT\x10\x80\x80\x80H\x12\x0f\n\x08\x41NT_Plus\x10\x80\x80\x80P\x12\r\n\x06\x41NT_FS\x10\x80\x80\x80X*=\n\nDeviceType\x12\x12\n\x0e\x45sp32BleFuzzer\x10\x00\x12\r\n\tButterfly\x10\x01\x12\x0c\n\x08\x42tleJack\x10\x02*\x80\x01\n\nCapability\x12\x0c\n\x08_CapNone\x10\x00\x12\t\n\x05Sniff\x10\x02\x12\n\n\x06Inject\x10\x04\x12\x07\n\x03Jam\x10\x08\x12\n\n\x06Hijack\x10\x10\x12\x08\n\x04Hook\x10 \x12\x0e\n\nMasterRole\x10@\x12\x0e\n\tSlaveRole\x10\x80\x01\x12\x0e\n\tNoRawData\x10\x80\x02\x62\x06proto3'
+  serialized_pb=b'\n\x15protocol/device.proto\x12\tdiscovery\"\x9b\x01\n\x0e\x44\x65viceInfoResp\x12\x0c\n\x04type\x18\x01 \x01(\r\x12\x15\n\rproto_min_ver\x18\x02 \x01(\r\x12\x18\n\x10\x66w_version_major\x18\x03 \x01(\r\x12\x18\n\x10\x66w_version_minor\x18\x04 \x01(\r\x12\x16\n\x0e\x66w_version_rev\x18\x05 \x01(\r\x12\x18\n\x0c\x63\x61pabilities\x18\x06 \x03(\rB\x02\x10\x01\"B\n\x14\x44\x65viceDomainInfoResp\x12\x0e\n\x06\x64omain\x18\x01 \x01(\r\x12\x1a\n\x12supported_commands\x18\x02 \x01(\x04\"$\n\x0f\x44\x65viceInfoQuery\x12\x11\n\tproto_ver\x18\x01 \x01(\r\"\'\n\x15\x44\x65viceDomainInfoQuery\x12\x0e\n\x06\x64omain\x18\x01 \x01(\r\"\xe4\x01\n\x07Message\x12\x30\n\ninfo_query\x18\x01 \x01(\x0b\x32\x1a.discovery.DeviceInfoQueryH\x00\x12.\n\tinfo_resp\x18\x02 \x01(\x0b\x32\x19.discovery.DeviceInfoRespH\x00\x12\x38\n\x0c\x64omain_query\x18\x03 \x01(\x0b\x32 .discovery.DeviceDomainInfoQueryH\x00\x12\x36\n\x0b\x64omain_resp\x18\x04 \x01(\x0b\x32\x1f.discovery.DeviceDomainInfoRespH\x00\x42\x05\n\x03msg*\xc9\x01\n\x06\x44omain\x12\x0f\n\x0b_DomainNone\x10\x00\x12\x0e\n\x07Generic\x10\x80\x80\x80\x08\x12\x10\n\tBtClassic\x10\x80\x80\x80\x10\x12\x0b\n\x04\x42tLE\x10\x80\x80\x80\x18\x12\r\n\x06Zigbee\x10\x80\x80\x80 \x12\x10\n\tSixLowPan\x10\x80\x80\x80(\x12\n\n\x03\x45sb\x10\x80\x80\x80\x30\x12\x17\n\x10LogitechUnifying\x10\x80\x80\x80\x38\x12\r\n\x06Mosart\x10\x80\x80\x80@\x12\n\n\x03\x41NT\x10\x80\x80\x80H\x12\x0f\n\x08\x41NT_Plus\x10\x80\x80\x80P\x12\r\n\x06\x41NT_FS\x10\x80\x80\x80X*=\n\nDeviceType\x12\x12\n\x0e\x45sp32BleFuzzer\x10\x00\x12\r\n\tButterfly\x10\x01\x12\x0c\n\x08\x42tleJack\x10\x02*\x8a\x01\n\nCapability\x12\x0c\n\x08_CapNone\x10\x00\x12\x08\n\x04Scan\x10\x01\x12\t\n\x05Sniff\x10\x02\x12\n\n\x06Inject\x10\x04\x12\x07\n\x03Jam\x10\x08\x12\n\n\x06Hijack\x10\x10\x12\x08\n\x04Hook\x10 \x12\x0e\n\nMasterRole\x10@\x12\x0e\n\tSlaveRole\x10\x80\x01\x12\x0e\n\tNoRawData\x10\x80\x02\x62\x06proto3'
 )
 
 _DOMAIN = _descriptor.EnumDescriptor(
@@ -143,42 +143,47 @@ _CAPABILITY = _descriptor.EnumDescriptor(
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='Sniff', index=1, number=2,
+      name='Scan', index=1, number=1,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='Inject', index=2, number=4,
+      name='Sniff', index=2, number=2,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='Jam', index=3, number=8,
+      name='Inject', index=3, number=4,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='Hijack', index=4, number=16,
+      name='Jam', index=4, number=8,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='Hook', index=5, number=32,
+      name='Hijack', index=5, number=16,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='MasterRole', index=6, number=64,
+      name='Hook', index=6, number=32,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='SlaveRole', index=7, number=128,
+      name='MasterRole', index=7, number=64,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='NoRawData', index=8, number=256,
+      name='SlaveRole', index=8, number=128,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='NoRawData', index=9, number=256,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
@@ -186,7 +191,7 @@ _CAPABILITY = _descriptor.EnumDescriptor(
   containing_type=None,
   serialized_options=None,
   serialized_start=840,
-  serialized_end=968,
+  serialized_end=978,
 )
 _sym_db.RegisterEnumDescriptor(_CAPABILITY)
 
@@ -207,6 +212,7 @@ Esp32BleFuzzer = 0
 Butterfly = 1
 BtleJack = 2
 _CapNone = 0
+Scan = 1
 Sniff = 2
 Inject = 4
 Jam = 8
