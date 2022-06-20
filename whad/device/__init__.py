@@ -1,12 +1,20 @@
-from whad.exceptions import RequiredImplementation, UnsupportedDomain
+from threading import Thread, Lock
+from queue import Queue, Empty
+
+from elementpath import TypedAttribute
+from whad.exceptions import RequiredImplementation, UnsupportedDomain, WhadDeviceNotReady
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.device_pb2 import DeviceType
+from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType
 from whad.helpers import message_filter
 
 class WhadDeviceInfo(object):
+    """This class caches a device information related to its firmware, type, and supported domains and capabilities.
 
+    :param DeviceInfoResp info_resp:  Whad message containing the device basic information.
+    """
     def __init__(self, info_resp):
+        
         # Store device information
         self.__whad_version = info_resp.proto_min_ver
         self.__fw_ver_maj = info_resp.fw_version_major
@@ -22,46 +30,94 @@ class WhadDeviceInfo(object):
             self.__commands[domain & 0xFF000000] = 0
 
     def add_supported_commands(self, domain, commands):
+        """Adds supported command for a given domain to the device information.
+
+        :param domain: target domain
+        :param commands: bitmask representing the supported commands for the given domain
+        """
         if domain in self.__domains:
             self.__commands[domain] = commands
 
+
+    def has_domain(self, domain):
+        """Determine if a domain is supported by this device.
+
+        :param Domain domain: Domain to check.
+        :returns: True if supported, False otherwise.
+        """
+        return domain in self.__domains
+
+
+    def has_domain_cap(self, domain, capability):
+        """Check if device supports a specific capability for a given domain.
+
+        :param Domain domain: target domain
+        :param Capability capability: capability to check
+        """
+        if domain in self.__domains:
+            
+            return (self.__domains[domain] & (1 << capability) > 0)
+        return False
+
+
+    def get_domain_capabilities(self, domain):
+        """Get device domain capabilities.
+        
+        :param Domain domain: target domain
+        :returns: Domain capabilities
+        :rtype: Bitmask of capabilities
+        """
+        if domain in self.__domains:
+            return self.__domains[domain]
+        return None
+
+
+    def get_domain_commands(self, domain):
+        """Get supported commands for a specific domain
+
+        :param Domain domain: Target domain
+        :returns: Bitmask of supported commands
+        """
+        if domain in self.__commands:
+            return self.__commands[domain]
+        return None
+
+
+    ##### Getters #####
+
     @property
     def version_str(self):
+        """Returns the device firmware version string.
+
+        :returns: Device firmware version string
+        """
         return '%d.%d.%d' % (
             self.fw_ver_maj,
             self.fw_ver_min,
             self.fw_ver_rev
         )
 
+
     @property
     def whad_version(self):
+        """Returns the device supported whad version.
+        """
         return self.__whad_version
-    
+
+
     @property
     def device_type(self):
+        """Returns the device type.
+        """
         return self.__device_type
+
 
     @property
     def domains(self):
+        """Return the list of supported domains.
+        """
         return self.__domains.keys()
 
-    def has_domain(self, domain):
-        return domain in self.__domains
-
-    def has_domain_cap(self, domain, capability):
-        if domain in self.__domains:
-            return (self.__domains[domain] & (1 << capability) > 0)
-        return False
-
-    def get_domain_capabilities(self, domain):
-        if domain in self.__domains:
-            return self.__domains[domain]
-        return None
-
-    def get_domain_commands(self, domain):
-        if domain in self.__commands:
-            return self.__commands[domain]
-        return None
 
 class WhadDeviceConnector(object):
     """
@@ -76,6 +132,8 @@ class WhadDeviceConnector(object):
 
         Link the device with this connector, and this connector with the
         provided device.
+
+        :param WhadDevice device: Device to be used with this connector.
         """
         self.set_device(device)
         if self.__device is not None:
@@ -85,6 +143,8 @@ class WhadDeviceConnector(object):
     def set_device(self, device=None):
         """
         Set device linked to this connector.
+
+        :param WhadDevice device: Device to be used with this connector.
         """
         if device is not None:
             self.__device = device
@@ -95,28 +155,110 @@ class WhadDeviceConnector(object):
 
     # Device interaction
     def send_message(self, message, filter=None):
+        """Sends a message to the underlying device without waiting for an answer.
+        
+        :param Message message: WHAD message to send to the device.
+        :param filter: optional filter function for incoming message queue.
+        """
         return self.__device.send_message(message, filter)
 
-    def process(self, keep=None):
-        return self.__device.process(keep)
+
+    def send_command(self, message, filter=None):
+        """Sends a command message to the underlying device and waits for an answer.
+
+        By default, this method will wait for a CmdResult message, but you can provide
+        any other filtering function/lambda if you are expecting another message as a
+        reply from the device.
+
+        :param Message message: WHAD message to send to the device
+        :param filter: Filtering function used to match the expected response from the device.
+        """
+        return self.__device.send_command(message, filter)
+
+    def wait_for_message(self, timeout=None, filter=None):
+        """Waits for a specific message to be received.
+
+        This method reads the message queue and return the first message that matches the
+        provided filter. A timeout can be specified and will cause this method to return
+        None if this timeout is reached.
+        """
+        return self.__device.wait_for_message(timeout=timeout, filter=filter)
 
     # Message callbacks
     def on_discovery_message(self, message):
+        """Callback function to process incoming discovery messages.
+
+        This method MUST be overriden by inherited classes.
+
+        :param message: Discovery message
+        """
         raise RequiredImplementation()
 
     def on_generic_message(self, message):
+        """Callback function to process incoming generic messages.
+
+        This method MUST be overriden by inherited classes.
+
+        :param message: Generic message
+        """
         raise RequiredImplementation()
 
     def on_domain_message(self, domain, message):
+        """Callback function to process incoming domain-related messages.
+
+        This method MUST be overriden by inherited classes.
+
+        :param message: Domain message
+        """
         raise RequiredImplementation()
 
-    
+
+class WhadDeviceIOThread(Thread):
+
+    """WhadDevice I/O cancellable Thread.
+
+    This thread runs in background and regularly calls the
+    device read() method to fetch any incoming data.
+    """
+
+    def __init__(self, device):
+        super().__init__()
+        self.__device = device
+        self.__canceled = False
+
+    def cancel(self):
+        """
+        Cancel current I/O task.
+        """
+        self.__canceled = True
+
+    def run(self):
+        """
+        Main task, call device process() method until thread
+        is canceled.
+        """
+        while not self.__canceled:
+            self.__device.read()
+
+
 class WhadDevice(object):
     """
-    Device interface class.
+    WHAD Device interface class.
 
     This device class handles the device discovery process, every possible
-    discovery and generic messages related to the device discovery.
+    discovery and generic messages related to the device discovery. It MUST be
+    inherited by device handling classes (such as the UartDevice class) in order
+    to provide read/write capabilities.
+
+    Inherited classes MUST only implement the following methods:
+
+      * open(): will handle device opening/access
+      * close(): will handle device closing
+      * read() to read data from the device and send them to on_data_received()
+      * write() to send data to the device
+
+    All the message re-assembling, parsing, dispatching and background data reading
+    will be performed in this class.
     """
 
     def __init__(self):
@@ -127,91 +269,202 @@ class WhadDevice(object):
         # Device connector
         self.__connector = None
 
+        # Device IO thread
+        self.__io_thread = None
+
+        # Message queue
+        self.__msg_queue = Queue()
+        self.__mq_filter = None
+
+        # Input pipes
+        self.__inpipe = bytearray()
+
+        # Create lock
+        self.__lock = Lock()
+
+
+    def lock(self):
+        """Locks the pending output data buffer."""
+        self.__lock.acquire()
+
+    def unlock(self):
+        """Unlocks the pending output data buffer."""
+        self.__lock.release()
+
     def set_connector(self, connector):
         """
         Set this device connector.
+
+        :param WhadDeviceConnector connector: connector to be used with this device.
         """
         self.__connector = connector
 
+
+    ######################################
+    # Device I/O operations
+    ######################################
+
     def open(self):
         """
-        Open device.
+        Open device method. By default, creates a simple thread
+        that will handle I/O in background. This requires the object
+        to be ready for I/O operations when this method is called.
+
+        This method MUST be overriden by inherited classes.
         """
-        raise RequiredImplementation()
+        self.__io_thread = WhadDeviceIOThread(self)
+        self.__io_thread.start()
+        
 
     def close(self):
         """
         Close device.
-        """
-        raise RequiredImplementation()
 
-    def has_domain(self, domain):
-        if self.__info is not None:
-            return self.__info.has_domain(domain)
-
-    def get_domains(self):
-        if self.__info is not None:
-            return self.__info.domains
-
-    def get_domain_capability(self, domain):
-        if self.__info is not None:
-            return self.__info.get_domain_capabilities(domain)
-
-    def get_domain_commands(self, domain):
-        if self.__info is not None:
-            return self.__info.get_domain_commands(domain)
-
-    def send_message(self, message, filter=None):
+        This method MUST be overriden by inherited classes.
         """
-        Send a WHAD message to the device.
+        # Cancel I/O thread
+        self.__io_thread.cancel()
+        self.__io_thread.join()
 
-        @param message WHAD message to send
-        @param filter  lambda function to filter the expected answer.
-        """
-        raise RequiredImplementation()
 
-    def process(self, keep=None):
+    def __write(self, data):
         """
-        Process outgoing and incoming messages. This method must be called very
-        regularly to send and receive messages to and from the target device.
-        """
-        raise RequiredImplementation()
+        Sends data to the device.
 
-    def on_discovery_msg(self, message):
+        This is an internal method that SHALL NOT be used from inherited classes.
         """
-        Method called when a discovery message is received. If a connector has
-        been associated with the device, forward this message to this connector.
-        """
-        if self.__connector is not None:
-            self.__connector.on_discovery_msg(message)
-        
-    def on_generic_msg(self, message):
-        """
-        Method called when a generic message is received.
-        """
-        # Handle generic result message
-        if message.WhichOneof('msg') == 'result':
-            if message.result == ResultCode.UNSUPPORTED_DOMAIN:
-                raise UnsupportedDomain()
+        self.lock()
+        self.write(bytes(data))
+        self.unlock()
 
-        # Forward everything to the connector, if any
-        if self.__connector is not None:
-            self.__connector.on_generic_msg(message)
 
-    def on_domain_msg(self, domain, message):
-        """
-        Forward to connector.
+    def set_queue_filter(self, filter=None):
+        """Sets the message queue filter.
 
-        This method MUST return True if message has been processed,
-        False otherwise.
+        :param filter: filtering function/lambda to be used by our message queue filter.
         """
-        if self.__connector is not None:
-            return self.__connector.on_domain_msg(domain, message)
-        return False
+        self.__mq_filter = filter
 
-    def on_message_received(self, message):
+
+    def wait_for_message(self, timeout=None, filter=None):
         """
-        Method called when a WHAD message is received, dispatching.
+        Configures the device message queue filter to automatically move messages
+        that matches the filter into the queue, and then waits for the first message
+        that matches this filter and returns it.
+
+        This method is blocking until a matching message is received.
+
+        :param int timeout: Timeout
+        :param filter: Message queue filtering function (optional)
+        """
+        if filter is not None:
+            self.set_queue_filter(filter)
+
+        while True:
+            # Wait for a matching message to be caught (blocking)
+            msg = self.__msg_queue.get(block=True, timeout=timeout)
+            
+            # If message does not match, dispatch.
+            if not self.__mq_filter(msg):
+                self.dispatch_message(msg)
+            else:
+                return msg
+
+
+    def send_message(self, message, keep=None):
+        """
+        Serializes a message and sends it to the device, without waiting for an answer.
+        Optionally, you can update the message queue filter if you need to wait for 
+        specific messages after the message sent.
+
+        :param Message message: Message to send
+        :param keep: Message queue filter function
+        """
+        # if `keep` is set, configure queue filter
+        self.set_queue_filter(keep)
+
+        # Convert message into bytes
+        raw_message = message.SerializeToString()
+
+        # Define header
+        header = [
+            0xAC, 0xBE,
+            len(raw_message) & 0xff,
+            (len(raw_message) >> 8) & 0xff
+        ]
+
+        # Send header followed by serialized message
+        self.__write(header)
+        self.__write(raw_message)
+
+
+    def send_command(self, command, keep=None):
+        """
+        Sends a command and awaits a specific response from the device.
+        WHAD commands usualy expect a CmdResult message, if `keep` is not
+        provided then this method will by default wait for a CmdResult.
+
+        :param Message command: Command message to send to the device
+        :param keep: Message queue filter function (optional)
+        :returns: Response message from the device
+        :rtype: Message
+        """
+        # If a queue filter is not provided, expect a default CmdResult
+        if keep is None:
+            self.send_message(command, message_filter(
+                'generic',
+                'cmd_result'
+            ))
+        else:
+            self.send_message(command, keep)
+
+        # Retrieve the first message matching our filter.
+        return self.wait_for_message()
+
+
+    def on_data_received(self, data):
+        """
+        Data received callback.
+
+        This callback will process incoming messages, parse them
+        and then forward to the message processing callback.
+
+        :param bytes data: Data received from the device.
+        """
+        messages = []
+        self.__inpipe.extend(data)
+        while len(self.__inpipe) > 2:
+            # Is the magic correct ?
+            if self.__inpipe[0] == 0xAC and self.__inpipe[1] == 0xBE:
+                # Have we received a complete message ?
+                if len(self.__inpipe) > 4:
+                    msg_size = self.__inpipe[2] | (self.__inpipe[3] << 8)
+                    if len(self.__inpipe) >= (msg_size+4):
+                        raw_message = self.__inpipe[4:4+msg_size]
+                        _msg = Message()
+                        _msg.ParseFromString(raw_message)
+                        self.on_message_received(_msg)
+                        
+                        # Chomp
+                        self.__inpipe = self.__inpipe[msg_size + 4:]
+                    else:
+                        break
+                else:
+                    break
+            else:
+                # Nope, that's not a header
+                while (len(self.__inpipe) >= 2):
+                    if (self.__inpipe[0] != 0xAC) or (self.__inpipe[1] != 0xBE):
+                        self.__inpipe = self.__inpipe[1:]
+                    else:
+                        break
+
+
+    def dispatch_message(self, message):
+        """Dispatches an incoming message to the corresponding callbacks depending on its
+        type and content.
+
+        :param Message message: Message to dispatch
         """
         if message.WhichOneof('msg') == 'discovery':
             self.on_discovery_msg(message.discovery)
@@ -222,14 +475,102 @@ class WhadDevice(object):
             self.on_domain_msg(domain, getattr(message,domain))
 
 
+    def on_message_received(self, message):
+        """
+        Method called when a WHAD message is received, dispatching.
+
+        :param Message message: Message received
+        """
+        # If message queue filter is defined and message matches this filter,
+        # move it into our message queue. 
+        if self.__mq_filter is not None and self.__mq_filter(message):
+            self.__msg_queue.put(message, block=True)
+        else:
+            self.dispatch_message(message)
+
+    ######################################
+    # Generic messages handling
+    ######################################   
+
+    def on_generic_msg(self, message):
+        """
+        This callback method is called whenever a Generic message is received.
+
+        :param Message message: Generic message received
+        """
+        # Handle generic result message
+        if message.WhichOneof('msg') == 'result':
+            if message.result == ResultCode.UNSUPPORTED_DOMAIN:
+                raise UnsupportedDomain()
+
+        # Forward everything to the connector, if any
+        if self.__connector is not None:
+            self.__connector.on_generic_msg(message)
+
+
+    ######################################
+    # Generic discovery
+    ######################################
+
+    def on_discovery_msg(self, message):
+        """
+        Method called when a discovery message is received. If a connector has
+        been associated with the device, forward this message to this connector.
+        """
+        if self.__connector is not None:
+            self.__connector.on_discovery_msg(message)
+
+
+    def has_domain(self, domain):
+        """Checks if device supports a specific domain.
+
+        :param Domain domain: Domain
+        :returns: True if domain is supported, False otherwise.
+        :rtype: bool
+        """
+        if self.__info is not None:
+            return self.__info.has_domain(domain)
+
+
+    def get_domains(self):
+        """Get device' supported domains.
+
+        :returns: list of supported domains
+        :rtype: list
+        """
+        if self.__info is not None:
+            return self.__info.domains
+
+
+    def get_domain_capability(self, domain):
+        """Get a device domain capabilities.
+
+        :param Domain domain: Target domain
+        :returns: Domain capabilities
+        :rtype: DeviceDomainInfoResp
+        """
+        if self.__info is not None:
+            return self.__info.get_domain_capabilities(domain)
+
+    def get_domain_commands(self, domain):
+        """Get a device supported domain commands.
+
+        :param Domain domain: Target domain
+        :returns: Bitmask of supported commands
+        :rtype: int
+        """
+        if self.__info is not None:
+            return self.__info.get_domain_commands(domain)
+
+
     def send_discover_info_query(self, proto_version=0x0100):
         """
-        Send a DeviceInfoQuery message and awaits for a DeviceInfoResp
+        Sends a DeviceInfoQuery message and awaits for a DeviceInfoResp
         answer.
         """
         msg = Message()
         msg.discovery.info_query.proto_ver=proto_version
-        return self.send_message(
+        return self.send_command(
             msg,
             message_filter('discovery', 'info_resp')
         )
@@ -237,12 +578,12 @@ class WhadDevice(object):
 
     def send_discover_domain_query(self, domain):
         """
-        Send a DeviceDomainQuery message and awaits for a DeviceDomainResp
+        Sends a DeviceDomainQuery message and awaits for a DeviceDomainResp
         answer.
         """
         msg = Message()
         msg.discovery.domain_query.domain = domain
-        return self.send_message(
+        return self.send_command(
             msg,
             message_filter('discovery', 'domain_resp')
         )
@@ -280,5 +621,23 @@ class WhadDevice(object):
             else:
                 raise WhadDeviceNotReady()
 
+    ######################################
+    # Upper layers (domains) handling
+    ######################################   
 
+    def on_domain_msg(self, domain, message):
+        """
+        Callback method handling domain-related messages. Since this layer is not
+        managed by the root WhadDevice class, forward it to the upper layer, the
+        associated connector (if any).
+
+        :param Domain domain: Target domain
+        :param Message message: Domain-related message received
+        """
+        if self.__connector is not None:
+            return self.__connector.on_domain_msg(domain, message)
+        return False
+
+
+# Defines every supported low-level device
 from whad.device.uart import UartDevice
