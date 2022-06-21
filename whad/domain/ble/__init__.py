@@ -12,8 +12,9 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, StartCmd, StopCmd, \
     ScanMode, Start, Stop, BleAdvType, ConnectToCmd, ConnectTo, CentralModeCmd, \
     SendPDUCmd
-
-from scapy.layers.bluetooth4LE import *
+from whad.domain.ble.stack import BleStack
+from scapy.layers.bluetooth4LE import BTLE_CTRL, BTLE_DATA, BTLE_ADV_IND, \
+    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
 
 
 class BLE(WhadDeviceConnector):
@@ -103,7 +104,7 @@ class BLE(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
     def on_generic_msg(self, message):
-        #print('generic: %s' % message)
+        print('generic: %s' % message)
         pass
 
     def on_discovery_msg(self, message):
@@ -122,25 +123,38 @@ class BLE(WhadDeviceConnector):
                     )
             elif msg_type == 'pdu':
                 self.on_pdu(message.pdu)
+            elif msg_type == 'connected':
+                self.on_connection(message.connected)
 
     def on_adv_pdu(self, rssi, packet):
         pass
 
+    def on_connection(self, pdu):
+        print(pdu)
+        print('Connection established')
+
     def on_pdu(self, pdu):
         print(hexlify(pdu.pdu))
         if pdu.pdu[0] & 0x3 == 0x03:
-            self.on_ctl_pdu(pdu.direction, pdu.pdu)
+            self.on_ctl_pdu(
+                pdu.direction,
+                BTLE_DATA(pdu.pdu)
+            )
         elif (pdu.pdu[0] & 0x3) in [0x01, 0x02]:
-            self.on_data_pdu(pdu.direction, pdu.pdu)
+            self.on_data_pdu(
+                pdu.direction,
+                BTLE_DATA(pdu.pdu)
+            )
         else:
-            print('[!] Wrong LLID')
+            self.on_error_pdu(pdu.direction, pdu.pdu)
     
     def on_data_pdu(self, direction, pdu):
-        print('[rx:data] %s' % hexlify(pdu))
         pass
 
     def on_ctl_pdu(self, direction, pdu):
-        print('[rx:ctl] %s' % hexlify(pdu))
+        pass
+
+    def on_error_pdu(self, direction, pdu):
         pass
 
     def send_ctrl_pdu(self, pdu):
@@ -148,13 +162,23 @@ class BLE(WhadDeviceConnector):
         Send CTRL PDU
         """
         final_pdu = bytes([0x03, len(pdu)] + pdu)
-        print('injecting pdu: %s' % final_pdu)
         msg = Message()
         msg.ble.send_pdu.direction = BleDirection.MASTER_TO_SLAVE
         msg.ble.send_pdu.pdu = final_pdu
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        print('cmd resp: %s' % resp)
+        resp = self.send_command(msg)
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+    def send_data_pdu(self, pdu):
+        """
+        Send data (L2CAP) PDU.
+        """
+        final_pdu = bytes([0x02, len(pdu)] + pdu)
+        msg = Message()
+        msg.ble.send_pdu.direction = BleDirection.MASTER_TO_SLAVE
+        msg.ble.send_pdu.pdu = final_pdu
+        resp = self.send_command(msg)
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
 
 class Scanner(BLE):
     """
@@ -197,10 +221,13 @@ class Scanner(BLE):
             else:
                 print('nope')
 
+
 class Central(BLE):
 
     def __init__(self, device):
         super().__init__(device)
+
+        self.use_stack(BleStack)
 
         # Check device accept central mode
         if not self.can_be_central():
@@ -209,3 +236,25 @@ class Central(BLE):
             self.stop()
             self.enable_central_mode()
 
+
+    def use_stack(self, clazz=BleStack):
+        """Specify a stack class to use for BLE. By default, our own stack (BleStack) is used.
+        """
+        self.__stack = clazz(self)
+
+    def on_ctl_pdu(self, direction, pdu):
+        """This method is called whenever a control PDU is received.
+        This PDU is then forwarded to the BLE stack to handle it.
+
+        Central devices act as a master, so we only forward slave to master
+        messages to the stack.
+        """
+        if direction == BleDirection.SLAVE_TO_MASTER:
+            self.__stack.on_ctl_pdu(pdu)
+
+    def on_data_pdu(self, direction, pdu):
+        """This method is called whenever a data PDU is received.
+        This PDU is then forwarded to the BLE stack to handle it.
+        """
+        if direction == BleDirection.SLAVE_TO_MASTER:
+            self.__stack.on_data_pdu(pdu)

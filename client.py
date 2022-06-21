@@ -1,8 +1,11 @@
-from whad.ble import Scanner, Central
+from whad.domain.ble import Scanner, Central
 from whad.device.uart import UartDevice
 from time import time,sleep
 from threading import Thread
 
+from whad.helpers import message_filter
+
+"""
 scanner = Scanner(UartDevice('/dev/ttyUSB0', 115200))
 scanner.start()
 while True:
@@ -13,7 +16,7 @@ while True:
         scanner.stop()
         scanner.device.close()
         break
-"""
+
 class MyAsyncScanner(Scanner):
     def __init__(self, device):
         super().__init__(device)
@@ -52,7 +55,7 @@ while True:
     except KeyboardInterrupt as exc:
         scanner.stop()
         break
-
+"""
 
 class deleg(Thread):
     def __init__(self, central):
@@ -65,18 +68,20 @@ class deleg(Thread):
 
 central = Central(UartDevice('/dev/ttyUSB0', 115200))
 central.connect_to('D4:3B:04:2C:AD:16')
-#central.connect_to('11:75:58:69:52:A4')
+#central.connect_to('D6:F3:6E:89:DA:F5')
 timeout = deleg(central)
 print(central.start())
-timeout.start()
+#timeout.start()
 try:
     while True:
-        messages = central.process()
-        if len(messages) > 0:
-            for message in messages:
-                print(message)
+        """
+        msg = central.wait_for_message(filter=message_filter('ble','pdu'))
+        print(msg)
+        """
+        sleep(1)
                 
 except KeyboardInterrupt as exc:
     central.stop()
-"""
+    central.device.close()
+
 
