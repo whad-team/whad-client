@@ -103,6 +103,8 @@ if __name__ == '__main__':
                 for cmd in get_domain_supported_commands(domain, dev.get_domain_commands(domain)):
                     print('  - %s' % cmd)
 
+            dev.close()
+
 
         except Exception as err:
             print('oops')
