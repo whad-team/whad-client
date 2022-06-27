@@ -4,6 +4,8 @@ Bluetooth LE Stack Link-layer Manager
 
 from scapy.layers.bluetooth4LE import *
 
+from whad.domain.ble.stack.l2cap import BleL2CAP
+
 CONNECTION_UPDATE_REQ = 0x00
 CHANNEL_MAP_REQ = 0x01
 TERMINATE_IND = 0x02
@@ -27,6 +29,21 @@ PING_RSP = 0x13
 LENGTH_REQ = 0x14
 LENGTH_RSP = 0x15
 
+class BleConnection(object):
+
+    def __init__(self, llm, conn_handle):
+        self.__llm = llm
+        self.__conn_handle = conn_handle
+        self.__l2cap = BleL2CAP(self)
+
+    def on_l2cap_data(self, data, fragment=False):
+        """Forward L2CAP data to L2CAP layer"""
+        self.__l2cap.on_data_received(data, fragment)
+
+    def send_l2cap_data(self, data, fragment=False):
+        """
+        """
+        self.__llm.send_data(self.__conn_handle, data, fragment)    
 
 class BleLinkLayerManager(object):
     
@@ -56,21 +73,54 @@ class BleLinkLayerManager(object):
             LENGTH_REQ: self.on_length_req,
             LENGTH_RSP: self.on_length_rsp
         }
+        self.__connections = {}
 
-    def on_ctl_pdu(self, control):
+    def on_connect(self, connection):
+        """Handles BLE connection
+        """
+        if connection.conn_handle not in self.__connections:
+            print('[llm] registers new connection %d' % connection.conn_handle)
+            self.__connections[connection.conn_handle] = BleConnection(
+                self,
+                connection.conn_handle
+            )
+        else:
+            print('[!] Connection already exists')
+
+    def on_disconnect(self, conn_handle):
+        if conn_handle in self.__connections:
+            del self.__connections[conn_handle]
+
+    def on_ctl_pdu(self, conn_handle, control):
         """Handles Control PDU
         """
-        # Dispatch control PDU based on opcode
-        if control.haslayer(BTLE_CTRL):
-            ctrl = control.getlayer(BTLE_CTRL)
-            if ctrl.opcode in self.__handlers:
-                self.__handlers[int(ctrl.opcode)](ctrl.getlayer(1))
+        if conn_handle in self.__connections:
+            # Dispatch control PDU based on opcode
+            if control.haslayer(BTLE_CTRL):
+                ctrl = control.getlayer(BTLE_CTRL)
+                if ctrl.opcode in self.__handlers:
+                    self.__handlers[int(ctrl.opcode)](ctrl.getlayer(1))
+        else:
+            print('[!] Wrong connection handle: %d', conn_handle)
 
-    def on_data_pdu(self, data):
+    def on_data_pdu(self, conn_handle, data):
         """Manages Data PDU.
         """
-        pass
+        if conn_handle in self.__connections:
+            conn = self.__connections[conn_handle]
+            conn.on_l2cap_data(bytes(data.payload), data.LLID == 0x1)
 
+    def send_data(self, conn_handle, data, fragment=False):
+        """Pack data into a Data PDU and transfer it to the device.
+        """
+        llid = 0x01 if fragment else 0x02
+        self.__stack.send_data(
+            conn_handle,
+            BTLE_DATA(
+                LLID=llid,
+                len=len(data)
+            )/data
+        )
 
     ### Link-layer control PDU callbacks
 

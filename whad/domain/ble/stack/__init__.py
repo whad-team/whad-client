@@ -32,13 +32,17 @@ class BleStack:
         self.__llm = BleLinkLayerManager(self)
 
     def on_connection(self, connection_data):
-        pass
+        self.__llm.on_connect(connection_data)
 
-    def on_ctl_pdu(self, control):
-        self.__llm.on_ctl_pdu(control)
+    def on_disconnection(self, conn_handle):
+        self.__llm.on_disconnect(conn_handle)
 
-    def on_data_pdu(self, data):
-        self.__llm.on_data_pdu(data)
+    def on_ctl_pdu(self, conn_handle, control):
+        self.__llm.on_ctl_pdu(conn_handle, control)
 
-    def send_pdu(self, pdu):
-        self.__connector.send_pdu(pdu)
+    def on_data_pdu(self, conn_handle, data):
+        print('received data pdu for conhandle %d', conn_handle)
+        self.__llm.on_data_pdu(conn_handle, data)
+
+    def send_data(self, conn_handle, data):
+        self.__connector.send_data_pdu(conn_handle, data)

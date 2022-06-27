@@ -70,7 +70,7 @@ central = Central(UartDevice('/dev/ttyUSB0', 115200))
 central.connect_to('D4:3B:04:2C:AD:16')
 #central.connect_to('D6:F3:6E:89:DA:F5')
 timeout = deleg(central)
-print(central.start())
+central.start()
 #timeout.start()
 try:
     while True:

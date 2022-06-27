@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x16protocol/ble/ble.proto\x12\x03\x62le\"%\n\x0fSetBdAddressCmd\x12\x12\n\nbd_address\x18\x01 \x01(\x0c\"8\n\x0bSniffAdvCmd\x12\x18\n\x10use_extended_adv\x18\x01 \x01(\x08\x12\x0f\n\x07\x63hannel\x18\x02 \x01(\r\"\x0b\n\tJamAdvCmd\"%\n\x12JamAdvOnChannelCmd\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\"%\n\x0fSniffConnReqCmd\x12\x12\n\nbd_address\x18\x01 \x01(\x0c\"\x17\n\x15SniffAccessAddressCmd\",\n\x12SniffActiveConnCmd\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\"$\n\nJamConnCmd\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\"\"\n\x0bScanModeCmd\x12\x13\n\x0b\x61\x63tive_scan\x18\x01 \x01(\x08\"5\n\nAdvModeCmd\x12\x11\n\tscan_data\x18\x01 \x01(\x0c\x12\x14\n\x0cscanrsp_data\x18\x02 \x01(\x0c\"8\n\rSetAdvDataCmd\x12\x11\n\tscan_data\x18\x01 \x01(\x0c\x12\x14\n\x0cscanrsp_data\x18\x02 \x01(\x0c\"\x10\n\x0e\x43\x65ntralModeCmd\"\"\n\x0c\x43onnectToCmd\x12\x12\n\nbd_address\x18\x01 \x01(\x0c\"g\n\rSendRawPDUCmd\x12$\n\tdirection\x18\x01 \x01(\x0e\x32\x11.ble.BleDirection\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x02 \x01(\r\x12\x0b\n\x03pdu\x18\x03 \x01(\x0c\x12\x0b\n\x03\x63rc\x18\x04 \x01(\r\"?\n\nSendPDUCmd\x12$\n\tdirection\x18\x01 \x01(\x0e\x32\x11.ble.BleDirection\x12\x0b\n\x03pdu\x18\x02 \x01(\x0c\"$\n\rDisconnectCmd\x12\x13\n\x0b\x63onn_handle\x18\x01 \x01(\x05\"<\n\x11PeripheralModeCmd\x12\x11\n\tscan_data\x18\x01 \x01(\x0c\x12\x14\n\x0cscanrsp_data\x18\x02 \x01(\x0c\"\n\n\x08StartCmd\"\t\n\x07StopCmd\":\n\tHijackCmd\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\x12\x15\n\rtarget_master\x18\x02 \x01(\x08\"1\n\x17\x41\x63\x63\x65ssAddressDiscovered\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\"}\n\x0e\x41\x64vPduReceived\x12!\n\x08\x61\x64v_type\x18\x01 \x01(\x0e\x32\x0f.ble.BleAdvType\x12\x0c\n\x04rssi\x18\x02 \x01(\x05\x12\x12\n\nbd_address\x18\x03 \x01(\x0c\x12\x10\n\x08\x61\x64v_data\x18\x04 \x01(\x0c\x12\x14\n\x0cscanrsp_data\x18\x05 \x01(\x0c\"J\n\tConnected\x12\x11\n\tinitiator\x18\x01 \x01(\x0c\x12\x12\n\nadvertiser\x18\x03 \x01(\x0c\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x02 \x01(\r\"\x1e\n\x0c\x44isconnected\x12\x0e\n\x06reason\x18\x01 \x01(\r\"z\n\x0cSynchronized\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\x12\x10\n\x08\x63rc_init\x18\x02 \x01(\r\x12\x14\n\x0chop_interval\x18\x03 \x01(\r\x12\x15\n\rhop_increment\x18\x04 \x01(\r\x12\x13\n\x0b\x63hannel_map\x18\x05 \x01(\x0c\"\"\n\x08Hijacked\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\"\xb1\x02\n\x0eRawPduReceived\x12$\n\tdirection\x18\x01 \x01(\x0e\x32\x11.ble.BleDirection\x12\x0f\n\x07\x63hannel\x18\x02 \x01(\r\x12\x11\n\x04rssi\x18\x03 \x01(\x05H\x00\x88\x01\x01\x12\x1f\n\x12\x61\x62solute_timestamp\x18\x04 \x01(\rH\x01\x88\x01\x01\x12\x1f\n\x12relative_timestamp\x18\x05 \x01(\rH\x02\x88\x01\x01\x12\x19\n\x0c\x63rc_validity\x18\x06 \x01(\x08H\x03\x88\x01\x01\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x07 \x01(\r\x12\x0b\n\x03pdu\x18\x08 \x01(\x0c\x12\x0b\n\x03\x63rc\x18\t \x01(\rB\x07\n\x05_rssiB\x15\n\x13_absolute_timestampB\x15\n\x13_relative_timestampB\x0f\n\r_crc_validity\"@\n\x0bPduReceived\x12$\n\tdirection\x18\x01 \x01(\x0e\x32\x11.ble.BleDirection\x12\x0b\n\x03pdu\x18\x02 \x01(\x0c\"\x80\t\n\x07Message\x12+\n\x0bset_bd_addr\x18\x01 \x01(\x0b\x32\x14.ble.SetBdAddressCmdH\x00\x12%\n\tsniff_adv\x18\x02 \x01(\x0b\x32\x10.ble.SniffAdvCmdH\x00\x12!\n\x07jam_adv\x18\x03 \x01(\x0b\x32\x0e.ble.JamAdvCmdH\x00\x12/\n\x0cjam_adv_chan\x18\x04 \x01(\x0b\x32\x17.ble.JamAdvOnChannelCmdH\x00\x12-\n\rsniff_connreq\x18\x05 \x01(\x0b\x32\x14.ble.SniffConnReqCmdH\x00\x12.\n\x08sniff_aa\x18\x06 \x01(\x0b\x32\x1a.ble.SniffAccessAddressCmdH\x00\x12-\n\nsniff_conn\x18\x07 \x01(\x0b\x32\x17.ble.SniffActiveConnCmdH\x00\x12#\n\x08jam_conn\x18\x08 \x01(\x0b\x32\x0f.ble.JamConnCmdH\x00\x12%\n\tscan_mode\x18\t \x01(\x0b\x32\x10.ble.ScanModeCmdH\x00\x12#\n\x08\x61\x64v_mode\x18\n \x01(\x0b\x32\x0f.ble.AdvModeCmdH\x00\x12*\n\x0cset_adv_data\x18\x0b \x01(\x0b\x32\x12.ble.SetAdvDataCmdH\x00\x12+\n\x0c\x63\x65ntral_mode\x18\x0c \x01(\x0b\x32\x13.ble.CentralModeCmdH\x00\x12$\n\x07\x63onnect\x18\r \x01(\x0b\x32\x11.ble.ConnectToCmdH\x00\x12*\n\x0csend_raw_pdu\x18\x0e \x01(\x0b\x32\x12.ble.SendRawPDUCmdH\x00\x12#\n\x08send_pdu\x18\x0f \x01(\x0b\x32\x0f.ble.SendPDUCmdH\x00\x12(\n\ndisconnect\x18\x10 \x01(\x0b\x32\x12.ble.DisconnectCmdH\x00\x12-\n\x0bperiph_mode\x18\x11 \x01(\x0b\x32\x16.ble.PeripheralModeCmdH\x00\x12\x1e\n\x05start\x18\x12 \x01(\x0b\x32\r.ble.StartCmdH\x00\x12\x1c\n\x04stop\x18\x13 \x01(\x0b\x32\x0c.ble.StopCmdH\x00\x12 \n\x06hijack\x18\x14 \x01(\x0b\x32\x0e.ble.HijackCmdH\x00\x12/\n\x07\x61\x61_disc\x18\x15 \x01(\x0b\x32\x1c.ble.AccessAddressDiscoveredH\x00\x12&\n\x07\x61\x64v_pdu\x18\x16 \x01(\x0b\x32\x13.ble.AdvPduReceivedH\x00\x12#\n\tconnected\x18\x17 \x01(\x0b\x32\x0e.ble.ConnectedH\x00\x12)\n\x0c\x64isconnected\x18\x18 \x01(\x0b\x32\x11.ble.DisconnectedH\x00\x12)\n\x0csynchronized\x18\x19 \x01(\x0b\x32\x11.ble.SynchronizedH\x00\x12!\n\x08hijacked\x18\x1a \x01(\x0b\x32\r.ble.HijackedH\x00\x12\x1f\n\x03pdu\x18\x1b \x01(\x0b\x32\x10.ble.PduReceivedH\x00\x12&\n\x07raw_pdu\x18\x1c \x01(\x0b\x32\x13.ble.RawPduReceivedH\x00\x42\x05\n\x03msg*\xa1\x02\n\nBleCommand\x12\x10\n\x0cSetBdAddress\x10\x00\x12\x0c\n\x08SniffAdv\x10\x01\x12\n\n\x06JamAdv\x10\x02\x12\x10\n\x0cSniffConnReq\x10\x03\x12\x16\n\x12SniffAccessAddress\x10\x04\x12\x13\n\x0fSniffActiveConn\x10\x05\x12\x0b\n\x07JamConn\x10\x06\x12\x0c\n\x08ScanMode\x10\x07\x12\x0b\n\x07\x41\x64vMode\x10\x08\x12\x0e\n\nSetAdvData\x10\t\x12\x0f\n\x0b\x43\x65ntralMode\x10\n\x12\r\n\tConnectTo\x10\x0b\x12\x0b\n\x07SendPDU\x10\x0c\x12\x0e\n\nDisconnect\x10\r\x12\x12\n\x0ePeripheralMode\x10\x0e\x12\t\n\x05Start\x10\x0f\x12\x08\n\x04Stop\x10\x10\x12\n\n\x06Hijack\x10\x11*w\n\nBleAdvType\x12\x0f\n\x0b\x41\x44V_UNKNOWN\x10\x00\x12\x0b\n\x07\x41\x44V_IND\x10\x01\x12\x12\n\x0e\x41\x44V_DIRECT_IND\x10\x02\x12\x13\n\x0f\x41\x44V_NONCONN_IND\x10\x03\x12\x10\n\x0c\x41\x44V_SCAN_IND\x10\x04\x12\x10\n\x0c\x41\x44V_SCAN_RSP\x10\x05*E\n\x0c\x42leDirection\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x13\n\x0fMASTER_TO_SLAVE\x10\x01\x12\x13\n\x0fSLAVE_TO_MASTER\x10\x02\x62\x06proto3'
+  serialized_pb=b'\n\x16protocol/ble/ble.proto\x12\x03\x62le\"%\n\x0fSetBdAddressCmd\x12\x12\n\nbd_address\x18\x01 \x01(\x0c\"L\n\x0bSniffAdvCmd\x12\x18\n\x10use_extended_adv\x18\x01 \x01(\x08\x12\x0f\n\x07\x63hannel\x18\x02 \x01(\r\x12\x12\n\nbd_address\x18\x03 \x01(\x0c\"\x0b\n\tJamAdvCmd\"%\n\x12JamAdvOnChannelCmd\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\"o\n\x0fSniffConnReqCmd\x12\x1a\n\x12show_empty_packets\x18\x01 \x01(\x08\x12\x1b\n\x13show_advertisements\x18\x02 \x01(\x08\x12\x0f\n\x07\x63hannel\x18\x03 \x01(\r\x12\x12\n\nbd_address\x18\x04 \x01(\x0c\"\x17\n\x15SniffAccessAddressCmd\",\n\x12SniffActiveConnCmd\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\"$\n\nJamConnCmd\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\"\"\n\x0bScanModeCmd\x12\x13\n\x0b\x61\x63tive_scan\x18\x01 \x01(\x08\"5\n\nAdvModeCmd\x12\x11\n\tscan_data\x18\x01 \x01(\x0c\x12\x14\n\x0cscanrsp_data\x18\x02 \x01(\x0c\"8\n\rSetAdvDataCmd\x12\x11\n\tscan_data\x18\x01 \x01(\x0c\x12\x14\n\x0cscanrsp_data\x18\x02 \x01(\x0c\"\x10\n\x0e\x43\x65ntralModeCmd\"\"\n\x0c\x43onnectToCmd\x12\x12\n\nbd_address\x18\x01 \x01(\x0c\"g\n\rSendRawPDUCmd\x12$\n\tdirection\x18\x01 \x01(\x0e\x32\x11.ble.BleDirection\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x02 \x01(\r\x12\x0b\n\x03pdu\x18\x03 \x01(\x0c\x12\x0b\n\x03\x63rc\x18\x04 \x01(\r\"T\n\nSendPDUCmd\x12$\n\tdirection\x18\x01 \x01(\x0e\x32\x11.ble.BleDirection\x12\x13\n\x0b\x63onn_handle\x18\x02 \x01(\r\x12\x0b\n\x03pdu\x18\x03 \x01(\x0c\"$\n\rDisconnectCmd\x12\x13\n\x0b\x63onn_handle\x18\x01 \x01(\x05\"<\n\x11PeripheralModeCmd\x12\x11\n\tscan_data\x18\x01 \x01(\x0c\x12\x14\n\x0cscanrsp_data\x18\x02 \x01(\x0c\"\n\n\x08StartCmd\"\t\n\x07StopCmd\":\n\tHijackCmd\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\x12\x15\n\rtarget_master\x18\x02 \x01(\x08\"1\n\x17\x41\x63\x63\x65ssAddressDiscovered\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\"}\n\x0e\x41\x64vPduReceived\x12!\n\x08\x61\x64v_type\x18\x01 \x01(\x0e\x32\x0f.ble.BleAdvType\x12\x0c\n\x04rssi\x18\x02 \x01(\x05\x12\x12\n\nbd_address\x18\x03 \x01(\x0c\x12\x10\n\x08\x61\x64v_data\x18\x04 \x01(\x0c\x12\x14\n\x0cscanrsp_data\x18\x05 \x01(\x0c\"_\n\tConnected\x12\x11\n\tinitiator\x18\x01 \x01(\x0c\x12\x12\n\nadvertiser\x18\x02 \x01(\x0c\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x03 \x01(\r\x12\x13\n\x0b\x63onn_handle\x18\x08 \x01(\r\"3\n\x0c\x44isconnected\x12\x0e\n\x06reason\x18\x01 \x01(\r\x12\x13\n\x0b\x63onn_handle\x18\x02 \x01(\r\"z\n\x0cSynchronized\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\x12\x10\n\x08\x63rc_init\x18\x02 \x01(\r\x12\x14\n\x0chop_interval\x18\x03 \x01(\r\x12\x15\n\rhop_increment\x18\x04 \x01(\r\x12\x13\n\x0b\x63hannel_map\x18\x05 \x01(\x0c\"(\n\x0e\x44\x65synchronized\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\"\"\n\x08Hijacked\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x01 \x01(\r\"7\n\x08Injected\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x1a\n\x12injection_attempts\x18\x02 \x01(\r\"\xc7\x02\n\x0eRawPduReceived\x12$\n\tdirection\x18\x01 \x01(\x0e\x32\x11.ble.BleDirection\x12\x0f\n\x07\x63hannel\x18\x02 \x01(\r\x12\x11\n\x04rssi\x18\x03 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x04 \x01(\rH\x01\x88\x01\x01\x12\x1f\n\x12relative_timestamp\x18\x05 \x01(\rH\x02\x88\x01\x01\x12\x19\n\x0c\x63rc_validity\x18\x06 \x01(\x08H\x03\x88\x01\x01\x12\x16\n\x0e\x61\x63\x63\x65ss_address\x18\x07 \x01(\r\x12\x0b\n\x03pdu\x18\x08 \x01(\x0c\x12\x0b\n\x03\x63rc\x18\t \x01(\r\x12\x13\n\x0b\x63onn_handle\x18\n \x01(\r\x12\x11\n\tprocessed\x18\x0b \x01(\x08\x42\x07\n\x05_rssiB\x0c\n\n_timestampB\x15\n\x13_relative_timestampB\x0f\n\r_crc_validity\"h\n\x0bPduReceived\x12$\n\tdirection\x18\x01 \x01(\x0e\x32\x11.ble.BleDirection\x12\x0b\n\x03pdu\x18\x02 \x01(\x0c\x12\x13\n\x0b\x63onn_handle\x18\x03 \x01(\r\x12\x11\n\tprocessed\x18\x04 \x01(\x08\"\xd2\t\n\x07Message\x12+\n\x0bset_bd_addr\x18\x01 \x01(\x0b\x32\x14.ble.SetBdAddressCmdH\x00\x12%\n\tsniff_adv\x18\x02 \x01(\x0b\x32\x10.ble.SniffAdvCmdH\x00\x12!\n\x07jam_adv\x18\x03 \x01(\x0b\x32\x0e.ble.JamAdvCmdH\x00\x12/\n\x0cjam_adv_chan\x18\x04 \x01(\x0b\x32\x17.ble.JamAdvOnChannelCmdH\x00\x12-\n\rsniff_connreq\x18\x05 \x01(\x0b\x32\x14.ble.SniffConnReqCmdH\x00\x12.\n\x08sniff_aa\x18\x06 \x01(\x0b\x32\x1a.ble.SniffAccessAddressCmdH\x00\x12-\n\nsniff_conn\x18\x07 \x01(\x0b\x32\x17.ble.SniffActiveConnCmdH\x00\x12#\n\x08jam_conn\x18\x08 \x01(\x0b\x32\x0f.ble.JamConnCmdH\x00\x12%\n\tscan_mode\x18\t \x01(\x0b\x32\x10.ble.ScanModeCmdH\x00\x12#\n\x08\x61\x64v_mode\x18\n \x01(\x0b\x32\x0f.ble.AdvModeCmdH\x00\x12*\n\x0cset_adv_data\x18\x0b \x01(\x0b\x32\x12.ble.SetAdvDataCmdH\x00\x12+\n\x0c\x63\x65ntral_mode\x18\x0c \x01(\x0b\x32\x13.ble.CentralModeCmdH\x00\x12$\n\x07\x63onnect\x18\r \x01(\x0b\x32\x11.ble.ConnectToCmdH\x00\x12*\n\x0csend_raw_pdu\x18\x0e \x01(\x0b\x32\x12.ble.SendRawPDUCmdH\x00\x12#\n\x08send_pdu\x18\x0f \x01(\x0b\x32\x0f.ble.SendPDUCmdH\x00\x12(\n\ndisconnect\x18\x10 \x01(\x0b\x32\x12.ble.DisconnectCmdH\x00\x12-\n\x0bperiph_mode\x18\x11 \x01(\x0b\x32\x16.ble.PeripheralModeCmdH\x00\x12\x1e\n\x05start\x18\x12 \x01(\x0b\x32\r.ble.StartCmdH\x00\x12\x1c\n\x04stop\x18\x13 \x01(\x0b\x32\x0c.ble.StopCmdH\x00\x12 \n\x06hijack\x18\x14 \x01(\x0b\x32\x0e.ble.HijackCmdH\x00\x12/\n\x07\x61\x61_disc\x18\x15 \x01(\x0b\x32\x1c.ble.AccessAddressDiscoveredH\x00\x12&\n\x07\x61\x64v_pdu\x18\x16 \x01(\x0b\x32\x13.ble.AdvPduReceivedH\x00\x12#\n\tconnected\x18\x17 \x01(\x0b\x32\x0e.ble.ConnectedH\x00\x12)\n\x0c\x64isconnected\x18\x18 \x01(\x0b\x32\x11.ble.DisconnectedH\x00\x12)\n\x0csynchronized\x18\x19 \x01(\x0b\x32\x11.ble.SynchronizedH\x00\x12!\n\x08hijacked\x18\x1a \x01(\x0b\x32\r.ble.HijackedH\x00\x12\x1f\n\x03pdu\x18\x1b \x01(\x0b\x32\x10.ble.PduReceivedH\x00\x12&\n\x07raw_pdu\x18\x1c \x01(\x0b\x32\x13.ble.RawPduReceivedH\x00\x12!\n\x08injected\x18\x1d \x01(\x0b\x32\r.ble.InjectedH\x00\x12-\n\x0e\x64\x65synchronized\x18\x1e \x01(\x0b\x32\x13.ble.DesynchronizedH\x00\x42\x05\n\x03msg*\xa1\x02\n\nBleCommand\x12\x10\n\x0cSetBdAddress\x10\x00\x12\x0c\n\x08SniffAdv\x10\x01\x12\n\n\x06JamAdv\x10\x02\x12\x10\n\x0cSniffConnReq\x10\x03\x12\x16\n\x12SniffAccessAddress\x10\x04\x12\x13\n\x0fSniffActiveConn\x10\x05\x12\x0b\n\x07JamConn\x10\x06\x12\x0c\n\x08ScanMode\x10\x07\x12\x0b\n\x07\x41\x64vMode\x10\x08\x12\x0e\n\nSetAdvData\x10\t\x12\x0f\n\x0b\x43\x65ntralMode\x10\n\x12\r\n\tConnectTo\x10\x0b\x12\x0b\n\x07SendPDU\x10\x0c\x12\x0e\n\nDisconnect\x10\r\x12\x12\n\x0ePeripheralMode\x10\x0e\x12\t\n\x05Start\x10\x0f\x12\x08\n\x04Stop\x10\x10\x12\n\n\x06Hijack\x10\x11*w\n\nBleAdvType\x12\x0f\n\x0b\x41\x44V_UNKNOWN\x10\x00\x12\x0b\n\x07\x41\x44V_IND\x10\x01\x12\x12\n\x0e\x41\x44V_DIRECT_IND\x10\x02\x12\x13\n\x0f\x41\x44V_NONCONN_IND\x10\x03\x12\x10\n\x0c\x41\x44V_SCAN_IND\x10\x04\x12\x10\n\x0c\x41\x44V_SCAN_RSP\x10\x05*E\n\x0c\x42leDirection\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x13\n\x0fMASTER_TO_SLAVE\x10\x01\x12\x13\n\x0fSLAVE_TO_MASTER\x10\x02\x62\x06proto3'
 )
 
 _BLECOMMAND = _descriptor.EnumDescriptor(
@@ -123,8 +123,8 @@ _BLECOMMAND = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=2860,
-  serialized_end=3149,
+  serialized_start=3260,
+  serialized_end=3549,
 )
 _sym_db.RegisterEnumDescriptor(_BLECOMMAND)
 
@@ -169,8 +169,8 @@ _BLEADVTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3151,
-  serialized_end=3270,
+  serialized_start=3551,
+  serialized_end=3670,
 )
 _sym_db.RegisterEnumDescriptor(_BLEADVTYPE)
 
@@ -200,8 +200,8 @@ _BLEDIRECTION = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3272,
-  serialized_end=3341,
+  serialized_start=3672,
+  serialized_end=3741,
 )
 _sym_db.RegisterEnumDescriptor(_BLEDIRECTION)
 
@@ -290,6 +290,13 @@ _SNIFFADVCMD = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='bd_address', full_name='ble.SniffAdvCmd.bd_address', index=2,
+      number=3, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -303,7 +310,7 @@ _SNIFFADVCMD = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=70,
-  serialized_end=126,
+  serialized_end=146,
 )
 
 
@@ -327,8 +334,8 @@ _JAMADVCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=128,
-  serialized_end=139,
+  serialized_start=148,
+  serialized_end=159,
 )
 
 
@@ -359,8 +366,8 @@ _JAMADVONCHANNELCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=141,
-  serialized_end=178,
+  serialized_start=161,
+  serialized_end=198,
 )
 
 
@@ -373,8 +380,29 @@ _SNIFFCONNREQCMD = _descriptor.Descriptor(
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='bd_address', full_name='ble.SniffConnReqCmd.bd_address', index=0,
-      number=1, type=12, cpp_type=9, label=1,
+      name='show_empty_packets', full_name='ble.SniffConnReqCmd.show_empty_packets', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='show_advertisements', full_name='ble.SniffConnReqCmd.show_advertisements', index=1,
+      number=2, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='channel', full_name='ble.SniffConnReqCmd.channel', index=2,
+      number=3, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='bd_address', full_name='ble.SniffConnReqCmd.bd_address', index=3,
+      number=4, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -391,8 +419,8 @@ _SNIFFCONNREQCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=180,
-  serialized_end=217,
+  serialized_start=200,
+  serialized_end=311,
 )
 
 
@@ -416,8 +444,8 @@ _SNIFFACCESSADDRESSCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=219,
-  serialized_end=242,
+  serialized_start=313,
+  serialized_end=336,
 )
 
 
@@ -448,8 +476,8 @@ _SNIFFACTIVECONNCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=244,
-  serialized_end=288,
+  serialized_start=338,
+  serialized_end=382,
 )
 
 
@@ -480,8 +508,8 @@ _JAMCONNCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=290,
-  serialized_end=326,
+  serialized_start=384,
+  serialized_end=420,
 )
 
 
@@ -512,8 +540,8 @@ _SCANMODECMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=328,
-  serialized_end=362,
+  serialized_start=422,
+  serialized_end=456,
 )
 
 
@@ -551,8 +579,8 @@ _ADVMODECMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=364,
-  serialized_end=417,
+  serialized_start=458,
+  serialized_end=511,
 )
 
 
@@ -590,8 +618,8 @@ _SETADVDATACMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=419,
-  serialized_end=475,
+  serialized_start=513,
+  serialized_end=569,
 )
 
 
@@ -615,8 +643,8 @@ _CENTRALMODECMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=477,
-  serialized_end=493,
+  serialized_start=571,
+  serialized_end=587,
 )
 
 
@@ -647,8 +675,8 @@ _CONNECTTOCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=495,
-  serialized_end=529,
+  serialized_start=589,
+  serialized_end=623,
 )
 
 
@@ -700,8 +728,8 @@ _SENDRAWPDUCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=531,
-  serialized_end=634,
+  serialized_start=625,
+  serialized_end=728,
 )
 
 
@@ -721,8 +749,15 @@ _SENDPDUCMD = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='pdu', full_name='ble.SendPDUCmd.pdu', index=1,
-      number=2, type=12, cpp_type=9, label=1,
+      name='conn_handle', full_name='ble.SendPDUCmd.conn_handle', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='pdu', full_name='ble.SendPDUCmd.pdu', index=2,
+      number=3, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -739,8 +774,8 @@ _SENDPDUCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=636,
-  serialized_end=699,
+  serialized_start=730,
+  serialized_end=814,
 )
 
 
@@ -771,8 +806,8 @@ _DISCONNECTCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=701,
-  serialized_end=737,
+  serialized_start=816,
+  serialized_end=852,
 )
 
 
@@ -810,8 +845,8 @@ _PERIPHERALMODECMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=739,
-  serialized_end=799,
+  serialized_start=854,
+  serialized_end=914,
 )
 
 
@@ -835,8 +870,8 @@ _STARTCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=801,
-  serialized_end=811,
+  serialized_start=916,
+  serialized_end=926,
 )
 
 
@@ -860,8 +895,8 @@ _STOPCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=813,
-  serialized_end=822,
+  serialized_start=928,
+  serialized_end=937,
 )
 
 
@@ -899,8 +934,8 @@ _HIJACKCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=824,
-  serialized_end=882,
+  serialized_start=939,
+  serialized_end=997,
 )
 
 
@@ -931,8 +966,8 @@ _ACCESSADDRESSDISCOVERED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=884,
-  serialized_end=933,
+  serialized_start=999,
+  serialized_end=1048,
 )
 
 
@@ -991,8 +1026,8 @@ _ADVPDURECEIVED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=935,
-  serialized_end=1060,
+  serialized_start=1050,
+  serialized_end=1175,
 )
 
 
@@ -1013,14 +1048,21 @@ _CONNECTED = _descriptor.Descriptor(
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='advertiser', full_name='ble.Connected.advertiser', index=1,
-      number=3, type=12, cpp_type=9, label=1,
+      number=2, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='access_address', full_name='ble.Connected.access_address', index=2,
-      number=2, type=13, cpp_type=3, label=1,
+      number=3, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='conn_handle', full_name='ble.Connected.conn_handle', index=3,
+      number=8, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -1037,8 +1079,8 @@ _CONNECTED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1062,
-  serialized_end=1136,
+  serialized_start=1177,
+  serialized_end=1272,
 )
 
 
@@ -1057,6 +1099,13 @@ _DISCONNECTED = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='conn_handle', full_name='ble.Disconnected.conn_handle', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -1069,8 +1118,8 @@ _DISCONNECTED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1138,
-  serialized_end=1168,
+  serialized_start=1274,
+  serialized_end=1325,
 )
 
 
@@ -1129,8 +1178,40 @@ _SYNCHRONIZED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1170,
-  serialized_end=1292,
+  serialized_start=1327,
+  serialized_end=1449,
+)
+
+
+_DESYNCHRONIZED = _descriptor.Descriptor(
+  name='Desynchronized',
+  full_name='ble.Desynchronized',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='access_address', full_name='ble.Desynchronized.access_address', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1451,
+  serialized_end=1491,
 )
 
 
@@ -1161,8 +1242,47 @@ _HIJACKED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1294,
-  serialized_end=1328,
+  serialized_start=1493,
+  serialized_end=1527,
+)
+
+
+_INJECTED = _descriptor.Descriptor(
+  name='Injected',
+  full_name='ble.Injected',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='success', full_name='ble.Injected.success', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='injection_attempts', full_name='ble.Injected.injection_attempts', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1529,
+  serialized_end=1584,
 )
 
 
@@ -1196,7 +1316,7 @@ _RAWPDURECEIVED = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='absolute_timestamp', full_name='ble.RawPduReceived.absolute_timestamp', index=3,
+      name='timestamp', full_name='ble.RawPduReceived.timestamp', index=3,
       number=4, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
@@ -1237,6 +1357,20 @@ _RAWPDURECEIVED = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='conn_handle', full_name='ble.RawPduReceived.conn_handle', index=9,
+      number=10, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='processed', full_name='ble.RawPduReceived.processed', index=10,
+      number=11, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -1254,7 +1388,7 @@ _RAWPDURECEIVED = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
     _descriptor.OneofDescriptor(
-      name='_absolute_timestamp', full_name='ble.RawPduReceived._absolute_timestamp',
+      name='_timestamp', full_name='ble.RawPduReceived._timestamp',
       index=1, containing_type=None,
       create_key=_descriptor._internal_create_key,
     fields=[]),
@@ -1269,8 +1403,8 @@ _RAWPDURECEIVED = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=1331,
-  serialized_end=1636,
+  serialized_start=1587,
+  serialized_end=1914,
 )
 
 
@@ -1296,6 +1430,20 @@ _PDURECEIVED = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='conn_handle', full_name='ble.PduReceived.conn_handle', index=2,
+      number=3, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='processed', full_name='ble.PduReceived.processed', index=3,
+      number=4, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -1308,8 +1456,8 @@ _PDURECEIVED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1638,
-  serialized_end=1702,
+  serialized_start=1916,
+  serialized_end=2020,
 )
 
 
@@ -1517,6 +1665,20 @@ _MESSAGE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='injected', full_name='ble.Message.injected', index=28,
+      number=29, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='desynchronized', full_name='ble.Message.desynchronized', index=29,
+      number=30, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -1534,8 +1696,8 @@ _MESSAGE = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=1705,
-  serialized_end=2857,
+  serialized_start=2023,
+  serialized_end=3257,
 )
 
 _SENDRAWPDUCMD.fields_by_name['direction'].enum_type = _BLEDIRECTION
@@ -1545,9 +1707,9 @@ _RAWPDURECEIVED.fields_by_name['direction'].enum_type = _BLEDIRECTION
 _RAWPDURECEIVED.oneofs_by_name['_rssi'].fields.append(
   _RAWPDURECEIVED.fields_by_name['rssi'])
 _RAWPDURECEIVED.fields_by_name['rssi'].containing_oneof = _RAWPDURECEIVED.oneofs_by_name['_rssi']
-_RAWPDURECEIVED.oneofs_by_name['_absolute_timestamp'].fields.append(
-  _RAWPDURECEIVED.fields_by_name['absolute_timestamp'])
-_RAWPDURECEIVED.fields_by_name['absolute_timestamp'].containing_oneof = _RAWPDURECEIVED.oneofs_by_name['_absolute_timestamp']
+_RAWPDURECEIVED.oneofs_by_name['_timestamp'].fields.append(
+  _RAWPDURECEIVED.fields_by_name['timestamp'])
+_RAWPDURECEIVED.fields_by_name['timestamp'].containing_oneof = _RAWPDURECEIVED.oneofs_by_name['_timestamp']
 _RAWPDURECEIVED.oneofs_by_name['_relative_timestamp'].fields.append(
   _RAWPDURECEIVED.fields_by_name['relative_timestamp'])
 _RAWPDURECEIVED.fields_by_name['relative_timestamp'].containing_oneof = _RAWPDURECEIVED.oneofs_by_name['_relative_timestamp']
@@ -1583,6 +1745,8 @@ _MESSAGE.fields_by_name['synchronized'].message_type = _SYNCHRONIZED
 _MESSAGE.fields_by_name['hijacked'].message_type = _HIJACKED
 _MESSAGE.fields_by_name['pdu'].message_type = _PDURECEIVED
 _MESSAGE.fields_by_name['raw_pdu'].message_type = _RAWPDURECEIVED
+_MESSAGE.fields_by_name['injected'].message_type = _INJECTED
+_MESSAGE.fields_by_name['desynchronized'].message_type = _DESYNCHRONIZED
 _MESSAGE.oneofs_by_name['msg'].fields.append(
   _MESSAGE.fields_by_name['set_bd_addr'])
 _MESSAGE.fields_by_name['set_bd_addr'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
@@ -1667,6 +1831,12 @@ _MESSAGE.fields_by_name['pdu'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
 _MESSAGE.oneofs_by_name['msg'].fields.append(
   _MESSAGE.fields_by_name['raw_pdu'])
 _MESSAGE.fields_by_name['raw_pdu'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['injected'])
+_MESSAGE.fields_by_name['injected'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['desynchronized'])
+_MESSAGE.fields_by_name['desynchronized'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
 DESCRIPTOR.message_types_by_name['SetBdAddressCmd'] = _SETBDADDRESSCMD
 DESCRIPTOR.message_types_by_name['SniffAdvCmd'] = _SNIFFADVCMD
 DESCRIPTOR.message_types_by_name['JamAdvCmd'] = _JAMADVCMD
@@ -1692,7 +1862,9 @@ DESCRIPTOR.message_types_by_name['AdvPduReceived'] = _ADVPDURECEIVED
 DESCRIPTOR.message_types_by_name['Connected'] = _CONNECTED
 DESCRIPTOR.message_types_by_name['Disconnected'] = _DISCONNECTED
 DESCRIPTOR.message_types_by_name['Synchronized'] = _SYNCHRONIZED
+DESCRIPTOR.message_types_by_name['Desynchronized'] = _DESYNCHRONIZED
 DESCRIPTOR.message_types_by_name['Hijacked'] = _HIJACKED
+DESCRIPTOR.message_types_by_name['Injected'] = _INJECTED
 DESCRIPTOR.message_types_by_name['RawPduReceived'] = _RAWPDURECEIVED
 DESCRIPTOR.message_types_by_name['PduReceived'] = _PDURECEIVED
 DESCRIPTOR.message_types_by_name['Message'] = _MESSAGE
@@ -1876,12 +2048,26 @@ Synchronized = _reflection.GeneratedProtocolMessageType('Synchronized', (_messag
   })
 _sym_db.RegisterMessage(Synchronized)
 
+Desynchronized = _reflection.GeneratedProtocolMessageType('Desynchronized', (_message.Message,), {
+  'DESCRIPTOR' : _DESYNCHRONIZED,
+  '__module__' : 'protocol.ble.ble_pb2'
+  # @@protoc_insertion_point(class_scope:ble.Desynchronized)
+  })
+_sym_db.RegisterMessage(Desynchronized)
+
 Hijacked = _reflection.GeneratedProtocolMessageType('Hijacked', (_message.Message,), {
   'DESCRIPTOR' : _HIJACKED,
   '__module__' : 'protocol.ble.ble_pb2'
   # @@protoc_insertion_point(class_scope:ble.Hijacked)
   })
 _sym_db.RegisterMessage(Hijacked)
+
+Injected = _reflection.GeneratedProtocolMessageType('Injected', (_message.Message,), {
+  'DESCRIPTOR' : _INJECTED,
+  '__module__' : 'protocol.ble.ble_pb2'
+  # @@protoc_insertion_point(class_scope:ble.Injected)
+  })
+_sym_db.RegisterMessage(Injected)
 
 RawPduReceived = _reflection.GeneratedProtocolMessageType('RawPduReceived', (_message.Message,), {
   'DESCRIPTOR' : _RAWPDURECEIVED,

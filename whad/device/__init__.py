@@ -361,6 +361,7 @@ class WhadDevice(object):
             self.set_queue_filter(filter)
 
         while True:
+
             # Wait for a matching message to be caught (blocking)
             msg = self.__msg_queue.get(block=True, timeout=timeout)
             
@@ -484,8 +485,10 @@ class WhadDevice(object):
         # If message queue filter is defined and message matches this filter,
         # move it into our message queue. 
         if self.__mq_filter is not None and self.__mq_filter(message):
+            print('msgqueue: %s' % message)
             self.__msg_queue.put(message, block=True)
         else:
+            print('dispatch: %s' % message)
             self.dispatch_message(message)
 
     ######################################

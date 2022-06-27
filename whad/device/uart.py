@@ -97,7 +97,7 @@ class UartDevice(WhadDevice):
         
         rlist = [self.__fileno]
         wlist = []
-        elist = []
+        elist = [self.__fileno]
 
         readers,writers,errors = select.select(
             rlist,
