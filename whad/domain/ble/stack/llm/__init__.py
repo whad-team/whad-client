@@ -2,6 +2,7 @@
 Bluetooth LE Stack Link-layer Manager
 """
 
+from matplotlib.pyplot import connect
 from scapy.layers.bluetooth4LE import *
 
 from whad.domain.ble.stack.l2cap import BleL2CAP
@@ -41,9 +42,16 @@ class BleConnection(object):
         self.__l2cap.on_data_received(data, fragment)
 
     def send_l2cap_data(self, data, fragment=False):
-        """
+        """Sends data back
         """
         self.__llm.send_data(self.__conn_handle, data, fragment)    
+
+    def use_gatt_class(self, clazz):
+        self.__l2cap.att.use_gatt_class(clazz)
+
+    @property
+    def gatt(self):
+        return self.__l2cap.att.gatt
 
 class BleLinkLayerManager(object):
     
@@ -84,6 +92,7 @@ class BleLinkLayerManager(object):
                 self,
                 connection.conn_handle
             )
+            return self.__connections[connection.conn_handle]
         else:
             print('[!] Connection already exists')
 

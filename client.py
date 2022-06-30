@@ -66,22 +66,24 @@ class deleg(Thread):
         sleep(6)
         self.central.send_ctrl_pdu([0x12])
 
+
 central = Central(UartDevice('/dev/ttyUSB0', 115200))
 central.connect_to('D4:3B:04:2C:AD:16')
 #central.connect_to('D6:F3:6E:89:DA:F5')
 timeout = deleg(central)
 central.start()
-#timeout.start()
-try:
-    while True:
-        """
-        msg = central.wait_for_message(filter=message_filter('ble','pdu'))
-        print(msg)
-        """
-        sleep(1)
-                
-except KeyboardInterrupt as exc:
-    central.stop()
-    central.device.close()
+
+# Wait for connection
+print('... waiting for connection ...')
+while not central.connected():
+    pass
+
+# Query primary services
+print(central.connection)
+central.connection.gatt.discover_primary_services()
+
+while True:
+    sleep(1)
+
 
 

@@ -1,11 +1,12 @@
 """
 Bluetooth Low Energy
 """
+from time import sleep
 from binascii import hexlify
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
+from whad.domain.ble.stack.gatt import GattClient
 from whad.helpers import message_filter, is_message_type, bd_addr_to_bytes
-from whad.device.uart import UartDevice
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
@@ -103,6 +104,9 @@ class BLE(WhadDeviceConnector):
         msg.ble.stop.CopyFrom(StopCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
+    def process_messages(self):
+        self.device.process_messages()
+
     def on_generic_msg(self, message):
         print('generic: %s' % message)
         pass
@@ -186,6 +190,7 @@ class BLE(WhadDeviceConnector):
         #self.send_message(msg, message_filter('generic', 'cmd_result'))
         #resp = self.wait_for_message(filter=lambda x: False)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        print('resp:%s' % resp)
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
 
@@ -237,6 +242,7 @@ class Central(BLE):
         super().__init__(device)
 
         self.use_stack(BleStack)
+        self.__connected = False
 
         # Check device accept central mode
         if not self.can_be_central():
@@ -246,14 +252,22 @@ class Central(BLE):
             self.enable_central_mode()
 
 
+    def connected(self):
+        return self.__connected
+
     def use_stack(self, clazz=BleStack):
         """Specify a stack class to use for BLE. By default, our own stack (BleStack) is used.
         """
         self.__stack = clazz(self)
 
+
+    ##############################
+    # Incoming events
+    ##############################
+
     def on_connected(self, connection_data):
         self.__stack.on_connection(connection_data)
-
+        
     def on_disconnected(self, connection_data):
         self.__stack.on_disconnected(connection_data.conn_handle)
 
@@ -274,3 +288,17 @@ class Central(BLE):
         if direction == BleDirection.SLAVE_TO_MASTER:
             print('slave->master Data PDU received')
             self.__stack.on_data_pdu(conn_handle, pdu)
+
+
+    def on_new_connection(self, connection):
+        """On new connection, discover primary services
+        """
+        print('>> on connection')
+
+        # Use GATT client
+        self.connection = connection
+        connection.use_gatt_class(GattClient)
+        self.__connected = True
+        #sleep(1)
+        # Start primary service discovery
+        #connection.gatt.discover_primary_services()

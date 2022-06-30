@@ -31,11 +31,17 @@ class BleStack:
         # Instanciate all the required controllers
         self.__llm = BleLinkLayerManager(self)
 
+    #############################
+    # Incoming messages
+    #############################
+
     def on_connection(self, connection_data):
-        self.__llm.on_connect(connection_data)
+        connection = self.__llm.on_connect(connection_data)
+        self.__connector.on_new_connection(connection)
 
     def on_disconnection(self, conn_handle):
         self.__llm.on_disconnect(conn_handle)
+        self.__connector.on_disconnect(conn_handle)
 
     def on_ctl_pdu(self, conn_handle, control):
         self.__llm.on_ctl_pdu(conn_handle, control)
@@ -46,3 +52,7 @@ class BleStack:
 
     def send_data(self, conn_handle, data):
         self.__connector.send_data_pdu(conn_handle, data)
+
+    ############################
+    # Interact
+    ############################

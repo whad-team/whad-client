@@ -213,7 +213,7 @@ class WhadDeviceConnector(object):
         raise RequiredImplementation()
 
 
-class WhadDeviceIOThread(Thread):
+class WhadDeviceInputThread(Thread):
 
     """WhadDevice I/O cancellable Thread.
 
@@ -239,6 +239,45 @@ class WhadDeviceIOThread(Thread):
         """
         while not self.__canceled:
             self.__device.read()
+
+class WhadDeviceMessageThread(Thread):
+
+    def __init__(self, device):
+        super().__init__()
+        self.__device = device
+        self.__canceled = False
+
+    def cancel(self):
+        """
+        Cancel current I/O task.
+        """
+        self.__canceled = True
+
+    def run(self):
+        """
+        Main task, call device process_messages() method until thread
+        is canceled.
+        """
+        while not self.__canceled:
+            self.__device.process_messages()
+
+class WhadDeviceIOThread(object):
+
+    def __init__(self, device):
+        self.__input = WhadDeviceInputThread(device)
+        self.__processing = WhadDeviceMessageThread(device)
+
+    def cancel(self):
+        self.__input.cancel()
+        self.__processing.cancel()
+
+    def start(self):
+        self.__input.start()
+        self.__processing.start()
+
+    def join(self):
+        self.__input.join()
+        self.__processing.join()
 
 
 class WhadDevice(object):
@@ -272,7 +311,8 @@ class WhadDevice(object):
         # Device IO thread
         self.__io_thread = None
 
-        # Message queue
+        # Message queues
+        self.__messages = Queue()
         self.__msg_queue = Queue()
         self.__mq_filter = None
 
@@ -488,8 +528,18 @@ class WhadDevice(object):
             print('msgqueue: %s' % message)
             self.__msg_queue.put(message, block=True)
         else:
-            print('dispatch: %s' % message)
-            self.dispatch_message(message)
+            # Save message for background dispatch
+            self.__messages.put(message, block=True)
+
+    def process_messages(self):
+        """Process pending messages
+        """
+        try:
+            message = self.__messages.get(block=False, timeout=0.01)
+            if message is not None:
+                self.dispatch_message(message)
+        except Empty:
+            return None
 
     ######################################
     # Generic messages handling
