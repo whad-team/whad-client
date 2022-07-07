@@ -6,6 +6,7 @@ from whad.domain.ble.characteristic import Characteristic as BleCharacteristic,\
 from whad.domain.ble.service import PrimaryService as BlePrimaryService, \
     SecondaryService as BleSecondaryService
 from whad.domain.ble.exceptions import InvalidHandleValueException
+from whad.domain.ble.stack.att.constants import BleAttProperties
 
 class Characteristic(object):
     """Characteristic model
@@ -240,10 +241,22 @@ class GenericProfile(object):
                 service.end_handle
             )
             for charac in service.characteristics():
-                output += '  Characteristic %s (handle:%d, value handle: %d)\n' % (
+                properties = charac.properties
+                charac_rights = ''
+                if properties & CharacteristicProperties.READ != 0:
+                    charac_rights += 'R'
+                if properties & CharacteristicProperties.WRITE != 0:
+                    charac_rights += 'W'
+                if properties & CharacteristicProperties.INDICATE != 0:
+                    charac_rights += 'I'
+                if properties & CharacteristicProperties.NOTIFY != 0:
+                    charac_rights += 'N'
+
+                output += '  Characteristic %s (handle:%d, value handle: %d, props: %s)\n' % (
                     charac.uuid,
                     charac.handle,
-                    charac.value_handle
+                    charac.value_handle,
+                    charac_rights
                 )
                 for desc in charac.descriptors():
                     output += '    Descriptor %s (handle: %d)\n' % (

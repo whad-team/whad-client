@@ -43,9 +43,9 @@ class BleL2CAP(object):
 
     def on_data_received(self, l2cap_data, fragment=False):
         """Handles incoming L2CAP data"""
-        if fragment:
+        if fragment and self.__packet is not None:
             self.__packet += l2cap_data
-        else:
+        elif len(l2cap_data) >= 2:
             # Start of L2CAP or complete L2CAP message
             self.__packet = l2cap_data
             
@@ -54,7 +54,9 @@ class BleL2CAP(object):
             
             if len(self.__packet) >= self.__expected_length:
                 # We have received a complete L2CAP packet, process it
-                self.on_l2cap_packet(L2CAP_Hdr(self.__packet))
+                self.on_l2cap_packet(L2CAP_Hdr(self.__packet[:self.__expected_length]))
+            
+            self.__packet = None
 
     def on_l2cap_packet(self, packet):
         """Process incoming L2CAP packets.

@@ -104,6 +104,9 @@ class BleATT(object):
         # Write Response has no body
         elif att_pkt.opcode == BleAttOpcode.WRITE_RESPONSE:
             self.on_write_response(None)
+        # Read Blob Response has no body
+        elif att_pkt.opcode == BleAttOpcode.READ_BLOB_RESPONSE:
+            self.on_read_blob_response(None)
 
     def on_error_response(self, error_resp):
         self.__gatt.on_error_response(
@@ -170,8 +173,9 @@ class BleATT(object):
         )
 
     def on_find_by_type_value_response(self, response):
+        handles = b''.join([item.build() for item in response.handles])
         self.__gatt.on_find_by_type_value_response(
-            GattFindByTypeValueResponse.from_bytes(response.handles)
+            GattFindByTypeValueResponse.from_bytes(handles)
         )
 
     def on_read_by_type_request(self, request):
@@ -229,12 +233,21 @@ class BleATT(object):
 
     def on_read_blob_response(self, response):
         """Handle ATT Read Blob Response
+
+        :param response: ATT response if provided, None otherwise.
         """
-        self.__gatt.on_read_blob_response(
-            GattReadBlobResponse(
-                response.value
+        if response is not None:
+            self.__gatt.on_read_blob_response(
+                GattReadBlobResponse(
+                    response.value
+                )
             )
-        )
+        else:
+            self.__gatt.on_read_blob_response(
+                GattReadBlobResponse(
+                    None
+                )
+            )
 
     def on_read_multiple_request(self, request):
         """Handle ATT Read Multiple Request
@@ -403,6 +416,16 @@ class BleATT(object):
         self.send(ATT_Find_Information_Response(
             format=format,
             handles=handles
+        ))
+
+    def find_by_type_value_request(self, start, end, type_uuid, value):
+        """Sends an ATT Find By Type Value Request
+        """
+        self.send(ATT_Find_By_Type_Value_Request(
+            start=start,
+            end=end,
+            uuid=type_uuid,
+            data=value
         ))
 
     def read_by_type_request(self, start, end, uuid):

@@ -1,13 +1,22 @@
 """Bluetooth Low Energy device abstraction
 """
 
+from whad.domain.ble.characteristic import CharacteristicProperties
 from whad.domain.ble.profile import GenericProfile
+from whad.domain.ble.stack.att.constants import BleAttProperties
+from whad.domain.ble.attribute import UUID
 
 class PeripheralCharacteristicDescriptor:
 
     def __init__(self, descriptor, gatt):
         self.__descriptor = descriptor
         self.__gatt = gatt
+
+    def read(self):
+        return self.__gatt.read(self.__descriptor.handle)
+
+    def write(self, value):
+        self.__gatt.write(self.__descriptor.handle, value)
 
 class PeripheralCharacteristic:
     """Characteristic wrapper for peripheral devices
@@ -26,6 +35,11 @@ class PeripheralCharacteristic:
         """
         return self.__gatt.read(self.__characteristic.value_handle)
 
+    def read_long(self):
+        """Read long characteristic value
+        """
+        return self.__gatt.read_long(self.__characteristic.value_handle)
+
     def write(self, value):
         """Set characteristic value
         """
@@ -41,6 +55,44 @@ class PeripheralCharacteristic:
                 self.__gatt
             )
 
+    def get_descriptor(self, type_uuid):
+        """Get descriptor of a given type
+        """
+        for desc in self.__characteristic.descriptors():
+            if desc.type_uuid == type_uuid:
+                return PeripheralCharacteristicDescriptor(
+                    desc,
+                    self.__gatt
+                )
+
+    def readable(self):
+        return ((self.__characteristic.properties & CharacteristicProperties.READ) != 0)
+
+    def writeable(self):
+        return ((self.__characteristic.properties & CharacteristicProperties.WRITE) != 0)
+
+    def subscribe(self, notification=True, indication=False):
+        """Subscribe for notification/indication
+        """
+        if notification:
+            # Look for CCCD
+            desc = self.get_descriptor(UUID(0x2902))
+            if desc is not None:
+                desc.write(bytes([0x01, 0x00]))
+                return True
+            else:
+                return False
+        elif indication:
+            # Look for CCCD
+            desc = self.get_descriptor(UUID(0x2902))
+            if desc is not None:
+                desc.write(bytes([0x02, 0x00]))
+                return True
+            else:
+                return False
+
+
+
 
 class PeripheralService:
     """Service wrapper for peripheral devices
@@ -52,6 +104,13 @@ class PeripheralService:
 
     def uuid(self):
         return self.__service.uuid
+
+    def read_characteristic_by_uuid(self, uuid):
+        return self.__gatt.read_characteristic_by_uuid(
+            uuid,
+            self.__service.handle,
+            self.__service.end_handle
+        )
 
     def get_characteristic(self, uuid):
         for charac in self.__service.characteristics():
@@ -89,6 +148,16 @@ class PeripheralDevice(GenericProfile):
         """
         # Discover
         self.__gatt.discover()
+
+    def find_service_by_uuid(self, uuid):
+        service = self.__gatt.discover_primary_service_by_uuid(uuid)
+        if service is not None:
+            return PeripheralService(
+                service,
+                self.__gatt
+            )
+        else:
+            return None
 
     def services(self):
         """Enumerate device services.

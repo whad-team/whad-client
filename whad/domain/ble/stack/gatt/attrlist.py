@@ -57,10 +57,13 @@ class GattHandleItem(GattListItem):
         :param bytes data: Serialized handle/end pair
         """
         if len(data) == 4:
-            handle, end = unpack('<HH', data)[0]
+            handle, end = unpack('<HH', data)
             return GattHandleItem(handle, end)
         else:
             return None
+
+    def to_bytes(self):
+        return pack('<HH', self.handle, self.end)
 
 class GattHandleUUIDItem(GattListItem):
     """GATT Attribute Data List item that stores a handle/UUID{16,128} pair.
@@ -182,6 +185,8 @@ class GattAttributeDataList(object):
     def append(self, item):
         if item.size() == self.__item_size:
             self.__items.append(item)
+        else:
+            print('wrong size (%d instead of %d)' % (item.size(), self.__item_size))
 
     def remove(self, item):
         self.__items.remove(item)

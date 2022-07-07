@@ -1,12 +1,14 @@
 """GATT Server and Client implementation
 """
+from time import time
 from queue import Queue, Empty
 from struct import unpack, pack
 
 from whad.domain.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
-from whad.domain.ble.stack.att.exceptions import error_response_to_exc, InsufficientAuthenticationError,\
+from whad.domain.ble.stack.att.exceptions import InvalidHandleValueError, error_response_to_exc, InsufficientAuthenticationError,\
     InsufficientAuthorizationError, InsufficientEncryptionKeySize, ReadNotPermittedError, AttErrorCode
 from whad.domain.ble.stack.gatt.message import *
+from whad.domain.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.domain.ble.profile import GenericProfile
 from whad.domain.ble.characteristic import Characteristic, ClientCharacteristicConfig
 from whad.domain.ble.service import PrimaryService, SecondaryService
@@ -37,15 +39,21 @@ class Gatt(object):
         """
         self.__queue.put(message, block=True, timeout=None)
 
-    def wait_for_message(self, message_clazz):
-        """Wait for a specific message type, other messages are dropped
+    def wait_for_message(self, message_clazz, timeout=30.0):
+        """Wait for a specific message type or error, other messages are dropped
 
         :param type message_clazz: Expected message class
+        :param float timeout: Timeout value (default: 30 seconds)
         """
-        while True:
-            msg = self.__queue.get(block=True)
-            if isinstance(msg, message_clazz) or isinstance(msg, GattErrorResponse):
-                return msg
+        start_time = time()
+        while (time() - start_time) < timeout:
+            try:
+                msg = self.__queue.get(timeout=0.5)
+                if isinstance(msg, message_clazz) or isinstance(msg, GattErrorResponse):
+                    return msg
+            except Empty:
+                pass
+        raise GattTimeoutException
 
 
     def error(self, request, handle, reason):
@@ -316,8 +324,22 @@ class GattClient(Gatt):
         """
         self.on_gatt_message(response)
 
+    def on_read_blob_response(self, response):
+        """ATT Read Blob Response callback
+
+        :param value: Attribute value
+        """
+        self.on_gatt_message(response)
+
     def on_write_response(self, response):
         """ATT Write Response callback
+        """
+        self.on_gatt_message(response)
+
+    def on_find_by_type_value_response(self, response):
+        """ATT Find By Type Value Response callback
+
+        :param GattFindByTypeValueResponse response: Response message
         """
         self.on_gatt_message(response)
 
@@ -325,8 +347,37 @@ class GattClient(Gatt):
     # GATT procedures
     ###################################
 
+    def discover_primary_service_by_uuid(self, uuid):
+        """Discover a primary service by its UUID.
+
+        :param UUID uuid: Service UUID
+        :return: Service if service has been found, None otherwise
+        """
+        self.att.find_by_type_value_request(
+            1,
+            0xFFFF,
+            0x2800,
+            uuid.packed
+        )
+        msg = self.wait_for_message(GattFindByTypeValueResponse)
+        if isinstance(msg, GattFindByTypeValueResponse):
+            for item in msg:
+                return PrimaryService(
+                    uuid=None,
+                    handle=item.handle,
+                    end_handle=item.end
+                )
+        elif isinstance(msg, GattErrorResponse):
+            if msg.reason == AttErrorCode.ATTR_NOT_FOUND:
+                return None
+            else:
+                raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+            
+
     def discover_primary_services(self):
-        """Discover remote Primary Services
+        """Discover remote Primary Services.
+
+        This function will yield every discovered primary service.
         """
         # List primary services handles
         handle = 1
@@ -359,7 +410,7 @@ class GattClient(Gatt):
                     error_response_to_exc(msg.reason, msg.request, msg.handle)
 
     def discover_secondary_services(self):
-        """Discover remote Secondary Services
+        """Discover remote Secondary Services.
         """
         # List primary services handles
         handle = 1
@@ -461,8 +512,12 @@ class GattClient(Gatt):
                 handle += 1
     
     def discover(self):
-        # Discover services and characteristics
+        # Discover services
+        services = []
         for service in self.discover_primary_services():
+            services.append(service)
+
+        for service in services:
             for characteristic in self.discover_characteristics(service):
                 service.add_characteristic(characteristic)
             self.__model.add_service(service)
@@ -491,6 +546,27 @@ class GattClient(Gatt):
             return msg.value
         elif isinstance(msg, GattErrorResponse):
             raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+
+    def read_long(self, handle):
+        """Read a long characteristic or descriptor
+
+        :param int handle: Handle of the attribute to read (descriptor or characteristic)
+        """
+        value=b''
+        offset=0
+        while True:
+            self.att.read_blob_request(handle, offset)
+            msg = self.wait_for_message(GattReadBlobResponse)
+            if isinstance(msg, GattReadBlobResponse):
+                if msg.value is not None:
+                    value += msg.value
+                    offset += len(msg.value)
+                else:
+                    break
+            elif isinstance(msg, GattErrorResponse):
+                raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+        return value
+
 
 
     def write(self, handle, value):
