@@ -1,98 +1,15 @@
 """GATT Server and Client implementation
 """
 from queue import Queue, Empty
-from whad.domain.ble.stack.att import BleAttOpcode, BleAttErrorCode
-from whad.domain.ble.stack.gatt.attrlist import GattAttributeDataList, GattGroupTypeItem, \
-    GattHandleUUIDItem
-from whad.domain.ble.exceptions import InvalidUUIDException
-from whad.domain.ble.characteristic import UUID
-
 from struct import unpack, pack
 
-
-class GattErrorResponse(object):
-    def __init__(self, request, handle, reason):
-        self.__request = request
-        self.__handle = handle
-        self.__reason = reason
-
-    @property
-    def request(self):
-        return self.__request
-
-    @property
-    def handle(self):
-        return self.__handle
-
-class GattFindInfoRequest(object):
-    """GATT Find Information Request
-    """
-    def __init__(self, start, end):
-        """Constructor
-
-        :param int start: Start handle value
-        :param int end: End handle value
-        """
-        self.__start = start
-        self.__end = end
-
-    @property
-    def start(self):
-        return self.__start
-
-    @property
-    def end(self):
-        return self.__end
-
-
-class GattFindInfoResponse(GattAttributeDataList):
-    """GATT Find Information Response
-    """
-
-    FORMAT_HANDLE_UUID_16 = 1
-    FORMAT_HANDLE_UUID_128 = 2          
-
-    def __init__(self, format):
-        """Store handles list
-
-        :param int format: Handle format
-        :param bytes handles_list: Handles data
-        """
-        self.__format = format
-        self.__handles = []
-        if self.__format == self.FORMAT_HANDLE_UUID_16:
-            super().__init__(2)
-        elif self.__format == self.FORMAT_HANDLE_UUID_128:
-            super().__init__(16)
-        
-    @staticmethod
-    def from_bytes(data):
-        if len(data)>1:
-            format = data[0]
-            res = GattFindInfoResponse(format)
-            item_size = 2 if format == GattFindInfoResponse.FORMAT_HANDLE_UUID_16 else 16
-            adl = GattAttributeDataList.from_bytes(data[1:], item_size, GattHandleUUIDItem)
-            for item in adl:
-                res.append(item)
-            return res
-        else:
-            return None
-
-class GattReadByGroupTypeResponse(GattAttributeDataList):
-    """GATT Read By Group Type Response
-    """
-
-    def __init__(self, item_size):
-        super().__init__(item_size)
-
-    @staticmethod
-    def from_bytes(item_size, data):
-        res = GattReadByGroupTypeResponse(item_size)
-        nb_items = int(len(data)/item_size)
-        for i in range(nb_items):
-            item = data[i*item_size:(i+1)*item_size]
-            res.append(GattGroupTypeItem.from_bytes(item))
-        return res
+from whad.domain.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
+from whad.domain.ble.stack.att.exceptions import error_response_to_exc, InsufficientAuthenticationError,\
+    InsufficientAuthorizationError, InsufficientEncryptionKeySize, ReadNotPermittedError, AttErrorCode
+from whad.domain.ble.stack.gatt.message import *
+from whad.domain.ble.profile import GenericProfile
+from whad.domain.ble.characteristic import Characteristic, ClientCharacteristicConfig
+from whad.domain.ble.service import PrimaryService, SecondaryService
 
 
 class Gatt(object):
@@ -140,10 +57,8 @@ class Gatt(object):
             reason
         )
 
-    def on_error_response(self, request, handle, reason):
-        self.on_gatt_message(
-            GattErrorResponse(request, handle, reason)
-        )
+    def on_error_response(self, error):
+        self.on_gatt_message(error)
 
     def on_find_info_request(self, start, end):
         """ATT Find Information Request callback
@@ -157,7 +72,7 @@ class Gatt(object):
             BleAttOpcode.FIND_INFO_REQUEST, start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
 
-    def on_find_info_response(self, format, handles):
+    def on_find_info_response(self, response):
         """ATT Find Information Response callback
 
         :param format: Information data format
@@ -165,22 +80,19 @@ class Gatt(object):
         """
         pass
 
-    def on_find_by_type_value_request(self, start, end, uuid, data):
+    def on_find_by_type_value_request(self, request):
         """ATT Find By Type Value Request callback
 
-        :param int start: Start handle value
-        :param int end: End handle value
-        :param uuid: Type UUID
-        :param data: Value
+        :param GattFindByTypeValueRequest request: Request
         """
         self.error(
-            BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST, start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST, request.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
 
-    def on_find_by_type_value_response(self, handles):
+    def on_find_by_type_value_response(self, response):
         """ATT Find By Type Value Response callback
 
-        :param handles: List of handles
+        :param GattFindByTypeValueResponse response: Response message
         """
         pass
 
@@ -207,11 +119,10 @@ class Gatt(object):
             BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST, start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
 
-    def on_read_by_type_response(self, length, handles):
+    def on_read_by_type_response(self, response):
         """ATT Read By Type Response callback
 
-        :param int length: Item length
-        :param handles: List of handles
+        :param GattReadByTypeResponse response: Response
         """
         pass
 
@@ -294,7 +205,7 @@ class Gatt(object):
             BleAttOpcode.WRITE_REQUEST, handle, BleAttErrorCode.INVALID_HANDLE
         )
 
-    def on_write_response(self):
+    def on_write_response(self, response):
         """ATT Write Response callback
         """
         pass
@@ -364,15 +275,62 @@ class GattClient(Gatt):
 
     def __init__(self, att):
         super().__init__(att)
+        self.__model = GenericProfile()
+
+    ###################################
+    # Supported response handlers
+    ###################################
+
+    def on_read_by_group_type_response(self, response):
+        """ATT Read By Group Type Response callback
+
+        """
+        self.on_gatt_message(response)
+
+    def on_read_by_type_response(self, response):
+        """ATT Read By Type Response callback
+
+        :param GattReadByTypeResponse response: Response
+        """
+        self.on_gatt_message(response)
+
+    def on_find_info_response(self, response):
+        """ATT Find Information Response callback
+
+        :param format: Information data format
+        :param handles: List of handles
+        """
+        self.on_gatt_message(response)
+
+    def on_read_response(self, response):
+        """ATT Read Response callback
+
+        :param value: Attribute value
+        """
+        self.on_gatt_message(response)
+
+    def on_read_by_type_response(self, response):
+        """ATT Read By Type Response callback
+
+        :param GattReadByTypeResponse response: Response
+        """
+        self.on_gatt_message(response)
+
+    def on_write_response(self, response):
+        """ATT Write Response callback
+        """
+        self.on_gatt_message(response)
+
+    ###################################
+    # GATT procedures
+    ###################################
 
     def discover_primary_services(self):
         """Discover remote Primary Services
         """
         # List primary services handles
-        primary_services = []
         handle = 1
         while True:
-            print('> discover primary services starting from handle %d' % handle)
             # Send a Read By Group Type Request
             self.att.read_by_group_type_request(
                 handle,
@@ -383,23 +341,200 @@ class GattClient(Gatt):
             msg = self.wait_for_message(GattReadByGroupTypeResponse)
             if isinstance(msg, GattReadByGroupTypeResponse):
                 for item in msg:
-                    primary_services.append(
-                        (item.handle, UUID(item.value))
+                    yield PrimaryService(
+                        uuid=UUID(item.value),
+                        handle=item.handle,
+                        end_handle=item.end
                     )
                     handle = item.end
+                    
+                    if handle == 0xFFFF:
+                        return
+
                 handle += 1
             elif isinstance(msg, GattErrorResponse):
-                break
-        print(primary_services)
+                if msg.reason == AttErrorCode.ATTR_NOT_FOUND:
+                    break
+                else:
+                    error_response_to_exc(msg.reason, msg.request, msg.handle)
 
-    def on_read_by_group_type_response(self, response):
-        """ATT Read By Group Type Response callback
-
-        :param int item_length: Item length
-        :param data: List of items
+    def discover_secondary_services(self):
+        """Discover remote Secondary Services
         """
-        print('>> Got answer')
-        self.on_gatt_message(response)
+        # List primary services handles
+        handle = 1
+        while True:
+            # Send a Read By Group Type Request
+            self.att.read_by_group_type_request(
+                handle,
+                0xFFFF,
+                0x2801
+            )
+
+            msg = self.wait_for_message(GattReadByGroupTypeResponse)
+            if isinstance(msg, GattReadByGroupTypeResponse):
+                for item in msg:
+                    yield SecondaryService(
+                        uuid=UUID(item.value),
+                        handle=item.handle,
+                        end_handle=item.end
+                    )
+                    handle = item.end
+                    
+                    if handle == 0xFFFF:
+                        return
+                    
+                handle += 1
+            elif isinstance(msg, GattErrorResponse):
+                if msg.reason == AttErrorCode.ATTR_NOT_FOUND:
+                    break
+                else:
+                    error_response_to_exc(msg.reason, msg.request, msg.handle)
+        
+    def discover_characteristics(self, service):
+        """
+        Discover service characteristics
+        """
+        if isinstance(service, PrimaryService):
+            handle = service.handle
+        else:
+            return
+        
+        while handle <= service.end_handle:
+            self.att.read_by_type_request(
+                handle,
+                service.end_handle,
+                0x2803
+            )
+
+            msg =self.wait_for_message(GattReadByTypeResponse)
+            if isinstance(msg, GattReadByTypeResponse):
+                for item in msg:
+                    charac_properties = item.value[0]
+                    #charac_handle = unpack('<H', item.value[1:3])[0]
+                    charac_handle = item.handle
+                    charac_value_handle = unpack('<H', item.value[1:3])[0]
+                    charac_uuid = UUID(item.value[3:])
+                    charac = Characteristic(
+                        uuid=charac_uuid,
+                        properties=charac_properties
+                    )
+                    charac.handle = charac_handle
+                    charac.value_handle = charac_value_handle
+                    handle = charac.handle+1
+                    yield charac
+
+            elif isinstance(msg, GattErrorResponse):
+                if msg.reason == AttErrorCode.ATTR_NOT_FOUND:
+                    break
+                else:
+                    error_response_to_exc(msg.reason, msg.request, msg.handle)
+
+    def discover_characteristic_descriptors(self, characteristic):
+        """Find characteristic descriptor
+        """
+        if isinstance(characteristic, Characteristic):
+            handle = characteristic.value_handle + 1
+            end_handle = self.__model.find_characteristic_end_handle(characteristic.handle)
+            while handle <= end_handle:
+                self.att.find_info_request(
+                    handle,
+                    end_handle
+                )
+
+                msg = self.wait_for_message(GattFindInfoResponse)
+                if isinstance(msg, GattFindInfoResponse):
+                    for descriptor in msg:
+                        handle = descriptor.handle
+                        
+                        # End discovery if returned handle is Ending Handle (0xFFFF)
+                        if handle == 0xFFFF:
+                            return
+
+                        yield(descriptor)
+                elif isinstance(msg, GattErrorResponse):
+                    if msg.reason == AttErrorCode.ATTR_NOT_FOUND:
+                        break
+                    else:
+                        error_response_to_exc(msg.reason, msg.request, msg.handle)
+
+                handle += 1
+    
+    def discover(self):
+        # Discover services and characteristics
+        for service in self.discover_primary_services():
+            for characteristic in self.discover_characteristics(service):
+                service.add_characteristic(characteristic)
+            self.__model.add_service(service)
+
+        # Searching for descriptors
+        for service in self.__model.services():
+            for characteristic in service.characteristics():
+                for descriptor in self.discover_characteristic_descriptors(characteristic):
+                    if descriptor.uuid == UUID(0x2902):
+                        characteristic.add_descriptor(
+                            ClientCharacteristicConfig(
+                                handle=descriptor.handle
+                            )
+                        )
+        print(self.__model)
+
+
+    def read(self, handle):
+        """Read a characteristic or a descriptor.
+        
+        :param int handle: Handle of the attribute to read (descriptor or characteristic)
+        """
+        self.att.read_request(gatt_handle=handle)
+        msg = self.wait_for_message(GattReadResponse)
+        if isinstance(msg, GattReadResponse):
+            return msg.value
+        elif isinstance(msg, GattErrorResponse):
+            raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+
+
+    def write(self, handle, value):
+        """Write data to a characteristic or a descriptor
+
+        :param int handle: Target characteristic or descriptor handle
+        :param bytes value: Data to write
+        """
+        self.att.write_request(
+            handle,
+            value
+        )
+        msg = self.wait_for_message(GattWriteResponse)
+        if isinstance(msg, GattWriteResponse):
+            return True
+        elif isinstance(msg, GattErrorResponse):
+            raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+
+
+    def read_characteristic_by_uuid(self, uuid, start=1, end=0xFFFF):
+        """Read a characteristic given its UUID if its handle is comprised in a given range.
+
+        :param UUID uuid: Characteristic UUID
+        :param int start: Start handle value
+        :param int end: End handle value
+        """
+        self.att.read_by_type_request(start, end, uuid.value())
+        msg = self.wait_for_message(GattReadByTypeResponse)
+        if isinstance(msg, GattReadByTypeResponse):
+            output = []
+            for item in msg:
+                output.append(item.value)
+            if len(output) == 1:
+                return output[0]
+            else:
+                return output
+        elif isinstance(msg, GattErrorResponse):
+            raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+
+    def services(self):
+        return self.__model.services()
+
+
+
         
 
     

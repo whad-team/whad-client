@@ -525,7 +525,7 @@ class WhadDevice(object):
         # If message queue filter is defined and message matches this filter,
         # move it into our message queue. 
         if self.__mq_filter is not None and self.__mq_filter(message):
-            print('msgqueue: %s' % message)
+            #print('msgqueue: %s' % message)
             self.__msg_queue.put(message, block=True)
         else:
             # Save message for background dispatch

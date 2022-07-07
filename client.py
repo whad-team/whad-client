@@ -1,4 +1,5 @@
 from whad.domain.ble import Scanner, Central
+from whad.domain.ble.attribute import UUID
 from whad.device.uart import UartDevice
 from time import time,sleep
 from threading import Thread
@@ -68,22 +69,17 @@ class deleg(Thread):
 
 
 central = Central(UartDevice('/dev/ttyUSB0', 115200))
-central.connect_to('D4:3B:04:2C:AD:16')
-#central.connect_to('D6:F3:6E:89:DA:F5')
-timeout = deleg(central)
-central.start()
+#device = central.connect('D4:3B:04:2C:AD:16')
+device = central.connect('D6:F3:6E:89:DA:F5')
+device.discover()
 
-# Wait for connection
-print('... waiting for connection ...')
-while not central.connected():
-    pass
-
-# Query primary services
-print(central.connection)
-central.connection.gatt.discover_primary_services()
-
-while True:
-    sleep(1)
+c = device.get_characteristic(UUID(0x1800), UUID(0x2A00))
+#print(central.connection.gatt.read_characteristic_by_uuid(UUID(0x2A00)))
+#print('device name: %s' % c.read())
+c.write(b'0wn3d!')
+print(c.read())
+central.stop()
+central.device.close()
 
 
 

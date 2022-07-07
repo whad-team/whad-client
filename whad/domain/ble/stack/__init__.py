@@ -47,7 +47,6 @@ class BleStack:
         self.__llm.on_ctl_pdu(conn_handle, control)
 
     def on_data_pdu(self, conn_handle, data):
-        print('received data pdu for conhandle %d', conn_handle)
         self.__llm.on_data_pdu(conn_handle, data)
 
     def send_data(self, conn_handle, data):

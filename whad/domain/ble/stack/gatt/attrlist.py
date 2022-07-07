@@ -2,18 +2,30 @@
 """
 from struct import pack, unpack
 
+from whad.domain.ble.attribute import UUID
+
 class GattListItem(object):
     """Template class for a GATT Attribute List Item
     """
+
     @staticmethod
     def from_bytes(data):
+        """Convert a byte array into a list item
+
+        :param bytes data: Data to convert to a list item
+        """
         return None
 
     def to_bytes(self):
+        """Serialize list item to bytes
+        """
         return b''
 
     def size(self):
+        """Get list item size
+        """
         return len(self.to_bytes())
+
 
 class GattHandleItem(GattListItem):
     """GATT Attribute Data List item used to store start and end handle values.
@@ -28,14 +40,22 @@ class GattHandleItem(GattListItem):
 
     @property
     def handle(self):
+        """Return attribute handle value
+        """
         return self.__handle
 
     @property
     def end(self):
+        """Return group end handle value
+        """
         return self.__end
 
     @staticmethod
     def from_bytes(data):
+        """Convert bytes to a GattHandleItem object
+
+        :param bytes data: Serialized handle/end pair
+        """
         if len(data) == 4:
             handle, end = unpack('<HH', data)[0]
             return GattHandleItem(handle, end)
@@ -184,3 +204,9 @@ class GattAttributeDataList(object):
         for item in self.__items:
             output += item.to_bytes()
         return output
+
+
+def gatt_attr_list_iter(item_size, data):
+    nb_items = int(len(data)/item_size)
+    for i in range(nb_items):
+        yield data[i*item_size:(i+1)*item_size]

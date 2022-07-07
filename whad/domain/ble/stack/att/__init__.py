@@ -1,5 +1,9 @@
 """
 BLE ATT layer manager
+
+This layer manager mostly translates Scapy ATT packets into GATT messages required by the GATT
+layer, and exposes an interface to the GATT layer in order to allow ATT packets to be forged
+and sent to the underlying layer (L2CAP).
 """
 
 from scapy.layers.bluetooth import ATT_Error_Response, ATT_Exchange_MTU_Request, \
@@ -11,9 +15,16 @@ from scapy.layers.bluetooth import ATT_Error_Response, ATT_Exchange_MTU_Request,
     ATT_Read_By_Type_Request, ATT_Read_By_Type_Response, ATT_Read_Multiple_Request, ATT_Read_Multiple_Response, \
     ATT_Read_Request, ATT_Read_Response, ATT_Write_Command, ATT_Write_Response, ATT_Write_Request, \
     ATT_Read_By_Type_Request_128bit, ATT_Hdr
+from whad.domain.ble.stack.att.constants import BleAttOpcode
 
-from whad.domain.ble.stack.att.constants import BleAttErrorCode, BleAttOpcode
-from whad.domain.ble.stack.gatt import Gatt, GattReadByGroupTypeResponse, GattErrorResponse
+from whad.domain.ble.stack.gatt import  Gatt
+from whad.domain.ble.stack.gatt.message import GattExecuteWriteRequest, GattExecuteWriteResponse, \
+    GattFindInfoResponse, GattHandleValueIndication, GattHandleValueNotification, GattPrepareWriteRequest, \
+    GattPrepareWriteResponse, GattReadByGroupTypeResponse, GattErrorResponse, \
+    GattFindByTypeValueRequest, GattFindByTypeValueResponse, GattFindInfoRequest, GattReadByTypeResponse, \
+    GattReadRequest, GattReadResponse, GattReadBlobRequest, GattReadBlobResponse, GattReadMultipleRequest, \
+    GattReadMultipleResponse, GattWriteCommand, GattWriteRequest, GattWriteResponse, GattPrepareWriteRequest, \
+    GattPrepareWriteResponse, GattExecuteWriteRequest, GattExecuteWriteResponse
 
 class BleATT(object):
 
@@ -90,12 +101,17 @@ class BleATT(object):
             self.on_handle_value_notification(att_pkt.getlayer(ATT_Handle_Value_Notification))
         elif ATT_Handle_Value_Indication in att_pkt:
             self.on_handle_value_indication(att_pkt.getlayer(ATT_Handle_Value_Indication))
+        # Write Response has no body
+        elif att_pkt.opcode == BleAttOpcode.WRITE_RESPONSE:
+            self.on_write_response(None)
 
     def on_error_response(self, error_resp):
         self.__gatt.on_error_response(
+            GattErrorResponse(
                 error_resp.request,
                 error_resp.handle,
                 error_resp.ecode
+            )
         )
 
     def on_exch_mtu_request(self, mtu_req):
@@ -126,29 +142,36 @@ class BleATT(object):
         :param ATT_Find_Information_Request request: Request
         """
         self.__gatt.on_find_info_request(
-            request.start,
-            request.end
+            GattFindInfoRequest(
+                request.start,
+                request.end
+            )
         )
 
     def on_find_info_response(self, response):
         """Handle ATT Find Information Response
         """
+        handles = b''.join([item.build() for item in response.handles])
         self.__gatt.on_find_info_response(
-            response.format,
-            response.handles
+            GattFindInfoResponse.from_bytes(
+                response.format,
+                handles
+            )
         )
 
     def on_find_by_type_value_request(self, request):
         self.__gatt.on_find_by_type_value_request(
-            request.start,
-            request.end,
-            request.uuid,
-            request.data
+            GattFindByTypeValueRequest(
+                request.start,
+                request.end,
+                request.uuid,
+                request.data
+            )
         )
 
     def on_find_by_type_value_response(self, response):
         self.__gatt.on_find_by_type_value_response(
-            response.handles
+            GattFindByTypeValueResponse.from_bytes(response.handles)
         )
 
     def on_read_by_type_request(self, request):
@@ -169,49 +192,62 @@ class BleATT(object):
     def on_read_by_type_response(self, response):
         """Handle read by type response
         """
-        self.__gatt.on_read_by_type_response(response.len, response.handles)
+        # Must rebuild handles payload as bytes, since scapy parsed it :(
+        handles = b''.join([item.build() for item in response.handles])
+        self.__gatt.on_read_by_type_response(
+            GattReadByTypeResponse.from_bytes(
+                response.len,
+                handles
+            )
+        )
 
     def on_read_request(self, request):
         """Handle ATT Read Request
         """
         self.__gatt.on_read_request(
-            request.gatt_handle
+            GattReadRequest(
+                request.gatt_handle
+            )
         )
 
     def on_read_response(self, response):
         """Handle ATT Read Response
         """
         self.__gatt.on_read_response(
-            response.value
+            GattReadResponse(response.value)
         )
 
     def on_read_blob_request(self, request):
         """Handle ATT Read Blob Request
         """
         self.__gatt.on_read_blob_request(
-            request.gatt_handle,
-            request.offset
+            GattReadBlobRequest(
+                request.gatt_handle,
+                request.offset
+            )
         )
 
     def on_read_blob_response(self, response):
         """Handle ATT Read Blob Response
         """
         self.__gatt.on_read_blob_response(
-            response.value
+            GattReadBlobResponse(
+                response.value
+            )
         )
 
     def on_read_multiple_request(self, request):
         """Handle ATT Read Multiple Request
         """
         self.__gatt.on_read_multiple_request(
-            request.handles
+            GattReadMultipleRequest(request.handles)
         )
 
     def on_read_multiple_response(self, response):
         """Handle ATT Read Multiple Response
         """
         self.__gatt.on_read_multiple_response(
-            response.values
+            GattReadMultipleResponse(response.values)
         )
 
     def on_read_by_group_type_request(self, request):
@@ -226,7 +262,6 @@ class BleATT(object):
     def on_read_by_group_type_response(self, response):
         """Handle ATT Read By Group Type Response
         """
-        print('>> ReadByGroupTypeResponse')
         self.__gatt.on_read_by_group_type_response(
             GattReadByGroupTypeResponse.from_bytes(
                 response.length,
@@ -238,67 +273,81 @@ class BleATT(object):
         """Handle ATT Write Request
         """
         self.__gatt.on_write_request(
-            request.gatt_handle,
-            request.data
+            GattWriteRequest(
+                request.gatt_handle,
+                request.data
+            )
         )
 
-    def on_write_response(self, request):
+    def on_write_response(self, response):
         """Handle ATT Write Response
         """
-        self.__gatt.on_write_response()
+        self.__gatt.on_write_response(GattWriteResponse())
     
     def on_write_command(self, command):
         """Handle ATT Write Command
         """
         self.__gatt.on_write_command(
-            command.gatt_handle,
-            command.data
+            GattWriteCommand(
+                command.gatt_handle,
+                command.data
+            )
         )
 
     def on_prepare_write_request(self, request):
         """Handle ATT Prepare Write Request
         """
         self.__gatt.on_prepare_write_request(
-            request.gatt_handle,
-            request.offset,
-            request.data
+            GattPrepareWriteRequest(
+                request.gatt_handle,
+                request.offset,
+                request.data
+            )
         )
 
     def on_prepare_write_response(self, response):
         """Handle ATT Prepare Write Response
         """
         self.__gatt.on_prepare_write_response(
-            response.gatt_handle,
-            response.offset,
-            response.data
+            GattPrepareWriteResponse(
+                response.gatt_handle,
+                response.offset,
+                response.data
+            )
         )
 
     def on_execute_write_request(self, request):
         """Handle ATT Execute Write Request
         """
         self.__gatt.on_execute_write_request(
-            request.flags
+            GattExecuteWriteRequest(
+                request.flags
+            )
         )
 
     def on_execute_write_response(self, response):
         """Handle ATT Execute Write Response
         """
-        self.__gatt.on_execute_write_response()
+        self.__gatt.on_execute_write_response(GattExecuteWriteResponse)
 
     def on_handle_value_notification(self, notif):
         """Handle ATT Handle Value Notification
         """
         self.__gatt.on_handle_value_notification(
-            notif.gatt_handle,
-            notif.value
+            GattHandleValueNotification(
+                notif.gatt_handle,
+                notif.value
+            )
         )
 
     def on_handle_value_indication(self, notif):
         """Handle ATT Handle Value indication
         """
         self.__gatt.on_handle_value_indication(
-            notif.gatt_handle,
-            notif.value
+            GattHandleValueIndication(
+                notif.gatt_handle,
+                notif.value
+            )
         )
 
     ##########################################
@@ -350,6 +399,7 @@ class BleATT(object):
     def  find_info_response(self, format, handles):
         """Sends an ATT Find Information Response
         """
+        
         self.send(ATT_Find_Information_Response(
             format=format,
             handles=handles

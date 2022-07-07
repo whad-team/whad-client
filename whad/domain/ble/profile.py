@@ -72,16 +72,22 @@ class ServiceModel(object):
     PRIMARY = 1
     SECONDARY = 2
 
-    def __init__(self, uuid=None, start_handle= None, name=None, service_type=PRIMARY, **kwargs):
+    def __init__(self, uuid=None, start_handle=None, end_handle=None, name=None, service_type=PRIMARY, **kwargs):
         self.__handle = 0
+        self.__end_handle = 0
         self.__uuid = uuid
         self.__name = name
         self.__characteristics = []
 
         if start_handle is None:
-            self.handle = 0
+            self.__handle = 0
         else:
-            self.handle = start_handle
+            self.__handle = start_handle
+
+        if end_handle is None:
+            self.__end_handle = 0
+        else:
+            self.__end_handle = end_handle
 
         # Loop on kwargs to find characteristics
         for arg in kwargs:
@@ -104,6 +110,10 @@ class ServiceModel(object):
         return self.__handle
 
     @property
+    def end(self):
+        return self.__end_handle
+
+    @property
     def name(self):
         return self.__name
 
@@ -120,15 +130,16 @@ class ServiceModel(object):
             yield charac
 
 class PrimaryService(ServiceModel):
-    def __init__(self, uuid=None, start_handle=None, name=None, **kwargs):
-        super().__init__(uuid, service_type=ServiceModel.PRIMARY, name=name, **kwargs)
+    def __init__(self, uuid=None, start_handle=None, end_handle=None, name=None, **kwargs):
+        super().__init__(uuid, start_handle, end_handle, service_type=ServiceModel.PRIMARY, name=name, **kwargs)
 
 
 class SecondaryService(ServiceModel):
-    def __init__(self, uuid=None, start_handle=None, name=None, **kwargs):
-        super().__init__(uuid, service_type=ServiceModel.SECONDARY, name=name, **kwargs)
+    def __init__(self, uuid=None, start_handle=None, end_handle=None, name=None, **kwargs):
+        super().__init__(uuid, start_handle, end_handle, service_type=ServiceModel.SECONDARY, name=name, **kwargs)
 
-class DeviceModel(object):
+
+class GenericProfile(object):
 
     def __init__(self, start_handle=1):
         """Parse the device model, instanciate all the services, characteristics
@@ -137,7 +148,6 @@ class DeviceModel(object):
 
         :param int start_handle: Start handle value to use (default: 1)
         """
-        self.__services = []
         self.__attr_db = {}
         self.__service_by_characteristic_handle = {}
 
@@ -221,6 +231,27 @@ class DeviceModel(object):
         self.__handle += number
         return self.__handle
 
+    def __repr__(self):
+        output = ''
+        for service in self.services():
+            output += 'Service %s (handles from %d to %d):\n' % (
+                service.uuid,
+                service.handle,
+                service.end_handle
+            )
+            for charac in service.characteristics():
+                output += '  Characteristic %s (handle:%d, value handle: %d)\n' % (
+                    charac.uuid,
+                    charac.handle,
+                    charac.value_handle
+                )
+                for desc in charac.descriptors():
+                    output += '    Descriptor %s (handle: %d)\n' % (
+                        desc.type_uuid,
+                        desc.handle
+                    )
+        return output
+
     def register_attribute(self, attribute):
         """Register a GATT attribute
 
@@ -232,13 +263,14 @@ class DeviceModel(object):
     def add_service(self, service):
         """Add a service to the current device
 
-        :print service: Service to add to the device
+        :param service: Service to add to the device
         """
         # Register service as an attribute
         self.register_attribute(service)
 
         # Register all its characteristics
         for charac in service.characteristics():
+            self.register_attribute(charac)
             self.__service_by_characteristic_handle[charac.handle] = service
         
 
@@ -249,10 +281,31 @@ class DeviceModel(object):
         :return: Object if handle is valid, or raise an IndexError exception otherwise
         :raises: IndexError 
         """
-        if handle in self.__handles:
-            return self.__handles[handle]
+        if handle in self.__attr_db:
+            return self.__attr_db[handle]
         else:
             raise IndexError
+
+    def find_characteristic_end_handle(self, handle):
+        try:
+            # Find service owning the characteristic
+            service = self.find_service_by_characteristic_handle(handle)
+
+            # Build a list of characteristic handles
+            service_char_handles=[]
+            for characteristic in service.characteristics():
+                service_char_handles.append(characteristic.handle)
+            
+            # Sort handles
+            service_char_handles.sort()
+            idx = service_char_handles.index(handle)
+            if idx == len(service_char_handles) - 1:
+                return service.end_handle
+            else:
+                return (service_char_handles[idx+1] - 1)
+
+        except InvalidHandleValueException:
+            return None
 
     def find_service_by_characteristic_handle(self, handle):
         """Find a service object given a characteristic handle
@@ -267,3 +320,9 @@ class DeviceModel(object):
                 raise InvalidHandleValueException
         except IndexError:
             raise InvalidHandleValueException
+
+    def services(self):
+        for handle in self.__attr_db:
+            object = self.__attr_db[handle]
+            if isinstance(object, BlePrimaryService) or isinstance(object, BleSecondaryService):
+                yield object

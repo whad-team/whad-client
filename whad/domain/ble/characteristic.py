@@ -61,6 +61,7 @@ class Characteristic(Attribute):
         """
         super().__init__(uuid=UUID(0x2803), handle=handle)
         self.__handle = handle
+        self.__charac_uuid = uuid
 
         if isinstance(handle, int):
             self.__value_handle = handle + 1
@@ -97,6 +98,10 @@ class Characteristic(Attribute):
     @property
     def value_handle(self):
         return self.__value_handle
+
+    @value_handle.setter
+    def value_handle(self, value):
+        self.__value_handle = value
     
     @value.setter
     def value(self, new_value):
@@ -113,6 +118,14 @@ class Characteristic(Attribute):
     @properties.setter
     def properties(self, new_properties):
         self.__properties = new_properties
+
+    @property
+    def uuid(self):
+        return self.__charac_uuid
+
+    @uuid.setter
+    def uuid(self, value):
+        self.__charac_uuid = value
 
     ##########################
     # Methods
@@ -131,30 +144,6 @@ class Characteristic(Attribute):
         """
         for desc in self.__descriptors:
             yield desc
-
-    #########################
-    # Callbacks
-    #########################
-
-    def on_notify(self):
-        """Notification callback
-        """
-        pass
-
-    def on_indicate(self):
-        """Indicate callback
-        """
-        pass
-
-    def on_read(self):
-        """Read callback for characteristic
-        """
-        return self.__value
-
-    def on_write(self, value):
-        """Write callback for characteristic
-        """
-        self.__value = value
 
 
     

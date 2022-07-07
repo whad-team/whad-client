@@ -45,7 +45,7 @@ class UUID:
                 self.packed = unhexlify(temp)[::-1]
                 self.type = UUID.TYPE_128
         elif len(uuid) == 32 and "-" not in uuid:
-            self.uuid = '-'.join((uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]))
+            self.uuid = b'-'.join((uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:])).decode('latin-1')
             self.packed = uuid.decode("hex")[::-1]
             self.type = UUID.TYPE_128
         # binary
@@ -55,7 +55,7 @@ class UUID:
             self.type = UUID.TYPE_16
         elif len(uuid) == 16:
             r = uuid[::-1]
-            self.uuid = '-'.join(map(lambda x: hexlify(x), (r[0:4], r[4:6], r[6:8], r[8:10], r[10:])))
+            self.uuid = b'-'.join(map(lambda x: hexlify(x), (r[0:4], r[4:6], r[6:8], r[8:10], r[10:]))).decode('latin-1')
             self.packed = uuid
             self.type = UUID.TYPE_128
 
@@ -71,6 +71,12 @@ class UUID:
 
     def to_bytes(self):
         return self.packed
+
+    def value(self):
+        if self.type == UUID.TYPE_16:
+            return unpack('<h', self.packed)[0]
+        else:
+            raise ValueError
 
 
 class Attribute(object):
@@ -112,5 +118,5 @@ class Attribute(object):
             raise InvalidHandleValueException
 
     @property
-    def uuid(self):
+    def type_uuid(self):
         return self.__uuid

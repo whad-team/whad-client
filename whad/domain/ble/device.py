@@ -1,97 +1,122 @@
 """Bluetooth Low Energy device abstraction
-
-
-class Device(BleDevice):
-
-    class battery(BleService):
-        uuid = UUID(0x2A00)
-        carac = Characteristic('2A00', b'', READ)
-        carac2 = Characteristic('2B00', b'Toto', READ)
-
-        def on_notify()
-
-    class MonAutreService(BleService):
-
-        carac = ...
 """
-from whad.domain.ble.characteristic import Characteristic
 
-class ServiceModel:
-    """BLE Service model mapping
+from whad.domain.ble.profile import GenericProfile
+
+class PeripheralCharacteristicDescriptor:
+
+    def __init__(self, descriptor, gatt):
+        self.__descriptor = descriptor
+        self.__gatt = gatt
+
+class PeripheralCharacteristic:
+    """Characteristic wrapper for peripheral devices
+
+    Instruments gatt to read/write a remote characteristic.
+    """
+    def __init__(self, characteristic, gatt):
+        self.__characteristic = characteristic
+        self.__gatt = gatt
+
+    def uuid(self):
+        return self.__characteristic.uuid
+
+    def read(self):
+        """Read characteristic value
+        """
+        return self.__gatt.read(self.__characteristic.value_handle)
+
+    def write(self, value):
+        """Set characteristic value
+        """
+        if isinstance(value, bytes):
+            return self.__gatt.write(self.__characteristic.value_handle, value)
+        else:
+            print('NOPE')
+
+    def descriptors(self):
+        for desc in self.__characteristic.descriptors():
+            yield PeripheralCharacteristicDescriptor(
+                desc,
+                self.__gatt
+            )
+
+
+class PeripheralService:
+    """Service wrapper for peripheral devices
     """
 
-    def __init__(self, device):
-        self.__device = device
-        self.__characteristics = []
+    def __init__(self, service, gatt):
+        self.__service = service
+        self.__gatt = gatt
 
-    def prepare_model(self, start_handle):
-        properties = dir(self)
-        for prop in properties:
-            if not prop.startswith('_'):
-                prop_obj = getattr(self, prop)
-                if not callable(prop_obj) and isinstance(prop_obj, Characteristic):
-                    
-                    # Found a characteristic, set handle
-                    prop_obj.handle=start_handle
-                    start_handle += 2
-                    setattr(self, prop, prop_obj)
-                    
-                    # Register characteristic
-                    self.__characteristics.append(prop_obj)
+    def uuid(self):
+        return self.__service.uuid
 
-        return start_handle
+    def get_characteristic(self, uuid):
+        for charac in self.__service.characteristics():
+            if charac.uuid == uuid:
+                return PeripheralCharacteristic(
+                    charac,
+                    self.__gatt
+                )
+        return None
 
-    @property
-    def device(self):
-        return self.__device
+    def characteristics(self):
+        for characteristic in self.__service.characteristics():
+            yield PeripheralCharacteristic(
+                characteristic,
+                self.__gatt
+            )
 
-    def show(self):
-        """Display service characteristics
-        """
-        for characteristic in self.__characteristics:
-            print('  - Characteristic %s (handle: %d)' % (
-                characteristic.uuid,
-                characteristic.handle
-            ))
-            print('    -> Value handle: %d' % characteristic.value_handle)
+class PeripheralDevice(GenericProfile):
+    """GATT client wrapper representing a remote device.
 
-class DeviceModel:
-    """Device Services and Characteristics model mapping
+    This class is used to wrap a device model used in a gatt client
+    in order to provide easy-to-use methods to access its services,
+    characteristics and descriptors.
     """
 
-    def __is_service_class(self, x):
-        return ServiceModel in x.__bases__
+    def __init__(self, gatt_client):
+        super().__init__()
+        self.__gatt = gatt_client
 
-    def __init__(self, start_handle=1):
-        """Introspect this class and build the device model
+    def discover(self):
+        """Discovers services, characteristics and descriptors.
+
+        This method must be called before accessing any service or characteristic,
+        as it is required to retrieve the corresponding GATT handles.
         """
-        self.__services = []
-        properties = dir(self)
-        print(properties)
-        for prop in properties:
-            if not prop.startswith('_'):
-                prop_obj = getattr(self, prop)
-                print(prop, type(prop_obj))
-                if callable(prop_obj) and hasattr(prop_obj, '__bases__') and ServiceModel in prop_obj.__bases__:
-                    print(prop)
-                    # Found a ServiceModel class, instanciate based on its name
-                    service = prop_obj(self)
-                    service.handle = start_handle
-                    start_handle = service.prepare_model(start_handle + 1)
-                    
-                    # Register as a new attribute
-                    setattr(self, prop, service)
+        # Discover
+        self.__gatt.discover()
 
-                    # Register in our known services
-                    self.__services.append(service)
-
-    def show(self):
-        """Display device attributes
+    def services(self):
+        """Enumerate device services.
         """
-        for service in self.__services:
-            print('[+] Service %s (handle: %d)' % (service.uuid, service.handle))
-            service.show()
+        for service in self.__gatt.services():
+            yield PeripheralService(service, self.__gatt)
 
+    def get_characteristic(self, service_uuid, charac_uuid):
+        """Get a PeripheralCharacteristic object representing a characteristic
+        defined by the given service UUID and characteristic UUID.
+
+        :return: PeripheralCharacteristic object on success, None if not found.
+        """
+        service = self.get_service(service_uuid)
+        if service is not None:
+            return service.get_characteristic(charac_uuid)
+        return None
+
+    def get_service(self, uuid):
+        """Retrieve a PeripheralService object given its UUID.
+        """
+        for service in self.__gatt.services():
+            if service.uuid == uuid:
+                return PeripheralService(service, self.__gatt)
+        return None
+
+
+    
 
 
                     

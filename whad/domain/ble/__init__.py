@@ -1,7 +1,7 @@
 """
 Bluetooth Low Energy
 """
-from time import sleep
+from time import sleep, time
 from binascii import hexlify
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
@@ -16,6 +16,7 @@ from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, StartCmd, StopC
 from whad.domain.ble.stack import BleStack
 from scapy.layers.bluetooth4LE import BTLE_CTRL, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
+from whad.domain.ble.device import PeripheralDevice
 
 
 class BLE(WhadDeviceConnector):
@@ -137,10 +138,9 @@ class BLE(WhadDeviceConnector):
         self.on_connected(connection_data)
 
     def on_pdu(self, pdu):
-        print(hexlify(pdu.pdu))
+        #print(hexlify(pdu.pdu))
         if pdu.processed:
             print('[ble PDU log-only]')
-            print(pdu)
         else:
             if pdu.pdu[0] & 0x3 == 0x03:
                 self.on_ctl_pdu(
@@ -182,7 +182,7 @@ class BLE(WhadDeviceConnector):
         Send data (L2CAP) PDU.
         """
         final_pdu = bytes(data)
-        print('sending: %s' % hexlify(final_pdu))
+        #print('sending: %s' % hexlify(final_pdu))
         msg = Message()
         msg.ble.send_pdu.direction = BleDirection.MASTER_TO_SLAVE
         msg.ble.send_pdu.pdu = final_pdu
@@ -190,7 +190,7 @@ class BLE(WhadDeviceConnector):
         #self.send_message(msg, message_filter('generic', 'cmd_result'))
         #resp = self.wait_for_message(filter=lambda x: False)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        print('resp:%s' % resp)
+        #print('resp:%s' % resp)
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
 
@@ -243,6 +243,7 @@ class Central(BLE):
 
         self.use_stack(BleStack)
         self.__connected = False
+        self.__peripheral = None
 
         # Check device accept central mode
         if not self.can_be_central():
@@ -251,9 +252,19 @@ class Central(BLE):
             self.stop()
             self.enable_central_mode()
 
+    def connect(self, bd_address, timeout=30):
+        """Connect to a target device
+        """
+        self.connect_to(bd_address)
+        self.start()
+        start_time=time()
+        while not self.__connected:
+            if time()-start_time >= timeout:
+                return None
+        return self.__peripheral
 
-    def connected(self):
-        return self.__connected
+    def peripheral(self):
+        return self.__peripheral
 
     def use_stack(self, clazz=BleStack):
         """Specify a stack class to use for BLE. By default, our own stack (BleStack) is used.
@@ -286,7 +297,6 @@ class Central(BLE):
         This PDU is then forwarded to the BLE stack to handle it.
         """
         if direction == BleDirection.SLAVE_TO_MASTER:
-            print('slave->master Data PDU received')
             self.__stack.on_data_pdu(conn_handle, pdu)
 
 
@@ -298,7 +308,5 @@ class Central(BLE):
         # Use GATT client
         self.connection = connection
         connection.use_gatt_class(GattClient)
+        self.__peripheral = PeripheralDevice(connection.gatt)
         self.__connected = True
-        #sleep(1)
-        # Start primary service discovery
-        #connection.gatt.discover_primary_services()

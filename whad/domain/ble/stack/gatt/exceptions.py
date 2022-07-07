@@ -1,0 +1,3 @@
+"""GATT exceptions
+"""
+
