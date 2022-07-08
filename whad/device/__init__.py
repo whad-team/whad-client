@@ -5,8 +5,8 @@ from elementpath import TypedAttribute
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, WhadDeviceNotReady
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType
-from whad.helpers import message_filter
+from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery
+from whad.helpers import message_filter, asciiz
 
 class WhadDeviceInfo(object):
     """This class caches a device information related to its firmware, type, and supported domains and capabilities.
@@ -21,6 +21,7 @@ class WhadDeviceInfo(object):
         self.__fw_ver_min = info_resp.fw_version_minor
         self.__fw_ver_rev = info_resp.fw_version_rev
         self.__device_type = info_resp.type
+        self.__device_id = asciiz(info_resp.devid)
 
         # Parse domains and capabilities
         self.__domains = {}
@@ -111,6 +112,11 @@ class WhadDeviceInfo(object):
         """
         return self.__device_type
 
+    @property
+    def device_id(self):
+        """Returns the device id.
+        """
+        return self.__device_id
 
     @property
     def domains(self):
@@ -354,6 +360,9 @@ class WhadDevice(object):
         """
         self.__io_thread = WhadDeviceIOThread(self)
         self.__io_thread.start()
+
+        # Ask for a reset
+        self.reset()
         
 
     def close(self):
@@ -673,6 +682,22 @@ class WhadDevice(object):
                 self.__discovered = True
             else:
                 raise WhadDeviceNotReady()
+
+    def reset(self):
+        """Reset device
+        """
+        msg = Message()
+        msg.discovery.reset_query.CopyFrom(DeviceResetQuery())
+        return self.send_command(
+            msg,
+            message_filter('discovery', 'ready_resp')
+        )
+
+    @property
+    def device_id(self):
+        """Return device ID
+        """
+        return self.__info.device_id
 
     ######################################
     # Upper layers (domains) handling
