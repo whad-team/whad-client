@@ -260,7 +260,7 @@ class Gatt(object):
         """
         pass
         
-    def on_handle_value_notification(self, handle, value):
+    def on_handle_value_notification(self, notification):
         """ATT Handle Value Notification
 
         :param int handle: Attribute handle
@@ -284,6 +284,7 @@ class GattClient(Gatt):
     def __init__(self, att):
         super().__init__(att)
         self.__model = GenericProfile()
+        self.__notification_callbacks = {}
 
     ###################################
     # Supported response handlers
@@ -343,9 +344,43 @@ class GattClient(Gatt):
         """
         self.on_gatt_message(response)
 
+
+    def on_handle_value_notification(self, notification):
+        """ATT Handle Value Notification
+
+        :param int handle: Attribute handle
+        :param value: Attribute value
+        """
+        if notification.handle in self.__notification_callbacks:
+            self.__notification_callbacks[notification.handle](
+                notification.handle,
+                notification.value,
+                indicate=False
+            )
+
+    def on_handle_value_indication(self, notification):
+        """ATT Handle Value Indication
+
+        :param int handle: Attribute handle
+        :param value: Attribute value
+        """
+        if notification.handle in self.__notification_callbacks:
+            self.__notification_callbacks[notification.handle](
+                notification.handle,
+                notification.value,
+                indicate=True
+            )
+        self.att.handle_value_confirmation()
+
     ###################################
     # GATT procedures
     ###################################
+
+    def register_notification_callback(self, handle, cb):
+        self.__notification_callbacks[handle] = cb
+
+    def unregister_notification_callback(self, handle):
+        del self.__notification_callbacks[handle]
 
     def discover_primary_service_by_uuid(self, uuid):
         """Discover a primary service by its UUID.

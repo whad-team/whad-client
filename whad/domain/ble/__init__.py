@@ -1,8 +1,9 @@
 """
 Bluetooth Low Energy
 """
+import re
 from time import sleep, time
-from binascii import hexlify
+from binascii import hexlify, unhexlify
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
 from whad.domain.ble.stack.gatt import GattClient
@@ -10,14 +11,40 @@ from whad.helpers import message_filter, is_message_type, bd_addr_to_bytes
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, StartCmd, StopCmd, \
+from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SendRawPDUCmd, StartCmd, StopCmd, \
     ScanMode, Start, Stop, BleAdvType, ConnectToCmd, ConnectTo, CentralModeCmd, \
-    SendPDUCmd
+    SendPDUCmd, SetBdAddress, SendPDU
 from whad.domain.ble.stack import BleStack
 from scapy.layers.bluetooth4LE import BTLE_CTRL, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
 from whad.domain.ble.device import PeripheralDevice
+from whad.domain.ble.exceptions import InvalidBDAddressException
 
+
+class BDAddress(object):
+
+    def __init__(self, address):
+        """Initialize BD address
+        """
+        if isinstance(address, str):
+            if re.match('^([0-9a-fA-F]{2}\:){5}[0-9a-fA-F]{2}$', address) is not None:
+                self.__value = unhexlify(address.replace(':',''))[::-1]
+            elif re.match('[0-9a-fA-F]{12}$', address) is not None:
+                self.__value = unhexlify(address)[::-1]
+            else:
+                raise InvalidBDAddressException
+        else:
+            raise InvalidBDAddressException
+
+    def __str__(self):
+        return ':'.join(['%02x' % b for b in self.__value[::-1]])
+
+    def __repr__(self):
+        return 'BDAddress(%s)' % str(self)
+
+    @property
+    def value(self):
+        return self.__value
 
 class BLE(WhadDeviceConnector):
     """
@@ -43,6 +70,10 @@ class BLE(WhadDeviceConnector):
         """
         super().__init__(device)
 
+        # Capability cache
+        self.__can_send = None
+        self.__can_send_raw = None
+
         # Open device and make sure it is compatible
         self.device.open()
         self.device.discover()
@@ -50,6 +81,15 @@ class BLE(WhadDeviceConnector):
         # Check device supports BLE
         if not self.device.has_domain(WhadDomain.BtLE):
             raise UnsupportedDomain()
+
+    def can_send(self):
+        """Determine if the device is able to send PDU
+        """
+        if self.__can_send is None:
+            # Retrieve supported commands
+            commands = self.device.get_domain_commands(WhadDomain.BtLE)
+            self.__can_send = (commands & (1 << SendPDU))>0
+        return self.__can_send
 
     def can_scan(self):
         """
@@ -76,6 +116,18 @@ class BLE(WhadDeviceConnector):
             (commands & (1 << Stop))>0
         )
 
+    def set_bd_address(self, bd_address):
+        """Set bluetooth address
+        """
+        # Ensure we can spoof BD address
+        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        if (commands & (1 << SetBdAddress))>0:
+            msg = Message()
+            msg.ble.set_bd_addr.bd_address = bd_addr_to_bytes(bd_address)
+            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+            return True
+        else:
+            return False
 
     def enable_scan_mode(self, active=False):
         msg = Message()
@@ -170,28 +222,34 @@ class BLE(WhadDeviceConnector):
         """
         Send CTRL PDU
         """
-        final_pdu = bytes([0x03, len(pdu)] + pdu)
-        msg = Message()
-        msg.ble.send_pdu.direction = BleDirection.MASTER_TO_SLAVE
-        msg.ble.send_pdu.pdu = final_pdu
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if self.can_send():
+            final_pdu = bytes([0x03, len(pdu)] + pdu)
+            msg = Message()
+            msg.ble.send_pdu.direction = BleDirection.MASTER_TO_SLAVE
+            msg.ble.send_pdu.pdu = final_pdu
+            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        else:
+            return False
 
     def send_data_pdu(self, conn_handle, data):
         """
         Send data (L2CAP) PDU.
         """
-        final_pdu = bytes(data)
-        #print('sending: %s' % hexlify(final_pdu))
-        msg = Message()
-        msg.ble.send_pdu.direction = BleDirection.MASTER_TO_SLAVE
-        msg.ble.send_pdu.pdu = final_pdu
-        msg.ble.send_pdu.conn_handle = conn_handle
-        #self.send_message(msg, message_filter('generic', 'cmd_result'))
-        #resp = self.wait_for_message(filter=lambda x: False)
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        #print('resp:%s' % resp)
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if self.can_send():
+            final_pdu = bytes(data)
+            #print('sending: %s' % hexlify(final_pdu))
+            msg = Message()
+            msg.ble.send_pdu.direction = BleDirection.MASTER_TO_SLAVE
+            msg.ble.send_pdu.pdu = final_pdu
+            msg.ble.send_pdu.conn_handle = conn_handle
+            #self.send_message(msg, message_filter('generic', 'cmd_result'))
+            #resp = self.wait_for_message(filter=lambda x: False)
+            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+            #print('resp:%s' % resp)
+            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        else:
+            return False
 
 
 class Scanner(BLE):

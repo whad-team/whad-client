@@ -18,3 +18,12 @@ def bd_addr_to_bytes(bd_addr):
         return bytes(bd_addr_b[::-1])
     else:
         return None
+
+def asciiz(s):
+    """Convert a bytes buffer into ascii
+    """
+    out=''
+    for c in s:
+        if s!=0:
+            out += chr(c)
+    return out

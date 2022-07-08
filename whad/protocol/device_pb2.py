@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x15protocol/device.proto\x12\tdiscovery\"\x9b\x01\n\x0e\x44\x65viceInfoResp\x12\x0c\n\x04type\x18\x01 \x01(\r\x12\x15\n\rproto_min_ver\x18\x02 \x01(\r\x12\x18\n\x10\x66w_version_major\x18\x03 \x01(\r\x12\x18\n\x10\x66w_version_minor\x18\x04 \x01(\r\x12\x16\n\x0e\x66w_version_rev\x18\x05 \x01(\r\x12\x18\n\x0c\x63\x61pabilities\x18\x06 \x03(\rB\x02\x10\x01\"B\n\x14\x44\x65viceDomainInfoResp\x12\x0e\n\x06\x64omain\x18\x01 \x01(\r\x12\x1a\n\x12supported_commands\x18\x02 \x01(\x04\"$\n\x0f\x44\x65viceInfoQuery\x12\x11\n\tproto_ver\x18\x01 \x01(\r\"\'\n\x15\x44\x65viceDomainInfoQuery\x12\x0e\n\x06\x64omain\x18\x01 \x01(\r\"\xe4\x01\n\x07Message\x12\x30\n\ninfo_query\x18\x01 \x01(\x0b\x32\x1a.discovery.DeviceInfoQueryH\x00\x12.\n\tinfo_resp\x18\x02 \x01(\x0b\x32\x19.discovery.DeviceInfoRespH\x00\x12\x38\n\x0c\x64omain_query\x18\x03 \x01(\x0b\x32 .discovery.DeviceDomainInfoQueryH\x00\x12\x36\n\x0b\x64omain_resp\x18\x04 \x01(\x0b\x32\x1f.discovery.DeviceDomainInfoRespH\x00\x42\x05\n\x03msg*\xc9\x01\n\x06\x44omain\x12\x0f\n\x0b_DomainNone\x10\x00\x12\x0e\n\x07Generic\x10\x80\x80\x80\x08\x12\x10\n\tBtClassic\x10\x80\x80\x80\x10\x12\x0b\n\x04\x42tLE\x10\x80\x80\x80\x18\x12\r\n\x06Zigbee\x10\x80\x80\x80 \x12\x10\n\tSixLowPan\x10\x80\x80\x80(\x12\n\n\x03\x45sb\x10\x80\x80\x80\x30\x12\x17\n\x10LogitechUnifying\x10\x80\x80\x80\x38\x12\r\n\x06Mosart\x10\x80\x80\x80@\x12\n\n\x03\x41NT\x10\x80\x80\x80H\x12\x0f\n\x08\x41NT_Plus\x10\x80\x80\x80P\x12\r\n\x06\x41NT_FS\x10\x80\x80\x80X*=\n\nDeviceType\x12\x12\n\x0e\x45sp32BleFuzzer\x10\x00\x12\r\n\tButterfly\x10\x01\x12\x0c\n\x08\x42tleJack\x10\x02*\x8a\x01\n\nCapability\x12\x0c\n\x08_CapNone\x10\x00\x12\x08\n\x04Scan\x10\x01\x12\t\n\x05Sniff\x10\x02\x12\n\n\x06Inject\x10\x04\x12\x07\n\x03Jam\x10\x08\x12\n\n\x06Hijack\x10\x10\x12\x08\n\x04Hook\x10 \x12\x0e\n\nMasterRole\x10@\x12\x0e\n\tSlaveRole\x10\x80\x01\x12\x0e\n\tNoRawData\x10\x80\x02\x62\x06proto3'
+  serialized_pb=b'\n\x15protocol/device.proto\x12\tdiscovery\"\x12\n\x10\x44\x65viceResetQuery\"\x11\n\x0f\x44\x65viceReadyResp\"\xaa\x01\n\x0e\x44\x65viceInfoResp\x12\x0c\n\x04type\x18\x01 \x01(\r\x12\r\n\x05\x64\x65vid\x18\x02 \x01(\x0c\x12\x15\n\rproto_min_ver\x18\x03 \x01(\r\x12\x18\n\x10\x66w_version_major\x18\x04 \x01(\r\x12\x18\n\x10\x66w_version_minor\x18\x05 \x01(\r\x12\x16\n\x0e\x66w_version_rev\x18\x06 \x01(\r\x12\x18\n\x0c\x63\x61pabilities\x18\x07 \x03(\rB\x02\x10\x01\"B\n\x14\x44\x65viceDomainInfoResp\x12\x0e\n\x06\x64omain\x18\x01 \x01(\r\x12\x1a\n\x12supported_commands\x18\x02 \x01(\x04\"$\n\x0f\x44\x65viceInfoQuery\x12\x11\n\tproto_ver\x18\x01 \x01(\r\"\'\n\x15\x44\x65viceDomainInfoQuery\x12\x0e\n\x06\x64omain\x18\x01 \x01(\r\"\xca\x02\n\x07Message\x12\x32\n\x0breset_query\x18\x01 \x01(\x0b\x32\x1b.discovery.DeviceResetQueryH\x00\x12\x30\n\nready_resp\x18\x02 \x01(\x0b\x32\x1a.discovery.DeviceReadyRespH\x00\x12\x30\n\ninfo_query\x18\x03 \x01(\x0b\x32\x1a.discovery.DeviceInfoQueryH\x00\x12.\n\tinfo_resp\x18\x04 \x01(\x0b\x32\x19.discovery.DeviceInfoRespH\x00\x12\x38\n\x0c\x64omain_query\x18\x05 \x01(\x0b\x32 .discovery.DeviceDomainInfoQueryH\x00\x12\x36\n\x0b\x64omain_resp\x18\x06 \x01(\x0b\x32\x1f.discovery.DeviceDomainInfoRespH\x00\x42\x05\n\x03msg*\xc9\x01\n\x06\x44omain\x12\x0f\n\x0b_DomainNone\x10\x00\x12\x0e\n\x07Generic\x10\x80\x80\x80\x08\x12\x10\n\tBtClassic\x10\x80\x80\x80\x10\x12\x0b\n\x04\x42tLE\x10\x80\x80\x80\x18\x12\r\n\x06Zigbee\x10\x80\x80\x80 \x12\x10\n\tSixLowPan\x10\x80\x80\x80(\x12\n\n\x03\x45sb\x10\x80\x80\x80\x30\x12\x17\n\x10LogitechUnifying\x10\x80\x80\x80\x38\x12\r\n\x06Mosart\x10\x80\x80\x80@\x12\n\n\x03\x41NT\x10\x80\x80\x80H\x12\x0f\n\x08\x41NT_Plus\x10\x80\x80\x80P\x12\r\n\x06\x41NT_FS\x10\x80\x80\x80X*=\n\nDeviceType\x12\x12\n\x0e\x45sp32BleFuzzer\x10\x00\x12\r\n\tButterfly\x10\x01\x12\x0c\n\x08\x42tleJack\x10\x02*\x8a\x01\n\nCapability\x12\x0c\n\x08_CapNone\x10\x00\x12\x08\n\x04Scan\x10\x01\x12\t\n\x05Sniff\x10\x02\x12\n\n\x06Inject\x10\x04\x12\x07\n\x03Jam\x10\x08\x12\n\n\x06Hijack\x10\x10\x12\x08\n\x04Hook\x10 \x12\x0e\n\nMasterRole\x10@\x12\x0e\n\tSlaveRole\x10\x80\x01\x12\x0e\n\tNoRawData\x10\x80\x02\x62\x06proto3'
 )
 
 _DOMAIN = _descriptor.EnumDescriptor(
@@ -93,8 +93,8 @@ _DOMAIN = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=573,
-  serialized_end=774,
+  serialized_start=729,
+  serialized_end=930,
 )
 _sym_db.RegisterEnumDescriptor(_DOMAIN)
 
@@ -124,8 +124,8 @@ _DEVICETYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=776,
-  serialized_end=837,
+  serialized_start=932,
+  serialized_end=993,
 )
 _sym_db.RegisterEnumDescriptor(_DEVICETYPE)
 
@@ -190,8 +190,8 @@ _CAPABILITY = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=840,
-  serialized_end=978,
+  serialized_start=996,
+  serialized_end=1134,
 )
 _sym_db.RegisterEnumDescriptor(_CAPABILITY)
 
@@ -224,6 +224,56 @@ NoRawData = 256
 
 
 
+_DEVICERESETQUERY = _descriptor.Descriptor(
+  name='DeviceResetQuery',
+  full_name='discovery.DeviceResetQuery',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=36,
+  serialized_end=54,
+)
+
+
+_DEVICEREADYRESP = _descriptor.Descriptor(
+  name='DeviceReadyResp',
+  full_name='discovery.DeviceReadyResp',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=56,
+  serialized_end=73,
+)
+
+
 _DEVICEINFORESP = _descriptor.Descriptor(
   name='DeviceInfoResp',
   full_name='discovery.DeviceInfoResp',
@@ -240,36 +290,43 @@ _DEVICEINFORESP = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='proto_min_ver', full_name='discovery.DeviceInfoResp.proto_min_ver', index=1,
-      number=2, type=13, cpp_type=3, label=1,
-      has_default_value=False, default_value=0,
+      name='devid', full_name='discovery.DeviceInfoResp.devid', index=1,
+      number=2, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='fw_version_major', full_name='discovery.DeviceInfoResp.fw_version_major', index=2,
+      name='proto_min_ver', full_name='discovery.DeviceInfoResp.proto_min_ver', index=2,
       number=3, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='fw_version_minor', full_name='discovery.DeviceInfoResp.fw_version_minor', index=3,
+      name='fw_version_major', full_name='discovery.DeviceInfoResp.fw_version_major', index=3,
       number=4, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='fw_version_rev', full_name='discovery.DeviceInfoResp.fw_version_rev', index=4,
+      name='fw_version_minor', full_name='discovery.DeviceInfoResp.fw_version_minor', index=4,
       number=5, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='capabilities', full_name='discovery.DeviceInfoResp.capabilities', index=5,
-      number=6, type=13, cpp_type=3, label=3,
+      name='fw_version_rev', full_name='discovery.DeviceInfoResp.fw_version_rev', index=5,
+      number=6, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='capabilities', full_name='discovery.DeviceInfoResp.capabilities', index=6,
+      number=7, type=13, cpp_type=3, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -286,8 +343,8 @@ _DEVICEINFORESP = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=37,
-  serialized_end=192,
+  serialized_start=76,
+  serialized_end=246,
 )
 
 
@@ -325,8 +382,8 @@ _DEVICEDOMAININFORESP = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=194,
-  serialized_end=260,
+  serialized_start=248,
+  serialized_end=314,
 )
 
 
@@ -357,8 +414,8 @@ _DEVICEINFOQUERY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=262,
-  serialized_end=298,
+  serialized_start=316,
+  serialized_end=352,
 )
 
 
@@ -389,8 +446,8 @@ _DEVICEDOMAININFOQUERY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=300,
-  serialized_end=339,
+  serialized_start=354,
+  serialized_end=393,
 )
 
 
@@ -403,29 +460,43 @@ _MESSAGE = _descriptor.Descriptor(
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='info_query', full_name='discovery.Message.info_query', index=0,
+      name='reset_query', full_name='discovery.Message.reset_query', index=0,
       number=1, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='info_resp', full_name='discovery.Message.info_resp', index=1,
+      name='ready_resp', full_name='discovery.Message.ready_resp', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='domain_query', full_name='discovery.Message.domain_query', index=2,
+      name='info_query', full_name='discovery.Message.info_query', index=2,
       number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='domain_resp', full_name='discovery.Message.domain_resp', index=3,
+      name='info_resp', full_name='discovery.Message.info_resp', index=3,
       number=4, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='domain_query', full_name='discovery.Message.domain_query', index=4,
+      number=5, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='domain_resp', full_name='discovery.Message.domain_resp', index=5,
+      number=6, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -447,14 +518,22 @@ _MESSAGE = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=342,
-  serialized_end=570,
+  serialized_start=396,
+  serialized_end=726,
 )
 
+_MESSAGE.fields_by_name['reset_query'].message_type = _DEVICERESETQUERY
+_MESSAGE.fields_by_name['ready_resp'].message_type = _DEVICEREADYRESP
 _MESSAGE.fields_by_name['info_query'].message_type = _DEVICEINFOQUERY
 _MESSAGE.fields_by_name['info_resp'].message_type = _DEVICEINFORESP
 _MESSAGE.fields_by_name['domain_query'].message_type = _DEVICEDOMAININFOQUERY
 _MESSAGE.fields_by_name['domain_resp'].message_type = _DEVICEDOMAININFORESP
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['reset_query'])
+_MESSAGE.fields_by_name['reset_query'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['ready_resp'])
+_MESSAGE.fields_by_name['ready_resp'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
 _MESSAGE.oneofs_by_name['msg'].fields.append(
   _MESSAGE.fields_by_name['info_query'])
 _MESSAGE.fields_by_name['info_query'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
@@ -467,6 +546,8 @@ _MESSAGE.fields_by_name['domain_query'].containing_oneof = _MESSAGE.oneofs_by_na
 _MESSAGE.oneofs_by_name['msg'].fields.append(
   _MESSAGE.fields_by_name['domain_resp'])
 _MESSAGE.fields_by_name['domain_resp'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+DESCRIPTOR.message_types_by_name['DeviceResetQuery'] = _DEVICERESETQUERY
+DESCRIPTOR.message_types_by_name['DeviceReadyResp'] = _DEVICEREADYRESP
 DESCRIPTOR.message_types_by_name['DeviceInfoResp'] = _DEVICEINFORESP
 DESCRIPTOR.message_types_by_name['DeviceDomainInfoResp'] = _DEVICEDOMAININFORESP
 DESCRIPTOR.message_types_by_name['DeviceInfoQuery'] = _DEVICEINFOQUERY
@@ -476,6 +557,20 @@ DESCRIPTOR.enum_types_by_name['Domain'] = _DOMAIN
 DESCRIPTOR.enum_types_by_name['DeviceType'] = _DEVICETYPE
 DESCRIPTOR.enum_types_by_name['Capability'] = _CAPABILITY
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
+
+DeviceResetQuery = _reflection.GeneratedProtocolMessageType('DeviceResetQuery', (_message.Message,), {
+  'DESCRIPTOR' : _DEVICERESETQUERY,
+  '__module__' : 'protocol.device_pb2'
+  # @@protoc_insertion_point(class_scope:discovery.DeviceResetQuery)
+  })
+_sym_db.RegisterMessage(DeviceResetQuery)
+
+DeviceReadyResp = _reflection.GeneratedProtocolMessageType('DeviceReadyResp', (_message.Message,), {
+  'DESCRIPTOR' : _DEVICEREADYRESP,
+  '__module__' : 'protocol.device_pb2'
+  # @@protoc_insertion_point(class_scope:discovery.DeviceReadyResp)
+  })
+_sym_db.RegisterMessage(DeviceReadyResp)
 
 DeviceInfoResp = _reflection.GeneratedProtocolMessageType('DeviceInfoResp', (_message.Message,), {
   'DESCRIPTOR' : _DEVICEINFORESP,

@@ -15,6 +15,8 @@ from scapy.layers.bluetooth import ATT_Error_Response, ATT_Exchange_MTU_Request,
     ATT_Read_By_Type_Request, ATT_Read_By_Type_Response, ATT_Read_Multiple_Request, ATT_Read_Multiple_Response, \
     ATT_Read_Request, ATT_Read_Response, ATT_Write_Command, ATT_Write_Response, ATT_Write_Request, \
     ATT_Read_By_Type_Request_128bit, ATT_Hdr
+from scapy.packet import bind_layers, Packet
+
 from whad.domain.ble.stack.att.constants import BleAttOpcode
 
 from whad.domain.ble.stack.gatt import  Gatt
@@ -25,6 +27,14 @@ from whad.domain.ble.stack.gatt.message import GattExecuteWriteRequest, GattExec
     GattReadRequest, GattReadResponse, GattReadBlobRequest, GattReadBlobResponse, GattReadMultipleRequest, \
     GattReadMultipleResponse, GattWriteCommand, GattWriteRequest, GattWriteResponse, GattPrepareWriteRequest, \
     GattPrepareWriteResponse, GattExecuteWriteRequest, GattExecuteWriteResponse
+
+# Add missing ATT_Handle_Value_Confirmation class
+class ATT_Handle_Value_Confirmation(Packet):
+    name = "Handle Value Confirmation"
+
+# Bind ATT_Handle_Value_Confirmation with ATT_Hdr
+bind_layers(ATT_Hdr, ATT_Handle_Value_Confirmation, opcode=BleAttOpcode.HANDLE_VALUE_CONFIRMATION)
+
 
 class BleATT(object):
 
@@ -623,3 +633,10 @@ class BleATT(object):
             gatt_handle=handle,
             value=value
         ))
+
+    def handle_value_confirmation(self):
+        """Sends an ATT Handle Value Confirmation
+        
+        Not supported yet
+        """
+        self.send(ATT_Handle_Value_Confirmation())

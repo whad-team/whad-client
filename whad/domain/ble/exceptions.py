@@ -4,8 +4,13 @@ class InvalidUUIDException(Exception):
     def __init__(self):
         super().__init__()
 
-class InvalidHandleValueException(Exception):
-    """Exception raised when an invalid handle value is provided.
+class InvalidBDAddressException(Exception):
+    """Invalid BD address used
     """
     def __init__(self):
         super().__init__()
+
+class InvalidHandleValueException(Exception):
+    def __init__(self):
+        super().__init__()
+

@@ -71,14 +71,31 @@ class PeripheralCharacteristic:
     def writeable(self):
         return ((self.__characteristic.properties & CharacteristicProperties.WRITE) != 0)
 
-    def subscribe(self, notification=True, indication=False):
+    def subscribe(self, notification=True, indication=False, callback=None):
         """Subscribe for notification/indication
         """
         if notification:
             # Look for CCCD
             desc = self.get_descriptor(UUID(0x2902))
             if desc is not None:
+                # Enable notification
                 desc.write(bytes([0x01, 0x00]))
+
+                # wrap our callback to provide more details about the concerned
+                # characteristic
+                def wrapped_cb(handle, value, indicate=False):
+                    callback(
+                        self,
+                        value,
+                        indicate=indicate
+                    )
+
+                # Register our callback
+                if callback is not None:
+                    self.__gatt.register_notification_callback(
+                        self.__characteristic.value_handle,
+                        wrapped_cb
+                    )
                 return True
             else:
                 return False
@@ -86,12 +103,18 @@ class PeripheralCharacteristic:
             # Look for CCCD
             desc = self.get_descriptor(UUID(0x2902))
             if desc is not None:
+                # Enable indication
                 desc.write(bytes([0x02, 0x00]))
+
+                # Register our callback
+                if callback is not None:
+                    self.__gatt.register_notification_callback(
+                        self.__characteristic.value_handle,
+                        callback
+                    )
                 return True
             else:
                 return False
-
-
 
 
 class PeripheralService:
