@@ -5,6 +5,7 @@ import sys
 
 from whad.device.uart import UartDevice
 from whad.protocol.ble.ble_pb2 import BleCommand
+from whad.protocol.zigbee.zigbee_pb2 import ZigbeeCommand
 from whad import WhadDomain, WhadCapability
 
 DOMAINS = {
@@ -28,6 +29,9 @@ CAPABILITIES = {
     WhadCapability.Jam: 'can jam connections',
     WhadCapability.MasterRole: 'can act as a master',
     WhadCapability.SlaveRole: 'can act as a slave',
+    WhadCapability.EndDeviceRole: 'can act as an end device',
+    WhadCapability.RouterRole: 'can act as a router',
+    WhadCapability.CoordinatorRole: 'can act as a coordinator',
     WhadCapability.Sniff: 'can sniff data',
     WhadCapability.NoRawData: 'can not read/write raw packet'
 }
@@ -50,7 +54,21 @@ BLE_COMMANDS = {
     BleCommand.PeripheralMode: 'PeripharlMode: can act as a peripheral',
     BleCommand.Start: 'Start: can start depending on the current mode',
     BleCommand.Stop: 'Stop: can stop depending on the current mode',
-    BleCommand.Hijack: 'Hijack: can hijack an active connection'
+    BleCommand.HijackMaster: 'HijackMaster: can hijack the Master role in an active connection',
+    BleCommand.HijackSlave: 'HijackSlave: can hijack the Slave role in an active connection'
+}
+
+ZIGBEE_COMMANDS = {
+    ZigbeeCommand.SetNodeAddress: "SetNodeAddress: can set Node address",
+    ZigbeeCommand.Sniff: "Sniff: can sniff Zigbee packets",
+    ZigbeeCommand.Jam: "Jam: can jam Zigbee packets",
+    ZigbeeCommand.Send: "Send: can transmit Zigbee packets",
+    ZigbeeCommand.EndDeviceMode: "EndDeviceMode: can act as an End Device",
+    ZigbeeCommand.CoordinatorMode: "CoordinatorMode: can act as a Coordinator",
+    ZigbeeCommand.RouterMode: "RouterMode: can act as a Router",
+    ZigbeeCommand.Start: "Start: can start depending on the current mode",
+    ZigbeeCommand.Stop: "Stop: can stop depending on the current mode",
+    ZigbeeCommand.ManInTheMiddle: "ManInTheMiddle: can perform a Man-in-the-Middle attack",
 }
 
 def get_readable_capabilities(caps):
@@ -67,10 +85,18 @@ def get_ble_supported_commands(commands):
             supp_commands.append(BLE_COMMANDS[i])
     return supp_commands
 
+def get_zigbee_supported_commands(commands):
+    supp_commands = []
+    for i in ZIGBEE_COMMANDS.keys():
+        if commands & (1 << i):
+            supp_commands.append(ZIGBEE_COMMANDS[i])
+    return supp_commands
 
 def get_domain_supported_commands(domain, commands):
     if domain == WhadDomain.BtLE:
         return get_ble_supported_commands(commands)
+    elif domain == WhadDomain.Zigbee:
+        return get_zigbee_supported_commands(commands)
     return []
 
 if __name__ == '__main__':
@@ -85,7 +111,6 @@ if __name__ == '__main__':
             dev.open()
             print('[i] Discovering domains ...')
             dev.discover()
-
             domains = {}
             for domain in dev.get_domains():
                 if domain in DOMAINS:
@@ -102,7 +127,10 @@ if __name__ == '__main__':
                 print(' List of supported commands:')
                 for cmd in get_domain_supported_commands(domain, dev.get_domain_commands(domain)):
                     print('  - %s' % cmd)
+                print('')
 
+            print('[i] Device ID: %s' % ":".join(["{:02x}".format(i) for i in dev.device_id.encode()]))
+            print('')
             dev.close()
 
 

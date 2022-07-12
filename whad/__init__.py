@@ -31,3 +31,6 @@ class WhadCapability(object):
     MasterRole = Capability.MasterRole
     SlaveRole = Capability.SlaveRole
     NoRawData = Capability.NoRawData
+    EndDeviceRole = Capability.EndDeviceRole
+    RouterRole = Capability.RouterRole
+    CoordinatorRole = Capability.CoordinatorRole
