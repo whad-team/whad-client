@@ -439,6 +439,17 @@ class BLE(WhadDeviceConnector):
     def on_connected(self, connection_data):
         self.on_connected(connection_data)
 
+    def on_raw_pdu(self, packet):
+        if BTLE_ADV in packet:
+            adv_pdu = packet[BTLE_ADV:]
+            adv_pdu.metadata = packet.metadata
+            self.on_adv_pdu(adv_pdu)
+
+        elif BTLE_DATA in packet:
+            conn_pdu = packet[BTLE_DATA:]
+            conn_pdu.metadata = packet.metadata
+            self.on_pdu(conn_pdu)
+
     def on_pdu(self, packet):
         if packet.LLID == 3:
             self.on_ctl_pdu(packet)
