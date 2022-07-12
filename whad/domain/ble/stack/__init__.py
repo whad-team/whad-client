@@ -18,7 +18,7 @@ class BleStack:
     - BLE connection control (handles Control PDUs)
     - BLE connection data (forward to upper layer, i.e. L2CAP)
     """
-    
+
     def __init__(self, connector):
         """
         Create an instance of BleStack associated with a specific connector. This
@@ -50,7 +50,7 @@ class BleStack:
         self.__llm.on_data_pdu(conn_handle, data)
 
     def send_data(self, conn_handle, data):
-        self.__connector.send_data_pdu(conn_handle, data)
+        self.__connector.send_data_pdu(data, conn_handle=conn_handle)
 
     ############################
     # Interact

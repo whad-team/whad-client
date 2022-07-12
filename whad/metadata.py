@@ -35,7 +35,7 @@ def generate_metadata(message):
         message = message.ble.adv_pdu
         metadata.direction = BleDirection.UNKNOWN
         metadata.rssi = message.rssi
-        
+
     elif is_message_type(message, "ble", "pdu"):
         message = message.ble.pdu
         metadata.connection_handle = message.ble.pdu.connection_handle
