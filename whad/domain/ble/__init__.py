@@ -142,8 +142,10 @@ class BLE(WhadDeviceConnector):
         """
         Determine if the device supports raw PDU.
         """
-        capabilities = self.device.get_domain_capability(WhadDomain.BtLE)
-        return not (capabilities & (1 << WhadCapability.NoRawData) > 0)
+        if self.__can_send_raw is None:
+            capabilities = self.device.get_domain_capability(WhadDomain.BtLE)
+            self.__can_send_raw = not (capabilities & (1 << WhadCapability.NoRawData) > 0)
+        return self.__can_send_raw
 
     def can_send(self):
         """
