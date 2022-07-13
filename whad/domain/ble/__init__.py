@@ -17,9 +17,11 @@ from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SendRawPDUCmd, 
     PeripheralModeCmd, SendPDUCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
     HijackSlave, HijackBoth, SendRawPDU
 from whad.domain.ble.stack import BleStack
-from scapy.layers.bluetooth4LE import BTLE_CTRL, BTLE_DATA, BTLE_ADV_IND, \
+from scapy.compat import raw
+from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_CTRL, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
 from whad.domain.ble.device import PeripheralDevice
+from whad.domain.ble.sniffing import SynchronizedConnection, SnifferConfiguration
 from whad.domain.ble.exceptions import InvalidBDAddressException
 
 
@@ -70,11 +72,15 @@ class BLE(WhadDeviceConnector):
         Initialize the connector, open the device (if not already opened), discover
         the services (if not already discovered).
         """
+        self.__ready = False
         super().__init__(device)
 
         # Capability cache
         self.__can_send = None
         self.__can_send_raw = None
+
+        # User packets callbacks
+        self.__user_callbacks = {}
 
         # Open device and make sure it is compatible
         self.device.open()
@@ -83,6 +89,22 @@ class BLE(WhadDeviceConnector):
         # Check device supports BLE
         if not self.device.has_domain(WhadDomain.BtLE):
             raise UnsupportedDomain()
+        else:
+            self.__ready = True
+
+    def attach_user_callbacks(self, callback, filter=lambda pkt:True):
+        self.__user_callbacks[callback] = filter
+
+    def detach_user_callbacks(self, callback):
+        if callback in self.__user_callbacks:
+            del self.__user_callbacks[callback]
+            return True
+        return False
+
+    def _run_user_callbacks(self, packet):
+        for callback,packet_filter in self.__user_callbacks.items():
+            if packet_filter(packet):
+                callback(packet)
 
     def _build_scapy_packet_from_message(self, message, msg_type):
         try:
@@ -91,17 +113,17 @@ class BLE(WhadDeviceConnector):
                     packet = BLE.SCAPY_CORR_ADV[message.adv_pdu.adv_type](
                             bytes(message.adv_pdu.bd_address) + bytes(message.adv_pdu.adv_data)
                         )
-                    packet.metadata = generate_metadata(message)
+                    packet.metadata = generate_metadata(message, msg_type)
                     return packet
 
             elif msg_type == 'raw_pdu':
                 packet = BTLE(bytes(struct.pack("I", message.raw_pdu.access_address)) + bytes(message.raw_pdu.pdu) + bytes(struct.pack(">I", message.raw_pdu.crc)[1:]))
-                packet.metadata = generate_metadata(message)
+                packet.metadata = generate_metadata(message, msg_type)
                 return packet
 
             elif msg_type == 'pdu':
                 packet = BTLE_DATA(message.pdu.pdu)
-                packet.metadata = generate_metadata(message)
+                packet.metadata = generate_metadata(message, msg_type)
                 return packet
 
         except AttributeError:
@@ -115,8 +137,8 @@ class BLE(WhadDeviceConnector):
         if BTLE in packet:
             msg.ble.send_raw_pdu.direction = direction
             msg.ble.send_raw_pdu.conn_handle = connection_handle
-            msg.ble.send_raw_pdu.crc = BTLE(raw(bytes_packet)).crc # force the CRC to be generated if not provided
-            msg.ble.send_raw_pdu.access_address = BTLE(raw(bytes_packet)).access_addr
+            msg.ble.send_raw_pdu.crc = BTLE(raw(packet)).crc # force the CRC to be generated if not provided
+            msg.ble.send_raw_pdu.access_address = BTLE(raw(packet)).access_addr
 
             if BTLE_DATA in packet:
                 msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_DATA:])
@@ -213,9 +235,9 @@ class BLE(WhadDeviceConnector):
         )
 
 
-    def can_sniff_connection(self):
+    def can_sniff_new_connection(self):
         """
-        Determine if the device implements a connection sniffer mode.
+        Determine if the device implements a new connection sniffer mode.
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (
@@ -309,7 +331,7 @@ class BLE(WhadDeviceConnector):
         """
         Sniff Bluetooth Low Energy connection (from initiation).
         """
-        if not self.can_sniff_connection():
+        if not self.can_sniff_new_connection():
             raise UnsupportedCapability("Sniff")
 
         msg = Message()
@@ -395,6 +417,9 @@ class BLE(WhadDeviceConnector):
 
 
     def on_domain_msg(self, domain, message):
+        if not self.__ready:
+            return
+
         if domain == 'ble':
             msg_type = message.WhichOneof('msg')
             if msg_type == 'adv_pdu':
@@ -436,12 +461,15 @@ class BLE(WhadDeviceConnector):
         pass
 
     def on_adv_pdu(self, packet):
-        pass
+        if not self.support_raw_pdu():
+            self._run_user_callbacks(packet)
 
     def on_connected(self, connection_data):
         self.on_connected(connection_data)
 
     def on_raw_pdu(self, packet):
+        if self.support_raw_pdu():
+            self._run_user_callbacks(packet)
         if BTLE_ADV in packet:
             adv_pdu = packet[BTLE_ADV:]
             adv_pdu.metadata = packet.metadata
@@ -453,6 +481,9 @@ class BLE(WhadDeviceConnector):
             self.on_pdu(conn_pdu)
 
     def on_pdu(self, packet):
+        if not self.support_raw_pdu():
+            self._run_user_callbacks(packet)
+
         if packet.LLID == 3:
             self.on_ctl_pdu(packet)
         elif packet.LLID in (1,2):
@@ -499,6 +530,159 @@ class BLE(WhadDeviceConnector):
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         else:
             return False
+
+class Sniffer(BLE):
+    """
+    BLE Sniffer interface for compatible WHAD device.
+    """
+    def __init__(self, device):
+        super().__init__(device)
+        self.__synchronized = False
+        self.__connection = None
+        self.__configuration = SnifferConfiguration()
+
+        # Check if device accepts advertisements or connection sniffing
+        if not self.can_sniff_advertisements() and not self.can_sniff_new_connection():
+            raise UnsupportedCapability("Sniff")
+        else:
+            self.stop()
+
+    def is_synchronized(self):
+        return self.__synchronized
+
+    @property
+    def access_address(self):
+        if self.__connection is None:
+            return 0x8e89bed6
+        else:
+            return self.__connection.access_address
+
+    @property
+    def crc_init(self):
+        if self.__connection is None:
+            return 0x555555
+        else:
+            return self.__connection.crc_init
+
+    @property
+    def hop_interval(self):
+        if self.__connection is None:
+            return None
+        else:
+            return self.__connection.hop_interval
+
+    @property
+    def hop_increment(self):
+        if self.__connection is None:
+            return None
+        else:
+            return self.__connection.hop_interval
+
+    @property
+    def channel_map(self):
+        if self.__connection is None:
+            return None
+        else:
+            return self.__connection.channel_map
+
+    def on_synchronized(self, access_address=None, crc_init=None, hop_increment=None, hop_interval=None, channel_map=None):
+        self.__synchronized = True
+        self.__connection = SynchronizedConnection(
+            access_address = access_address,
+            crc_init = crc_init,
+            hop_increment = hop_increment,
+            hop_interval = hop_interval,
+            channel_map = channel_map
+        )
+        print("[sniffer] Connection synchronized -> access_address={}, crc_init={}, hop_interval={} ({} us), hop_increment={}, channel_map={}.".format(
+                    "0x{:08x}".format(self.__connection.access_address),
+                    "0x{:06x}".format(self.__connection.crc_init),
+                    str(self.__connection.hop_interval), str(self.__connection.hop_interval*1250),
+                    str(self.__connection.hop_increment),
+                    "0x"+self.__connection.channel_map.hex()
+        ))
+
+    def on_desynchronized(self, access_address=None):
+        self.__synchronized = False
+        self.__connection = None
+        print("[sniffer] Connection lost.")
+
+    def _enable_sniffing(self):
+        if self.__configuration.follow_connection:
+            if not self.can_sniff_new_connection():
+                raise UnsupportedCapability("Sniff")
+            else:
+                self.sniff_new_connection(channel=self.__configuration.channel, show_advertisements=self.__configuration.show_advertisements ,show_empty_packets=self.__configuration.show_empty_packets, bd_address=self.__configuration.filter)
+        elif self.__configuration.show_advertisements:
+            if not self.can_sniff_advertisements():
+                raise UnsupportedCapability("Sniff")
+            else:
+                self.sniff_advertisements(channel=self.__configuration.channel,bd_address=self.__configuration.filter)
+
+    def configure(self, advertisements=True, connection=True, empty_packets=False):
+        self.stop()
+        self.__configuration.show_advertisements = advertisements
+        self.__configuration.show_empty_packets = empty_packets
+        self.__configuration.follow_connection = connection
+        self._enable_sniffing()
+
+    @property
+    def filter(self):
+        return self.__configuration.filter.upper()
+
+    @filter.setter
+    def set_filter(self, address="FF:FF:FF:FF:FF:FF"):
+        self.stop()
+        self.__configuration.filter = address.upper()
+        self._enable_sniffing()
+
+    @property
+    def channel(self):
+        return self.__configuration.channel
+
+    @channel.setter
+    def set_channel(self, channel=37):
+        self.stop()
+        self.__configuration.channel = channel
+        self._enable_sniffing()
+
+
+    def available_actions(self, filter=None):
+        actions = []
+        if self.__synchronized:
+            if self.can_inject():
+                actions.append(Injector(self.device, connection=self.__connection))
+
+            return [action for action in actions if filter is None or isinstance(action, filter)]
+
+    def sniff(self):
+        while True:
+            if self.support_raw_pdu():
+                message_type = "raw_pdu"
+            elif self.__synchronized:
+                message_type = "pdu"
+            else:
+                message_type = "adv_pdu"
+
+            message = self.wait_for_message(filter=message_filter('ble', message_type))
+            yield self._build_scapy_packet_from_message(message.ble, message_type)
+
+
+class Injector(BLE):
+
+    def __init__(self, device, connection=None):
+        super().__init__(device)
+        self.__connection = connection
+
+        # Check if device accepts injection
+        if not self.can_inject():
+            raise UnsupportedCapability("Inject")
+
+    def inject(self, packet):
+        # implement send_raw_pdu ?
+        self.send_pdu(packet, access_address=self.__connection.access_address, direction=BleDirection.UNKNOWN)
+        message = self.wait_for_message(filter=message_filter('ble', 'injected'))
+        return (message.ble.injected.success, message.ble.injected.injection_attempts)
 
 class Scanner(BLE):
     """
@@ -561,13 +745,16 @@ class Central(BLE):
     def connect(self, bd_address, timeout=30):
         """Connect to a target device
         """
-        self.connect_to(bd_address)
-        self.start()
-        start_time=time()
-        while not self.__connected:
-            if time()-start_time >= timeout:
-                return None
-        return self.__peripheral
+        if self.can_connect():
+            self.connect_to(bd_address)
+            self.start()
+            start_time=time()
+            while not self.__connected:
+                if time()-start_time >= timeout:
+                    return None
+            return self.__peripheral
+        else:
+            return None
 
     def peripheral(self):
         return self.__peripheral
@@ -588,22 +775,22 @@ class Central(BLE):
     def on_disconnected(self, connection_data):
         self.__stack.on_disconnected(connection_data.conn_handle)
 
-    def on_ctl_pdu(self, conn_handle, direction, pdu):
+    def on_ctl_pdu(self, pdu):
         """This method is called whenever a control PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
 
         Central devices act as a master, so we only forward slave to master
         messages to the stack.
         """
-        if direction == BleDirection.SLAVE_TO_MASTER:
-            self.__stack.on_ctl_pdu(conn_handle, pdu)
+        if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
+            self.__stack.on_ctl_pdu(pdu.metadata.connection_handle, pdu)
 
-    def on_data_pdu(self, conn_handle, direction, pdu):
+    def on_data_pdu(self, pdu):
         """This method is called whenever a data PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
         """
-        if direction == BleDirection.SLAVE_TO_MASTER:
-            self.__stack.on_data_pdu(conn_handle, pdu)
+        if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
+            self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
 
 
     def on_new_connection(self, connection):

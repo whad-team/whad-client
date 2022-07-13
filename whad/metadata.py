@@ -16,10 +16,10 @@ class BLEMetadata(Metadata):
     is_crc_valid : bool = None
     relative_timestamp : int = None
 
-def generate_metadata(message):
+def generate_metadata(message, msg_type):
     metadata = BLEMetadata()
-    if is_message_type(message, "ble", "raw_pdu"):
-        message = message.ble.raw_pdu
+    if msg_type == "raw_pdu":
+        message = message.raw_pdu
         metadata.direction = message.direction
         if message.HasField("rssi"):
             metadata.rssi = message.rssi
@@ -31,15 +31,14 @@ def generate_metadata(message):
         if message.HasField("relative_timestamp"):
             metadata.relative_timestamp = message.relative_timestamp
 
-    elif is_message_type(message, "ble", "adv_pdu"):
-        message = message.ble.adv_pdu
+    elif msg_type == "adv_pdu":
+        message = message.adv_pdu
         metadata.direction = BleDirection.UNKNOWN
         metadata.rssi = message.rssi
 
-    elif is_message_type(message, "ble", "pdu"):
-        message = message.ble.pdu
+    elif msg_type == "pdu":
+        message = message.pdu
         metadata.connection_handle = message.ble.pdu.connection_handle
         metadata.direction = message.direction
 
-    metadata = BLEMetadata()
     return metadata

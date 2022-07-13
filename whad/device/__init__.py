@@ -14,7 +14,7 @@ class WhadDeviceInfo(object):
     :param DeviceInfoResp info_resp:  Whad message containing the device basic information.
     """
     def __init__(self, info_resp):
-        
+
         # Store device information
         self.__whad_version = info_resp.proto_min_ver
         self.__fw_ver_maj = info_resp.fw_version_major
@@ -56,14 +56,14 @@ class WhadDeviceInfo(object):
         :param Capability capability: capability to check
         """
         if domain in self.__domains:
-            
+
             return (self.__domains[domain] & (1 << capability) > 0)
         return False
 
 
     def get_domain_capabilities(self, domain):
         """Get device domain capabilities.
-        
+
         :param Domain domain: target domain
         :returns: Domain capabilities
         :rtype: Bitmask of capabilities
@@ -144,7 +144,7 @@ class WhadDeviceConnector(object):
         self.set_device(device)
         if self.__device is not None:
             self.__device.set_connector(self)
-        
+
 
     def set_device(self, device=None):
         """
@@ -154,7 +154,7 @@ class WhadDeviceConnector(object):
         """
         if device is not None:
             self.__device = device
-    
+
     @property
     def device(self):
         return self.__device
@@ -162,7 +162,7 @@ class WhadDeviceConnector(object):
     # Device interaction
     def send_message(self, message, filter=None):
         """Sends a message to the underlying device without waiting for an answer.
-        
+
         :param Message message: WHAD message to send to the device.
         :param filter: optional filter function for incoming message queue.
         """
@@ -363,7 +363,7 @@ class WhadDevice(object):
 
         # Ask for a reset
         self.reset()
-        
+
 
     def close(self):
         """
@@ -413,7 +413,7 @@ class WhadDevice(object):
 
             # Wait for a matching message to be caught (blocking)
             msg = self.__msg_queue.get(block=True, timeout=timeout)
-            
+
             # If message does not match, dispatch.
             if not self.__mq_filter(msg):
                 self.dispatch_message(msg)
@@ -424,7 +424,7 @@ class WhadDevice(object):
     def send_message(self, message, keep=None):
         """
         Serializes a message and sends it to the device, without waiting for an answer.
-        Optionally, you can update the message queue filter if you need to wait for 
+        Optionally, you can update the message queue filter if you need to wait for
         specific messages after the message sent.
 
         :param Message message: Message to send
@@ -494,7 +494,7 @@ class WhadDevice(object):
                         _msg = Message()
                         _msg.ParseFromString(raw_message)
                         self.on_message_received(_msg)
-                        
+
                         # Chomp
                         self.__inpipe = self.__inpipe[msg_size + 4:]
                     else:
@@ -532,7 +532,7 @@ class WhadDevice(object):
         :param Message message: Message received
         """
         # If message queue filter is defined and message matches this filter,
-        # move it into our message queue. 
+        # move it into our message queue.
         if self.__mq_filter is not None and self.__mq_filter(message):
             #print('msgqueue: %s' % message)
             self.__msg_queue.put(message, block=True)
@@ -552,7 +552,7 @@ class WhadDevice(object):
 
     ######################################
     # Generic messages handling
-    ######################################   
+    ######################################
 
     def on_generic_msg(self, message):
         """
@@ -677,7 +677,7 @@ class WhadDevice(object):
                         resp.discovery.domain_resp.domain,
                         resp.discovery.domain_resp.supported_commands
                     )
-                
+
                 # Mark device as discovered
                 self.__discovered = True
             else:
@@ -701,7 +701,7 @@ class WhadDevice(object):
 
     ######################################
     # Upper layers (domains) handling
-    ######################################   
+    ######################################
 
     def on_domain_msg(self, domain, message):
         """
