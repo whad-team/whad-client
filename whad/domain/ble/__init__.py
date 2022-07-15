@@ -421,7 +421,6 @@ class BLE(WhadDeviceConnector):
             return
 
         if domain == 'ble':
-            #print("<", message)
             msg_type = message.WhichOneof('msg')
             if msg_type == 'adv_pdu':
                 packet = self._build_scapy_packet_from_message(message, msg_type)
@@ -530,7 +529,6 @@ class BLE(WhadDeviceConnector):
             packet.metadata.connection_handle = conn_handle
 
             msg = self._build_message_from_scapy_packet(packet)
-            #print(">", msg)
 
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
@@ -550,8 +548,6 @@ class Sniffer(BLE):
         # Check if device accepts advertisements or connection sniffing
         if not self.can_sniff_advertisements() and not self.can_sniff_new_connection():
             raise UnsupportedCapability("Sniff")
-        else:
-            self.stop()
 
     def is_synchronized(self):
         return self.__synchronized
@@ -693,14 +689,16 @@ class Hijacker(BLE):
         actions = []
         if self.__status:
             # It should be replaced by arguments in function calls, building a pseudo packet seems dirty
-            pseudo_connection = Message()
-            pseudo_connection.ble.connected.CopyFrom(Connected())
-            pseudo_connection.ble.connected.conn_handle = 0
-
             if self.__hijack_master:
+                pseudo_connection = Message()
+                pseudo_connection.ble.connected.CopyFrom(Connected())
+                pseudo_connection.ble.connected.conn_handle = 0
                 actions.append(Central(self.device, existing_connection=pseudo_connection.ble.connected))
-            #if self.__hijack_slave:
-            #    actions.append(Peripheral(self.device))
+            if self.__hijack_slave:
+                pseudo_connection = Message()
+                pseudo_connection.ble.connected.CopyFrom(Connected())
+                pseudo_connection.ble.connected.conn_handle = 1
+                actions.append(Peripheral(self.device, existing_connection=pseudo_connection.ble.connected))
         return [action for action in actions if filter is None or isinstance(action, filter)]
 
     def hijack(self, master = True, slave = False):
@@ -780,10 +778,79 @@ class Scanner(BLE):
             else:
                 print('nope')
 
+class Peripheral(BLE):
+    def __init__(self, device, existing_connection = None):
+        super().__init__(device)
+
+        self.use_stack(BleStack)
+        self.__connected = False
+
+        # Check if device accepts peripheral mode
+        if not self.can_be_peripheral():
+            raise UnsupportedCapability("Peripheral")
+        else:
+            self.enable_peripheral_mode()
+
+            # If an existing connection is hijacked, simulate a connection
+            if existing_connection is not None:
+                self.on_connected(existing_connection)
+
+    def send_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6):
+        """
+        Override send_pdu to use SLAVE_TO_MASTER as default direction and use 1 as default connection handle.
+        """
+        super().send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address)
+
+    def use_stack(self, clazz=BleStack):
+        """Specify a stack class to use for BLE. By default, our own stack (BleStack) is used.
+        """
+        self.__stack = clazz(self)
+
+
+    ##############################
+    # Incoming events
+    ##############################
+
+    def on_connected(self, connection_data):
+        self.__stack.on_connection(connection_data)
+
+    def on_disconnected(self, connection_data):
+        self.__stack.on_disconnected(connection_data.conn_handle)
+
+    def on_ctl_pdu(self, pdu):
+        """This method is called whenever a control PDU is received.
+        This PDU is then forwarded to the BLE stack to handle it.
+
+        Peripheral devices act as a slave, so we only forward master to slave
+        messages to the stack.
+        """
+        if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
+            pass
+            # self.__stack.on_ctl_pdu(pdu.metadata.connection_handle, pdu)
+
+    def on_data_pdu(self, pdu):
+        """This method is called whenever a data PDU is received.
+        This PDU is then forwarded to the BLE stack to handle it.
+        """
+        if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
+            pass
+            #self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
+
+
+    def on_new_connection(self, connection):
+        """On new connection, discover primary services
+        """
+        print('>> on connection')
+
+        # Use GATT server
+        self.connection = connection
+        # connection.use_gatt_class(GattServer)
+        self.__connected = True
+
 
 class Central(BLE):
 
-    def __init__(self, device, existing_connection=None):
+    def __init__(self, device, existing_connection = None):
         super().__init__(device)
 
         self.use_stack(BleStack)
@@ -796,6 +863,7 @@ class Central(BLE):
         else:
             # self.stop() # ButteRFly doesn't support calling stop when spawning central
             self.enable_central_mode()
+            # If an existing connection is hijacked, simulate a connection
             if existing_connection is not None:
                 self.on_connected(existing_connection)
 

