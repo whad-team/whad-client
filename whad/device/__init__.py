@@ -311,8 +311,8 @@ class WhadDevice(object):
         self.__info = None
         self.__discovered = False
 
-        # Device connector
-        self.__connector = None
+        # Device connectors
+        self.__connectors = []
 
         # Device IO thread
         self.__io_thread = None
@@ -343,8 +343,8 @@ class WhadDevice(object):
 
         :param WhadDeviceConnector connector: connector to be used with this device.
         """
-        self.__connector = connector
-
+        #self.__connector = connector
+        self.__connectors.append(connector)
 
     ######################################
     # Device I/O operations
@@ -565,9 +565,10 @@ class WhadDevice(object):
             if message.result == ResultCode.UNSUPPORTED_DOMAIN:
                 raise UnsupportedDomain()
 
-        # Forward everything to the connector, if any
-        if self.__connector is not None:
-            self.__connector.on_generic_msg(message)
+        # Forward everything to the connectors, if any
+        if len(self.__connectors) != 0:
+            for connector in self.__connectors:
+                connector.on_generic_msg(message)
 
 
     ######################################
@@ -579,9 +580,11 @@ class WhadDevice(object):
         Method called when a discovery message is received. If a connector has
         been associated with the device, forward this message to this connector.
         """
-        if self.__connector is not None:
-            self.__connector.on_discovery_msg(message)
 
+        # Forward everything to the connectors, if any
+        if len(self.__connectors) != 0:
+            for connector in self.__connectors:
+                connector.on_discovery_msg(message)
 
     def has_domain(self, domain):
         """Checks if device supports a specific domain.
@@ -712,8 +715,11 @@ class WhadDevice(object):
         :param Domain domain: Target domain
         :param Message message: Domain-related message received
         """
-        if self.__connector is not None:
-            return self.__connector.on_domain_msg(domain, message)
+
+        # Forward everything to the connectors, if any
+        if len(self.__connectors) != 0:
+            for connector in self.__connectors:
+                connector.on_domain_msg(domain, message)
         return False
 
 
