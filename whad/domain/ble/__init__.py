@@ -15,7 +15,7 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SendRawPDUCmd, StartCmd, StopCmd, \
     ScanMode, Start, Stop, BleAdvType, ConnectToCmd, ConnectTo, CentralModeCmd, PeripheralMode, \
     PeripheralModeCmd, SendPDUCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
-    HijackSlave, HijackBoth, SendRawPDU
+    HijackSlave, HijackBoth, SendRawPDU, Connected
 from whad.domain.ble.stack import BleStack
 from scapy.compat import raw
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_CTRL, BTLE_DATA, BTLE_ADV_IND, \
@@ -421,6 +421,7 @@ class BLE(WhadDeviceConnector):
             return
 
         if domain == 'ble':
+            #print("<", message)
             msg_type = message.WhichOneof('msg')
             if msg_type == 'adv_pdu':
                 packet = self._build_scapy_packet_from_message(message, msg_type)
@@ -526,6 +527,8 @@ class BLE(WhadDeviceConnector):
             packet.metadata.connection_handle = conn_handle
 
             msg = self._build_message_from_scapy_packet(packet)
+            #print(">", msg)
+
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         else:
@@ -653,6 +656,9 @@ class Sniffer(BLE):
             if self.can_inject():
                 actions.append(Injector(self.device, connection=self.__connection))
 
+            if self.can_hijack_both() or self.can_hijack_slave() or self.can_hijack_master():
+                actions.append(Hijacker(self.device, connection=self.__connection))
+
             return [action for action in actions if filter is None or isinstance(action, filter)]
 
     def sniff(self):
@@ -667,6 +673,52 @@ class Sniffer(BLE):
             message = self.wait_for_message(filter=message_filter('ble', message_type))
             yield self._build_scapy_packet_from_message(message.ble, message_type)
 
+class Hijacker(BLE):
+
+    def __init__(self, device, connection=None):
+        super().__init__(device)
+        self.__connection = connection
+        self.__hijack_master = False
+        self.__hijack_slave = False
+        self.__status = False
+
+        # Check if device accepts hijacking
+        if not self.can_hijack_slave() and not self.can_hijack_master():
+            raise UnsupportedCapability("Hijack")
+
+    def available_actions(self, filter=None):
+        actions = []
+        if self.__status:
+            # It should be replaced by arguments in function calls, building a pseudo packet seems dirty
+            pseudo_connection = Message()
+            pseudo_connection.ble.connected.CopyFrom(Connected())
+            pseudo_connection.ble.connected.conn_handle = 0
+
+            if self.__hijack_master:
+                actions.append(Central(self.device, existing_connection=pseudo_connection.ble.connected))
+            #if self.__hijack_slave:
+            #    actions.append(Peripheral(self.device))
+        return [action for action in actions if filter is None or isinstance(action, filter)]
+
+    def hijack(self, master = True, slave = False):
+        """
+        Hijack master, slave, or both
+        """
+        if master and slave:
+            self.__hijack_master = master
+            self.__hijack_slave = slave
+            self.hijack_both(self.__connection.access_address)
+        elif master:
+            self.__hijack_master = master
+            self.hijack_master(self.__connection.access_address)
+
+        elif slave:
+            self.__hijack_slave = slave
+            self.hijack_slave(self.__connection.access_address)
+
+        message = self.wait_for_message(filter=message_filter('ble', 'hijacked'))
+        self.__status = message.ble.hijacked.success
+        return (message.ble.hijacked.success)
 
 class Injector(BLE):
 
@@ -728,7 +780,7 @@ class Scanner(BLE):
 
 class Central(BLE):
 
-    def __init__(self, device):
+    def __init__(self, device, existing_connection=None):
         super().__init__(device)
 
         self.use_stack(BleStack)
@@ -739,8 +791,10 @@ class Central(BLE):
         if not self.can_be_central():
             raise UnsupportedCapability('Central')
         else:
-            self.stop()
+            # self.stop() # ButteRFly doesn't support calling stop when spawning central
             self.enable_central_mode()
+            if existing_connection is not None:
+                self.on_connected(existing_connection)
 
     def connect(self, bd_address, timeout=30):
         """Connect to a target device

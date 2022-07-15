@@ -31,6 +31,8 @@ def generate_metadata(message, msg_type):
         if message.HasField("relative_timestamp"):
             metadata.relative_timestamp = message.relative_timestamp
 
+        metadata.connection_handle = message.conn_handle
+
     elif msg_type == "adv_pdu":
         message = message.adv_pdu
         metadata.direction = BleDirection.UNKNOWN
@@ -38,7 +40,7 @@ def generate_metadata(message, msg_type):
 
     elif msg_type == "pdu":
         message = message.pdu
-        metadata.connection_handle = message.ble.pdu.connection_handle
+        metadata.connection_handle = message.conn_handle
         metadata.direction = message.direction
 
     return metadata

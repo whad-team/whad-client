@@ -61,7 +61,7 @@ class Gatt(object):
         """
         self.att.error_response(
             request,
-            handle, 
+            handle,
             reason
         )
 
@@ -200,9 +200,9 @@ class Gatt(object):
 
         :param int item_length: Item length
         :param data: List of items
-        """        
+        """
         pass
-        
+
     def on_write_request(self, handle, data):
         """ATT Write Request callback
 
@@ -259,7 +259,7 @@ class Gatt(object):
         """ATT Execute Write Response callback
         """
         pass
-        
+
     def on_handle_value_notification(self, notification):
         """ATT Handle Value Notification
 
@@ -407,7 +407,7 @@ class GattClient(Gatt):
                 return None
             else:
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
-            
+
 
     def discover_primary_services(self):
         """Discover remote Primary Services.
@@ -433,7 +433,7 @@ class GattClient(Gatt):
                         end_handle=item.end
                     )
                     handle = item.end
-                    
+
                     if handle == 0xFFFF:
                         return
 
@@ -466,17 +466,17 @@ class GattClient(Gatt):
                         end_handle=item.end
                     )
                     handle = item.end
-                    
+
                     if handle == 0xFFFF:
                         return
-                    
+
                 handle += 1
             elif isinstance(msg, GattErrorResponse):
                 if msg.reason == AttErrorCode.ATTR_NOT_FOUND:
                     break
                 else:
                     error_response_to_exc(msg.reason, msg.request, msg.handle)
-        
+
     def discover_characteristics(self, service):
         """
         Discover service characteristics
@@ -485,7 +485,7 @@ class GattClient(Gatt):
             handle = service.handle
         else:
             return
-        
+
         while handle <= service.end_handle:
             self.att.read_by_type_request(
                 handle,
@@ -532,7 +532,7 @@ class GattClient(Gatt):
                 if isinstance(msg, GattFindInfoResponse):
                     for descriptor in msg:
                         handle = descriptor.handle
-                        
+
                         # End discovery if returned handle is Ending Handle (0xFFFF)
                         if handle == 0xFFFF:
                             return
@@ -545,13 +545,12 @@ class GattClient(Gatt):
                         error_response_to_exc(msg.reason, msg.request, msg.handle)
 
                 handle += 1
-    
+
     def discover(self):
         # Discover services
         services = []
         for service in self.discover_primary_services():
             services.append(service)
-
         for service in services:
             for characteristic in self.discover_characteristics(service):
                 service.add_characteristic(characteristic)
@@ -572,7 +571,7 @@ class GattClient(Gatt):
 
     def read(self, handle):
         """Read a characteristic or a descriptor.
-        
+
         :param int handle: Handle of the attribute to read (descriptor or characteristic)
         """
         self.att.read_request(gatt_handle=handle)
@@ -643,12 +642,3 @@ class GattClient(Gatt):
 
     def services(self):
         return self.__model.services()
-
-
-
-        
-
-    
-    
-
-    

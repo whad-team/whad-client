@@ -44,7 +44,7 @@ class BleConnection(object):
     def send_l2cap_data(self, data, fragment=False):
         """Sends data back
         """
-        self.__llm.send_data(self.__conn_handle, data, fragment)    
+        self.__llm.send_data(self.__conn_handle, data, fragment)
 
     def use_gatt_class(self, clazz):
         self.__l2cap.att.use_gatt_class(clazz)
@@ -54,7 +54,7 @@ class BleConnection(object):
         return self.__l2cap.att.gatt
 
 class BleLinkLayerManager(object):
-    
+
     def __init__(self, stack):
         self.__stack = stack
         self.__handlers = {
