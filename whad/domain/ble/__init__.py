@@ -614,12 +614,20 @@ class Sniffer(BLE):
             if not self.can_sniff_new_connection():
                 raise UnsupportedCapability("Sniff")
             else:
-                self.sniff_new_connection(channel=self.__configuration.channel, show_advertisements=self.__configuration.show_advertisements ,show_empty_packets=self.__configuration.show_empty_packets, bd_address=self.__configuration.filter)
+                self.sniff_new_connection(
+                    channel=self.__configuration.channel,
+                    show_advertisements=self.__configuration.show_advertisements,
+                    show_empty_packets=self.__configuration.show_empty_packets,
+                    bd_address=self.__configuration.filter
+                )
         elif self.__configuration.show_advertisements:
             if not self.can_sniff_advertisements():
                 raise UnsupportedCapability("Sniff")
             else:
-                self.sniff_advertisements(channel=self.__configuration.channel,bd_address=self.__configuration.filter)
+                self.sniff_advertisements(
+                    channel=self.__configuration.channel,
+                    bd_address=self.__configuration.filter
+                )
 
     def configure(self, advertisements=True, connection=True, empty_packets=False):
         self.stop()
@@ -779,6 +787,7 @@ class Scanner(BLE):
                 print('nope')
 
 class Peripheral(BLE):
+    
     def __init__(self, device, existing_connection = None):
         super().__init__(device)
 
