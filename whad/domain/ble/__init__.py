@@ -428,16 +428,19 @@ class BLE(WhadDeviceConnector):
                 self.on_adv_pdu(packet)
 
             elif msg_type == 'pdu':
-                if pdu.processed:
+                if message.pdu.processed:
                     print('[ble PDU log-only]')
                 else:
                     packet = self._build_scapy_packet_from_message(message, msg_type)
                     self.on_pdu(packet)
 
             elif msg_type == 'raw_pdu':
-                # Extract scapy packet
-                packet = self._build_scapy_packet_from_message(message, msg_type)
-                self.on_raw_pdu(packet)
+                if message.raw_pdu.processed:
+                    print('[ble PDU log-only]')
+                else:
+                    # Extract scapy packet
+                    packet = self._build_scapy_packet_from_message(message, msg_type)
+                    self.on_raw_pdu(packet)
 
             elif msg_type == 'synchronized':
                 self.on_synchronized(
