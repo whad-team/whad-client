@@ -12,20 +12,20 @@ def print_data_and_hex(data, is_handle_in_data, prefix=""):
     :type prefix: str
 
     """
-    print prefix + "Data (Copy/Paste version)"
-    print prefix + "=========================="
+    print(prefix + "Data (Copy/Paste version)")
+    print(prefix + "==========================")
     if data == -1:
-        print prefix + "Invalid Handle/UUID"
-        print prefix + "====="
+        print(prefix + "Invalid Handle/UUID")
+        print(prefix + "=====")
         return
     if data == -2:
-        print prefix + "Permission error. Cannot read supplied handle/UUID."
-        print prefix + "====="
+        print(prefix + "Permission error. Cannot read supplied handle/UUID.")
+        print(prefix + "=====")
         return
 
     if data is None:
-        print prefix + "No data found from a previous from a previous read operation."
-        print prefix + "====="
+        print(prefix + "No data found from a previous from a previous read operation.")
+        print(prefix + "=====")
         return
     if isinstance(data, list):
         for i in data:
@@ -42,12 +42,12 @@ def print_data_and_hex(data, is_handle_in_data, prefix=""):
                 handle = i[:2][::-1]
                 i = i[2:]
                 if handle is not None:
-                    print prefix + "Handle:", "".join("{:02x}".format(ord(c)) for c in handle)
+                    print(prefix + "Handle:", "".join("{:02x}".format(ord(c)) for c in handle))
                 else:
-                    print prefix + "Handle:"
-            print prefix + str(i)
-            print prefix + "-" * len(str(i))
-            print prefix + " ". join("{:02x}".format(ord(c)) for c in str(i))
+                    print(prefix + "Handle:")
+            print(prefix + str(i))
+            print(prefix + "-" * len(str(i)))
+            print(prefix + " ". join("{:02x}".format(ord(c)) for c in str(i)))
     else:
         if is_handle_in_data:
             # UUID read response packets contain
@@ -56,10 +56,10 @@ def print_data_and_hex(data, is_handle_in_data, prefix=""):
             handle = data[:2][::-1]
             i = data[2:]
             if handle is not None:
-                print prefix + "Handle:", "".join("{:02x}".format(ord(c)) for c in handle)
+                print(prefix + "Handle:", "".join("{:02x}".format(ord(c)) for c in handle))
             else:
-                print prefix + "Handle:"
-        print prefix + str(data)
-        print prefix + "-" * len(str(data))
-        print prefix + " ".join("{:02x}".format(ord(c)) for c in str(data))
-    print prefix + "====="
+                print(prefix + "Handle:")
+        print(prefix + str(data))
+        print(prefix + "-" * len(str(data)))
+        print(prefix + " ".join("{:02x}".format(ord(c)) for c in str(data)))
+    print(prefix + "=====")
