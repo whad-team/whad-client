@@ -1,6 +1,3 @@
-from helpers import load_whad_path
-load_whad_path()
-
 from whad.domain.ble import Sniffer, Hijacker, Central, Peripheral
 from whad.device.uart import UartDevice
 from time import time,sleep
