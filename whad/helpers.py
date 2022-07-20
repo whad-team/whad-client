@@ -4,6 +4,8 @@ def message_filter(category, message):
 def is_message_type(message, category, message_type):
     if message.WhichOneof('msg') == category:
         return (hasattr(message, category) and getattr(message, category).WhichOneof('msg') == message_type)
+    else:
+        return False
 
 def bd_addr_to_bytes(bd_addr):
     """
@@ -27,7 +29,7 @@ def asciiz(s):
     """
     if not isinstance(s,bytes):
         return None
-        
+
     out=''
     for c in s:
         if s!=0:
