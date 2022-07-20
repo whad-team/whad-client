@@ -15,6 +15,7 @@ The project is structured as follow:
 │   ├── ble_injector.py
 │   ├── ble_master_hijacker.py
 │   └── ble_slave_hijacker.py
+├── TODO.md                           # TODO file
 ├── LICENSE                           # license file
 ├── pyproject.toml                    # configuration file
 ├── README.md                         # the README file you are currently reading
