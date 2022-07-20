@@ -492,7 +492,7 @@ class WhadDevice(object):
                     if len(self.__inpipe) >= (msg_size+4):
                         raw_message = self.__inpipe[4:4+msg_size]
                         _msg = Message()
-                        _msg.ParseFromString(raw_message)
+                        _msg.ParseFromString(bytes(raw_message))
                         self.on_message_received(_msg)
 
                         # Chomp
