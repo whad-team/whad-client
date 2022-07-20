@@ -1,4 +1,5 @@
 # WHAD library
+[![Tests](https://github.com/virtualabs/whad-client/actions/workflows/tests.yml/badge.svg)](https://github.com/virtualabs/whad-client/actions/workflows/tests.yml)
 
 This repository contains a python library allowing to easily interact with offensive hardware tools implementing the WHAD (Wireless HAcking Devices).
 
