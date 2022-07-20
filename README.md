@@ -33,7 +33,7 @@ The project is structured as follow:
 ## Required dependencies
 
 The following dependencies are needed to use this package:
-- protobuf (>=4.21.2)
+- protobuf (>=4.21.0)
 - scapy (>=2.4.55)
 - elementpath (>=2.4.0)
 - pyserial (>=3.5.0)
