@@ -9,6 +9,9 @@ def bd_addr_to_bytes(bd_addr):
     """
     Convert BD address to bytes
     """
+    if not isinstance(bd_addr,str):
+        return None
+
     # Clean BD address
     bd_addr_b = []
     bd_addr = bd_addr.replace(':','').lower()
@@ -22,6 +25,9 @@ def bd_addr_to_bytes(bd_addr):
 def asciiz(s):
     """Convert a bytes buffer into ascii
     """
+    if not isinstance(s,bytes):
+        return None
+        
     out=''
     for c in s:
         if s!=0:
