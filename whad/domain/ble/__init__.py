@@ -739,11 +739,16 @@ class Injector(BLE):
         if not self.can_inject():
             raise UnsupportedCapability("Inject")
 
-    def inject(self, packet):
-        # implement send_raw_pdu ?
-        self.send_pdu(packet, access_address=self.__connection.access_address, direction=BleDirection.UNKNOWN)
+    def inject_to_slave(self, packet):
+        self.send_pdu(packet, access_address=self.__connection.access_address, direction=BleDirection.INJECTION_TO_SLAVE)
         message = self.wait_for_message(filter=message_filter('ble', 'injected'))
         return (message.ble.injected.success, message.ble.injected.injection_attempts)
+
+    def inject_to_master(self, packet):
+        self.send_pdu(packet, access_address=self.__connection.access_address, direction=BleDirection.INJECTION_TO_MASTER)
+        message = self.wait_for_message(filter=message_filter('ble', 'injected'))
+        return (message.ble.injected.success, message.ble.injected.injection_attempts)
+
 
 class Scanner(BLE):
     """
@@ -787,7 +792,7 @@ class Scanner(BLE):
                 print('nope')
 
 class Peripheral(BLE):
-    
+
     def __init__(self, device, existing_connection = None):
         super().__init__(device)
 

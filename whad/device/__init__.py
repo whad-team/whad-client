@@ -1,7 +1,7 @@
 from threading import Thread, Lock
 from queue import Queue, Empty
 
-from elementpath import TypedAttribute
+#from elementpath import TypedAttribute
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, WhadDeviceNotReady
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message

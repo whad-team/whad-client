@@ -2,7 +2,6 @@
 Bluetooth LE Stack Link-layer Manager
 """
 
-from matplotlib.pyplot import connect
 from scapy.layers.bluetooth4LE import *
 
 from whad.domain.ble.stack.l2cap import BleL2CAP
