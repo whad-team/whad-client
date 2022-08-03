@@ -1,4 +1,4 @@
-from whad.domain.ble.crypto import e,em1
+from whad.domain.ble.crypto import e,em1,s1
 import pytest
 
 @pytest.mark.parametrize("test_input, expected", [
@@ -39,3 +39,13 @@ def test_em1(test_input, expected):
     ciphertext = bytes.fromhex(ciphertext)
     expected = bytes.fromhex(expected)
     assert em1(key,ciphertext) == expected
+
+@pytest.mark.parametrize("test_input, expected", [
+(("00000000000000000000000000000000", "000F0E0D0C0B0A091122334455667788", "010203040506070899AABBCCDDEEFF00"), "9a1fe1f0e8b0f49b5b4216ae796da062")
+])
+def test_s1(test_input, expected):
+    key, r1, r2 = test_input
+    key = bytes.fromhex(key)
+    r1,r2 = bytes.fromhex(r1), bytes.fromhex(r2)
+    expected = bytes.fromhex(expected)
+    assert s1(key,r1,r2) == expected
