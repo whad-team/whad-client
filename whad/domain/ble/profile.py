@@ -7,6 +7,8 @@ from whad.domain.ble.service import PrimaryService as BlePrimaryService, \
     SecondaryService as BleSecondaryService
 from whad.domain.ble.exceptions import InvalidHandleValueException
 from whad.domain.ble.stack.att.constants import BleAttProperties
+from whad.domain.ble.advdata import AdvDataFieldList, AdvFlagsField, AdvManufacturerSpecificData, \
+    AdvShortenedLocalName, AdvCompleteLocalName
 
 class Characteristic(object):
     """Characteristic model
