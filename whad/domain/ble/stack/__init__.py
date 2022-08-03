@@ -1,7 +1,9 @@
 """
 Pythonic Bluetooth LE stack
 """
+from whad.domain.ble.stack.gatt import GattClient
 from .llm import BleLinkLayerManager
+from .constants import BtVersion
 
 class BleStack:
     """
@@ -19,7 +21,7 @@ class BleStack:
     - BLE connection data (forward to upper layer, i.e. L2CAP)
     """
 
-    def __init__(self, connector):
+    def __init__(self, connector, gatt_class=None, bt_version=BtVersion(4, 0), manufacturer=0x0002, sub_version=0x0100):
         """
         Create an instance of BleStack associated with a specific connector. This
         connector provides the transport layer.
@@ -28,8 +30,26 @@ class BleStack:
         """
         self.__connector = connector
 
+        # Store BT supported version, manufacturer and sub version
+        self.__version = bt_version
+        self.__manufacturer = manufacturer
+        self.__sub_version = sub_version
+
         # Instanciate all the required controllers
-        self.__llm = BleLinkLayerManager(self)
+        self.__llm = BleLinkLayerManager(self, gatt_class)
+
+    @property
+    def manufacturer_id(self):
+        return self.__manufacturer
+
+    @property
+    def bt_version(self):
+        return self.__version.value
+
+    @property
+    def bt_sub_version(self):
+        return self.__sub_version
+
 
     #############################
     # Incoming messages
@@ -51,6 +71,9 @@ class BleStack:
 
     def send_data(self, conn_handle, data):
         self.__connector.send_data_pdu(data, conn_handle=conn_handle)
+
+    def send_control(self, conn_handle, pdu):
+        self.__connector.send_ctrl_pdu(pdu, conn_handle)
 
     ############################
     # Interact

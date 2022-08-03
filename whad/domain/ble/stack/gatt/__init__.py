@@ -10,7 +10,7 @@ from whad.domain.ble.stack.att.exceptions import InvalidHandleValueError, error_
 from whad.domain.ble.stack.gatt.message import *
 from whad.domain.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.domain.ble.profile import GenericProfile
-from whad.domain.ble.characteristic import Characteristic, ClientCharacteristicConfig
+from whad.domain.ble.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
 from whad.domain.ble.service import PrimaryService, SecondaryService
 
 
@@ -22,15 +22,30 @@ class Gatt(object):
     request and sending default responses whenever it is possible.
     """
 
-    def __init__(self, att):
+    def __init__(self, att=None):
         """Gatt constructor
         """
         self.__att = att
         self.__queue = Queue()
 
+    def attach(self, att):
+        """Attach this GATT instance to the underlying ATT layer
+        """
+        self.__att = att
+
     @property
     def att(self):
         return self.__att
+
+    def indicate(self, characteristic):
+        """Send an indication to a GATT client. Not implemented by default.
+        """
+        pass
+
+    def notify(self, characteristic):
+        """Send a notfication to a GATT client. Not implemented by default.
+        """
+        pass
 
     def on_gatt_message(self, message):
         """Add a GATT message into our message queue
@@ -276,13 +291,17 @@ class Gatt(object):
         """
         pass
 
+    def on_terminated(self):
+        """Called when the underlying connection has been terminated.
+        """
+        pass
 
 class GattClient(Gatt):
     """GATT client
     """
 
-    def __init__(self, att):
-        super().__init__(att)
+    def __init__(self):
+        super().__init__()
         self.__model = GenericProfile()
         self.__notification_callbacks = {}
 
@@ -566,8 +585,6 @@ class GattClient(Gatt):
                                 handle=descriptor.handle
                             )
                         )
-        print(self.__model)
-
 
     def read(self, handle):
         """Read a characteristic or a descriptor.
@@ -642,3 +659,651 @@ class GattClient(Gatt):
 
     def services(self):
         return self.__model.services()
+
+
+class GattServer(Gatt):
+    """
+    BLE GATT server
+    """
+
+    def __init__(self, model):
+        """Instanciate our GATT server and use the provided device model
+
+        :param DeviceModel model: Device model object
+        """
+        super().__init__()
+        self.__model = model
+
+        # Prepared write queues
+        self.__write_queues = {}
+
+        # Subscribed characteristics
+        self.__subscribed_characs = []
+
+    ###################################
+    # Supported response handlers
+    ###################################
+
+
+    ###################################
+    # GATT procedures
+    ###################################
+
+    def notify(self, characteristic):
+        """Sends a notification to a GATT client for a given characteristic.
+
+        :param Characteristic characteristic: Characteristic to notify the GATT client about.
+        """
+        self.att.handle_value_notification(
+            characteristic.value_handle,
+            characteristic.value[:self.att.local_mtu-3]
+        )
+
+    def indicate(self, characteristic):
+        """Sends an indication to a GATT client for a given characteristic.
+
+        :param Characteristic characteristic: Characteristic to notify the GATT client about.
+        """
+        self.att.handle_value_indication(
+            characteristic.value_handle,
+            characteristic.value[:self.att.local_mtu-3]
+        )
+
+    def on_find_info_request(self, request):
+        """Find information request
+        """
+        # List attributes by type UUID, sorted by handles
+        attrs = {}
+        attrs_handles = []
+        for attribute in self.__model.find_objects_by_range(request.start, request.end):
+            attrs[attribute.handle] = attribute
+            attrs_handles.append(attribute.handle)
+        attrs_handles.sort()
+
+        # If we have at least one item to return
+        if len(attrs_handles) > 0:
+            
+            # Get MTU
+            mtu = self.att.local_mtu
+
+            # Get item size (UUID size + 2)
+            uuid_size = len(attrs[attrs_handles[0]].type_uuid.packed)
+            if uuid_size == 2:
+                item_format = 1
+            else:
+                item_format = 2
+            item_size = uuid_size + 2
+            max_nb_items = int((mtu - 2) / item_size)
+            
+            # Create our datalist
+            datalist = GattAttributeDataList(item_size)
+
+            # Iterate over items while UUID size matches and data fits in MTU
+            for i in range(max_nb_items):
+                if i < len(attrs_handles):
+                    handle = attrs_handles[i]
+                    attr_obj = attrs[handle]
+                    if len(attr_obj.type_uuid.packed) == uuid_size:
+                        datalist.append(
+                            GattHandleUUIDItem(
+                                attr_obj.handle,
+                                attr_obj.type_uuid
+                            )
+                        )
+                else:
+                    break
+            
+            # Once datalist created, send answer
+            datalist_raw = datalist.to_bytes()
+            self.att.find_info_response(item_format, datalist_raw)
+        else:
+            self.error(
+               BleAttOpcode.FIND_INFO_REQUEST,
+               request.start,
+               BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            )
+
+
+    def on_read_request(self, request):
+        """Read attribute value (if any)
+
+        :param int handle: Characteristic or descriptor handle
+        """
+        try:
+            # Search attribute by handle and send respons
+            attr = self.__model.find_object_by_handle(request.handle)
+
+            # Ensure attribute is a readable characteristic value or a descriptor
+            if isinstance(attr, CharacteristicValue):
+
+                # Check characteristic is readable
+                charac = self.__model.find_object_by_handle(request.handle - 1)
+
+                if charac.readable():
+                    service = self.__model.find_service_by_characteristic_handle(charac.handle)
+                    value =  self.__model.on_characteristic_read(
+                        service,
+                        charac,
+                        0,
+                        self.att.local_mtu - 1
+                    )
+
+                    # If value is none, return an error while reading
+                    if value is None:
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.READ_NOT_PERMITTED
+                        )
+                    else:
+                        # Make sure the returned value matches the boundaries
+                        value = value[:self.att.local_mtu - 1]
+
+                        self.att.read_response(
+                            value
+                        )
+                else:
+                    # Characteristic is not readable
+                    self.error(
+                        BleAttOpcode.READ_REQUEST,
+                        request.handle,
+                        BleAttErrorCode.READ_NOT_PERMITTED
+                    )
+            elif isinstance(attr, CharacteristicDescriptor):
+                # Make sure the returned value matches the boundaries
+                self.att.read_response(
+                    attr.value[:self.att.local_mtu - 1]
+                )
+
+        except IndexError as e:
+            print('Error occured, attribute not found')
+            self.error(
+                BleAttOpcode.READ_REQUEST,
+                request.handle,
+                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            )
+
+
+    def on_read_blob_request(self, request: GattReadBlobRequest):
+        """Read blob request
+        """
+        try:
+            # Search attribute by handle and send response
+            attr = self.__model.find_object_by_handle(request.handle)
+
+            if request.offset < len(attr.value):
+
+                # If attribute is a characteristic, make sure it is readable
+                # before returning a value.
+                if isinstance(attr, CharacteristicValue):
+                    charac = self.__model.find_object_by_handle(request.handle - 1)
+                    service = self.__model.find_service_by_characteristic_handle(charac.handle)
+                    if not charac.readable():
+                        self.error(
+                            BleAttOpcode.READ_BLOB_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.READ_NOT_PERMITTED
+                        )
+                        return
+
+                    # Call our characteristic read hook
+                    value =  self.__model.on_characteristic_read(
+                        service,
+                        charac,
+                        request.offset,
+                        self.att.local_mtu - 1
+                    )
+
+                    if value is None:
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.READ_NOT_PERMITTED
+                        )
+                    else:
+                        # Make sure the returned value matches the boundaries
+                        value = value[:self.att.local_mtu - 1]
+
+                        # Valid offset, return data[offset:offset + MTU - 1]
+                        self.att.read_blob_response(
+                            value
+                        )
+
+                elif isinstance(attr, CharacteristicDescriptor):
+                    # Valid offset, return data[offset:offset + MTU - 1]
+                    self.att.read_blob_response(
+                        attr.value[request.offset:request.offset + self.att.local_mtu - 1]
+                    )
+            elif request.offset == len(attr.value):
+                # Special case: when offset == attribute length then return empty data
+                self.att.read_blob_response(b'')
+            else:
+                # Invalid offset
+                self.error(
+                    BleAttOpcode.READ_BLOB_REQUEST,
+                    request.handle,
+                    BleAttErrorCode.INVALID_OFFSET
+                )
+        except IndexError as e:
+            # Attribute not found
+            self.error(
+                BleAttOpcode.READ_BLOB_REQUEST,
+                request.handle,
+                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            )
+        
+
+    def on_write_request(self, request):
+        """Write request for characteristic or descriptor value
+        """
+        try:
+            # Retrieve attribute from model
+            attr = self.__model.find_object_by_handle(request.handle)
+            if isinstance(attr, CharacteristicValue):
+                # Check the corresponding characteristic is writeable
+                charac = self.__model.find_object_by_handle(request.handle - 1)
+                if charac.writeable():
+                    # Retrieve corresponding service info
+                    service = self.__model.find_service_by_characteristic_handle(charac.handle)
+
+                    # Trigger our write hook
+                    value =  self.__model.on_characteristic_write(
+                        service,
+                        charac,
+                        0,
+                        request.value,
+                        False
+                    )
+                    
+                    if value is None:
+                        self.error(
+                            BleAttOpcode.WRITE_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.WRITE_NOT_PERMITTED
+                        )
+                    else:
+                        # Variable length, copy data.
+                        attr.value = value
+                        self.att.write_response()
+                else:
+                    self.error(
+                        BleAttOpcode.WRITE_REQUEST,
+                        request.handle,
+                        BleAttErrorCode.WRITE_NOT_PERMITTED
+                    )
+            elif isinstance(attr, ClientCharacteristicConfig):
+                # Fixed length, make sure size <= 2.
+                if len(request.value) <= 2:
+                    attr.value = request.value + attr.value[len(request.value):]
+                    self.att.write_response()
+
+                    # Notify our model
+                    if attr.config == 0x0001:
+                        charac = attr.characteristic
+                        service = self.__model.find_service_by_characteristic_handle(charac.handle)
+
+                        # Set characteristic notification callback
+                        charac.set_notification_callback(self.notify)
+
+                        self.__model.on_characteristic_subscribed(
+                            service,
+                            charac,
+                            notification=True
+                        )
+                    elif attr.config == 0x0002:
+                        charac = attr.characteristic
+                        service = self.__model.find_service_by_characteristic_handle(charac.handle)
+
+                        # Set characteristic indication callback
+                        charac.set_indication_callback(self.indicate)
+
+                        self.__model.on_characteristic_subscribed(
+                            service,
+                            charac,
+                            indication=True
+                        )
+                    elif attr.config == 0x0000:
+                        charac = attr.characteristic
+                        print(charac)
+                        service = self.__model.find_service_by_characteristic_handle(charac.handle)
+
+                        # Unset characteristic indication and notification callbacks
+                        charac.set_notification_callback(None)
+                        charac.set_indication_callback(None)
+
+                        # Notify model
+                        self.__model.on_characteristic_unsubscribed(
+                            service,
+                            charac
+                        )
+                else:
+                    # Wrong length
+                    self.error(
+                        BleAttOpcode.WRITE_REQUEST,
+                        request.handle,
+                        BleAttErrorCode.INVALID_ATTR_VALUE_LENGTH
+                    )
+        except IndexError:
+            self.error(
+                BleAttOpcode.WRITE_REQUEST,
+                request.handle,
+                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            )
+
+    def on_write_command(self, request):
+        """Write command (without response)
+        """
+        try:
+            # Retrieve attribute from model
+            attr = self.__model.find_object_by_handle(request.handle)
+            if isinstance(attr, CharacteristicValue):
+                # Check the corresponding characteristic is writeable
+                charac = self.__model.find_object_by_handle(request.handle - 1)
+                if charac.writeable():
+                    # Retrieve corresponding service info
+                    service = self.__model.find_service_by_characteristic_handle(charac.handle)
+
+                    # Trigger our write hook
+                    value =  self.__model.on_characteristic_write(
+                        service,
+                        charac,
+                        0,
+                        request.value,
+                        True
+                    )
+                    
+                    if value is None:
+                        self.error(
+                            BleAttOpcode.WRITE_COMMAND,
+                            request.handle,
+                            BleAttErrorCode.WRITE_NOT_PERMITTED
+                        )
+                    else:
+                        # Variable length, copy data.
+                        attr.value = value
+
+                else:
+                    self.error(
+                        BleAttOpcode.WRITE_COMMAND,
+                        request.handle,
+                        BleAttErrorCode.WRITE_NOT_PERMITTED
+                    )
+
+            elif isinstance(attr, ClientCharacteristicConfig):
+                # Fixed length, make sure size <= 2.
+                if len(request.value) <= 2:
+                    attr.value = request.value + attr.value[len(request.value):]
+
+                    # Notify our model
+                    if attr.config == 0x0001:
+                        charac = attr.characteristic
+                        service = self.__model.find_service_by_characteristic_handle(charac.handle)
+
+                        # Set characteristic notification callback
+                        charac.set_notification_callback(self.notify)
+                        if charac not in self.__subscribed_characs:
+                            self.__subscribed_characs.append(charac)
+
+                        self.__model.on_characteristic_subscribed(
+                            service,
+                            charac,
+                            notification=True
+                        )
+                    elif attr.config == 0x0002:
+                        charac = attr.characteristic
+                        service = self.__model.find_service_by_characteristic_handle(charac.handle)
+
+                        # Set characteristic indication callback
+                        charac.set_indication_callback(self.indicate)
+                        if charac not in self.__subscribed_characs:
+                            self.__subscribed_characs.append(charac)
+
+                        self.__model.on_characteristic_subscribed(
+                            service,
+                            charac,
+                            indication=True
+                        )
+                    elif attr.config == 0x0000:
+                        charac = attr.characteristic
+                        print(charac)
+                        service = self.__model.find_service_by_characteristic_handle(charac.handle)
+
+                        # Unset characteristic indication and notification callbacks
+                        charac.set_notification_callback(None)
+                        charac.set_indication_callback(None)
+                        
+                        if charac in self.__subscribed_characs:
+                            self.__subscribed_characs.remove(charac)
+
+                        # Notify model
+                        self.__model.on_characteristic_unsubscribed(
+                            service,
+                            charac
+                        )
+                else:
+                    # Wrong length
+                    self.error(
+                        BleAttOpcode.WRITE_COMMAND,
+                        request.handle,
+                        BleAttErrorCode.INVALID_ATTR_VALUE_LENGTH
+                    )
+        except IndexError:
+            self.error(
+                BleAttOpcode.WRITE_COMMAND,
+                request.handle,
+                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            )
+    def on_prepare_write_request(self, request: GattPrepareWriteRequest):
+        """Prepare write request
+        """
+        try:
+            # Retrieve attribute from model
+            attr = self.__model.find_object_by_handle(request.handle)
+
+            # Queue request
+            if request.handle not in self.__write_queues:
+                self.__write_queues[request.handle] = []
+            self.__write_queues[request.handle].append(request)
+
+            # Send response
+            self.att.prepare_write_response(
+                request.handle,
+                request.offset,
+                request.value
+            )
+
+        except IndexError:
+            self.error(
+                BleAttOpcode.PREPARE_WRITE_REQUEST,
+                request.handle,
+                BleAttErrorCode.INVALID_HANDLE
+            )
+
+    def on_execute_write_request(self, request: GattExecuteWriteRequest):
+        """Execute write request
+        """
+        # Clear all prepared write queues
+        if request.flags == 0:
+            self.__write_queues = {}
+            self.att.execute_write_response()
+        elif request.flags == 1:
+            # Apply write requests to items
+            for handle in self.__write_queues:
+                try:
+                    # Retrieve attribute from model
+                    attr = self.__model.find_object_by_handle(handle)
+
+                    if isinstance(attr, CharacteristicValue):
+                        # apply each update
+                        for write_req in self.__write_queues[handle]:
+                            attr_value = attr.value
+                            if write_req.offset > len(attr_value):
+                                # Clear queues
+                                self.__write_queues = {}
+                                
+                                # Send error
+                                self.error(
+                                    BleAttOpcode.EXECUTE_WRITE_REQUEST,
+                                    handle,
+                                    BleAttErrorCode.INVALID_OFFSET
+                                )
+
+                                # Stop now
+                                return
+                            else:
+                                if len(attr_value) >= (write_req.offset + len(write_req.value)):
+                                    attr_value = attr_value[:write_req.offset] + write_req.value + attr_value[write_req.offset + len(write_req.value):]
+                                    print(attr_value)
+                                else:
+                                    attr_value = attr_value[:write_req.offset] + write_req.value
+                                    print(attr_value)
+                                attr.value = attr_value
+                        print('charac value (handle %d): %s' % (handle, attr.value))
+                    else:
+                        # Nope, only characteristic values are supported
+                        pass
+
+                except IndexError:
+                    # Clear write queues
+                    self.__write_queues = {}
+
+                    # Send error
+                    self.error(
+                        BleAttOpcode.EXECUTE_WRITE_REQUEST,
+                        request.handle,
+                        BleAttErrorCode.INVALID_HANDLE
+                    )
+
+                    # Done
+                    return
+
+            # Done !
+            self.att.execute_write_response()
+        else:
+            # Unknown flag !
+            pass
+
+    def on_read_by_type_request(self, start, end, uuid):
+        """Read attribute by type request
+        """
+        print('> read by type request (start:%d, end:%d, uuid:%s' %(
+            start,
+            end,
+            uuid
+        ))
+        # List attributes by type UUID, sorted by handles
+        attrs = {}
+        attrs_handles = []
+        for attribute in self.__model.attr_by_type_uuid(UUID(uuid), start, end):
+            attrs[attribute.handle] = attribute
+            attrs_handles.append(attribute.handle)
+        attrs_handles.sort()
+
+        # If we have at least one item to return
+        if len(attrs_handles) > 0:
+            
+            # Get MTU
+            mtu = self.att.local_mtu
+
+            # Get item size (UUID size + 2)
+            uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
+            item_size = uuid_size + 5
+            max_nb_items = int((mtu - 2) / item_size)
+            
+            # Create our datalist
+            datalist = GattAttributeDataList(item_size)
+
+            # Iterate over items while UUID size matches and data fits in MTU
+            for i in range(max_nb_items):
+                if i < len(attrs_handles):
+                    handle = attrs_handles[i]
+                    attr_obj = attrs[handle]
+                    if len(attr_obj.uuid.packed) == uuid_size:
+                        if isinstance(attrs[handle], Characteristic):
+                            datalist.append(
+                                GattAttributeValueItem(
+                                    handle,
+                                    pack(
+                                        '<BH',
+                                        attr_obj.properties,
+                                        attr_obj.value_handle,
+                                    ) + attr_obj.uuid.packed
+                                )
+                            )
+                else:
+                    break
+            
+            # Once datalist created, send answer
+            datalist_raw = datalist.to_bytes()
+            self.att.read_by_type_response(item_size, datalist_raw)
+        else:
+            self.error(
+               BleAttOpcode.READ_BY_TYPE_REQUEST,
+               start,
+               BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            )
+
+
+    def on_read_by_group_type_request(self, start, end, uuid):
+        """Read by group type request
+
+        List attribute with given type UUID from `start` handle to ̀`end` handle.
+        """
+        # List attributes by type UUID, sorted by handles
+        attrs = {}
+        attrs_handles = []
+        for attribute in self.__model.attr_by_type_uuid(UUID(uuid), start, end):
+            attrs[attribute.handle] = attribute
+            attrs_handles.append(attribute.handle)
+        attrs_handles.sort()
+
+        # If we have at least one item to return
+        if len(attrs_handles) > 0:
+            
+            # Get MTU
+            mtu = self.att.local_mtu
+
+            # Get item size (UUID size + 4)
+            uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
+            item_size = uuid_size + 4
+            max_nb_items = int((mtu - 2) / item_size)
+            
+            # Create our datalist
+            datalist = GattAttributeDataList(item_size)
+
+            # Iterate over items while UUID size matches and data fits in MTU
+            for i in range(max_nb_items):
+                if i < len(attrs_handles):
+                    handle = attrs_handles[i]
+                    end_handle = attrs[handle].end_handle
+                    attr_uuid = attrs[handle].uuid
+                    if len(attr_uuid.packed) == uuid_size:
+                        datalist.append(
+                            GattGroupTypeItem(handle, end_handle, attr_uuid.packed)
+                        )
+                else:
+                    break
+            
+            # Once datalist created, send answer
+            datalist_raw = datalist.to_bytes()
+            self.att.read_by_group_type_response(item_size, datalist_raw)
+        else:
+            self.error(
+               BleAttOpcode.READ_BY_GROUP_TYPE_REQUEST,
+               start,
+               BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            )
+
+    def on_terminated(self):
+        """Connection has been terminated, remove characteristics subscriptions.
+        """
+        for charac in self.__subscribed_characs:
+            charac.set_notification_callback(None)
+            charac.set_indication_callback(None)
+        self.__subscribed_characs = []
+
+
+        
+
+
+        

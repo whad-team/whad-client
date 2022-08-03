@@ -39,6 +39,9 @@ class Characteristic(object):
         self.__handle = value
 
     @property
+    def end_handle(self):
+        return self.handle + self.get_required_handles()
+    @property
     def name(self):
         return self.__name
 
@@ -100,7 +103,14 @@ class ServiceModel(object):
 
 
     def add_characteristic(self, characteristic_model):
+        """Add a characteristic to the model
+        """
+        # Add characteristic to the list of our characteristics
         self.__characteristics.append(characteristic_model)
+
+        # Update end handle value
+        if characteristic_model.end_handle >= self.__end_handle:
+            self.__end_handle = characteristic_model.end_handle
 
     @property
     def uuid(self):
@@ -131,18 +141,18 @@ class ServiceModel(object):
             yield charac
 
 class PrimaryService(ServiceModel):
-    def __init__(self, uuid=None, start_handle=None, end_handle=None, name=None, **kwargs):
+    def __init__(self, uuid=None, start_handle=0, end_handle=0, name=None, **kwargs):
         super().__init__(uuid, start_handle, end_handle, service_type=ServiceModel.PRIMARY, name=name, **kwargs)
 
 
 class SecondaryService(ServiceModel):
-    def __init__(self, uuid=None, start_handle=None, end_handle=None, name=None, **kwargs):
+    def __init__(self, uuid=None, start_handle=0, end_handle=0, name=None, **kwargs):
         super().__init__(uuid, start_handle, end_handle, service_type=ServiceModel.SECONDARY, name=name, **kwargs)
 
 
 class GenericProfile(object):
 
-    def __init__(self, start_handle=1):
+    def __init__(self, start_handle=0):
         """Parse the device model, instanciate all the services, characteristics
         and descriptors, compute all handle values and registers everything
         inside this instance for further use.
@@ -201,15 +211,20 @@ class GenericProfile(object):
                     
                 charac_obj = BleCharacteristic(
                     uuid=charac.uuid,
-                    handle=self.__alloc_handle(2),
+                    handle=self.__alloc_handle(1),
                     value=charac.value,
                     properties=charac_props
                 )
+                self.__handle = charac_obj.end_handle
+
+                # Register this characteristic
                 self.register_attribute(charac_obj)
+                self.register_attribute(charac_obj.value_attr)
 
                 # If notify or indicate is set to true, we must add a new CCC descriptor
                 if charac.must_notify or charac.must_indicate:
                     ccc_desc = ClientCharacteristicConfig(
+                        charac_obj,
                         handle=self.__alloc_handle(),
                         notify=charac.must_notify,
                         indicate=charac.must_indicate
@@ -298,7 +313,18 @@ class GenericProfile(object):
             return self.__attr_db[handle]
         else:
             raise IndexError
+    
+    def find_objects_by_range(self, start, end):
+        """Find attributes with handles belonging in the [start, end+1] interval.
+        """
+        handles = []
+        for handle in self.__attr_db:
+            if handle>=start and handle<=end:
+                handles.append(handle)
+        handles.sort()
+        return [self.find_object_by_handle(handle) for handle in handles]
 
+    
     def find_characteristic_end_handle(self, handle):
         try:
             # Find service owning the characteristic
@@ -339,3 +365,42 @@ class GenericProfile(object):
             object = self.__attr_db[handle]
             if isinstance(object, BlePrimaryService) or isinstance(object, BleSecondaryService):
                 yield object
+
+    def attr_by_type_uuid(self, uuid, start=1, end=0xFFFF):
+        for handle in self.__attr_db:
+            object = self.__attr_db[handle]
+            if object.type_uuid == uuid and object.handle >= start and object.handle <= end:
+                yield object
+
+    def on_characteristic_read(self, service, characteristic, offset=0, length=0):
+        """Characteristic read hook.
+
+        This hook is called whenever a characteristic is about to be read by a GATT client.
+        If this method returns a byte array, this byte array will be sent back to the
+        GATT client. If this method returns None, then the read operation will return an
+        error (not allowed to read characteristic value).
+        
+
+        :param BlePrimaryService service: Service owning the characteristic
+        :param BleCharacteristic characteristic: Characteristic object
+        :param int offset: Read offset (default: 0)
+        :param int length: Max read length
+        :return: Value to return to the GATT client
+        """
+        print(characteristic)
+        print(characteristic.value)
+        return characteristic.value[offset:offset + length]
+
+    def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
+        """Characteristic write hook
+
+        This hook is called whenever a charactertistic is about to be written by a GATT
+        client. If this method returns None, then the write operation will return an error.
+        """
+        return value
+
+    def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
+        pass
+
+    def on_characteristic_unsubscribed(self, service, characteristic):
+        pass

@@ -13,6 +13,9 @@ class BleL2CAP(object):
         self.__expected_length = 0
         self.__att = BleATT(self)
 
+        # Set ATT GATT layer based on connection GATT class instance
+        self.__att.gatt = self.__connection.gatt_class
+
         # Default MTU for L2CAP: 23 bytes
         self.__remote_mtu = 23
         self.__local_mtu = 23

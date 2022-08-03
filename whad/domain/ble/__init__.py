@@ -7,7 +7,7 @@ from binascii import hexlify, unhexlify
 from whad import WhadDomain, WhadCapability
 from whad.metadata import generate_metadata, BLEMetadata
 from whad.device import WhadDeviceConnector
-from whad.domain.ble.stack.gatt import GattClient
+from whad.domain.ble.stack.gatt import GattClient, GattServer
 from whad.helpers import message_filter, is_message_type, bd_addr_to_bytes
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.protocol.generic_pb2 import ResultCode
@@ -15,12 +15,13 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SendRawPDUCmd, StartCmd, StopCmd, \
     ScanMode, Start, Stop, BleAdvType, ConnectToCmd, ConnectTo, CentralModeCmd, PeripheralMode, \
     PeripheralModeCmd, SendPDUCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
-    HijackSlave, HijackBoth, SendRawPDU, Connected
+    HijackSlave, HijackBoth, SendRawPDU, Connected, AdvModeCmd
 from whad.domain.ble.stack import BleStack
 from scapy.compat import raw
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_CTRL, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
 from whad.domain.ble.device import PeripheralDevice
+from whad.domain.ble.profile import GenericProfile
 from whad.domain.ble.sniffing import SynchronizedConnection, SnifferConfiguration
 from whad.domain.ble.exceptions import InvalidBDAddressException
 
@@ -133,7 +134,6 @@ class BLE(WhadDeviceConnector):
         msg = Message()
         direction = packet.metadata.direction
         connection_handle = packet.metadata.connection_handle
-
         if BTLE in packet:
             msg.ble.send_raw_pdu.direction = direction
             msg.ble.send_raw_pdu.conn_handle = connection_handle
@@ -166,7 +166,7 @@ class BLE(WhadDeviceConnector):
         """
         if self.__can_send_raw is None:
             capabilities = self.device.get_domain_capability(WhadDomain.BtLE)
-            self.__can_send_raw = not (capabilities & (1 << WhadCapability.NoRawData) > 0)
+            self.__can_send_raw = not (capabilities & WhadCapability.NoRawData)
         return self.__can_send_raw
 
     def can_send(self):
@@ -372,12 +372,30 @@ class BLE(WhadDeviceConnector):
         msg.ble.central_mode.CopyFrom(CentralModeCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
-    def enable_peripheral_mode(self):
+    def enable_adv_mode(self, adv_data=None, scan_data=None):
+        """
+        Enable BLE advertising mode (acts as a broadcaster)
+        """
+        msg = Message()
+        if adv_data is not None and isinstance(adv_data, bytes):
+            msg.ble.adv_mode.scan_data = adv_data
+        if scan_data is not None and isinstance(scan_data, bytes):
+            msg.ble.adv_mode.scanrsp_data = scan_data
+        if adv_data is None and scan_data is None:
+            msg.ble.adv_mode.CopyFrom(AdvModeCmd())
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result')) 
+
+    def enable_peripheral_mode(self, adv_data=None, scan_data=None):
         """
         Enable Bluetooth Low Energy peripheral mode (acts as slave).
         """
         msg = Message()
-        msg.ble.periph_mode.CopyFrom(PeripheralModeCmd())
+        if adv_data is not None and isinstance(adv_data, bytes):
+            msg.ble.periph_mode.scan_data = adv_data
+        if scan_data is not None and isinstance(scan_data, bytes):
+            msg.ble.periph_mode.scanrsp_data = scan_data
+        if adv_data is None and scan_data is None:
+            msg.ble.periph_mode.CopyFrom(PeripheralModeCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
     def connect_to(self, bd_addr):
@@ -529,6 +547,7 @@ class BLE(WhadDeviceConnector):
             packet.metadata.connection_handle = conn_handle
 
             msg = self._build_message_from_scapy_packet(packet)
+            print(msg)
 
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
@@ -793,11 +812,19 @@ class Scanner(BLE):
 
 class Peripheral(BLE):
 
-    def __init__(self, device, existing_connection = None):
+    def __init__(self, device, existing_connection = None, profile=None):
         super().__init__(device)
 
-        self.use_stack(BleStack)
+        # Initialize stack
+        #self.use_stack(BleStack)
+        self.__stack = BleStack(self, GattServer(profile))
         self.__connected = False
+
+        # Initialize profile
+        if profile is None:
+            self.__profile = GenericProfile()
+        else:
+            self.__profile = profile
 
         # Check if device accepts peripheral mode
         if not self.can_be_peripheral():
@@ -809,11 +836,10 @@ class Peripheral(BLE):
             if existing_connection is not None:
                 self.on_connected(existing_connection)
 
+    
     def send_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6):
-        """
-        Override send_pdu to use SLAVE_TO_MASTER as default direction and use 1 as default connection handle.
-        """
         super().send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address)
+    
 
     def use_stack(self, clazz=BleStack):
         """Specify a stack class to use for BLE. By default, our own stack (BleStack) is used.
@@ -839,16 +865,15 @@ class Peripheral(BLE):
         messages to the stack.
         """
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
-            pass
-            # self.__stack.on_ctl_pdu(pdu.metadata.connection_handle, pdu)
+            self.__stack.on_ctl_pdu(pdu.metadata.connection_handle, pdu)
 
     def on_data_pdu(self, pdu):
         """This method is called whenever a data PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
         """
+        pdu.show()
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
-            pass
-            #self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
+            self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
 
 
     def on_new_connection(self, connection):
@@ -858,7 +883,6 @@ class Peripheral(BLE):
 
         # Use GATT server
         self.connection = connection
-        # connection.use_gatt_class(GattServer)
         self.__connected = True
 
 
@@ -867,7 +891,8 @@ class Central(BLE):
     def __init__(self, device, existing_connection = None):
         super().__init__(device)
 
-        self.use_stack(BleStack)
+        #self.use_stack(BleStack)
+        self.__stack = BleStack(self, GattClient())
         self.__connected = False
         self.__peripheral = None
 
@@ -898,11 +923,6 @@ class Central(BLE):
     def peripheral(self):
         return self.__peripheral
 
-    def use_stack(self, clazz=BleStack):
-        """Specify a stack class to use for BLE. By default, our own stack (BleStack) is used.
-        """
-        self.__stack = clazz(self)
-
 
     ##############################
     # Incoming events
@@ -918,7 +938,7 @@ class Central(BLE):
         """This method is called whenever a control PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
 
-        Central devices act as a master, so we only forward slave to master
+        Central devices act as master, so we only forward slave to master
         messages to the stack.
         """
         if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
@@ -939,6 +959,5 @@ class Central(BLE):
 
         # Use GATT client
         self.connection = connection
-        connection.use_gatt_class(GattClient)
         self.__peripheral = PeripheralDevice(connection.gatt)
         self.__connected = True

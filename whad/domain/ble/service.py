@@ -3,10 +3,11 @@
 from whad.domain.ble.attribute import Attribute, UUID
 
 class Service(Attribute):
-    def __init__(self, uuid, type_uuid, handle=None, end_handle=None):
+    def __init__(self, uuid, type_uuid, handle=0, end_handle=0):
         super().__init__(uuid=type_uuid,handle=handle)
         self.__service_uuid = uuid
-        self.__end_handle = end_handle
+        if handle > 0:
+            self.__end_handle = end_handle if end_handle > 0 else handle
         self.__characteristics = []
 
     @property
@@ -25,6 +26,14 @@ class Service(Attribute):
         return self.__service_uuid.to_bytes()
 
     def add_characteristic(self, characteristic):
+        """Add characteristic, update end handle
+        """
+        if self.handle == 0:
+            self.handle = characteristic.handle
+        print(characteristic.handle)
+        print(self.__end_handle)
+        if characteristic.value_handle >= self.__end_handle:
+            self.__end_handle = characteristic.value_handle
         self.__characteristics.append(characteristic)
 
     def characteristics(self):
@@ -42,7 +51,7 @@ class Service(Attribute):
 
 class PrimaryService(Service):
 
-    def __init__(self, uuid, handle=None, end_handle=None):
+    def __init__(self, uuid, handle=0, end_handle=0):
         super().__init__(uuid, UUID(0x2800),handle=handle, end_handle=end_handle)
 
 class SecondaryService(Service):

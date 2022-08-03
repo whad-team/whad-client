@@ -19,7 +19,7 @@ from scapy.packet import bind_layers, Packet
 
 from whad.domain.ble.stack.att.constants import BleAttOpcode
 
-from whad.domain.ble.stack.gatt import  Gatt
+#from whad.domain.ble.stack.gatt import  Gatt
 from whad.domain.ble.stack.gatt.message import GattExecuteWriteRequest, GattExecuteWriteResponse, \
     GattFindInfoResponse, GattHandleValueIndication, GattHandleValueNotification, GattPrepareWriteRequest, \
     GattPrepareWriteResponse, GattReadByGroupTypeResponse, GattErrorResponse, \
@@ -40,14 +40,27 @@ class BleATT(object):
 
     def __init__(self, l2cap):
         self.__l2cap = l2cap
-        self.__gatt = Gatt(self)
+        #self.__gatt = Gatt(self)
+        self.__gatt = None
 
     @property
     def gatt(self):
         return self.__gatt
 
-    def use_gatt_class(self, gatt_clazz):
-        self.__gatt = gatt_clazz(self)
+    @gatt.setter
+    def gatt(self, gatt_inst):
+        self.__gatt = gatt_inst
+        self.__gatt.attach(self)
+
+    @property
+    def local_mtu(self):
+        return self.__l2cap.local_mtu
+
+    def use_gatt_class(self, gatt_clazz, profile=None):
+        if profile is None:
+            self.__gatt = gatt_clazz(self)
+        else:
+            self.__gatt = gatt_clazz(self, profile)
 
     ##########################################
     # Incoming requests and responses

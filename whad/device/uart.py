@@ -103,7 +103,7 @@ class UartDevice(WhadDevice):
             rlist,
             wlist,
             elist,
-            0.01
+            10
         )
         
         # Handle incoming messages if any

@@ -544,7 +544,7 @@ class WhadDevice(object):
         """Process pending messages
         """
         try:
-            message = self.__messages.get(block=False, timeout=0.01)
+            message = self.__messages.get(block=True, timeout=None)
             if message is not None:
                 self.dispatch_message(message)
         except Empty:
