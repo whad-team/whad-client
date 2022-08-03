@@ -373,6 +373,13 @@ class WhadDevice(object):
         """
         # Cancel I/O thread
         self.__io_thread.cancel()
+
+        # Send a NOP message to unlock process_messages()
+        msg = Message()
+        msg.generic.verbose.data=b''
+        self.on_message_received(msg)
+
+        # Wait for the thread to terminate nicely.
         self.__io_thread.join()
 
 
