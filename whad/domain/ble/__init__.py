@@ -24,6 +24,7 @@ from whad.domain.ble.device import PeripheralDevice
 from whad.domain.ble.profile import GenericProfile
 from whad.domain.ble.sniffing import SynchronizedConnection, SnifferConfiguration
 from whad.domain.ble.exceptions import InvalidBDAddressException
+from whad.domain.ble.advdata import AdvDataFieldList
 
 
 class BDAddress(object):
@@ -389,6 +390,12 @@ class BLE(WhadDeviceConnector):
         """
         Enable Bluetooth Low Energy peripheral mode (acts as slave).
         """
+        # Build advertising data if required
+        if isinstance(adv_data, AdvDataFieldList):
+            adv_data = adv_data.to_bytes()
+        if isinstance(scan_data, AdvDataFieldList):
+            scan_data = scan_data.to_bytes()
+
         msg = Message()
         if adv_data is not None and isinstance(adv_data, bytes):
             msg.ble.periph_mode.scan_data = adv_data
