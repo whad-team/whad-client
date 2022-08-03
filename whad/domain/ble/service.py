@@ -32,8 +32,8 @@ class Service(Attribute):
             self.handle = characteristic.handle
         print(characteristic.handle)
         print(self.__end_handle)
-        if characteristic.value_handle >= self.__end_handle:
-            self.__end_handle = characteristic.value_handle
+        if characteristic.end_handle >= self.__end_handle:
+            self.__end_handle = characteristic.end_handle
         self.__characteristics.append(characteristic)
 
     def characteristics(self):
