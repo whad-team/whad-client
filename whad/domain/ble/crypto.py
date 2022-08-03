@@ -1,4 +1,4 @@
-from Crypto.Cipher import AES
+from Cryptodome.Cipher import AES
 
 def e(key, plaintext):
     """
