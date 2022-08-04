@@ -146,7 +146,7 @@ class BleATT(object):
 
         :param ATT_Exchange_MTU_Request mtu_req: MTU request
         """
-
+        print('> exchange MTU request')
         # Update L2CAP Client MTU
         self.__l2cap.remote_mtu = mtu_req.mtu
         

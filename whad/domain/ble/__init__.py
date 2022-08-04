@@ -554,7 +554,6 @@ class BLE(WhadDeviceConnector):
             packet.metadata.connection_handle = conn_handle
 
             msg = self._build_message_from_scapy_packet(packet)
-            print(msg)
 
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
@@ -878,7 +877,6 @@ class Peripheral(BLE):
         """This method is called whenever a data PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
         """
-        pdu.show()
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
             self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
 
@@ -968,3 +966,8 @@ class Central(BLE):
         self.connection = connection
         self.__peripheral = PeripheralDevice(connection.gatt)
         self.__connected = True
+
+    def export_profile(self):
+        """Export remote device profile
+        """
+        return self.connection.gatt.model.export_json()

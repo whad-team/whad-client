@@ -54,6 +54,10 @@ class CharacteristicValue(Attribute):
     def __init__(self, uuid, handle=None, value=b''):
         super().__init__(uuid=uuid, handle=handle, value=value)
 
+    @property
+    def uuid(self):
+        return self.type_uuid
+
 
 class Characteristic(Attribute):
     """BLE Characteristic
@@ -111,6 +115,8 @@ class Characteristic(Attribute):
         if isinstance(new_handle, int):
             self.__handle = new_handle
             self.__value_handle = self.__handle + 1
+            if self.__end_handle is None:
+                self.__end_handle = self.__value_handle
         else:
             raise InvalidHandleValueException
 

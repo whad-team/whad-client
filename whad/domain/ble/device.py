@@ -27,13 +27,32 @@ class PeripheralCharacteristic:
         self.__characteristic = characteristic
         self.__gatt = gatt
 
+    @property
+    def value(self):
+        """Transparent characteristic read
+
+        :return bytes: Characteristic value
+        """
+        return self.read()
+
+    @value.setter
+    def value(self, val):
+        """Transparent characteristic write
+
+        :param bytes val: Value to write into this characteristic
+        """
+        return self.write(val)
+
     def uuid(self):
         return self.__characteristic.uuid
 
-    def read(self):
+    def read(self, offset=0):
         """Read characteristic value
         """
-        return self.__gatt.read(self.__characteristic.value_handle)
+        if offset == 0:
+            return self.__gatt.read(self.__characteristic.value_handle)
+        else:
+            return self.__gatt.read_blob(self.__characteristic.value_handle, offset)
 
     def read_long(self):
         """Read long characteristic value
