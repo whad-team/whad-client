@@ -1,14 +1,13 @@
 """Bluetooth Low Energy device model
 """
-from whad.domain.ble.attribute import Attribute
+import json
+from whad.domain.ble.attribute import Attribute, UUID
 from whad.domain.ble.characteristic import Characteristic as BleCharacteristic,\
     CharacteristicProperties, ClientCharacteristicConfig
 from whad.domain.ble.service import PrimaryService as BlePrimaryService, \
     SecondaryService as BleSecondaryService
 from whad.domain.ble.exceptions import InvalidHandleValueException
 from whad.domain.ble.stack.att.constants import BleAttProperties
-from whad.domain.ble.advdata import AdvDataFieldList, AdvFlagsField, AdvManufacturerSpecificData, \
-    AdvShortenedLocalName, AdvCompleteLocalName
 
 class Characteristic(object):
     """Characteristic model
@@ -154,7 +153,7 @@ class SecondaryService(ServiceModel):
 
 class GenericProfile(object):
 
-    def __init__(self, start_handle=0):
+    def __init__(self, start_handle=0, from_json=None):
         """Parse the device model, instanciate all the services, characteristics
         and descriptors, compute all handle values and registers everything
         inside this instance for further use.
@@ -167,78 +166,137 @@ class GenericProfile(object):
         self.__start_handle = start_handle
         self.__handle = self.__start_handle
 
-        services = []
-        props = dir(self)
-        for prop in props:
-            if not prop.startswith('_'):
-                if isinstance(getattr(self, prop), ServiceModel):
-                    service = getattr(self, prop)
-                    service.name = prop
-                    services.append(service)
+        # Populate attribute database and model from JSON export if provided
+        if from_json is not None:
+            from_json = json.loads(from_json)
+            # Parse JSON services, characteristics and descriptors to create
+            # the corresponding model and attribute database
+            if 'services' in from_json:
+                # Loop on services
+                for service in from_json['services']:
+                    # Collect characteristics
+                    service_characs = []
+                    service_last_handle = service['start_handle']
+                    if UUID(service['type_uuid']) == UUID(0x2800):
+                        service_obj = BlePrimaryService(
+                            uuid=UUID(service['uuid']),
+                            handle=service['start_handle']
+                        )
+                    elif UUID(service['type_uuid']) == UUID(0x2801):
+                        service_obj = BleSecondaryService(
+                            uuid=UUID(service['uuid']),
+                            handle=service['start_handle']
+                        )
+                    else:
+                        # This is not a known service type UUID, continue with
+                        # next service
+                        continue
 
-        # Instanciate each service, and for each of them the corresponding
-        # characteristics
-        for service in services:
-            if isinstance(service, PrimaryService):
-                # Create service
-                service_obj = BlePrimaryService(
-                    uuid=service.uuid,
-                    handle=self.__alloc_handle()
-                )
+                    if 'characteristics' in service:
+                        for charac in service['characteristics']:
+                            charac_obj = BleCharacteristic(
+                                uuid=UUID(charac['value']['uuid']),
+                                handle=charac['handle'],
+                                value=b'',
+                                properties=charac['properties']
+                            )
+                            
+                            # Loop on descriptors, only support CCC at the moment
+                            for desc in charac['descriptors']:
+                                if UUID(desc['uuid']) == UUID(0x2902):
+                                    desc_obj = ClientCharacteristicConfig(
+                                        charac_obj,
+                                        handle=desc['handle'],
+                                        notify=charac_obj.must_notify(),
+                                        indicate=charac_obj.must_indicate()
+                                    )
+                                    charac_obj.add_descriptor(desc_obj)
+                                    self.register_attribute(desc_obj)
 
-            elif isinstance(service, SecondaryService):
-                # Create service
-                service_obj = BleSecondaryService(
-                    uuid=service.uuid,
-                    handle=self.__alloc_handle()
-                )
-                self.__attr_db[service_obj.handle] = service_obj
-            else:
-                continue 
+                            # Register characteristic and its value
+                            self.register_attribute(charac_obj)
+                            self.register_attribute(charac_obj.value_attr)
 
-            # Create the corresponding instance property
-            setattr(self, service.name, service_obj)
+                            # Add characteristic to its related service
+                            service_obj.add_characteristic(charac_obj)
 
-            # Loop on underlying characteristics, and create them too.
-            for charac in service.characteristics():
-                charac_props = 0
-                if 'read' in charac.permissions:
-                    charac_props |= CharacteristicProperties.READ
-                if 'write' in charac.permissions:
-                    charac_props |= CharacteristicProperties.WRITE
-                if charac.must_notify:
-                    charac_props |= CharacteristicProperties.NOTIFY
-                if charac.must_indicate:
-                    charac_props |= CharacteristicProperties.INDICATE
-                    
-                charac_obj = BleCharacteristic(
-                    uuid=charac.uuid,
-                    handle=self.__alloc_handle(1),
-                    value=charac.value,
-                    properties=charac_props
-                )
-                self.__handle = charac_obj.end_handle
+                    self.register_attribute(service_obj)
+                    self.add_service(service_obj)  
 
-                # Register this characteristic
-                self.register_attribute(charac_obj)
-                self.register_attribute(charac_obj.value_attr)
+        else:
+            # Introspect this class definition and build model
+            services = []
+            props = dir(self)
+            for prop in props:
+                if not prop.startswith('_'):
+                    if isinstance(getattr(self, prop), ServiceModel):
+                        service = getattr(self, prop)
+                        service.name = prop
+                        services.append(service)
 
-                # If notify or indicate is set to true, we must add a new CCC descriptor
-                if charac.must_notify or charac.must_indicate:
-                    ccc_desc = ClientCharacteristicConfig(
-                        charac_obj,
-                        handle=self.__alloc_handle(),
-                        notify=charac.must_notify,
-                        indicate=charac.must_indicate
+            # Instanciate each service, and for each of them the corresponding
+            # characteristics
+            for service in services:
+                if isinstance(service, PrimaryService):
+                    # Create service
+                    service_obj = BlePrimaryService(
+                        uuid=service.uuid,
+                        handle=self.__alloc_handle()
                     )
-                    charac_obj.add_descriptor(ccc_desc)
-                    self.register_attribute(ccc_desc)
 
-                # Add our characteristic object to the corresponding service
-                setattr(service_obj, charac.name, charac_obj)
-                service_obj.add_characteristic(charac_obj)
+                elif isinstance(service, SecondaryService):
+                    # Create service
+                    service_obj = BleSecondaryService(
+                        uuid=service.uuid,
+                        handle=self.__alloc_handle()
+                    )
+                    self.__attr_db[service_obj.handle] = service_obj
+                else:
+                    continue 
 
-            self.add_service(service_obj)
+                # Create the corresponding instance property
+                setattr(self, service.name, service_obj)
+
+                # Loop on underlying characteristics, and create them too.
+                for charac in service.characteristics():
+                    charac_props = 0
+                    if 'read' in charac.permissions:
+                        charac_props |= CharacteristicProperties.READ
+                    if 'write' in charac.permissions:
+                        charac_props |= CharacteristicProperties.WRITE
+                    if charac.must_notify:
+                        charac_props |= CharacteristicProperties.NOTIFY
+                    if charac.must_indicate:
+                        charac_props |= CharacteristicProperties.INDICATE
+                        
+                    charac_obj = BleCharacteristic(
+                        uuid=charac.uuid,
+                        handle=self.__alloc_handle(1),
+                        value=charac.value,
+                        properties=charac_props
+                    )
+                    self.__handle = charac_obj.end_handle
+
+                    # Register this characteristic
+                    self.register_attribute(charac_obj)
+                    self.register_attribute(charac_obj.value_attr)
+
+                    # If notify or indicate is set to true, we must add a new CCC descriptor
+                    if charac.must_notify or charac.must_indicate:
+                        ccc_desc = ClientCharacteristicConfig(
+                            charac_obj,
+                            handle=self.__alloc_handle(),
+                            notify=charac.must_notify,
+                            indicate=charac.must_indicate
+                        )
+                        charac_obj.add_descriptor(ccc_desc)
+                        self.register_attribute(ccc_desc)
+
+                    # Add our characteristic object to the corresponding service
+                    setattr(service_obj, charac.name, charac_obj)
+                    service_obj.add_characteristic(charac_obj)
+
+                self.add_service(service_obj)
 
     def __alloc_handle(self, number=1):
         """Allocate one or more handle values.
@@ -374,6 +432,48 @@ class GenericProfile(object):
             if object.type_uuid == uuid and object.handle >= start and object.handle <= end:
                 yield object
 
+    def export_json(self):
+        """Export profile as JSON data, including services, characteristics and descriptors
+        definition.
+
+        :return string: JSON data corresponding to this profile
+        """
+        profile_dict = {}
+        profile_dict['services'] = []
+        for service in self.services():
+            service_dict = {
+                'uuid': str(service.uuid),
+                'type_uuid': str(service.type_uuid),
+                'start_handle': service.handle,
+                'end_handle': service.end_handle
+            }
+            service_dict['characteristics'] = []
+            for charac in service.characteristics():
+                charac_dict = {
+                    'handle': charac.handle,
+                    'uuid': str(charac.type_uuid),
+                    'properties': charac.properties,
+                    'value': {
+                        'handle': charac.value_handle,
+                        'uuid': str(charac.uuid),
+                    }
+                }
+                charac_dict['descriptors'] = []
+                for desc in charac.descriptors():
+                    desc_dict = {
+                        'handle': desc.handle,
+                        'uuid': str(desc.type_uuid)
+                    }
+                    charac_dict['descriptors'].append(desc_dict)
+                service_dict['characteristics'].append(charac_dict)
+            profile_dict['services'].append(service_dict)
+        return json.dumps(profile_dict)
+
+
+    ################################################
+    # Characteristic Read/Write/Subscribe hooks
+    ################################################
+
     def on_characteristic_read(self, service, characteristic, offset=0, length=0):
         """Characteristic read hook.
 
@@ -389,8 +489,6 @@ class GenericProfile(object):
         :param int length: Max read length
         :return: Value to return to the GATT client
         """
-        print(characteristic)
-        print(characteristic.value)
         return characteristic.value[offset:offset + length]
 
     def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):

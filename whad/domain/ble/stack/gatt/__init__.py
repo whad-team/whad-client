@@ -305,6 +305,10 @@ class GattClient(Gatt):
         self.__model = GenericProfile()
         self.__notification_callbacks = {}
 
+    @property
+    def model(self):
+        return self.__model
+
     ###################################
     # Supported response handlers
     ###################################
@@ -582,6 +586,7 @@ class GattClient(Gatt):
                     if descriptor.uuid == UUID(0x2902):
                         characteristic.add_descriptor(
                             ClientCharacteristicConfig(
+                                characteristic,
                                 handle=descriptor.handle
                             )
                         )
@@ -597,6 +602,20 @@ class GattClient(Gatt):
             return msg.value
         elif isinstance(msg, GattErrorResponse):
             raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+
+    def read_blob(self, handle, offset=0):
+        """Read a characteristic or a descriptor starting from `offset`.
+
+        :param int handle: Handle of the characteristic value or descriptor to read.
+        :param int offset: Start reading from this offset value (default: 0)
+        """
+        self.att.read_blob_request(handle, offset)
+        msg = self.wait_for_message(GattReadBlobResponse)
+        if isinstance(msg, GattReadBlobResponse):
+            return msg.value
+        elif isinstance(msg, GattErrorResponse):
+            raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+
 
     def read_long(self, handle):
         """Read a long characteristic or descriptor
@@ -816,7 +835,6 @@ class GattServer(Gatt):
                 )
 
         except IndexError as e:
-            print('Error occured, attribute not found')
             self.error(
                 BleAttOpcode.READ_REQUEST,
                 request.handle,
@@ -964,7 +982,6 @@ class GattServer(Gatt):
                         )
                     elif attr.config == 0x0000:
                         charac = attr.characteristic
-                        print(charac)
                         service = self.__model.find_service_by_characteristic_handle(charac.handle)
 
                         # Unset characteristic indication and notification callbacks
@@ -1065,7 +1082,6 @@ class GattServer(Gatt):
                         )
                     elif attr.config == 0x0000:
                         charac = attr.characteristic
-                        print(charac)
                         service = self.__model.find_service_by_characteristic_handle(charac.handle)
 
                         # Unset characteristic indication and notification callbacks
@@ -1153,12 +1169,9 @@ class GattServer(Gatt):
                             else:
                                 if len(attr_value) >= (write_req.offset + len(write_req.value)):
                                     attr_value = attr_value[:write_req.offset] + write_req.value + attr_value[write_req.offset + len(write_req.value):]
-                                    print(attr_value)
                                 else:
                                     attr_value = attr_value[:write_req.offset] + write_req.value
-                                    print(attr_value)
                                 attr.value = attr_value
-                        print('charac value (handle %d): %s' % (handle, attr.value))
                     else:
                         # Nope, only characteristic values are supported
                         pass
@@ -1186,11 +1199,6 @@ class GattServer(Gatt):
     def on_read_by_type_request(self, start, end, uuid):
         """Read attribute by type request
         """
-        print('> read by type request (start:%d, end:%d, uuid:%s' %(
-            start,
-            end,
-            uuid
-        ))
         # List attributes by type UUID, sorted by handles
         attrs = {}
         attrs_handles = []
@@ -1233,9 +1241,18 @@ class GattServer(Gatt):
                 else:
                     break
             
-            # Once datalist created, send answer
-            datalist_raw = datalist.to_bytes()
-            self.att.read_by_type_response(item_size, datalist_raw)
+            # Check that our result datalist does contain something
+            if len(datalist) > 0:
+                # Once datalist created, send answer
+                datalist_raw = datalist.to_bytes()
+                self.att.read_by_type_response(item_size, datalist_raw)
+            else:
+                # If not, send an error.
+                self.error(
+                    BleAttOpcode.READ_BY_TYPE_REQUEST,
+                    start,
+                    BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                )
         else:
             self.error(
                BleAttOpcode.READ_BY_TYPE_REQUEST,

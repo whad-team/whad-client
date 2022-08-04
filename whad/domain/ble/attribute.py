@@ -25,7 +25,7 @@ class UUID:
         elif isinstance(uuid, int):
             if 0 <= uuid <= 65536:
                 self.uuid = '%04X' % uuid
-                self.packed = pack('<h', uuid)
+                self.packed = pack('<H', uuid)
                 self.type = UUID.TYPE_16
             elif 0 <= uuid <= 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:
                 self.uuid = '%032X' % uuid
@@ -50,7 +50,7 @@ class UUID:
             self.type = UUID.TYPE_128
         # binary
         elif len(uuid) == 2:
-            self.uuid = '%04X' % unpack('<h', uuid)[0]
+            self.uuid = '%04X' % unpack('<H', uuid)[0]
             self.packed = uuid
             self.type = UUID.TYPE_16
         elif len(uuid) == 16:
@@ -74,7 +74,7 @@ class UUID:
 
     def value(self):
         if self.type == UUID.TYPE_16:
-            return unpack('<h', self.packed)[0]
+            return unpack('<H', self.packed)[0]
         else:
             raise ValueError
 

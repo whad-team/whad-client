@@ -30,8 +30,6 @@ class Service(Attribute):
         """
         if self.handle == 0:
             self.handle = characteristic.handle
-        print(characteristic.handle)
-        print(self.__end_handle)
         if characteristic.end_handle >= self.__end_handle:
             self.__end_handle = characteristic.end_handle
         self.__characteristics.append(characteristic)
