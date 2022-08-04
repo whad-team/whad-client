@@ -1,8 +1,8 @@
-protobuf>=3.19.0,<=3.20.1
+protobuf==3.20.*
 scapy==2.4.5
 elementpath==2.4.0
 pyserial==3.5.0
 tox==3.9.0
 pytest==6.2.5
 pytest-cov==2.12.1
-pycrypto==2.6.1
+pycryptodomex==3.11.0

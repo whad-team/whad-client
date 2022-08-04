@@ -1,5 +1,5 @@
-protobuf>=3.19.0,<=3.20.1
+protobuf==3.20.*
 scapy==2.4.55
 elementpath==2.4.0
 pyserial==3.5.0
-pycrypto==2.6.1
+pycryptodomex==3.11.0
