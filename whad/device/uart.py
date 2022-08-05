@@ -5,14 +5,20 @@ This class handles device connection, disconnection and read/write operations. A
 parsing magic is performed in our WhadDevice class.
 """
 
+from asyncio import QueueEmpty
 import os
 import select
 from threading import Lock
 from serial import Serial
+from time import sleep
+from queue import Empty
 
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotReady
 from whad.protocol.whad_pb2 import Message
+from whad.helpers import message_filter
+from whad.protocol.device_pb2 import DeviceResetQuery
+from whad.protocol.generic_pb2 import ResultCode
 
 class UartDevice(WhadDevice):
     """
@@ -45,8 +51,44 @@ class UartDevice(WhadDevice):
             self.__fileno = self.__uart.fileno()
             self.__opened = True
 
+            self.__uart.dtr = False             # Non reset state
+            self.__uart.rts = False             # Non reset state
+            self.__uart.dtr = self.__uart.dtr   # usbser.sys workaround
+
             # Ask parent class to run a background I/O thread
             super().open()
+
+
+    def reset(self):
+        """Reset device.
+
+        This routine tries to reset device by setting RTS to high. This works
+        on NodeMCU chips as well as any Arduino-compatible device.
+        """
+        # Reset device through DTR
+        self.__uart.dtr = False             # Non reset state
+        self.__uart.rts = True             # Non reset state
+        sleep(0.2)
+        self.__uart.dtr = False             # Non reset state
+        self.__uart.rts = False             # Non reset state
+
+        try:
+            # Wait for a ready message for 1 second
+            msg = self.wait_for_single_message(
+                1.0,
+                message_filter('discovery', 'ready_resp')
+            )
+            self.dispatch_message(msg)
+        except Empty:
+            # Use the classic way to reset device (RTS-based reset failed)
+            msg = Message()
+            msg.discovery.reset_query.CopyFrom(DeviceResetQuery())
+            self.send_command(
+                msg,
+                message_filter('discovery', 'ready_resp')
+            )
+        
+
 
     def close(self):
         """
@@ -110,3 +152,20 @@ class UartDevice(WhadDevice):
         if len(readers) > 0:
             data = os.read(self.__fileno, 1024)
             self.on_data_received(data)
+
+    def change_transport_speed(self, speed):
+        """Set UART speed
+        """
+        msg = Message()
+        msg.discovery.set_speed.speed = speed
+        resp = self.send_command(
+            msg,
+            message_filter('generic', 'cmd_result')
+        )
+
+        if (resp.generic.cmd_result.result == ResultCode.SUCCESS):
+            # Change baudrate
+            self.__uart.baudrate = speed
+
+            # Wait for device to be ready (500ms)
+            sleep(0.5)

@@ -105,12 +105,24 @@ if __name__ == '__main__':
         device = sys.argv[1]
 
         # Connect to target device and performs discovery
-        try:
+        #try:
+        if 1:
             print('[i] Connecting to device ...')
             dev = UartDevice(device, 115200)
             dev.open()
-            print('[i] Discovering domains ...')
             dev.discover()
+            
+            print('[i] Device details')
+            print('')
+            print(' Device ID: %s' % ":".join(["{:02x}".format(i) for i in dev.device_id.encode()]))
+            print(' Firmware info: ')
+            if len(dev.info.fw_author) > 0:
+                print(' - Author : %s' % dev.info.fw_author)
+            if len(dev.info.fw_url) > 0:
+                print(' - URL    : %s' % dev.info.fw_url)
+            print(' - Version: %s' % dev.info.version_str)
+            print('')
+            print('[i] Discovering domains ...')
             domains = {}
             for domain in dev.get_domains():
                 if domain in DOMAINS:
@@ -129,14 +141,13 @@ if __name__ == '__main__':
                     print('  - %s' % cmd)
                 print('')
 
-            print('[i] Device ID: %s' % ":".join(["{:02x}".format(i) for i in dev.device_id.encode()]))
-            print('')
             dev.close()
 
 
-        except Exception as err:
-            print('oops')
-            print(type(err))
+        #except Exception as err:
+        #    print(err)
+        #    print('oops')
+        #    print(type(err))
 
     else:
         print('Usage: %s [device]' % sys.argv[0])

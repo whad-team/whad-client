@@ -14,9 +14,11 @@ class WhadDeviceInfo(object):
     :param DeviceInfoResp info_resp:  Whad message containing the device basic information.
     """
     def __init__(self, info_resp):
-
         # Store device information
         self.__whad_version = info_resp.proto_min_ver
+        self.__max_speed = info_resp.max_speed
+        self.__fw_author = info_resp.fw_author
+        self.__fw_url = info_resp.fw_url
         self.__fw_ver_maj = info_resp.fw_version_major
         self.__fw_ver_min = info_resp.fw_version_minor
         self.__fw_ver_rev = info_resp.fw_version_rev
@@ -93,9 +95,9 @@ class WhadDeviceInfo(object):
         :returns: Device firmware version string
         """
         return '%d.%d.%d' % (
-            self.fw_ver_maj,
-            self.fw_ver_min,
-            self.fw_ver_rev
+            self.__fw_ver_maj,
+            self.__fw_ver_min,
+            self.__fw_ver_rev
         )
 
 
@@ -105,6 +107,17 @@ class WhadDeviceInfo(object):
         """
         return self.__whad_version
 
+    @property
+    def fw_author(self):
+        return self.__fw_author.decode('utf-8')
+
+    @property
+    def fw_url(self):
+        return self.__fw_url.decode('utf-8')
+
+    @property
+    def max_speed(self):
+        return self.__max_speed
 
     @property
     def device_type(self):
@@ -361,9 +374,8 @@ class WhadDevice(object):
         self.__io_thread = WhadDeviceIOThread(self)
         self.__io_thread.start()
 
-        # Ask for a reset
+        # Ask firmware for a reset
         self.reset()
-
 
     def close(self):
         """
@@ -401,12 +413,23 @@ class WhadDevice(object):
         """
         self.__mq_filter = filter
 
+    def wait_for_single_message(self, timeout, filter=None):
+        """Configures the device message queue filter to automatically move messages
+        that matches the filter into the queue, and then waits for the first message
+        that matches this filter and returns it.
+        """
+        if filter is not None:
+            self.set_queue_filter(filter)
+
+        # Wait for a matching message to be caught (blocking)
+        return self.__msg_queue.get(block=True, timeout=timeout)
+
 
     def wait_for_message(self, timeout=None, filter=None):
         """
         Configures the device message queue filter to automatically move messages
         that matches the filter into the queue, and then waits for the first message
-        that matches this filter and returns it.
+        that matches this filter and process it.
 
         This method is blocking until a matching message is received.
 
@@ -529,7 +552,8 @@ class WhadDevice(object):
             self.on_generic_msg(message.generic)
         else:
             domain = message.WhichOneof('msg')
-            self.on_domain_msg(domain, getattr(message,domain))
+            if domain is not None:
+                self.on_domain_msg(domain, getattr(message,domain))
 
 
     def on_message_received(self, message):
@@ -690,6 +714,11 @@ class WhadDevice(object):
 
                 # Mark device as discovered
                 self.__discovered = True
+
+                # Switch to max transport speed
+                self.change_transport_speed(
+                    self.info.max_speed
+                )
             else:
                 raise WhadDeviceNotReady()
 
@@ -703,11 +732,22 @@ class WhadDevice(object):
             message_filter('discovery', 'ready_resp')
         )
 
+    def change_transport_speed(self, speed):
+        """Set device transport speed.
+
+        Optional.
+        """
+        pass
+
     @property
     def device_id(self):
         """Return device ID
         """
         return self.__info.device_id
+
+    @property
+    def info(self):
+        return self.__info
 
     ######################################
     # Upper layers (domains) handling
