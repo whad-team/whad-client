@@ -10,6 +10,7 @@ import os
 import select
 from threading import Lock
 from serial import Serial
+from serial.tools.list_ports import comports
 from time import sleep
 from queue import Empty
 
@@ -19,6 +20,15 @@ from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter
 from whad.protocol.device_pb2 import DeviceResetQuery
 from whad.protocol.generic_pb2 import ResultCode
+
+def get_port_info(port):
+    """Find information about a serial port
+
+    :param string port: Target serial port
+    """
+    for p in comports():
+        if p.device == port:
+            return p
 
 class UartDevice(WhadDevice):
     """
@@ -38,6 +48,18 @@ class UartDevice(WhadDevice):
         self.__uart = None
         self.__opened = False
 
+        # Determine if device is CDC ACM (usb subsystem)
+        port_info = get_port_info(self.__port)
+        self.__is_acm = (port_info.subsystem == 'usb')
+
+
+    def is_acm(self):
+        """Determine if this UART device is a CDC ACM one.
+
+        :return: True if CDC ACM, False otherwise.
+        """
+        return self.__is_acm
+
 
     def open(self):
         """
@@ -51,9 +73,12 @@ class UartDevice(WhadDevice):
             self.__fileno = self.__uart.fileno()
             self.__opened = True
 
-            self.__uart.dtr = False             # Non reset state
-            self.__uart.rts = False             # Non reset state
-            self.__uart.dtr = self.__uart.dtr   # usbser.sys workaround
+            # If device is CDC ACM, we don't need to reset it
+            # only reset true serial devices
+            if not self.__is_acm:
+                self.__uart.dtr = False             # Non reset state
+                self.__uart.rts = False             # Non reset state
+                self.__uart.dtr = self.__uart.dtr   # usbser.sys workaround
 
             # Ask parent class to run a background I/O thread
             super().open()
@@ -65,29 +90,38 @@ class UartDevice(WhadDevice):
         This routine tries to reset device by setting RTS to high. This works
         on NodeMCU chips as well as any Arduino-compatible device.
         """
-        # Reset device through DTR
-        self.__uart.dtr = False             # Non reset state
-        self.__uart.rts = True             # Non reset state
-        sleep(0.2)
-        self.__uart.dtr = False             # Non reset state
-        self.__uart.rts = False             # Non reset state
+        # If device is a true serial device, ask for a reset through DTR/RTS
+        if not self.__is_acm:
+            # Reset device through DTR
+            self.__uart.dtr = False             # Non reset state
+            self.__uart.rts = True             # Non reset state
+            sleep(0.2)
+            self.__uart.dtr = False             # Non reset state
+            self.__uart.rts = False             # Non reset state
 
-        try:
-            # Wait for a ready message for 1 second
-            msg = self.wait_for_single_message(
-                1.0,
-                message_filter('discovery', 'ready_resp')
-            )
-            self.dispatch_message(msg)
-        except Empty:
-            # Use the classic way to reset device (RTS-based reset failed)
+            try:
+                # Wait for a ready message for 1 second
+                msg = self.wait_for_single_message(
+                    1.0,
+                    message_filter('discovery', 'ready_resp')
+                )
+                self.dispatch_message(msg)
+            except Empty:
+                # Use the classic way to reset device (RTS-based reset failed)
+                msg = Message()
+                msg.discovery.reset_query.CopyFrom(DeviceResetQuery())
+                self.send_command(
+                    msg,
+                    message_filter('discovery', 'ready_resp')
+                )
+        else:
+            # Device is ACM, send a classic reset message to device
             msg = Message()
             msg.discovery.reset_query.CopyFrom(DeviceResetQuery())
             self.send_command(
                 msg,
                 message_filter('discovery', 'ready_resp')
             )
-        
 
 
     def close(self):
@@ -154,18 +188,22 @@ class UartDevice(WhadDevice):
             self.on_data_received(data)
 
     def change_transport_speed(self, speed):
-        """Set UART speed
+        """Set UART speed for true serial devices. CDC ACM devices will ignore
+        it.
+
+        :param int speed: New baudrate to apply to current serial device.
         """
-        msg = Message()
-        msg.discovery.set_speed.speed = speed
-        resp = self.send_command(
-            msg,
-            message_filter('generic', 'cmd_result')
-        )
+        if not self.__is_acm:
+            msg = Message()
+            msg.discovery.set_speed.speed = speed
+            resp = self.send_command(
+                msg,
+                message_filter('generic', 'cmd_result')
+            )
 
-        if (resp.generic.cmd_result.result == ResultCode.SUCCESS):
-            # Change baudrate
-            self.__uart.baudrate = speed
+            if (resp.generic.cmd_result.result == ResultCode.SUCCESS):
+                # Change baudrate
+                self.__uart.baudrate = speed
 
-            # Wait for device to be ready (500ms)
-            sleep(0.5)
+                # Wait for device to be ready (500ms)
+                sleep(0.5)
