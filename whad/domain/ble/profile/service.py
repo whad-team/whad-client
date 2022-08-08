@@ -1,6 +1,6 @@
 """Bluetooth Low Energy Service class
 """
-from whad.domain.ble.attribute import Attribute, UUID
+from whad.domain.ble.profile.attribute import Attribute, UUID
 
 class Service(Attribute):
     def __init__(self, uuid, type_uuid, handle=0, end_handle=0):

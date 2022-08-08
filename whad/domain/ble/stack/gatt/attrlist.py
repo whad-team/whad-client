@@ -2,7 +2,7 @@
 """
 from struct import pack, unpack
 
-from whad.domain.ble.attribute import UUID
+from whad.domain.ble.profile import UUID
 
 class GattListItem(object):
     """Template class for a GATT Attribute List Item
