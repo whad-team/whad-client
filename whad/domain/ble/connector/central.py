@@ -34,10 +34,10 @@ class Central(BLE):
             self.connect_to(bd_address)
             self.start()
             start_time=time()
-            while not self.__connected:
+            while not self.is_connected():
                 if time()-start_time >= timeout:
                     return None
-            return self.__peripheral
+            return self.peripheral()
         else:
             return None
 
@@ -48,6 +48,9 @@ class Central(BLE):
     ##############################
     # Incoming events
     ##############################
+
+    def is_connected(self):
+        return self.__connected
 
     def on_connected(self, connection_data):
         self.__stack.on_connection(connection_data)

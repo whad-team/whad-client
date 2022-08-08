@@ -8,7 +8,7 @@ from whad.exceptions import UnsupportedCapability
 
 class Peripheral(BLE):
 
-    def __init__(self, device, existing_connection = None, profile=None):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None):
         super().__init__(device)
 
         # Initialize stack
@@ -26,7 +26,7 @@ class Peripheral(BLE):
         if not self.can_be_peripheral():
             raise UnsupportedCapability("Peripheral")
         else:
-            self.enable_peripheral_mode()
+            self.enable_peripheral_mode(adv_data)
 
             # If an existing connection is hijacked, simulate a connection
             if existing_connection is not None:
