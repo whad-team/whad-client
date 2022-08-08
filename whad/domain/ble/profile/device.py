@@ -1,10 +1,10 @@
 """Bluetooth Low Energy device abstraction
 """
 
-from whad.domain.ble.characteristic import CharacteristicProperties
+from whad.domain.ble.profile.characteristic import CharacteristicProperties
 from whad.domain.ble.profile import GenericProfile
 from whad.domain.ble.stack.att.constants import BleAttProperties
-from whad.domain.ble.attribute import UUID
+from whad.domain.ble.profile.attribute import UUID
 
 class PeripheralCharacteristicDescriptor:
 

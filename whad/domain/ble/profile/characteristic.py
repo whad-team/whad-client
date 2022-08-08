@@ -1,7 +1,7 @@
 """Bluetooth Low Energy Characteristic Abstraction
 """
 from whad.domain.ble.stack.att.constants import BleAttProperties
-from whad.domain.ble.attribute import Attribute, UUID
+from whad.domain.ble.profile.attribute import Attribute, UUID
 from whad.domain.ble.exceptions import InvalidHandleValueException
 from struct import pack, unpack
 

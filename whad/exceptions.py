@@ -30,3 +30,7 @@ class UnsupportedCapability(Exception):
 class WhadDeviceNotReady(Exception):
     def __init__(self):
         super().__init__()
+
+class WhadDeviceNotFound(Exception):
+    def __init__(self):
+        super().__init__()

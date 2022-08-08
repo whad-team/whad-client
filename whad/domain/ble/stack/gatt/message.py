@@ -1,6 +1,6 @@
 from .attrlist import gatt_attr_list_iter, GattAttributeDataList, GattHandleUUIDItem, GattHandleItem, \
     GattAttributeValueItem, GattGroupTypeItem
-from whad.domain.ble.attribute import UUID
+from whad.domain.ble.profile.attribute import UUID
 
 
 class GattDataHolder(object):

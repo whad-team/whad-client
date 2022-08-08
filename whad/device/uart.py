@@ -20,6 +20,7 @@ from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter
 from whad.protocol.device_pb2 import DeviceResetQuery
 from whad.protocol.generic_pb2 import ResultCode
+from whad.exceptions import WhadDeviceNotFound
 
 def get_port_info(port):
     """Find information about a serial port
@@ -29,6 +30,7 @@ def get_port_info(port):
     for p in comports():
         if p.device == port:
             return p
+    return None
 
 class UartDevice(WhadDevice):
     """
@@ -50,7 +52,10 @@ class UartDevice(WhadDevice):
 
         # Determine if device is CDC ACM (usb subsystem)
         port_info = get_port_info(self.__port)
-        self.__is_acm = (port_info.subsystem == 'usb')
+        if port_info is None:
+            raise WhadDeviceNotFound
+        else:
+            self.__is_acm = (port_info.subsystem == 'usb')
 
 
     def is_acm(self):

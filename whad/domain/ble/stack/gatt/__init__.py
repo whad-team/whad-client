@@ -10,8 +10,8 @@ from whad.domain.ble.stack.att.exceptions import InvalidHandleValueError, error_
 from whad.domain.ble.stack.gatt.message import *
 from whad.domain.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.domain.ble.profile import GenericProfile
-from whad.domain.ble.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
-from whad.domain.ble.service import PrimaryService, SecondaryService
+from whad.domain.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
+from whad.domain.ble.profile.service import PrimaryService, SecondaryService
 
 
 class Gatt(object):
