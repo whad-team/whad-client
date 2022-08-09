@@ -175,6 +175,3 @@ class NetworkLayerCryptoManager:
             if self.patched:
                 packet[ZigbeeSecurityHeader].nwk_seclevel = 0
             return (packet, False) # integrity check
-
-nlcm = NetworkLayerCryptoManager(bytes.fromhex("ad8ebbc4f96ae7000506d3fcd1627fb8"))
-print(nlcm.decrypt(bytes.fromhex("618864472400008a5c480200008a5c1e5d28e1000000013ce801008d150001ea59de1f960eea8aee185a11893096414e05a243")))
