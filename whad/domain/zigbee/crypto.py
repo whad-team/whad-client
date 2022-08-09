@@ -78,6 +78,60 @@ class NetworkLayerCryptoManager:
             message = b""
         return message, mic
 
+    def generateMIC(self,packet):
+        self.auth = self.generateAuth(packet)
+        plaintext = packet.data
+        auth = len(self.auth).to_bytes(2, byteorder = 'big')+self.auth
+        auth = auth + (32 - len(auth))*b"\x00" + plaintext+(16 - len(plaintext))*b"\x00"
+
+        flags = (0 << 7) | ((0 if len(self.auth) == 0 else 1) << 6 ) | ((2 - 1) << 3) | ((self.M-2)//2 if self.M else 0)
+        B0 = bytes([flags]) + self.nonce + pack(">H",len(plaintext))
+        X0 = b"\x00"*16
+        cipher = AES.new(self.key, AES.MODE_CBC, X0)
+        X1 = cipher.encrypt(B0 + auth)
+        return X1[-16:-12]
+
+    def encrypt(self, packet):
+        # convert into scapy packet if bytes only
+        if isinstance(packet, bytes):
+            packet = Dot15d4(packet)
+
+        # don't process FCS if present
+        if Dot15d4FCS in packet:
+            packet = Dot15d4(raw(packet)[:-2])
+
+        # raise MissingNetworkSecurityHeader exception if no security header is found
+        if ZigbeeSecurityHeader not in packet:
+            raise MissingNetworkSecurityHeader()
+
+        # check security level (and patch the packet content if needed - see wireshark source code for details)
+        packet, self.M, self.integrity, self.encryption = self.checkSecurityLevel(packet)
+
+        # generate the nonce
+        self.nonce = self.generateNonce(packet)
+
+        # generate the AES-CCM parameters
+        self.auth = self.generateAuth(packet)
+
+        # Extract plaintext
+        plaintext = packet.data[:-self.M]
+
+        # Encrypt and generate MIC
+        cipher = AES.new(self.key, AES.MODE_CCM, nonce=self.nonce, mac_len=self.M)
+        cipher.update(self.auth)
+
+        ciphertext = cipher.encrypt(plaintext)
+
+        mic = cipher.digest()
+        packet.data = ciphertext
+        packet.mic = mic
+
+        # Restore security level if patched
+        if self.patched:
+            packet[ZigbeeSecurityHeader].nwk_seclevel = 0
+
+        return packet
+
     def decrypt(self, packet):
         # convert into scapy packet if bytes only
         if isinstance(packet, bytes):
@@ -101,7 +155,6 @@ class NetworkLayerCryptoManager:
         self.auth = self.generateAuth(packet)
         ciphertext, mic = self.extractCiphertextPayload(packet)
 
-        print(ciphertext.hex(),self.nonce.hex(),mic.hex(),self.auth.hex())
         # Perform the decryption and integrity check
         cipher = AES.new(self.key, AES.MODE_CCM, nonce=self.nonce, mac_len=self.M)
         cipher.update(self.auth)
@@ -110,11 +163,7 @@ class NetworkLayerCryptoManager:
         try:
             cipher.verify(mic)
             packet.data = plaintext
-
-            auth = len(self.auth).to_bytes(2, byteorder = 'big')+self.auth
-            auth = auth + (32 - len(auth))*b"\x00" + plaintext
-
-            flags = (0 << 7) | ((0 if len(self.auth) == 0 else 1) << 6 ) | (self.M - 1) " stop it here"
+            packet.mic = self.generateMIC(packet)
             # Reverse patching if needed
             if self.patched:
                 packet[ZigbeeSecurityHeader].nwk_seclevel = 0
@@ -126,8 +175,3 @@ class NetworkLayerCryptoManager:
             if self.patched:
                 packet[ZigbeeSecurityHeader].nwk_seclevel = 0
             return (packet, False) # integrity check
-
-
-m = NetworkLayerCryptoManager(bytes.fromhex("ad8ebbc4f96ae7000506d3fcd1627fb8"))
-a,b = m.decrypt(bytes.fromhex("618864472400008a5c480200008a5c1e5d28e1000000013ce801008d150001ea59de1f960eea8aee185a11893096414e05a243"))
-print(raw(a).hex(),b)
