@@ -78,15 +78,15 @@ class Zigbee(WhadDeviceConnector):
 
     def _build_message_from_scapy_packet(self, packet, channel=11):
         msg = Message()
-        msg.zigbee.send.channel = channel
+        msg.zigbee.send_raw.channel = channel
 
         if Dot15d4 in packet:
             packet = Dot15d4FCS(raw(packet)+Dot15d4FCS().compute_fcs(raw(packet)))
 
         pdu = raw(packet)[:-2]
         print(hex(packet.fcs))
-        msg.zigbee.send.pdu = bytes([len(raw(packet))]) + pdu
-        msg.zigbee.send.fcs = packet.fcs
+        msg.zigbee.send_raw.pdu = bytes([len(raw(packet))]) + pdu
+        msg.zigbee.send_raw.fcs = packet.fcs
 
         return msg
 
