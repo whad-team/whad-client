@@ -2,6 +2,7 @@ from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
+from whad.metadata import generate_zigbee_metadata, ZigbeeMetadata
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.zigbee.zigbee_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, Send, SendCmd
@@ -64,13 +65,13 @@ class Zigbee(WhadDeviceConnector):
     def _build_scapy_packet_from_message(self, message, msg_type):
         try:
             if msg_type == 'raw_pdu':
-                packet = Dot15d4FCS(bytes(message.raw_pdu.pdu)[1:] + bytes(struct.pack(">H", message.raw_pdu.fcs)))
-                #packet.metadata = generate_metadata(message, msg_type)
+                packet = Dot15d4FCS(bytes(message.raw_pdu.pdu) + bytes(struct.pack(">H", message.raw_pdu.fcs)))
+                packet.metadata = generate_zigbee_metadata(message, msg_type)
                 return packet
 
             elif msg_type == 'pdu':
-                packet = Dot15d4(bytes(message.pdu.pdu)[1:])
-                #packet.metadata = generate_metadata(message, msg_type)
+                packet = Dot15d4(bytes(message.pdu.pdu))
+                packet.metadata = generate_zigbee_metadata(message, msg_type)
                 return packet
 
         except AttributeError:
@@ -78,15 +79,19 @@ class Zigbee(WhadDeviceConnector):
 
     def _build_message_from_scapy_packet(self, packet, channel=11):
         msg = Message()
-        msg.zigbee.send_raw.channel = channel
 
-        if Dot15d4 in packet:
-            packet = Dot15d4FCS(raw(packet)+Dot15d4FCS().compute_fcs(raw(packet)))
+        if Dot15d4FCS in packet:
+            msg.zigbee.send_raw.channel = channel
+            pdu = raw(packet)[:-2]
+            msg.zigbee.send_raw.pdu = pdu
+            msg.zigbee.send_raw.fcs = packet.fcs
 
-        pdu = raw(packet)[:-2]
-        print(hex(packet.fcs))
-        msg.zigbee.send_raw.pdu = bytes([len(raw(packet))]) + pdu
-        msg.zigbee.send_raw.fcs = packet.fcs
+        elif Dot15d4 in packet:
+            msg.zigbee.send.channel = channel
+            pdu = raw(packet)
+            msg.zigbee.send.pdu = pdu
+        else:
+            msg = None
 
         return msg
 
@@ -132,17 +137,21 @@ class Zigbee(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-    def send(self,packet,channel=11):
+    def send(self,pdu,channel=11):
         """
         Send Zigbee packets (on a single channel).
         """
-        if not self.can_send():
-            raise UnsupportedCapability("Send")
+        if self.can_send():
+            if self.support_raw_pdu() and Dot15d4FCS not in pdu:
+                packet = Dot15d4FCS(raw(pdu)+Dot15d4FCS().compute_fcs(raw(pdu)))
+            else:
+                packet = pdu
+            msg = self._build_message_from_scapy_packet(packet, channel)
+            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-        msg = self._build_message_from_scapy_packet(packet, channel)
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
+        else:
+            return False
 
     def start(self):
         """
