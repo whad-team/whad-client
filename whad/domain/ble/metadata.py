@@ -1,18 +1,6 @@
 from whad.protocol.ble.ble_pb2 import BleDirection
-from whad.helpers import is_message_type
+from whad.domain.common.metadata import Metadata
 from dataclasses import dataclass
-from enum import IntEnum
-
-@dataclass
-class Metadata:
-    timestamp : int = None
-    channel : int = None
-    rssi : int = None
-
-
-@dataclass
-class ZigbeeMetadata(Metadata):
-    is_fcs_valid : bool = None
 
 @dataclass
 class BLEMetadata(Metadata):
@@ -47,23 +35,5 @@ def generate_ble_metadata(message, msg_type):
         message = message.pdu
         metadata.connection_handle = message.conn_handle
         metadata.direction = message.direction
-
-    return metadata
-
-def generate_zigbee_metadata(message, msg_type):
-    metadata = ZigbeeMetadata()
-
-    if msg_type == "raw_pdu":
-        message = message.raw_pdu
-    elif msg_type == "pdu":
-        message = message.pdu
-
-    if message.HasField("rssi"):
-        metadata.rssi = message.rssi
-    metadata.channel = message.channel
-    if message.HasField("timestamp"):
-        metadata.timestamp = message.timestamp
-    if message.HasField("fcs_validity"):
-        metadata.is_fcs_valid = message.fcs_validity
 
     return metadata

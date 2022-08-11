@@ -2,7 +2,7 @@ from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.metadata import generate_zigbee_metadata, ZigbeeMetadata
+from whad.domain.zigbee.metadata import generate_zigbee_metadata, ZigbeeMetadata
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.zigbee.zigbee_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, Send, SendCmd
