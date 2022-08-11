@@ -1,12 +1,17 @@
 from threading import Thread, Lock
 from queue import Queue, Empty
+from binascii import hexlify
 
-#from elementpath import TypedAttribute
+# Whad imports
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, WhadDeviceNotReady
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery
 from whad.helpers import message_filter, asciiz
+
+# Logging
+import logging
+logger = logging.getLogger(__name__)
 
 class WhadDeviceInfo(object):
     """This class caches a device information related to its firmware, type, and supported domains and capabilities.
@@ -58,7 +63,6 @@ class WhadDeviceInfo(object):
         :param Capability capability: capability to check
         """
         if domain in self.__domains:
-
             return (self.__domains[domain] & (1 << capability) > 0)
         return False
 
@@ -179,6 +183,7 @@ class WhadDeviceConnector(object):
         :param Message message: WHAD message to send to the device.
         :param filter: optional filter function for incoming message queue.
         """
+        logger.debug('sending WHAD message to device: %s' % message)
         return self.__device.send_message(message, filter)
 
 
@@ -211,6 +216,7 @@ class WhadDeviceConnector(object):
 
         :param message: Discovery message
         """
+        logger.error('method `on_discovery_message` must be implemented in inherited classes')
         raise RequiredImplementation()
 
     def on_generic_message(self, message):
@@ -220,6 +226,7 @@ class WhadDeviceConnector(object):
 
         :param message: Generic message
         """
+        logger.error('method `on_generic_message` must be implemented in inherited classes')
         raise RequiredImplementation()
 
     def on_domain_message(self, domain, message):
@@ -229,6 +236,7 @@ class WhadDeviceConnector(object):
 
         :param message: Domain message
         """
+        logger.error('method `on_domain_message` must be implemented in inherited classes')
         raise RequiredImplementation()
 
 
@@ -291,12 +299,16 @@ class WhadDeviceIOThread(object):
         self.__processing.cancel()
 
     def start(self):
+        logger.info('starting WhadDevice IO management thread ...')
         self.__input.start()
         self.__processing.start()
+        logger.info('WhadDevice IO management thread up and running.')
 
     def join(self):
+        logger.info('waiting for WhadDevice IO management thread to finish ...')
         self.__input.join()
         self.__processing.join()
+        logger.info('WhadDevice IO management thread finished.')
 
 
 class WhadDevice(object):
@@ -356,7 +368,6 @@ class WhadDevice(object):
 
         :param WhadDeviceConnector connector: connector to be used with this device.
         """
-        #self.__connector = connector
         self.__connectors.append(connector)
 
     ######################################
@@ -375,6 +386,7 @@ class WhadDevice(object):
         self.__io_thread.start()
 
         # Ask firmware for a reset
+        logger.info('resetting device (if possible)')
         self.reset()
 
     def close(self):
@@ -383,6 +395,8 @@ class WhadDevice(object):
 
         This method MUST be overriden by inherited classes.
         """
+        logger.info('closing WHAD device')
+
         # Cancel I/O thread
         self.__io_thread.cancel()
 
@@ -402,6 +416,7 @@ class WhadDevice(object):
         This is an internal method that SHALL NOT be used from inherited classes.
         """
         self.lock()
+        logger.debug('sending %s to WHAD device', bytes(data))
         self.write(bytes(data))
         self.unlock()
 
@@ -460,11 +475,13 @@ class WhadDevice(object):
         :param Message message: Message to send
         :param keep: Message queue filter function
         """
+        logger.info('sending message %s to device' % message)
         # if `keep` is set, configure queue filter
         self.set_queue_filter(keep)
 
         # Convert message into bytes
         raw_message = message.SerializeToString()
+        
 
         # Define header
         header = [
@@ -511,6 +528,7 @@ class WhadDevice(object):
 
         :param bytes data: Data received from the device.
         """
+        logger.debug('received raw data from device: %s' % hexlify(data))
         messages = []
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
@@ -523,6 +541,7 @@ class WhadDevice(object):
                         raw_message = self.__inpipe[4:4+msg_size]
                         _msg = Message()
                         _msg.ParseFromString(bytes(raw_message))
+                        logger.debug('WHAD message successfully parsed')
                         self.on_message_received(_msg)
 
                         # Chomp
@@ -546,15 +565,18 @@ class WhadDevice(object):
 
         :param Message message: Message to dispatch
         """
+        logger.info('dispatching WHAD message ...')
         if message.WhichOneof('msg') == 'discovery':
+            logger.info('message is about device discovery, forwarding to discovery handler')
             self.on_discovery_msg(message.discovery)
         elif message.WhichOneof('msg') == 'generic':
+            logger.info('message is generic, forwarding to default handler')
             self.on_generic_msg(message.generic)
         else:
             domain = message.WhichOneof('msg')
             if domain is not None:
+                logger.info('message concerns domain `%s`, forward to domain-specific handler' % domain)
                 self.on_domain_msg(domain, getattr(message,domain))
-
 
     def on_message_received(self, message):
         """
@@ -566,9 +588,11 @@ class WhadDevice(object):
         # move it into our message queue.
         if self.__mq_filter is not None and self.__mq_filter(message):
             #print('msgqueue: %s' % message)
+            logger.info('message does match current filter, save it for processing')
             self.__msg_queue.put(message, block=True)
         else:
             # Save message for background dispatch
+            logger.info('message does not match filter or no filter set, save in default message queue')
             self.__messages.put(message, block=True)
 
     def process_messages(self):
@@ -594,6 +618,7 @@ class WhadDevice(object):
         # Handle generic result message
         if message.WhichOneof('msg') == 'result':
             if message.result == ResultCode.UNSUPPORTED_DOMAIN:
+                logger.error('domain not supported by this device')
                 raise UnsupportedDomain()
 
         # Forward everything to the connectors, if any
@@ -664,6 +689,7 @@ class WhadDevice(object):
         Sends a DeviceInfoQuery message and awaits for a DeviceInfoResp
         answer.
         """
+        logger.info('preparing a DeviceInfoQuery message')
         msg = Message()
         msg.discovery.info_query.proto_ver=proto_version
         return self.send_command(
@@ -677,6 +703,7 @@ class WhadDevice(object):
         Sends a DeviceDomainQuery message and awaits for a DeviceDomainResp
         answer.
         """
+        logger.info('preparing a DeviceDomainInfoQuery message')
         msg = Message()
         msg.discovery.domain_query.domain = domain
         return self.send_command(
@@ -705,6 +732,7 @@ class WhadDevice(object):
                 )
 
                 # Query device domains
+                logger.info('query supported commands per domain')
                 for domain in self.__info.domains:
                     resp = self.send_discover_domain_query(domain)
                     self.__info.add_supported_commands(
@@ -713,18 +741,22 @@ class WhadDevice(object):
                     )
 
                 # Mark device as discovered
+                logger.info('device discovery done')
                 self.__discovered = True
 
                 # Switch to max transport speed
+                logger.info('set transport speed to %d' % self.info.max_speed)
                 self.change_transport_speed(
                     self.info.max_speed
                 )
             else:
+                logger.error('device is not ready !')
                 raise WhadDeviceNotReady()
 
     def reset(self):
         """Reset device
         """
+        logger.info('preparing a DeviceResetQuery message')
         msg = Message()
         msg.discovery.reset_query.CopyFrom(DeviceResetQuery())
         return self.send_command(

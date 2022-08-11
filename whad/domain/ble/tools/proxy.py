@@ -200,10 +200,6 @@ class LinkLayerProxy(object):
         # Callbacks
         self.__callbacks = []
 
-    def register_callback(self, callback):
-        """Register a callback routine to be notified on
-        """
-
     def start(self):
         """Start proxy
 
