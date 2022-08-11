@@ -12,7 +12,7 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.domain.ble.metadata import generate_metadata, BLEMetadata
+from whad.domain.ble.metadata import generate_ble_metadata, BLEMetadata
 from whad.helpers import message_filter, bd_addr_to_bytes
 from whad.domain.ble.profile.advdata import AdvDataFieldList
 
@@ -82,17 +82,17 @@ class BLE(WhadDeviceConnector):
                     packet = BLE.SCAPY_CORR_ADV[message.adv_pdu.adv_type](
                             bytes(message.adv_pdu.bd_address) + bytes(message.adv_pdu.adv_data)
                         )
-                    packet.metadata = generate_metadata(message, msg_type)
+                    packet.metadata = generate_ble_metadata(message, msg_type)
                     return packet
 
             elif msg_type == 'raw_pdu':
                 packet = BTLE(bytes(struct.pack("I", message.raw_pdu.access_address)) + bytes(message.raw_pdu.pdu) + bytes(struct.pack(">I", message.raw_pdu.crc)[1:]))
-                packet.metadata = generate_metadata(message, msg_type)
+                packet.metadata = generate_ble_metadata(message, msg_type)
                 return packet
 
             elif msg_type == 'pdu':
                 packet = BTLE_DATA(message.pdu.pdu)
-                packet.metadata = generate_metadata(message, msg_type)
+                packet.metadata = generate_ble_metadata(message, msg_type)
                 return packet
 
         except AttributeError:
@@ -351,7 +351,7 @@ class BLE(WhadDeviceConnector):
             msg.ble.adv_mode.scanrsp_data = scan_data
         if adv_data is None and scan_data is None:
             msg.ble.adv_mode.CopyFrom(AdvModeCmd())
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result')) 
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
     def enable_peripheral_mode(self, adv_data=None, scan_data=None):
         """

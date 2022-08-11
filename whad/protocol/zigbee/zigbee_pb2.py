@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x1cprotocol/zigbee/zigbee.proto\x12\x06zigbee\"$\n\x11SetNodeAddressCmd\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\x0c\"\x1b\n\x08SniffCmd\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\"\x19\n\x06JamCmd\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\"4\n\x07SendCmd\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\x12\x0b\n\x03pdu\x18\x02 \x01(\x0c\x12\x0b\n\x03\x63rc\x18\x03 \x01(\r\"\x0e\n\x0c\x45ndDeviceCmd\"\x0b\n\tRouterCmd\"\x10\n\x0e\x43oordinatorCmd\"\n\n\x08StartCmd\"\t\n\x07StopCmd\"9\n\x11ManInTheMiddleCmd\x12$\n\x04role\x18\x01 \x01(\x0e\x32\x16.zigbee.ZigbeeMitmRole\"\x1b\n\x06Jammed\x12\x11\n\ttimestamp\x18\x01 \x01(\r\"\xa9\x01\n\x0eRawPduReceived\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x19\n\x0c\x66\x63s_validity\x18\x04 \x01(\x08H\x02\x88\x01\x01\x12\x0b\n\x03pdu\x18\x05 \x01(\x0c\x12\x0b\n\x03\x66\x63s\x18\x06 \x01(\rB\x07\n\x05_rssiB\x0c\n\n_timestampB\x0f\n\r_fcs_validity\"\x99\x01\n\x0bPduReceived\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x19\n\x0c\x66\x63s_validity\x18\x04 \x01(\x08H\x02\x88\x01\x01\x12\x0b\n\x03pdu\x18\x05 \x01(\x0c\x42\x07\n\x05_rssiB\x0c\n\n_timestampB\x0f\n\r_fcs_validity\"\x87\x04\n\x07Message\x12\x32\n\rset_node_addr\x18\x01 \x01(\x0b\x32\x19.zigbee.SetNodeAddressCmdH\x00\x12!\n\x05sniff\x18\x02 \x01(\x0b\x32\x10.zigbee.SniffCmdH\x00\x12\x1d\n\x03jam\x18\x03 \x01(\x0b\x32\x0e.zigbee.JamCmdH\x00\x12\x1f\n\x04send\x18\x04 \x01(\x0b\x32\x0f.zigbee.SendCmdH\x00\x12*\n\nend_device\x18\x05 \x01(\x0b\x32\x14.zigbee.EndDeviceCmdH\x00\x12#\n\x06router\x18\x06 \x01(\x0b\x32\x11.zigbee.RouterCmdH\x00\x12-\n\x0b\x63oordinator\x18\x07 \x01(\x0b\x32\x16.zigbee.CoordinatorCmdH\x00\x12!\n\x05start\x18\x08 \x01(\x0b\x32\x10.zigbee.StartCmdH\x00\x12\x1f\n\x04stop\x18\t \x01(\x0b\x32\x0f.zigbee.StopCmdH\x00\x12)\n\x04mitm\x18\n \x01(\x0b\x32\x19.zigbee.ManInTheMiddleCmdH\x00\x12 \n\x06jammed\x18\x0b \x01(\x0b\x32\x0e.zigbee.JammedH\x00\x12)\n\x07raw_pdu\x18\x0c \x01(\x0b\x32\x16.zigbee.RawPduReceivedH\x00\x12\"\n\x03pdu\x18\r \x01(\x0b\x32\x13.zigbee.PduReceivedH\x00\x42\x05\n\x03msg*\xa2\x01\n\rZigbeeCommand\x12\x12\n\x0eSetNodeAddress\x10\x00\x12\t\n\x05Sniff\x10\x01\x12\x07\n\x03Jam\x10\x02\x12\x08\n\x04Send\x10\x03\x12\x11\n\rEndDeviceMode\x10\x04\x12\x13\n\x0f\x43oordinatorMode\x10\x05\x12\x0e\n\nRouterMode\x10\x06\x12\t\n\x05Start\x10\x07\x12\x08\n\x04Stop\x10\x08\x12\x12\n\x0eManInTheMiddle\x10\t*4\n\x0eZigbeeMitmRole\x12\x13\n\x0fREACTIVE_JAMMER\x10\x00\x12\r\n\tCORRECTOR\x10\x01\x62\x06proto3'
+  serialized_pb=b'\n\x1cprotocol/zigbee/zigbee.proto\x12\x06zigbee\"$\n\x11SetNodeAddressCmd\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\x0c\"\x1b\n\x08SniffCmd\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\"\x19\n\x06JamCmd\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\"\'\n\x07SendCmd\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\x12\x0b\n\x03pdu\x18\x02 \x01(\x0c\"7\n\nSendRawCmd\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\x12\x0b\n\x03pdu\x18\x02 \x01(\x0c\x12\x0b\n\x03\x66\x63s\x18\x03 \x01(\r\"\x0e\n\x0c\x45ndDeviceCmd\"\x0b\n\tRouterCmd\"\x10\n\x0e\x43oordinatorCmd\"\n\n\x08StartCmd\"\t\n\x07StopCmd\"9\n\x11ManInTheMiddleCmd\x12$\n\x04role\x18\x01 \x01(\x0e\x32\x16.zigbee.ZigbeeMitmRole\"\x1b\n\x06Jammed\x12\x11\n\ttimestamp\x18\x01 \x01(\r\"\xa9\x01\n\x0eRawPduReceived\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x19\n\x0c\x66\x63s_validity\x18\x04 \x01(\x08H\x02\x88\x01\x01\x12\x0b\n\x03pdu\x18\x05 \x01(\x0c\x12\x0b\n\x03\x66\x63s\x18\x06 \x01(\rB\x07\n\x05_rssiB\x0c\n\n_timestampB\x0f\n\r_fcs_validity\"\x99\x01\n\x0bPduReceived\x12\x0f\n\x07\x63hannel\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x19\n\x0c\x66\x63s_validity\x18\x04 \x01(\x08H\x02\x88\x01\x01\x12\x0b\n\x03pdu\x18\x05 \x01(\x0c\x42\x07\n\x05_rssiB\x0c\n\n_timestampB\x0f\n\r_fcs_validity\"\xaf\x04\n\x07Message\x12\x32\n\rset_node_addr\x18\x01 \x01(\x0b\x32\x19.zigbee.SetNodeAddressCmdH\x00\x12!\n\x05sniff\x18\x02 \x01(\x0b\x32\x10.zigbee.SniffCmdH\x00\x12\x1d\n\x03jam\x18\x03 \x01(\x0b\x32\x0e.zigbee.JamCmdH\x00\x12\x1f\n\x04send\x18\x04 \x01(\x0b\x32\x0f.zigbee.SendCmdH\x00\x12&\n\x08send_raw\x18\x05 \x01(\x0b\x32\x12.zigbee.SendRawCmdH\x00\x12*\n\nend_device\x18\x06 \x01(\x0b\x32\x14.zigbee.EndDeviceCmdH\x00\x12#\n\x06router\x18\x07 \x01(\x0b\x32\x11.zigbee.RouterCmdH\x00\x12-\n\x0b\x63oordinator\x18\x08 \x01(\x0b\x32\x16.zigbee.CoordinatorCmdH\x00\x12!\n\x05start\x18\t \x01(\x0b\x32\x10.zigbee.StartCmdH\x00\x12\x1f\n\x04stop\x18\n \x01(\x0b\x32\x0f.zigbee.StopCmdH\x00\x12)\n\x04mitm\x18\x0b \x01(\x0b\x32\x19.zigbee.ManInTheMiddleCmdH\x00\x12 \n\x06jammed\x18\x0c \x01(\x0b\x32\x0e.zigbee.JammedH\x00\x12)\n\x07raw_pdu\x18\r \x01(\x0b\x32\x16.zigbee.RawPduReceivedH\x00\x12\"\n\x03pdu\x18\x0e \x01(\x0b\x32\x13.zigbee.PduReceivedH\x00\x42\x05\n\x03msg*\xaf\x01\n\rZigbeeCommand\x12\x12\n\x0eSetNodeAddress\x10\x00\x12\t\n\x05Sniff\x10\x01\x12\x07\n\x03Jam\x10\x02\x12\x08\n\x04Send\x10\x03\x12\x0b\n\x07SendRaw\x10\x04\x12\x11\n\rEndDeviceMode\x10\x05\x12\x13\n\x0f\x43oordinatorMode\x10\x06\x12\x0e\n\nRouterMode\x10\x07\x12\t\n\x05Start\x10\x08\x12\x08\n\x04Stop\x10\t\x12\x12\n\x0eManInTheMiddle\x10\n*4\n\x0eZigbeeMitmRole\x12\x13\n\x0fREACTIVE_JAMMER\x10\x00\x12\r\n\tCORRECTOR\x10\x01\x62\x06proto3'
 )
 
 _ZIGBEECOMMAND = _descriptor.EnumDescriptor(
@@ -51,40 +51,45 @@ _ZIGBEECOMMAND = _descriptor.EnumDescriptor(
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='EndDeviceMode', index=4, number=4,
+      name='SendRaw', index=4, number=4,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='CoordinatorMode', index=5, number=5,
+      name='EndDeviceMode', index=5, number=5,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='RouterMode', index=6, number=6,
+      name='CoordinatorMode', index=6, number=6,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='Start', index=7, number=7,
+      name='RouterMode', index=7, number=7,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='Stop', index=8, number=8,
+      name='Start', index=8, number=8,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='ManInTheMiddle', index=9, number=9,
+      name='Stop', index=9, number=9,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='ManInTheMiddle', index=10, number=10,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1197,
-  serialized_end=1359,
+  serialized_start=1281,
+  serialized_end=1456,
 )
 _sym_db.RegisterEnumDescriptor(_ZIGBEECOMMAND)
 
@@ -109,8 +114,8 @@ _ZIGBEEMITMROLE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1361,
-  serialized_end=1413,
+  serialized_start=1458,
+  serialized_end=1510,
 )
 _sym_db.RegisterEnumDescriptor(_ZIGBEEMITMROLE)
 
@@ -119,12 +124,13 @@ SetNodeAddress = 0
 Sniff = 1
 Jam = 2
 Send = 3
-EndDeviceMode = 4
-CoordinatorMode = 5
-RouterMode = 6
-Start = 7
-Stop = 8
-ManInTheMiddle = 9
+SendRaw = 4
+EndDeviceMode = 5
+CoordinatorMode = 6
+RouterMode = 7
+Start = 8
+Stop = 9
+ManInTheMiddle = 10
 REACTIVE_JAMMER = 0
 CORRECTOR = 1
 
@@ -248,8 +254,47 @@ _SENDCMD = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=134,
+  serialized_end=173,
+)
+
+
+_SENDRAWCMD = _descriptor.Descriptor(
+  name='SendRawCmd',
+  full_name='zigbee.SendRawCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
     _descriptor.FieldDescriptor(
-      name='crc', full_name='zigbee.SendCmd.crc', index=2,
+      name='channel', full_name='zigbee.SendRawCmd.channel', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='pdu', full_name='zigbee.SendRawCmd.pdu', index=1,
+      number=2, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='fcs', full_name='zigbee.SendRawCmd.fcs', index=2,
       number=3, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
@@ -267,8 +312,8 @@ _SENDCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=134,
-  serialized_end=186,
+  serialized_start=175,
+  serialized_end=230,
 )
 
 
@@ -292,8 +337,8 @@ _ENDDEVICECMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=188,
-  serialized_end=202,
+  serialized_start=232,
+  serialized_end=246,
 )
 
 
@@ -317,8 +362,8 @@ _ROUTERCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=204,
-  serialized_end=215,
+  serialized_start=248,
+  serialized_end=259,
 )
 
 
@@ -342,8 +387,8 @@ _COORDINATORCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=217,
-  serialized_end=233,
+  serialized_start=261,
+  serialized_end=277,
 )
 
 
@@ -367,8 +412,8 @@ _STARTCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=235,
-  serialized_end=245,
+  serialized_start=279,
+  serialized_end=289,
 )
 
 
@@ -392,8 +437,8 @@ _STOPCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=247,
-  serialized_end=256,
+  serialized_start=291,
+  serialized_end=300,
 )
 
 
@@ -424,8 +469,8 @@ _MANINTHEMIDDLECMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=258,
-  serialized_end=315,
+  serialized_start=302,
+  serialized_end=359,
 )
 
 
@@ -456,8 +501,8 @@ _JAMMED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=317,
-  serialized_end=344,
+  serialized_start=361,
+  serialized_end=388,
 )
 
 
@@ -538,8 +583,8 @@ _RAWPDURECEIVED = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=347,
-  serialized_end=516,
+  serialized_start=391,
+  serialized_end=560,
 )
 
 
@@ -613,8 +658,8 @@ _PDURECEIVED = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=519,
-  serialized_end=672,
+  serialized_start=563,
+  serialized_end=716,
 )
 
 
@@ -655,64 +700,71 @@ _MESSAGE = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='end_device', full_name='zigbee.Message.end_device', index=4,
+      name='send_raw', full_name='zigbee.Message.send_raw', index=4,
       number=5, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='router', full_name='zigbee.Message.router', index=5,
+      name='end_device', full_name='zigbee.Message.end_device', index=5,
       number=6, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='coordinator', full_name='zigbee.Message.coordinator', index=6,
+      name='router', full_name='zigbee.Message.router', index=6,
       number=7, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='start', full_name='zigbee.Message.start', index=7,
+      name='coordinator', full_name='zigbee.Message.coordinator', index=7,
       number=8, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='stop', full_name='zigbee.Message.stop', index=8,
+      name='start', full_name='zigbee.Message.start', index=8,
       number=9, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='mitm', full_name='zigbee.Message.mitm', index=9,
+      name='stop', full_name='zigbee.Message.stop', index=9,
       number=10, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='jammed', full_name='zigbee.Message.jammed', index=10,
+      name='mitm', full_name='zigbee.Message.mitm', index=10,
       number=11, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='raw_pdu', full_name='zigbee.Message.raw_pdu', index=11,
+      name='jammed', full_name='zigbee.Message.jammed', index=11,
       number=12, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='pdu', full_name='zigbee.Message.pdu', index=12,
+      name='raw_pdu', full_name='zigbee.Message.raw_pdu', index=12,
       number=13, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='pdu', full_name='zigbee.Message.pdu', index=13,
+      number=14, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -734,8 +786,8 @@ _MESSAGE = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=675,
-  serialized_end=1194,
+  serialized_start=719,
+  serialized_end=1278,
 )
 
 _MANINTHEMIDDLECMD.fields_by_name['role'].enum_type = _ZIGBEEMITMROLE
@@ -761,6 +813,7 @@ _MESSAGE.fields_by_name['set_node_addr'].message_type = _SETNODEADDRESSCMD
 _MESSAGE.fields_by_name['sniff'].message_type = _SNIFFCMD
 _MESSAGE.fields_by_name['jam'].message_type = _JAMCMD
 _MESSAGE.fields_by_name['send'].message_type = _SENDCMD
+_MESSAGE.fields_by_name['send_raw'].message_type = _SENDRAWCMD
 _MESSAGE.fields_by_name['end_device'].message_type = _ENDDEVICECMD
 _MESSAGE.fields_by_name['router'].message_type = _ROUTERCMD
 _MESSAGE.fields_by_name['coordinator'].message_type = _COORDINATORCMD
@@ -782,6 +835,9 @@ _MESSAGE.fields_by_name['jam'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
 _MESSAGE.oneofs_by_name['msg'].fields.append(
   _MESSAGE.fields_by_name['send'])
 _MESSAGE.fields_by_name['send'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['send_raw'])
+_MESSAGE.fields_by_name['send_raw'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
 _MESSAGE.oneofs_by_name['msg'].fields.append(
   _MESSAGE.fields_by_name['end_device'])
 _MESSAGE.fields_by_name['end_device'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
@@ -813,6 +869,7 @@ DESCRIPTOR.message_types_by_name['SetNodeAddressCmd'] = _SETNODEADDRESSCMD
 DESCRIPTOR.message_types_by_name['SniffCmd'] = _SNIFFCMD
 DESCRIPTOR.message_types_by_name['JamCmd'] = _JAMCMD
 DESCRIPTOR.message_types_by_name['SendCmd'] = _SENDCMD
+DESCRIPTOR.message_types_by_name['SendRawCmd'] = _SENDRAWCMD
 DESCRIPTOR.message_types_by_name['EndDeviceCmd'] = _ENDDEVICECMD
 DESCRIPTOR.message_types_by_name['RouterCmd'] = _ROUTERCMD
 DESCRIPTOR.message_types_by_name['CoordinatorCmd'] = _COORDINATORCMD
@@ -854,6 +911,13 @@ SendCmd = _reflection.GeneratedProtocolMessageType('SendCmd', (_message.Message,
   # @@protoc_insertion_point(class_scope:zigbee.SendCmd)
   })
 _sym_db.RegisterMessage(SendCmd)
+
+SendRawCmd = _reflection.GeneratedProtocolMessageType('SendRawCmd', (_message.Message,), {
+  'DESCRIPTOR' : _SENDRAWCMD,
+  '__module__' : 'protocol.zigbee.zigbee_pb2'
+  # @@protoc_insertion_point(class_scope:zigbee.SendRawCmd)
+  })
+_sym_db.RegisterMessage(SendRawCmd)
 
 EndDeviceCmd = _reflection.GeneratedProtocolMessageType('EndDeviceCmd', (_message.Message,), {
   'DESCRIPTOR' : _ENDDEVICECMD,
