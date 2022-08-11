@@ -1,9 +1,7 @@
-from xml.dom.minidom import CharacterData
-#from whad.domain.ble.device import ServiceModel, DeviceModel
-from whad.domain.ble.characteristic import UUID
-from whad.domain.ble.model import PrimaryService, Characteristic, DeviceModel, SecondaryService
+from whad.domain.ble.characteristic import UUID, ClientCharacteristicConfig
+from whad.domain.ble.profile import PrimaryService, Characteristic, GenericProfile, SecondaryService
 
-class MonDevice(DeviceModel):
+class MonDevice(GenericProfile):
 
     second_service = SecondaryService(
         uuid=UUID(0x4567)
@@ -41,13 +39,14 @@ class OtherDevice(MonDevice):
     )
 
 a = MonDevice()
-print(a.premier_service)
-print(a.premier_service.premiere_carac.value)
-a.premier_service.premiere_carac.value = b'Something else'
-print(a.premier_service.premiere_carac.value)
-b = OtherDevice()
+print(a)
+model_export = a.export_json()
+print(model_export)
 
-print(b.second_service.handle)
-print(b.premier_service.handle)
-print(b.troisieme_service.handle)
-print(OtherDevice.__bases__[0])
+# try to create a new model
+class ImportedDevice(GenericProfile):
+    def __init__(self, from_json):
+        super().__init__(from_json=from_json)
+
+b = ImportedDevice(model_export)
+print(b)

@@ -73,7 +73,7 @@ class BleL2CAP(object):
         packets=[]
         #data.show()
         # If data is bigger than MTU-1, then split
-        if len(data) >= self.__remote_mtu:
+        if len(data) > self.__remote_mtu:
             nb_packets = int(len(data)/(self.__remote_mtu - 1))
             if nb_packets * (self.__remote_mtu - 1) < len(data):
                 nb_packets += 1

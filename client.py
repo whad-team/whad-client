@@ -1,10 +1,7 @@
-from whad.domain.ble import Scanner, Central
-from whad.domain.ble.attribute import UUID
+from whad.domain.ble import Central
+from whad.domain.ble.profile import UUID
 from whad.device.uart import UartDevice
 from time import time,sleep
-from threading import Thread
-
-from whad.helpers import message_filter
 
 """
 scanner = Scanner(UartDevice('/dev/ttyUSB0', 115200))
@@ -39,7 +36,7 @@ class AsyncScan(Thread):
             self.scan.process()
 """
 
-""" Asynchronous scanner
+""" Asynchronous scanner 
 scanner = AsyncScan(UartDevice('/dev/ttyUSB0', 115200))
 scanner.start()
 scanner.join()
@@ -58,28 +55,33 @@ while True:
         break
 """
 
-class deleg(Thread):
-    def __init__(self, central):
-        super().__init__()
-        self.central = central
-    
-    def run(self):
-        sleep(6)
-        self.central.send_ctrl_pdu([0x12])
 
+def test_cb(characteristic, value, indicate=False):
+    print('> charac %s updated with value: %s' % (characteristic.uuid(), value))
 
 central = Central(UartDevice('/dev/ttyUSB0', 115200))
-#device = central.connect('D4:3B:04:2C:AD:16')
+print(central.device.device_id)
+#device = central.connect('84:CC:A8:7E:D5:A2')
+#device = central.connect('EC:8C:47:10:66:F0')
 device = central.connect('D6:F3:6E:89:DA:F5')
+#device = central.connect('d4:3b:04:2c:ad:16')
+#device = central.connect('0c:b8:15:c2:35:16')
+#device = central.connect('C1:7C:2F:90:37:E1')
 device.discover()
 
-c = device.get_characteristic(UUID(0x1800), UUID(0x2A00))
-#print(central.connection.gatt.read_characteristic_by_uuid(UUID(0x2A00)))
-#print('device name: %s' % c.read())
-c.write(b'0wn3d!')
-print(c.read())
-central.stop()
-central.device.close()
+#c = device.get_characteristic(UUID('b112f5e6-2679-30da-a26e-0273b6043849'), UUID('b112f5e6-2679-30da-a26e-0273b6043849'))
+print(central.export_profile())
 
+#print('sub=%s' % c.subscribe(notification=True, callback=test_cb))
+c = device.get_characteristic(UUID('1800'), UUID('2A00'))
+c.write(b'tralala')
+print(c.read())
+print(c.value)
+
+try:
+    while True:
+        sleep(1)
+except KeyboardInterrupt:
+    central.stop()
 
 

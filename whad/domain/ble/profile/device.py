@@ -12,6 +12,14 @@ class PeripheralCharacteristicDescriptor:
         self.__descriptor = descriptor
         self.__gatt = gatt
 
+    @property
+    def handle(self):
+        return self.__descriptor.handle
+
+    @property
+    def type_uuid(self):
+        return self.__descriptor.type_uuid
+
     def read(self):
         return self.__gatt.read(self.__descriptor.handle)
 
@@ -43,8 +51,29 @@ class PeripheralCharacteristic:
         """
         return self.write(val)
 
+    @property
     def uuid(self):
         return self.__characteristic.uuid
+
+    @property
+    def type_uuid(self):
+        return self.__characteristic.type_uuid
+
+    @property
+    def properties(self):
+        return self.__characteristic.properties
+
+    @property
+    def handle(self):
+        return self.__characteristic.handle
+
+    @property
+    def end_handle(self):
+        return self.__characteristic.end_handle
+
+    @property
+    def value_handle(self):
+        return self.__characteristic.value_handle
 
     def read(self, offset=0):
         """Read characteristic value
@@ -61,6 +90,8 @@ class PeripheralCharacteristic:
 
     def write(self, value):
         """Set characteristic value
+
+        TODO: handle prepared write !
         """
         if isinstance(value, bytes):
             return self.__gatt.write(self.__characteristic.value_handle, value)
@@ -144,8 +175,21 @@ class PeripheralService:
         self.__service = service
         self.__gatt = gatt
 
+    @property
+    def handle(self):
+        return self.__service.handle
+
+    @property
+    def end_handle(self):
+        return self.__service.end_handle
+
+    @property
     def uuid(self):
         return self.__service.uuid
+
+    @property
+    def type_uuid(self):
+        return self.__service.type_uuid
 
     def read_characteristic_by_uuid(self, uuid):
         return self.__gatt.read_characteristic_by_uuid(
@@ -225,7 +269,6 @@ class PeripheralDevice(GenericProfile):
             if service.uuid == uuid:
                 return PeripheralService(service, self.__gatt)
         return None
-
 
     
 

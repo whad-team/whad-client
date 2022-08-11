@@ -12,7 +12,7 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.metadata import generate_metadata, BLEMetadata
+from whad.domain.ble.metadata import generate_metadata, BLEMetadata
 from whad.helpers import message_filter, bd_addr_to_bytes
 from whad.domain.ble.profile.advdata import AdvDataFieldList
 
@@ -57,6 +57,9 @@ class BLE(WhadDeviceConnector):
             raise UnsupportedDomain()
         else:
             self.__ready = True
+
+    def close(self):
+        self.device.close()
 
     def attach_user_callbacks(self, callback, filter=lambda pkt:True):
         self.__user_callbacks[callback] = filter

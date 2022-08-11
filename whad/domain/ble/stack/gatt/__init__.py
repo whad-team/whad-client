@@ -63,7 +63,7 @@ class Gatt(object):
         start_time = time()
         while (time() - start_time) < timeout:
             try:
-                msg = self.__queue.get(timeout=0.5)
+                msg = self.__queue.get(block=False,timeout=0.5)
                 if isinstance(msg, message_clazz) or isinstance(msg, GattErrorResponse):
                     return msg
             except Empty:
