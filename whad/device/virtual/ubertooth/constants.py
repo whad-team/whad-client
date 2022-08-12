@@ -1,3 +1,6 @@
+"""
+This module provides some constants used by WHAD to communicate with the Ubertooth One.
+"""
 # USB device Identifiers
 UBERTOOTH_ID_VENDOR         = 0x1D50
 UBERTOOTH_ID_PRODUCT        = 0x6002
