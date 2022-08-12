@@ -13,6 +13,9 @@ from usb.util import get_string
 
 # Helpers functions
 def get_ubertooth(id=0,serial=None):
+    '''
+    Returns an ubertooth USB object based on index or serial number.
+    '''
     devices = list(find(idVendor=UBERTOOTH_ID_VENDOR, idProduct=UBERTOOTH_ID_PRODUCT,find_all=True))
     if serial is not None:
         for device in devices:
@@ -27,6 +30,27 @@ def get_ubertooth(id=0,serial=None):
             return None
 
 class UbertoothDevice(VirtualDevice):
+
+    INTERFACE_NAME = "ubertooth"
+
+    @classmethod
+    def list(cls):
+        '''
+        Returns a list of available Ubertooth devices.
+        '''
+        available_devices = []
+        for ubertooth in find(idVendor=UBERTOOTH_ID_VENDOR, idProduct=UBERTOOTH_ID_PRODUCT,find_all=True):
+            available_devices.append(UbertoothDevice(serial=get_string(ubertooth, ubertooth.iSerialNumber)))
+        return available_devices
+
+    @property
+    def identifier(self):
+        '''
+        Returns the identifier of the current device (e.g., serial number).
+        '''
+        return get_string(self.__ubertooth, self.__ubertooth.iSerialNumber)
+
+
     def __init__(self, index=0, serial=None):
         """
         Create device connection
@@ -41,11 +65,11 @@ class UbertoothDevice(VirtualDevice):
 
     def open(self):
         self.__ubertooth.set_configuration()
-        self.dev_id = self._get_serial_number()
-        self.fw_author = self._get_manufacturer()
-        self.fw_url = self._get_url()
-        self.fw_version = self._get_firmware_version()
-        self.dev_capabilities = self._get_capabilities()
+        self._dev_id = self._get_serial_number()
+        self._fw_author = self._get_manufacturer()
+        self._fw_url = self._get_url()
+        self._fw_version = self._get_firmware_version()
+        self._dev_capabilities = self._get_capabilities()
 
         self._set_modulation(MOD_BT_LOW_ENERGY)
         self._set_jam_mode(JAM_NONE)

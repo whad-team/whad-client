@@ -36,6 +36,35 @@ class UartDevice(WhadDevice):
     """
     UartDevice device class.
     """
+    INTERFACE_NAME = "uart"
+
+    @classmethod
+    def list(cls):
+        '''
+        Returns a list of available UART devices.
+
+        To prevent identifying serial ports which are not compatible with WHAD, it implements
+        a filtering mechanism based on vid, pid, manufacturer and / or product.
+        '''
+        supported_uart_devices = (
+            (0xc0ff, 0xeeee, "WHAD", "ButteRFly dongle"), # Butterfly Dongle
+            (0x303A, None, None, None) # Espressif ESP-32 board
+        )
+        devices = []
+        for uart_dev in comports():
+            pid, vid, manufacturer, product = uart_dev.pid, uart_dev.vid,uart_dev.manufacturer, uart_dev.product
+            for (supported_vid, supported_pid, supported_manufacturer, supported_product) in supported_uart_devices:
+                if (
+                    (supported_pid is None or supported_pid == pid) and
+                    (supported_vid is None or supported_vid == vid) and
+                    (supported_manufacturer is None or supported_manufacturer == manufacturer) and
+                    (supported_product is None or supported_product == product)
+                ):
+                    dev = UartDevice(uart_dev.device, baudrate=115200)
+                    devices.append(dev)
+                    break
+        return devices
+
 
     def __init__(self, port='/dev/ttyUSB0', baudrate=115200):
         """
@@ -57,6 +86,12 @@ class UartDevice(WhadDevice):
         else:
             self.__is_acm = (port_info.subsystem == 'usb')
 
+    @property
+    def identifier(self):
+        '''
+        Returns the identifier of the device (e.g., serial port).
+        '''
+        return self.__port
 
     def is_acm(self):
         """Determine if this UART device is a CDC ACM one.
@@ -140,12 +175,12 @@ class UartDevice(WhadDevice):
         self.__uart.close()
         self.__uart = None
         self.__fileno = None
-        self.__opened = False       
+        self.__opened = False
 
     def write(self, data):
         """Writes data to the device. It relies on select() in order to make sure
         we are allowed to write to the device and wait without eating too much CPU
-        if the device is not ready to be written to. 
+        if the device is not ready to be written to.
 
         :param bytes data: Data to write
         :returns: number of bytes written to the device
@@ -172,10 +207,10 @@ class UartDevice(WhadDevice):
         our parsing method through on_data_received() that will handle data reassembling
         and message parsing and dispatch.
         """
-        
+
         if not self.__opened:
             raise WhadDeviceNotReady()
-        
+
         rlist = [self.__fileno]
         wlist = []
         elist = [self.__fileno]
@@ -186,7 +221,7 @@ class UartDevice(WhadDevice):
             elist,
             1
         )
-        
+
         # Handle incoming messages if any
         if len(readers) > 0:
             data = os.read(self.__fileno, 1024)

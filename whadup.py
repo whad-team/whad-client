@@ -2,8 +2,8 @@
 Whad up ?
 """
 import sys
-
-from whad.device.uart import UartDevice
+from whad.exceptions import WhadDeviceNotFound
+from whad.device import WhadDevice
 from whad.protocol.ble.ble_pb2 import BleCommand
 from whad.protocol.zigbee.zigbee_pb2 import ZigbeeCommand
 from whad import WhadDomain, WhadCapability
@@ -101,17 +101,18 @@ def get_domain_supported_commands(domain, commands):
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
-        # Retrieve target device
-        device = sys.argv[1]
+        # Retrieve target interface
+        interface = sys.argv[1]
 
         # Connect to target device and performs discovery
-        #try:
-        if 1:
+
+        if 1:#try:
+            dev = WhadDevice.create(interface)
+
             print('[i] Connecting to device ...')
-            dev = UartDevice(device, 115200)
             dev.open()
             dev.discover()
-            
+
             print('[i] Device details')
             print('')
             print(' Device ID: %s' % ":".join(["{:02x}".format(i) for i in dev.device_id.encode()]))
@@ -142,7 +143,9 @@ if __name__ == '__main__':
                 print('')
 
             dev.close()
-
+        #except WhadDeviceNotFound:
+        #    print('[e] Device not found')
+        #    exit(1)
 
         #except Exception as err:
         #    print(err)
@@ -150,4 +153,10 @@ if __name__ == '__main__':
         #    print(type(err))
 
     else:
-        print('Usage: %s [device]' % sys.argv[0])
+        print("[i] Available devices")
+        for device in WhadDevice.list(): #print('Usage: %s [device]' % sys.argv[0])
+            print("-",device.interface)
+            print("  Type:",device.type)
+            print("  Index:", device.index)
+            print("  Identifier:", device.identifier)
+            print()

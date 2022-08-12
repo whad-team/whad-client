@@ -26,12 +26,12 @@ class VirtualDevice(WhadDevice):
     AdapterDevice device class.
     """
     def __init__(self):
-        self.dev_type = None
-        self.dev_id = None
-        self.fw_author = None
-        self.fw_url = None
-        self.fw_version = None
-        self.dev_capabilities = None
+        self._dev_type = None
+        self._dev_id = None
+        self._fw_author = None
+        self._fw_url = None
+        self._fw_version = None
+        self._dev_capabilities = None
         super().__init__()
 
     def send_message(self, message, keep=None):
@@ -60,20 +60,20 @@ class VirtualDevice(WhadDevice):
     def on_whad_info_query(self, message):
         msg = Message()
         msg.discovery.info_resp.type = DeviceType.VirtualDevice
-        msg.discovery.info_resp.devid = self.dev_id
+        msg.discovery.info_resp.devid = self._dev_id
         msg.discovery.info_resp.proto_min_ver = 0x0100
-        msg.discovery.info_resp.fw_author = self.fw_author
-        msg.discovery.info_resp.fw_url = self.fw_url
-        major, minor, revision = self.fw_version
+        msg.discovery.info_resp.fw_author = self._fw_author
+        msg.discovery.info_resp.fw_url = self._fw_url
+        major, minor, revision = self._fw_version
         msg.discovery.info_resp.fw_version_major = major
         msg.discovery.info_resp.fw_version_minor = minor
         msg.discovery.info_resp.fw_version_rev = revision
-        for domain, capabilities in self.dev_capabilities.items():
+        for domain, capabilities in self._dev_capabilities.items():
             msg.discovery.info_resp.capabilities.extend([domain | (capabilities[0] & 0xFFFFFF)])
         self.send_whad_message(msg)
 
     def on_whad_domain_query(self, message):
-        supported_commands = self.dev_capabilities[message.domain][1]
+        supported_commands = self._dev_capabilities[message.domain][1]
         msg = Message()
         msg.discovery.domain_resp.domain = message.domain
         msg.discovery.domain_resp.supported_commands = 0
@@ -83,8 +83,8 @@ class VirtualDevice(WhadDevice):
 
 
     def send_whad_message(self, message):
-        print("Transmitting whad message:")
-        print(message)
+        #print("Transmitting whad message:")
+        #print(message)
         self.on_message_received(message)
 
     def send_whad_command_result(self, code):

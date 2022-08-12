@@ -3,7 +3,7 @@ from queue import Queue, Empty
 from binascii import hexlify
 
 # Whad imports
-from whad.exceptions import RequiredImplementation, UnsupportedDomain, WhadDeviceNotReady
+from whad.exceptions import RequiredImplementation, UnsupportedDomain, WhadDeviceNotReady, WhadDeviceNotFound
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery
@@ -329,8 +329,12 @@ class WhadDevice(object):
     All the message re-assembling, parsing, dispatching and background data reading
     will be performed in this class.
     """
+
     @classmethod
-    def list(cls):
+    def _get_sub_classes(cls):
+        """
+        Helper allowing to get every subclass of WhadDevice.
+        """
         # List every available device class
         device_classes = set()
         for device_class in cls.__subclasses__():
@@ -339,8 +343,132 @@ class WhadDevice(object):
                     device_classes.add(virtual_device_class)
             else:
                 device_classes.add(device_class)
+        return device_classes
 
-        print(device_classes)
+    @classmethod
+    def _create(cls, interface_string):
+        """
+        Helper allowing to get a device according to the interface string provided.
+
+        To make it work, every device class must implement:
+            - a class attribute INTERFACE_NAME, matching the interface name
+            - a class method list, returning the available devices
+            - a property identifier, allowing to identify the device in a unique way
+
+        This method should NOT be used outside of this class. Use WhadDevice.create instead.
+        """
+        if interface_string.startswith(cls.INTERFACE_NAME):
+            identifier = None
+            index = None
+            if len(interface_string) == len(cls.INTERFACE_NAME):
+                index = 0
+            elif interface_string[len(cls.INTERFACE_NAME)] == ":":
+                index = None
+                try:
+                    _, identifier = interface_string.split(":")
+                except ValueError:
+                    identifier = None
+            else:
+                try:
+                    index = int(interface_string[len(cls.INTERFACE_NAME):])
+                except ValueError:
+                    index = None
+
+            available_devices = cls.list()
+            if index is not None:
+                try:
+                    return available_devices[index]
+                except IndexError:
+                    raise WhadDeviceNotFound
+            elif identifier is not None:
+                for dev in available_devices:
+                    if dev.identifier == identifier:
+                        return dev
+                raise WhadDeviceNotFound
+            else:
+                raise WhadDeviceNotFound
+        else:
+            raise WhadDeviceNotFound
+
+    @classmethod
+    def create(cls, interface_string):
+        '''
+        Allows to get a specific device according to the provided interface string.
+        The interface string is formed as follow:
+
+        "<device_type>[device_index][:device_identifier]"
+
+        Examples:
+            * Instantiating the first available UartDevice:
+                "uart" or "uart0"
+
+            * Instantiating the second available UartDevice:
+                "uart1"
+
+            * Instantiating an UartDevice linked to /dev/ttyACM0:
+                "uart:/dev/ttyACM0"
+
+            * Instantiating the first available UbertoothDevice:
+                "ubertooth" or "ubertooth0"
+
+            * Instantiating an UbertoothDevice with serial number "11223344556677881122334455667788":
+                ubertooth:11223344556677881122334455667788
+
+        '''
+        device_classes = cls._get_sub_classes()
+
+        device = None
+        for device_class in device_classes:
+            try:
+                device = device_class._create(interface_string)
+                return device
+            except WhadDeviceNotFound:
+                continue
+
+        raise WhadDeviceNotFound
+
+    @classmethod
+    def list(cls):
+        '''
+        Returns every available compatible devices.
+        '''
+        device_classes = cls._get_sub_classes()
+
+        available_devices = []
+        for device_class in device_classes:
+            for device in device_class.list():
+                available_devices.append(device)
+        return available_devices
+
+    @property
+    def index(self):
+        '''
+        Returns the current index of the device.
+        '''
+        devices = self.__class__.list()
+        for dev in devices:
+            if dev.identifier == self.identifier:
+                return devices.index(dev)
+
+
+    @property
+    def interface(self):
+        '''
+        Returns the current interface of the device.
+        '''
+        if hasattr(self.__class__,"INTERFACE_NAME"):
+            return self.__class__.INTERFACE_NAME + str(self.index)
+        else:
+            return "unknown"
+
+    @property
+    def type(self):
+        '''
+        Returns the name of the class linked to the current device.
+        '''
+        return self.__class__.__name__
+
+
     def __init__(self):
         # Device information
         self.__info = None
@@ -362,7 +490,6 @@ class WhadDevice(object):
 
         # Create lock
         self.__lock = Lock()
-
 
     def lock(self):
         """Locks the pending output data buffer."""
