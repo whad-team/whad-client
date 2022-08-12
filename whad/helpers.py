@@ -35,3 +35,14 @@ def asciiz(s):
         if s!=0:
             out += chr(c)
     return out
+
+def swap_bits(value):
+    """
+    Swap the bits of a byte or a sequence of bytes.
+    """
+    if isinstance(value, int):
+        return (value * 0x0202020202 & 0x010884422010) % 1023
+    elif isinstance(value,bytes):
+        return bytes([(i * 0x0202020202 & 0x010884422010) % 1023 for i in value])
+    else:
+        return None

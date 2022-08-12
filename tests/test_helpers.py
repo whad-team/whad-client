@@ -1,4 +1,4 @@
-from whad.helpers import bd_addr_to_bytes, asciiz, is_message_type
+from whad.helpers import bd_addr_to_bytes, asciiz, is_message_type, swap_bits
 from whad.protocol.whad_pb2 import Message
 from tests.sample_messages import DISCOVERY_SAMPLE_MESSAGES,GENERIC_SAMPLE_MESSAGES, BLE_SAMPLE_MESSAGES
 from google.protobuf.text_format import Parse
@@ -50,6 +50,15 @@ def test_is_message_type(test_input, expected):
     msg = Message()
     Parse(message, msg)
     assert is_message_type(msg, category, msg_type) ==  expected
+
+@pytest.mark.parametrize("test_input, expected", [
+    (0x48, 0x12),
+    (b"\xF0\xF0\xF0\xF0", b"\x0F\x0F\x0F\x0F"),
+    (b"\x12\x34", b"\x48\x2c"),
+    ("toto", None)
+    ])
+def test_swap_bits(test_input, expected):
+    assert swap_bits(test_input) == expected
 
 #TODO: message_filter test
 #TODO: is_message_msg_type test
