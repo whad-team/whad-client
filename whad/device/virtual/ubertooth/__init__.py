@@ -6,7 +6,8 @@ from whad import WhadDomain, WhadCapability
 from whad.protocol.generic_pb2 import ResultCode
 from whad.device.virtual.ubertooth.constants import UBERTOOTH_ID_VENDOR, UBERTOOTH_ID_PRODUCT, \
     CTRL_IN, CTRL_OUT, UBERTOOTH_POLL, UBERTOOTH_GET_SERIAL, UBERTOOTH_GET_REV_NUM, \
-    MOD_BT_LOW_ENERGY, UBERTOOTH_SET_MOD, UBERTOOTH_STOP, UBERTOOTH_JAM_MODE, JAM_NONE, JAM_CONTINUOUS
+    MOD_BT_LOW_ENERGY, UBERTOOTH_SET_MOD, UBERTOOTH_STOP, UBERTOOTH_JAM_MODE, JAM_NONE, \
+    JAM_CONTINUOUS, UBERTOOTH_SET_CLOCK, UBERTOOTH_SET_CRC_VERIFY
 from whad.protocol.ble.ble_pb2 import SniffAdv, Start, Stop
 from usb.core import find, USBError
 from usb.util import get_string
@@ -142,3 +143,9 @@ class UbertoothDevice(VirtualDevice):
 
     def _set_jam_mode(self, mode=JAM_NONE):
         self._ubertooth_ctrl_transfer_out(UBERTOOTH_JAM_MODE, mode)
+
+    def _reset_clock(self):
+        self._ubertooth_ctrl_transfer_out(UBERTOOTH_SET_CLOCK, data=b"\x00\x00\x00\x00\x00\x00")
+
+    def _set_crc_checking(self, enable=True):
+        self._ubertooth_ctrl_transfer_out(UBERTOOTH_SET_CRC_VERIFY, int(enable))
