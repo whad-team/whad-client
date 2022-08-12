@@ -37,27 +37,20 @@ class VirtualDevice(WhadDevice):
     def send_message(self, message, keep=None):
         # if `keep` is set, configure queue filter
         self.set_queue_filter(keep)
-        self.on_whad_message(message)
+        self._on_whad_message(message)
 
-    def on_whad_message(self, message):
-        message_type = message.WhichOneof('msg')
-        if message_type == "discovery":
-            self.on_whad_discovery_message(message)
-        elif message_type == "ble":
-            self.on_whad_ble_message(message)
+    def _on_whad_message(self, message):
+        category = message.WhichOneof('msg')
+        message_type = getattr(message,category).WhichOneof('msg')
+
+        callback_name = "_on_whad_"+category+"_"+message_type
+        if hasattr(self, callback_name) and callable(getattr(self, callback_name)):
+            inner_message = getattr(getattr(message,category), message_type)
+            getattr(self, callback_name)(inner_message)
         else:
-            print(message)
+            self._send_whad_command_result(ResultCode.ERROR)
 
-    def on_whad_discovery_message(self, message):
-        if is_message_type(message, "discovery", "info_query"):
-            self.on_whad_info_query(message.discovery.info_query)
-        elif is_message_type(message, "discovery", "domain_query"):
-            self.on_whad_domain_query(message.discovery.domain_query)
-
-    def on_whad_ble_message(self, message):
-        pass
-
-    def on_whad_info_query(self, message):
+    def _on_whad_discovery_info_query(self, message):
         msg = Message()
         msg.discovery.info_resp.type = DeviceType.VirtualDevice
         msg.discovery.info_resp.devid = self._dev_id
@@ -70,26 +63,24 @@ class VirtualDevice(WhadDevice):
         msg.discovery.info_resp.fw_version_rev = revision
         for domain, capabilities in self._dev_capabilities.items():
             msg.discovery.info_resp.capabilities.extend([domain | (capabilities[0] & 0xFFFFFF)])
-        self.send_whad_message(msg)
+        self._send_whad_message(msg)
 
-    def on_whad_domain_query(self, message):
+    def _on_whad_discovery_domain_query(self, message):
         supported_commands = self._dev_capabilities[message.domain][1]
         msg = Message()
         msg.discovery.domain_resp.domain = message.domain
         msg.discovery.domain_resp.supported_commands = 0
         for command in supported_commands:
             msg.discovery.domain_resp.supported_commands |= (1 << command)
-        self.send_whad_message(msg)
+        self._send_whad_message(msg)
 
 
-    def send_whad_message(self, message):
-        #print("Transmitting whad message:")
-        #print(message)
+    def _send_whad_message(self, message):
         self.on_message_received(message)
 
-    def send_whad_command_result(self, code):
+    def _send_whad_command_result(self, code):
         msg = Message()
         msg.generic.cmd_result.result = code
-        self.send_whad_message(msg)
+        self._send_whad_message(msg)
 
 from .ubertooth import UbertoothDevice
