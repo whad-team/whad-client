@@ -1,10 +1,10 @@
 from whad.exceptions import WhadDeviceNotFound
-from whad.device.adapters import AdapterDevice
+from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter,is_message_type
-from whad import WhadDomain,WhadCapability
+from whad import WhadDomain, WhadCapability
 from whad.protocol.generic_pb2 import ResultCode
-from whad.device.adapters.ubertooth.constants import UBERTOOTH_ID_VENDOR, UBERTOOTH_ID_PRODUCT, \
+from whad.device.virtual.ubertooth.constants import UBERTOOTH_ID_VENDOR, UBERTOOTH_ID_PRODUCT, \
     CTRL_IN, CTRL_OUT, UBERTOOTH_POLL, UBERTOOTH_GET_SERIAL, UBERTOOTH_GET_REV_NUM, \
     MOD_BT_LOW_ENERGY, UBERTOOTH_SET_MOD, UBERTOOTH_STOP, UBERTOOTH_JAM_MODE, JAM_NONE, JAM_CONTINUOUS
 from whad.protocol.ble.ble_pb2 import SniffAdv, Start, Stop
@@ -26,7 +26,7 @@ def get_ubertooth(id=0,serial=None):
         except IndexError:
             return None
 
-class UbertoothDevice(AdapterDevice):
+class UbertoothDevice(VirtualDevice):
     def __init__(self, index=0, serial=None):
         """
         Create device connection
@@ -41,7 +41,6 @@ class UbertoothDevice(AdapterDevice):
 
     def open(self):
         self.__ubertooth.set_configuration()
-        self.dev_type = 0xFF
         self.dev_id = self._get_serial_number()
         self.fw_author = self._get_manufacturer()
         self.fw_url = self._get_url()

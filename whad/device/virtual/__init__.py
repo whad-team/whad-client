@@ -1,4 +1,4 @@
-"""This module provides a AdapterDevice class that can be used with a WhadDeviceConnector
+"""This module provides a VirtuaDevice class that can be used with a WhadDeviceConnector
 to interact with a device that doesn't support WHAD protocol. It allows to convert WHAD messages
 to the corresponding specific API calls.
 
@@ -17,11 +17,11 @@ from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotReady
 from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter,is_message_type
-from whad.protocol.device_pb2 import DeviceResetQuery
+from whad.protocol.device_pb2 import DeviceResetQuery,DeviceType
 from whad.protocol.generic_pb2 import ResultCode
 from whad.exceptions import WhadDeviceNotFound
 
-class AdapterDevice(WhadDevice):
+class VirtualDevice(WhadDevice):
     """
     AdapterDevice device class.
     """
@@ -59,7 +59,7 @@ class AdapterDevice(WhadDevice):
 
     def on_whad_info_query(self, message):
         msg = Message()
-        msg.discovery.info_resp.type = self.dev_type
+        msg.discovery.info_resp.type = DeviceType.VirtualDevice
         msg.discovery.info_resp.devid = self.dev_id
         msg.discovery.info_resp.proto_min_ver = 0x0100
         msg.discovery.info_resp.fw_author = self.fw_author

@@ -1,6 +1,4 @@
-
 from whad.protocol.device_pb2 import Domain, Capability
-from whad.device.uart import UartDevice
 
 class WhadDomain(object):
     """

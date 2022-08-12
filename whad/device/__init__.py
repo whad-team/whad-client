@@ -8,7 +8,6 @@ from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery
 from whad.helpers import message_filter, asciiz
-
 # Logging
 import logging
 logger = logging.getLogger(__name__)
@@ -330,7 +329,18 @@ class WhadDevice(object):
     All the message re-assembling, parsing, dispatching and background data reading
     will be performed in this class.
     """
+    @classmethod
+    def list(cls):
+        # List every available device class
+        device_classes = set()
+        for device_class in cls.__subclasses__():
+            if device_class.__name__ == "VirtualDevice":
+                for virtual_device_class in device_class.__subclasses__():
+                    device_classes.add(virtual_device_class)
+            else:
+                device_classes.add(device_class)
 
+        print(device_classes)
     def __init__(self):
         # Device information
         self.__info = None
@@ -481,7 +491,7 @@ class WhadDevice(object):
 
         # Convert message into bytes
         raw_message = message.SerializeToString()
-        
+
 
         # Define header
         header = [
@@ -804,3 +814,4 @@ class WhadDevice(object):
 
 # Defines every supported low-level device
 from whad.device.uart import UartDevice
+from whad.device.virtual import UbertoothDevice

@@ -1,5 +1,5 @@
 from whad.domain.ble import Sniffer
-from whad.device.adapters import UbertoothDevice
+from whad.device.virtual import UbertoothDevice
 from time import time,sleep
 import sys
 
