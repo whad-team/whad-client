@@ -6,3 +6,4 @@ tox==3.9.0
 pytest==6.2.5
 pytest-cov==2.12.1
 pycryptodomex==3.11.0
+pyusb==1.2.1
