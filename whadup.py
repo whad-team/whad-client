@@ -106,7 +106,7 @@ if __name__ == '__main__':
 
         # Connect to target device and performs discovery
 
-        if 1:#try:
+        try:
             dev = WhadDevice.create(interface)
 
             print('[i] Connecting to device ...')
@@ -143,9 +143,9 @@ if __name__ == '__main__':
                 print('')
 
             dev.close()
-        #except WhadDeviceNotFound:
-        #    print('[e] Device not found')
-        #    exit(1)
+        except WhadDeviceNotFound:
+            print('[e] Device not found')
+            exit(1)
 
         #except Exception as err:
         #    print(err)
