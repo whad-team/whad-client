@@ -48,6 +48,8 @@ class VirtualDevice(WhadDevice):
             inner_message = getattr(getattr(message,category), message_type)
             getattr(self, callback_name)(inner_message)
         else:
+            print("[i] Unhandled message:")
+            print(message)
             self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_discovery_info_query(self, message):

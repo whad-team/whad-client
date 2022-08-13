@@ -1,6 +1,15 @@
 """
 This module provides some constants used by WHAD to communicate with the Ubertooth One.
 """
+from enum import IntEnum
+
+class UbertoothInternalState(IntEnum):
+    NONE = 0
+    ADVERTISEMENT_SNIFFING = 1
+    NEW_CONNECTION_SNIFFING = 2
+    EXISTING_CONNECTION_SNIFFING = 3
+    
+
 # USB device Identifiers
 UBERTOOTH_ID_VENDOR         = 0x1D50
 UBERTOOTH_ID_PRODUCT        = 0x6002

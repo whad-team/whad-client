@@ -5,17 +5,19 @@ from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad import WhadDomain, WhadCapability
 from whad.domain.ble.utils.phy import channel_to_frequency, frequency_to_channel
 from whad.protocol.generic_pb2 import ResultCode
+from whad.protocol.ble.ble_pb2 import SniffAdv, Start, Stop
 from whad.device.virtual.ubertooth.constants import UBERTOOTH_ID_VENDOR, UBERTOOTH_ID_PRODUCT, \
     CTRL_IN, CTRL_OUT, UBERTOOTH_POLL, UBERTOOTH_GET_SERIAL, UBERTOOTH_GET_REV_NUM, \
     MOD_BT_LOW_ENERGY, UBERTOOTH_SET_MOD, UBERTOOTH_STOP, UBERTOOTH_JAM_MODE, JAM_NONE, \
     JAM_CONTINUOUS, UBERTOOTH_SET_CLOCK, UBERTOOTH_SET_CRC_VERIFY, UBERTOOTH_RESET, \
     UBERTOOTH_BTLE_SNIFFING, UBERTOOTH_BTLE_PROMISC, UBERTOOTH_GET_ACCESS_ADDRESS, \
-    UBERTOOTH_SET_ACCESS_ADDRESS, UBERTOOTH_SET_CHANNEL, UBERTOOTH_GET_CHANNEL, UBERTOOTH_BTLE_SET_TARGET
-from whad.protocol.ble.ble_pb2 import SniffAdv, Start, Stop
+    UBERTOOTH_SET_ACCESS_ADDRESS, UBERTOOTH_SET_CHANNEL, UBERTOOTH_GET_CHANNEL, \
+    UBERTOOTH_BTLE_SET_TARGET, UbertoothInternalState
+from whad.scapy.layers.ubertooth import Ubertooth_Hdr
 from usb.core import find, USBError
 from usb.util import get_string
 from struct import unpack, pack
-
+from time import sleep
 # Helpers functions
 def get_ubertooth(id=0,serial=None):
     '''
@@ -65,6 +67,7 @@ class UbertoothDevice(VirtualDevice):
             raise WhadDeviceNotFound
 
         self.__opened = False
+        self.__internal_state = UbertoothInternalState.NONE
         self.__index, self.__ubertooth = device
         super().__init__()
 
@@ -76,8 +79,6 @@ class UbertoothDevice(VirtualDevice):
         self._fw_version = self._get_firmware_version()
         self._dev_capabilities = self._get_capabilities()
 
-        self._set_modulation(MOD_BT_LOW_ENERGY)
-        self._set_jam_mode(JAM_NONE)
         self.__opened = True
         # Ask parent class to run a background I/O thread
         super().open()
@@ -89,24 +90,58 @@ class UbertoothDevice(VirtualDevice):
     def read(self):
         if not self.__opened:
             raise WhadDeviceNotReady()
-        data = self._ubertooth_ctrl_transfer_in(UBERTOOTH_POLL,512)
-        if len(data) > 0:
-            print(data.hex())
+        if self.__internal_state != UbertoothInternalState.NONE:
+            data = self._ubertooth_ctrl_transfer_in(UBERTOOTH_POLL,512)
+            if len(data) > 0:
+                print(data.hex())
+                Ubertooth_Hdr(data).show()
 
     def reset(self):
+        self.__internal_state = UbertoothInternalState.NONE
         self.__ubertooth.reset()
+
+        self._set_jam_mode(JAM_NONE)
+        self._set_modulation(MOD_BT_LOW_ENERGY)
+        self._reset_clock()
+
+    def close(self):
+        self._soft_reset()
+        super().close()
 
     # Virtual device whad message callbacks
     def _on_whad_ble_stop(self, message):
         self._stop()
-        self.send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+    def _on_whad_ble_sniff_adv(self, message):
+        channel = message.channel
+
+        # TODO : implement address filtering in python, ubertooth doesn't support it natively for adv only mode
+        if message.bd_address == b"\xFF\xFF\xFF\xFF\xFF\xFF":
+            bd_address = b"\x00\x00\x00\x00\x00\x00"
+        else:
+            bd_address = message.bd_address[::-1]
+
+        self._set_channel(37)
+        self._set_crc_checking(True)
+        self.__internal_state = UbertoothInternalState.ADVERTISEMENT_SNIFFING
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+    def _on_whad_ble_start(self, message):
+        if self.__internal_state == UbertoothInternalState.ADVERTISEMENT_SNIFFING:
+            #self._set_access_address(0x8e89bed6)
+            self._enable_advertisements_sniffing()
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.ERROR)
 
     # Ubertooth low level communication primitives
     def _ubertooth_ctrl_transfer_in(self, request, size, timeout=100):
         try:
             received_data = self.__ubertooth.ctrl_transfer(CTRL_IN, request, 0, 0, size, timeout=timeout)
-            received_data = received_data.tobytes()[1:]
-
+            received_data = received_data.tobytes()
+            if len(received_data) == 1:
+                received_data = b""
         except USBError:
             received_data = b""
 
@@ -114,6 +149,7 @@ class UbertoothDevice(VirtualDevice):
 
     def _ubertooth_ctrl_transfer_out(self, request, value=0, data=None, timeout=100):
         self.__ubertooth.ctrl_transfer(CTRL_OUT, request, value, 0, data, timeout=timeout)
+
 
     # Discovery related functions
     def _get_capabilities(self):
@@ -157,8 +193,8 @@ class UbertoothDevice(VirtualDevice):
     def _set_crc_checking(self, enable=True):
         self._ubertooth_ctrl_transfer_out(UBERTOOTH_SET_CRC_VERIFY, int(enable))
 
-    def _set_target(self, address="00:00:00:00:00:00"):
-        data = bd_addr_to_bytes(address)[::-1] + b"\x30"
+    def _set_target(self, address=b"\x00\x00\x00\x00\x00\x00"):
+        data = address + b"\x30"
         self._ubertooth_ctrl_transfer_out(UBERTOOTH_BTLE_SET_TARGET, data=data)
 
     def _set_channel(self, channel=37):

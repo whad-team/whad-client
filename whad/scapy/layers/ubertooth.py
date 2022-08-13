@@ -1,8 +1,8 @@
-from scapy.packet import Packet
+from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteEnumField, ByteField, LEIntField, LEShortField, \
     LEX3BytesField, ShortField, SignedByteField, XByteField, XLEIntField
 from scapy.layers.bluetooth4LE import BTLE
-
+from struct import unpack
 # Ubertooth Packet Types
 UBERTOOTH_PACKET_TYPES = [
     "BR_PACKET",
@@ -36,7 +36,7 @@ class Ubertooth_Hdr(Packet):
     ]
     def pre_dissect(self,s):
         if s[0] == 0x01:
-            size = struct.unpack('B',s[14:][5:6])[0]
+            size = unpack('B',s[14:][5:6])[0]
             return s[0:14+size+ACCESS_ADDRESS_SIZE+HEADER_SIZE+CRC_SIZE]
         else:
             return s
