@@ -1,4 +1,4 @@
-from whad.domain.ble.utils.phy import channel_to_frequency,frequency_to_channel
+from whad.domain.ble.utils.phy import channel_to_frequency,frequency_to_channel,crc
 import pytest
 
 @pytest.mark.parametrize("test_input, expected", [
@@ -95,3 +95,13 @@ def test_frequency_to_channel(test_input, expected):
     ])
 def test_channel_to_frequency(test_input, expected):
     assert channel_to_frequency(test_input) == expected
+
+
+@pytest.mark.parametrize("test_input, expected", [
+    ( "0215110006000461ca0ce41b1e430559ac74e382667051", "545d96" ),
+    ])
+
+def test_crc(test_input, expected):
+    data = bytes.fromhex(test_input)
+    crc_value = bytes.fromhex(expected)
+    assert crc(data) == crc_value

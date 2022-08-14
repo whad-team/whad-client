@@ -1,7 +1,15 @@
 '''
-This module provides some helpers functions related to Bluetooth Low Energy physical layer.
+This module provides some helpers functions and constants related to Bluetooth Low Energy physical layer.
 '''
 from whad.helpers import swap_bits
+from enum import IntEnum
+
+# Size of major BLE fields (in bytes)
+class FieldsSize(IntEnum):
+    ACCESS_ADDRESS_SIZE = 4
+    HEADER_SIZE = 2
+    CRC_SIZE = 3
+
 
 def frequency_to_channel(frequency):
     '''
@@ -42,3 +50,32 @@ def channel_to_frequency(channel):
         freq_offset = 2 * (channel + 3)
 
     return 2400 + freq_offset
+
+def crc(data, init=0x555555):
+    '''
+    Computes the 24-bit CRC of provided data.
+    '''
+    ret = [(init >> 16) & 0xff, (init >> 8) & 0xff, init & 0xff]
+    for d in data:
+        for v in range(8):
+            t = (ret[0] >> 7) & 1
+
+            ret[0] <<= 1
+            if ret[1] & 0x80:
+                ret[0] |= 1
+
+            ret[1] <<= 1
+            if ret[2] & 0x80:
+                ret[1] |= 1
+
+            ret[2] <<= 1
+            if d & 1 != t:
+                ret[2] ^= 0x5b
+                ret[1] ^= 0x06
+
+            d >>= 1
+
+    ret[0] = swap_bits(ret[0] & 0xFF)
+    ret[1] = swap_bits(ret[1] & 0xFF)
+    ret[2] = swap_bits(ret[2] & 0xFF)
+    return bytes(ret)
