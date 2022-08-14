@@ -17,6 +17,7 @@ class SnifferConfiguration:
     show_advertisements : bool = True
     follow_connection : bool = False
     show_empty_packets : bool = False
+    access_addresses_discovery : bool = False
     channel : int = 37
     filter : str = "FF:FF:FF:FF:FF:FF"
 
@@ -95,7 +96,10 @@ class Sniffer(BLE):
         print("[sniffer] Connection lost.")
 
     def _enable_sniffing(self):
-        if self.__configuration.follow_connection:
+        if self.__configuration.access_addresses_discovery:
+            self.discover_access_addresses()
+
+        elif self.__configuration.follow_connection:
             if not self.can_sniff_new_connection():
                 raise UnsupportedCapability("Sniff")
             else:
@@ -114,8 +118,10 @@ class Sniffer(BLE):
                     bd_address=self.__configuration.filter
                 )
 
-    def configure(self, advertisements=True, connection=True, empty_packets=False):
+
+    def configure(self, access_addresses_discovery=False, advertisements=True, connection=True, empty_packets=False):
         self.stop()
+        self.__configuration.access_addresses_discovery = access_addresses_discovery
         self.__configuration.show_advertisements = advertisements
         self.__configuration.show_empty_packets = empty_packets
         self.__configuration.follow_connection = connection
@@ -155,12 +161,16 @@ class Sniffer(BLE):
 
     def sniff(self):
         while True:
-            if self.support_raw_pdu():
-                message_type = "raw_pdu"
-            elif self.__synchronized:
-                message_type = "pdu"
+            if self.__configuration.access_addresses_discovery:
+                message = self.wait_for_message(filter=message_filter('ble', "aa_disc"))
+                yield message.ble.aa_disc.access_address
             else:
-                message_type = "adv_pdu"
+                if self.support_raw_pdu():
+                    message_type = "raw_pdu"
+                elif self.__synchronized:
+                    message_type = "pdu"
+                else:
+                    message_type = "adv_pdu"
 
-            message = self.wait_for_message(filter=message_filter('ble', message_type))
-            yield self._build_scapy_packet_from_message(message.ble, message_type)
+                message = self.wait_for_message(filter=message_filter('ble', message_type))
+                yield self._build_scapy_packet_from_message(message.ble, message_type)

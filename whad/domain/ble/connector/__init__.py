@@ -7,7 +7,8 @@ from whad.device import WhadDeviceConnector
 from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, StartCmd, StopCmd, \
     ScanMode, Start, Stop, BleAdvType, ConnectTo, CentralModeCmd, PeripheralMode, \
     PeripheralModeCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
-    HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType
+    HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
+    SniffAccessAddressCmd
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
@@ -191,6 +192,18 @@ class BLE(WhadDeviceConnector):
             (commands & (1 << Stop))>0
         )
 
+    def can_discover_access_addresses(self):
+        """
+        Determine if the device implements an access addresses discovery mode.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        return (
+            (commands & (1 << SniffAccessAddress)) > 0 and
+            (commands & (1 << Start))>0 and
+            (commands & (1 << Stop))>0
+        )
+
+
     def can_sniff_advertisements(self):
         """
         Determine if the device implements an advertisements sniffer mode.
@@ -254,6 +267,19 @@ class BLE(WhadDeviceConnector):
         msg.ble.hijack_master.access_address = access_address
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+    def discover_access_addresses(self):
+        """
+        Discover access addresses.
+        """
+        if not self.can_discover_access_addresses():
+            raise UnsupportedCapability("AccessAddressesDiscovery")
+
+        msg = Message()
+        msg.ble.sniff_aa.CopyFrom(SniffAccessAddressCmd())
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
 
 
     def hijack_slave(self, access_address):
