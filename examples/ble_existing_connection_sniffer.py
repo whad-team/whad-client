@@ -17,7 +17,7 @@ if __name__ == '__main__':
             sniffer.configure(access_addresses_discovery=True)
             sniffer.start()
             for i in sniffer.sniff():
-                print("Access address found: ", hex(i))
+                print("[i] Access address found: ", repr(i))
 
 
         except (KeyboardInterrupt, SystemExit):

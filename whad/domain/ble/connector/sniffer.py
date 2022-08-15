@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-
-from whad.domain.ble.connector import BLE
-from whad.domain.ble.connector import Injector, Hijacker
+from whad.domain.ble.exceptions import InvalidAccessAddressException
+from whad.domain.ble.connector import BLE, Injector, Hijacker
+from whad.domain.ble.utils.phy import is_access_address_valid
 from whad.domain.ble import UnsupportedCapability, message_filter
 
 @dataclass
@@ -21,6 +21,51 @@ class SnifferConfiguration:
     channel : int = 37
     filter : str = "FF:FF:FF:FF:FF:FF"
 
+class AccessAddress:
+    def __init__(self, access_address, timestamp=None, rssi=None):
+        if not is_access_address_valid(access_address):
+            raise InvalidAccessAddressException()
+
+        self.__access_address = access_address
+        self.__timestamp = timestamp
+        self.__rssi = rssi
+        self.__count = 1
+
+    def __int__(self):
+        return self.__access_address
+
+    def __eq__(self, other):
+        return int(other) == int(self)
+
+    def update(self, timestamp=None, rssi=None):
+        self.__count += 1
+        if timestamp is not None:
+            self.__timestamp = timestamp
+        if rssi is not None:
+            self.__rssi = rssi
+
+    @property
+    def last_timestamp(self):
+        return self.__timestamp
+
+    @property
+    def last_rssi(self):
+        return self.__rssi
+
+    @property
+    def count(self):
+        return self.__count
+
+    def __repr__(self):
+        printable_string =  ("0x{:08x}".format(self.__access_address) +
+                            " (seen "+str(self.__count)+" times" +
+                            (", rssi = "+str(self.__rssi) if self.__rssi is not None else "") +
+                            (", last_timestamp = "+str(self.__timestamp) if self.__timestamp is not None else "") +
+                            ")")
+        return printable_string
+
+
+
 class Sniffer(BLE):
     """
     BLE Sniffer interface for compatible WHAD device.
@@ -29,6 +74,7 @@ class Sniffer(BLE):
         super().__init__(device)
         self.__synchronized = False
         self.__connection = None
+        self.__access_addresses = {}
         self.__configuration = SnifferConfiguration()
 
         # Check if device accepts advertisements or connection sniffing
@@ -163,7 +209,19 @@ class Sniffer(BLE):
         while True:
             if self.__configuration.access_addresses_discovery:
                 message = self.wait_for_message(filter=message_filter('ble', "aa_disc"))
-                yield message.ble.aa_disc.access_address
+                rssi = None
+                timestamp = None
+                if message.ble.aa_disc.HasField("rssi"):
+                    rssi = message.ble.aa_disc.rssi
+                if message.ble.aa_disc.HasField("timestamp"):
+                    timestamp = message.ble.aa_disc.timestamp
+                aa = message.ble.aa_disc.access_address
+
+                if aa not in self.__access_addresses:
+                    self.__access_addresses[aa] = AccessAddress(aa, timestamp=timestamp, rssi=rssi)
+                else:
+                    self.__access_addresses[aa].update(timestamp=timestamp, rssi=rssi)
+                yield self.__access_addresses[aa]
             else:
                 if self.support_raw_pdu():
                     message_type = "raw_pdu"

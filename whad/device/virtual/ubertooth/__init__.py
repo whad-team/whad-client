@@ -3,9 +3,9 @@ from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad import WhadDomain, WhadCapability
-from whad.domain.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, FieldsSize
+from whad.domain.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, FieldsSize, is_access_address_valid
 from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.ble.ble_pb2 import SniffAdv,SniffConnReq, Start, Stop
+from whad.protocol.ble.ble_pb2 import SniffAdv,SniffConnReq, SniffAccessAddress, Start, Stop
 from whad.device.virtual.ubertooth.constants import UbertoothId, \
     UbertoothTransfers, UbertoothModulations, UbertoothCommands, \
     UbertoothInternalState, UbertoothModes, UbertoothJammingModes
@@ -102,16 +102,21 @@ class UbertoothDevice(VirtualDevice):
                 if UBERTOOTH_PACKET_TYPES[packet.packet_type] == "LE_PACKET":
                     timestamp = round(packet.clk_100ns/10) # convert into us timestamp
                     rssi = packet.rssi_min - 54
-                    btle_packet = packet[BTLE:]
-                    if self._filter(btle_packet):
-                        self._send_whad_ble_raw_pdu(btle_packet, timestamp, rssi)
-                    if (
-                            self.__internal_state == UbertoothInternalState.NEW_CONNECTION_SNIFFING and
-                            BTLE_CONNECT_REQ in btle_packet
-                    ):
-                        self.__crc_init = btle_packet.crc_init
-                        self.__access_address = btle_packet.AA
-                        self._send_whad_ble_synchronized(btle_packet)
+                    if self.__internal_state == UbertoothInternalState.EXISTING_CONNECTION_SNIFFING:
+                        access_address = packet[BTLE:].access_addr
+                        if is_access_address_valid(access_address):
+                            self._send_whad_ble_aa_disc(access_address, timestamp, rssi)
+                    else:
+                        btle_packet = packet[BTLE:]
+                        if self._filter(btle_packet):
+                            self._send_whad_ble_raw_pdu(btle_packet, timestamp, rssi)
+                        if (
+                                self.__internal_state == UbertoothInternalState.NEW_CONNECTION_SNIFFING and
+                                BTLE_CONNECT_REQ in btle_packet
+                        ):
+                            self.__crc_init = btle_packet.crc_init
+                            self.__access_address = btle_packet.AA
+                            self._send_whad_ble_synchronized(btle_packet)
                 else:
                     print(data.hex())
                     packet.show()
@@ -159,6 +164,14 @@ class UbertoothDevice(VirtualDevice):
         msg.ble.synchronized.channel_map = bytes.fromhex("{:10x}".format(packet.chM))
         self._send_whad_message(msg)
 
+
+    def _send_whad_ble_aa_disc(self, access_address, timestamp, rssi):
+        msg = Message()
+        msg.ble.aa_disc.access_address = access_address
+        msg.ble.aa_disc.timestamp = timestamp
+        msg.ble.aa_disc.rssi = rssi
+        self._send_whad_message(msg)
+
     # Virtual device whad message callbacks
     def _on_whad_ble_stop(self, message):
         self._stop()
@@ -190,12 +203,22 @@ class UbertoothDevice(VirtualDevice):
         else:
             self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
 
+    def _on_whad_ble_sniff_aa(self, message):
+        self.__show_empty_packets = False
+        self.__show_advertisements = False
+        self.__internal_state = UbertoothInternalState.EXISTING_CONNECTION_SNIFFING
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
     def _on_whad_ble_start(self, message):
         if self.__internal_state == UbertoothInternalState.ADVERTISEMENT_SNIFFING:
             self._enable_advertisements_sniffing()
             self._send_whad_command_result(ResultCode.SUCCESS)
         elif self.__internal_state == UbertoothInternalState.NEW_CONNECTION_SNIFFING:
             self._enable_connection_sniffing()
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        elif self.__internal_state == UbertoothInternalState.EXISTING_CONNECTION_SNIFFING:
+            #self._set_target(b"\x00\x00\x00\x00\x00\x00")
+            self._enable_promiscuous_mode()
             self._send_whad_command_result(ResultCode.SUCCESS)
         else:
             self._send_whad_command_result(ResultCode.ERROR)
@@ -234,7 +257,7 @@ class UbertoothDevice(VirtualDevice):
         capabilities = {
             WhadDomain.BtLE : (
                                 (WhadCapability.Sniff | WhadCapability.Jam),
-                                [SniffAdv, SniffConnReq, Start, Stop]
+                                [SniffAdv, SniffConnReq, SniffAccessAddress, Start, Stop]
             )
         }
         return capabilities

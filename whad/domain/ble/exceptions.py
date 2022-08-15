@@ -20,3 +20,7 @@ class InvalidHandleValueException(Exception):
     def __init__(self):
         super().__init__()
 
+
+class InvalidAccessAddressException(Exception):
+    def __init__(self):
+        super().__init__()

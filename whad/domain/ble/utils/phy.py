@@ -79,3 +79,35 @@ def crc(data, init=0x555555):
     ret[1] = swap_bits(ret[1] & 0xFF)
     ret[2] = swap_bits(ret[2] & 0xFF)
     return bytes(ret)
+
+
+
+def is_access_address_valid(aa):
+    '''
+    This function checks if the provided access address is valid.
+    '''
+    a = (aa & 0xff000000)>>24
+    b = (aa & 0x00ff0000)>>16
+    c = (aa & 0x0000ff00)>>8
+    d = (aa & 0x000000ff)
+    if a==b and b==c and c==d:
+        return False
+    if (aa == 0x8E89BED6):
+        return True
+    bb = aa
+    for i in range(0,26):
+        if (bb & 0x3F) == 0 or (bb & 0x3F) == 0x3F:
+            return False
+        bb >>= 1
+    bb = aa
+    t = 0
+    a = (bb & 0x80000000)>>31
+    for i in range(30,0,-1):
+        if (bb & (1<<i)) >> i != a:
+            a = (bb & (1<<i))>>i
+            t += 1
+            if t>24:
+                return False
+        if (i<26) and (t<2):
+            return False
+    return True
