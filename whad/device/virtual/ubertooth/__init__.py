@@ -253,7 +253,10 @@ class UbertoothDevice(VirtualDevice):
     def _get_firmware_version(self):
         firmware_version = self._ubertooth_ctrl_transfer_in(UbertoothCommands.UBERTOOTH_GET_REV_NUM,20)[2:].decode("utf-8")
         if "git" in firmware_version:
-            major, minor, revision = 1, 7, int(firmware_version.split("-")[1], 16)
+            try:
+                major, minor, revision = 1, 7, int(firmware_version.split("-")[1], 16)
+            except ValueError:
+                major, minor, revision = 1, 7, 0
         else:
             major, minor, revision = firmware_version.split("-")
             major, minor, revision = int(major), int(minor), int(revision.replace("R",""))
