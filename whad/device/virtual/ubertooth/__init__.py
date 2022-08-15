@@ -252,8 +252,12 @@ class UbertoothDevice(VirtualDevice):
 
     def _get_firmware_version(self):
         firmware_version = self._ubertooth_ctrl_transfer_in(UbertoothCommands.UBERTOOTH_GET_REV_NUM,20)[2:].decode("utf-8")
-        major, minor, revision = firmware_version.split("-")
-        return (int(major), int(minor), int(revision.replace("R","")))
+        if "git" in firmware_version:
+            major, minor, revision = 1, 7, int(firmware_version.split("-")[1], 16)
+        else:
+            major, minor, revision = firmware_version.split("-")
+            major, minor, revision = int(major), int(minor), int(revision.replace("R",""))
+        return (major, minor, revision)
 
     # Ubertooth commands
     def _set_modulation(self, modulation=UbertoothModulations.MOD_BT_LOW_ENERGY):
