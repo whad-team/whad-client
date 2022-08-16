@@ -86,3 +86,4 @@ class VirtualDevice(WhadDevice):
         self._send_whad_message(msg)
 
 from .ubertooth import UbertoothDevice
+from .rzusbstick import RZUSBStick

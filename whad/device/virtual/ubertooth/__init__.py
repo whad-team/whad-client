@@ -223,6 +223,7 @@ class UbertoothDevice(VirtualDevice):
         else:
             self._send_whad_command_result(ResultCode.ERROR)
 
+    # Software implementation features
     def _filter(self, packet):
         if BTLE_DATA in packet and packet.len == 0 and not self.__show_empty_packets:
             return False
