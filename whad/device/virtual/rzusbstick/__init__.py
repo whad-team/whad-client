@@ -1,4 +1,4 @@
-from whad.exceptions import WhadDeviceNotFound
+from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
@@ -6,8 +6,9 @@ from whad import WhadDomain, WhadCapability
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.zigbee.zigbee_pb2 import Sniff, Send, Start, Stop
 from whad.device.virtual.rzusbstick.constants import RZUSBStickInternalStates, \
-    RZUSBStickId, RZUSBStickModes, RZUSBStickEndPoints, RZUSBStickCommands
-from usb.core import find, USBError
+    RZUSBStickId, RZUSBStickModes, RZUSBStickEndPoints, RZUSBStickCommands, \
+    RZUSBStickResponses
+from usb.core import find, USBError, USBTimeoutError
 from usb.util import get_string
 from struct import unpack, pack
 from time import sleep
@@ -68,7 +69,13 @@ class RZUSBStick(VirtualDevice):
         super().__init__()
 
     def open(self):
-        self.__rzusbstick.set_configuration()
+        try:
+            self.__rzusbstick.set_configuration()
+        except USBError as err:
+            if err.errno == 13:
+                raise WhadDeviceAccessDenied("rzusbstick")
+            else:
+                raise WhadDeviceNotReady()
         self._dev_id = self._get_serial_number()
         self._fw_author = self._get_manufacturer()
         self._fw_url = self._get_url()
@@ -86,14 +93,29 @@ class RZUSBStick(VirtualDevice):
     def read(self):
         if not self.__opened:
             raise WhadDeviceNotReady()
-        self.__input_buffer = b""
-        self.__input_buffer_length = 0
         if self.__opened_stream:
-            data = self.__rzusbstick_read_packet()
+            try:
+                data = self.__rzusbstick_read_packet()
+            except USBTimeoutError:
+                data = b""
             if data is not None and len(data) >= 1:
                 if data[0] == RZUSBStickResponses.RZ_AIRCAPTURE_DATA and len(data) >= 10:
+                    self.__input_header = data[:9]
                     self.__input_buffer = data[9:]
-                    self.__input_buffer_length = data[1]
+                    self.__input_buffer_length = data[1] - 9
+                elif len(self.__input_header) > 0:
+                    self.__input_buffer += data
+                else:
+                    self.__input_buffer = b""
+                    self.__input_buffer_length = 0
+                    self.__input_header = b""
+
+                if len(self.__input_header) == 9 and self.__input_buffer_length == len(self.__input_buffer):
+                    rssi = 3 * self.__input_header[6] - 91
+                    valid_fcs = (self.__input_header[7] == 0x01)
+                    packet = self.__input_buffer[:-1]
+                    link_quality_indicator = self.__input_buffer[-1]
+                    self._send_whad_zigbee_raw_pdu(packet, rssi=rssi, is_fcs_valid=valid_fcs)
     def reset(self):
         self.__rzusbstick.reset()
 
@@ -101,6 +123,20 @@ class RZUSBStick(VirtualDevice):
         super().close()
 
     # Virtual device whad message builder
+    def _send_whad_zigbee_raw_pdu(self, packet, rssi=None, is_fcs_valid=None, timestamp=None):
+        pdu = packet[:-2]
+        fcs = unpack("H",packet[-2:])[0]
+        msg = Message()
+        msg.zigbee.raw_pdu.channel = self.__channel
+        if rssi is not None:
+            msg.zigbee.raw_pdu.rssi = rssi
+        if timestamp is not None:
+            msg.zigbee.raw_pdu.timestamp = timestamp
+        msg.zigbee.raw_pdu.fcs_validity = is_fcs_valid
+        msg.zigbee.raw_pdu.pdu = pdu
+        msg.zigbee.raw_pdu.fcs = fcs
+        self._send_whad_message(msg)
+
 
     # Virtual device whad message callbacks
     def _on_whad_zigbee_stop(self, message):
@@ -108,6 +144,16 @@ class RZUSBStick(VirtualDevice):
             self._send_whad_command_result(ResultCode.SUCCESS)
         else:
             self._send_whad_command_result(ResultCode.ERROR)
+
+    def _on_whad_zigbee_send_raw(self, message):
+        channel = message.channel
+
+        if self._set_channel(channel):
+            packet = message.pdu + pack("H",message.fcs)
+            success = self._send_packet(packet)
+        else:
+            success = False
+        self._send_whad_command_result(ResultCode.SUCCESS if success else ResultCode.ERROR)
 
     def _on_whad_zigbee_sniff(self, message):
         channel = message.channel
@@ -119,6 +165,9 @@ class RZUSBStick(VirtualDevice):
             self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
 
     def _on_whad_zigbee_start(self, message):
+        self.__input_buffer = b""
+        self.__input_buffer_length = 0
+        self.__input_header = b""
         if self._start():
             self._send_whad_command_result(ResultCode.SUCCESS)
         else:
@@ -227,5 +276,7 @@ class RZUSBStick(VirtualDevice):
 
     def _send_packet(self, data):
         if len(data) >= 1 and len(data) <= 125:
-            data += b"\x00\x00" # FCS bytes
-            return self._rzusbstick_send_command(RZUSBStickCommands.RZ_INJECT_FRAME, bytes([len(data)+data]))
+            self._close_stream()
+            success = self._rzusbstick_send_command(RZUSBStickCommands.RZ_INJECT_FRAME, bytes([len(data)])+data, timeout=700)
+            self._open_stream()
+            return success
