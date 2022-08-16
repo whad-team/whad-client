@@ -1,4 +1,4 @@
-from whad.exceptions import WhadDeviceNotFound
+from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
@@ -63,7 +63,7 @@ class UbertoothDevice(VirtualDevice):
         """
         device = get_ubertooth(index,serial)
         if device is None:
-            raise WhadDeviceNotFound
+            raise WhadDeviceNotFound()
 
         self.__opened = False
         self.__address_filter = b"\xFF\xFF\xFF\xFF\xFF\xFF"
@@ -77,7 +77,13 @@ class UbertoothDevice(VirtualDevice):
         super().__init__()
 
     def open(self):
-        self.__ubertooth.set_configuration()
+        try:
+            self.__ubertooth.set_configuration()
+        except USBError as err:
+            if err.errno == 13:
+                raise WhadDeviceAccessDenied("ubertooth")
+            else:
+                raise WhadDeviceNotReady()
         self._dev_id = self._get_serial_number()
         self._fw_author = self._get_manufacturer()
         self._fw_url = self._get_url()
