@@ -142,8 +142,13 @@ class Zigbee(WhadDeviceConnector):
         Send Zigbee packets (on a single channel).
         """
         if self.can_send():
-            if self.support_raw_pdu() and Dot15d4FCS not in pdu:
-                packet = Dot15d4FCS(raw(pdu)+Dot15d4FCS().compute_fcs(raw(pdu)))
+            if self.support_raw_pdu():
+                if Dot15d4FCS not in pdu:
+                    packet = Dot15d4FCS(raw(pdu)+Dot15d4FCS().compute_fcs(raw(pdu)))
+                else:
+                    packet = pdu
+            elif Dot15d4FCS in pdu:
+                pdu = Dot15d4(raw(pdu)[:-2])
             else:
                 packet = pdu
             msg = self._build_message_from_scapy_packet(packet, channel)
