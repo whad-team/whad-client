@@ -31,7 +31,7 @@ def get_rzusbstick(id=0,bus=None, address=None):
         except IndexError:
             return None
 
-class RZUSBStick(VirtualDevice):
+class RZUSBStickDevice(VirtualDevice):
 
     INTERFACE_NAME = "rzusbstick"
 
@@ -42,7 +42,7 @@ class RZUSBStick(VirtualDevice):
         '''
         available_devices = []
         for rzusbstick in find(idVendor=RZUSBStickId.RZUSBSTICK_ID_VENDOR, idProduct=RZUSBStickId.RZUSBSTICK_ID_PRODUCT,find_all=True):
-            available_devices.append(RZUSBStick(bus=rzusbstick.bus, address=rzusbstick.address))
+            available_devices.append(RZUSBStickDevice(bus=rzusbstick.bus, address=rzusbstick.address))
         return available_devices
 
     @property
