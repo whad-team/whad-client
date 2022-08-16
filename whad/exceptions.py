@@ -34,3 +34,11 @@ class WhadDeviceNotReady(Exception):
 class WhadDeviceNotFound(Exception):
     def __init__(self):
         super().__init__()
+
+class WhadDeviceAccessDenied(Exception):
+    def __init__(self, device_name):
+        self.__device_name = device_name
+        super().__init__()
+
+    def __str__(self):
+        return 'WhadDeviceAccessDenied(%s) - missing udev rules' % self.__device_name
