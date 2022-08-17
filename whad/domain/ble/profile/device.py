@@ -133,11 +133,11 @@ class PeripheralCharacteristic:
 
                 # wrap our callback to provide more details about the concerned
                 # characteristic
-                def wrapped_cb(handle, value, indicate=False):
+                def wrapped_cb(handle, value, indication=False):
                     callback(
                         self,
                         value,
-                        indicate=indicate
+                        indication=indication
                     )
 
                 # Register our callback
@@ -165,6 +165,24 @@ class PeripheralCharacteristic:
                 return True
             else:
                 return False
+    
+    def unsubscribe(self):
+        """Unsubscribe to this characteristic
+        """
+        # Look for CCCD
+        desc = self.get_descriptor(UUID(0x2902))
+
+        if desc is not None:
+            # Disable notification/indication
+            desc.write(bytes([0x00, 0x00]))
+
+            # Unregister our callback
+            self.__gatt.unregister_notification_callback(
+                self.__characteristic.value_handle
+            )
+            return True
+        else:
+            return False
 
 
 class PeripheralService:

@@ -4,6 +4,8 @@ from time import time
 from queue import Queue, Empty
 from struct import unpack, pack
 
+from whad.domain.ble.exceptions import HookReturnValue, HookReturnAuthRequired,\
+    HookReturnAccessDenied, HookReturnGattError, HookReturnNotFound
 from whad.domain.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
 from whad.domain.ble.stack.att.exceptions import InvalidHandleValueError, error_response_to_exc, InsufficientAuthenticationError,\
     InsufficientAuthorizationError, InsufficientEncryptionKeySize, ReadNotPermittedError, AttErrorCode
@@ -378,7 +380,7 @@ class GattClient(Gatt):
             self.__notification_callbacks[notification.handle](
                 notification.handle,
                 notification.value,
-                indicate=False
+                indication=False
             )
 
     def on_handle_value_indication(self, notification):
@@ -799,27 +801,51 @@ class GattServer(Gatt):
                 charac = self.__model.find_object_by_handle(request.handle - 1)
 
                 if charac.readable():
-                    service = self.__model.find_service_by_characteristic_handle(charac.handle)
-                    value =  self.__model.on_characteristic_read(
-                        service,
-                        charac,
-                        0,
-                        self.att.local_mtu - 1
-                    )
+                    try:
+                        service = self.__model.find_service_by_characteristic_handle(charac.handle)
+                        self.__model.on_characteristic_read(
+                            service,
+                            charac,
+                            0,
+                            self.att.local_mtu - 1
+                        )
+                        
+                        # Make sure the returned value matches the boundaries
+                        value = charac.value[:self.att.local_mtu - 1]
 
-                    # If value is none, return an error while reading
-                    if value is None:
+                        self.att.read_response(
+                            value
+                        )
+                    except HookReturnValue as force_value:
+                        # Make sure the returned value matches the boundaries
+                        value = force_value.value[:self.att.local_mtu - 1]
+
+                        self.att.read_response(
+                            value
+                        )
+                    except HookReturnAuthRequired as auth_error:
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                    except HookReturnAccessDenied as access_denied:
                         self.error(
                             BleAttOpcode.READ_REQUEST,
                             request.handle,
                             BleAttErrorCode.READ_NOT_PERMITTED
                         )
-                    else:
-                        # Make sure the returned value matches the boundaries
-                        value = value[:self.att.local_mtu - 1]
-
-                        self.att.read_response(
-                            value
+                    except HookReturnNotFound as not_found:
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                        )
+                    except HookReturnGattError as gatt_error:
+                        self.error(
+                            gatt_error.request if gatt_error.request is not None else BleAttOpcode.READ_REQUEST,
+                            gatt_error.handle if gatt_error.handle is not None else request.handle,
+                            gatt_error.error if gatt_error.error is not None else BleAttErrorCode.ATTRIBUTE_NOT_FOUND
                         )
                 else:
                     # Characteristic is not readable
@@ -854,39 +880,63 @@ class GattServer(Gatt):
                 # If attribute is a characteristic, make sure it is readable
                 # before returning a value.
                 if isinstance(attr, CharacteristicValue):
-                    charac = self.__model.find_object_by_handle(request.handle - 1)
-                    service = self.__model.find_service_by_characteristic_handle(charac.handle)
-                    if not charac.readable():
+                    try:
+                        charac = self.__model.find_object_by_handle(request.handle - 1)
+                        service = self.__model.find_service_by_characteristic_handle(charac.handle)
+                        if not charac.readable():
+                            self.error(
+                                BleAttOpcode.READ_BLOB_REQUEST,
+                                request.handle,
+                                BleAttErrorCode.READ_NOT_PERMITTED
+                            )
+                            return
+
+                        # Call our characteristic read hook
+                        self.__model.on_characteristic_read(
+                            service,
+                            charac,
+                            request.offset,
+                            self.att.local_mtu - 1
+                        )
+
+                        # Make sure the returned value matches the boundaries
+                        value = charac.value[request.offset:request.offset + self.att.local_mtu - 1]
+
+                        self.att.read_blob_response(
+                            value
+                        ) 
+
+                    except HookReturnValue as force_value:
+                        # Make sure the returned value matches the boundaries
+                        value = force_value.value[:self.att.local_mtu - 1]
+
+                        self.att.read_blob_response(
+                            value
+                        )
+                    except HookReturnAuthRequired as auth_error:
+                        self.error(
+                            BleAttOpcode.READ_BLOB_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                    except HookReturnAccessDenied as access_denied:
                         self.error(
                             BleAttOpcode.READ_BLOB_REQUEST,
                             request.handle,
                             BleAttErrorCode.READ_NOT_PERMITTED
                         )
-                        return
-
-                    # Call our characteristic read hook
-                    value =  self.__model.on_characteristic_read(
-                        service,
-                        charac,
-                        request.offset,
-                        self.att.local_mtu - 1
-                    )
-
-                    if value is None:
+                    except HookReturnNotFound as not_found:
                         self.error(
-                            BleAttOpcode.READ_REQUEST,
+                            BleAttOpcode.READ_BLOB_REQUEST,
                             request.handle,
-                            BleAttErrorCode.READ_NOT_PERMITTED
+                            BleAttErrorCode.ATTRIBUTE_NOT_FOUND
                         )
-                    else:
-                        # Make sure the returned value matches the boundaries
-                        value = value[:self.att.local_mtu - 1]
-
-                        # Valid offset, return data[offset:offset + MTU - 1]
-                        self.att.read_blob_response(
-                            value
-                        )
-
+                    except HookReturnGattError as gatt_error:
+                        self.error(
+                            gatt_error.request if gatt_error.request is not None else BleAttOpcode.READ_REQUEST,
+                            gatt_error.handle if gatt_error.handle is not None else request.handle,
+                            gatt_error.error if gatt_error.error is not None else BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                        )                
                 elif isinstance(attr, CharacteristicDescriptor):
                     # Valid offset, return data[offset:offset + MTU - 1]
                     self.att.read_blob_response(
@@ -924,25 +974,48 @@ class GattServer(Gatt):
                     # Retrieve corresponding service info
                     service = self.__model.find_service_by_characteristic_handle(charac.handle)
 
-                    # Trigger our write hook
-                    value =  self.__model.on_characteristic_write(
-                        service,
-                        charac,
-                        0,
-                        request.value,
-                        False
-                    )
-                    
-                    if value is None:
+                    try:
+                        # Trigger our write hook
+                        self.__model.on_characteristic_write(
+                            service,
+                            charac,
+                            0,
+                            request.value,
+                            False
+                        )
+
+                        # Update attribute value
+                        attr.value = request.value
+                        self.att.write_response()
+
+                    except HookReturnValue as force_value:
+                        # Make sure the returned value matches the boundaries
+                        attr.value = force_value.value
+                        self.att.write_response()
+                    except HookReturnAuthRequired as auth_error:
                         self.error(
                             BleAttOpcode.WRITE_REQUEST,
                             request.handle,
-                            BleAttErrorCode.WRITE_NOT_PERMITTED
+                            BleAttErrorCode.INSUFFICIENT_AUTHENT
                         )
-                    else:
-                        # Variable length, copy data.
-                        attr.value = value
-                        self.att.write_response()
+                    except HookReturnAccessDenied as access_denied:
+                        self.error(
+                            BleAttOpcode.WRITE_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.READ_NOT_PERMITTED
+                        )
+                    except HookReturnNotFound as not_found:
+                        self.error(
+                            BleAttOpcode.WRITE_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                        )
+                    except HookReturnGattError as gatt_error:
+                        self.error(
+                            gatt_error.request if gatt_error.request is not None else BleAttOpcode.READ_REQUEST,
+                            gatt_error.handle if gatt_error.handle is not None else request.handle,
+                            gatt_error.error if gatt_error.error is not None else BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                        )
                 else:
                     self.error(
                         BleAttOpcode.WRITE_REQUEST,
@@ -1020,25 +1093,45 @@ class GattServer(Gatt):
                     # Retrieve corresponding service info
                     service = self.__model.find_service_by_characteristic_handle(charac.handle)
 
-                    # Trigger our write hook
-                    value =  self.__model.on_characteristic_write(
-                        service,
-                        charac,
-                        0,
-                        request.value,
-                        True
-                    )
-                    
-                    if value is None:
+                    try:
+                        # Trigger our write hook
+                        value =  self.__model.on_characteristic_write(
+                            service,
+                            charac,
+                            0,
+                            request.value,
+                            True
+                        )
+
+                        # Update attribute value
+                        attr.value = request.value
+                    except HookReturnValue as force_value:
+                        # Make sure the returned value matches the boundaries
+                        attr.value = force_value.value
+                    except HookReturnAuthRequired as auth_error:
                         self.error(
                             BleAttOpcode.WRITE_COMMAND,
                             request.handle,
-                            BleAttErrorCode.WRITE_NOT_PERMITTED
+                            BleAttErrorCode.INSUFFICIENT_AUTHENT
                         )
-                    else:
-                        # Variable length, copy data.
-                        attr.value = value
-
+                    except HookReturnAccessDenied as access_denied:
+                        self.error(
+                            BleAttOpcode.WRITE_COMMAND,
+                            request.handle,
+                            BleAttErrorCode.READ_NOT_PERMITTED
+                        )
+                    except HookReturnNotFound as not_found:
+                        self.error(
+                            BleAttOpcode.WRITE_COMMAND,
+                            request.handle,
+                            BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                        )
+                    except HookReturnGattError as gatt_error:
+                        self.error(
+                            gatt_error.request if gatt_error.request is not None else BleAttOpcode.READ_REQUEST,
+                            gatt_error.handle if gatt_error.handle is not None else request.handle,
+                            gatt_error.error if gatt_error.error is not None else BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                        )
                 else:
                     self.error(
                         BleAttOpcode.WRITE_COMMAND,
@@ -1109,6 +1202,8 @@ class GattServer(Gatt):
                 request.handle,
                 BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
+
+
     def on_prepare_write_request(self, request: GattPrepareWriteRequest):
         """Prepare write request
         """

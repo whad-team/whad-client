@@ -11,6 +11,8 @@ class RequiredImplementation(Exception):
         super().__init__()
 
 
+# Device discovery exceptions
+
 class UnsupportedDomain(Exception):
     def __init__(self):
         super().__init__()
@@ -27,6 +29,9 @@ class UnsupportedCapability(Exception):
     def __repr__(self):
         return str(self)
 
+
+# Device communication exceptions
+
 class WhadDeviceNotReady(Exception):
     def __init__(self):
         super().__init__()
@@ -34,3 +39,4 @@ class WhadDeviceNotReady(Exception):
 class WhadDeviceNotFound(Exception):
     def __init__(self):
         super().__init__()
+

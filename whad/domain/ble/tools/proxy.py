@@ -4,6 +4,7 @@ from scapy.layers.bluetooth import L2CAP_Hdr
 from whad.domain.ble.connector import BLE, Central, Peripheral, BleDirection
 from whad.domain.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvCompleteLocalName
 from whad.domain.ble.profile import GenericProfile
+from whad.domain.ble.exceptions import HookReturnValue
 from whad.exceptions import WhadDeviceNotFound
 
 def is_pdu_valid(pdu):
@@ -79,12 +80,8 @@ class LowLevelPeripheral(Peripheral):
         """This method is called whenever a data PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
         """
-        print('proxy >> central')
-        pdu.show()
-        print(pdu.metadata)
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
             if self.__other_half is not None and self.__connected:
-                print('send to central device')
                 self.__other_half.forward_data_pdu(pdu)
             else:
                 print('central not connected')
@@ -147,22 +144,18 @@ class LowLevelCentral(Central):
     def on_data_pdu(self, pdu):
         """Forward Data PDU to other half, if connected
         """
-        print('central >> proxy')
-        pdu.show()
         if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
             if self.__other_half is not None and self.__connected:
                 self.__other_half.forward_data_pdu(pdu)
 
     def forward_ctrl_pdu(self, pdu):
         if self.__conn_handle is not None:
-            print('central is sending control pdu ...')
             return self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
         else:
             print('central is not connected')
 
     def forward_data_pdu(self, pdu):
         if self.__conn_handle is not None:
-            print('central is sending data pdu ...')
             return self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
         else:
             print('central is not connected')
@@ -230,14 +223,19 @@ class LinkLayerProxy(object):
 
 
 class ImportedDevice(GenericProfile):
-    def __init__(self, target, from_json):
+    def __init__(self, proxy, target, from_json):
         super().__init__(from_json=from_json)
         self.__target = target
+        self.__proxy = proxy
 
     def on_characteristic_read(self, service, characteristic, offset=0, length=0):
-        print('>> characteristic read')
-        c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
-        return c.read(offset=offset)
+        # Get characteristic and return its value.
+        self.__proxy.on_characteristic_read(
+            service,
+            characteristic,
+            offset,
+            length
+        )
 
     def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
         """Characteristic write hook
@@ -245,21 +243,33 @@ class ImportedDevice(GenericProfile):
         This hook is called whenever a charactertistic is about to be written by a GATT
         client. If this method returns None, then the write operation will return an error.
         """
-        print('write %s to charac %s' % (value, characteristic.uuid))
-        c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
-        c.write(value)
-        print('written')
-        return True
+        self.__proxy.on_characteristic_write(
+            service,
+            characteristic,
+            offset,
+            value,
+            without_response
+        )
 
     def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
-        """Not supported yet
+        """Characteristic subscription hook.
         """
-        pass
+        self.__proxy.on_characteristic_subscribed(
+            service,
+            characteristic,
+            notification=notification,
+            indication=indication
+        )
 
     def on_characteristic_unsubscribed(self, service, characteristic):
         """Not supported yet
         """
-        pass
+        self.__proxy.on_characteristic_unsubscribed(
+            service,
+            characteristic
+        )
+
+
 
 class GattProxy(object):
     """GATT Proxy
@@ -277,6 +287,69 @@ class GattProxy(object):
             self.__adv_data = adv_data
         self.__target_bd_addr = bd_address
 
+
+    def on_characteristic_read(self, service, characteristic, offset=0, length=0):
+        """This callback is called whenever a characteristic is read.
+
+        :param Service service: Service object the target characteristic belongs to.
+        :param Characteristic characteristic: Target characteristic object.
+        :param int offset: write offset
+        :param int length: maximum read length for this characteristic
+        """
+        # Get characteristic and return its value.
+        c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
+        value = c.read(offset=offset)
+        print(' << Read characteristic %s: %s' % (characteristic.uuid, value))
+        raise HookReturnValue(value)
+
+    def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
+        """This callback is called whenever a characteristic is written.
+
+        :param Service service: Service object the target characteristic belongs to.
+        :param Characteristic characteristic: Target characteristic object.
+        :param int offset: write offset
+        :param bytes value: value to write into this characteristic
+        :param bool without_response: True if write operation does not require a response, False otherwise (default: False)
+        """
+        print(' >> Write characteristic %s with value %s at offset %d' % (characteristic.uuid, value, offset))
+        # Get target characteristic and write its value
+        c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
+        c.write(value)
+
+    def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
+        """This callback is called whenever a characteristic is subscribed to for notification or indication.
+
+        :param Service service: Service object the target characteristic belongs to.
+        :param Characteristic characteristic: Target characteristic object.
+        :param bool notification: Set to True to subscribe for notification
+        :param bool indication: Set to True to subscribe to indication
+        """
+        print(' ** Subscribed to characteristic %s from service %s' % (characteristic.uuid, service.uuid))
+        c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
+        if notification:
+            # Forward callback
+            def notif_cb(charac, value, indication=False):
+                characteristic.value = value
+
+            c.subscribe(callback=notif_cb, notification=True)
+        elif indication:
+            # Forward callback
+            def indicate_cb(charac, value, indication=True):
+                characteristic.value = value
+
+            c.subscribe(callback=indicate_cb, indication=True)
+
+    def on_characteristic_unsubscribed(self, service, characteristic):
+        """This callback is called whenever a characteristic is unsubscribed.
+
+        :param Service service: Service object the target characteristic belongs to.
+        :param Characteristic characteristic: Target characteristic object.
+        """
+        print(' ** Unsubscribed to characteristic %s from service %s' % (characteristic.uuid, service.uuid))
+        c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
+        c.unsubscribe()
+
+
     def start(self):
         """Start our GATT Proxy
         """
@@ -293,6 +366,7 @@ class GattProxy(object):
             # Once connected, we start our peripheral
             print('[i] Create our peripheral')
             self.__peripheral = Peripheral(self.__proxy_dev, profile=ImportedDevice(
+                self,
                 self.__target,
                 target_profile
             ))
