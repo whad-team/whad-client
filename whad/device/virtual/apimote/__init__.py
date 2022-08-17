@@ -2,6 +2,9 @@ from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAc
 from whad.device.virtual.apimote.constants import APIMoteId, APIMoteRegisters
 from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
+from whad import WhadDomain, WhadCapability
+from whad.protocol.generic_pb2 import ResultCode
+from whad.protocol.zigbee.zigbee_pb2 import Sniff, Send, Start, Stop
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from serial import Serial,PARITY_NONE
 from serial.tools.list_ports import comports
@@ -62,7 +65,41 @@ class APIMoteDevice(VirtualDevice):
         port_info = get_port_info(self.__port)
         if port_info is None:
             raise WhadDeviceNotFound()
+            
+        self._dev_id = self._generate_dev_id(port_info)
+        self._fw_author = self._get_author()
+        self._fw_url = self._get_firmware_url()
+        self._fw_version = self._get_firmware_version()
+        self._dev_capabilities = self._get_capabilities()
 
+    # Discovery related functions
+    def _get_capabilities(self):
+        capabilities = {
+            WhadDomain.Zigbee : (
+                                (WhadCapability.Sniff | WhadCapability.Inject),
+                                [Sniff, Send, Start, Stop]
+            )
+        }
+        return capabilities
+
+    def _generate_dev_id(self, port_info):
+        dev_id = (
+                        port_info.serial_number.encode('utf-8') +
+                        pack("H", port_info.vid) +
+                        pack("H", port_info.pid)
+        )
+        dev_id = b"\x00"*(16 - len(dev_id)) + dev_id
+        return dev_id
+
+    def _get_firmware_version(self):
+        return (4, 0, 0) # APIMote v4 beta
+
+    def _get_author(self):
+        return "Ryan Speers".encode("utf-8")
+
+    def _get_firmware_url(self):
+        # Maybe we should replace it by GoodFET URL ?
+        return "https://github.com/riverloopsec/apimote".encode("utf-8")
 
     def open(self):
         """
@@ -84,8 +121,6 @@ class APIMoteDevice(VirtualDevice):
 
             # Ask parent class to run a background I/O thread
             super().open()
-
-            self._dev_id = b"\xFF"*16
 
     def reset(self):
         """Reset device.
