@@ -56,7 +56,7 @@ class Gatt(object):
         """
         self.__queue.put(message, block=True, timeout=None)
 
-    def wait_for_message(self, message_clazz, timeout=30.0):
+    def wait_for_message(self, message_clazz, timeout=5.0):
         """Wait for a specific message type or error, other messages are dropped
 
         :param type message_clazz: Expected message class
