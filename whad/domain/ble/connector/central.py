@@ -7,6 +7,9 @@ from whad.domain.ble.profile.device import PeripheralDevice
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
 
+import logging
+logger = logging.getLogger(__name__)
+
 class Central(BLE):
 
     def __init__(self, device, existing_connection = None):
@@ -68,10 +71,12 @@ class Central(BLE):
         Central devices act as master, so we only forward slave to master
         messages to the stack.
         """
+        logger.info('received control PDU')
         if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
             self.__stack.on_ctl_pdu(pdu.metadata.connection_handle, pdu)
 
     def on_data_pdu(self, pdu):
+        logger.info('received data PDU')
         """This method is called whenever a data PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
         """
@@ -82,7 +87,7 @@ class Central(BLE):
     def on_new_connection(self, connection):
         """On new connection, discover primary services
         """
-        print('>> on connection')
+        logger.info('new connection established')
 
         # Use GATT client
         self.connection = connection
