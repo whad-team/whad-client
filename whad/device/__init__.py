@@ -941,4 +941,4 @@ class WhadDevice(object):
 
 # Defines every supported low-level device
 from whad.device.uart import UartDevice
-from whad.device.virtual import UbertoothDevice
+from whad.device.virtual import VirtualDevice
