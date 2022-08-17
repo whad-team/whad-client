@@ -130,6 +130,9 @@ class BleATT(object):
         # Read Blob Response has no body
         elif att_pkt.opcode == BleAttOpcode.READ_BLOB_RESPONSE:
             self.on_read_blob_response(None)
+        # Read Response has no body
+        elif att_pkt.opcode == BleAttOpcode.READ_RESPONSE:
+            self.on_read_response(None)
 
     def on_error_response(self, error_resp):
         self.__gatt.on_error_response(
@@ -240,9 +243,18 @@ class BleATT(object):
     def on_read_response(self, response):
         """Handle ATT Read Response
         """
-        self.__gatt.on_read_response(
-            GattReadResponse(response.value)
-        )
+        if response is not None:
+            self.__gatt.on_read_response(
+                GattReadResponse(
+                    response.value
+                )
+            )
+        else:
+            self.__gatt.on_read_response(
+                GattReadResponse(
+                    b''
+                )
+            )
 
     def on_read_blob_request(self, request):
         """Handle ATT Read Blob Request
