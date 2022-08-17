@@ -45,6 +45,9 @@ class APIMoteDevice(VirtualDevice):
         self.__fileno = None
         self.__uart = None
         self.__opened = False
+        self.__synced = False
+        self.__last_reply = None
+
         port_info = get_port_info(self.__port)
         if port_info is None:
             raise WhadDeviceNotFound()
@@ -62,7 +65,6 @@ class APIMoteDevice(VirtualDevice):
             # Get file number to use with select()
             self.__fileno = self.__uart.fileno()
             self.__opened = True
-            self.__synced = False
 
             self.__input_data = b""
             self.__uart.dtr = False             # Non reset state
@@ -146,9 +148,17 @@ class APIMoteDevice(VirtualDevice):
         self.__fileno = None
         self.__opened = False
 
+    def _send_goodfet_cmd(self, cmd, reply_filter=lambda reply:True):
+        self.write(raw(cmd))
+        while self.__last_reply is None or not reply_filter(self.__last_reply):
+            sleep(0.1)
+        return self.__last_reply
+
     def _process_goodfet_reply(self, reply):
         if GoodFET_Init_Reply in reply and reply.url == "http://goodfet.sf.net/":
             self.synced = True
+        elif self.synced:
+            self.__last_reply = reply
 
     def _process_input_data(self, data):
         self.__input_data += data

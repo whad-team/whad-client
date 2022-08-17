@@ -87,4 +87,4 @@ class VirtualDevice(WhadDevice):
 
 from .ubertooth import UbertoothDevice
 from .rzusbstick import RZUSBStickDevice
-#from .apimote import APIMoteDevice
+from .apimote import APIMoteDevice
