@@ -7,11 +7,13 @@ from enum import IntEnum
 class RZUSBStickOSPrimitive(IntEnum):
     USBDEVFS_RESET = ord('U') << (4 * 2) | 20
 
+# RZUSBStick Internal states
 class RZUSBStickInternalStates(IntEnum):
     NONE                    = 0
     SNIFFING                = 1
     TRANSMITTING            = 2
 
+# USB identifiers
 class RZUSBStickId(IntEnum):
     RZUSBSTICK_ID_VENDOR    = 0x03eb
     RZUSBSTICK_ID_PRODUCT   = 0x210a
