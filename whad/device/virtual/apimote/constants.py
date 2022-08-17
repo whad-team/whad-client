@@ -8,6 +8,24 @@ class APIMoteId(IntEnum):
     APIMOTE_ID_PRODUCT   = 0x6015
 
 class APIMoteRegisters(IntEnum):
+    # Status registers: initiate the change of an internal state or mode
+    SNOP            = 0x00        # No operation
+    SXOSCON         = 0x01        # Crystal oscillator
+    STXCAL          = 0x02        # Enable/calibrate frequency Synthesizer
+    SRXON           = 0x03        # Enable RX
+    STXON           = 0x04        # Enable TX
+    STXONCCA        = 0x05        # Enable TX if CCA indicates a clear channel
+    SRFOFF          = 0x06        # Disable RX/TX and frequency synthetiser
+    SRXOSCOFF       = 0x07        # Turn off RF and crystal oscillator
+    SFLUSHRX        = 0x08        # Flush RX fifo and reset demodulator
+    SFLUSHTX        = 0x09        # Flush TX fifo
+    SACK            = 0x0A        # Send Acknowledgment, with pending field cleared
+    SACKPEND        = 0x0B        # Send Acknowledgment, with pending field set
+    SRXDEC          = 0x0C        # Start RX fifo decryption / authentication
+    STXENC          = 0x0D        # Start TX fifo encryption / authentication
+    SAES            = 0x0E        # AES encryption strobe
+
+    # Configuration registers
     MAIN            = 0x10        # Main Control Register
     MDMCTRL0        = 0x11        # Modem Control Register 0
     MDMCTRL1        = 0x12        # Modem Control Register 1
