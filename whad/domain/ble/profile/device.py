@@ -240,9 +240,21 @@ class PeripheralDevice(GenericProfile):
     characteristics and descriptors.
     """
 
-    def __init__(self, gatt_client):
-        super().__init__()
+    def __init__(self,  central, gatt_client, conn_handle):
         self.__gatt = gatt_client
+        self.__conn_handle = conn_handle
+        self.__central = central
+        super().__init__()
+
+    @property
+    def conn_handle(self):
+        return self.__conn_handle
+
+    def disconnect(self):
+        """Terminate the connection to this device
+        """
+        # Ask associated central to disconnect this peripheral device.
+        self.__central.disconnect(self.__conn_handle)
 
     def discover(self):
         """Discovers services, characteristics and descriptors.

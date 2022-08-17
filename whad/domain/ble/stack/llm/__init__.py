@@ -67,6 +67,7 @@ class BleConnection(object):
         # Notify GATT layer that the connection has been terminated.
         if self.__l2cap.gatt is not None:
             self.__l2cap.gatt.on_terminated()
+            #self.__llm.on_disconnected()
 
     def on_ctrl_pdu(self, control):
         """Handle Control PDU at connection-level"""
@@ -97,6 +98,9 @@ class BleConnection(object):
     def gatt(self):
         return self.__l2cap.att.gatt
 
+    @property
+    def conn_handle(self):
+        return self.__conn_handle
 
     ### Link-layer control PDU callbacks
 

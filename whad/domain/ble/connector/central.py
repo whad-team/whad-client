@@ -61,8 +61,17 @@ class Central(BLE):
     def on_connected(self, connection_data):
         self.__stack.on_connection(connection_data)
 
-    def on_disconnected(self, connection_data):
-        self.__stack.on_disconnected(connection_data.conn_handle)
+    def on_disconnected(self, disconnection_data):
+        self.__stack.on_disconnection(
+            disconnection_data.conn_handle,
+            disconnection_data.reason
+        )
+
+        self.__connected = False
+        
+        # Notify peripheral device about this disconnection
+        if self.__peripheral is not None:
+            self.__peripheral.on_disconnect(disconnection_data.conn_handle)
 
     def on_ctl_pdu(self, pdu):
         """This method is called whenever a control PDU is received.
@@ -91,8 +100,15 @@ class Central(BLE):
 
         # Use GATT client
         self.connection = connection
-        self.__peripheral = PeripheralDevice(connection.gatt)
+        self.__peripheral = PeripheralDevice(
+            self,
+            connection.gatt,
+            connection.conn_handle
+        )
         self.__connected = True
+
+        # Notify peripheral about this connection
+        self.__peripheral.on_connect(self.connection.conn_handle)
 
     def export_profile(self):
         """Export remote device profile

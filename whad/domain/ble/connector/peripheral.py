@@ -6,6 +6,10 @@ from whad.domain.ble.profile import GenericProfile
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
 
+# Logging
+import logging
+logger = logging.getLogger(__name__)
+
 class Peripheral(BLE):
 
     def __init__(self, device, existing_connection = None, profile=None, adv_data=None):
@@ -18,14 +22,18 @@ class Peripheral(BLE):
 
         # Initialize profile
         if profile is None:
+            logger.info('No profile provided to this Peripheral instance, use a default one.')
             self.__profile = GenericProfile()
         else:
+            logger.info('Peripheral will use the provided profile.')
             self.__profile = profile
 
         # Check if device accepts peripheral mode
         if not self.can_be_peripheral():
+            logger.info('Capability MasterRole not supported by this WHAD device')
             raise UnsupportedCapability("Peripheral")
         else:
+            logger.info('Enable peripheral mode with advertising data: %s' % adv_data)
             self.enable_peripheral_mode(adv_data)
 
             # If an existing connection is hijacked, simulate a connection
@@ -48,10 +56,23 @@ class Peripheral(BLE):
     ##############################
 
     def on_connected(self, connection_data):
+        """A device has just connected to this peripheral.
+        """
+        logger.info('a device is now connected (connection handle: %d)' % connection_data.conn_handle)
         self.__stack.on_connection(connection_data)
 
-    def on_disconnected(self, connection_data):
-        self.__stack.on_disconnected(connection_data.conn_handle)
+    def on_disconnected(self, disconnection_data):
+        """A device has just disconnected from this peripheral.
+        """
+        logger.info('a device has just connected (connection handle: %d)' % disconnection_data.conn_handle)
+        self.__stack.on_disconnection(
+            disconnection_data.conn_handle,
+            disconnection_data.reason
+        )
+
+        # Notify peripheral device about this disconnection
+        if self.__profile is not None:
+            self.__profile.on_disconnect(disconnection_data.conn_handle)
 
     def on_ctl_pdu(self, pdu):
         """This method is called whenever a control PDU is received.
@@ -61,6 +82,7 @@ class Peripheral(BLE):
         messages to the stack.
         """
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
+            logger.info('Control PDU comes from master, forward to peripheral')
             self.__stack.on_ctl_pdu(pdu.metadata.connection_handle, pdu)
 
     def on_data_pdu(self, pdu):
@@ -68,14 +90,16 @@ class Peripheral(BLE):
         This PDU is then forwarded to the BLE stack to handle it.
         """
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
+            logger.info('Data PDU comes from master, forward to peripheral')
             self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
 
 
     def on_new_connection(self, connection):
         """On new connection, discover primary services
         """
-        print('>> on connection')
-
         # Use GATT server
         self.connection = connection
         self.__connected = True
+
+        # Notify our profile about this connection
+        self.__profile.on_connect(self.connection.conn_handle)

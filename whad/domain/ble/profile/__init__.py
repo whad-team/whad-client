@@ -471,6 +471,25 @@ class GenericProfile(object):
 
 
     ################################################
+    # Connection/disconnection hooks
+    ################################################
+
+    def on_connect(self, conn_handle):
+        """Connection hook.
+
+        This hook is only used to notify the connection of a device.
+        """
+        pass
+
+    def on_disconnect(self, conn_handle):
+        """Disconnection hook.
+
+        This hook is only used to notify the disconnection of a device.
+        """
+        pass
+
+
+    ################################################
     # Characteristic Read/Write/Subscribe hooks
     ################################################
 
