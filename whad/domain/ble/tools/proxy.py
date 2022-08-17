@@ -9,6 +9,10 @@ from whad.domain.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.exceptions import WhadDeviceNotFound
 from ....protocol.device_pb2 import Hook
 
+#############################################
+# Link-layer Proxy related classes
+#############################################
+
 def is_pdu_valid(pdu):
     if pdu.haslayer(BTLE_DATA):
         btle_data = pdu.getlayer(BTLE_DATA)
@@ -223,6 +227,12 @@ class LinkLayerProxy(object):
             print('[i] Start advertising')
             self.__peripheral.start()
 
+
+
+#############################################
+# GATT Proxy related classes
+#############################################
+
 class ImportedDevice(GenericProfile):
     def __init__(self, proxy, target, from_json):
         super().__init__(from_json=from_json)
@@ -230,12 +240,28 @@ class ImportedDevice(GenericProfile):
         self.__proxy = proxy
 
     def on_connect(self, conn_handle):
+        """This method is called when a device connects to the GATT proxy, and will
+        forward this event to the GATT proxy.
+        """
         self.__proxy.on_connect(conn_handle)
 
     def on_disconnect(self, conn_handle):
+        """This method is called when a device disconnects from the GATT proxy and
+        forwards this event to the proxy itself.
+        """
         self.__proxy.on_disconnect(conn_handle)
 
     def on_characteristic_read(self, service, characteristic, offset=0, length=0):
+        """Callback method that handles a characteristic read operation.
+
+        This method accesses the characteristic value and call a proxy-specific
+        callback to let the user choose what should be done with this value.
+
+        If the proxy callback raises a HookReturnValue exception, the underlying
+        GATT stack will take the provided value and return it to the client.
+
+        If no exception is raised then the original characteristic value is returned.
+        """
         try:
             # Get characteristic and read its value
             c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
