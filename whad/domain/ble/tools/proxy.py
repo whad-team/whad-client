@@ -7,6 +7,7 @@ from whad.domain.ble.profile import GenericProfile
 from whad.domain.ble.exceptions import HookReturnValue
 from whad.domain.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.exceptions import WhadDeviceNotFound
+from ....protocol.device_pb2 import Hook
 
 def is_pdu_valid(pdu):
     if pdu.haslayer(BTLE_DATA):
@@ -222,21 +223,38 @@ class LinkLayerProxy(object):
             print('[i] Start advertising')
             self.__peripheral.start()
 
-
 class ImportedDevice(GenericProfile):
     def __init__(self, proxy, target, from_json):
         super().__init__(from_json=from_json)
         self.__target = target
         self.__proxy = proxy
 
+    def on_connect(self, conn_handle):
+        self.__proxy.on_connect(conn_handle)
+
+    def on_disconnect(self, conn_handle):
+        self.__proxy.on_disconnect(conn_handle)
+
     def on_characteristic_read(self, service, characteristic, offset=0, length=0):
-        # Get characteristic and return its value.
-        self.__proxy.on_characteristic_read(
-            service,
-            characteristic,
-            offset,
-            length
-        )
+        try:
+            # Get characteristic and read its value
+            c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
+            value = c.read(offset=offset)
+
+            # Call our proxy characteristic read hook
+            self.__proxy.on_characteristic_read(
+                service,
+                characteristic,
+                value,
+                offset,
+                length
+            )
+
+            # By default, return characteristic value
+            raise HookReturnValue(value)
+        except GattTimeoutException as gatt_error:
+            print(' !!! timeout')
+            raise HookReturnValue(b'')
 
     def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
         """Characteristic write hook
@@ -244,31 +262,72 @@ class ImportedDevice(GenericProfile):
         This hook is called whenever a charactertistic is about to be written by a GATT
         client. If this method returns None, then the write operation will return an error.
         """
-        self.__proxy.on_characteristic_write(
-            service,
-            characteristic,
-            offset,
-            value,
-            without_response
-        )
+        c = None
+
+        try:
+
+             # Get target characteristic and write its value
+            c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
+
+            self.__proxy.on_characteristic_write(
+                service,
+                characteristic,
+                offset,
+                value,
+                without_response
+            )
+
+            # Write value to target device
+            c.write(value)
+        except HookReturnValue as write_override:
+            c.write(write_override.value)
+        except GattTimeoutException as gatt_error:
+            print(' !!! GATT server timed out')
+            pass
 
     def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
         """Characteristic subscription hook.
         """
-        self.__proxy.on_characteristic_subscribed(
-            service,
-            characteristic,
-            notification=notification,
-            indication=indication
-        )
+        try:
+            c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
+            if notification:
+                # Forward callback
+                def notif_cb(charac, value, indication=False):
+                    characteristic.value = value
+
+                c.subscribe(callback=notif_cb, notification=True)
+            elif indication:
+                # Forward callback
+                def indicate_cb(charac, value, indication=True):
+                    characteristic.value = value
+
+                c.subscribe(callback=indicate_cb, indication=True)
+
+            # No action possible here (for now)
+            self.__proxy.on_characteristic_subscribed(
+                service,
+                characteristic,
+                notification=notification,
+                indication=indication
+            )
+        except GattTimeoutException as gatt_error:
+            print(' !!! GATT server timed out')
 
     def on_characteristic_unsubscribed(self, service, characteristic):
         """Not supported yet
         """
-        self.__proxy.on_characteristic_unsubscribed(
-            service,
-            characteristic
-        )
+        try:
+            c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
+            c.unsubscribe()
+
+            # No action possible here (for now)
+            self.__proxy.on_characteristic_unsubscribed(
+                service,
+                characteristic
+            )
+        except GattTimeoutException as gatt_error:
+            print(' !!! GATT server timedout')
+
 
 
 
@@ -289,26 +348,32 @@ class GattProxy(object):
         self.__target_bd_addr = bd_address
 
 
-    def on_characteristic_read(self, service, characteristic, offset=0, length=0):
+    def on_connect(self, conn_handle):
+        print('> client connected to proxy')
+
+    def on_disconnect(self, conn_handle):
+        print('> client disconnected from proxy')
+
+    def on_characteristic_read(self, service, characteristic, value, offset=0, length=0):
         """This callback is called whenever a characteristic is read.
 
         :param Service service: Service object the target characteristic belongs to.
         :param Characteristic characteristic: Target characteristic object.
+        :param bytes value: Characteristic value
         :param int offset: write offset
         :param int length: maximum read length for this characteristic
         """
-        try:
-            # Get characteristic and return its value.
-            c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
-            value = c.read(offset=offset)
-            print(' << Read characteristic %s: %s' % (characteristic.uuid, value))
-            raise HookReturnValue(value)
-        except GattTimeoutException as gatt_error:
-            print(' !!! timeout')
-            raise HookReturnValue(b'')
+        print(' << Read characteristic %s: %s' % (characteristic.uuid, value))
 
     def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
         """This callback is called whenever a characteristic is written.
+
+        Raise a HookReturnValue() exception to override the value that will be written
+        in the target characteristic.
+
+        Raise any other hook exception (HookReturnAccessDenied, HookReturnNotFound, or
+        HookReturnAuthRequired) to force the proxy to return a specific error to the
+        initiator device.
 
         :param Service service: Service object the target characteristic belongs to.
         :param Characteristic characteristic: Target characteristic object.
@@ -316,14 +381,7 @@ class GattProxy(object):
         :param bytes value: value to write into this characteristic
         :param bool without_response: True if write operation does not require a response, False otherwise (default: False)
         """
-        try:
-            print(' >> Write characteristic %s with value %s at offset %d' % (characteristic.uuid, value, offset))
-            # Get target characteristic and write its value
-            c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
-            c.write(value)
-        except GattTimeoutException as gatt_error:
-            print(' !!! GATT server timed out')
-            pass
+        print(' >> Write characteristic %s with value %s at offset %d' % (characteristic.uuid, value, offset))
 
     def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
         """This callback is called whenever a characteristic is subscribed to for notification or indication.
@@ -333,23 +391,7 @@ class GattProxy(object):
         :param bool notification: Set to True to subscribe for notification
         :param bool indication: Set to True to subscribe to indication
         """
-        try:
-            print(' ** Subscribed to characteristic %s from service %s' % (characteristic.uuid, service.uuid))
-            c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
-            if notification:
-                # Forward callback
-                def notif_cb(charac, value, indication=False):
-                    characteristic.value = value
-
-                c.subscribe(callback=notif_cb, notification=True)
-            elif indication:
-                # Forward callback
-                def indicate_cb(charac, value, indication=True):
-                    characteristic.value = value
-
-                c.subscribe(callback=indicate_cb, indication=True)
-        except GattTimeoutException as gatt_error:
-            print(' !!! GATT server timed out')
+        print(' ** Subscribed to characteristic %s from service %s' % (characteristic.uuid, service.uuid))
 
     def on_characteristic_unsubscribed(self, service, characteristic):
         """This callback is called whenever a characteristic is unsubscribed.
@@ -357,12 +399,7 @@ class GattProxy(object):
         :param Service service: Service object the target characteristic belongs to.
         :param Characteristic characteristic: Target characteristic object.
         """
-        try:
-            print(' ** Unsubscribed to characteristic %s from service %s' % (characteristic.uuid, service.uuid))
-            c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
-            c.unsubscribe()
-        except GattTimeoutException as gatt_error:
-            print(' !!! GATT server timedout')
+        print(' ** Unsubscribed to characteristic %s from service %s' % (characteristic.uuid, service.uuid))
 
 
     def start(self):

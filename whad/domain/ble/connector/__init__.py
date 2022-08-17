@@ -419,6 +419,16 @@ class BLE(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
+    def disconnect(self, conn_handle):
+        """Terminate a specific connection.
+
+        :param int conn_handle: Connection handle of the connection to terminate.
+        """
+        msg = Message()
+        msg.ble.disconnect.conn_handle = conn_handle
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
     def stop(self):
         """
         Stop currently enabled mode.
@@ -426,6 +436,7 @@ class BLE(WhadDeviceConnector):
         msg = Message()
         msg.ble.stop.CopyFrom(StopCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def process_messages(self):
         self.device.process_messages()
@@ -479,6 +490,9 @@ class BLE(WhadDeviceConnector):
             elif msg_type == 'connected':
                 self.on_connected(message.connected)
 
+            elif msg_type == 'disconnected':
+                self.on_disconnected(message.disconnected)
+
 
     def on_synchronized(self, access_address=None, crc_init=None, hop_increment=None, hop_interval=None, channel_map=None):
         pass
@@ -496,7 +510,9 @@ class BLE(WhadDeviceConnector):
         logger.debug(
             'connection handle: %d' % connection_data.handle if connection_data.handle is not None else 0
         )
-        self.on_connected(connection_data)
+
+    def on_disconnected(self, disconnection_data):
+        logger.info('a connection has been terminated')
 
     def on_raw_pdu(self, packet):
         if self.support_raw_pdu():

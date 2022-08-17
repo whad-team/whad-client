@@ -59,9 +59,8 @@ class BleStack:
         connection = self.__llm.on_connect(connection_data)
         self.__connector.on_new_connection(connection)
 
-    def on_disconnection(self, conn_handle):
+    def on_disconnection(self, conn_handle, reason):
         self.__llm.on_disconnect(conn_handle)
-        self.__connector.on_disconnect(conn_handle)
 
     def on_ctl_pdu(self, conn_handle, control):
         self.__llm.on_ctl_pdu(conn_handle, control)
