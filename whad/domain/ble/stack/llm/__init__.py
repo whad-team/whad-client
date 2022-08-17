@@ -234,6 +234,11 @@ class BleLinkLayerManager(object):
             return self.__connections[connection.conn_handle]
         else:
             print('[!] Connection already exists')
+            self.__connections[connection.conn_handle] = BleConnection(
+                self,
+                connection.conn_handle
+            )
+            return self.__connections[connection.conn_handle]
 
     def on_disconnect(self, conn_handle):
         if conn_handle in self.__connections:
