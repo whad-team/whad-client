@@ -523,3 +523,9 @@ class GenericProfile(object):
 
     def on_characteristic_unsubscribed(self, service, characteristic):
         pass
+
+    def on_notification(self, service, characteristic, value):
+        pass
+
+    def on_indication(self, service, characteristic, value):
+        pass
