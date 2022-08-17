@@ -17,6 +17,10 @@ from whad.domain.ble.metadata import generate_ble_metadata, BLEMetadata
 from whad.helpers import message_filter, bd_addr_to_bytes
 from whad.domain.ble.profile.advdata import AdvDataFieldList
 
+# Logging
+import logging
+logger = logging.getLogger(__name__)
+
 class BLE(WhadDeviceConnector):
     """
     BLE protocol connector.
@@ -427,10 +431,11 @@ class BLE(WhadDeviceConnector):
         self.device.process_messages()
 
     def on_generic_msg(self, message):
-        print('generic: %s' % message)
+        logger.info('generic message: %s' % message)
         pass
 
     def on_discovery_msg(self, message):
+        logger.info('discovery message: %s' % message)
         pass
 
 
@@ -446,14 +451,14 @@ class BLE(WhadDeviceConnector):
 
             elif msg_type == 'pdu':
                 if message.pdu.processed:
-                    print('[ble PDU log-only]')
+                    logger.info('[ble PDU log-only]')
                 else:
                     packet = self._build_scapy_packet_from_message(message, msg_type)
                     self.on_pdu(packet)
 
             elif msg_type == 'raw_pdu':
                 if message.raw_pdu.processed:
-                    print('[ble PDU log-only]')
+                    logger.info('[ble PDU log-only]')
                 else:
                     # Extract scapy packet
                     packet = self._build_scapy_packet_from_message(message, msg_type)
@@ -482,10 +487,15 @@ class BLE(WhadDeviceConnector):
         pass
 
     def on_adv_pdu(self, packet):
+        logger.info('received an advertisement PDU')
         if not self.support_raw_pdu():
             self._run_user_callbacks(packet)
 
     def on_connected(self, connection_data):
+        logger.info('a connection has been established')
+        logger.debug(
+            'connection handle: %d' % connection_data.handle if connection_data.handle is not None else 0
+        )
         self.on_connected(connection_data)
 
     def on_raw_pdu(self, packet):
@@ -513,9 +523,11 @@ class BLE(WhadDeviceConnector):
             self.on_error_pdu(packet)
 
     def on_data_pdu(self, pdu):
+        logger.info('received a data PDU')
         pass
 
     def on_ctl_pdu(self, pdu):
+        logger.info('received a control PDU')
         pass
 
     def on_error_pdu(self, pdu):
@@ -525,12 +537,14 @@ class BLE(WhadDeviceConnector):
         """
         Send CTRL PDU
         """
+        logger.info('send control PDU to connection (handle:%d)' % conn_handle)
         return self.send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address)
 
     def send_data_pdu(self, data, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6):
         """
         Send data (L2CAP) PDU.
         """
+        logger.info('send data PDU to connection (handle:%d)' % conn_handle)
         return self.send_pdu(data, conn_handle=conn_handle, direction=direction, access_address=access_address)
 
     def send_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6):
