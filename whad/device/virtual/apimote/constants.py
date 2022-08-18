@@ -1,7 +1,8 @@
 """
 This module provides some constants used by WHAD to communicate with the APIMote.
 """
-from enum import IntEnum
+from enum import IntEnum,Enum
+from whad.domain.common import RegisterMask
 
 class APIMoteId(IntEnum):
     APIMOTE_ID_VENDOR    = 0x0403
@@ -61,3 +62,16 @@ class APIMoteRegisters(IntEnum):
     RESERVED        = 0x30        # Reserved for future use control
     TXFIFO          = 0x3E        # Transmit FIFO Byte Register
     RXFIFO          = 0x3F        # Receiver FIFO Byte Register
+
+class APIMoteRegistersMasks:
+
+    class MDMCTRL0:
+        # tuple of mask, offset
+        PREAMBLE_LENGTH = RegisterMask(mask=0b1111, offset=0)
+        AUTO_ACK = RegisterMask(mask=0b1, offset=4)
+        AUTO_CRC = RegisterMask(mask=0b1, offset=5)
+        CCA_MODE = RegisterMask(mask=0b11, offset=6)
+        CCA_HYST = RegisterMask(mask=0b111, offset=8)
+        ADR_DECODE = RegisterMask(mask=0b1, offset=11)
+        PAN_COORDINATOR = RegisterMask(mask=0b1, offset=12)
+        RESERVED_FRAME_MODE = RegisterMask(mask=0b1, offset=13)
