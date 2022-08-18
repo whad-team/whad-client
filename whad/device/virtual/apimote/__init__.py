@@ -305,6 +305,7 @@ class APIMoteDevice(VirtualDevice):
 
     def _init_radio(self):
         self._setup_crystal_oscillator()
+        self._setup_rf_calibration()
         self._configure_mdmctrl0(
                                     auto_ack=False,
                                     auto_crc=False,
@@ -313,6 +314,9 @@ class APIMoteDevice(VirtualDevice):
                                     pan_coordinator=False,
                                     reserved_accepted=False
         )
+        self._configure_mdmctrl1(demodulator_thresold=20)
+        self._configure_iocfg0(filter_beacons=False)
+
     def _setup_crystal_oscillator(self):
         # Must be performed two times for some reason. See GOODFETCCSPI.py in Killerbee drivers.
         self._strobe_ccspi(APIMoteRegisters.SXOSCON)
@@ -333,5 +337,45 @@ class APIMoteDevice(VirtualDevice):
                 ((int(auto_ack) & masks.AUTO_ACK.mask) << masks.AUTO_ACK.offset) |
                 ((int(auto_crc) & masks.AUTO_CRC.mask) << masks.AUTO_CRC.offset) |
                 ((leading_zeroes-1 & masks.PREAMBLE_LENGTH.mask) << masks.PREAMBLE_LENGTH.offset)
+            )
+        )
+
+
+    def _configure_mdmctrl1(self, demodulator_thresold=20):
+        masks = APIMoteRegistersMasks.MDMCTRL1
+        return self._poke_ccspi(APIMoteRegisters.MDMCTRL1,
+            (
+                ((demodulator_thresold & masks.CORR_THR.mask) << masks.CORR_THR.offset) |
+                ((0 & masks.DEMOD_AVG_MODE.mask) << masks.DEMOD_AVG_MODE.offset) |
+                ((0 & masks.MODULATION_MODE.mask) << masks.MODULATION_MODE.offset) |
+                ((0 & masks.TX_MODE.mask) << masks.TX_MODE.offset) |
+                ((0 & masks.RX_MODE.mask) << masks.RX_MODE.offset)
+            )
+        )
+
+    def _configure_iocfg0(self, filter_beacons=False):
+        masks = APIMoteRegistersMasks.IOCFG0
+        return self._poke_ccspi(APIMoteRegisters.IOCFG0,
+            (
+                ((int(!filter_beacons) & masks.BCN_ACCEPT.mask) << masks.BCN_ACCEPT.offset) |
+                ((0 & masks.FIFO_POLARITY.mask) << masks.FIFO_POLARITY.offset) |
+                ((0 & masks.FIFOP_POLARITY.mask) << masks.FIFOP_POLARITY.offset) |
+                ((0 & masks.SFD_POLARITY.mask) << masks.SFD_POLARITY.offset) |
+                ((0 & masks.CCA_POLARITY.mask) << masks.CCA_POLARITY.offset) |
+                ((0x7F & masks.FIFOP_THR.mask) << masks.FIFOP_THR.offset)
+            )
+        )
+
+    def _configure_secctrl0(self, enable_cbcmac=False, M=4, rx_key_select=0, tx_key_select=1, sa_key_select=1):
+        masks = APIMoteRegistersMasks.SECCTRL0
+        return self._poke_ccspi(APIMoteRegisters.SECCTRL0,
+            (
+                ((0 & masks.RXFIFO_PROTECTION.mask) << masks.RXFIFO_PROTECTION.offset) |
+                ((1 & masks.SEC_CBC_HEAD.mask) << masks.SEC_CBC_HEAD.offset) |
+                ((sa_key_select & masks.SEC_SAKEYSEL.mask) << masks.SEC_SAKEYSEL.offset) |
+                ((tx_key_select & masks.SEC_TXKEYSEL.mask) << masks.SEC_TXKEYSEL.offset) |
+                ((rx_key_select & masks.SEC_RXKEYSEL.mask) << masks.SEC_RXKEYSEL.offset) |
+                ((int((M-2)//2) & masks.SEC_M.mask) << masks.SEC_M.offset) |
+                ((int(enable_cbcmac) & masks.SEC_MODE.mask) << masks.SEC_MODE.offset)
             )
         )

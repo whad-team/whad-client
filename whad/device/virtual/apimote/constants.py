@@ -66,7 +66,6 @@ class APIMoteRegisters(IntEnum):
 class APIMoteRegistersMasks:
 
     class MDMCTRL0:
-        # tuple of mask, offset
         PREAMBLE_LENGTH = RegisterMask(mask=0b1111, offset=0)
         AUTO_ACK = RegisterMask(mask=0b1, offset=4)
         AUTO_CRC = RegisterMask(mask=0b1, offset=5)
@@ -75,3 +74,27 @@ class APIMoteRegistersMasks:
         ADR_DECODE = RegisterMask(mask=0b1, offset=11)
         PAN_COORDINATOR = RegisterMask(mask=0b1, offset=12)
         RESERVED_FRAME_MODE = RegisterMask(mask=0b1, offset=13)
+
+    class MDMCTRL1:
+        RX_MODE = RegisterMask(mask=0b11, offset=0)
+        TX_MODE = RegisterMask(mask=0b11, offset=2)
+        MODULATION_MODE = RegisterMask(mask=0b1, offset=3)
+        DEMOD_AVG_MODE = RegisterMask(mask=0b1, offset=4)
+        CORR_THR = RegisterMask(mask=0b11111, offset=5)
+
+    class IOCFG0:
+        FIFOP_THR = RegisterMask(mask=0b1111111, offset=0)
+        CCA_POLARITY = RegisterMask(mask=0b1, offset=7)
+        SFD_POLARITY = RegisterMask(mask=0b1, offset=8)
+        FIFOP_POLARITY = RegisterMask(mask=0b1, offset=9)
+        FIFO_POLARITY = RegisterMask(mask=0b1, offset=10)
+        BCN_ACCEPT = RegisterMask(mask=0b1, offset=11)
+
+    class SECCTRL0:
+        SEC_MODE = RegisterMask(mask=0b11, offset=0)
+        SEC_M = RegisterMask(mask=0b111, offset=2)
+        SEC_RXKEYSEL = RegisterMask(mask=0b1, offset=5)
+        SEC_TXKEYSEL = RegisterMask(mask=0b1, offset=6)
+        SEC_SAKEYSEL = RegisterMask(mask=0b1, offset=7)
+        SEC_CBC_HEAD = RegisterMask(mask=0b1, offset=8)
+        RXFIFO_PROTECTION = RegisterMask(mask=0b1, offset=9)
