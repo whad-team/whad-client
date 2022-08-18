@@ -3,6 +3,7 @@ from whad.device.virtual.apimote.constants import APIMoteId, APIMoteRegisters, A
 from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
 from whad import WhadDomain, WhadCapability
+from whad.domain.zigbee.utils.phy import channel_to_frequency, frequency_to_channel
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.zigbee.zigbee_pb2 import Sniff, Send, Start, Stop
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
@@ -12,7 +13,8 @@ from whad.device.uart import get_port_info
 from whad.scapy.layers.apimote import GoodFET_Command_Hdr, GoodFET_Reply_Hdr, GoodFET_Init_Reply, \
     GoodFET_Peek_Command, GoodFET_Monitor_Connected_Command, GoodFET_Peek_Reply, \
     GoodFET_Setup_CCSPI_Command, GoodFET_Setup_CCSPI_Reply,GoodFET_Transfer_Command, \
-    GoodFET_Transfer_Reply, GoodFET_Poke_Reply, GoodFET_Poke_Command, CC_VERSIONS
+    GoodFET_Transfer_Reply, GoodFET_Poke_Reply, GoodFET_Poke_Command, GoodFET_Peek_RAM_Command, \
+    GoodFET_Poke_RAM_Command, GoodFET_Peek_RAM_Reply, GoodFET_Poke_RAM_Reply, CC_VERSIONS
 from struct import pack
 from scapy.compat import raw
 from time import sleep
@@ -274,6 +276,22 @@ class APIMoteDevice(VirtualDevice):
         )
         return reply.data
 
+    def _peek_ram(self, address, count=4):
+        reply = self._send_goodfet_cmd(
+                                        GoodFET_Peek_RAM_Command(address=address, count=count),
+                                        app="CCSPI",
+                                        reply_filter = lambda reply:GoodFET_Peek_RAM_Reply in reply
+        )
+        return reply.data
+
+    def _poke_ram(self, address, value):
+        data = bytes([address & 0xFF, (address & 0xFF00) >> 8]) + value
+        reply = self._send_goodfet_cmd(
+                                        GoodFET_Poke_RAM_Command(data=data),
+                                        app="CCSPI",
+                                        reply_filter = lambda reply:GoodFET_Poke_RAM_Reply in reply
+        )
+
     def _setup_ccspi(self):
         reply = self._send_goodfet_cmd(
                                         GoodFET_Setup_CCSPI_Command(),
@@ -321,6 +339,9 @@ class APIMoteDevice(VirtualDevice):
         print(self._set_frequency(2425))
         print(self._get_frequency())
 
+    def _get_rssi(self):
+        return self._peek_ccspi(APIMoteRegisters.RSSI)
+
     def _setup_crystal_oscillator(self):
         # Must be performed two times for some reason. See GOODFETCCSPI.py in Killerbee drivers.
         self._strobe_ccspi(APIMoteRegisters.SXOSCON)
@@ -343,6 +364,12 @@ class APIMoteDevice(VirtualDevice):
 
     def _set_syncword(self, syncword = 0xA70F):
         return self._poke_ccspi(APIMoteRegisters.SYNCWORD, syncword)
+
+    def _get_channel(self):
+        return frequency_to_channel(self._get_frequency())
+
+    def _set_channel(self, channel):
+        self._set_frequency(channel_to_frequency(channel))
 
     def _get_frequency(self):
         masks = APIMoteRegistersMasks.FSCTRL
