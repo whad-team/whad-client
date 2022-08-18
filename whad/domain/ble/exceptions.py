@@ -33,6 +33,13 @@ class InvalidAccessAddressException(Exception):
 # Hook Exceptions
 #######################
 
+class HookDontForward(Exception):
+    """Raise this exception in a hook to avoid forwarding.
+    """
+
+    def __init__(self):
+        super().__init__()
+
 class HookReturnValue(Exception):
     """Raise this exception in a hook to return a specific value to the
     caller.

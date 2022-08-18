@@ -103,7 +103,6 @@ class AdvDataFieldList(object):
         output = b''
         for field in self.__fields:
             field_record = field.to_bytes()
-            print(field, field_record)
             if len(output) + len(field_record) <= 31:
                 output += field_record
             else:

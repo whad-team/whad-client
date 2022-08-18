@@ -4,7 +4,7 @@ from scapy.layers.bluetooth import L2CAP_Hdr
 from whad.domain.ble.connector import BLE, Central, Peripheral, BleDirection
 from whad.domain.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvCompleteLocalName
 from whad.domain.ble.profile import GenericProfile
-from whad.domain.ble.exceptions import HookReturnValue
+from whad.domain.ble.exceptions import HookReturnValue, HookDontForward
 from whad.domain.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.exceptions import WhadDeviceNotFound
 from ....protocol.device_pb2 import Hook
@@ -67,7 +67,6 @@ class LowLevelPeripheral(Peripheral):
                 self.send_pdu(_pdu, self.__conn_handle)
 
     def on_disconnected(self, connection_data):
-        print('[!] client device disconnected')
         self.__connected = False
         self.__conn_handle = None
 
@@ -319,13 +318,47 @@ class ImportedDevice(GenericProfile):
             if notification:
                 # Forward callback
                 def notif_cb(charac, value, indication=False):
-                    characteristic.value = value
+                    try:
+                        # Forward to proxy
+                        self.__proxy.on_notification(
+                            service,
+                            characteristic,
+                            value
+                        )
+
+                        # Update characteristic value
+                        characteristic.value = value
+
+                    except HookReturnValue as value_override:
+                        # Override value if required
+                        characteristic.value = value_override.value
+
+                    except HookDontForward as block:
+                        # Don't forward notification
+                        pass
 
                 c.subscribe(callback=notif_cb, notification=True)
             elif indication:
                 # Forward callback
                 def indicate_cb(charac, value, indication=True):
-                    characteristic.value = value
+                    try:
+                        # Forward to proxy hook.
+                        self.__proxy.on_notification(
+                            service,
+                            characteristic,
+                            value
+                        )
+
+                        # Update characteristic value
+                        characteristic.value = value
+
+                    except HookReturnValue as value_override:
+                        # Override value if required
+                        characteristic.value = value_override.value
+
+                    except HookDontForward as block:
+                        # Don't forward notification
+                        pass
 
                 c.subscribe(callback=indicate_cb, indication=True)
 
@@ -340,7 +373,7 @@ class ImportedDevice(GenericProfile):
             print(' !!! GATT server timed out')
 
     def on_characteristic_unsubscribed(self, service, characteristic):
-        """Not supported yet
+        """Characteristic unsubscription hook.
         """
         try:
             c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
@@ -353,9 +386,6 @@ class ImportedDevice(GenericProfile):
             )
         except GattTimeoutException as gatt_error:
             print(' !!! GATT server timedout')
-
-
-
 
 class GattProxy(object):
     """GATT Proxy
@@ -427,6 +457,15 @@ class GattProxy(object):
         """
         print(' ** Unsubscribed to characteristic %s from service %s' % (characteristic.uuid, service.uuid))
 
+    def on_notification(self, service, characteristic, value):
+        """This callback is called whenever a notification is received.
+        """
+        print(' == notification for characteristic %s from service %s: %s' %  (characteristic.uuid, service.uuid, value))
+
+    def on_indication(self, service, characteristic, value):
+        """This callback is called whenever a notification is received.
+        """
+        print(' == indication for characteristic %s from service %s: %s' %  (characteristic.uuid, service.uuid, value))
 
     def start(self):
         """Start our GATT Proxy

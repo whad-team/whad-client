@@ -715,20 +715,52 @@ class GattServer(Gatt):
 
         :param Characteristic characteristic: Characteristic to notify the GATT client about.
         """
-        self.att.handle_value_notification(
-            characteristic.value_handle,
-            characteristic.value[:self.att.local_mtu-3]
-        )
+        try:
+            # Call model callback
+            service = self.__model.find_service_by_characteristic_handle(characteristic.handle)
+            self.__model.on_notification(
+                service,
+                characteristic,
+                characteristic.value[:self.att.local_mtu-3]
+            )
+
+            # Send notification
+            self.att.handle_value_notification(
+                characteristic.value_handle,
+                characteristic.value[:self.att.local_mtu-3]
+            )
+        except HookReturnValue as value_override:
+            # Return overriden value
+            self.att.handle_value_notification(
+                characteristic.value_handle,
+                value_override.value[:self.att.local_mtu-3]
+            )
 
     def indicate(self, characteristic):
         """Sends an indication to a GATT client for a given characteristic.
 
         :param Characteristic characteristic: Characteristic to notify the GATT client about.
         """
-        self.att.handle_value_indication(
-            characteristic.value_handle,
-            characteristic.value[:self.att.local_mtu-3]
-        )
+        try:
+            # Call model callback
+            service = self.__model.find_service_by_characteristic_handle(characteristic.handle)
+            self.__model.on_indication(
+                service,
+                characteristic,
+                characteristic.value[:self.att.local_mtu-3]
+            )
+
+            # Send notification
+            self.att.handle_value_indication(
+                characteristic.value_handle,
+                characteristic.value[:self.att.local_mtu-3]
+            )
+        except HookReturnValue as value_override:
+            # Return overriden value
+            self.att.handle_value_indication(
+                characteristic.value_handle,
+                value_override.value[:self.att.local_mtu-3]
+            )
 
     def on_find_info_request(self, request):
         """Find information request
