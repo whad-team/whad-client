@@ -1,13 +1,32 @@
 """
 This module provides some constants used by WHAD to communicate with the APIMote.
 """
-from enum import IntEnum
+from enum import IntEnum,Enum
+from whad.domain.common import RegisterMask
 
 class APIMoteId(IntEnum):
     APIMOTE_ID_VENDOR    = 0x0403
     APIMOTE_ID_PRODUCT   = 0x6015
 
 class APIMoteRegisters(IntEnum):
+    # Status registers: initiate the change of an internal state or mode
+    SNOP            = 0x00        # No operation
+    SXOSCON         = 0x01        # Crystal oscillator
+    STXCAL          = 0x02        # Enable/calibrate frequency Synthesizer
+    SRXON           = 0x03        # Enable RX
+    STXON           = 0x04        # Enable TX
+    STXONCCA        = 0x05        # Enable TX if CCA indicates a clear channel
+    SRFOFF          = 0x06        # Disable RX/TX and frequency synthetiser
+    SRXOSCOFF       = 0x07        # Turn off RF and crystal oscillator
+    SFLUSHRX        = 0x08        # Flush RX fifo and reset demodulator
+    SFLUSHTX        = 0x09        # Flush TX fifo
+    SACK            = 0x0A        # Send Acknowledgment, with pending field cleared
+    SACKPEND        = 0x0B        # Send Acknowledgment, with pending field set
+    SRXDEC          = 0x0C        # Start RX fifo decryption / authentication
+    STXENC          = 0x0D        # Start TX fifo encryption / authentication
+    SAES            = 0x0E        # AES encryption strobe
+
+    # Configuration registers
     MAIN            = 0x10        # Main Control Register
     MDMCTRL0        = 0x11        # Modem Control Register 0
     MDMCTRL1        = 0x12        # Modem Control Register 1
@@ -43,3 +62,47 @@ class APIMoteRegisters(IntEnum):
     RESERVED        = 0x30        # Reserved for future use control
     TXFIFO          = 0x3E        # Transmit FIFO Byte Register
     RXFIFO          = 0x3F        # Receiver FIFO Byte Register
+
+class APIMoteRegistersMasks:
+
+    class MDMCTRL0:
+        PREAMBLE_LENGTH = RegisterMask(mask=0b1111, offset=0)
+        AUTO_ACK = RegisterMask(mask=0b1, offset=4)
+        AUTO_CRC = RegisterMask(mask=0b1, offset=5)
+        CCA_MODE = RegisterMask(mask=0b11, offset=6)
+        CCA_HYST = RegisterMask(mask=0b111, offset=8)
+        ADR_DECODE = RegisterMask(mask=0b1, offset=11)
+        PAN_COORDINATOR = RegisterMask(mask=0b1, offset=12)
+        RESERVED_FRAME_MODE = RegisterMask(mask=0b1, offset=13)
+
+    class MDMCTRL1:
+        RX_MODE = RegisterMask(mask=0b11, offset=0)
+        TX_MODE = RegisterMask(mask=0b11, offset=2)
+        MODULATION_MODE = RegisterMask(mask=0b1, offset=3)
+        DEMOD_AVG_MODE = RegisterMask(mask=0b1, offset=4)
+        CORR_THR = RegisterMask(mask=0b11111, offset=5)
+
+    class IOCFG0:
+        FIFOP_THR = RegisterMask(mask=0b1111111, offset=0)
+        CCA_POLARITY = RegisterMask(mask=0b1, offset=7)
+        SFD_POLARITY = RegisterMask(mask=0b1, offset=8)
+        FIFOP_POLARITY = RegisterMask(mask=0b1, offset=9)
+        FIFO_POLARITY = RegisterMask(mask=0b1, offset=10)
+        BCN_ACCEPT = RegisterMask(mask=0b1, offset=11)
+
+    class SECCTRL0:
+        SEC_MODE = RegisterMask(mask=0b11, offset=0)
+        SEC_M = RegisterMask(mask=0b111, offset=2)
+        SEC_RXKEYSEL = RegisterMask(mask=0b1, offset=5)
+        SEC_TXKEYSEL = RegisterMask(mask=0b1, offset=6)
+        SEC_SAKEYSEL = RegisterMask(mask=0b1, offset=7)
+        SEC_CBC_HEAD = RegisterMask(mask=0b1, offset=8)
+        RXFIFO_PROTECTION = RegisterMask(mask=0b1, offset=9)
+
+    class FSCTRL:
+        FREQ = RegisterMask(mask=0b1111111111, offset=0)
+        LOCK_STATUS = RegisterMask(mask=0b1, offset=10)
+        LOCK_LENGTH = RegisterMask(mask=0b1, offset=11)
+        CAL_RUNNING = RegisterMask(mask=0b1, offset=12)
+        CAL_DONE = RegisterMask(mask=0b1, offset=13)
+        LOCK_THR = RegisterMask(mask=0b11, offset=14)

@@ -1,5 +1,5 @@
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.device.virtual.apimote.constants import APIMoteId, APIMoteRegisters
+from whad.device.virtual.apimote.constants import APIMoteId, APIMoteRegisters, APIMoteRegistersMasks
 from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
 from whad import WhadDomain, WhadCapability
@@ -65,7 +65,7 @@ class APIMoteDevice(VirtualDevice):
         port_info = get_port_info(self.__port)
         if port_info is None:
             raise WhadDeviceNotFound()
-            
+
         self._dev_id = self._generate_dev_id(port_info)
         self._fw_author = self._get_author()
         self._fw_url = self._get_firmware_url()
@@ -142,7 +142,7 @@ class APIMoteDevice(VirtualDevice):
         if self._peek_ccspi(APIMoteRegisters.MANFIDL) != 0x233D:
             raise WhadDeviceNotReady()
 
-        print(self._peek_ccspi(APIMoteRegisters.MANFIDH))
+        self._init_radio()
 
     def read(self):
 
@@ -235,7 +235,7 @@ class APIMoteDevice(VirtualDevice):
         self._send_goodfet_cmd(GoodFET_Monitor_Connected_Command())
 
 
-    def _strobe_ccspi(self, register=0x00):
+    def _strobe_ccspi(self, register):
         data = bytes([register])
         status = self._transfer_ccspi(data)
         return status[0]
@@ -248,8 +248,9 @@ class APIMoteDevice(VirtualDevice):
             (value & 0xFF)]
         )
         reply = self._send_goodfet_cmd(
-                                        GoodFET_Poke_Command(address=address),
-                                        app="CCSPI"
+                                        GoodFET_Poke_Command(data=data),
+                                        app="CCSPI",
+                                        reply_filter=lambda reply:GoodFET_Poke_Reply in reply
         )
         return self._peek_ccspi(register) == value
 
@@ -281,6 +282,7 @@ class APIMoteDevice(VirtualDevice):
         )
         return reply
 
+
     def _monitor_peek(self, address, size=8):
         if size == 8:
             reply = self._send_goodfet_cmd(
@@ -300,3 +302,116 @@ class APIMoteDevice(VirtualDevice):
             return reply_low.data[0] + (reply_high.data[0] << 8)
         else:
             return None
+
+    def _init_radio(self):
+        self._setup_crystal_oscillator()
+        self._setup_rf_calibration()
+        self._configure_mdmctrl0(
+                                    auto_ack=False,
+                                    auto_crc=False,
+                                    leading_zeroes=3,
+                                    hardware_access_decoding=False,
+                                    pan_coordinator=False,
+                                    reserved_accepted=False
+        )
+        self._configure_mdmctrl1(demodulator_thresold=20)
+        self._configure_iocfg0(filter_beacons=False)
+
+        print(self._get_frequency())
+        print(self._set_frequency(2425))
+        print(self._get_frequency())
+
+    def _setup_crystal_oscillator(self):
+        # Must be performed two times for some reason. See GOODFETCCSPI.py in Killerbee drivers.
+        self._strobe_ccspi(APIMoteRegisters.SXOSCON)
+        self._strobe_ccspi(APIMoteRegisters.SXOSCON)
+
+    def _setup_rf_calibration(self):
+        self._strobe_ccspi(APIMoteRegisters.STXCAL)
+
+    def _switch_rf_to_idle(self):
+        self._strobe_ccspi(APIMoteRegisters.SRFOFF)
+
+    def _switch_rf_to_rx(self):
+        self._strobe_ccspi(APIMoteRegisters.SRXON)
+
+    def _switch_rf_to_tx(self):
+        self._strobe_ccspi(APIMoteRegisters.STXON)
+
+    def _get_syncword(self):
+        return self._peek_ccspi(APIMoteRegisters.SYNCWORD)
+
+    def _set_syncword(self, syncword = 0xA70F):
+        return self._poke_ccspi(APIMoteRegisters.SYNCWORD, syncword)
+
+    def _get_frequency(self):
+        masks = APIMoteRegistersMasks.FSCTRL
+        fsctrl_value = self._peek_ccspi(APIMoteRegisters.FSCTRL)
+        frequency_offset = (fsctrl_value & masks.FREQ.mask) >> masks.FREQ.offset
+        return 2048+frequency_offset
+
+    def _set_frequency(self, frequency):
+        masks = APIMoteRegistersMasks.FSCTRL
+        fsctrl_value = self._peek_ccspi(APIMoteRegisters.FSCTRL)
+        self._poke_ccspi( APIMoteRegisters.FSCTRL,
+                            (fsctrl_value & ~(masks.FREQ.mask << masks.FREQ.offset)) |
+                            ((int(frequency - 2048) & masks.FREQ.mask) << masks.FREQ.offset)
+        )
+        self._setup_rf_calibration()
+        sleep(0.01)
+        self._switch_rf_to_rx()
+
+    def _configure_mdmctrl0(self, auto_ack=False, auto_crc=False, leading_zeroes=4, hardware_access_decoding=False, pan_coordinator=False, reserved_accepted=False):
+        masks = APIMoteRegistersMasks.MDMCTRL0
+        return self._poke_ccspi(APIMoteRegisters.MDMCTRL0,
+            (
+                ((int(reserved_accepted) & masks.RESERVED_FRAME_MODE.mask) << masks.RESERVED_FRAME_MODE.offset) |
+                ((int(pan_coordinator) & masks.PAN_COORDINATOR.mask) << masks.PAN_COORDINATOR.offset) |
+                ((int(hardware_access_decoding) & masks.ADR_DECODE.mask) << masks.ADR_DECODE.offset) |
+                ((2 & masks.CCA_MODE.mask) << masks.CCA_HYST.offset) |
+                ((3 & masks.CCA_MODE.mask) << masks.CCA_MODE.offset) |
+                ((int(auto_ack) & masks.AUTO_ACK.mask) << masks.AUTO_ACK.offset) |
+                ((int(auto_crc) & masks.AUTO_CRC.mask) << masks.AUTO_CRC.offset) |
+                ((leading_zeroes-1 & masks.PREAMBLE_LENGTH.mask) << masks.PREAMBLE_LENGTH.offset)
+            )
+        )
+
+
+    def _configure_mdmctrl1(self, demodulator_thresold=20):
+        masks = APIMoteRegistersMasks.MDMCTRL1
+        return self._poke_ccspi(APIMoteRegisters.MDMCTRL1,
+            (
+                ((demodulator_thresold & masks.CORR_THR.mask) << masks.CORR_THR.offset) |
+                ((0 & masks.DEMOD_AVG_MODE.mask) << masks.DEMOD_AVG_MODE.offset) |
+                ((0 & masks.MODULATION_MODE.mask) << masks.MODULATION_MODE.offset) |
+                ((0 & masks.TX_MODE.mask) << masks.TX_MODE.offset) |
+                ((0 & masks.RX_MODE.mask) << masks.RX_MODE.offset)
+            )
+        )
+
+    def _configure_iocfg0(self, filter_beacons=False):
+        masks = APIMoteRegistersMasks.IOCFG0
+        return self._poke_ccspi(APIMoteRegisters.IOCFG0,
+            (
+                ((int(not filter_beacons) & masks.BCN_ACCEPT.mask) << masks.BCN_ACCEPT.offset) |
+                ((0 & masks.FIFO_POLARITY.mask) << masks.FIFO_POLARITY.offset) |
+                ((0 & masks.FIFOP_POLARITY.mask) << masks.FIFOP_POLARITY.offset) |
+                ((0 & masks.SFD_POLARITY.mask) << masks.SFD_POLARITY.offset) |
+                ((0 & masks.CCA_POLARITY.mask) << masks.CCA_POLARITY.offset) |
+                ((0x7F & masks.FIFOP_THR.mask) << masks.FIFOP_THR.offset)
+            )
+        )
+
+    def _configure_secctrl0(self, enable_cbcmac=False, M=4, rx_key_select=0, tx_key_select=1, sa_key_select=1):
+        masks = APIMoteRegistersMasks.SECCTRL0
+        return self._poke_ccspi(APIMoteRegisters.SECCTRL0,
+            (
+                ((0 & masks.RXFIFO_PROTECTION.mask) << masks.RXFIFO_PROTECTION.offset) |
+                ((1 & masks.SEC_CBC_HEAD.mask) << masks.SEC_CBC_HEAD.offset) |
+                ((sa_key_select & masks.SEC_SAKEYSEL.mask) << masks.SEC_SAKEYSEL.offset) |
+                ((tx_key_select & masks.SEC_TXKEYSEL.mask) << masks.SEC_TXKEYSEL.offset) |
+                ((rx_key_select & masks.SEC_RXKEYSEL.mask) << masks.SEC_RXKEYSEL.offset) |
+                ((int((M-2)//2) & masks.SEC_M.mask) << masks.SEC_M.offset) |
+                ((int(enable_cbcmac) & masks.SEC_MODE.mask) << masks.SEC_MODE.offset)
+            )
+        )
