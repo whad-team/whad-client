@@ -98,3 +98,11 @@ class APIMoteRegistersMasks:
         SEC_SAKEYSEL = RegisterMask(mask=0b1, offset=7)
         SEC_CBC_HEAD = RegisterMask(mask=0b1, offset=8)
         RXFIFO_PROTECTION = RegisterMask(mask=0b1, offset=9)
+
+    class FSCTRL:
+        FREQ = RegisterMask(mask=0b1111111111, offset=0)
+        LOCK_STATUS = RegisterMask(mask=0b1, offset=10)
+        LOCK_LENGTH = RegisterMask(mask=0b1, offset=11)
+        CAL_RUNNING = RegisterMask(mask=0b1, offset=12)
+        CAL_DONE = RegisterMask(mask=0b1, offset=13)
+        LOCK_THR = RegisterMask(mask=0b11, offset=14)

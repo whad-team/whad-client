@@ -317,13 +317,49 @@ class APIMoteDevice(VirtualDevice):
         self._configure_mdmctrl1(demodulator_thresold=20)
         self._configure_iocfg0(filter_beacons=False)
 
+        print(self._get_frequency())
+        print(self._set_frequency(2425))
+        print(self._get_frequency())
+
     def _setup_crystal_oscillator(self):
         # Must be performed two times for some reason. See GOODFETCCSPI.py in Killerbee drivers.
         self._strobe_ccspi(APIMoteRegisters.SXOSCON)
         self._strobe_ccspi(APIMoteRegisters.SXOSCON)
 
     def _setup_rf_calibration(self):
-        self._strobe_ccspi(APIMoteRegisters.SCAL)
+        self._strobe_ccspi(APIMoteRegisters.STXCAL)
+
+    def _switch_rf_to_idle(self):
+        self._strobe_ccspi(APIMoteRegisters.SRFOFF)
+
+    def _switch_rf_to_rx(self):
+        self._strobe_ccspi(APIMoteRegisters.SRXON)
+
+    def _switch_rf_to_tx(self):
+        self._strobe_ccspi(APIMoteRegisters.STXON)
+
+    def _get_syncword(self):
+        return self._peek_ccspi(APIMoteRegisters.SYNCWORD)
+
+    def _set_syncword(self, syncword = 0xA70F):
+        return self._poke_ccspi(APIMoteRegisters.SYNCWORD, syncword)
+
+    def _get_frequency(self):
+        masks = APIMoteRegistersMasks.FSCTRL
+        fsctrl_value = self._peek_ccspi(APIMoteRegisters.FSCTRL)
+        frequency_offset = (fsctrl_value & masks.FREQ.mask) >> masks.FREQ.offset
+        return 2048+frequency_offset
+
+    def _set_frequency(self, frequency):
+        masks = APIMoteRegistersMasks.FSCTRL
+        fsctrl_value = self._peek_ccspi(APIMoteRegisters.FSCTRL)
+        self._poke_ccspi( APIMoteRegisters.FSCTRL,
+                            (fsctrl_value & ~(masks.FREQ.mask << masks.FREQ.offset)) |
+                            ((int(frequency - 2048) & masks.FREQ.mask) << masks.FREQ.offset)
+        )
+        self._setup_rf_calibration()
+        sleep(0.01)
+        self._switch_rf_to_rx()
 
     def _configure_mdmctrl0(self, auto_ack=False, auto_crc=False, leading_zeroes=4, hardware_access_decoding=False, pan_coordinator=False, reserved_accepted=False):
         masks = APIMoteRegistersMasks.MDMCTRL0
@@ -357,7 +393,7 @@ class APIMoteDevice(VirtualDevice):
         masks = APIMoteRegistersMasks.IOCFG0
         return self._poke_ccspi(APIMoteRegisters.IOCFG0,
             (
-                ((int(!filter_beacons) & masks.BCN_ACCEPT.mask) << masks.BCN_ACCEPT.offset) |
+                ((int(not filter_beacons) & masks.BCN_ACCEPT.mask) << masks.BCN_ACCEPT.offset) |
                 ((0 & masks.FIFO_POLARITY.mask) << masks.FIFO_POLARITY.offset) |
                 ((0 & masks.FIFOP_POLARITY.mask) << masks.FIFOP_POLARITY.offset) |
                 ((0 & masks.SFD_POLARITY.mask) << masks.SFD_POLARITY.offset) |
