@@ -11,6 +11,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Central(BLE):
+    """This connector provides a BLE Central role.
+
+    To initiate a connection to a device, just call `connect` with the target
+    BD address and it should return an instance of `PeripheralDevice` in return.
+
+    """
 
     def __init__(self, device, existing_connection = None):
         super().__init__(device)
@@ -32,6 +38,10 @@ class Central(BLE):
 
     def connect(self, bd_address, timeout=30):
         """Connect to a target device
+
+        :param string bd_address: Bluetooth device address (in format 'xx:xx:xx:xx:xx:xx')
+        :param int timeout: Connection timeout
+        :returns: An instance of `PeripheralDevice` on success, `None` on failure.
         """
         if self.can_connect():
             self.connect_to(bd_address)
@@ -56,12 +66,20 @@ class Central(BLE):
     ##############################
 
     def is_connected(self):
+        """Determine if the central device is connected to a peripheral.
+
+        :returns: `True` if central is connected to a peripheral device, `False` otherwise.
+        """
         return self.__connected
 
     def on_connected(self, connection_data):
+        """Callback method to handle connection event.
+        """
         self.__stack.on_connection(connection_data)
 
     def on_disconnected(self, disconnection_data):
+        """Callback method to handle disconnection event.
+        """
         self.__stack.on_disconnection(
             disconnection_data.conn_handle,
             disconnection_data.reason
@@ -74,17 +92,27 @@ class Central(BLE):
             self.__peripheral.on_disconnect(disconnection_data.conn_handle)
 
     def on_ctl_pdu(self, pdu):
-        """This method is called whenever a control PDU is received.
+        """This callback method is called whenever a control PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
 
         Central devices act as master, so we only forward slave to master
         messages to the stack.
+        
+        :param pdu: BLE Control PDU
         """
         logger.info('received control PDU')
         if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
             self.__stack.on_ctl_pdu(pdu.metadata.connection_handle, pdu)
 
     def on_data_pdu(self, pdu):
+        """This callback methid is called whenever a data PDU is received.
+        This PDU is then forwarded to the BLE stack to handle it.
+
+        Central devices act as master, so we only forward slave to master
+        messages to the stack.
+        
+        :param pdu: BLE Control PDU
+        """
         logger.info('received data PDU')
         """This method is called whenever a data PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
@@ -94,7 +122,7 @@ class Central(BLE):
 
 
     def on_new_connection(self, connection):
-        """On new connection, discover primary services
+        """On new connection, discover primary services.
         """
         logger.info('new connection established')
 
@@ -111,6 +139,9 @@ class Central(BLE):
         self.__peripheral.on_connect(self.connection.conn_handle)
 
     def export_profile(self):
-        """Export remote device profile
+        """Export GATT profile of the existing connection.
+
+        :rtype: string
+        :returns: Profile as a JSON string
         """
         return self.connection.gatt.model.export_json()

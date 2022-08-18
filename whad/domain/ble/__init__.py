@@ -15,4 +15,25 @@ from whad.domain.ble.profile.device import PeripheralDevice
 from whad.domain.ble.profile import GenericProfile
 from whad.domain.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvDataField, AdvCompleteLocalName, \
     AdvManufacturerSpecificData, AdvShortenedLocalName, AdvTxPowerLevel, AdvDataFieldListOverflow
-from whad.domain.ble.connector import BLE, Central, Peripheral, Sniffer, Hijacker, Injector
+from whad.domain.ble.connector import BLE, Central, Peripheral, Sniffer, Hijacker, Injector, Scanner
+
+__all__ = [
+    'GattClient',
+    'GattServer',
+    'BDAddress',
+    'GenericProfile',
+    'AdvDataFieldList',
+    'AdvFlagsField',
+    'AdvDataField',
+    'AdvCompleteLocalName',
+    'AdvManufacturerSpecificData',
+    'AdvShortenedLocalName',
+    'AdvTxPowerLevel',
+    'AdvDataFieldListOverflow',
+    'Central',
+    'Peripheral',
+    'Sniffer',
+    'Hijacker',
+    'Injector',
+    'Scanner'
+]

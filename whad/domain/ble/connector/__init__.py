@@ -588,3 +588,4 @@ from whad.domain.ble.connector.central import Central
 from whad.domain.ble.connector.injector import Injector
 from whad.domain.ble.connector.hijacker import Hijacker
 from whad.domain.ble.connector.sniffer import Sniffer
+from whad.domain.ble.connector.scanner import Scanner

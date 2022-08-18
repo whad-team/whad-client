@@ -11,8 +11,20 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Peripheral(BLE):
+    """This BLE connector provides a way to create a peripheral device.
+
+    A peripheral device exposes some services and characteristics that may
+    be accessed by a central device. These services and characteristics are
+    defined by a specific profile.    
+    """
 
     def __init__(self, device, existing_connection = None, profile=None, adv_data=None):
+        """Create a peripheral device.
+
+        :param WhadDevice device: WHAD device to use as a peripheral
+        :param GattProfile profile: Device profile to use
+        :param AdvDataFieldList adv_data: Advertisement data
+        """
         super().__init__(device)
 
         # Initialize stack
@@ -42,6 +54,16 @@ class Peripheral(BLE):
 
     
     def send_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6):
+        """Send a PDU to the central device this peripheral device is connected to.
+
+        Sending direction is set to ̀ BleDirection.SLAVE_TO_MASTER` as we need to send PDUs to a central device.
+
+        :param bytes pdu: PDU to send
+        :param int conn_handle: Connection handle
+        :param int direction: Sending direction (to master or slave)
+        :param access_address: Target access address
+        :type access_address: int, optional
+        """
         super().send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address)
     
 

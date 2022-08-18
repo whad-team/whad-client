@@ -1,0 +1,2 @@
+WHAD communication protocol
+===========================
