@@ -1,4 +1,4 @@
-from whad.domain.common.metadata import Metadata
+from whad.common.metadata import Metadata
 from dataclasses import dataclass
 
 @dataclass
