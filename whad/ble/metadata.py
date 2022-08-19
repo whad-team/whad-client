@@ -1,5 +1,5 @@
 from whad.protocol.ble.ble_pb2 import BleDirection
-from whad.domain.common.metadata import Metadata
+from whad.common.metadata import Metadata
 from dataclasses import dataclass
 
 @dataclass

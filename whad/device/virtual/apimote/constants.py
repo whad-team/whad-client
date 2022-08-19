@@ -2,7 +2,7 @@
 This module provides some constants used by WHAD to communicate with the APIMote.
 """
 from enum import IntEnum,Enum
-from whad.domain.common import RegisterMask
+from whad.common import RegisterMask
 
 class APIMoteId(IntEnum):
     APIMOTE_ID_VENDOR    = 0x0403
