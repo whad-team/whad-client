@@ -14,7 +14,7 @@ from whad.ble.bdaddr import BDAddress
 from whad.ble.profile.device import PeripheralDevice
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvDataField, AdvCompleteLocalName, \
-    AdvManufacturerSpecificData, AdvShortenedLocalName, AdvTxPowerLevel, AdvDataFieldListOverflow
+    AdvManufacturerSpecificData, AdvShortenedLocalName, AdvTxPowerLevel, AdvDataFieldListOverflow, AdvDataError
 from whad.ble.connector import BLE, Central, Peripheral, Sniffer, Hijacker, Injector, Scanner
 
 __all__ = [
@@ -30,6 +30,7 @@ __all__ = [
     'AdvShortenedLocalName',
     'AdvTxPowerLevel',
     'AdvDataFieldListOverflow',
+    'AdvDataError',
     'Central',
     'Peripheral',
     'Sniffer',
