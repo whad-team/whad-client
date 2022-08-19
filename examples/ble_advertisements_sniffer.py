@@ -11,12 +11,17 @@ if __name__ == '__main__':
 
         # Connect to target device and performs discovery
         try:
+            def show_packet(pkt):
+                pkt.show()
+
             dev = WhadDevice.create(interface)
             sniffer = Sniffer(dev)
             sniffer.configure(advertisements=True, connection=False)
+
+            sniffer.attach_callback(show_packet)
             sniffer.start()
-            for i in sniffer.sniff():
-                print(i.metadata, repr(i))
+            while True:
+                sleep(0.1)
 
 
 

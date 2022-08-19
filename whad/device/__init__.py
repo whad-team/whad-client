@@ -140,7 +140,6 @@ class WhadDeviceInfo(object):
         """
         return self.__domains.keys()
 
-
 class WhadDeviceConnector(object):
     """
     Device connector.
@@ -160,6 +159,49 @@ class WhadDeviceConnector(object):
         self.set_device(device)
         if self.__device is not None:
             self.__device.set_connector(self)
+
+        # Packet callbacks
+        self.__reception_callbacks = {}
+        self.__transmission_callbacks = {}
+
+
+    def attach_callback(self, callback, on_reception=True, on_transmission=True, filter=lambda pkt:True):
+        callbacks_dicts = (
+            [self.__reception_callbacks] if on_reception else [] +
+            [self.__transmission_callbacks] if on_transmission else []
+        )
+        for callback_dict in callbacks_dicts:
+            callback_dict[callback] = filter
+
+    def detach_callback(self, callback, on_reception=True, on_transmission=True):
+        removed = False
+        callbacks_dicts = (
+            [self.__reception_callbacks] if on_reception else [] +
+            [self.__transmission_callbacks] if on_transmission else []
+        )
+        for callback_dict in callbacks_dicts:
+            if callback in callback_dict:
+                del callback_dict[callback]
+                removed = True
+        return removed
+
+    def reset_callbacks(self, reception = True, transmission = True):
+        callbacks_dicts = (
+            [self.__reception_callbacks] if reception else [] +
+            [self.__transmission_callbacks] if transmission else []
+        )
+        self.__reception_callbacks = {}
+        self.transmission_callbacks = {}
+
+    def _signal_packet_transmission(self, packet):
+        for callback,packet_filter in self.__transmission_callbacks.items():
+            if packet_filter(packet):
+                callback(packet)
+
+    def _signal_packet_reception(self, packet):
+        for callback,packet_filter in self.__reception_callbacks.items():
+            if packet_filter(packet):
+                callback(packet)
 
 
     def set_device(self, device=None):

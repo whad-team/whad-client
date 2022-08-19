@@ -50,9 +50,6 @@ class BLE(WhadDeviceConnector):
         self.__can_send = None
         self.__can_send_raw = None
 
-        # User packets callbacks
-        self.__user_callbacks = {}
-
         # Open device and make sure it is compatible
         self.device.open()
         self.device.discover()
@@ -65,20 +62,6 @@ class BLE(WhadDeviceConnector):
 
     def close(self):
         self.device.close()
-
-    def attach_user_callbacks(self, callback, filter=lambda pkt:True):
-        self.__user_callbacks[callback] = filter
-
-    def detach_user_callbacks(self, callback):
-        if callback in self.__user_callbacks:
-            del self.__user_callbacks[callback]
-            return True
-        return False
-
-    def _run_user_callbacks(self, packet):
-        for callback,packet_filter in self.__user_callbacks.items():
-            if packet_filter(packet):
-                callback(packet)
 
     def _build_scapy_packet_from_message(self, message, msg_type):
         try:
@@ -503,7 +486,7 @@ class BLE(WhadDeviceConnector):
     def on_adv_pdu(self, packet):
         logger.info('received an advertisement PDU')
         if not self.support_raw_pdu():
-            self._run_user_callbacks(packet)
+            self._signal_packet_reception(packet)
 
     def on_connected(self, connection_data):
         logger.info('a connection has been established')
@@ -516,7 +499,7 @@ class BLE(WhadDeviceConnector):
 
     def on_raw_pdu(self, packet):
         if self.support_raw_pdu():
-            self._run_user_callbacks(packet)
+            self._signal_packet_reception(packet)
         if BTLE_ADV in packet:
             adv_pdu = packet[BTLE_ADV:]
             adv_pdu.metadata = packet.metadata
@@ -529,7 +512,7 @@ class BLE(WhadDeviceConnector):
 
     def on_pdu(self, packet):
         if not self.support_raw_pdu():
-            self._run_user_callbacks(packet)
+            self._signal_packet_reception(packet)
 
         if packet.LLID == 3:
             self.on_ctl_pdu(packet)
@@ -575,7 +558,7 @@ class BLE(WhadDeviceConnector):
             packet.metadata = BLEMetadata()
             packet.metadata.direction = direction
             packet.metadata.connection_handle = conn_handle
-
+            self._signal_packet_transmission(packet)
             msg = self._build_message_from_scapy_packet(packet)
 
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
