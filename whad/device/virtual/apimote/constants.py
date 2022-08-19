@@ -2,11 +2,24 @@
 This module provides some constants used by WHAD to communicate with the APIMote.
 """
 from enum import IntEnum,Enum
-from whad.common import RegisterMask
+from dataclasses import dataclass
+
+
+@dataclass
+class RegisterMask:
+    mask : int = 0
+    offset : int = 0
 
 class APIMoteId(IntEnum):
     APIMOTE_ID_VENDOR    = 0x0403
     APIMOTE_ID_PRODUCT   = 0x6015
+
+# APIMote internal states
+class APIMoteInternalStates(IntEnum):
+    NONE                    = 0
+    SNIFFING                = 1
+    TRANSMITTING            = 2
+
 
 class APIMoteRegisters(IntEnum):
     # Status registers: initiate the change of an internal state or mode
@@ -78,9 +91,9 @@ class APIMoteRegistersMasks:
     class MDMCTRL1:
         RX_MODE = RegisterMask(mask=0b11, offset=0)
         TX_MODE = RegisterMask(mask=0b11, offset=2)
-        MODULATION_MODE = RegisterMask(mask=0b1, offset=3)
-        DEMOD_AVG_MODE = RegisterMask(mask=0b1, offset=4)
-        CORR_THR = RegisterMask(mask=0b11111, offset=5)
+        MODULATION_MODE = RegisterMask(mask=0b1, offset=4)
+        DEMOD_AVG_MODE = RegisterMask(mask=0b1, offset=5)
+        CORR_THR = RegisterMask(mask=0b11111, offset=6)
 
     class IOCFG0:
         FIFOP_THR = RegisterMask(mask=0b1111111, offset=0)

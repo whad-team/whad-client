@@ -64,6 +64,7 @@ class RZUSBStickDevice(VirtualDevice):
         self.__opened = False
         self.__opened_stream = False
         self.__channel = 11
+        self.__future_channel = 11
         self.__internal_state = RZUSBStickInternalStates.NONE
         self.__index, self.__rzusbstick = device
         super().__init__()
@@ -157,22 +158,21 @@ class RZUSBStickDevice(VirtualDevice):
 
     def _on_whad_zigbee_sniff(self, message):
         channel = message.channel
-
-        if self._set_channel(channel):
-            self.__internal_state = RZUSBStickInternalStates.SNIFFING
-            self._send_whad_command_result(ResultCode.SUCCESS)
-        else:
-            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+        self.__future_channel = channel
+        self.__internal_state = RZUSBStickInternalStates.SNIFFING
+        self._send_whad_command_result(ResultCode.SUCCESS)
 
     def _on_whad_zigbee_start(self, message):
         self.__input_buffer = b""
         self.__input_buffer_length = 0
         self.__input_header = b""
         if self._start():
+            if self.__future_channel != self.__channel:
+                self._set_channel(self.__future_channel)
             self._send_whad_command_result(ResultCode.SUCCESS)
         else:
             self._send_whad_command_result(ResultCode.ERROR)
-
+            
     # RZUSBStick low level communication primitives
 
     def __rzusbstick_read_packet(self, timeout=200):

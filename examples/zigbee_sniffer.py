@@ -16,7 +16,7 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             sniffer = Sniffer(dev)
-            sniffer.channel = 11
+            sniffer.channel = 14
             sniffer.start()
             for i in sniffer.sniff():
                 print(i.metadata, repr(i))
