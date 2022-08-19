@@ -19,6 +19,9 @@ class BDAddress(object):
         else:
             raise InvalidBDAddressException
 
+    def __eq__(self, other):
+        return self.__value == other.value
+
     def __str__(self):
         return ':'.join(['%02x' % b for b in self.__value[::-1]])
 
@@ -28,3 +31,18 @@ class BDAddress(object):
     @property
     def value(self):
         return self.__value
+
+    @staticmethod
+    def from_bytes(bd_addr_bytes):
+        """Convert a 6-byte array into a valid BD address.
+
+        :param bytes bd_addr_bytes: Bluetooth Device address as a bytearray.
+        :rtype: BDAddress
+        :returns: An instance of BDAddress representing the corresponding BD address.
+        """
+        if len(bd_addr_bytes) == 6:
+            hex_address = hexlify(bd_addr_bytes[::-1])
+            address = b':'.join([hex_address[i*2:(i+1)*2] for i in range(int(len(hex_address)/2))])
+            return BDAddress(address.decode('utf-8'))
+        else:
+            raise InvalidBDAddressException
