@@ -10,13 +10,13 @@ Getting started
 Scan available devices
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Use the :class:`whad.domain.ble.connector.scanner.Scanner` class to instanciate
+Use the :class:`whad.ble.connector.scanner.Scanner` class to instanciate
 a BLE device scanner and detect all the available devices.
 
 .. code-block:: python
 
     from whad import UartDevice
-    from whad.domain.ble import Scanner
+    from whad.ble import Scanner
 
     scanner = Scanner(UartDevice('/dev/ttyUSB0'))
     scanner.start()
@@ -27,13 +27,13 @@ a BLE device scanner and detect all the available devices.
 Initiate a connection to a BLE device
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Use the :class:`whad.domain.ble.connector.central.Central` class to create a
+Use the :class:`whad.ble.connector.central.Central` class to create a
 BLE central device and initiate a connection to a BLE peripheral device.
 
 .. code-block:: python
 
     from whad import UartDevice
-    from whad.domain.ble import Central
+    from whad.ble import Central
 
     # Create a central device
     central = Central(UartDevice('/dev/ttyUSB0'))
@@ -41,7 +41,7 @@ BLE central device and initiate a connection to a BLE peripheral device.
     # Connect to our target device
     target = central.connect('0C:B8:15:C4:88:8E')
 
-The `connect()` method returns a :class:`whad.domain.ble.profile.device.PeripheralDevice` object
+The `connect()` method returns a :class:`whad.ble.profile.device.PeripheralDevice` object
 that represents the remote device.
 
 Enumerate services and characteristics
@@ -58,7 +58,7 @@ and display them.
     # Display target profile
     print(target)
 
-The :class:`whad.domain.ble.profile.device.PeripheralDevice` also provides some methods
+The :class:`whad.ble.profile.device.PeripheralDevice` also provides some methods
 to iterate over services and characteristics:
 
 .. code-block:: python
@@ -95,7 +95,7 @@ Subscribe for notification/indication
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Sometimes it is needed to subscribe to notifications or indications for a given
-characteristic. This is done through the `subscribe()` method of :class:`whad.domain.ble.profile.device.PeripheralDevice`, as shown below:
+characteristic. This is done through the `subscribe()` method of :class:`whad.ble.profile.device.PeripheralDevice`, as shown below:
 
 .. code-block:: python
 
@@ -115,7 +115,7 @@ characteristic. This is done through the `subscribe()` method of :class:`whad.do
 Close connection
 ~~~~~~~~~~~~~~~~
 
-To close an existing connection, simply call the `disconnect()` method of the class:`whad.domain.ble.profile.device.PeripheralDevice` class:
+To close an existing connection, simply call the `disconnect()` method of the class:`whad.ble.profile.device.PeripheralDevice` class:
 
 .. code-block:: python
 
@@ -131,9 +131,9 @@ the device services and characteristics:
 .. code-block:: python
 
     from whad import UartDevice
-    from whad.domain.ble import Peripheral
-    from whad.domain.ble.profile import GattProfile
-    from whad.domain.ble.profile.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
+    from whad.ble import Peripheral
+    from whad.ble.profile import GattProfile
+    from whad.ble.profile.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
 
     class MyPeripheral(GenericProfile):
 
@@ -155,7 +155,7 @@ the device services and characteristics:
             ),
         )
 
-Once this profile defined, instanciate a :class:`whad.domain.ble.connector.Peripheral` object
+Once this profile defined, instanciate a :class:`whad.ble.connector.Peripheral` object
 using this profile:
 
 .. code-block:: python
@@ -178,7 +178,7 @@ using this profile:
     periph.start()
 
 It is also possible to trigger specific actions when a characteristic is read or written,
-through the dedicated callbacks provided by :class:`whad.domain.ble.profile.GenericProfile`
+through the dedicated callbacks provided by :class:`whad.ble.profile.GenericProfile`
 
 Use a link-layer proxy
 ~~~~~~~~~~~~~~~~~~~~~~

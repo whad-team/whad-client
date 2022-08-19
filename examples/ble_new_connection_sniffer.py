@@ -1,4 +1,4 @@
-from whad.domain.ble import Sniffer
+from whad.ble import Sniffer
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from time import time,sleep

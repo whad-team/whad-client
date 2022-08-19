@@ -1,4 +1,4 @@
-from whad.domain.zigbee import Sniffer
+from whad.zigbee import Sniffer
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from time import time,sleep

@@ -8,9 +8,9 @@ TODO: Parse AD records and handle display ...
 import sys
 from argparse import ArgumentParser
 from whad.device import WhadDevice
-from whad.domain.ble.profile.advdata import AdvCompleteLocalName, AdvDataError, AdvDataFieldListOverflow, AdvIncServiceUuid128List, AdvShortenedLocalName
+from whad.ble.profile.advdata import AdvCompleteLocalName, AdvDataError, AdvDataFieldListOverflow, AdvIncServiceUuid128List, AdvShortenedLocalName
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
-from whad.domain.ble import BLE, Scanner, Sniffer, BDAddress, AdvDataFieldList
+from whad.ble import BLE, Scanner, Sniffer, BDAddress, AdvDataFieldList
 
 from scapy.layers.bluetooth4LE import BTLE_ADV_IND, BTLE_ADV_NONCONN_IND, \
     BTLE_ADV_DIRECT_IND, BTLE_SCAN_RSP

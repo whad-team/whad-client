@@ -1,7 +1,7 @@
-from whad.domain.ble import Peripheral
-from whad.domain.ble.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
-from whad.domain.ble.attribute import UUID
-from whad.domain.ble.profile import PrimaryService, Characteristic, GenericProfile
+from whad.ble import Peripheral
+from whad.ble.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
+from whad.ble.attribute import UUID
+from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
 from whad.device.uart import UartDevice
 from time import sleep
 

@@ -3,7 +3,7 @@ from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad import WhadDomain, WhadCapability
-from whad.domain.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, FieldsSize, is_access_address_valid
+from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, FieldsSize, is_access_address_valid
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.ble.ble_pb2 import SniffAdv,SniffConnReq, SniffAccessAddress, Start, Stop
 from whad.device.virtual.ubertooth.constants import UbertoothId, \

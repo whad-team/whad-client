@@ -50,14 +50,14 @@ WHAD provides different connectors for different protocols such as (non-exhausti
 
 A connector is some kind of wrapper that will drive a specific device in order to
 perform one or more specific actions. As an example, we are going to connect to
-a BLE device using a dedicated connector, :class:`whad.domain.ble.connector.central.Central`.
+a BLE device using a dedicated connector, :class:`whad.ble.connector.central.Central`.
 
 First, we need to create a :class:`UartDevice` object and pass it to our connector:
 
 .. code-block:: python
 
     from whad import UartDevice
-    from whad.domain.ble import Central
+    from whad.ble import Central
 
     central = Central(UartDevice('/dev/ttyUSB0'))
 
@@ -104,7 +104,7 @@ terminate the connection:
 .. code-block:: python
 
     from whad import UartDevice
-    from whad.domain.ble import Central
+    from whad.ble import Central
 
     # Create a central device
     central = Central(UartDevice('/dev/ttyUSB0'))
@@ -144,7 +144,7 @@ forward everything to the already connected device.
 .. code-block:: python
 
     from whad import UartDevice
-    from whad.domain.ble.tools import GattProxy
+    from whad.ble.tools import GattProxy
 
     class MyProxy(GattProxy):
 

@@ -1,8 +1,8 @@
-from whad.domain.ble import Sniffer, Hijacker, Peripheral
+from whad.ble import Sniffer, Hijacker, Peripheral
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from time import time,sleep
-from whad.domain.ble.attribute import UUID
+from whad.ble.attribute import UUID
 from scapy.all import BTLE_DATA, L2CAP_Hdr, ATT_Hdr, ATT_Read_Response
 import sys
 

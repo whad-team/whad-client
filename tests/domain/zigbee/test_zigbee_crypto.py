@@ -1,4 +1,4 @@
-from whad.domain.zigbee.crypto import NetworkLayerCryptoManager
+from whad.zigbee.crypto import NetworkLayerCryptoManager
 from scapy.compat import raw
 import pytest
 

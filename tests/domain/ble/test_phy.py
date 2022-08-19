@@ -1,4 +1,4 @@
-from whad.domain.ble.utils.phy import channel_to_frequency,frequency_to_channel,crc
+from whad.ble.utils.phy import channel_to_frequency,frequency_to_channel,crc
 import pytest
 
 @pytest.mark.parametrize("test_input, expected", [

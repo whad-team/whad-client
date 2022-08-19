@@ -2,7 +2,7 @@ from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteEnumField, ByteField, LEIntField, LEShortField, \
     LEX3BytesField, ShortField, SignedByteField, XByteField, XLEIntField
 from scapy.layers.bluetooth4LE import BTLE
-from whad.domain.ble.utils.phy import FieldsSize
+from whad.ble.utils.phy import FieldsSize
 from struct import unpack
 # Ubertooth Packet Types
 UBERTOOTH_PACKET_TYPES = [
