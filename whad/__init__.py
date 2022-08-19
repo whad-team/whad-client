@@ -32,3 +32,14 @@ class WhadCapability(object):
     EndDeviceRole = Capability.EndDeviceRole
     RouterRole = Capability.RouterRole
     CoordinatorRole = Capability.CoordinatorRole
+
+# Import device related classes
+from whad.device import UartDevice, VirtualDevice
+from whad.exceptions import RequiredImplementation, UnsupportedDomain, \
+    UnsupportedCapability, WhadDeviceNotReady, WhadDeviceNotFound, \
+    WhadDeviceAccessDenied
+
+__all__ = [
+    'UartDevice',
+    'VirtualDevice',
+]

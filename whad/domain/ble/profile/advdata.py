@@ -153,7 +153,12 @@ class AdvShortenedLocalName(AdvDataField):
     """
 
     def __init__(self, local_name):
+        self.__name = local_name
         super().__init__(0x08, local_name)
+
+    @property
+    def name(self):
+        return self.__name
 
     @staticmethod
     def from_bytes(ad_record):
@@ -164,7 +169,12 @@ class AdvCompleteLocalName(AdvDataField):
     """
 
     def __init__(self, local_name):
+        self.__name = local_name
         super().__init__(0x09, local_name)
+
+    @property
+    def name(self):
+        return self.__name
 
     @staticmethod
     def from_bytes(ad_record):
@@ -179,7 +189,10 @@ class AdvTxPowerLevel(AdvDataField):
 
     @staticmethod
     def from_bytes(ad_record):
-        return AdvTxPowerLevel(ad_record[0])
+        if len(ad_record) >= 1:
+            return AdvTxPowerLevel(ad_record[0])
+        else:
+            raise AdvDataError
 
 
 class AdvManufacturerSpecificData(AdvDataField):

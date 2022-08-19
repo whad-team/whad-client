@@ -265,6 +265,7 @@ class WhadDeviceInputThread(Thread):
         """
         while not self.__canceled:
             self.__device.read()
+        logger.info('Device IO thread canceled and stopped.')
 
 class WhadDeviceMessageThread(Thread):
 
@@ -286,12 +287,15 @@ class WhadDeviceMessageThread(Thread):
         """
         while not self.__canceled:
             self.__device.process_messages()
+        logger.info('Device message thread canceled and stopped.')
 
 class WhadDeviceIOThread(object):
 
     def __init__(self, device):
         self.__input = WhadDeviceInputThread(device)
+        self.__input.daemon = True
         self.__processing = WhadDeviceMessageThread(device)
+        self.__processing.daemon = True
 
     def cancel(self):
         self.__input.cancel()
@@ -305,8 +309,9 @@ class WhadDeviceIOThread(object):
 
     def join(self):
         logger.info('waiting for WhadDevice IO management thread to finish ...')
-        self.__input.join()
-        self.__processing.join()
+        while self.__input.is_alive() or self.__processing.is_alive():
+            self.__input.join(1.0)
+            self.__processing.join(1.0)
         logger.info('WhadDevice IO management thread finished.')
 
 
@@ -732,11 +737,11 @@ class WhadDevice(object):
             logger.info('message does not match filter or no filter set, save in default message queue')
             self.__messages.put(message, block=True)
 
-    def process_messages(self):
+    def process_messages(self, timeout=1.0):
         """Process pending messages
         """
         try:
-            message = self.__messages.get(block=True, timeout=None)
+            message = self.__messages.get(block=True, timeout=timeout)
             if message is not None:
                 self.dispatch_message(message)
         except Empty:

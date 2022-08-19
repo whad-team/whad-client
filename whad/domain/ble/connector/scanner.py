@@ -36,11 +36,17 @@ class Scanner(BLE):
             message = self.wait_for_message(filter=message_filter('ble', 'adv_pdu'))
             # Convert message from rebuilt PDU
             if message.ble.adv_pdu.adv_type in scapy_corr_adv:
-                yield (
-                    message.ble.adv_pdu.rssi,
-                    scapy_corr_adv[message.ble.adv_pdu.adv_type](
-                        bytes(message.ble.adv_pdu.bd_address) + bytes(message.ble.adv_pdu.adv_data)
+                if message.ble.adv_pdu.adv_type == BleAdvType.ADV_SCAN_RSP:
+                    yield (
+                        message.ble.adv_pdu.rssi,
+                        scapy_corr_adv[message.ble.adv_pdu.adv_type](
+                            bytes(message.ble.adv_pdu.bd_address) + bytes(message.ble.adv_pdu.scanrsp_data)
+                        )
                     )
-                )
-            else:
-                print('nope')
+                else:
+                    yield (
+                        message.ble.adv_pdu.rssi,
+                        scapy_corr_adv[message.ble.adv_pdu.adv_type](
+                            bytes(message.ble.adv_pdu.bd_address) + bytes(message.ble.adv_pdu.scanrsp_data)
+                        )
+                    )
