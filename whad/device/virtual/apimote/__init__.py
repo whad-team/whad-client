@@ -1,5 +1,6 @@
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.device.virtual.apimote.constants import APIMoteId, APIMoteRegisters, APIMoteRegistersMasks
+from whad.device.virtual.apimote.constants import APIMoteId, APIMoteRegisters, APIMoteRegistersMasks, \
+    APIMoteInternalStates
 from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
 from whad import WhadDomain, WhadCapability
@@ -14,12 +15,16 @@ from whad.scapy.layers.apimote import GoodFET_Command_Hdr, GoodFET_Reply_Hdr, Go
     GoodFET_Peek_Command, GoodFET_Monitor_Connected_Command, GoodFET_Peek_Reply, \
     GoodFET_Setup_CCSPI_Command, GoodFET_Setup_CCSPI_Reply,GoodFET_Transfer_Command, \
     GoodFET_Transfer_Reply, GoodFET_Poke_Reply, GoodFET_Poke_Command, GoodFET_Peek_RAM_Command, \
-    GoodFET_Poke_RAM_Command, GoodFET_Peek_RAM_Reply, GoodFET_Poke_RAM_Reply, CC_VERSIONS
+    GoodFET_Poke_RAM_Command, GoodFET_Peek_RAM_Reply, GoodFET_Poke_RAM_Reply, \
+    GoodFET_Read_RF_Packet_Command, GoodFET_Read_RF_Packet_Reply, CC_VERSIONS
 from struct import pack
+from scapy.layers.dot15d4 import Dot15d4FCS
 from scapy.compat import raw
+from threading import Thread
 from time import sleep
 import select
 import os
+
 
 class APIMoteDevice(VirtualDevice):
 
@@ -63,7 +68,9 @@ class APIMoteDevice(VirtualDevice):
         self.__opened = False
         self.__synced = False
         self.__last_reply = None
+        self.__packet_polling = False
 
+        self.__polling_thread = Thread(target=self._polling)
         port_info = get_port_info(self.__port)
         if port_info is None:
             raise WhadDeviceNotFound()
@@ -139,10 +146,10 @@ class APIMoteDevice(VirtualDevice):
 
         while not self.__synced:
             sleep(0.1)
-
+        self.__polling_thread.start()
         self._setup_ccspi()
-        if self._peek_ccspi(APIMoteRegisters.MANFIDL) != 0x233D:
-            raise WhadDeviceNotReady()
+        while self._peek_ccspi(APIMoteRegisters.MANFIDL) != 0x233D:
+            sleep(0.1)
 
         self._init_radio()
 
@@ -201,12 +208,78 @@ class APIMoteDevice(VirtualDevice):
         super().close()
 
         # Close underlying device.
+        self.__opened = False
+        self.__polling_thread.join()
         self.__uart.close()
         self.__uart = None
         self.__fileno = None
-        self.__opened = False
 
+    def _on_packet_received(self, packet):
+        print(packet.hex())
+        packet = Dot15d4FCS(packet)
+        packet.show()
+        print(Dot15d4FCS().compute_fcs(raw(packet)[:-2]).hex(), Dot15d4FCS().compute_fcs(raw(packet)[:-2]) == pack("<H",packet.fcs))
+
+    def _polling(self):
+        while self.__opened:
+            if self.__packet_polling:
+                if self._packet_queue is None:
+                    packet = self._get_rx_packet()
+                    if packet is not None:
+                        print(packet)
+                        packet_size = packet[0]
+                        # size of packet + 1-byte long length field
+                        if packet_size + 1 < len(packet):
+                            packet, self._packet_queue = packet[1:packet_size+1], packet[packet_size+2:]
+                            self._on_packet_received(packet)
+                        else:
+                            self._on_packet_received(packet[1:])
+                else:
+                    packet = self._packet_queue
+                    self._packet_queue = None
+                    self._on_packet_received(packet)
+
+    # Virtual device whad message callbacks
+    def _on_whad_zigbee_stop(self, message):
+        if self._switch_rf_to_idle():
+            self.__internal_state = APIMoteInternalStates.SNIFFING
+            self.__packet_polling = False
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.ERROR)
+
+    """
+    def _on_whad_zigbee_send_raw(self, message):
+        channel = message.channel
+
+        if self._set_channel(channel):
+            packet = message.pdu + pack("H",message.fcs)
+            success = self._send_packet(packet)
+        else:
+            success = False
+        self._send_whad_command_result(ResultCode.SUCCESS if success else ResultCode.ERROR)
+    """
+
+    def _on_whad_zigbee_sniff(self, message):
+        channel = message.channel
+        if self._set_channel(channel):
+            self.__internal_state = APIMoteInternalStates.SNIFFING
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+    def _on_whad_zigbee_start(self, message):
+        if self.__internal_state == APIMoteInternalStates.SNIFFING:
+            if self._switch_rf_to_rx():
+                self._packet_queue = None
+                self.__packet_polling = True
+                self._send_whad_command_result(ResultCode.SUCCESS)
+            else:
+                self._send_whad_command_result(ResultCode.ERROR)
+
+    # APIMote / GoodFET low level primitives
     def _send_goodfet_cmd(self, cmd, app="MONITOR", reply_filter=None):
+        #print("> cmd", repr(GoodFET_Command_Hdr(app=app)/cmd))
         self.write(raw(GoodFET_Command_Hdr(app=app)/cmd))
         if reply_filter is not None and callable(reply_filter):
             while self.__last_reply is None or not reply_filter(self.__last_reply):
@@ -216,7 +289,7 @@ class APIMoteDevice(VirtualDevice):
             return matched_reply
 
     def _process_goodfet_reply(self, reply):
-        print("reply", repr(reply))
+        #print("< reply", repr(reply))
 
         if GoodFET_Init_Reply in reply and reply.url == b"http://goodfet.sf.net/":
             self.__synced = True
@@ -225,7 +298,8 @@ class APIMoteDevice(VirtualDevice):
             self.__last_reply = reply
 
     def _process_input_data(self, data):
-        print(data)
+        #print(data)
+
         self.__input_data += data
         if len(self.__input_data) >= 4:
             reply_length = (self.__input_data[2] | self.__input_data[3] << 8) + 4
@@ -292,15 +366,6 @@ class APIMoteDevice(VirtualDevice):
                                         reply_filter = lambda reply:GoodFET_Poke_RAM_Reply in reply
         )
 
-    def _setup_ccspi(self):
-        reply = self._send_goodfet_cmd(
-                                        GoodFET_Setup_CCSPI_Command(),
-                                        app="CCSPI",
-                                        reply_filter = lambda reply:GoodFET_Setup_CCSPI_Reply in reply
-        )
-        return reply
-
-
     def _monitor_peek(self, address, size=8):
         if size == 8:
             reply = self._send_goodfet_cmd(
@@ -321,63 +386,130 @@ class APIMoteDevice(VirtualDevice):
         else:
             return None
 
+
+    def _setup_ccspi(self):
+        reply = self._send_goodfet_cmd(
+                                        GoodFET_Setup_CCSPI_Command(),
+                                        app="CCSPI",
+                                        reply_filter = lambda reply:GoodFET_Setup_CCSPI_Reply in reply
+        )
+        return reply
+
+    # APIMote RF-related primitives
     def _init_radio(self):
+        """
+        Configure the radio as promiscuous and switch to idle.
+        """
         self._setup_crystal_oscillator()
         self._setup_rf_calibration()
         self._configure_mdmctrl0(
                                     auto_ack=False,
                                     auto_crc=False,
-                                    leading_zeroes=3,
+                                    leading_zeroes=4,
                                     hardware_access_decoding=False,
                                     pan_coordinator=False,
                                     reserved_accepted=False
         )
         self._configure_mdmctrl1(demodulator_thresold=20)
         self._configure_iocfg0(filter_beacons=False)
+        self._configure_secctrl0(
+                                    enable_cbcmac=False,
+                                    M=4,
+                                    rx_key_select=0,
+                                    tx_key_select=1,
+                                    sa_key_select=1
+        )
+        #self._switch_rf_to_idle()
 
-        print(self._get_frequency())
-        print(self._set_frequency(2425))
-        print(self._get_frequency())
+
+    def _get_rx_packet(self):
+        """
+        Return RX packet (if any is available).
+        """
+        reply = self._send_goodfet_cmd(
+                                GoodFET_Read_RF_Packet_Command(),
+                                app = "CCSPI",
+                                reply_filter=lambda reply:True
+        )
+        if GoodFET_Read_RF_Packet_Reply in reply and reply.size > 0:
+            return reply.data
+        return None
 
     def _get_rssi(self):
+        """
+        Return last RSSI.
+        """
         return self._peek_ccspi(APIMoteRegisters.RSSI)
 
     def _setup_crystal_oscillator(self):
+        """
+        Configure the crystal oscillator.
+        """
         # Must be performed two times for some reason. See GOODFETCCSPI.py in Killerbee drivers.
         self._strobe_ccspi(APIMoteRegisters.SXOSCON)
-        self._strobe_ccspi(APIMoteRegisters.SXOSCON)
+        return self._strobe_ccspi(APIMoteRegisters.SXOSCON)
 
     def _setup_rf_calibration(self):
-        self._strobe_ccspi(APIMoteRegisters.STXCAL)
+        """
+        Setup the RF calibration.
+        """
+        return self._strobe_ccspi(APIMoteRegisters.STXCAL)
 
     def _switch_rf_to_idle(self):
-        self._strobe_ccspi(APIMoteRegisters.SRFOFF)
+        """
+        Switch radio to idle mode.
+        """
+        return self._strobe_ccspi(APIMoteRegisters.SRFOFF)
 
     def _switch_rf_to_rx(self):
-        self._strobe_ccspi(APIMoteRegisters.SRXON)
+        """
+        Switch radio to reception mode (RX).
+        """
+        return self._strobe_ccspi(APIMoteRegisters.SRXON)
 
     def _switch_rf_to_tx(self):
-        self._strobe_ccspi(APIMoteRegisters.STXON)
+        """
+        Switch radio to transmission mode (TX).
+        """
+        return self._strobe_ccspi(APIMoteRegisters.STXON)
 
     def _get_syncword(self):
+        """
+        Return syncword in use (default is 802.15.4 SFD).
+        """
         return self._peek_ccspi(APIMoteRegisters.SYNCWORD)
 
     def _set_syncword(self, syncword = 0xA70F):
+        """
+        Configure syncword to use.
+        """
         return self._poke_ccspi(APIMoteRegisters.SYNCWORD, syncword)
 
     def _get_channel(self):
+        """
+        Return channel currently in use.
+        """
         return frequency_to_channel(self._get_frequency())
 
     def _set_channel(self, channel):
+        """
+        Configure channel to use.
+        """
         self._set_frequency(channel_to_frequency(channel))
 
     def _get_frequency(self):
+        """
+        Return frequency in use.
+        """
         masks = APIMoteRegistersMasks.FSCTRL
         fsctrl_value = self._peek_ccspi(APIMoteRegisters.FSCTRL)
         frequency_offset = (fsctrl_value & masks.FREQ.mask) >> masks.FREQ.offset
         return 2048+frequency_offset
 
     def _set_frequency(self, frequency):
+        """
+        Configure frequency to use.
+        """
         masks = APIMoteRegistersMasks.FSCTRL
         fsctrl_value = self._peek_ccspi(APIMoteRegisters.FSCTRL)
         self._poke_ccspi( APIMoteRegisters.FSCTRL,
@@ -389,6 +521,9 @@ class APIMoteDevice(VirtualDevice):
         self._switch_rf_to_rx()
 
     def _configure_mdmctrl0(self, auto_ack=False, auto_crc=False, leading_zeroes=4, hardware_access_decoding=False, pan_coordinator=False, reserved_accepted=False):
+        """
+        Configure MDMCTRL0 register (manages various RF related features and hardware processing).
+        """
         masks = APIMoteRegistersMasks.MDMCTRL0
         return self._poke_ccspi(APIMoteRegisters.MDMCTRL0,
             (
@@ -405,6 +540,9 @@ class APIMoteDevice(VirtualDevice):
 
 
     def _configure_mdmctrl1(self, demodulator_thresold=20):
+        """
+        Configure MDMCTRL1 register (manages various RF-related features).
+        """
         masks = APIMoteRegistersMasks.MDMCTRL1
         return self._poke_ccspi(APIMoteRegisters.MDMCTRL1,
             (
@@ -417,6 +555,9 @@ class APIMoteDevice(VirtualDevice):
         )
 
     def _configure_iocfg0(self, filter_beacons=False):
+        """
+        Configure IOCFG0 register (manages polarity, beacon filtering and FIFO).
+        """
         masks = APIMoteRegistersMasks.IOCFG0
         return self._poke_ccspi(APIMoteRegisters.IOCFG0,
             (
@@ -430,6 +571,9 @@ class APIMoteDevice(VirtualDevice):
         )
 
     def _configure_secctrl0(self, enable_cbcmac=False, M=4, rx_key_select=0, tx_key_select=1, sa_key_select=1):
+        """
+        Configure SECCTRL0 register (manages security-related features implemented in hardware).
+        """
         masks = APIMoteRegistersMasks.SECCTRL0
         return self._poke_ccspi(APIMoteRegisters.SECCTRL0,
             (
