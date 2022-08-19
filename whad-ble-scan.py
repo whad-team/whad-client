@@ -234,7 +234,7 @@ if __name__ == '__main__':
 
     except WhadDeviceNotFound as dev_error:
         # Device not found, display error and return -1
-        print('[!] WHAD device not found (are you sure ̀ %s` is a valid device identifier ?)' % (
+        print('[!] WHAD device not found (are you sure `%s` is a valid device identifier ?)' % (
             args.device
         ))
         sys.exit(-1)
