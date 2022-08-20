@@ -12,6 +12,7 @@ GOODFET_OPCODES = {
     0x02 : "peek",
     0x03 : "poke",
     0x80 : "read_rf_packet",
+    0x81 : "send_rf_packet",
     0x84 : "peek_ram",
     0x85 : "poke_ram",
     0x10 : "setup_ccspi",
@@ -71,6 +72,13 @@ class GoodFET_Peek_RAM_Command(Packet):
 
 class GoodFET_Poke_RAM_Command(Packet):
     name = "GoodFET Poke RAM Command"
+    fields_desc = [
+        FieldLenField("size", None, length_of="data", fmt="<H"),
+        StrLenField("data", None, length_from=lambda x:x.size)
+    ]
+
+class GoodFET_Send_RF_Packet_Command(Packet):
+    name = "GoodFET Send RF Packet Command"
     fields_desc = [
         FieldLenField("size", None, length_of="data", fmt="<H"),
         StrLenField("data", None, length_from=lambda x:x.size)
@@ -151,6 +159,12 @@ class GoodFET_Read_RF_Packet_Reply(Packet):
         StrLenField("data", None, length_from=lambda x:x.size)
     ]
 
+class GoodFET_Send_RF_Packet_Reply(Packet):
+    name = "GoodFET Send RF Packet Reply"
+    fields_desc = [
+        FieldLenField("size", None, length_of="data", fmt="<H"),
+        StrLenField("data", None, length_from=lambda x:x.size)
+    ]
 
 class GoodFET_Debug_String_Reply(Packet):
     name = "GoodFET Debug String Reply"
@@ -165,6 +179,7 @@ bind_layers(GoodFET_Command_Hdr, GoodFET_Setup_CCSPI_Command, verb = 0x10)
 bind_layers(GoodFET_Command_Hdr, GoodFET_Transfer_Command, verb = 0x00)
 bind_layers(GoodFET_Command_Hdr, GoodFET_Poke_Command, verb = 0x03)
 bind_layers(GoodFET_Command_Hdr, GoodFET_Read_RF_Packet_Command, verb = 0x80)
+bind_layers(GoodFET_Command_Hdr, GoodFET_Send_RF_Packet_Command, verb = 0x81)
 bind_layers(GoodFET_Command_Hdr, GoodFET_Peek_RAM_Command, verb = 0x84)
 bind_layers(GoodFET_Command_Hdr, GoodFET_Poke_RAM_Command, verb = 0x85)
 
@@ -175,5 +190,6 @@ bind_layers(GoodFET_Reply_Hdr, GoodFET_Debug_String_Reply, verb = 0xFF)
 bind_layers(GoodFET_Reply_Hdr, GoodFET_Setup_CCSPI_Reply, verb = 0x10)
 bind_layers(GoodFET_Reply_Hdr, GoodFET_Transfer_Reply, verb = 0x00)
 bind_layers(GoodFET_Reply_Hdr, GoodFET_Read_RF_Packet_Reply, verb = 0x80)
+bind_layers(GoodFET_Reply_Hdr, GoodFET_Send_RF_Packet_Reply, verb = 0x81)
 bind_layers(GoodFET_Reply_Hdr, GoodFET_Peek_RAM_Reply, verb = 0x84)
 bind_layers(GoodFET_Reply_Hdr, GoodFET_Peek_RAM_Reply, verb = 0x85)

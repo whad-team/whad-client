@@ -33,9 +33,6 @@ class Zigbee(WhadDeviceConnector):
         self.__can_send = None
         self.__can_send_raw = None
 
-        # User packets callbacks
-        self.__user_callbacks = {}
-
         # Open device and make sure it is compatible
         self.device.open()
         self.device.discover()
@@ -46,20 +43,6 @@ class Zigbee(WhadDeviceConnector):
         else:
             self.__ready = True
             conf.dot15d4_protocol = 'zigbee'
-
-    def attach_user_callbacks(self, callback, filter=lambda pkt:True):
-        self.__user_callbacks[callback] = filter
-
-    def detach_user_callbacks(self, callback):
-        if callback in self.__user_callbacks:
-            del self.__user_callbacks[callback]
-            return True
-        return False
-
-    def _run_user_callbacks(self, packet):
-        for callback,packet_filter in self.__user_callbacks.items():
-            if packet_filter(packet):
-                callback(packet)
 
 
     def _build_scapy_packet_from_message(self, message, msg_type):
@@ -151,6 +134,7 @@ class Zigbee(WhadDeviceConnector):
                 pdu = Dot15d4(raw(pdu)[:-2])
             else:
                 packet = pdu
+            self._signal_packet_transmission(packet)
             msg = self._build_message_from_scapy_packet(packet, channel)
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
@@ -203,14 +187,16 @@ class Zigbee(WhadDeviceConnector):
 
 
     def on_raw_pdu(self, packet):
+
         if self.support_raw_pdu():
-            self._run_user_callbacks(packet)
+            self._signal_packet_reception(packet)
 
         self.on_pdu(Dot15d4(raw(packet)[:-2]))
 
     def on_pdu(self, packet):
+
         if not self.support_raw_pdu():
-            self._run_user_callbacks(packet)
+            self._signal_packet_reception(packet)
 
 
 class Sniffer(Zigbee):

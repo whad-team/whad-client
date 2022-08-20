@@ -140,7 +140,6 @@ class WhadDeviceInfo(object):
         """
         return self.__domains.keys()
 
-
 class WhadDeviceConnector(object):
     """
     Device connector.
@@ -160,6 +159,87 @@ class WhadDeviceConnector(object):
         self.set_device(device)
         if self.__device is not None:
             self.__device.set_connector(self)
+
+        # Packet callbacks
+        self.__reception_callbacks = {}
+        self.__transmission_callbacks = {}
+
+
+    def attach_callback(self, callback, on_reception=True, on_transmission=True, filter=lambda pkt:True):
+        """
+        Attach a new packet callback to current connector.
+
+        :param callback: Processing function.
+        :param on_reception: Boolean indicating if the callback monitors reception.
+        :param on_transmission: Boolean indicating if the callback monitors transmission.
+        :param filter: Lambda function filtering packets matching the callback.
+        :returns: Boolean indicating if the callback has been successfully attached.
+        """
+        callbacks_dicts = (
+            [self.__reception_callbacks] if on_reception else [] +
+            [self.__transmission_callbacks] if on_transmission else []
+        )
+        for callback_dict in callbacks_dicts:
+            callback_dict[callback] = filter
+
+        return len(callbacks_dicts) > 0
+
+    def detach_callback(self, callback, on_reception=True, on_transmission=True):
+        """
+        Detach an existing packet callback from current connector.
+
+        :param callback: Processing function.
+        :param on_reception: Boolean indicating if the callback was monitoring reception.
+        :param on_transmission: Boolean indicating if the callback was monitoring transmission.
+        :returns: Boolean indicating if the callback has been successfully detached.
+        """
+        removed = False
+        callbacks_dicts = (
+            [self.__reception_callbacks] if on_reception else [] +
+            [self.__transmission_callbacks] if on_transmission else []
+        )
+        for callback_dict in callbacks_dicts:
+            if callback in callback_dict:
+                del callback_dict[callback]
+                removed = True
+        return removed
+
+    def reset_callbacks(self, reception = True, transmission = True):
+        """
+        Detach any packet callback attached to the current connector.
+
+        :param on_reception: Boolean indicating if the callbacks monitoring reception are detached.
+        :param on_transmission: Boolean indicating if the callbacks monitoring transmission are detached.
+        :returns: Boolean indicating if callbacks have been successfully detached.
+        """
+        callbacks_dicts = (
+            [self.__reception_callbacks] if reception else [] +
+            [self.__transmission_callbacks] if transmission else []
+        )
+        for callback_dict in callbacks_dicts:
+            callback_dict = {}
+
+        return len(callbacks_dicts) > 0
+
+    def _signal_packet_transmission(self, packet):
+        """
+        Signals the transmission of a packet and triggers execution of matching transmission callbacks.
+
+        :param packet: scapy packet being transmitted from whad-client.
+        """
+        for callback,packet_filter in self.__transmission_callbacks.items():
+            if packet_filter(packet):
+                callback(packet)
+
+    def _signal_packet_reception(self, packet):
+        """
+        Signals the reception of a packet and triggers execution of matching reception callbacks.
+
+        :param packet: scapy packet being received by whad-client.
+        """
+        for callback,packet_filter in self.__reception_callbacks.items():
+            if packet_filter(packet):
+                callback(packet)
 
 
     def set_device(self, device=None):

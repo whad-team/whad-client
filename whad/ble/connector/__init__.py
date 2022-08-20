@@ -50,9 +50,6 @@ class BLE(WhadDeviceConnector):
         self.__can_send = None
         self.__can_send_raw = None
 
-        # User packets callbacks
-        self.__user_callbacks = {}
-
         # Open device and make sure it is compatible
         self.device.open()
         self.device.discover()
@@ -66,20 +63,6 @@ class BLE(WhadDeviceConnector):
     def close(self):
         self.device.close()
 
-    def attach_user_callbacks(self, callback, filter=lambda pkt:True):
-        self.__user_callbacks[callback] = filter
-
-    def detach_user_callbacks(self, callback):
-        if callback in self.__user_callbacks:
-            del self.__user_callbacks[callback]
-            return True
-        return False
-
-    def _run_user_callbacks(self, packet):
-        for callback,packet_filter in self.__user_callbacks.items():
-            if packet_filter(packet):
-                callback(packet)
-
     def _build_scapy_packet_from_message(self, message, msg_type):
         try:
             if msg_type == 'adv_pdu':
@@ -88,25 +71,35 @@ class BLE(WhadDeviceConnector):
                             bytes(message.adv_pdu.bd_address) + bytes(message.adv_pdu.adv_data)
                         )
                     packet.metadata = generate_ble_metadata(message, msg_type)
+                    self._signal_packet_reception(packet)
+
                     return packet
 
             elif msg_type == 'raw_pdu':
                 packet = BTLE(bytes(struct.pack("I", message.raw_pdu.access_address)) + bytes(message.raw_pdu.pdu) + bytes(struct.pack(">I", message.raw_pdu.crc)[1:]))
                 packet.metadata = generate_ble_metadata(message, msg_type)
+
+                self._signal_packet_reception(packet)
                 return packet
 
             elif msg_type == 'pdu':
                 packet = BTLE_DATA(message.pdu.pdu)
                 packet.metadata = generate_ble_metadata(message, msg_type)
+
+                self._signal_packet_reception(packet)
                 return packet
 
-        except AttributeError:
+        except AttributeError as err:
+            print(err)
             return None
 
     def _build_message_from_scapy_packet(self, packet):
         msg = Message()
         direction = packet.metadata.direction
         connection_handle = packet.metadata.connection_handle
+
+        self._signal_packet_transmission(packet)
+
         if BTLE in packet:
             msg.ble.send_raw_pdu.direction = direction
             msg.ble.send_raw_pdu.conn_handle = connection_handle
@@ -502,8 +495,6 @@ class BLE(WhadDeviceConnector):
 
     def on_adv_pdu(self, packet):
         logger.info('received an advertisement PDU')
-        if not self.support_raw_pdu():
-            self._run_user_callbacks(packet)
 
     def on_connected(self, connection_data):
         logger.info('a connection has been established')
@@ -515,8 +506,7 @@ class BLE(WhadDeviceConnector):
         logger.info('a connection has been terminated')
 
     def on_raw_pdu(self, packet):
-        if self.support_raw_pdu():
-            self._run_user_callbacks(packet)
+
         if BTLE_ADV in packet:
             adv_pdu = packet[BTLE_ADV:]
             adv_pdu.metadata = packet.metadata
@@ -528,8 +518,6 @@ class BLE(WhadDeviceConnector):
             self.on_pdu(conn_pdu)
 
     def on_pdu(self, packet):
-        if not self.support_raw_pdu():
-            self._run_user_callbacks(packet)
 
         if packet.LLID == 3:
             self.on_ctl_pdu(packet)
