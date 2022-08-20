@@ -181,7 +181,8 @@ class WhadDeviceConnector(object):
         )
         for callback_dict in callbacks_dicts:
             callback_dict[callback] = filter
-        return len(callback_dicts) > 0
+
+        return len(callbacks_dicts) > 0
 
     def detach_callback(self, callback, on_reception=True, on_transmission=True):
         """
