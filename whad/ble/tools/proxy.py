@@ -21,7 +21,6 @@ from whad.ble.profile import GenericProfile
 from whad.ble.exceptions import HookReturnValue, HookDontForward
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.exceptions import WhadDeviceNotFound
-from ....protocol.device_pb2 import Hook
 
 # Logging
 import logging
