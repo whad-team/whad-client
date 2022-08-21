@@ -1,4 +1,5 @@
 from whad import WhadDomain, WhadCapability
+from whad.scapy.layers.dot15d4tap import Dot15d4TAP_TLV_Hdr, Dot15d4TAP_FCS_Type
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
@@ -44,17 +45,33 @@ class Zigbee(WhadDeviceConnector):
             self.__ready = True
             conf.dot15d4_protocol = 'zigbee'
 
+    def format(self, packet):
+        if hasattr(packet, "metadata"):
+            header, timestamp = packet.metadata.convert_to_header()
+        else:
+            header = Dot15d4TAP_Hdr()
+            timestamp = None
+
+        header.data.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_FCS_Type(
+            fcs_type=int(Dot15d4FCS in packet)
+            )
+        )
+        formatted_packet = header/packet
+        return formatted_packet, timestamp
 
     def _build_scapy_packet_from_message(self, message, msg_type):
         try:
             if msg_type == 'raw_pdu':
                 packet = Dot15d4FCS(bytes(message.raw_pdu.pdu) + bytes(struct.pack(">H", message.raw_pdu.fcs)))
                 packet.metadata = generate_zigbee_metadata(message, msg_type)
+                self._signal_packet_reception(packet)
+
                 return packet
 
             elif msg_type == 'pdu':
                 packet = Dot15d4(bytes(message.pdu.pdu))
                 packet.metadata = generate_zigbee_metadata(message, msg_type)
+                self._signal_packet_reception(packet)
                 return packet
 
         except AttributeError:
@@ -62,6 +79,8 @@ class Zigbee(WhadDeviceConnector):
 
     def _build_message_from_scapy_packet(self, packet, channel=11):
         msg = Message()
+
+        self._signal_packet_transmission(packet)
 
         if Dot15d4FCS in packet:
             msg.zigbee.send_raw.channel = channel
@@ -134,7 +153,6 @@ class Zigbee(WhadDeviceConnector):
                 pdu = Dot15d4(raw(pdu)[:-2])
             else:
                 packet = pdu
-            self._signal_packet_transmission(packet)
             msg = self._build_message_from_scapy_packet(packet, channel)
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
@@ -187,16 +205,10 @@ class Zigbee(WhadDeviceConnector):
 
 
     def on_raw_pdu(self, packet):
-
-        if self.support_raw_pdu():
-            self._signal_packet_reception(packet)
-
         self.on_pdu(Dot15d4(raw(packet)[:-2]))
 
     def on_pdu(self, packet):
-
-        if not self.support_raw_pdu():
-            self._signal_packet_reception(packet)
+        pass
 
 
 class Sniffer(Zigbee):

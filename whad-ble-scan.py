@@ -9,6 +9,7 @@ import sys
 from argparse import ArgumentParser
 
 from whad.device import WhadDevice
+from whad.common.monitors import PcapWriterMonitor
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 
 from whad.ble import BLE, Scanner, Sniffer, BDAddress, AdvDataFieldList, \
@@ -21,13 +22,13 @@ from scapy.layers.bluetooth4LE import BTLE_ADV_IND, BTLE_ADV_NONCONN_IND, \
 class BleDevice(object):
     """Store information about a device
     """
-    
+
     def __init__(self, rssi, bd_address, adv_data, undirected=True, connectable=True):
         self.__bd_address = bd_address
         self.__adv_data = adv_data
         self.__rssi = rssi
         self.__got_scan_rsp = False
-        self.__undirected = undirected 
+        self.__undirected = undirected
         self.__connectable = connectable
 
     @property
@@ -53,7 +54,7 @@ class BleDevice(object):
                 short_name = record.name.decode('utf-8')
             elif isinstance(record, AdvCompleteLocalName):
                 complete_name = record.name.decode('utf-8')
-        
+
         # Pick the best name
         if complete_name:
             name = 'name:"%s"' % complete_name
@@ -68,7 +69,7 @@ class BleDevice(object):
             self.__bd_address,
             name
         )
-        
+
 
     def update_rssi(self, rssi=0):
         """Update device RSSI
@@ -191,6 +192,14 @@ if __name__ == '__main__':
         help='minimal RSSI threshold, in -dBm (default: 100, meaning -100 dBm)'
     )
     parser.add_argument(
+        '-o',
+        '--output',
+        dest='output',
+        default=None,
+        type=str,
+        help='Output PCAP file'
+    )
+    parser.add_argument(
         'device',
         metavar='DEVICE',
         type=str,
@@ -210,7 +219,10 @@ if __name__ == '__main__':
         if ble_device.can_scan():
             # Create a BLE scanner
             scanner = Scanner(device)
-
+            if args.output is not None:
+                monitor = PcapWriterMonitor(args.output)
+                monitor.attach(scanner)
+                monitor.start()
             # Start scanning
             scanner.start()
             for rssi, advertisement in scanner.discover_devices():
@@ -220,12 +232,17 @@ if __name__ == '__main__':
                         advertisement,
                         filter_addr=args.bd_addr
                     )
-                
+
         elif ble_device.can_sniff_advertisements():
             # Create a sniffer
             scanner = Sniffer(device)
+            if args.output is not None:
+                monitor = PcapWriterMonitor(args.output)
+                monitor.attach(scanner)
+                monitor.start()
+
             scanner.configure(advertisements=True)
-            
+
             scanner.start()
             for pkt in scanner.sniff():
                 if pkt.metadata.rssi > -args.rssi:
@@ -254,3 +271,5 @@ if __name__ == '__main__':
             scanner.close()
             sys.stdout.write(' done\n')
             sys.stdout.flush()
+        if monitor is not None:
+            monitor.close()

@@ -1,6 +1,7 @@
 from whad.zigbee import Sniffer
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
+from whad.common.monitors import PcapWriterMonitor
 from time import time,sleep
 from scapy.compat import raw
 from scapy.layers.dot15d4 import Dot15d4
@@ -14,9 +15,11 @@ if __name__ == '__main__':
         # Connect to target device and performs discovery
         try:
             dev = WhadDevice.create(interface)
-
             sniffer = Sniffer(dev)
-            sniffer.channel = 14
+            monitor = PcapWriterMonitor("/tmp/zigbeepcap.pcap")
+            monitor.attach(sniffer)
+            monitor.start()
+            sniffer.channel = 11
             sniffer.start()
             for i in sniffer.sniff():
                 print(i.metadata, repr(i))
@@ -24,6 +27,8 @@ if __name__ == '__main__':
 
 
         except (KeyboardInterrupt, SystemExit):
+            monitor.detach()
+            monitor.close()
             dev.close()
 
         except WhadDeviceNotFound:
