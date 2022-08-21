@@ -38,27 +38,47 @@ class BLE(WhadDeviceConnector):
         BleAdvType.ADV_SCAN_RSP: BTLE_SCAN_RSP
     }
 
+    def format(self, packet):
+        """
+        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
+        the appropriate header and the timestamp in microseconds.
+        """
+        formatted_packet = packet
+        if BTLE not in packet:
+            if BTLE_ADV in packet:
+                formatted_packet = BTLE(access_addr=0x8e89bed6)/packet
+            elif BTLE_DATA in packet:
+                # We are forced to use a pseudo access address for connections in this case.
+                formatted_packet = BTLE(access_addr=0x11223344) / packet
+
+        timestamp = None
+        if hasattr(packet, "metadata"):
+            header, timestamp = packet.metadata.convert_to_header()
+            formatted_packet = header / formatted_packet
+            
+        return formatted_packet, timestamp
+
     def __init__(self, device=None):
-        """
-        Initialize the connector, open the device (if not already opened), discover
-        the services (if not already discovered).
-        """
-        self.__ready = False
-        super().__init__(device)
+            """
+            Initialize the connector, open the device (if not already opened), discover
+            the services (if not already discovered).
+            """
+            self.__ready = False
+            super().__init__(device)
 
-        # Capability cache
-        self.__can_send = None
-        self.__can_send_raw = None
+            # Capability cache
+            self.__can_send = None
+            self.__can_send_raw = None
 
-        # Open device and make sure it is compatible
-        self.device.open()
-        self.device.discover()
+            # Open device and make sure it is compatible
+            self.device.open()
+            self.device.discover()
 
-        # Check device supports BLE
-        if not self.device.has_domain(WhadDomain.BtLE):
-            raise UnsupportedDomain()
-        else:
-            self.__ready = True
+            # Check device supports BLE
+            if not self.device.has_domain(WhadDomain.BtLE):
+                raise UnsupportedDomain()
+            else:
+                self.__ready = True
 
     def close(self):
         self.device.close()
