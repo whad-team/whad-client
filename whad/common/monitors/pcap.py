@@ -27,7 +27,11 @@ class PcapWriterMonitor(WhadMonitor):
                 # We collect the first packet timestamp to use it as reference time
                 self._start_time = PcapReader(self._pcap_file).read_packet().time * 1000000
 
-        self._writer = PcapWriter(self._pcap_file, append=existing_pcap_file)
+        self._writer = PcapWriter(
+                                    self._pcap_file,
+                                    append=existing_pcap_file and not sync,
+                                    sync=sync
+        )
 
         self._formatter = self.default_formatter
         if (
@@ -37,7 +41,7 @@ class PcapWriterMonitor(WhadMonitor):
             self._formatter = getattr(self._connector, "format")
 
     def close(self):
-        if self._writer is not None:
+        if hasattr(self, "_writer") and self._writer is not None:
             self._writer.close()
             self._writer = None
 
@@ -71,4 +75,7 @@ class PcapWriterMonitor(WhadMonitor):
 
             # Convert timestamp to second (float)
             packet.time = timestamp / 1000000
-            self._writer.write(packet)
+            try:
+                self._writer.write(packet)
+            except BrokenPipeError:
+                pass

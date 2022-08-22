@@ -55,3 +55,4 @@ class WhadMonitor:
         self.close()
 
 from .pcap import PcapWriterMonitor
+from .wireshark import WiresharkMonitor

@@ -48,3 +48,15 @@ class WhadDeviceAccessDenied(Exception):
     def __str__(self):
         return 'WhadDeviceAccessDenied(%s) - missing udev rules' % self.__device_name
 
+# External tools exceptions
+
+class ExternalToolNotFound(Exception):
+    def __init__(self, tool):
+        super().__init__()
+        self.__tool = tool
+
+    def __str__(self):
+        return 'ExternalToolNotFound(%s)' % self.__tool
+
+    def __repr__(self):
+        return str(self)
