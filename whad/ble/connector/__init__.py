@@ -44,7 +44,6 @@ class BLE(WhadDeviceConnector):
         the appropriate header and the timestamp in microseconds.
         """
         formatted_packet = packet
-        packet.show()
         if BTLE not in packet:
             if BTLE_ADV in packet:
                 formatted_packet = BTLE(access_addr=0x8e89bed6)/packet
