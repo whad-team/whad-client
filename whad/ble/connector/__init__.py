@@ -44,6 +44,7 @@ class BLE(WhadDeviceConnector):
         the appropriate header and the timestamp in microseconds.
         """
         formatted_packet = packet
+        packet.show()
         if BTLE not in packet:
             if BTLE_ADV in packet:
                 formatted_packet = BTLE(access_addr=0x8e89bed6)/packet
@@ -55,7 +56,7 @@ class BLE(WhadDeviceConnector):
         if hasattr(packet, "metadata"):
             header, timestamp = packet.metadata.convert_to_header()
             formatted_packet = header / formatted_packet
-            
+
         return formatted_packet, timestamp
 
     def __init__(self, device=None):
@@ -87,8 +88,13 @@ class BLE(WhadDeviceConnector):
         try:
             if msg_type == 'adv_pdu':
                 if message.adv_pdu.adv_type in BLE.SCAPY_CORR_ADV:
-                    packet = BLE.SCAPY_CORR_ADV[message.adv_pdu.adv_type](
-                            bytes(message.adv_pdu.bd_address) + bytes(message.adv_pdu.adv_data)
+                    if message.adv_pdu.adv_type == BleAdvType.ADV_SCAN_RSP:
+                        data = bytes(message.adv_pdu.scanrsp_data)
+                    else:
+                        data = bytes(message.adv_pdu.adv_data)
+
+                    packet = BTLE_ADV()/BLE.SCAPY_CORR_ADV[message.adv_pdu.adv_type](
+                            bytes(message.adv_pdu.bd_address) + data
                         )
                     packet.metadata = generate_ble_metadata(message, msg_type)
                     self._signal_packet_reception(packet)

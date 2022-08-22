@@ -3,6 +3,8 @@ from scapy.utils import PcapWriter,PcapReader
 from os.path import exists
 from scapy.all import BTLE_RF
 from time import time
+from os import stat
+from stat import S_ISFIFO
 
 class PcapWriterMonitor(WhadMonitor):
     def __init__(self, pcap_file, monitor_reception=True, monitor_transmission=True):
@@ -15,10 +17,15 @@ class PcapWriterMonitor(WhadMonitor):
 
     def setup(self):
         existing_pcap_file = exists(self._pcap_file)
+        sync = False
         if existing_pcap_file:
-            print("[i] PCAP file %s exists, appending new packets."  % self._pcap_file)
-            # We collect the first packet timestamp to use it as reference time
-            self._start_time = PcapReader(self._pcap_file).read_packet().time * 1000000
+            if S_ISFIFO(stat(self._pcap_file).st_mode):
+                print("[i] Named pipe %s detected, syncing." % self._pcap_file)
+                sync = True
+            else:
+                print("[i] PCAP file %s exists, appending new packets."  % self._pcap_file)
+                # We collect the first packet timestamp to use it as reference time
+                self._start_time = PcapReader(self._pcap_file).read_packet().time * 1000000
 
         self._writer = PcapWriter(self._pcap_file, append=existing_pcap_file)
 

@@ -208,6 +208,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     scanner = None
+    monitor = None
     try:
         # Create our device DB
         dev_db = BleDevicesDB()
@@ -225,10 +226,10 @@ if __name__ == '__main__':
                 monitor.start()
             # Start scanning
             scanner.start()
-            for rssi, advertisement in scanner.discover_devices():
-                if rssi > -args.rssi:
+            for advertisement in scanner.discover_devices():
+                if advertisement.metadata.rssi > -args.rssi:
                     dev_db.on_device_found(
-                        rssi,
+                        advertisement.metadata.rssi,
                         advertisement,
                         filter_addr=args.bd_addr
                     )
