@@ -6,13 +6,20 @@ from shutil import which
 from os import mkfifo
 
 class WiresharkMonitor(PcapWriterMonitor):
+    """
+    WiresharkMonitor.
+
+    Runs a wireshark instance in background and monitor the traffic received and transmitted
+    by the targeted connector. It is mainly a very basic wrapper that launches wireshark in background,
+    creates a named fifo and populates it using underlying PcapWriterMonitor implementation.
+    """
     def __init__(self, monitor_reception=True, monitor_transmission=True):
-        # Check if wireshark can be found:
         self._wireshark_process = None
+        # Checks the presence of wireshark
         self._wireshark_path = which("wireshark")
         if self._wireshark_path is None:
             raise ExternalToolNotFound("wireshark")
-
+        # We create a random name for our named pipe.
         fifo_name = gettempdir()+"/" + next(_get_candidate_names()) + ".pcap"
         mkfifo(fifo_name)
 

@@ -9,7 +9,7 @@ import sys
 from argparse import ArgumentParser
 
 from whad.device import WhadDevice
-from whad.common.monitors import PcapWriterMonitor
+from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 
 from whad.ble import BLE, Scanner, Sniffer, BDAddress, AdvDataFieldList, \
@@ -200,6 +200,13 @@ if __name__ == '__main__':
         help='Output PCAP file'
     )
     parser.add_argument(
+        '-w',
+        '--wireshark',
+        dest='wireshark',
+        action='store_true',
+        help='Enable wireshark monitoring'
+    )
+    parser.add_argument(
         'device',
         metavar='DEVICE',
         type=str,
@@ -208,7 +215,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     scanner = None
-    monitor = None
+    monitor_pcap = None
+    monitor_wireshark = None
     try:
         # Create our device DB
         dev_db = BleDevicesDB()
@@ -221,9 +229,13 @@ if __name__ == '__main__':
             # Create a BLE scanner
             scanner = Scanner(device)
             if args.output is not None:
-                monitor = PcapWriterMonitor(args.output)
-                monitor.attach(scanner)
-                monitor.start()
+                monitor_pcap = PcapWriterMonitor(args.output)
+                monitor_pcap.attach(scanner)
+                monitor_pcap.start()
+            if args.wireshark:
+                monitor_wireshark = WiresharkMonitor()
+                monitor_wireshark.attach(scanner)
+                monitor_wireshark.start()
             # Start scanning
             scanner.start()
             for advertisement in scanner.discover_devices():
@@ -238,9 +250,13 @@ if __name__ == '__main__':
             # Create a sniffer
             scanner = Sniffer(device)
             if args.output is not None:
-                monitor = PcapWriterMonitor(args.output)
-                monitor.attach(scanner)
-                monitor.start()
+                monitor_pcap = PcapWriterMonitor(args.output)
+                monitor_pcap.attach(scanner)
+                monitor_pcap.start()
+            if args.wireshark:
+                monitor_wireshark = WiresharkMonitor()
+                monitor_wireshark.attach(scanner)
+                monitor_wireshark.start()
 
             scanner.configure(advertisements=True)
 
@@ -272,5 +288,7 @@ if __name__ == '__main__':
             scanner.close()
             sys.stdout.write(' done\n')
             sys.stdout.flush()
-        if monitor is not None:
-            monitor.close()
+        if monitor_pcap is not None:
+            monitor_pcap.close()
+        if monitor_wireshark is not None:
+            monitor_wireshark.close()
