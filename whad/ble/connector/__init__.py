@@ -87,10 +87,7 @@ class BLE(WhadDeviceConnector):
         try:
             if msg_type == 'adv_pdu':
                 if message.adv_pdu.adv_type in BLE.SCAPY_CORR_ADV:
-                    if message.adv_pdu.adv_type == BleAdvType.ADV_SCAN_RSP:
-                        data = bytes(message.adv_pdu.scanrsp_data)
-                    else:
-                        data = bytes(message.adv_pdu.adv_data)
+                    data = bytes(message.adv_pdu.adv_data)
 
                     packet = BTLE_ADV()/BLE.SCAPY_CORR_ADV[message.adv_pdu.adv_type](
                             bytes(message.adv_pdu.bd_address) + data
