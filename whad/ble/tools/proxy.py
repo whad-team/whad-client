@@ -57,8 +57,8 @@ def reshape_pdu(pdu):
 class LowLevelPeripheral(Peripheral):
     """Link-layer only Peripheral implementation
     """
-    def __init__(self, device, adv_data):
-        super().__init__(device, adv_data=adv_data)
+    def __init__(self, device, adv_data, scan_data):
+        super().__init__(device, adv_data=adv_data, scan_data=scan_data)
         self.__connected = False
         self.__conn_handle = None
         self.__other_half = None
@@ -188,7 +188,7 @@ class LinkLayerProxy(object):
     traffic to another device.
     """
 
-    def __init__(self, proxy=None, target=None, adv_data=None, bd_address=None):
+    def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None):
         """
         :param BLE proxy: BLE device to use as a peripheral (GATT Server)
         :param BLE target: BLE device to use as a central (GATT Client)
@@ -204,6 +204,8 @@ class LinkLayerProxy(object):
             )
         else:
             self.__adv_data = adv_data
+        
+        self.__scan_data = scan_data
 
         # Save both devices
         self.__proxy = proxy
@@ -214,6 +216,17 @@ class LinkLayerProxy(object):
 
         # Callbacks
         self.__callbacks = []
+
+
+    @property
+    def target(self):
+        return self.__central
+
+    def close(self):
+        if self.__central is not None:
+            self.__central.close()
+        if self.__peripheral is not None:
+            self.__peripheral.close()
 
     def start(self):
         """Start proxy
@@ -231,7 +244,8 @@ class LinkLayerProxy(object):
             # Once connected, we start our peripheral
             self.__peripheral = LowLevelPeripheral(
                 self.__proxy,
-                self.__adv_data
+                self.__adv_data,
+                self.__scan_data
             )
             # Interconnect central and peripheral
             logger.info('proxy peripheral device created, interconnect with central ...')
