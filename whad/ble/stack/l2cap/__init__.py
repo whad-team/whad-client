@@ -71,7 +71,6 @@ class BleL2CAP(object):
         """Send data
         """
         packets=[]
-        #data.show()
         # If data is bigger than MTU-1, then split
         if len(data) > self.__remote_mtu:
             nb_packets = int(len(data)/(self.__remote_mtu - 1))
@@ -83,7 +82,7 @@ class BleL2CAP(object):
         else:
             nb_packets = 1
             packets = [
-                bytes(data)
+                data
             ]
 
         # Send packets
