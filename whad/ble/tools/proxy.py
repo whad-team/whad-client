@@ -8,11 +8,8 @@ The class :class:`GattProxy` provides a GATT BLE proxy that will connect to a
 target device, creates another device and relay GATT operations (characteristic
 read, write, notification and indication) between a client and the target
 device.
-
-
 """
 
-from time import sleep
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL
 from scapy.layers.bluetooth import L2CAP_Hdr
 from whad.ble.connector import BLE, Central, Peripheral, BleDirection
@@ -31,6 +28,12 @@ logger = logging.getLogger(__name__)
 #############################################
 
 def is_pdu_valid(pdu):
+    """Check if a given PDU is valid (either Data or Control PDU)
+
+    :param Packet pdu: PDU to check
+    :rtype: bool
+    :return: True if PDU is valid, False otherwise
+    """
     if pdu.haslayer(BTLE_DATA):
         btle_data = pdu.getlayer(BTLE_DATA)
         if btle_data.LLID in [0x01, 0x02]:
@@ -38,6 +41,7 @@ def is_pdu_valid(pdu):
         else:
             return (btle_data.LLID == 0x03)
     return False
+
 
 def reshape_pdu(pdu):
     """This function remove any SN/NESN/MD bit as it is usually handled by
@@ -54,11 +58,24 @@ def reshape_pdu(pdu):
         len=len(payload)
     )/payload
 
+
 class LowLevelPeripheral(Peripheral):
     """Link-layer only Peripheral implementation
+
+    This class is used by the :class:`whad.ble.tools.proxy.LinkLayerProxy` class
+    to provide a Link-Layer peripheral with the requested advertising data.
     """
-    def __init__(self, device, adv_data, scan_data):
+
+    def __init__(self, proxy, device, adv_data, scan_data):
+        """Instanciate a LowLevelPeripheral instance
+
+        :param LinkLayerProxy proxy: Reference to the link-layer proxy that will receive events
+        :param WhadDevice device: A :class:`whad.device.WhadDevice` object to use as the physical link
+        :param AdvDataFieldList adv_data: Advertising data of the exposed proxy device (mandatory)
+        :param AdvDataFieldList scan_data: Scan response data of the exposed proxy device (optional, can be None)
+        """
         super().__init__(device, adv_data=adv_data, scan_data=scan_data)
+        self.__proxy = proxy
         self.__connected = False
         self.__conn_handle = None
         self.__other_half = None
@@ -66,26 +83,51 @@ class LowLevelPeripheral(Peripheral):
         self.__pending_control_pdus = []
 
     def set_other_half(self, other_half):
+        """Set the *other half*, i.e. the reference to a :class:`LowLevelCentral` device connected to the target device
+
+        :param LowLevelCentral other_half: Link-layer Central device to notify events
+        """
         self.__other_half = other_half
 
     def on_connected(self, connection_data):
+        """Callback to handle link-layer connection from the underlying peripheral connector
+        
+        :param connection_data: Connection data object
+        """
         self.__connected = True
         if connection_data.conn_handle is None:
            self.__conn_handle = 0
         else: 
             self.__conn_handle = connection_data.conn_handle
-
+        
+        # Notify proxy that a connection has been established
+        self.__proxy.on_connect()
+        
+        # Foward pending PDUs
         if len(self.__pending_control_pdus) > 0:
             for _pdu in self.__pending_control_pdus:
-                self.send_pdu(_pdu, self.__conn_handle)
+                pdu = self.__proxy.on_ctl_pdu(pdu)
+                if pdu is not None:
+                    self.send_pdu(_pdu, self.__conn_handle)
         
         if len(self.__pending_data_pdus) > 0:
             for _pdu in self.__pending_data_pdus:
-                self.send_pdu(_pdu, self.__conn_handle)
+                pdu = self.__proxy.on_data_pdu(pdu)
+                if pdu is not None:
+                    self.send_pdu(_pdu, self.__conn_handle)
+
 
     def on_disconnected(self, connection_data):
+        """Callback to handle link-layer disconnection event
+
+        :param connection_data: Connection data
+        """
         self.__connected = False
         self.__conn_handle = None
+
+        # Notify proxy the current connection has been terminated
+        self.__proxy.on_disconnect()
+
 
     def on_ctl_pdu(self, pdu):
         """This method is called whenever a control PDU is received.
@@ -93,94 +135,158 @@ class LowLevelPeripheral(Peripheral):
 
         Peripheral devices act as a slave, so we only forward master to slave
         messages to the stack.
+
+        :param Packet pdu: Control PDU received
         """
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
             if self.__other_half is not None and self.__connected:
-                self.__other_half.forward_ctrl_pdu(pdu)
+                pdu = self.__proxy.on_ctl_pdu(pdu)
+                if pdu is not None:
+                    self.__other_half.forward_ctrl_pdu(pdu)
 
     def on_data_pdu(self, pdu):
         """This method is called whenever a data PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
+
+        :param Packet pdu: Data PDU received
         """
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
             if self.__other_half is not None and self.__connected:
-                self.__other_half.forward_data_pdu(pdu)
+                pdu = self.__proxy.on_data_pdu(pdu)
+                if pdu is not None:
+                    self.__other_half.forward_data_pdu(pdu)
             else:
                 logger.error('client is not connected to proxy')
 
     def forward_ctrl_pdu(self, pdu):
+        """Forward a control pdu to the target device.
+
+        :param Packet pdu: Control PDU to forward
+        """
         if self.__conn_handle is not None:
             return self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
         else:
             self.__pending_control_pdus.append(reshape_pdu(pdu))
 
     def forward_data_pdu(self, pdu):
+        """Forward a data pdu to the target device.
+
+        :param Packet pdu: Data PDU to forward
+        """
         if self.__conn_handle is not None:
             return self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
         else:
             self.__pending_data_pdus.append(reshape_pdu(pdu))
 
+
 class LowLevelCentral(Central):
     """Link-layer only Central implementation
+
+    This class implements a Central role that is able to initiate a BLE connection
+    to a target device and then forward all the control and data PDUs to the attached
+    LowLevelPeripheral instance. 
+
+    No BLE stack is bound tho this Central role, only raw PDUs sent by the target
+    device or received from the associated peripheral.
     """
 
     def __init__(self, device):
+        """Instanciate a LowLevelCentral object
+
+        :param WhadDevice device: Underlying WHAD device to use.
+        """
         super().__init__(device)
         self.__connected = False
         self.__conn_handle = None
         self.__other_half = None
 
     def set_other_half(self, other_half):
+        """Set the *other half*, the associated LowLevelPeripheral.
+
+        :param LowLevelPeripheral other_half: Associated LowLevelPeripheral
+        """
         self.__other_half = other_half
 
     def is_connected(self):
+        """Determine if this Central device is connected to the target device.
+
+        :rtype: bool
+        :return: True if an active connection exists between the central device and the target, False otherwise
+        """
         return self.__connected
+
 
     def peripheral(self):
         return True
 
     def on_connected(self, connection_data):
-        """Override `on_connected` method to avoid notifying the stack. 
+        """Callback called when our central device is successfully connected to our target device
 
-        We mark this low-level central as connected and save the connection
-        handle.
+        :param connection_data: Connection data
         """
         self.__connected = True
         if connection_data.conn_handle is None:
            self.__conn_handle = 0
         else: 
             self.__conn_handle = connection_data.conn_handle
+        self.__proxy.on_connect()
 
     def on_disconnected(self, connection_data):
+        """Callback called when our central device has been disconnected from our target device
+        """
         logger.info('target device has disconnected')
         self.__connected = False
         self.__conn_handle = None
+        self.__proxy.on_disconnect()
 
     def on_ctl_pdu(self, pdu):
-        """Forward Control PDU to other half, if connected
+        """Callback called whenever a Control PDU has been received.
+
+        This callback method then forwards PDU to the associated LowLevelPeripheral object that
+        will handle it.
+
+        :param Packet pdu: Received Control PDU
         """
         if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
             if self.__other_half is not None and self.__connected:
                 self.__other_half.forward_ctrl_pdu(pdu)
 
+
     def on_data_pdu(self, pdu):
-        """Forward Data PDU to other half, if connected
+        """Callback called whenever a Data PDU has been received.
+
+        This callback method then forwards PDU to the associated LowLevelPeripheral object that
+        will handle it.
+
+        :param Packet pdu: Received Data PDU
         """
         if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
             if self.__other_half is not None and self.__connected:
-                self.__other_half.forward_data_pdu(pdu)
+                pdu = self.__proxy.on_data_pdu(pdu)
+                if pdu is not None:
+                    self.__other_half.forward_data_pdu(pdu)
+
 
     def forward_ctrl_pdu(self, pdu):
+        """Forward a Control PDU to the connected device, if an active connection exists
+
+        :param Packet pdu: Control PDU to send to the connected device
+        """
         if self.__conn_handle is not None:
             return self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
         else:
             logger.error('proxy is not connected to target device')
 
     def forward_data_pdu(self, pdu):
+        """Forward a Data PDU to the connected device, if an active connection exists
+
+        :param Packet pdu: Data PDU to send to the connected device
+        """
         if self.__conn_handle is not None:
             return self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
         else:
             logger.error('proxy is not connected to target device')
+
 
 class LinkLayerProxy(object):
     """This class implements a GATT proxy that relies on two BLE-compatible
@@ -193,6 +299,8 @@ class LinkLayerProxy(object):
         :param BLE proxy: BLE device to use as a peripheral (GATT Server)
         :param BLE target: BLE device to use as a central (GATT Client)
         :param AdvDataFieldList adv_data: Advertising data
+        :param AdvDataFieldList scan_data: Scan response data
+        :param str bd_address: BD address of target device
         """
         if proxy is None or target is None or bd_address is None:
             raise WhadDeviceNotFound
@@ -243,6 +351,7 @@ class LinkLayerProxy(object):
             
             # Once connected, we start our peripheral
             self.__peripheral = LowLevelPeripheral(
+                self,
                 self.__proxy,
                 self.__adv_data,
                 self.__scan_data
@@ -258,6 +367,40 @@ class LinkLayerProxy(object):
             self.__peripheral.start()
             logger.info('LinkLayerProxy instance is ready')
 
+    def on_connect(self):
+        """This method is called when a client connects to the proxy.
+        """
+        logger.info('Client has just connected to our proxy')
+
+    def on_disconnect(self):
+        """This method is called when a client disconnects from the proxy.
+        """
+        logger.info('Client has just disconnected from our proxy')
+
+
+    def on_ctl_pdu(self, pdu):
+        """Control PDU callback
+
+        This method is called whenever a BLE control PDU is received. The returned
+        PDU will be forwarded to the target device, or discarded if None is returned.
+
+        :param Packet pdu: Scapy packet representing the BLE control PDU
+        :returns: A PDU to be sent to the target device or None to avoid forwarding.
+        :rtype: Packet, None
+        """
+        logger.info('Received a Control PDU: %s' % pdu)
+    
+    def on_data_pdu(self, pdu):
+        """Data PDU callback
+
+        This method is called whenever a BLE data PDU is received. The returned
+        PDU will be forwarded to the target device, or discarded if None is returned.
+
+        :param Packet pdu: Scapy packet representing the BLE data PDU
+        :returns: A PDU to be sent to the target device or None to avoid forwarding.
+        :rtype: Packet, None
+        """
+        logger.info('Received a Data PDU: %s' % pdu)
 
 
 #############################################
