@@ -309,7 +309,7 @@ class BLE(WhadDeviceConnector):
             raise UnsupportedCapability("AccessAddressesDiscovery")
 
         msg = Message()
-        msg.ble.sniff_aa.CopyFrom(SniffAccessAddressCmd())
+        msg.ble.sniff_aa.monitored_channels = b"\xFF\xFF\xFF\xFF\x1F" #CopyFrom(SniffAccessAddressCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -322,6 +322,7 @@ class BLE(WhadDeviceConnector):
 
         msg = Message()
         msg.ble.sniff_conn.access_address = access_address
+        msg.ble.sniff_conn.monitored_channels = b"\xFF\xFF\xFF\xFF\x1F"
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
