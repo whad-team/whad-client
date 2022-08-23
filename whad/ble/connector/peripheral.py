@@ -18,7 +18,7 @@ class Peripheral(BLE):
     defined by a specific profile.    
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None):
         """Create a peripheral device.
 
         :param WhadDevice device: WHAD device to use as a peripheral
@@ -46,7 +46,7 @@ class Peripheral(BLE):
             raise UnsupportedCapability("Peripheral")
         else:
             logger.info('Enable peripheral mode with advertising data: %s' % adv_data)
-            self.enable_peripheral_mode(adv_data)
+            self.enable_peripheral_mode(adv_data, scan_data)
 
             # If an existing connection is hijacked, simulate a connection
             if existing_connection is not None:
