@@ -1,5 +1,5 @@
 from whad.ble import Peripheral
-from whad.common.monitors import PcapWriterMonitor
+from whad.common.monitors import WiresharkMonitor
 from whad.ble.profile.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
@@ -21,9 +21,7 @@ class MyPeripheral(GenericProfile):
 
 my_profile = MyPeripheral()
 periph = Peripheral(UartDevice('/dev/ttyUSB0', 115200), profile=my_profile)
-monitor = PcapWriterMonitor("test.pcap")
-monitor.attach(periph)
-monitor.start()
+
 periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
     AdvCompleteLocalName(b'TestMe!'),
     AdvFlagsField()

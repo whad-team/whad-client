@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
             sniffer = Sniffer(dev)
 
-            """
+
             # Access address discovery
             sniffer.configure(access_addresses_discovery=True)
             sniffer.start()
@@ -26,7 +26,7 @@ if __name__ == '__main__':
             sniffer.start()
             while True:
                 sleep(1)
-
+            """
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 
