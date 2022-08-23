@@ -389,6 +389,7 @@ class LinkLayerProxy(object):
         :rtype: Packet, None
         """
         logger.info('Received a Control PDU: %s' % pdu)
+        return pdu
     
     def on_data_pdu(self, pdu):
         """Data PDU callback
@@ -401,6 +402,7 @@ class LinkLayerProxy(object):
         :rtype: Packet, None
         """
         logger.info('Received a Data PDU: %s' % pdu)
+        return pdu
 
 
 #############################################
