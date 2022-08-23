@@ -18,6 +18,7 @@ class SnifferConfiguration:
     follow_connection : bool = False
     show_empty_packets : bool = False
     access_addresses_discovery : bool = False
+    active_connection : int = None
     channel : int = 37
     filter : str = "FF:FF:FF:FF:FF:FF"
 
@@ -145,6 +146,9 @@ class Sniffer(BLE):
         if self.__configuration.access_addresses_discovery:
             self.discover_access_addresses()
 
+        elif self.__configuration.active_connection is not None:
+            self.sniff_active_connection(self.__configuration.active_connection)
+
         elif self.__configuration.follow_connection:
             if not self.can_sniff_new_connection():
                 raise UnsupportedCapability("Sniff")
@@ -165,8 +169,9 @@ class Sniffer(BLE):
                 )
 
 
-    def configure(self, access_addresses_discovery=False, advertisements=True, connection=True, empty_packets=False):
+    def configure(self,active_connection=None, access_addresses_discovery=False, advertisements=True, connection=True, empty_packets=False):
         self.stop()
+        self.__configuration.active_connection = int(active_connection) if active_connection is not None else None
         self.__configuration.access_addresses_discovery = access_addresses_discovery
         self.__configuration.show_advertisements = advertisements
         self.__configuration.show_empty_packets = empty_packets
@@ -222,6 +227,11 @@ class Sniffer(BLE):
                 else:
                     self.__access_addresses[aa].update(timestamp=timestamp, rssi=rssi)
                 yield self.__access_addresses[aa]
+
+            elif self.__configuration.active_connection is not None:
+                message = self.wait_for_message(filter=message_filter('ble', "synchronized"))
+                print(message)
+
             else:
                 if self.support_raw_pdu():
                     message_type = "raw_pdu"

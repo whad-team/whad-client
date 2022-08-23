@@ -8,7 +8,7 @@ from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, StartCmd, StopC
     ScanMode, Start, Stop, BleAdvType, ConnectTo, CentralModeCmd, PeripheralMode, \
     PeripheralModeCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
     HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
-    SniffAccessAddressCmd
+    SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
@@ -225,6 +225,16 @@ class BLE(WhadDeviceConnector):
             (commands & (1 << Stop))>0
         )
 
+    def can_sniff_active_connection(self):
+        """
+        Determine if the device allows to sniff an active connection.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        return (
+            (commands & (1 << SniffActiveConn)) > 0 and
+            (commands & (1 << Start))>0 and
+            (commands & (1 << Stop))>0
+        )
 
     def can_sniff_advertisements(self):
         """
@@ -302,6 +312,17 @@ class BLE(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
+    def sniff_active_connection(self, access_address):
+        """
+        Sniff active connection.
+        """
+        if not self.can_sniff_active_connection():
+            raise UnsupportedCapability("ActiveConnectionSniffing")
+
+        msg = Message()
+        msg.ble.sniff_conn.access_address = access_address
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
 
     def hijack_slave(self, access_address):
