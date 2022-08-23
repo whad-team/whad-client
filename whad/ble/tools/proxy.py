@@ -19,6 +19,7 @@ from whad.ble.exceptions import HookReturnValue, HookDontForward
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.exceptions import WhadDeviceNotFound
 from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
+from binascii import hexlify
 
 # Logging
 import logging
@@ -418,7 +419,7 @@ class LinkLayerProxy(object):
         :returns: A PDU to be sent to the target device or None to avoid forwarding.
         :rtype: Packet, None
         """
-        logger.info('Received a Control PDU: %s' % pdu)
+        logger.info('Received a Control PDU: %s' % hexlify(bytes(pdu)))
         return pdu
 
 
@@ -432,7 +433,7 @@ class LinkLayerProxy(object):
         :returns: A PDU to be sent to the target device or None to avoid forwarding.
         :rtype: Packet, None
         """
-        logger.info('Received a Data PDU: %s' % pdu)
+        logger.info('Received a Data PDU: %s' % hexlify(bytes(pdu)))
         return pdu
 
 
