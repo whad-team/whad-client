@@ -429,9 +429,14 @@ class BLE(WhadDeviceConnector):
         """
         Start currently enabled mode.
         """
+        logger.info('starting current BLE mode ...')
         msg = Message()
         msg.ble.start.CopyFrom(StartCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        if (resp.generic.cmd_result.result == ResultCode.SUCCESS):
+            logger.info('current BLE mode successfully started')
+        else:
+            logger.info('an error occured while starting !')
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def disconnect(self, conn_handle):
