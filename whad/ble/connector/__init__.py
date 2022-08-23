@@ -1,6 +1,7 @@
 import struct
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
-    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
+    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
+    BTLE_RF
 from scapy.compat import raw
 
 from whad.device import WhadDeviceConnector
@@ -54,6 +55,9 @@ class BLE(WhadDeviceConnector):
         timestamp = None
         if hasattr(packet, "metadata"):
             header, timestamp = packet.metadata.convert_to_header()
+            formatted_packet = header / formatted_packet
+        else:
+            header = BTLE_RF()
             formatted_packet = header / formatted_packet
 
         return formatted_packet, timestamp

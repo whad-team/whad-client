@@ -176,8 +176,8 @@ class WhadDeviceConnector(object):
         :returns: Boolean indicating if the callback has been successfully attached.
         """
         callbacks_dicts = (
-            [self.__reception_callbacks] if on_reception else [] +
-            [self.__transmission_callbacks] if on_transmission else []
+            ([self.__reception_callbacks] if on_reception else []) +
+            ([self.__transmission_callbacks] if on_transmission else [])
         )
         for callback_dict in callbacks_dicts:
             callback_dict[callback] = filter
@@ -195,8 +195,8 @@ class WhadDeviceConnector(object):
         """
         removed = False
         callbacks_dicts = (
-            [self.__reception_callbacks] if on_reception else [] +
-            [self.__transmission_callbacks] if on_transmission else []
+            ([self.__reception_callbacks] if on_reception else []) +
+            ([self.__transmission_callbacks] if on_transmission else [])
         )
         for callback_dict in callbacks_dicts:
             if callback in callback_dict:
@@ -213,8 +213,8 @@ class WhadDeviceConnector(object):
         :returns: Boolean indicating if callbacks have been successfully detached.
         """
         callbacks_dicts = (
-            [self.__reception_callbacks] if reception else [] +
-            [self.__transmission_callbacks] if transmission else []
+            ([self.__reception_callbacks] if on_reception else []) +
+            ([self.__transmission_callbacks] if on_transmission else [])
         )
         for callback_dict in callbacks_dicts:
             callback_dict = {}
