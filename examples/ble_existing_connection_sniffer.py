@@ -14,11 +14,18 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             sniffer = Sniffer(dev)
+
+            """
+            # Access address discovery
             sniffer.configure(access_addresses_discovery=True)
             sniffer.start()
             for i in sniffer.sniff():
                 print("[i] Access address found: ", repr(i))
-
+            """
+            sniffer.configure(active_connection=0xee8b0570)
+            sniffer.start()
+            while True:
+                sleep(1)
 
         except (KeyboardInterrupt, SystemExit):
             dev.close()
