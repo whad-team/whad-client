@@ -5,6 +5,7 @@ Bluetooth LE Stack Link-layer Manager
 from scapy.layers.bluetooth4LE import *
 
 from whad.ble.stack.l2cap import BleL2CAP
+from whad.ble.crypto import LinkLayerCryptoManager
 
 CONNECTION_UPDATE_REQ = 0x00
 CHANNEL_MAP_REQ = 0x01
@@ -31,10 +32,14 @@ LENGTH_RSP = 0x15
 
 class BleConnection(object):
 
-    def __init__(self, llm, conn_handle):
+    def __init__(self, llm, conn_handle, local_peer_addr, remote_peer_addr):
         self.__llm = llm
         self.__conn_handle = conn_handle
+        self.__local_peer = local_peer_addr
+        self.__remote_peer = remote_peer_addr
         self.__l2cap = BleL2CAP(self)
+        self.__encrypted = False
+        self.__llcm = None
 
         self.__handlers = {
             CONNECTION_UPDATE_REQ: self.on_connection_update_req,
@@ -60,6 +65,14 @@ class BleConnection(object):
             LENGTH_REQ: self.on_length_req,
             LENGTH_RSP: self.on_length_rsp
         }
+
+    @property
+    def remote_peer(self):
+        return self.__remote_peer
+
+    @property
+    def local_peer(self):
+        return self.__local_peer
 
     def on_disconnect(self):
         """Connection has been closed.
@@ -102,6 +115,10 @@ class BleConnection(object):
     def conn_handle(self):
         return self.__conn_handle
 
+    def set_stk(self, stk):
+        self.__encrypted = True
+        self.__stk = stk
+
     ### Link-layer control PDU callbacks
 
     def on_unsupported_opcode(self, opcode):
@@ -126,9 +143,26 @@ class BleConnection(object):
         self.__llm.on_disconnect(self.__conn_handle)
 
     def on_enc_req(self, enc_req):
-        """Encryption not supported yet
+        """Encryption request handler
         """
-        self.on_unsupported_opcode(ENC_REQ)
+        # Allowed if we have already negociated an STK
+        if self.__stk is not None:
+
+            # TODO: manage encryption enable
+            self.__rand_c = enc_req.rand
+            self.__llcm = LinkLayerCryptoManager(
+                self.__stk,
+                enc_req.skd_c,
+                enc_req.ediv,
+                b'\x00'*8,
+                b'\x00'*4
+            )
+        else:
+            self.send_control(
+                BTLE_CTRL() / LL_REJECT_IND(
+                    code=0x1A # Unsupported Remote Feature
+                )
+            )
 
     def on_enc_rsp(self, enc_rsp):
         """Encryption not supported yet
@@ -226,23 +260,27 @@ class BleLinkLayerManager(object):
     def stack(self):
         return self.__stack
 
-    def on_connect(self, connection):
+    def on_connect(self, conn_handle, local_peer_addr, remote_peer_addr):
         """Handles BLE connection
         """
-        if connection.conn_handle not in self.__connections:
-            print('[llm] registers new connection %d' % connection.conn_handle)
-            self.__connections[connection.conn_handle] = BleConnection(
+        if conn_handle not in self.__connections:
+            print('[llm] registers new connection %d with %s' % (conn_handle, remote_peer_addr))
+            self.__connections[conn_handle] = BleConnection(
                 self,
-                connection.conn_handle
+                conn_handle,
+                local_peer_addr,
+                remote_peer_addr
             )
-            return self.__connections[connection.conn_handle]
+            return self.__connections[conn_handle]
         else:
             print('[!] Connection already exists')
-            self.__connections[connection.conn_handle] = BleConnection(
+            self.__connections[conn_handle] = BleConnection(
                 self,
-                connection.conn_handle
+                conn_handle,
+                local_peer_addr,
+                remote_peer_addr
             )
-            return self.__connections[connection.conn_handle]
+            return self.__connections[conn_handle]
 
     def on_disconnect(self, conn_handle):
         if conn_handle in self.__connections:

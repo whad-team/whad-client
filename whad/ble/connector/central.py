@@ -1,11 +1,14 @@
 from time import time
 
 from whad.ble.connector import BLE
+from whad.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
 from whad.ble.stack.gatt import GattClient
 from whad.ble.profile.device import PeripheralDevice
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
+
+from binascii import hexlify
 
 import logging
 logger = logging.getLogger(__name__)
@@ -25,6 +28,7 @@ class Central(BLE):
         self.__stack = BleStack(self, GattClient())
         self.__connected = False
         self.__peripheral = None
+        self.__random_addr = False
 
         # Check device accept central mode
         if not self.can_be_central():
@@ -36,7 +40,7 @@ class Central(BLE):
             if existing_connection is not None:
                 self.on_connected(existing_connection)
 
-    def connect(self, bd_address, timeout=30):
+    def connect(self, bd_address, random=False, timeout=30):
         """Connect to a target device
 
         :param string bd_address: Bluetooth device address (in format 'xx:xx:xx:xx:xx:xx')
@@ -44,12 +48,13 @@ class Central(BLE):
         :returns: An instance of `PeripheralDevice` on success, `None` on failure.
         """
         if self.can_connect():
-            self.connect_to(bd_address)
+            self.connect_to(bd_address, random=random)
             self.start()
             start_time=time()
             while not self.is_connected():
                 if time()-start_time >= timeout:
                     return None
+            self.__random_addr = random
             return self.peripheral()
         else:
             return None
@@ -75,7 +80,17 @@ class Central(BLE):
     def on_connected(self, connection_data):
         """Callback method to handle connection event.
         """
-        self.__stack.on_connection(connection_data)
+        self.__stack.on_connection(
+            connection_data.conn_handle,
+            BDAddress.from_bytes(
+                connection_data.initiator,
+                addr_type=connection_data.init_addr_type
+            ),
+            BDAddress.from_bytes(
+                connection_data.advertiser,
+                connection_data.adv_addr_type
+            )
+        )
 
     def on_disconnected(self, disconnection_data):
         """Callback method to handle disconnection event.

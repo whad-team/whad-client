@@ -1,7 +1,16 @@
 from Cryptodome.Cipher import AES
 from Cryptodome.Hash import CMAC
+from Cryptodome.Random import get_random_bytes
 from whad.protocol.ble.ble_pb2 import BleDirection
 from struct import pack
+
+def generate_random_value(bits):
+    """Generate a random value of provided bit size.
+
+    :param int bits: Number of bits (8-bit aligned) to generate.
+    :return bytes: Random bytes
+    """
+    return get_random_bytes(int(bits/8))
 
 def e(key, plaintext):
     """

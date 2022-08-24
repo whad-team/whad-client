@@ -2,8 +2,9 @@
 Bluetooth LE Stack L2CAP manager
 """
 from struct import unpack, pack
-from scapy.layers.bluetooth import L2CAP_Hdr, ATT_Hdr
+from scapy.layers.bluetooth import L2CAP_Hdr, ATT_Hdr, SM_Hdr
 from whad.ble.stack.att import BleATT
+from whad.ble.stack.smp import BleSMP
 
 class BleL2CAP(object):
 
@@ -12,6 +13,7 @@ class BleL2CAP(object):
         self.__packet = None
         self.__expected_length = 0
         self.__att = BleATT(self)
+        self.__smp = BleSMP(self)
 
         # Set ATT GATT layer based on connection GATT class instance
         self.__att.gatt = self.__connection.gatt_class
@@ -19,6 +21,10 @@ class BleL2CAP(object):
         # Default MTU for L2CAP: 23 bytes
         self.__remote_mtu = 23
         self.__local_mtu = 23
+
+    @property
+    def connection(self):
+        return self.__connection
 
     @property
     def att(self):
@@ -66,8 +72,10 @@ class BleL2CAP(object):
         """
         if ATT_Hdr in packet:
             self.__att.on_packet(packet.getlayer(ATT_Hdr))
+        elif SM_Hdr in packet:
+            self.__smp.on_smp_packet(packet.getlayer(SM_Hdr))
 
-    def send(self, data):
+    def send(self, data, channel='attribute'):
         """Send data
         """
         packets=[]
@@ -90,7 +98,7 @@ class BleL2CAP(object):
             # First packet is sent with no fragment flag
             if i == 0:
                 self.__connection.send_l2cap_data(
-                    L2CAP_Hdr(cid="attribute", len=len(data))/pkt,
+                    L2CAP_Hdr(cid=channel, len=len(data))/pkt,
                     fragment=False
                 )
             else:

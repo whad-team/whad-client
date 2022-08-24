@@ -55,8 +55,12 @@ class BleStack:
     # Incoming messages
     #############################
 
-    def on_connection(self, connection_data):
-        connection = self.__llm.on_connect(connection_data)
+    def on_connection(self, conn_handle, local_peer_addr, remote_peer_addr):
+        connection = self.__llm.on_connect(
+            conn_handle,
+            local_peer_addr,
+            remote_peer_addr
+        )
         self.__connector.on_new_connection(connection)
 
     def on_disconnection(self, conn_handle, reason):

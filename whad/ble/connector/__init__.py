@@ -9,7 +9,7 @@ from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, StartCmd, StopC
     ScanMode, Start, Stop, BleAdvType, ConnectTo, CentralModeCmd, PeripheralMode, \
     PeripheralModeCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
     HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
-    SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd
+    SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd, BleAddrType
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
@@ -443,12 +443,16 @@ class BLE(WhadDeviceConnector):
             msg.ble.periph_mode.CopyFrom(PeripheralModeCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
-    def connect_to(self, bd_addr):
+    def connect_to(self, bd_addr, random=False):
         """
         Initiate a Bluetooth Low Energy connection.
         """
         msg = Message()
         msg.ble.connect.bd_address = bd_addr_to_bytes(bd_addr)
+        if random:
+            msg.ble.connect.addr_type = BleAddrType.RANDOM
+        else:
+            msg.ble.connect.addr_type = BleAddrType.PUBLIC
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
     def start(self):
