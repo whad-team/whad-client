@@ -1,4 +1,5 @@
 from whad.ble import Sniffer
+from whad.ble.connector.sniffer import SynchronizedConnection
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from time import time,sleep
@@ -22,7 +23,8 @@ if __name__ == '__main__':
             for i in sniffer.sniff():
                 print("[i] Access address found: ", repr(i))
             """
-            sniffer.configure(active_connection=0xee8b0570)
+            #[sniffer] Connection synchronized -> access_address=0xc8ab6bce, crc_init=0x0cca08, hop_interval=54 (67500 us), hop_increment=11, channel_map=0xffff0f0010.
+            sniffer.configure(active_connection=SynchronizedConnection(access_address=0xc8ab6bce, crc_init=0x0cca08))
             sniffer.start()
             while True:
                 sleep(1)

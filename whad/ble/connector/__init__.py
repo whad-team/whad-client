@@ -313,7 +313,7 @@ class BLE(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-    def sniff_active_connection(self, access_address):
+    def sniff_active_connection(self, access_address, crc_init=None):
         """
         Sniff active connection.
         """
@@ -322,6 +322,10 @@ class BLE(WhadDeviceConnector):
 
         msg = Message()
         msg.ble.sniff_conn.access_address = access_address
+
+        if crc_init is not None:
+            msg.ble.sniff_conn.crc_init = crc_init
+
         msg.ble.sniff_conn.monitored_channels = b"\xFF\xFF\xFF\xFF\x1F"
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)

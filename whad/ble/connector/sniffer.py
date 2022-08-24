@@ -147,7 +147,14 @@ class Sniffer(BLE):
             self.discover_access_addresses()
 
         elif self.__configuration.active_connection is not None:
-            self.sniff_active_connection(self.__configuration.active_connection)
+            access_address = None
+            crc_init = None
+            if self.__configuration.active_connection.access_address is not None:
+                access_address = self.__configuration.active_connection.access_address
+            if self.__configuration.active_connection.crc_init is not None:
+                crc_init = self.__configuration.active_connection.crc_init
+
+            self.sniff_active_connection(access_address, crc_init)
 
         elif self.__configuration.follow_connection:
             if not self.can_sniff_new_connection():
@@ -171,7 +178,7 @@ class Sniffer(BLE):
 
     def configure(self,active_connection=None, access_addresses_discovery=False, advertisements=True, connection=True, empty_packets=False):
         self.stop()
-        self.__configuration.active_connection = int(active_connection) if active_connection is not None else None
+        self.__configuration.active_connection = active_connection if active_connection is not None else None
         self.__configuration.access_addresses_discovery = access_addresses_discovery
         self.__configuration.show_advertisements = advertisements
         self.__configuration.show_empty_packets = empty_packets
