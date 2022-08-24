@@ -309,11 +309,11 @@ class BLE(WhadDeviceConnector):
             raise UnsupportedCapability("AccessAddressesDiscovery")
 
         msg = Message()
-        msg.ble.sniff_aa.monitored_channels = b"\xFF\xFF\xFF\xFF\x1F" #CopyFrom(SniffAccessAddressCmd())
+        msg.ble.sniff_aa.monitored_channels = b"\xFF\xFF\xFF\xFF\x1F"
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-    def sniff_active_connection(self, access_address, crc_init=None):
+    def sniff_active_connection(self, access_address, crc_init=None, channel_map=None, hop_interval=None, hop_increment=None):
         """
         Sniff active connection.
         """
@@ -326,7 +326,17 @@ class BLE(WhadDeviceConnector):
         if crc_init is not None:
             msg.ble.sniff_conn.crc_init = crc_init
 
+        if channel_map is not None:
+            msg.ble.sniff_conn.channel_map = channel_map
+
+        if hop_interval is not None:
+            msg.ble.sniff_conn.hop_interval = hop_interval
+
+        if hop_increment is not None:
+            msg.ble.sniff_conn.hop_increment = hop_increment
+
         msg.ble.sniff_conn.monitored_channels = b"\xFF\xFF\xFF\xFF\x1F"
+        print(msg)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 

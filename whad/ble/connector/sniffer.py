@@ -147,14 +147,13 @@ class Sniffer(BLE):
             self.discover_access_addresses()
 
         elif self.__configuration.active_connection is not None:
-            access_address = None
-            crc_init = None
-            if self.__configuration.active_connection.access_address is not None:
-                access_address = self.__configuration.active_connection.access_address
-            if self.__configuration.active_connection.crc_init is not None:
-                crc_init = self.__configuration.active_connection.crc_init
+            access_address = self.__configuration.active_connection.access_address
+            crc_init = self.__configuration.active_connection.crc_init
+            channel_map = self.__configuration.active_connection.channel_map
+            hop_interval = self.__configuration.active_connection.hop_interval
+            hop_increment = self.__configuration.active_connection.hop_increment
 
-            self.sniff_active_connection(access_address, crc_init)
+            self.sniff_active_connection(access_address, crc_init, channel_map, hop_interval, hop_increment)
 
         elif self.__configuration.follow_connection:
             if not self.can_sniff_new_connection():
