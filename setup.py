@@ -2,9 +2,12 @@ from setuptools import setup
 from setuptools.command.install import install
 from sys import platform, exit, executable
 from subprocess import Popen, DEVNULL, PIPE
-from os import listdir, geteuid
 from os.path import exists, realpath
 from shutil import copy
+try:
+    from os import listdir, geteuid
+except ImportError:
+    pass
 
 class DevicesInstall(install):
     UDEV_LOCATION = [
@@ -89,6 +92,6 @@ class DevicesInstall(install):
             # Windows
             print("Automatic device installation is not supported on Windows.")
             exit(1)
-            
+
 if __name__ == "__main__":
     setup()
