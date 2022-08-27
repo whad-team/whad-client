@@ -17,7 +17,7 @@ from os import read, write
 from time import sleep
 from queue import Queue
 
-def get_hci(self, index=0):
+def get_hci(index):
     '''
     Returns an HCI socket based on adapter index.
     '''
@@ -47,14 +47,15 @@ class HCIDevice(VirtualDevice):
         devices_ids = HCIConfig.list()
         for device_id in devices_ids:
             available_devices.append(HCIDevice(index=device_id))
+
         return available_devices
 
-    def __init__(self, index=0):
+    def __init__(self, index):
+        super().__init__()
         self.__index = index
         self.__socket = None
         self.__opened = False
         self.__hci_responses = Queue()
-        super().__init__()
 
     @property
     def identifier(self):

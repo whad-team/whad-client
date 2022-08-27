@@ -24,8 +24,7 @@ class HCIConfig(object):
         device_ids = []
         for device_number in range(number_of_devices):
             device_id = unpack('H', output[4 + 8*device_number:4 + 8*device_number + 2])[0]
-            device_ids.append(device_id)
-
+            device_ids.insert(0, device_id)
         return device_ids
 
     @classmethod
