@@ -5,7 +5,7 @@ from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
 from scapy.compat import raw
 
 from whad.device import WhadDeviceConnector
-from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, StartCmd, StopCmd, \
+from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCmd, StartCmd, StopCmd, \
     ScanMode, Start, Stop, BleAdvType, ConnectTo, CentralModeCmd, PeripheralMode, \
     PeripheralModeCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
     HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
@@ -74,6 +74,9 @@ class BLE(WhadDeviceConnector):
             self.__can_send = None
             self.__can_send_raw = None
 
+            # Link-layer encryption
+            self.__encrypted = False
+
             # Open device and make sure it is compatible
             self.device.open()
             self.device.discover()
@@ -119,7 +122,7 @@ class BLE(WhadDeviceConnector):
             print(err)
             return None
 
-    def _build_message_from_scapy_packet(self, packet):
+    def _build_message_from_scapy_packet(self, packet, encrypt=False):
         msg = Message()
         direction = packet.metadata.direction
         connection_handle = packet.metadata.connection_handle
@@ -132,6 +135,8 @@ class BLE(WhadDeviceConnector):
             msg.ble.send_raw_pdu.crc = BTLE(raw(packet)).crc # force the CRC to be generated if not provided
             msg.ble.send_raw_pdu.access_address = BTLE(raw(packet)).access_addr
 
+            msg.ble.send_raw_pdu.encrypt = encrypt
+
             if BTLE_DATA in packet:
                 msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_DATA:])
             elif BTLE_ADV in packet:
@@ -142,6 +147,7 @@ class BLE(WhadDeviceConnector):
         else:
             msg.ble.send_pdu.direction = direction
             msg.ble.send_pdu.conn_handle = connection_handle
+            msg.ble.send_pdu.encrypt = encrypt
 
             if BTLE_DATA in packet:
                 msg.ble.send_pdu.pdu = raw(packet[BTLE_DATA:])
@@ -160,6 +166,13 @@ class BLE(WhadDeviceConnector):
             capabilities = self.device.get_domain_capability(WhadDomain.BtLE)
             self.__can_send_raw = not (capabilities & WhadCapability.NoRawData)
         return self.__can_send_raw
+
+    def is_ll_encrypted(self):
+        """Determine if the link-layer is encrypted.
+
+        :return: True if link-layer is encrypted, False otherwise
+        :rtype: bool
+        """
 
     def can_send(self):
         """
@@ -488,6 +501,26 @@ class BLE(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
+    def set_encryption(self, enabled=False, key=None, iv=None):
+        """Notify WHAD device about encryption status
+        """
+        # Send SetEncryptionCmd to device
+        msg = Message()
+        msg.ble.encryption.enabled = enabled
+        if key is not None:
+            msg.ble.encryption.key = key
+        if iv is not None:
+            msg.ble.encryption.iv = iv
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+
+        # Update LL encryption status
+        if (resp.generic.cmd_result.result == ResultCode.SUCCESS):
+            self.__encrypted = enabled
+            logger.info('[ble connector] encryption is now: %s' % self.__encrypted)
+
+        # Return command result
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
     def process_messages(self):
         self.device.process_messages()
 
@@ -512,6 +545,8 @@ class BLE(WhadDeviceConnector):
 
             elif msg_type == 'pdu':
                 if message.pdu.processed:
+                    packet = self._build_scapy_packet_from_message(message, msg_type)
+                    packet.show()
                     logger.info('[ble PDU log-only]')
                 else:
                     packet = self._build_scapy_packet_from_message(message, msg_type)
@@ -575,7 +610,7 @@ class BLE(WhadDeviceConnector):
             self.on_pdu(conn_pdu)
 
     def on_pdu(self, packet):
-
+        packet.show()
         if packet.LLID == 3:
             self.on_ctl_pdu(packet)
         elif packet.LLID in (1,2):
@@ -594,21 +629,21 @@ class BLE(WhadDeviceConnector):
     def on_error_pdu(self, pdu):
         pass
 
-    def send_ctrl_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6):
+    def send_ctrl_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
         """
         Send CTRL PDU
         """
         logger.info('send control PDU to connection (handle:%d)' % conn_handle)
-        return self.send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address)
+        return self.send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
 
-    def send_data_pdu(self, data, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6):
+    def send_data_pdu(self, data, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
         """
         Send data (L2CAP) PDU.
         """
         logger.info('send data PDU to connection (handle:%d)' % conn_handle)
-        return self.send_pdu(data, conn_handle=conn_handle, direction=direction, access_address=access_address)
+        return self.send_pdu(data, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
 
-    def send_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6):
+    def send_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
         """
         Send generic PDU.
         """
@@ -621,7 +656,14 @@ class BLE(WhadDeviceConnector):
             packet.metadata.direction = direction
             packet.metadata.connection_handle = conn_handle
 
-            msg = self._build_message_from_scapy_packet(packet)
+            # If encrypt is provided, take it into account
+            # otherwise consider using the internal link-layer encryption status
+            if encrypt is not None and isinstance(encrypt, bool):
+                logger.info('[ble connector] encrypt is specified (%s)' % encrypt)
+                msg = self._build_message_from_scapy_packet(packet, encrypt)
+            else:
+                logger.info('[ble connector] link-layer encryption: %s' % self.__encrypted)
+                msg = self._build_message_from_scapy_packet(packet, self.__encrypted)
 
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)

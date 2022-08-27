@@ -9,7 +9,7 @@ parse raw advertising data through class :class:`AdvDataFieldList`.
 """
 from struct import pack, unpack
 from urllib.parse import urlparse
-from whad.ble import BDAddress
+from whad.ble.bdaddr import BDAddress
 from whad.ble.profile.attribute import UUID
 
 

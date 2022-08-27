@@ -23,6 +23,10 @@ class BleL2CAP(object):
         self.__local_mtu = 23
 
     @property
+    def smp(self):
+        return self.__smp
+
+    @property
     def connection(self):
         return self.__connection
 

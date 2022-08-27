@@ -56,7 +56,7 @@ class Peripheral(BLE):
                 self.on_connected(existing_connection)
 
     
-    def send_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6):
+    def send_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None):
         """Send a PDU to the central device this peripheral device is connected to.
 
         Sending direction is set to ̀ BleDirection.SLAVE_TO_MASTER` as we need to send PDUs to a central device.
@@ -67,9 +67,8 @@ class Peripheral(BLE):
         :param access_address: Target access address
         :type access_address: int, optional
         """
-        super().send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address)
+        super().send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
     
-
     def use_stack(self, clazz=BleStack):
         """Specify a stack class to use for BLE. By default, our own stack (BleStack) is used.
         """

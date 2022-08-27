@@ -10,6 +10,7 @@ class BLEMetadata(Metadata):
     connection_handle : int = None
     is_crc_valid : bool = None
     relative_timestamp : int = None
+    decrypted : bool = None
 
     def convert_to_header(self):
         timestamp = None
@@ -61,6 +62,7 @@ def generate_ble_metadata(message, msg_type):
             metadata.is_crc_valid = message.crc_validity
         if message.HasField("relative_timestamp"):
             metadata.relative_timestamp = message.relative_timestamp
+            metadata.decrypted = message.decrypted
 
         metadata.connection_handle = message.conn_handle
 
@@ -73,5 +75,7 @@ def generate_ble_metadata(message, msg_type):
         message = message.pdu
         metadata.connection_handle = message.conn_handle
         metadata.direction = message.direction
+        metadata.decrypted = message.decrypted
+
 
     return metadata

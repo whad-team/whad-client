@@ -63,8 +63,8 @@ class Central(BLE):
         return self.__peripheral
 
 
-    def send_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6):
-        return super().send_pdu(pdu, conn_handle, direction=direction, access_address=access_address)
+    def send_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
+        return super().send_pdu(pdu, conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
 
     ##############################
     # Incoming events

@@ -51,6 +51,30 @@ def channel_to_frequency(channel):
 
     return 2400 + freq_offset
 
+# Swap bits of a 8-bit value
+def swap_bits(value):
+    return (value * 0x0202020202  & 0x010884422010) % 1023
+
+# (De)Whiten data based on BLE channel
+def dewhitening(data, channel):
+  ret = []
+  lfsr = swap_bits(channel) | 2
+
+  for d in data:
+    d = swap_bits(d)
+    for i in 128, 64, 32, 16, 8, 4, 2, 1:
+      if lfsr & 0x80:
+        lfsr ^= 0x11
+        d ^= i
+
+      lfsr <<= 1
+      i >>=1
+    ret.append(swap_bits(d))
+
+  return ret
+
+
+
 def crc(data, init=0x555555):
     '''
     Computes the 24-bit CRC of provided data.

@@ -72,11 +72,20 @@ class BleStack:
     def on_data_pdu(self, conn_handle, data):
         self.__llm.on_data_pdu(conn_handle, data)
 
-    def send_data(self, conn_handle, data):
-        self.__connector.send_data_pdu(data, conn_handle=conn_handle)
+    def send_data(self, conn_handle, data, encrypt=None):
+        self.__connector.send_data_pdu(data, conn_handle=conn_handle, encrypt=encrypt)
 
-    def send_control(self, conn_handle, pdu):
-        self.__connector.send_ctrl_pdu(pdu, conn_handle)
+    def send_control(self, conn_handle, pdu, encrypt=None):
+        self.__connector.send_ctrl_pdu(pdu, conn_handle, encrypt=encrypt)
+
+    def set_encryption(self, conn_handle, enabled, key, iv):
+        """Notify encryption status directly
+
+        Call connector's `notify_encryption_status()` method usually implemented
+        in BLE in order to notify the underlying WHAD device that encryption has
+        been enabled or not.
+        """
+        return self.__connector.set_encryption(enabled=enabled, key=key, iv=iv)
 
     ############################
     # Interact

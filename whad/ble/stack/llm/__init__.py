@@ -1,11 +1,19 @@
 """
 Bluetooth LE Stack Link-layer Manager
 """
+from binascii import hexlify
+from struct import pack
+from random import randint
+
+from time import sleep
 
 from scapy.layers.bluetooth4LE import *
 
 from whad.ble.stack.l2cap import BleL2CAP
-from whad.ble.crypto import LinkLayerCryptoManager
+from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, e 
+
+import logging
+logger = logging.getLogger(__name__)
 
 CONNECTION_UPDATE_REQ = 0x00
 CHANNEL_MAP_REQ = 0x01
@@ -93,15 +101,15 @@ class BleConnection(object):
         """Forward L2CAP data to L2CAP layer"""
         self.__l2cap.on_data_received(data, fragment)
 
-    def send_l2cap_data(self, data, fragment=False):
+    def send_l2cap_data(self, data, fragment=False, encrypt=None):
         """Sends data back
         """
-        self.__llm.send_data(self.__conn_handle, data, fragment)
+        self.__llm.send_data(self.__conn_handle, data, fragment, encrypt=encrypt)
 
-    def send_control(self, pdu):
+    def send_control(self, pdu, encrypt=None):
         """Sends back a control PDU
         """
-        self.__llm.send_control(self.__conn_handle, pdu)
+        self.__llm.send_control(self.__conn_handle, pdu, encrypt=encrypt)
 
     @property
     def gatt_class(self):
@@ -118,6 +126,9 @@ class BleConnection(object):
     def set_stk(self, stk):
         self.__encrypted = True
         self.__stk = stk
+
+    def set_ltk(self, ltk):
+        self.__ltk = ltk
 
     ### Link-layer control PDU callbacks
 
@@ -148,15 +159,86 @@ class BleConnection(object):
         # Allowed if we have already negociated an STK
         if self.__stk is not None:
 
-            # TODO: manage encryption enable
-            self.__rand_c = enc_req.rand
+            # Generate our SKD and IV
+            self.__skd = randint(0, 0x10000000000000000)
+            self.__iv = randint(0, 0x100000000)
+
+            logger.info('[llm] Received LL_ENC_REQ: rand=%s ediv=%s skd=%s iv=%s' % (
+                hexlify(pack('<Q', enc_req.rand)),
+                hexlify(pack('<H', enc_req.ediv)),
+                hexlify(pack('<Q', enc_req.skdm)),
+                hexlify(pack('<I', enc_req.ivm)),
+            ))
+
+            logger.info('[llm] Initiate connection LinkLayerCryptoManager')
+
+            # Save master rand/iv
+            self.__randm = enc_req.rand
+            self.__ediv = enc_req.ediv
+
+            # Initiate LLCM
             self.__llcm = LinkLayerCryptoManager(
                 self.__stk,
-                enc_req.skd_c,
-                enc_req.ediv,
-                b'\x00'*8,
-                b'\x00'*4
+                enc_req.skdm,
+                enc_req.ivm,
+                self.__skd,
+                self.__iv
             )
+
+            # Compute session key
+            master_skd = pack(">Q", enc_req.skdm)
+            master_iv = pack("<L", enc_req.ivm)
+            slave_skd = pack(">Q", self.__skd)
+            slave_iv = pack("<L", self.__iv)
+
+            # Generate session key diversifier
+            skd = slave_skd + master_skd
+
+            # Generate initialization vector
+            iv = master_iv + slave_iv
+
+            # Generate session key
+            session_key = e(self.__stk, skd)
+
+            logger.info('[llm] master  skd: %s' % hexlify(master_skd))
+            logger.info('[llm] master   iv: %s' % hexlify(master_iv))
+            logger.info('[llm] slave   skd: %s' % hexlify(slave_skd))
+            logger.info('[llm] slave    iv: %s' % hexlify(slave_iv))
+            logger.info('[llm] Session  TK: %s' % hexlify(self.__stk))
+            logger.info('[llm] Session  iv: %s' % hexlify(iv))
+            logger.info('[llm] Exp. Ses iv: %s' % hexlify(self.__llcm.iv))
+            logger.info('[llm] Session key: %s' % hexlify(session_key))
+
+            logger.info('[llm] Send LL_ENC_RSP: skd=%s iv=%s' % (
+                hexlify(pack('<Q', self.__skd)),
+                hexlify(pack('<I', self.__iv))
+            ))
+
+            # Send back our parameters
+            self.send_control(
+                BTLE_CTRL() / LL_ENC_RSP(
+                    skds = self.__skd,
+                    ivs = self.__iv
+                )
+            )
+
+            # Notify encryption enabled
+            if not self.__llm.set_encryption(
+                self.conn_handle,
+                enabled = True,
+                key=session_key,
+                iv=iv
+            ):
+                logger.info('[llm] Cannot enable encryption')
+            else:
+                logger.info('[llm] Encryption enabled in hardware')
+
+            # Start encryption (STK as LTK)
+            self.send_control(
+                BTLE_CTRL() / LL_START_ENC_REQ(),
+                encrypt=False
+            )
+            
         else:
             self.send_control(
                 BTLE_CTRL() / LL_REJECT_IND(
@@ -175,9 +257,25 @@ class BleConnection(object):
         self.on_unsupported_opcode(START_ENC_REQ)
 
     def on_start_enc_rsp(self, start_enc_rsp):
-        """Encryption not supported yet
+        """Encryption start response handler
+
+        Normally, we get this packet when a link has successfully
+        been encrypted (with STK or LTK). So we need to notify the
+        SMP that encryption has been acknowledged by the remote peer.
+
+
         """
-        self.on_unsupported_opcode(START_ENC_RSP)
+        # Check if we are the encryption initiator,
+        # if yes then we need to answer to this encrypted LL_START_ENC_RSP
+        # with another encrypted LL_START_ENC_RSP
+        if not self.__l2cap.smp.is_initiator():
+            self.send_control(
+                BTLE_CTRL() / LL_START_ENC_RSP()
+            )
+
+        # Notify SMP channel is now encrypted
+        self.__l2cap.smp.on_channel_encrypted()
+
 
     def on_unknown_rsp(self, unk_rsp):
         pass
@@ -303,7 +401,7 @@ class BleLinkLayerManager(object):
             conn = self.__connections[conn_handle]
             conn.on_l2cap_data(bytes(data.payload), data.LLID == 0x1)
 
-    def send_data(self, conn_handle, data, fragment=False):
+    def send_data(self, conn_handle, data, fragment=False, encrypt=None):
         """Pack data into a Data PDU and transfer it to the device.
         """
         llid = 0x01 if fragment else 0x02
@@ -312,10 +410,11 @@ class BleLinkLayerManager(object):
             BTLE_DATA(
                 LLID=llid,
                 len=len(data)
-            )/data
+            )/data,
+            encrypt=encrypt
         )
 
-    def send_control(self, conn_handle, control_pdu):
+    def send_control(self, conn_handle, control_pdu, encrypt=None):
         """Send a control PDU
         """
         self.__stack.send_control(
@@ -323,5 +422,16 @@ class BleLinkLayerManager(object):
             BTLE_DATA(
                 LLID=0x03,
                 len=len(control_pdu)
-            )/control_pdu
+            )/control_pdu,
+            encrypt=encrypt
+        )
+
+    def set_encryption(self, conn_handle, enabled=False, key=None, iv=None):
+        """Notify connector encryption has been enabled or disabled.
+        """
+        return self.__stack.set_encryption(
+            conn_handle,
+            enabled,
+            key,
+            iv
         )

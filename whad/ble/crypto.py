@@ -3,6 +3,7 @@ from Cryptodome.Hash import CMAC
 from Cryptodome.Random import get_random_bytes
 from whad.protocol.ble.ble_pb2 import BleDirection
 from struct import pack
+from binascii import hexlify
 
 def generate_random_value(bits):
     """Generate a random value of provided bit size.
@@ -193,7 +194,7 @@ class LinkLayerCryptoManager:
         Generate a nonce according to the counter value, the direction and the IV.
         """
         counter = pack("i",self.master_cnt if direction == BleDirection.MASTER_TO_SLAVE else self.slave_cnt)
-        direction = b"\x00" if direction == BleDirection.MASTER_TO_SLAVE else b"\x80"
+        direction = b"\x80" if direction == BleDirection.MASTER_TO_SLAVE else b"\x00"
         return counter + direction + self.iv
 
     def encrypt(self, payload, direction=BleDirection.MASTER_TO_SLAVE):
@@ -217,6 +218,7 @@ class LinkLayerCryptoManager:
         ciphertext = payload[2:-4]
         mic = payload[-4:]
         nonce = self.generate_nonce(direction)
+        print(hexlify(nonce))
         cipher = AES.new(self.session_key, AES.MODE_CCM, nonce=nonce, mac_len=4, assoc_len=len(header))
         cipher.update(header)
         plaintext = cipher.decrypt(ciphertext)

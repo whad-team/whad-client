@@ -7,10 +7,12 @@ BleSMP provides these different pairing strategies:
 """
 from struct import pack
 from binascii import hexlify
+from random import randint
 
 
 from scapy.layers.bluetooth import SM_Pairing_Request, SM_Pairing_Response, SM_Hdr,\
-    SM_Confirm, SM_Random, SM_Failed
+    SM_Confirm, SM_Random, SM_Failed, SM_Encryption_Information, SM_Master_Identification, \
+    SM_Identity_Information, SM_Signing_Information
 from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, c1, s1
 
 from whad.ble.stack.smp.constants import *
@@ -38,13 +40,13 @@ class SM_Peer(object):
 
         # Key distribution (by default, corresponds to Legacy JustWorks)
         self.__kd_link_key = False
-        self.__kd_sign_key = True
-        self.__kd_enc_key = True
-        self.__kd_id_key = True
+        self.__kd_sign_key = False
+        self.__kd_enc_key = False
+        self.__kd_id_key = False
 
         # Default security parameters
         self.__oob = False
-        self.__bonding = True
+        self.__bonding = False
         self.__mitm = False
         self.__lesc = False
         self.__keypress = False
@@ -56,6 +58,12 @@ class SM_Peer(object):
         self.__rand = None
         self.__stk = None
         self.__ltk = None
+
+        # Distribution parameters
+        self.__dist_ltk = False
+        self.__dist_ediv_rand = False
+        self.__dist_irk = False
+        self.__dist_csrk = False
 
         # Pairing method
         self.__pairing_method = PM_LEGACY_JUSTWORKS
@@ -183,19 +191,26 @@ class SM_Peer(object):
             keys = []
             if self.__kd_enc_key:
                 keys.append('ltk, ediv, rand')
+                self.__dist_ltk = True
+                self.__dist_ediv_rand = True
             if self.__kd_id_key:
                 keys.append('irk')
+                self.__dist_irk = True
             if self.__kd_sign_key:
                 keys.append('csrk')
+                self.__dist_csrk = True
             logger.debug('Set distribute key for peer: %s' % (','.join(keys)))
         elif self.__pairing_method in [PM_LESC_JUSTWORKS, PM_LESC_NUMCOMP, PM_OOB]:
             keys=[]
             if self.__kd_id_key:
                 keys.append('irk')
+                self.__dist_irk = True
             if self.__kd_sign_key:
                 keys.append('csrk')
+                self.__dist_csrk = True
             if self.__kd_link_key:
                 keys.append('ltk')
+                self.__dist_ltk = True
             logger.debug('Set distribute key for peer: %s' % (','.join(keys)))
 
     def get_key_distribution(self):
@@ -217,6 +232,18 @@ class SM_Peer(object):
         if self.__kd_link_key:
             kd |= 0x08
         return kd
+
+    def must_dist_ltk(self):
+        return self.__dist_ltk
+
+    def must_dist_ediv_rand(self):
+        return self.__dist_ediv_rand
+
+    def must_dist_irk(self):
+        return self.__dist_irk
+
+    def must_dist_csrk(self):
+        return self.__dist_csrk
 
     @property
     def max_key_size(self):
@@ -360,6 +387,9 @@ class BleSMP(object):
     STATE_LESC_PAIRING_RANDOM_RECVD = 0x0B
     STATE_LESC_DHK_CHECK_SENT = 0x0C
     STATE_LESC_DHK_CHECK_RECVD = 0x0D
+    STATE_PAIRING_DONE = 0x0E
+    STATE_DISTRIBUTE_KEY = 0x0F
+    STATE_BONDING_DONE = 0xFF
 
     def __init__(self, l2cap, justworks=True, lesc=False, capabilities=IOCAP_NOINPUT_NOOUTPUT):
         self.__l2cap = l2cap
@@ -385,8 +415,14 @@ class BleSMP(object):
         self.__pairing_resp = None
         self.__tk = b'\x00'*16
         self.__stk = b'\x00'*16
+        self.__ltk = b'\x00'*16
+
+        # Initiator role
+        self.__enc_initiator = False
 
 
+    def is_initiator(self):
+        return self.__enc_initiator
 
     ##
     # Helpers
@@ -527,7 +563,7 @@ class BleSMP(object):
             self.__pairing_req = pairing_req
 
             # We are definitely not the initiator but the responder
-            self.__initiator = False
+            self.__enc_initiator = False
             self.__responder = SM_Peer(self.__l2cap.connection.local_peer)
 
             # Create the initiator SM_Peer instance
@@ -543,8 +579,8 @@ class BleSMP(object):
             )
             self.__initiator.iocap = pairing_req.iocap
 
-            # Store responder key distribution options
-            self.__responder.distribute_keys(
+            # Store initiator key distribution options
+            self.__initiator.distribute_keys(
                 enc_key = ((pairing_req.responder_key_distribution & 0x01) != 0),
                 id_key = ((pairing_req.responder_key_distribution & 0x02) != 0),
                 sign_key =((pairing_req.responder_key_distribution & 0x04) != 0),
@@ -571,7 +607,7 @@ class BleSMP(object):
 
         else:
             logger.info('Unexpected packet received, report error and return to idle.')
-            
+
             # Notify error
             error = SM_Failed(
                 reason = SM_ERROR_UNSPEC_REASON
@@ -685,6 +721,54 @@ class BleSMP(object):
 
             # Return to IDLE mode
             self.__state = BleSMP.STATE_IDLE
+
+    def on_channel_encrypted(self):
+        """Handling LL_START_ENC_RSP (channel successfully encrypted).
+
+        This method is called when we successfully received and decrypted an
+        encrypted LL_START_ENC_RSP packet from the remote peer. 
+        """
+        # Previous state was STATE_LEGACY_PAIRING_RANDOM_SENT
+        # since LL_ENC_REQ / LL_ENC_RSP / LL_START_ENC_REQ / LL_START_ENC_RSP
+        # sequence has been handled by the link-layer manager.
+
+        if self.__state == BleSMP.STATE_LEGACY_PAIRING_RANDOM_SENT:
+            logger.info('[smp] Channel is now successfully encrypted')
+
+            self.__ltk = generate_random_value(self.__initiator.max_key_size)
+            self.__rand = generate_random_value(8)
+            self.__ediv = randint(0, 0x10000)
+
+            # Perform key distribution to initiator
+            if self.__initiator.must_dist_ltk():
+                logger.info('[smp] sending generated LTK ...')
+                self.send(SM_Encryption_Information(
+                    ltk=self.__ltk
+                ))
+                logger.info('[smp] LTK sent.')
+            
+            if self.__initiator.must_dist_ediv_rand():
+                logger.info('[smp] sending generated EDIV/RAND ...')
+                self.send(SM_Master_Identification(ediv = self.__ediv, rand = self.__rand))
+                logger.info('[smp] EDIV/RAND sent.')
+
+            if self.__initiator.must_dist_irk():
+                logger.info('[smp] sending generated IRK ...')
+                self.__irk = generate_random_value(16)
+                self.send(SM_Identity_Information(
+                    irk = self.__irk
+                ))
+                logger.info('[smp] IRK sent.')
+
+            if self.__initiator.must_dist_csrk():
+                logger.info('[smp] sending generated CSRK ...')
+                self.__csrk = generate_random_value(16)
+                self.send(SM_Signing_Information(
+                    csrk=self.__csrk
+                ))
+                logger.info('[smp] CSRK sent.')
+        else:
+            logger.error('[smp] Received an unexpected notification (LL_START_ENC_RSP)')
 
 
 
