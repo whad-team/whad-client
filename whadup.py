@@ -51,7 +51,7 @@ BLE_COMMANDS = {
     BleCommand.ConnectTo: 'ConnectTo: can initiate a BLE connection',
     BleCommand.SendPDU: 'SendPDU: can send a raw PDU',
     BleCommand.Disconnect: 'Disconnect: can terminate an active connection (in Central mode)',
-    BleCommand.PeripheralMode: 'PeripharlMode: can act as a peripheral',
+    BleCommand.PeripheralMode: 'PeripheralMode: can act as a peripheral',
     BleCommand.Start: 'Start: can start depending on the current mode',
     BleCommand.Stop: 'Stop: can stop depending on the current mode',
     BleCommand.HijackMaster: 'HijackMaster: can hijack the Master role in an active connection',
