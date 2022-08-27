@@ -1,13 +1,13 @@
-from setuptools import setup
-from setuptools.command.install import install
-from sys import platform, exit, executable
-from subprocess import Popen, DEVNULL, PIPE
-from os.path import exists, realpath
-from shutil import copy
 try:
+    from setuptools import setup
+    from setuptools.command.install import install
+    from sys import platform, exit, executable
+    from subprocess import Popen, DEVNULL, PIPE
+    from os.path import exists, realpath
+    from shutil import copy
     from os import listdir, geteuid
 except ImportError:
-    pass
+    print("Your operating system is not supported.")
 
 class DevicesInstall(install):
     UDEV_LOCATION = [
@@ -84,13 +84,8 @@ class DevicesInstall(install):
                 print("An error occured during HCI capabilities installation.")
 
 
-        elif platform == "darwin":
-            # OS X
-            print("Automatic device installation is not supported on Mac OS/X.")
-            exit(1)
-        elif platform == "win32":
-            # Windows
-            print("Automatic device installation is not supported on Windows.")
+        else:
+            print("Automatic device installation is not supported on your operating system.")
             exit(1)
 
 if __name__ == "__main__":
