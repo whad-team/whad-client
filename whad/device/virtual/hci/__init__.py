@@ -249,6 +249,9 @@ class HCIDevice(VirtualDevice):
         return None
 
     def _read_LE_supported_states(self):
+        """
+        Returns the list of Bluetooth Low Energy states supported by the HCI device.
+        """
         response = self._write_command(HCI_Cmd_LE_Read_Supported_States())
         if response.status == 0x00 and HCI_Cmd_Complete_LE_Read_Supported_States in response:
             states = []
