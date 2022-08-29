@@ -25,6 +25,7 @@ class HCIConfig(object):
         for device_number in range(number_of_devices):
             device_id = unpack('H', output[4 + 8*device_number:4 + 8*device_number + 2])[0]
             device_ids.insert(0, device_id)
+
         return device_ids
 
     @classmethod
@@ -42,12 +43,12 @@ class HCIConfig(object):
 
         '''
 
-        try:
-            sock = socket(31, SOCK_RAW, 1)
-            ioctl(sock.fileno(), cls.HCIDEVDOWN, index)
-            sock.close()
-        except IOError:
-            return False
+        #try:
+        sock = socket(31, SOCK_RAW, 1)
+        ioctl(sock.fileno(), cls.HCIDEVDOWN, index)
+        sock.close()
+        #except IOError:
+        #    return False
         return True
 
     @classmethod
@@ -65,8 +66,8 @@ class HCIConfig(object):
 
         '''
         try:
-            sock = socket(31, SOCK_RAW, index)
-            ioctl(sock.fileno(), cls.HCIDEVRESET, 0)
+            sock = socket(31, SOCK_RAW, 1)
+            ioctl(sock.fileno(), cls.HCIDEVRESET, index)
             sock.close()
         except IOError:
             return False
@@ -87,8 +88,8 @@ class HCIConfig(object):
 
         '''
         try:
-            sock = socket(31, SOCK_RAW, index)
-            ioctl(sock.fileno(), cls.HCIDEVUP, 0)
+            sock = socket(31, SOCK_RAW, 1)
+            ioctl(sock.fileno(), cls.HCIDEVUP, index)
             sock.close()
         except IOError:
             return False

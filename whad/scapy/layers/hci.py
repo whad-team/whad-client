@@ -2,7 +2,7 @@ from whad.ble.stack.constants import BT_MANUFACTURERS
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteEnumField, ByteField, LEShortEnumField, LEShortField, \
     StrField, StrNullField, LELongField
-from scapy.layers.bluetooth import HCI_Command_Hdr, HCI_Event_Command_Complete
+from scapy.layers.bluetooth import HCI_Command_Hdr, HCI_Event_Command_Complete, LEMACField
 
 HCI_VERSIONS = LMP_VERSIONS = {
     0x00:   "1.0b",
@@ -60,9 +60,86 @@ class HCI_Cmd_Complete_LE_Read_Supported_States(Packet):
     ]
 
 
+# Vendor specific commands - BD address modification
+# Manufacturer : Texas Instruments (13)
+class HCI_Cmd_TI_Write_BD_Address(Packet):
+    name = "TI Write BD Address"
+    fields_desc = [
+        LEMACField("addr","\x00\x01\x02\x03\x04\x05")
+    ]
+
+# Manufacturer : Broadcom (15)
+class HCI_Cmd_BCM_Write_BD_Address(Packet):
+    name = "BCM Write BD Address"
+    fields_desc = [
+        LEMACField("addr","\x00\x01\x02\x03\x04\x05")
+    ]
+
+# Manufacturer : Zeevo (18)
+class HCI_Cmd_Zeevo_Write_BD_Address(Packet):
+    name = "Zeevo Write BD Address"
+    fields_desc = [
+        LEMACField("addr","\x00\x01\x02\x03\x04\x05")
+    ]
+
+
+# Manufacturer : Ericsson (0 / 57)
+class HCI_Cmd_Ericsson_Write_BD_Address(Packet):
+    name = "Ericsson Write BD Address"
+    fields_desc = [
+        LEMACField("addr","\x00\x01\x02\x03\x04\x05")
+    ]
+
+# Manufacturer : Cambridge Silicon Radios (10)
+class HCI_Cmd_CSR_Write_BD_Address(Packet):
+    name = "CSR Write BD Address"
+    fields_desc = [
+        LEMACField("addr","\x00\x01\x02\x03\x04\x05")
+    ]
+
+    def post_build(self,p,pay):
+        payload = bytearray(b"\xc2\x02\x00\x0c\x00\x11G\x03p\x00\x00\x01\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
+
+        payload[17] = p[2]
+        payload[19] = p[0]
+        payload[20] = p[1]
+        payload[21] = p[3]
+        payload[23] = p[4]
+        payload[24] = p[5]
+
+        return payload
+
+class HCI_Cmd_CSR_Reset(Packet):
+    name = "CSR Write BD Address"
+    fields_desc = [
+        StrField("bytes",b"\xc2\x02\x00\t\x00\x00\x00\x01@\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
+    ]
+
+
+# Manufacturer : ST (48)
+class HCI_Cmd_ST_Write_BD_Address(Packet):
+    name = "ST Write BD Address"
+    fields_desc = [
+        ByteField("user_id", 0xfe),
+        ByteField("data_len",0x06),
+        LEMACField("addr","\x00\x01\x02\x03\x04\x05"),
+        StrField("padding","\x00"*247)
+    ]
+
+
+
+
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Version_Information,                        opcode=0x1001)
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Local_Version_Information,    opcode=0x1001)
 bind_layers(HCI_Command_Hdr,HCI_Cmd_Read_Local_Name,			                            opcode=0x0c14)
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Local_Name,                   opcode=0x0c14)
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Supported_States,                              opcode=0x201c)
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_LE_Read_Supported_States,          opcode=0x201c)
+
+bind_layers(HCI_Command_Hdr, HCI_Cmd_ST_Write_BD_Address,                                   opcode=0xfc22)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_Zeevo_Write_BD_Address,                                opcode=0xfc01)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_TI_Write_BD_Address,                                   opcode=0xfc06)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_Ericsson_Write_BD_Address,                             opcode=0xfc0d)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_BCM_Write_BD_Address,                                  opcode=0xfc01)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_CSR_Write_BD_Address,                                  opcode=0xfc00)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_CSR_Reset,                                             opcode=0xfc00)
