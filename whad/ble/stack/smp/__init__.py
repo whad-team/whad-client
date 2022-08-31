@@ -39,7 +39,7 @@ class SM_Peer(object):
         self.__address = address
 
         # Key distribution (by default, corresponds to Legacy JustWorks)
-        self.__kd_link_key = False
+        self.__kd_link_key = True
         self.__kd_sign_key = False
         self.__kd_enc_key = False
         self.__kd_id_key = False
@@ -735,8 +735,8 @@ class BleSMP(object):
         if self.__state == BleSMP.STATE_LEGACY_PAIRING_RANDOM_SENT:
             logger.info('[smp] Channel is now successfully encrypted')
 
-            self.__ltk = generate_random_value(self.__initiator.max_key_size)
-            self.__rand = generate_random_value(8)
+            self.__ltk = generate_random_value(2**self.__initiator.max_key_size)
+            self.__rand = generate_random_value(2**8)
             self.__ediv = randint(0, 0x10000)
 
             # Perform key distribution to initiator
@@ -746,7 +746,6 @@ class BleSMP(object):
                     ltk=self.__ltk
                 ))
                 logger.info('[smp] LTK sent.')
-            
             if self.__initiator.must_dist_ediv_rand():
                 logger.info('[smp] sending generated EDIV/RAND ...')
                 self.send(SM_Master_Identification(ediv = self.__ediv, rand = self.__rand))
@@ -759,7 +758,6 @@ class BleSMP(object):
                     irk = self.__irk
                 ))
                 logger.info('[smp] IRK sent.')
-
             if self.__initiator.must_dist_csrk():
                 logger.info('[smp] sending generated CSRK ...')
                 self.__csrk = generate_random_value(16)
