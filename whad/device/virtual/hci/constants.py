@@ -2,6 +2,13 @@ from whad import WhadCapability
 from whad.protocol.ble.ble_pb2 import Start, Stop, AdvMode, SetAdvData, \
     ScanMode, CentralMode, ConnectTo, SendPDU, PeripheralMode, Disconnect
 from whad.ble.stack.constants import BT_MANUFACTURERS
+from enum import IntEnum
+
+class HCIInternalState(IntEnum):
+    NONE = 0
+    SCANNING = 1
+    CENTRAL = 2
+    
 LE_STATES = {
     0 : ("Non-connectable Advertising State", 0 , [Start, Stop, AdvMode, SetAdvData]),
     1 : ("Scannable Advertising State", 0, [Start, Stop, AdvMode, SetAdvData]),
