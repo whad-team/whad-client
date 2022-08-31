@@ -1,13 +1,17 @@
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device.virtual import VirtualDevice
-from whad.protocol.ble.ble_pb2 import SetBdAddress
+from whad.protocol.device_pb2 import Capability
+from whad.protocol.ble.ble_pb2 import SetBdAddress, ScanMode, CentralMode, ConnectTo
 from whad import WhadDomain
+from whad.protocol.generic_pb2 import ResultCode
 from scapy.layers.bluetooth import BluetoothUserSocket, BluetoothSocketError, \
     HCI_Hdr, HCI_Command_Hdr, HCI_Cmd_Reset, HCI_Cmd_Set_Event_Filter, \
     HCI_Cmd_Connect_Accept_Timeout, HCI_Cmd_Set_Event_Mask, HCI_Cmd_LE_Host_Supported, \
-    HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr
+    HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
+    HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection
+from whad.device.virtual.hci.converter import HCIConverter
 from whad.device.virtual.hci.hciconfig import HCIConfig
-from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS
+from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState
 from whad.scapy.layers.hci import HCI_Cmd_Read_Local_Version_Information, \
     HCI_Cmd_Complete_Read_Local_Version_Information, HCI_VERSIONS, BT_MANUFACTURERS, \
     HCI_Cmd_Read_Local_Name, HCI_Cmd_Complete_Read_Local_Name, HCI_Cmd_LE_Read_Supported_States, \
@@ -54,8 +58,10 @@ class HCIDevice(VirtualDevice):
 
     def __init__(self, index):
         super().__init__()
+        self.__converter = HCIConverter()
         self.__index = index
         self.__socket = None
+        self.__internal_state = HCIInternalState.NONE
         self.__opened = False
         self.__hci_responses = Queue()
         self._dev_capabilities = None
@@ -125,10 +131,13 @@ class HCIDevice(VirtualDevice):
         try:
             if self.__socket is not None and self.__socket.readable():
                 event = self.__socket.recv()
-                if event.type == 0x4 and event.code == 0xe:
+                if event.type == 0x4 and (event.code == 0xe or event.code == 0xf):
                     self.__hci_responses.put(event)
                 else:
-                    print(event)
+                    messages = self.__converter.process_event(event)
+                    if messages is not None:
+                        for message in messages:
+                            self._send_whad_message(message)
         except (BrokenPipeError, OSError):
             print("Error, waiting...")
             sleep(1)
@@ -162,7 +171,6 @@ class HCIDevice(VirtualDevice):
 
     def _generate_dev_id(self):
         devid = (bytes.fromhex(self.__bd_address.replace(":","")) + self.__local_name)[:16]
-        print(devid)
         if len(devid) < 16:
             devid += b"\x00" * (16 - len(devid))
         return devid
@@ -183,7 +191,7 @@ class HCIDevice(VirtualDevice):
         supported_commands = list(set(supported_commands))
         capabilities = {
             WhadDomain.BtLE : (
-                                capabilities,
+                                capabilities | Capability.NoRawData,
                                 supported_commands
             )
         }
@@ -291,7 +299,7 @@ class HCIDevice(VirtualDevice):
             self._dev_capabilities = self._get_capabilities()
 
         if SetBdAddress in self._dev_capabilities[WhadDomain.BtLE][1]:
-            print("Address modification supported !")
+            print("[i] Address modification supported !")
             if self._manufacturer == b'Qualcomm Technologies International, Ltd. (QTIL)':
                 # Keep in cache existing devices
                 existing_devices = devices = HCIConfig.list()
@@ -341,5 +349,65 @@ class HCIDevice(VirtualDevice):
             return self._bd_address == bd_address
 
         else:
-            print("Address modification not supported.")
+            print("[i] Address modification not supported.")
             return False
+
+    def _set_scan_parameters(self, active=True):
+        """
+        Configure Scan parameters for HCI device.
+        """
+        response = self._write_command(HCI_Cmd_LE_Set_Scan_Parameters(type=int(active)))
+        return response.status == 0x00
+
+    def _set_scan_mode(self, enable=True):
+        """
+        Enable or disable scan mode for HCI device.
+        """
+        response = self._write_command(HCI_Cmd_LE_Set_Scan_Enable(enable=int(enable), filter_dups=False))
+        return response.status == 0x00
+
+    def _connect(self, bd_address):
+        """
+        Establish a connection using HCI device.
+        """
+        response = self._write_command(HCI_Cmd_LE_Create_Connection(paddr=bd_address))
+        return response.status == 0x00
+
+    def _on_whad_ble_connect(self, message):
+        if ConnectTo in self._dev_capabilities[WhadDomain.BtLE][1]:
+            bd_address = message.bd_address
+            if self._connect(bd_address):
+                self._send_whad_command_result(ResultCode.SUCCESS)
+                return
+        self._send_whad_command_result(ResultCode.ERROR)
+
+    def _on_whad_ble_central_mode(self, message):
+        if CentralMode in self._dev_capabilities[WhadDomain.BtLE][1]:
+            self.__internal_state = HCIInternalState.CENTRAL
+            self._send_whad_command_result(ResultCode.SUCCESS)
+            return
+        self._send_whad_command_result(ResultCode.ERROR)
+
+    def _on_whad_ble_scan_mode(self, message):
+        if ScanMode in self._dev_capabilities[WhadDomain.BtLE][1]:
+            active_scan = message.active_scan
+            if self._set_scan_parameters(active_scan):
+                self.__internal_state = HCIInternalState.SCANNING
+                self._send_whad_command_result(ResultCode.SUCCESS)
+                return
+        self._send_whad_command_result(ResultCode.ERROR)
+
+    def _on_whad_ble_start(self, message):
+        if self.__internal_state == HCIInternalState.SCANNING:
+            self._set_scan_mode(True)
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.ERROR)
+
+    def _on_whad_ble_stop(self, message):
+        if self.__internal_state == HCIInternalState.SCANNING:
+            self._set_scan_mode(False)
+            self.__internal_state = HCIInternalState.NONE
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.ERROR)
