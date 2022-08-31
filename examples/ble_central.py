@@ -1,7 +1,7 @@
 from whad.ble import Central
 from whad.ble.profile import UUID
 from whad.device import WhadDevice
-
+from time import sleep
 
 central = Central(WhadDevice.create('hci1'))
 print('Using device: %s' % central.device.device_id)

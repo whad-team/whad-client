@@ -1,14 +1,16 @@
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device.virtual import VirtualDevice
 from whad.protocol.device_pb2 import Capability
-from whad.protocol.ble.ble_pb2 import SetBdAddress, ScanMode, CentralMode, ConnectTo
+from whad.protocol.ble.ble_pb2 import BleDirection, SetBdAddress, ScanMode, CentralMode, \
+    ConnectTo, BleAddrType
+from whad.protocol.whad_pb2 import Message
 from whad import WhadDomain
 from whad.protocol.generic_pb2 import ResultCode
 from scapy.layers.bluetooth import BluetoothUserSocket, BluetoothSocketError, \
     HCI_Hdr, HCI_Command_Hdr, HCI_Cmd_Reset, HCI_Cmd_Set_Event_Filter, \
     HCI_Cmd_Connect_Accept_Timeout, HCI_Cmd_Set_Event_Mask, HCI_Cmd_LE_Host_Supported, \
     HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
-    HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection
+    HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect
 from whad.device.virtual.hci.converter import HCIConverter
 from whad.device.virtual.hci.hciconfig import HCIConfig
 from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState
@@ -58,7 +60,7 @@ class HCIDevice(VirtualDevice):
 
     def __init__(self, index):
         super().__init__()
-        self.__converter = HCIConverter()
+        self.__converter = HCIConverter(self)
         self.__index = index
         self.__socket = None
         self.__internal_state = HCIInternalState.NONE
@@ -66,6 +68,7 @@ class HCIDevice(VirtualDevice):
         self.__hci_responses = Queue()
         self._dev_capabilities = None
         self._bd_address = None
+        self._bd_address_type = BleAddrType.PUBLIC
         self._fw_version = None
         self._fw_url = None
         self._fw_author = None
@@ -131,7 +134,7 @@ class HCIDevice(VirtualDevice):
         try:
             if self.__socket is not None and self.__socket.readable():
                 event = self.__socket.recv()
-                if event.type == 0x4 and (event.code == 0xe or event.code == 0xf):
+                if event.type == 0x4 and (event.code == 0xe or event.code == 0xf or event.code == 0x13):
                     self.__hci_responses.put(event)
                 else:
                     messages = self.__converter.process_event(event)
@@ -145,6 +148,16 @@ class HCIDevice(VirtualDevice):
     def _wait_response(self, timeout=None):
         response = self.__hci_responses.get(block=True, timeout=timeout)
         return response
+
+    def _write_packet(self, packet):
+        """
+        Writes an HCI packet.
+        """
+        self.__socket.send(packet)
+        response = self._wait_response()
+        while response.code != 0x13:
+            response = self._wait_response()
+        return response.number == 1
 
     def _write_command(self, command, wait_response=True):
         """
@@ -161,8 +174,8 @@ class HCIDevice(VirtualDevice):
         return response
 
     def reset(self):
-        self.__bd_address = self._read_BD_address()
-        self.__local_name = self._read_local_name()
+        self._bd_address = self._read_BD_address()
+        self._local_name = self._read_local_name()
         self._fw_version, self._manufacturer = self._read_local_version_information()
         self._fw_author = self._manufacturer
         self._dev_id = self._generate_dev_id()
@@ -170,14 +183,14 @@ class HCIDevice(VirtualDevice):
         self._dev_capabilities = self._get_capabilities()
 
     def _generate_dev_id(self):
-        devid = (bytes.fromhex(self.__bd_address.replace(":","")) + self.__local_name)[:16]
+        devid = (bytes.fromhex(self._bd_address.replace(":","")) + self._local_name)[:16]
         if len(devid) < 16:
             devid += b"\x00" * (16 - len(devid))
         return devid
 
     def _get_capabilities(self):
         supported_states = self._read_LE_supported_states()
-        _, self._manufacturer = self._read_local_version_information()
+
         capabilities = 0
         supported_commands = []
         for state in supported_states:
@@ -185,8 +198,7 @@ class HCIDevice(VirtualDevice):
             capabilities = capabilities | cap
             supported_commands += commands
 
-        if self._manufacturer in ADDRESS_MODIFICATION_VENDORS:
-            supported_commands += [SetBdAddress]
+        supported_commands += [SetBdAddress]
 
         supported_commands = list(set(supported_commands))
         capabilities = {
@@ -291,66 +303,71 @@ class HCIDevice(VirtualDevice):
         else:
             return None
 
-    def _set_BD_address(self, bd_address="11:22:33:44:55:66"):
+    def _set_BD_address(self, bd_address="11:22:33:44:55:66", bd_address_type=BleAddrType.PUBLIC):
         """
         Modify the BD address (if supported by the HCI device).
         """
-        if self._dev_capabilities is None:
-            self._dev_capabilities = self._get_capabilities()
+        if bd_address_type == BleAddrType.PUBLIC:
+            _, self._manufacturer = self._read_local_version_information()
+            if self._manufacturer in ADDRESS_MODIFICATION_VENDORS:
+                print("[i] Address modification supported !")
+                if self._manufacturer == b'Qualcomm Technologies International, Ltd. (QTIL)':
+                    # Keep in cache existing devices
+                    existing_devices = devices = HCIConfig.list()
 
-        if SetBdAddress in self._dev_capabilities[WhadDomain.BtLE][1]:
-            print("[i] Address modification supported !")
-            if self._manufacturer == b'Qualcomm Technologies International, Ltd. (QTIL)':
-                # Keep in cache existing devices
-                existing_devices = devices = HCIConfig.list()
+                    # Write BD address and reset with vendor specific commands
+                    self._write_command(HCI_Cmd_CSR_Write_BD_Address(addr=bd_address), wait_response=False)
+                    self._write_command(HCI_Cmd_CSR_Reset(), wait_response=False)
+                    # We are forced to close the socket and reopen it here...
+                    self.__socket.close()
+                    # Add a delay to prevent error
+                    sleep(0.5)
 
-                # Write BD address and reset with vendor specific commands
-                self._write_command(HCI_Cmd_CSR_Write_BD_Address(addr=bd_address), wait_response=False)
-                self._write_command(HCI_Cmd_CSR_Reset(), wait_response=False)
-                # We are forced to close the socket and reopen it here...
-                self.__socket.close()
-                # Add a delay to prevent error
-                sleep(0.5)
+                    # The index may have changed, find it automatically and reconfigure self.__index
+                    success = False
+                    while not success:
+                        devices = HCIConfig.list()
+                        if self.__index not in devices:
+                            for i in existing_devices:
+                                if i != self.__index:
+                                    devices.remove(i)
+                            if len(devices) > 0:
+                                self.__index = devices[0]
+                                success = True
 
-                # The index may have changed, find it automatically and reconfigure self.__index
-                success = False
-                while not success:
-                    devices = HCIConfig.list()
-                    if self.__index not in devices:
-                        for i in existing_devices:
-                            if i != self.__index:
-                                devices.remove(i)
-                        if len(devices) > 0:
-                            self.__index = devices[0]
-                            success = True
+                    # If all goes right, we should be able to open a new socket
+                    self.__socket = get_hci(self.__index)
+                    # Initialize a new socket
+                    self._initialize()
 
-                # If all goes right, we should be able to open a new socket
-                self.__socket = get_hci(self.__index)
-                # Initialize a new socket
-                self._initialize()
+                else:
+                    # For the other manufacturers, we only need to pick the right command and perform a reset
+                    BD_ADDRESS_MODIFICATION_MAP = {
+                        b'Texas Instruments Inc.' : HCI_Cmd_TI_Write_BD_Address,
+                        b'Broadcom Corporation' : HCI_Cmd_BCM_Write_BD_Address,
+                        b'Zeevo, Inc.' : HCI_Cmd_Zeevo_Write_BD_Address,
+                        b'Ericsson Technology Licensing' : HCI_Cmd_Ericsson_Write_BD_Address,
+                        b'Integrated System Solution Corp.' : HCI_Cmd_Ericsson_Write_BD_Address,
+                        b'ST Microelectronics' : HCI_Cmd_ST_Write_BD_Address
+                    }
+                    command = BD_ADDRESS_MODIFICATION_MAP[self._manufacturer]
+                    self._write_command(command, wait_response=False)
+                    self._reset()
+
+                # Check the modification success and re-generate device ID
+                self._bd_address = self._read_BD_address()
+                self._dev_id = self._generate_dev_id()
+                self._bd_address_type = BleAddrType.PUBLIC
+                return self._bd_address == bd_address
 
             else:
-                # For the other manufacturers, we only need to pick the right command and perform a reset
-                BD_ADDRESS_MODIFICATION_MAP = {
-                    b'Texas Instruments Inc.' : HCI_Cmd_TI_Write_BD_Address,
-                    b'Broadcom Corporation' : HCI_Cmd_BCM_Write_BD_Address,
-                    b'Zeevo, Inc.' : HCI_Cmd_Zeevo_Write_BD_Address,
-                    b'Ericsson Technology Licensing' : HCI_Cmd_Ericsson_Write_BD_Address,
-                    b'Integrated System Solution Corp.' : HCI_Cmd_Ericsson_Write_BD_Address,
-                    b'ST Microelectronics' : HCI_Cmd_ST_Write_BD_Address
-                }
-                command = BD_ADDRESS_MODIFICATION_MAP[self._manufacturer]
-                self._write_command(command, wait_response=False)
-                self._reset()
-
-            # Check the modification success and re-generate device ID
-            self.__bd_address = self._read_BD_address()
-            self._dev_id = self._generate_dev_id()
-            return self._bd_address == bd_address
-
+                print("[i] Address modification not supported.")
+                return False
         else:
-            print("[i] Address modification not supported.")
-            return False
+            self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
+            self._bd_address = bd_address
+            self._bd_address_type = BleAddrType.RANDOM
+            return True
 
     def _set_scan_parameters(self, active=True):
         """
@@ -366,17 +383,33 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_LE_Set_Scan_Enable(enable=int(enable), filter_dups=False))
         return response.status == 0x00
 
-    def _connect(self, bd_address):
+    def _connect(self, bd_address, bd_address_type=BleAddrType.PUBLIC):
         """
         Establish a connection using HCI device.
         """
-        response = self._write_command(HCI_Cmd_LE_Create_Connection(paddr=bd_address))
+        patype = 0 if bd_address_type == BleAddrType.PUBLIC else 1
+        response = self._write_command(HCI_Cmd_LE_Create_Connection(paddr=bd_address, patype=patype))
         return response.status == 0x00
+
+    def _disconnect(self, handle):
+        """
+        Establish a disconnection using HCI device.
+        """
+        response = self._write_command(HCI_Cmd_Disconnect(handle=handle))
+        return response.status == 0x00
+
+    def _on_whad_ble_disconnect(self, message):
+        success = self._disconnect(message.conn_handle)
+        if success:
+            self._send_whad_command_result(ResultCode.SUCCESS)
+            return
+        self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_ble_connect(self, message):
         if ConnectTo in self._dev_capabilities[WhadDomain.BtLE][1]:
             bd_address = message.bd_address
-            if self._connect(bd_address):
+            bd_address_type = message.addr_type
+            if self._connect(bd_address, bd_address_type):
                 self._send_whad_command_result(ResultCode.SUCCESS)
                 return
         self._send_whad_command_result(ResultCode.ERROR)
@@ -411,3 +444,15 @@ class HCIDevice(VirtualDevice):
             self._send_whad_command_result(ResultCode.SUCCESS)
         else:
             self._send_whad_command_result(ResultCode.ERROR)
+
+    def _on_whad_ble_send_pdu(self, message):
+        if self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE:
+            hci_packets = self.__converter.process_message(message)
+            if hci_packets is not None:
+                success = True
+                for hci_packet in hci_packets:
+                    success = success and self._write_packet(hci_packet)
+                if success:
+                    self._send_whad_command_result(ResultCode.SUCCESS)
+                else:
+                    self._send_whad_command_result(ResultCode.ERROR)
