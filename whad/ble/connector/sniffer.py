@@ -237,6 +237,17 @@ class Sniffer(BLE):
             elif self.__configuration.active_connection is not None:
                 message = self.wait_for_message(filter=message_filter('ble', "synchronized"))
                 print(message)
+                # TODO : improve the switch
+                if message.ble.synchronized.hop_increment > 0:
+                    if self.support_raw_pdu():
+                        message_type = "raw_pdu"
+                    elif self.__synchronized:
+                        message_type = "pdu"
+                    else:
+                        message_type = "adv_pdu"
+
+                    message = self.wait_for_message(filter=message_filter('ble', message_type))
+                    yield self._build_scapy_packet_from_message(message.ble, message_type)
 
             else:
                 if self.support_raw_pdu():

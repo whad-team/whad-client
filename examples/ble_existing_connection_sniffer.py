@@ -24,11 +24,13 @@ if __name__ == '__main__':
             for i in sniffer.sniff():
                 print("[i] Access address found: ", repr(i))
             """
-            #access_address=0x6138f6ed, crc_init=0xfc7987, hop_interval=0 (0 us), hop_increment=0, channel_map=0x033e780000.
-            sniffer.configure(active_connection=SynchronizedConnection(access_address=0x722d53a3, crc_init=0xec3c9b, channel_map=bytes.fromhex("ffffffff1f")))
+            #  [sniffer] Connection synchronized -> access_address=0x9096cd63, crc_init=0xa4f31c, hop_interval=36 (45000 us), hop_increment=13, channel_map=0xffffffff1f.
+
+
+            sniffer.configure(active_connection=SynchronizedConnection(access_address=0x9096cd63, crc_init=0xa4f31c, channel_map=bytes.fromhex("ffefffff1f")))
             sniffer.start()
-            while True:
-                sleep(1)
+            for i in sniffer.sniff():
+                print(i)
 
         except (KeyboardInterrupt, SystemExit):
             dev.close()
