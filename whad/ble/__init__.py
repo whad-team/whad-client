@@ -9,7 +9,8 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import BleDirection, BleAdvType, Connected
 from whad.ble.stack import BleStack
 from scapy.layers.bluetooth4LE import BTLE_ADV_IND, \
-    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
+    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP,\
+    BTLE_ADV
 from whad.ble.bdaddr import BDAddress
 from whad.ble.profile.device import PeripheralDevice
 from whad.ble.profile import GenericProfile

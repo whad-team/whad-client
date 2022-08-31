@@ -1,7 +1,12 @@
-from whad.domain.ble import Central
-from whad.domain.ble.profile import UUID
+from whad.ble import Central
+from whad.ble.profile import UUID
 from whad.device.uart import UartDevice
 from time import time,sleep
+from whad.common.monitors import WiresharkMonitor
+
+import logging
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger('whad.ble.stack.llm').setLevel(logging.INFO)
 
 """
 scanner = Scanner(UartDevice('/dev/ttyUSB0', 115200))
@@ -63,25 +68,32 @@ central = Central(UartDevice('/dev/ttyUSB0', 115200))
 print(central.device.device_id)
 #device = central.connect('84:CC:A8:7E:D5:A2')
 #device = central.connect('EC:8C:47:10:66:F0')
-device = central.connect('D6:F3:6E:89:DA:F5')
+#device = central.connect('D6:F3:6E:89:DA:F5')
 #device = central.connect('d4:3b:04:2c:ad:16')
 #device = central.connect('0c:b8:15:c2:35:16')
-#device = central.connect('C1:7C:2F:90:37:E1')
+#device = central.connect('0C:B8:15:C4:88:8E')
+device = central.connect('C1:7C:2F:90:37:E1')
+
+monitor_pcap = WiresharkMonitor()
+monitor_pcap.attach(central)
+monitor_pcap.start()
 device.discover()
+for service in device.services():
+    print('-- Service %s' % service.uuid)
+    for charac in service.characteristics():
+        print(' + Characteristic %s' % charac.uuid)
 
 #c = device.get_characteristic(UUID('b112f5e6-2679-30da-a26e-0273b6043849'), UUID('b112f5e6-2679-30da-a26e-0273b6043849'))
 print(central.export_profile())
 
 #print('sub=%s' % c.subscribe(notification=True, callback=test_cb))
 c = device.get_characteristic(UUID('1800'), UUID('2A00'))
-c.write(b'tralala')
-print(c.read())
 print(c.value)
+#print(central.stop())
+monitor_pcap.close()
+device.disconnect()
+central.stop()
+central.close()
 
-try:
-    while True:
-        sleep(1)
-except KeyboardInterrupt:
-    central.stop()
 
 

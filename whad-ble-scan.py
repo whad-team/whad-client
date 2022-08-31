@@ -17,13 +17,14 @@ from whad.ble import BLE, Scanner, Sniffer, BDAddress, AdvDataFieldList, \
     AdvShortenedLocalName
 
 from scapy.layers.bluetooth4LE import BTLE_ADV_IND, BTLE_ADV_NONCONN_IND, \
-    BTLE_ADV_DIRECT_IND, BTLE_SCAN_RSP
+    BTLE_ADV_DIRECT_IND, BTLE_SCAN_RSP, BTLE_ADV
 
 class BleDevice(object):
     """Store information about a device
     """
 
-    def __init__(self, rssi, bd_address, adv_data, undirected=True, connectable=True):
+    def __init__(self, rssi, address_type, bd_address, adv_data, undirected=True, connectable=True):
+        self.__address_type = address_type
         self.__bd_address = bd_address
         self.__adv_data = adv_data
         self.__rssi = rssi
@@ -34,6 +35,10 @@ class BleDevice(object):
     @property
     def address(self):
         return str(self.__bd_address)
+
+    @property
+    def address_type(self):
+        return self.__address_type
 
     @property
     def rssi(self):
@@ -63,9 +68,16 @@ class BleDevice(object):
         else:
             name = ''
 
+        # Display address type
+        if self.__address_type == 0:
+            addrtype = '[PUB]'
+        else:
+            addrtype = '[RND]'
+
         # Generate device summary
-        return '[%4d dBm] %s %s' % (
+        return '[%4d dBm] %s %s %s' % (
             self.__rssi,
+            addrtype,
             self.__bd_address,
             name
         )
@@ -110,6 +122,8 @@ class BleDevicesDB(object):
 
         Parse the incoming packet and handle device appropriately.
         """
+        addr_type = adv_packet.getlayer(BTLE_ADV).TxAdd
+
         if adv_packet.haslayer(BTLE_ADV_IND):
             bd_address = BDAddress(adv_packet[BTLE_ADV_IND].AdvA)
             try:
@@ -117,6 +131,7 @@ class BleDevicesDB(object):
                 adv_list = AdvDataFieldList.from_bytes(adv_data)
                 device = BleDevice(
                     rssi,
+                    addr_type,
                     bd_address,
                     adv_list
                 )
@@ -140,6 +155,7 @@ class BleDevicesDB(object):
                 adv_list = AdvDataFieldList.from_bytes(adv_data)
                 device = BleDevice(
                     rssi,
+                    addr_type,
                     bd_address,
                     adv_list,
                     connectable=False

@@ -1,5 +1,5 @@
-from whad.domain.ble.characteristic import UUID, ClientCharacteristicConfig
-from whad.domain.ble.profile import PrimaryService, Characteristic, GenericProfile, SecondaryService
+from whad.ble.characteristic import UUID, ClientCharacteristicConfig
+from whad.ble.profile import PrimaryService, Characteristic, GenericProfile, SecondaryService
 
 class MonDevice(GenericProfile):
 

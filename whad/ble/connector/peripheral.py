@@ -1,10 +1,13 @@
 
 from whad.ble.connector import BLE
+from whad.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
 from whad.ble.stack.gatt import GattServer
 from whad.ble.profile import GenericProfile
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
+
+from binascii import hexlify
 
 # Logging
 import logging
@@ -53,7 +56,7 @@ class Peripheral(BLE):
                 self.on_connected(existing_connection)
 
     
-    def send_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6):
+    def send_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None):
         """Send a PDU to the central device this peripheral device is connected to.
 
         Sending direction is set to ̀ BleDirection.SLAVE_TO_MASTER` as we need to send PDUs to a central device.
@@ -64,9 +67,8 @@ class Peripheral(BLE):
         :param access_address: Target access address
         :type access_address: int, optional
         """
-        super().send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address)
+        super().send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
     
-
     def use_stack(self, clazz=BleStack):
         """Specify a stack class to use for BLE. By default, our own stack (BleStack) is used.
         """
@@ -81,7 +83,17 @@ class Peripheral(BLE):
         """A device has just connected to this peripheral.
         """
         logger.info('a device is now connected (connection handle: %d)' % connection_data.conn_handle)
-        self.__stack.on_connection(connection_data)
+        self.__stack.on_connection(
+            connection_data.conn_handle,
+            BDAddress.from_bytes(
+                connection_data.advertiser,
+                connection_data.adv_addr_type
+            ),
+            BDAddress.from_bytes(
+                connection_data.initiator,
+                connection_data.init_addr_type
+            )
+        )
 
     def on_disconnected(self, disconnection_data):
         """A device has just disconnected from this peripheral.

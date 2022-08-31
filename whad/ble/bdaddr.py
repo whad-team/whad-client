@@ -3,12 +3,28 @@ from binascii import hexlify, unhexlify
 from whad.ble.exceptions import InvalidBDAddressException
 
 class BDAddress(object):
-    """This class represents a Bluetooth Device address
+    """This class represents a Bluetooth Device address.
     """
 
-    def __init__(self, address):
+    PUBLIC = 0x00
+    RANDOM = 0x01
+
+    def __init__(self, address, random=False, addr_type=None):
         """Initialize BD address
+
+        By default, BD address is public unless `random` is set to True.
+
+        :param int addr_type: Set BD address type (either BDAddress.PUBLIC or BDAddress.RANDOM). This setting overseeds `random`
+        :param bool random: Set BD address as random if set to True. BD address is public by default.
         """
+        if addr_type is not None:
+            if addr_type in [BDAddress.PUBLIC, BDAddress.RANDOM]:
+                self.__type = addr_type
+        elif random:
+            self.__type = BDAddress.RANDOM
+        else:
+            self.__type = BDAddress.PUBLIC
+
         if isinstance(address, str):
             if re.match('^([0-9a-fA-F]{2}\:){5}[0-9a-fA-F]{2}$', address) is not None:
                 self.__value = unhexlify(address.replace(':',''))[::-1]
@@ -20,7 +36,7 @@ class BDAddress(object):
             raise InvalidBDAddressException
 
     def __eq__(self, other):
-        return self.__value == other.value
+        return (self.__value == other.value) and (self.__type == other.type)
 
     def __str__(self):
         return ':'.join(['%02x' % b for b in self.__value[::-1]])
@@ -29,20 +45,42 @@ class BDAddress(object):
         return 'BDAddress(%s)' % str(self)
 
     @property
+    def type(self):
+        return self.__type
+
+    @property
     def value(self):
         return self.__value
 
+    def is_public(self):
+        """Determine if address is public.
+
+        :rtype: bool
+        :return: True if BD address is public, False otherwise.
+        """
+        return (self.__type == BDAddress.PUBLIC)
+
+    def is_random(self):
+        """Determine if address is random.
+
+        :rtype: bool
+        :return: True if BD address is random, False otherwise.
+        """
+        return (self.__type == BDAddress.RANDOM)
+
     @staticmethod
-    def from_bytes(bd_addr_bytes):
+    def from_bytes(bd_addr_bytes, addr_type=None):
         """Convert a 6-byte array into a valid BD address.
 
         :param bytes bd_addr_bytes: Bluetooth Device address as a bytearray.
+        :param addr_type: Bluetooth Device Address type
+        :type addr_type: int, optional
         :rtype: BDAddress
         :returns: An instance of BDAddress representing the corresponding BD address.
         """
         if len(bd_addr_bytes) == 6:
             hex_address = hexlify(bd_addr_bytes[::-1])
             address = b':'.join([hex_address[i*2:(i+1)*2] for i in range(int(len(hex_address)/2))])
-            return BDAddress(address.decode('utf-8'))
+            return BDAddress(address.decode('utf-8'), addr_type=addr_type)
         else:
             raise InvalidBDAddressException
