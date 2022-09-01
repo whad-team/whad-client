@@ -94,7 +94,7 @@ class HCIConverter:
             msg.ble.disconnected.conn_handle = handle
             msg.ble.disconnected.reason = reason
             return [msg]
-            
+
     def process_advertising_reports(self, reports):
         messages = []
         for report in reports.reports:

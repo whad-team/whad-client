@@ -2,7 +2,7 @@ from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAc
 from whad.device.virtual import VirtualDevice
 from whad.protocol.device_pb2 import Capability
 from whad.protocol.ble.ble_pb2 import BleDirection, SetBdAddress, ScanMode, CentralMode, \
-    ConnectTo, BleAddrType
+    ConnectTo, BleAddrType, PeripheralMode
 from whad.protocol.whad_pb2 import Message
 from whad import WhadDomain
 from whad.protocol.generic_pb2 import ResultCode
@@ -10,7 +10,8 @@ from scapy.layers.bluetooth import BluetoothUserSocket, BluetoothSocketError, \
     HCI_Hdr, HCI_Command_Hdr, HCI_Cmd_Reset, HCI_Cmd_Set_Event_Filter, \
     HCI_Cmd_Connect_Accept_Timeout, HCI_Cmd_Set_Event_Mask, HCI_Cmd_LE_Host_Supported, \
     HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
-    HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect
+    HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect, \
+    HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, HCI_Cmd_LE_Set_Scan_Response_Data
 from whad.device.virtual.hci.converter import HCIConverter
 from whad.device.virtual.hci.hciconfig import HCIConfig
 from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState
@@ -62,6 +63,7 @@ class HCIDevice(VirtualDevice):
         super().__init__()
         self.__converter = HCIConverter(self)
         self.__index = index
+        self._advertising = False
         self.__socket = None
         self.__internal_state = HCIInternalState.NONE
         self.__opened = False
@@ -141,6 +143,7 @@ class HCIDevice(VirtualDevice):
                     if messages is not None:
                         for message in messages:
                             self._send_whad_message(message)
+
         except (BrokenPipeError, OSError):
             print("Error, waiting...")
             sleep(1)
@@ -398,6 +401,47 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_Disconnect(handle=handle))
         return response.status == 0x00
 
+    def _set_advertising_data(self, data):
+        """
+        Configure advertising data to use by HCI device.
+        """
+        response = self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data))
+        return response.status == 0x00
+
+    def _set_scan_response_data(self, data):
+        """
+        Configure scan response data to use by HCI device.
+        """
+        response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(data=data))
+        return response.status == 0x00
+
+    def _set_advertising_mode(self, enable=True):
+        """
+        Enable or disable advertising mode for HCI device.
+        """
+        if self._advertising and enable:
+            return True
+        else:
+            response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))
+            success = response.status == 0x00
+            if success:
+                self._advertising = enable
+            return success
+
+    def _on_whad_ble_periph_mode(self, message):
+        if PeripheralMode in self._dev_capabilities[WhadDomain.BtLE][1]:
+            success = True
+            if len(message.scan_data) > 0:
+                success = success and self._set_advertising_data(message.scan_data)
+            if len(message.scanrsp_data) > 0:
+                success = success and self._set_scan_response_data(message.scanrsp_data)
+            success = success and self._set_advertising_mode(True)
+            if success:
+                self.__internal_state = HCIInternalState.PERIPHERAL
+                self._send_whad_command_result(ResultCode.SUCCESS)
+                return
+        self._send_whad_command_result(ResultCode.ERROR)
+
     def _on_whad_ble_disconnect(self, message):
         success = self._disconnect(message.conn_handle)
         if success:
@@ -442,11 +486,17 @@ class HCIDevice(VirtualDevice):
             self._set_scan_mode(False)
             self.__internal_state = HCIInternalState.NONE
             self._send_whad_command_result(ResultCode.SUCCESS)
+        elif self.__internal_state == HCIInternalState.CENTRAL:
+            self.__internal_state = HCIInternalState.NONE
+            self._send_whad_command_result(ResultCode.SUCCESS)
         else:
             self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_ble_send_pdu(self, message):
-        if self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE:
+
+        if ((self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE) or
+           (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
+
             hci_packets = self.__converter.process_message(message)
             if hci_packets is not None:
                 success = True
