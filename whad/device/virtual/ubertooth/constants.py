@@ -8,7 +8,7 @@ class UbertoothInternalState(IntEnum):
     ADVERTISEMENT_SNIFFING = 1
     NEW_CONNECTION_SNIFFING = 2
     EXISTING_CONNECTION_SNIFFING = 3
-
+    ACCESS_ADDRESS_SNIFFING = 4
 
 # USB device Identifiers
 class UbertoothId(IntEnum):
