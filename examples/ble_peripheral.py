@@ -20,7 +20,7 @@ class MyPeripheral(GenericProfile):
     )
 
 my_profile = MyPeripheral()
-periph = Peripheral(WhadDevice.create('hci1'), profile=my_profile)
+periph = Peripheral(WhadDevice.create('hci0'), profile=my_profile)
 
 periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
     AdvCompleteLocalName(b'TestMe!'),

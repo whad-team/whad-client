@@ -1,4 +1,6 @@
 from .mac import MACManager
+from .constants import Dot15d4Phy
+from whad.exceptions import RequiredImplementation
 
 """
 Pythonic ZigBee stack
@@ -23,17 +25,47 @@ class ZigbeeStack:
         :param WhadDeviceConnector connector: Connector to use with this stack.
         """
         self.__connector = connector
-
+        self.__selected_phy = Dot15d4Phy.OQPSK
         # Instanciate all the required controllers
         self.__mac = MACManager(self)
 
+    @property
+    def phy(self):
+        return self.__selected_phy
 
+    @phy.setter
+    def phy(self, new_phy):
+        if new_phy != Dot15d4Phy.OQPSK:
+            raise RequiredImplementation("PhySelection")
+        self.__selected_phy = new_phy
+
+    @property
+    def mac_services(self):
+        return (self.__mac.management_service, self.__mac.data_service)
+
+    @property
+    def nwk_services(self):
+        return (self.__mac.upper_layer.services)
 
     #############################
     # Incoming messages
     #############################
+    def on_pdu(self, pdu):
+        self.__mac.on_pdu(pdu)
 
-
+    def on_ed_sample(self, timestamp, sample):
+        self.__mac.on_ed_sample(timestamp, sample)
     ############################
     # Interact
     ############################
+    def set_channel(self, channel):
+        self.__connector.set_channel(channel)
+
+    def set_channel_page(self, page):
+        self.__connector.set_channel_page(page)
+
+    def perform_ed_scan(self, channel):
+        self.__connector.perform_ed_scan(channel)
+
+    def send(self, packet):
+        self.__connector.send(packet)

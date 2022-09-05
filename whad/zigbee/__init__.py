@@ -4,9 +4,11 @@ from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.zigbee.metadata import generate_zigbee_metadata, ZigbeeMetadata
+from whad.zigbee.stack import ZigbeeStack
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.zigbee.zigbee_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, Send, SendCmd
+from whad.protocol.zigbee.zigbee_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
+    Send, SendCmd, EnergyDetection, EnergyDetectionCmd
 from whad.zigbee.sniffing import SnifferConfiguration
 from scapy.compat import raw
 from scapy.config import conf
@@ -44,6 +46,10 @@ class Zigbee(WhadDeviceConnector):
         else:
             self.__ready = True
             conf.dot15d4_protocol = 'zigbee'
+
+    def close(self):
+        self.stop()
+        self.device.close()
 
     def format(self, packet):
         if hasattr(packet, "metadata"):
@@ -118,6 +124,18 @@ class Zigbee(WhadDeviceConnector):
         return self.__can_send
 
 
+    def can_perform_ed_scan(self):
+        """
+        Determine if the device can perform energy detection scan.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Zigbee)
+        return (
+            (commands & (1 << EnergyDetection)) > 0 and
+            (commands & (1 << Start))>0 and
+            (commands & (1 << Stop))>0
+        )
+
+
     def support_raw_pdu(self):
         """
         Determine if the device supports raw PDU.
@@ -160,6 +178,18 @@ class Zigbee(WhadDeviceConnector):
         else:
             return False
 
+    def perform_ed_scan(self, channel=11):
+        """
+        Perform an Energy Detection scan.
+        """
+        if self.can_perform_ed_scan():
+            msg = Message()
+            msg.zigbee.ed.channel = channel
+            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        else:
+            return False
+
     def start(self):
         """
         Start currently enabled mode.
@@ -176,6 +206,7 @@ class Zigbee(WhadDeviceConnector):
         msg = Message()
         msg.zigbee.stop.CopyFrom(StopCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def process_messages(self):
         self.device.process_messages()
@@ -202,7 +233,8 @@ class Zigbee(WhadDeviceConnector):
             elif msg_type == 'raw_pdu':
                 packet = self._build_scapy_packet_from_message(message, msg_type)
                 self.on_raw_pdu(packet)
-
+            elif msg_type == "ed_sample":
+                self.on_ed_sample(message.ed_sample.timestamp, message.ed_sample.sample)
 
     def on_raw_pdu(self, packet):
         self.on_pdu(Dot15d4(raw(packet)[:-2]))
@@ -210,6 +242,55 @@ class Zigbee(WhadDeviceConnector):
     def on_pdu(self, packet):
         pass
 
+    def on_ed_sample(self, timestamp, sample):
+        print(sample)
+
+class EndDevice(Zigbee):
+    """
+    Zigbee End Device interface for compatible WHAD device.
+    """
+    def __init__(self, device):
+        super().__init__(device)
+
+        self.__stack = ZigbeeStack(self)
+        if not self.can_sniff() or not self.can_send():
+            raise UnsupportedCapability("EndDevice")
+
+        self.__channel = 11
+        self.__channel_page = 0
+        self.enable_reception()
+
+    @property
+    def stack(self):
+        return self.__stack
+
+    def enable_reception(self):
+        self.sniff_zigbee(channel=self.__channel)
+
+    def set_channel(self, channel=11):
+        self.__channel = channel
+        self.enable_reception()
+
+    def perform_ed_scan(self, channel):
+        if not self.can_perform_ed_scan():
+            raise UnsupportedCapability("EnergyDetection")
+        self.__channel = channel
+        super().perform_ed_scan(channel)
+
+    def set_channel_page(self, page=0):
+        if page != 0:
+            raise UnsupportedCapability("ChannelPageSelection")
+        else:
+            self.__channel_page = page
+
+    def send(self, packet):
+        super().send(packet, channel=self.__channel)
+
+    def on_pdu(self, pdu):
+        self.__stack.on_pdu(pdu)
+
+    def on_ed_sample(self, timestamp, sample):
+        self.__stack.on_ed_sample(timestamp, sample)
 
 class Sniffer(Zigbee):
     """
