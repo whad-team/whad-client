@@ -53,7 +53,7 @@ class NetworkLayerCryptoManager:
         else:
             # Parse network security level to check how to process the packet
             self.patched = False
-            level = NetworkLayerCrypto.SECURITY_LEVELS[packet[ZigbeeSecurityHeader].nwk_seclevel]
+            level = NetworkLayerCryptoManager.SECURITY_LEVELS[packet[ZigbeeSecurityHeader].nwk_seclevel]
             encryption = level["encryption"]
             integrity = level["integrity"]
             if integrity:
@@ -88,7 +88,7 @@ class NetworkLayerCryptoManager:
         B0 = bytes([flags]) + self.nonce + pack(">H",len(plaintext))
         X0 = b"\x00"*16
         cipher = AES.new(self.key, AES.MODE_CBC, X0)
-        X1 = cipher.encrypt(B0 + auth)
+        X1 = cipher.encrypt((16-len(B0+auth)%16)*b"\x00" + B0 + auth)
         return X1[-16:-12]
 
     def encrypt(self, packet):
@@ -175,3 +175,4 @@ class NetworkLayerCryptoManager:
             if self.patched:
                 packet[ZigbeeSecurityHeader].nwk_seclevel = 0
             return (packet, False) # integrity check
+        

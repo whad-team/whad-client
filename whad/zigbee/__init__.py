@@ -1,5 +1,5 @@
 from whad import WhadDomain, WhadCapability
-from whad.scapy.layers.dot15d4tap import Dot15d4TAP_TLV_Hdr, Dot15d4TAP_FCS_Type
+from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr, Dot15d4TAP_FCS_Type
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
@@ -71,7 +71,6 @@ class Zigbee(WhadDeviceConnector):
                 packet = Dot15d4FCS(bytes(message.raw_pdu.pdu) + bytes(struct.pack(">H", message.raw_pdu.fcs)))
                 packet.metadata = generate_zigbee_metadata(message, msg_type)
                 self._signal_packet_reception(packet)
-
                 return packet
 
             elif msg_type == 'pdu':
@@ -287,6 +286,14 @@ class EndDevice(Zigbee):
         super().send(packet, channel=self.__channel)
 
     def on_pdu(self, pdu):
+        if (
+            hasattr(pdu,"metadata") and
+            hasattr(pdu.metadata, "is_fcs_valid") and
+            not pdu.metadata.is_fcs_valid
+        ):
+            print("dropped packet")
+            return
+
         self.__stack.on_pdu(pdu)
 
     def on_ed_sample(self, timestamp, sample):

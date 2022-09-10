@@ -21,6 +21,34 @@ class MACPowerSource(IntEnum):
     BATTERY_SOURCE = 0
     ALTERNATING_CURRENT_SOURCE = 1
 
+class MACNetworkType(IntEnum):
+    """
+    Enum representing the different network type supported by 802.15.4.
+    """
+    BEACON_ENABLED = 0
+    NON_BEACON_ENABLED = 1
+
+
+class MACSecurityLevel(IntEnum):
+    """
+    Enum representing the different security levels supported by 802.15.4.
+    """
+    NONE = 0
+    MIC_32 = 1
+    MIC_64 = 2
+    MIC_128 = 3
+    ENC_MIC_32 = 5
+    ENC_MIC_64 = 6
+    ENC_MIC_128 = 7
+
+class MACKeyIdentifier(IntEnum):
+    """
+    Enum representing the different key identifiers supported by 802.15.4.
+    """
+    IMPLICIT = 0
+    KEY_INDEX = 1
+    KEY_SOURCE_4_BYTES = 2
+    KEY_SOURCE_8_BYTES = 3
 
 class MACScanType(IntEnum):
     """
@@ -67,6 +95,7 @@ class Dot15d4PANNetwork:
         self.pan_coord = beacon.sf_pancoord
         self.assoc_permit = beacon.sf_assocpermit
         self.gts_permit = beacon.gts_spec_permit
+        self.network_type = MACNetworkType.BEACON_ENABLED if self.beacon_order < 15 else MACNetworkType.NON_BEACON_ENABLED
 
     def __eq__(self, other):
         return self.coord_addr == other.coord_addr and self.coord_pan_id == other.coord_pan_id
@@ -77,6 +106,7 @@ class Dot15d4PANNetwork:
                 "pan_coord=" + (hex(self.coord_addr) if isinstance(self.coord_addr,int) else self.coord_addr) + ", "
                 "channel_page=" + str(self.channel_page)+", "
                 "channel=" + str(self.channel)+", "
+                "network_type=" + ("beacon_enabled ({})".format(self.beacon_order) if self.network_type == MACNetworkType.BEACON_ENABLED else "non_beacon_enabled")+", "
                 "association=" + ("permitted" if self.assoc_permit else "forbidden") +
             ")"
         )

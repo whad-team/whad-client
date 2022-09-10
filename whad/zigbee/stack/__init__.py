@@ -1,7 +1,8 @@
 from .mac import MACManager
+from .nwk import NWKManager
 from .constants import Dot15d4Phy
 from whad.exceptions import RequiredImplementation
-
+from scapy.config import conf
 """
 Pythonic ZigBee stack
 """
@@ -26,8 +27,12 @@ class ZigbeeStack:
         """
         self.__connector = connector
         self.__selected_phy = Dot15d4Phy.OQPSK
+
+        conf.dot15d4_protocol = "zigbee"
         # Instanciate all the required controllers
         self.__mac = MACManager(self)
+        self.__nwk = NWKManager(self.__mac)
+        self.__mac.upper_layer = self.__nwk
 
     @property
     def phy(self):
@@ -40,12 +45,12 @@ class ZigbeeStack:
         self.__selected_phy = new_phy
 
     @property
-    def mac_services(self):
-        return (self.__mac.management_service, self.__mac.data_service)
+    def mac(self):
+        return self.__mac
 
     @property
-    def nwk_services(self):
-        return (self.__mac.upper_layer.services)
+    def nwk(self):
+        return self.__nwk
 
     #############################
     # Incoming messages
@@ -55,6 +60,7 @@ class ZigbeeStack:
 
     def on_ed_sample(self, timestamp, sample):
         self.__mac.on_ed_sample(timestamp, sample)
+
     ############################
     # Interact
     ############################

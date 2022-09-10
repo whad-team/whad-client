@@ -1,26 +1,37 @@
 from whad.zigbee import EndDevice
 from whad.zigbee.stack.mac.constants import MACScanType
 from whad.device import WhadDevice
+from whad.zigbee.crypto import NetworkLayerCryptoManager
 from whad.exceptions import WhadDeviceNotFound
 from time import time,sleep
+from whad.common.monitors import PcapWriterMonitor
 from scapy.compat import raw
 from scapy.layers.dot15d4 import Dot15d4
 import sys
+
+import logging
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
         # Retrieve target interface
         interface = sys.argv[1]
-
         # Connect to target device and performs discovery
         try:
+            #monitor = PcapWriterMonitor("/tmp/decrypt.pcap")
             dev = WhadDevice.create(interface)
             endDevice = EndDevice(dev)
+            #monitor.attach(endDevice)
+            #monitor.start()
             endDevice.start()
-            management_service, _ = endDevice.stack.mac_services
-            print(management_service.scan())
+            endDevice.stack.nwk.database.set("nwkSecurityLevel", 5)
+            endDevice.stack.nwk.add_key("44:81:97:51:b6:02:04:91:81:dc:8b:c2:71:4d:f0:9d")
+            management_service = endDevice.stack.nwk.get_service("management")
+            print(management_service.network_discovery())
             #management_service.associate(coordinator_pan_id=0xcb3a, coordinator_address=0xed23)
-
+            endDevice.set_channel(15)
             input()
         except (KeyboardInterrupt, SystemExit):
             dev.close()
