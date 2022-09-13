@@ -26,12 +26,15 @@ if __name__ == '__main__':
             #monitor.attach(endDevice)
             #monitor.start()
             endDevice.start()
-            endDevice.stack.nwk.database.set("nwkSecurityLevel", 5)
-            endDevice.stack.nwk.add_key("44:81:97:51:b6:02:04:91:81:dc:8b:c2:71:4d:f0:9d")
+            #endDevice.stack.nwk.database.set("nwkSecurityLevel", 5)
+            #endDevice.stack.nwk.add_key("44:81:97:51:b6:02:04:91:81:dc:8b:c2:71:4d:f0:9d")
             management_service = endDevice.stack.nwk.get_service("management")
-            print(management_service.network_discovery())
-            #management_service.associate(coordinator_pan_id=0xcb3a, coordinator_address=0xed23)
-            endDevice.set_channel(15)
+            for network in management_service.network_discovery():
+                print(network)
+            management_service.join(extended_pan_id=0xf4ce364269d30198)
+            #management_service = endDevice.stack.mac.get_service("management")
+            #management_service.associate(coordinator_pan_id=0x2699, coordinator_address=0x0, channel_page=0, channel=16)
+
             input()
         except (KeyboardInterrupt, SystemExit):
             dev.close()

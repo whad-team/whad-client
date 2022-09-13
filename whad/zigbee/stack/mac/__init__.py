@@ -1,14 +1,15 @@
 from .constants import MACScanType, MACConstants, MACAddressMode, Dot15d4PANNetwork, \
     EDMeasurement, MACDeviceType, MACPowerSource
+from .helpers import is_short_address
 from whad.zigbee.stack.constants import SYMBOL_DURATION
 from whad.zigbee.stack.database import Dot15d4Database
 from whad.zigbee.stack.service import Dot15d4Service
 from whad.zigbee.stack.manager import Dot15d4Manager
-from .exceptions import MACTimeoutException
+from .exceptions import MACTimeoutException, MACAssociationFailure
 from whad.exceptions import RequiredImplementation
 from queue import Queue, Empty
 from scapy.layers.dot15d4 import Dot15d4Data, Dot15d4Beacon, Dot15d4Cmd, \
-    Dot15d4Ack, Dot15d4, Dot15d4CmdAssocReq
+    Dot15d4Ack, Dot15d4, Dot15d4CmdAssocReq, Dot15d4CmdAssocResp
 from time import time,sleep
 from whad.zigbee.stack.nwk import NWKManager
 import logging
@@ -24,7 +25,7 @@ class MACPIB(Dot15d4Database):
         """
         Reset the PIB database to its default value.
         """
-        self.macExtendedAddress = None
+        self.macExtendedAddress = 0x1122334455667788
         self.macAssociatedPanCoord = False
         self.macAssociationPermit = False
         self.macAutoRequest = False
@@ -34,8 +35,9 @@ class MACPIB(Dot15d4Database):
         self.macShortAddress = 0xFFFF
         self.macCoordShortAddress = 0
         self.macCoordExtendedAddress = 0
-        self.macPromiscuousMode = True
+        self.macPromiscuousMode = False
         self.macImplicitBroadcast = False
+        self.macResponseWaitTime = 32
 
 
 class MACService(Dot15d4Service):
@@ -83,12 +85,14 @@ class MACDataService(MACService):
         destination_pan_id = pdu.dest_panid if hasattr(pdu, "dest_panid") else None
         destination_address = pdu.dest_addr if hasattr(pdu, "dest_addr") else None
         payload = pdu[Dot15d4Data].payload if Dot15d4Data in pdu else pdu[Dot15d4].payload
+        link_quality = pdu.metadata.lqi if hasattr(pdu, "metadata") and hasattr(pdu.metadata, "lqi") else 255
         return {
             "pdu":payload,
             "destination_pan_id":destination_pan_id,
             "destination_address":destination_address,
             "source_pan_id":source_pan_id,
-            "source_address":source_address
+            "source_address":source_address,
+            "link_quality":link_quality
         }
 
 class MACManagementService(MACService):
@@ -127,6 +131,7 @@ class MACManagementService(MACService):
         """
         if set_default_pib:
             self.database.reset()
+            self.manager.set_extended_address(self.database.get("macExtendedAddress"))
             return True
         return False
 
@@ -154,33 +159,74 @@ class MACManagementService(MACService):
                 return False
         return False
 
+    @Dot15d4Service.request("MLME-ASSOCIATE")
     def associate(self, channel_page=0, channel=11, coordinator_pan_id=0, coordinator_address=0, device_type=MACDeviceType.FFD, power_source=MACPowerSource.ALTERNATING_CURRENT_SOURCE, idle_receiving=True, allocate_address=True, security_capability=False, fast_association=False):
         """
         Implement the MLME-ASSOCIATE request operation.
         """
+        self.database.set("macPanId", coordinator_pan_id)
+        if is_short_address(coordinator_address):
+            self.database.set("macCoordShortAddress", coordinator_address)
+        else:
+            self.database.set("macCoordExtendedAddress", coordinator_address)
         self.manager.set_channel_page(channel_page)
         self.manager.set_channel(channel)
-        #print("Channel", channel)
-        acked = self.manager.send_data(
-                Dot15d4Cmd(
-                    cmd_id="AssocReq",
-                    dest_addr=coordinator_address,
-                    dest_panid=coordinator_pan_id,
-                    src_addr="00:17:88:01:02:03:04:05",
-                    src_panid=0xFFFF
-                )/
-                Dot15d4CmdAssocReq(
-    				allocate_address=int(allocate_address),
-    				security_capability = int(security_capability),
-    				power_source=int(power_source == MACPowerSource.ALTERNATING_CURRENT_SOURCE),
-    				device_type=int(device_type == MACDeviceType.FFD),
-    				receiver_on_when_idle=int(idle_receiving),
-    				alternate_pan_coordinator=int(fast_association)
-    		  )
-            , wait_for_ack=True)
 
-        if acked:
-            pass
+        duration = self.database.get("macResponseWaitTime") * MACConstants.A_BASE_SUPERFRAME_DURATION * SYMBOL_DURATION[self.manager.stack.phy]
+        try:
+            acked = self.manager.send_data(
+                    Dot15d4Cmd(
+                        cmd_id="AssocReq",
+                        dest_addr=coordinator_address,
+                        dest_panid=coordinator_pan_id,
+                        src_addr=self.database.get("macExtendedAddress"),
+                        src_panid=0xFFFF
+                    )/
+                    Dot15d4CmdAssocReq(
+        				allocate_address=int(allocate_address),
+        				security_capability = int(security_capability),
+        				power_source=int(power_source == MACPowerSource.ALTERNATING_CURRENT_SOURCE),
+        				device_type=int(device_type == MACDeviceType.FFD),
+        				receiver_on_when_idle=int(idle_receiving),
+        				alternate_pan_coordinator=int(fast_association)
+        		  )
+                , wait_for_ack=True, source_address_mode=MACAddressMode.EXTENDED)
+
+            if acked:
+                sleep(duration/1000000)
+                ack = self.manager.send_data(
+                    Dot15d4Cmd(
+                        cmd_id="DataReq",
+                        dest_addr=coordinator_address,
+                        dest_panid=coordinator_pan_id,
+                        src_addr=self.database.get("macExtendedAddress"),
+                        src_panid=0xFFFF
+                    ),
+                    wait_for_ack=True, source_address_mode=MACAddressMode.EXTENDED)
+                if acked:
+                    try:
+                        association_response = self.wait_for_packet(lambda pkt: Dot15d4CmdAssocResp in pkt, timeout=5.0)
+                        if association_response.association_status == 0:
+                            self.manager.set_short_address(association_response.short_address)
+                            if association_response.fcf_srcaddrmode == 2:
+                                self.database.set("macCoordShortAddress", association_response.src_addr)
+                            elif association_response.fcf_srcaddrmode == 3:
+                                self.database.set("macCoordExtendedAddress", association_response.src_addr)
+
+                            return True
+                        else:
+                            raise MACAssociationFailure("association response unsuccessful (status={})".format(hex(association_response.association_status)))
+                    except MACTimeoutException:
+                        raise MACAssociationFailure("association response timeout. ")
+                else:
+                    raise MACAssociationFailure("no acknowledgement received for DataRequest. ")
+            else:
+                raise MACAssociationFailure("no acknowledgement received for AssociationRequest. ")
+
+        except MACAssociationFailure as err:
+            logger.info("[{}] Association failure - {}. ".format(self._name, err.reason))
+            self.database.set("macPanId", 0xFFFF)
+            return False
 
     @Dot15d4Service.request("MLME-SCAN")
     def scan(self, scan_type=MACScanType.ACTIVE,channel_page=0, scan_channels=0x7fff800, scan_duration=5):
@@ -218,7 +264,10 @@ class MACManagementService(MACService):
     # Indications
     @Dot15d4Service.indication("MLME-BEACON-NOTIFY")
     def indicate_beacon_notify(self, pan_descriptor, beacon_payload):
-        return {"pan_descriptor": pan_descriptor, "beacon_payload":beacon_payload}
+        return {
+                    "pan_descriptor": pan_descriptor,
+                    "beacon_payload":beacon_payload
+        }
 
 
 
@@ -232,7 +281,7 @@ class MACManagementService(MACService):
             self.manager.set_channel_page(channel_page)
             self.manager.set_channel(channel)
             #print("Channel", channel)
-            start_time = time()* 1000000
+            start_time = time()
             if active:
                 self.manager.send_data(Dot15d4Cmd(
                     cmd_id="BeaconReq",
@@ -240,7 +289,7 @@ class MACManagementService(MACService):
                     dest_panid=0xFFFF)
                 )
 
-            while (time()* 1000000 - start_time) < duration:
+            while (time() - start_time) < duration:
                 try:
                     beacon = self.wait_for_packet(lambda pkt: Dot15d4Beacon in pkt, timeout=0.0001)
                     pan_descriptor = Dot15d4PANNetwork(beacon, channel_page, channel)
@@ -260,9 +309,9 @@ class MACManagementService(MACService):
             self._samples_queue.queue.clear()
             self.manager.perform_ed_scan(channel)
 
-            start_time = time()* 1000000
+            start_time = time()
             samples = []
-            while (time()* 1000000 - start_time) < duration:
+            while (time() - start_time) < duration:
                 try:
                     sample = self._samples_queue.get(block=False)
                     samples.append(sample)
@@ -273,7 +322,7 @@ class MACManagementService(MACService):
 
     # Input callbacks
     def on_cmd_pdu(self, pdu):
-        pass#pdu.show()
+        self.add_packet_to_queue(pdu)
 
     def on_beacon_pdu(self, pdu):
         self.add_packet_to_queue(pdu)
@@ -313,6 +362,7 @@ class MACManager(Dot15d4Manager):
         )
         self.__stack = stack
         self.__ack_queue = Queue()
+        self.set_extended_address(self.database.get("macExtendedAddress"))
 
     @property
     def stack(self):
@@ -334,7 +384,10 @@ class MACManager(Dot15d4Manager):
             elif pdu.fcf_frametype == 0x00 or Dot15d4Beacon in pdu:
                 self.get_service("management").on_beacon_pdu(pdu)
             else:
-                logger.warning("[mac_manager] Malformed PDU received: {}", repr(pdu))
+                logger.warning("[mac_manager] Malformed PDU received: {}".format(repr(pdu)))
+
+            #if hasattr(pdu, "fcf_ackreq") and pdu.fcf_ackreq:
+            #    self.send_ack(pdu)
 
     def match_filter(self, pdu):
         macPromiscuousMode = self.database.get("macPromiscuousMode")
@@ -375,6 +428,14 @@ class MACManager(Dot15d4Manager):
 
         return True
 
+    def set_short_address(self, address):
+        self.database.set("macShortAddress", address)
+        self.stack.set_short_address(address)
+
+    def set_extended_address(self, address):
+        self.database.set("macExtendedAddress", address)
+        self.stack.set_extended_address(address)
+
     def on_ed_sample(self, timestamp, sample):
         self.get_service("management").on_ed_sample(timestamp, sample)
 
@@ -401,8 +462,23 @@ class MACManager(Dot15d4Manager):
                 pass
         raise MACTimeoutException
 
-    def send_data(self, packet, wait_for_ack=False, return_ack=False):
-        packet = Dot15d4()/packet
+    """
+    def send_ack(self, acknowledged_pdu):
+        ack = Dot15d4(seqnum=acknowledged_pdu.seqnum)/Dot15d4Ack()
+        self.stack.send(ack)
+    """
+
+    def send_data(self, packet, wait_for_ack=False, return_ack=False, source_address_mode=None):
+        if source_address_mode is not None:
+            if source_address_mode == MACAddressMode.NONE:
+                fcf_srcaddrmode = 0
+            elif source_address_mode == MACAddressMode.SHORT:
+                fcf_srcaddrmode = 2
+            else:
+                fcf_srcaddrmode = 3
+            packet = Dot15d4(fcf_srcaddrmode=fcf_srcaddrmode)/packet
+        else:
+            packet = Dot15d4()/packet
         if wait_for_ack:
             packet.fcf_ackreq = 1
         sequence_number = self.database.get("macDataSequenceNumber")

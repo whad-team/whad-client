@@ -8,7 +8,8 @@ from whad.zigbee.stack import ZigbeeStack
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.zigbee.zigbee_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
-    Send, SendCmd, EnergyDetection, EnergyDetectionCmd
+    Send, SendCmd, EnergyDetection, EnergyDetectionCmd, EndDeviceMode, SetNodeAddress, \
+    AddressType
 from whad.zigbee.sniffing import SnifferConfiguration
 from scapy.compat import raw
 from scapy.config import conf
@@ -113,6 +114,29 @@ class Zigbee(WhadDeviceConnector):
             (commands & (1 << Stop))>0
         )
 
+
+    def can_set_node_address(self):
+        """
+        Determine if the device can configure a Node address.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Zigbee)
+        return (
+            (commands & (1 << SetNodeAddress)) > 0
+        )
+
+    def can_be_end_device(self):
+        """
+        Determine if the device implements an End Device role mode.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Zigbee)
+        return (
+            (commands & (1 << EndDeviceMode)) > 0 and
+            (commands & (1 << Start))>0 and
+            (commands & (1 << Stop))>0
+        )
+
+
+
     def can_send(self):
         """
         Determine if the device can transmit packets.
@@ -153,6 +177,32 @@ class Zigbee(WhadDeviceConnector):
 
         msg = Message()
         msg.zigbee.sniff.channel = channel
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+    def set_node_address(self, address, mode=AddressType.SHORT):
+        """
+        Modify Zigbee node address.
+        """
+        if not self.can_set_node_address():
+            raise UnsupportedCapability("SetNodeAddress")
+
+        msg = Message()
+        msg.zigbee.set_node_addr.address = address
+        msg.zigbee.set_node_addr.address_type = mode
+        print(msg)
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+    def set_end_device_mode(self, channel=11):
+        """
+        Acts as a ZigBee End Device.
+        """
+        if not self.can_be_end_device():
+            raise UnsupportedCapability("EndDevice")
+
+        msg = Message()
+        msg.zigbee.end_device.channel = channel
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -217,7 +267,6 @@ class Zigbee(WhadDeviceConnector):
     def on_discovery_msg(self, message):
         pass
 
-
     def on_domain_msg(self, domain, message):
         if not self.__ready:
             return
@@ -236,7 +285,9 @@ class Zigbee(WhadDeviceConnector):
                 self.on_ed_sample(message.ed_sample.timestamp, message.ed_sample.sample)
 
     def on_raw_pdu(self, packet):
-        self.on_pdu(Dot15d4(raw(packet)[:-2]))
+        pdu = Dot15d4(raw(packet)[:-2])
+        pdu.metadata = packet.metadata
+        self.on_pdu(pdu)
 
     def on_pdu(self, packet):
         pass
@@ -252,7 +303,7 @@ class EndDevice(Zigbee):
         super().__init__(device)
 
         self.__stack = ZigbeeStack(self)
-        if not self.can_sniff() or not self.can_send():
+        if not self.can_be_end_device():
             raise UnsupportedCapability("EndDevice")
 
         self.__channel = 11
@@ -264,7 +315,7 @@ class EndDevice(Zigbee):
         return self.__stack
 
     def enable_reception(self):
-        self.sniff_zigbee(channel=self.__channel)
+        self.set_end_device_mode(channel=self.__channel)
 
     def set_channel(self, channel=11):
         self.__channel = channel

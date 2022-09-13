@@ -1,6 +1,7 @@
 from .mac import MACManager
 from .nwk import NWKManager
 from .constants import Dot15d4Phy
+from whad.protocol.zigbee.zigbee_pb2 import AddressType
 from whad.exceptions import RequiredImplementation
 from scapy.config import conf
 """
@@ -64,6 +65,13 @@ class ZigbeeStack:
     ############################
     # Interact
     ############################
+
+    def set_short_address(self, address):
+        self.__connector.set_node_address(address, mode=AddressType.SHORT)
+
+    def set_extended_address(self, address):
+        self.__connector.set_node_address(address, mode=AddressType.EXTENDED)
+
     def set_channel(self, channel):
         self.__connector.set_channel(channel)
 

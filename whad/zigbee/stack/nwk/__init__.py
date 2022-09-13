@@ -1,11 +1,14 @@
 from scapy.layers.zigbee import ZigBeeBeacon, ZigbeeNWKStub, ZigbeeNWK, \
-    ZigbeeSecurityHeader, ZigbeeNWKCommandPayload, ZigbeeAppDataPayload
+    ZigbeeSecurityHeader, ZigbeeNWKCommandPayload, ZigbeeAppDataPayload, \
+    ZigbeeAppDataPayloadStub
 from scapy.fields import FlagValueIter
 from whad.zigbee.crypto import NetworkLayerCryptoManager
 from .exceptions import NWKTimeoutException
 from .constants import ZigbeeNetwork, NWKAddressMode, BROADCAST_ADDRESSES, \
-    NetworkSecurityMaterial
-from whad.zigbee.stack.mac.constants import MACScanType, MACAddressMode
+    NetworkSecurityMaterial, NWKJoinMode, ZigbeeDeviceType, NWKNeighborTable, \
+    ZigbeeRelationship
+from whad.zigbee.stack.mac.constants import MACScanType, MACAddressMode, \
+    MACPowerSource, MACDeviceType
 from whad.zigbee.stack.service import Dot15d4Service
 from whad.zigbee.stack.manager import Dot15d4Manager
 from whad.zigbee.stack.database import Dot15d4Database
@@ -25,7 +28,7 @@ class NWKIB(Dot15d4Database):
         #self.nwkMaxChildren = None
         self.nwkMaxDepth = 30 # ?
         #self.nwkMaxRouters = None
-        self.nwkNeighborTable = []
+        self.nwkNeighborTable = NWKNeighborTable()
         #self.nwkNetworkBroadcastDeliveryTime = None
         self.nwkReportConstantCost = 0
         self.nwkRouteTable = []
@@ -47,6 +50,12 @@ class NWKIB(Dot15d4Database):
         self.nwkSecurityLevel = 0
         self.nwkSecurityMaterialSet = []
         self.nwkActiveKeySeqNumber = 0
+
+        self.nwkLinkStatusPeriod = 0x0f
+        self.nwkRouterAgeLimit = 3
+
+        self.nwkParentInformation = 0
+        self.nwkCapabilityInformation = None
 
 class NWKService(Dot15d4Service):
     """
@@ -127,11 +136,11 @@ class NWKDataService(NWKService):
                     wait_for_ack=acknowledged
         )
 
-    def on_data_npdu(self, npdu):
-        self.indicate_data(npdu)
+    def on_data_npdu(self, npdu, link_quality=255):
+        self.indicate_data(npdu, link_quality=link_quality)
 
     @Dot15d4Service.indication("NLDE-DATA")
-    def indicate_data(self, npdu):
+    def indicate_data(self, npdu, link_quality=255):
         destination_address_mode = (
             NWKAddressMode.MULTICAST if "multicast" in npdu.flags else
             NWKAddressMode.UNICAST
@@ -150,7 +159,8 @@ class NWKDataService(NWKService):
             "destination_address_mode":destination_address_mode,
             "destination_address":destination_address,
             "source_address":source_address,
-            "security_use":security_use
+            "security_use":security_use,
+            "link_quality":link_quality
         }
 class NWKManagementService(NWKService):
     """
@@ -160,7 +170,7 @@ class NWKManagementService(NWKService):
     @Dot15d4Service.request("NLME-RESET")
     def reset(self, warm_start=False):
         if warm_start:
-            self.database.set("nwkNeighborTable",[])
+            self.database.set("nwkNeighborTable",NWKNeighborTable())
             self.database.set("nwkRouteTable",[])
             return True
         else:
@@ -197,8 +207,58 @@ class NWKManagementService(NWKService):
         )
         return confirm
 
+    @Dot15d4Service.request("NLME-JOIN")
+    def join(self, extended_pan_id, association_type=NWKJoinMode.NEW_JOIN, scan_channels=0x7fff800, scan_duration=14, join_as_router=False, rx_on_when_idle=True, mains_powered_device=True, security_enable=False):
+        if association_type == NWKJoinMode.NEW_JOIN:
+            table = self.database.get("nwkNeighborTable")
+            while True:
+                candidate_parents = table.select_suitable_parent(extended_pan_id, self.database.get("nwkUpdateId"))
+                if len(candidate_parents) == 0:
+                    return False
+
+                selected_parent = candidate_parents[0]
+                for candidate_parent in candidate_parents[1:]:
+                    if candidate_parent.depth < selected_parent.depth:
+                        selected_parent = candidate_parent
+
+                self.database.set("nwkParentInformation", 0)
+
+                device_type = MACDeviceType.FFD if join_as_router else MACDeviceType.RFD
+                power_source = MACPowerSource.ALTERNATING_CURRENT_SOURCE if mains_powered_device else MACPowerSource.BATTERY_SOURCE
+
+                capability_information = (
+                    0 |
+                    (int(join_as_router) << 1) |
+                    (int(mains_powered_device) << 2) |
+                    (int(rx_on_when_idle) << 3) |
+                    (0 << 4) |
+                    (0 << 6) |
+                    (1 << 7)
+                )
+                self.database.set("nwkCapabilityInformation", capability_information)
+                if self.manager.mac.get_service("management").associate(
+                    channel_page=0,
+                    channel=selected_parent.logical_channel,
+                    coordinator_pan_id=selected_parent.pan_id,
+                    coordinator_address=selected_parent.address,
+                    device_type=device_type,
+                    power_source=power_source,
+                    idle_receiving=rx_on_when_idle,
+                    allocate_address=True,
+                    security_capability=False,
+                    fast_association=False
+                ):
+                    self.database.set("nwkNetworkAddress", self.manager.mac.database.get("macShortAddress"))
+                    self.database.set("nwkUpdateId", selected_parent.update_id)
+                    self.database.set("nwkPANId", selected_parent.pan_id)
+                    self.database.set("nwkExtendedPANID", extended_pan_id)
+                    selected_parent.relationship = ZigbeeRelationship.IS_PARENT
+                    return True
+                else:
+                    selected_parent.potential_parent = 0
+
     @Dot15d4Service.request("NLME-NETWORK-DISCOVERY")
-    def network_discovery(self, scan_channels=0x7fff800, scan_duration=2):
+    def network_discovery(self, scan_channels=0x7fff800, scan_duration=4):
         """
         Implements the NLME-NETWORK-DISCOVERY request.
         """
@@ -214,7 +274,10 @@ class NWKManagementService(NWKService):
             try:
                 beacon = self.wait_for_packet(lambda pkt:ZigBeeBeacon in pkt, timeout=0.1)
                 if beacon.pan_descriptor in confirm:
-                    zigbee_networks.append(ZigbeeNetwork(beacon))
+                    network = ZigbeeNetwork(beacon)
+                    if network not in zigbee_networks:
+                        zigbee_networks.append(network)
+
             except NWKTimeoutException:
                 notifications_left = False
         return zigbee_networks
@@ -223,7 +286,7 @@ class NWKManagementService(NWKService):
         beacon_payload.pan_descriptor = pan_descriptor
         self.add_packet_to_queue(beacon_payload)
 
-    def on_command_npdu(self, npdu):
+    def on_command_npdu(self, npdu, link_quality):
         pass
 
 class NWKInterpanService(NWKService):
@@ -242,14 +305,14 @@ class NWKInterpanService(NWKService):
             wait_for_ack=False
         )
 
-    def on_interpan_npdu(self, pdu, destination_pan_id, destination_address, source_pan_id, source_address):
+    def on_interpan_npdu(self, pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality):
         profile_id = pdu.profile
         cluster_id = pdu.cluster
         asdu = pdu[ZigbeeAppDataPayloadStub].data
-        self.indicate_interpan_data(asdu, profile_id=profile_id, cluster_id=cluster_id, destination_pan_id=destination_pan_id, destination_address=destination_address, source_pan_id=source_pan_id, source_address=source_address)
+        self.indicate_interpan_data(asdu, profile_id=profile_id, cluster_id=cluster_id, destination_pan_id=destination_pan_id, destination_address=destination_address, source_pan_id=source_pan_id, source_address=source_address, link_quality=link_quality)
 
     @Dot15d4Service.indication("INTRP-DATA")
-    def indicate_interpan_data(self, asdu, profile_id=0, cluster_id=0, destination_pan_id=0xFFFF, destination_address=0xFFFF, source_pan_id=0xFFFF, source_address=0xFFFF):
+    def indicate_interpan_data(self, asdu, profile_id=0, cluster_id=0, destination_pan_id=0xFFFF, destination_address=0xFFFF, source_pan_id=0xFFFF, source_address=0xFFFF, link_quality=255):
         return {
             "asdu":asdu,
             "profile_id":profile_id,
@@ -257,7 +320,8 @@ class NWKInterpanService(NWKService):
             "destination_pan_id":destination_pan_id,
             "destination_address":destination_address,
             "source_pan_id":source_pan_id,
-            "source_address":source_address
+            "source_address":source_address,
+            "link_quality":link_quality
         }
 
 class NWKManager(Dot15d4Manager):
@@ -348,9 +412,9 @@ class NWKManager(Dot15d4Manager):
             logger.info("[nwk] decryption failure - MIC not matching.")
             return pdu, False
 
-    def on_mcps_data(self, pdu, destination_pan_id, destination_address, source_pan_id, source_address):
+    def on_mcps_data(self, pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality):
         if ZigbeeNWKStub in pdu and ZigbeeAppDataPayloadStub in pdu:
-            self.get_service("interpan").on_interpan_npdu(pdu, destination_pan_id, destination_address, source_pan_id, source_address)
+            self.get_service("interpan").on_interpan_npdu(pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality)
         elif ZigbeeNWK in pdu:
             if ZigbeeSecurityHeader in pdu:
                 decrypted, success = self.decrypt(pdu)
@@ -359,11 +423,11 @@ class NWKManager(Dot15d4Manager):
                 else:
                     print("failure during decryption.")
             if pdu.frametype == 0:
-                self.get_service("data").on_data_npdu(pdu)
+                self.get_service("data").on_data_npdu(pdu, link_quality)
             elif pdu.frametype == 1:
-                self.get_service("management").on_command_npdu(pdu)
+                self.get_service("management").on_command_npdu(pdu, link_quality)
             else:
-                self.get_service("interpan").on_interpan_npdu(pdu)
+                self.get_service("interpan").on_interpan_npdu(pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality)
 
     def on_mlme_beacon_notify(self, pan_descriptor, beacon_payload):
         if isinstance(beacon_payload, bytes):
@@ -371,3 +435,21 @@ class NWKManager(Dot15d4Manager):
         # Check if this is a Zigbee beacon
         if hasattr(beacon_payload, "proto_id") and beacon_payload.proto_id == 0:
             self.get_service("management").on_beacon_npdu(pan_descriptor, beacon_payload)
+            # Update the neighbor table
+            table = self.database.get("nwkNeighborTable")
+            table.update(
+                pan_descriptor.coord_addr,
+                device_type=ZigbeeDeviceType.COORDINATOR,
+                transmit_failure=0,
+                lqi=pan_descriptor.link_quality,
+                outgoing_cost=0,
+                age=0,
+                extended_pan_id=beacon_payload.extended_pan_id,
+                logical_channel=pan_descriptor.channel,
+                depth=beacon_payload.device_depth,
+                beacon_order=pan_descriptor.beacon_order,
+                permit_joining=pan_descriptor.assoc_permit,
+                potential_parent=True,
+                update_id=beacon_payload.update_id,
+                pan_id=pan_descriptor.coord_pan_id
+            )

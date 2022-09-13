@@ -4,5 +4,5 @@ class Dot15d4Phy(IntEnum):
     OQPSK = 0
 
 SYMBOL_DURATION = {
-    Dot15d4Phy.OQPSK : 16
+    Dot15d4Phy.OQPSK : (4/250000)
 }

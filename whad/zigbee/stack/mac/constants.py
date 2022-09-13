@@ -4,6 +4,7 @@ class MACAddressMode(IntEnum):
     """
     Enum representing the different MAC address modes supported by 802.15.4.
     """
+    NONE = 0
     SHORT = 1
     EXTENDED = 2
 
@@ -88,6 +89,7 @@ class Dot15d4PANNetwork:
         self.coord_addr = beacon.src_addr
         self.channel = channel
         self.channel_page = channel_page
+        self.link_quality = beacon.metadata.lqi if hasattr(beacon, "metadata") and hasattr(beacon.metadata, "lqi") else 255
         self.beacon_order = beacon.sf_beaconorder
         self.superframe_order = beacon.sf_sforder
         self.final_capslot = beacon.sf_finalcapslot
@@ -103,9 +105,10 @@ class Dot15d4PANNetwork:
     def __repr__(self):
         return ("Dot15d4PANNetwork("+
                 "pan_id=" + hex(self.coord_pan_id)+", "
-                "pan_coord=" + (hex(self.coord_addr) if isinstance(self.coord_addr,int) else self.coord_addr) + ", "
+                "pan_coord=" + hex(self.coord_addr)+ ", "
                 "channel_page=" + str(self.channel_page)+", "
                 "channel=" + str(self.channel)+", "
+                "link_quality=" + str(self.link_quality)+", "
                 "network_type=" + ("beacon_enabled ({})".format(self.beacon_order) if self.network_type == MACNetworkType.BEACON_ENABLED else "non_beacon_enabled")+", "
                 "association=" + ("permitted" if self.assoc_permit else "forbidden") +
             ")"
