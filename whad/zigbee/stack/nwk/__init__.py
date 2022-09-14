@@ -13,6 +13,7 @@ from whad.zigbee.stack.service import Dot15d4Service
 from whad.zigbee.stack.manager import Dot15d4Manager
 from whad.zigbee.stack.database import Dot15d4Database
 from whad.exceptions import RequiredImplementation
+from whad.zigbee.stack.aps import APSManager
 from queue import Queue, Empty
 from copy import copy
 from time import time
@@ -56,6 +57,7 @@ class NWKIB(Dot15d4Database):
 
         self.nwkParentInformation = 0
         self.nwkCapabilityInformation = None
+        self.nwkAddressMap = {}
 
 class NWKService(Dot15d4Service):
     """
@@ -69,6 +71,9 @@ class NWKDataService(NWKService):
     """
     NWK service processing Data packets.
     """
+    def __init__(self, manager):
+        super().__init__(manager, name="nwk_data")
+
     @Dot15d4Service.request("NLDE-DATA")
     def data(self,nsdu,nsdu_handle=0, alias_address=None, alias_sequence_number=0, destination_address_mode=NWKAddressMode.UNICAST, destination_address=0xFFFF, radius=0, non_member_radius=7, discover_route=False, security_enable=False):
         if alias_address is not None:
@@ -147,13 +152,12 @@ class NWKDataService(NWKService):
         )
         destination_address = npdu.destination
         source_address = npdu.source
-        security_use = ZigbeeSecurityHeader in npdu
+        security_use = ZigbeeSecurityHeader in npdu and npdu[ZigbeeSecurityHeader].underlayer.__class__ is ZigbeeNWK
         if security_use:
             nsdu = ZigbeeAppDataPayload(npdu.data)
         else:
             nsdu = npdu[ZigbeeAppDataPayload]
 
-        nsdu.show()
         return {
             "nsdu":nsdu,
             "destination_address_mode":destination_address_mode,
@@ -166,6 +170,8 @@ class NWKManagementService(NWKService):
     """
     NWK service processing Management packets.
     """
+    def __init__(self, manager):
+        super().__init__(manager, name="nwk_management")
 
     @Dot15d4Service.request("NLME-RESET")
     def reset(self, warm_start=False):
@@ -253,6 +259,10 @@ class NWKManagementService(NWKService):
                     self.database.set("nwkPANId", selected_parent.pan_id)
                     self.database.set("nwkExtendedPANID", extended_pan_id)
                     selected_parent.relationship = ZigbeeRelationship.IS_PARENT
+
+                    if selected_parent.extended_address is not None and selected_parent.address is not None:
+                        nwkAddressMap = self.database.get("nwkAddressMap")
+                        nwkAddressMap[selected_parent.extended_address] = selected_parent.address
                     return True
                 else:
                     selected_parent.potential_parent = 0
@@ -290,6 +300,10 @@ class NWKManagementService(NWKService):
         pass
 
 class NWKInterpanService(NWKService):
+
+    def __init__(self, manager):
+        super().__init__(manager, name="nwk_interpan")
+
     @Dot15d4Service.request("INTRP-DATA")
     def interpan_data(self,asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, profile_id=0, cluster_id=0):
         data = ZigbeeNWKStub()/ZigbeeAppDataPayloadStub(
@@ -340,7 +354,7 @@ class NWKManager(Dot15d4Manager):
                         "interpan":NWKInterpanService(self)
             },
             database=NWKIB(),
-            upper_layer=None,
+            upper_layer=APSManager(self),
             lower_layer=mac
         )
         self._crypto_managers = []
@@ -409,6 +423,7 @@ class NWKManager(Dot15d4Manager):
             selected_key_material.add_incoming_frame_counter(sender_address, received_frame_count+1)
             return cleartext, True
         else:
+            print("Undecoded:", bytes(pdu).hex())
             logger.info("[nwk] decryption failure - MIC not matching.")
             return pdu, False
 
@@ -416,12 +431,12 @@ class NWKManager(Dot15d4Manager):
         if ZigbeeNWKStub in pdu and ZigbeeAppDataPayloadStub in pdu:
             self.get_service("interpan").on_interpan_npdu(pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality)
         elif ZigbeeNWK in pdu:
-            if ZigbeeSecurityHeader in pdu:
+            if ZigbeeSecurityHeader in pdu and pdu[ZigbeeSecurityHeader].underlayer.__class__ is ZigbeeNWK:
                 decrypted, success = self.decrypt(pdu)
                 if success:
                     pdu = decrypted
                 else:
-                    print("failure during decryption.")
+                    return
             if pdu.frametype == 0:
                 self.get_service("data").on_data_npdu(pdu, link_quality)
             elif pdu.frametype == 1:
