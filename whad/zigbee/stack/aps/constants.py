@@ -34,7 +34,7 @@ class APSNetworkKeyData(APSTransportKeyData):
     Specializes APSTransportKeyData class to store a Network Key and its related data.
     """
     def __init__(self, key, key_sequence_number, use_parent, parent_address=None):
-        super().__init__(self, key)
+        super().__init__(key)
         self.key_sequence_number = key_sequence_number
         self.use_parent = use_parent
         self.parent_address = parent_address
@@ -44,7 +44,7 @@ class APSApplicationLinkKeyData(APSTransportKeyData):
     Specializes APSTransportKeyData class to store an Applicatino Key and its related data.
     """
     def __init__(self, key, partner_address):
-        super().__init__(self, key)
+        super().__init__(key)
         self.partner_address = partner_address
 
 class APSKeyPair:

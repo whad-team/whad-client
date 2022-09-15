@@ -44,7 +44,7 @@ class NWKIB(Dot15d4Database):
         self.nwkStackProfile = None
         self.nwkExtendedPANID = 0x0000000000000000
         self.nwkPANId = 0xFFFF
-        self.nwkIeeeAddress = None
+        self.nwkIeeeAddress = 0x1122334455667788
         self.nwkLeaveRequestAllowed = True
         self.nwkTxTotal = 0
 
@@ -81,7 +81,7 @@ class NWKDataService(NWKService):
             sequence_number = self.database.get("nwkSequenceNumber")
             self.database.set("nwkSequenceNumber", sequence_number+1)
         else:
-            self.manager.mac.get_service("management").get("macShortAddress")
+            source_address = self.manager.mac.get_service("management").get("macShortAddress")
             sequence_number = alias_sequence_number
         if radius == 0:
             radius = self.database.get("nwkMaxDepth") * 2
@@ -97,7 +97,7 @@ class NWKDataService(NWKService):
             radius=radius,
             flags=flags,
             destination=destination_address,
-            source=alias_address if alias_address is not None else self.database.nwkMac
+            source=source_address
         )
         if destination_address in BROADCAST_ADDRESSES.keys():
             destination_pan_id = self.database.get("nwkPANId")

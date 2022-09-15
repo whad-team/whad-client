@@ -1,4 +1,5 @@
-from scapy.layers.zigbee import ZigbeeSecurityHeader, ZigbeeAppDataPayload
+from scapy.layers.zigbee import ZigbeeSecurityHeader, ZigbeeAppDataPayload, \
+    ZigbeeAppCommandPayload
 from whad.zigbee.stack.service import Dot15d4Service
 from whad.zigbee.stack.manager import Dot15d4Manager
 from whad.zigbee.stack.database import Dot15d4Database
@@ -87,13 +88,13 @@ class APSManagementService(APSService):
             transport_key_data = APSApplicationLinkKeyData(asdu.key, asdu.src_addr)
 
         if (
-                (asdu.key_type in (1,4) and asdu.dest_addr == self.nwk.database.get("nwkIeeeAddress") or
+                (asdu.key_type in (1,4) and asdu.dest_addr == self.manager.nwk.database.get("nwkIeeeAddress")) or
                 (asdu.key_type == 1 and asdu.dest_addr == 0x0000000000000000)
         ):
             source = asdu.src_addr
             standard_key_type = asdu.key_type
             if asdu.key_type == 1:
-                transport_key_data = APSNetworkKeyData(asdu.key, key_sequence_number=asdu.key_seqnum, use_parent=False)
+                transport_key_data = APSNetworkKeyData(asdu.key, asdu.key_seqnum, False)
             else:
                 transport_key_data = APSTrustCenterLinkKeyData(asdu.key)
             return self.indicate_transport_key(source, standard_key_type, transport_key_data)
@@ -101,17 +102,22 @@ class APSManagementService(APSService):
         if asdu.key_type == 1 and asdu.dest_addr == 0xFFFFFFFFFFFFFFFF:
             source = asdu.src_addr
             standard_key_type = asdu.key_type
-            transport_key_data = APSNetworkKeyData(asdu.key, key_sequence_number=asdu.key_seqnum, use_parent=False)
+            transport_key_data = APSNetworkKeyData(asdu.key, asdu.key_seqnum, False)
             self.database.set("apsTrustCenterAddress", 0xFFFFFFFFFFFFFFFF)
             return self.indicate_transport_key(source, standard_key_type, transport_key_data)
 
-        if asdu.key_type in (1,4) and asdu.dest_addr != self.nwk.database.get("nwkIeeeAddress"):
+        if asdu.key_type in (1,4) and asdu.dest_addr != self.manager.nwk.database.get("nwkIeeeAddress"):
             # Forward to destination device
-            self.manager.nwk.data(asdu, destination_address=asdu.dest_addr, security_enable=False)
+            self.manager.nwk.get_service("data").data(asdu, destination_address=asdu.dest_addr, security_enable=False)
 
 
-    def on_command_apdu(self, apdu, destination_address_mode, destination_address, source_address, security_status, link_quality):
-        if nsdu.command_identifier == 5: # APS_CMD_TRANSPORT_KEY
+    def on_command_apdu(self, nsdu, destination_address_mode, destination_address, source_address, security_status, link_quality):
+        if ZigbeeSecurityHeader in nsdu:
+            asdu = ZigbeeAppCommandPayload(nsdu.data)
+        else:
+            asdu = nsdu[ZigbeeAppCommandPayload]
+
+        if asdu.cmd_identifier == 5: # APS_CMD_TRANSPORT_KEY
             self.process_transport_key(nsdu, source_address, security_status)
 
 class APSManager(Dot15d4Manager):
