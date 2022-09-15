@@ -241,6 +241,8 @@ class BleConnection(object):
             
         else:
             self.send_control(
+
+
                 BTLE_CTRL() / LL_REJECT_IND(
                     code=0x1A # Unsupported Remote Feature
                 )
@@ -275,7 +277,6 @@ class BleConnection(object):
 
         # Notify SMP channel is now encrypted
         self.__l2cap.smp.on_channel_encrypted()
-
 
     def on_unknown_rsp(self, unk_rsp):
         pass
@@ -318,7 +319,7 @@ class BleConnection(object):
         pass
 
     def on_connection_param_req(self, conn_param_req):
-        pass
+        self.on_unsupported_opcode(CONNECTION_PARAM_REQ)
 
     def on_connection_param_rsp(self, conn_param_rsp):
         pass

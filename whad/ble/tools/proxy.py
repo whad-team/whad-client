@@ -68,7 +68,7 @@ class LowLevelPeripheral(Peripheral):
     to provide a Link-Layer peripheral with the requested advertising data.
     """
 
-    def __init__(self, proxy, device, adv_data, scan_data):
+    def __init__(self, proxy, device, adv_data, scan_data, bd_address=None):
         """Instanciate a LowLevelPeripheral instance
 
         :param LinkLayerProxy proxy: Reference to the link-layer proxy that will receive events
@@ -76,7 +76,7 @@ class LowLevelPeripheral(Peripheral):
         :param AdvDataFieldList adv_data: Advertising data of the exposed proxy device (mandatory)
         :param AdvDataFieldList scan_data: Scan response data of the exposed proxy device (optional, can be None)
         """
-        super().__init__(device, adv_data=adv_data, scan_data=scan_data)
+        super().__init__(device, adv_data=adv_data, scan_data=scan_data, bd_address=bd_address)
         self.__proxy = proxy
         self.__connected = False
         self.__conn_handle = None
@@ -302,7 +302,7 @@ class LinkLayerProxy(object):
     traffic to another device.
     """
 
-    def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None):
+    def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None, spoof=False):
         """
         :param BLE proxy: BLE device to use as a peripheral (GATT Server)
         :param BLE target: BLE device to use as a central (GATT Client)
@@ -329,6 +329,7 @@ class LinkLayerProxy(object):
         self.__target = target
         self.__peripheral = None
         self.__target_bd_addr = bd_address
+        self.__spoof = spoof
 
         # Callbacks
         self.__callbacks = []
@@ -383,8 +384,10 @@ class LinkLayerProxy(object):
                 self,
                 self.__proxy,
                 self.__adv_data,
-                self.__scan_data
+                self.__scan_data,
+                bd_address=self.__target_bd_addr if self.__spoof else None
             )
+
             # Interconnect central and peripheral
             logger.info('proxy peripheral device created, interconnect with central ...')
             self.__peripheral.set_other_half(self.__central)

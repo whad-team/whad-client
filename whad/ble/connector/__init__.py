@@ -546,7 +546,6 @@ class BLE(WhadDeviceConnector):
             elif msg_type == 'pdu':
                 if message.pdu.processed:
                     packet = self._build_scapy_packet_from_message(message, msg_type)
-                    packet.show()
                     logger.info('[ble PDU log-only]')
                 else:
                     packet = self._build_scapy_packet_from_message(message, msg_type)
@@ -610,7 +609,6 @@ class BLE(WhadDeviceConnector):
             self.on_pdu(conn_pdu)
 
     def on_pdu(self, packet):
-        packet.show()
         if packet.LLID == 3:
             self.on_ctl_pdu(packet)
         elif packet.LLID in (1,2):

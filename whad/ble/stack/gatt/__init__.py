@@ -4,6 +4,10 @@ from time import time
 from queue import Queue, Empty
 from struct import unpack, pack
 
+import logging
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger('whad.ble.stack.gatt').setLevel(logging.INFO)
+
 from whad.ble.exceptions import HookReturnValue, HookReturnAuthRequired,\
     HookReturnAccessDenied, HookReturnGattError, HookReturnNotFound
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
@@ -311,6 +315,10 @@ class GattClient(Gatt):
     def model(self):
         return self.__model
 
+    def set_model(self, model):
+        if isinstance(model, GenericProfile):
+            self.__model = model
+
     ###################################
     # Supported response handlers
     ###################################
@@ -393,7 +401,7 @@ class GattClient(Gatt):
             self.__notification_callbacks[notification.handle](
                 notification.handle,
                 notification.value,
-                indicate=True
+                indication=True
             )
         self.att.handle_value_confirmation()
 
@@ -639,8 +647,6 @@ class GattClient(Gatt):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
         return value
 
-
-
     def write(self, handle, value):
         """Write data to a characteristic or a descriptor
 
@@ -657,6 +663,19 @@ class GattClient(Gatt):
         elif isinstance(msg, GattErrorResponse):
             raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
+    def write_command(self, handle, value):
+        """Write data to a characteristic or a descriptor, do not expect an answer.
+
+        :param int handle: Target characteristic or descriptor handle
+        :param bytes value: Data to write
+        """
+        self.att.write_command(
+            handle,
+            value
+        )
+
+        # Write command does not cause the GATT server to return a response.
+        return True
 
     def read_characteristic_by_uuid(self, uuid, start=1, end=0xFFFF):
         """Read a characteristic given its UUID if its handle is comprised in a given range.

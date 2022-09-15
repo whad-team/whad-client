@@ -21,14 +21,16 @@ class Central(BLE):
 
     """
 
-    def __init__(self, device, existing_connection = None):
+    def __init__(self, device, existing_connection = None, from_json=None):
         super().__init__(device)
 
         #self.use_stack(BleStack)
-        self.__stack = BleStack(self, GattClient())
+        self.__gatt_client = GattClient()
+        self.__stack = BleStack(self, self.__gatt_client)
         self.__connected = False
         self.__peripheral = None
         self.__random_addr = False
+        self.__profile_json = from_json
 
         # Check device accept central mode
         if not self.can_be_central():
@@ -146,8 +148,10 @@ class Central(BLE):
         self.__peripheral = PeripheralDevice(
             self,
             connection.gatt,
-            connection.conn_handle
+            connection.conn_handle,
+            from_json=self.__profile_json
         )
+        self.__gatt_client.set_model(self.__peripheral)
         self.__connected = True
 
         # Notify peripheral about this connection
