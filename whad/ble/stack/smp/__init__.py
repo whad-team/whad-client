@@ -8,6 +8,7 @@ BleSMP provides these different pairing strategies:
 from struct import pack
 from binascii import hexlify
 from random import randint
+from time import sleep
 
 
 from scapy.layers.bluetooth import SM_Pairing_Request, SM_Pairing_Response, SM_Hdr,\
@@ -39,9 +40,9 @@ class SM_Peer(object):
         self.__address = address
 
         # Key distribution (by default, corresponds to Legacy JustWorks)
-        self.__kd_link_key = True
+        self.__kd_link_key = False
         self.__kd_sign_key = False
-        self.__kd_enc_key = False
+        self.__kd_enc_key = True
         self.__kd_id_key = False
 
         # Default security parameters
@@ -740,6 +741,7 @@ class BleSMP(object):
             self.__ediv = randint(0, 0x10000)
 
             # Perform key distribution to initiator
+            sleep(.5)
             if self.__initiator.must_dist_ltk():
                 logger.info('[smp] sending generated LTK ...')
                 self.send(SM_Encryption_Information(
@@ -750,7 +752,6 @@ class BleSMP(object):
                 logger.info('[smp] sending generated EDIV/RAND ...')
                 self.send(SM_Master_Identification(ediv = self.__ediv, rand = self.__rand))
                 logger.info('[smp] EDIV/RAND sent.')
-
             if self.__initiator.must_dist_irk():
                 logger.info('[smp] sending generated IRK ...')
                 self.__irk = generate_random_value(16)
@@ -765,6 +766,7 @@ class BleSMP(object):
                     csrk=self.__csrk
                 ))
                 logger.info('[smp] CSRK sent.')
+            self.__state = BleSMP.STATE_BONDING_DONE
         else:
             logger.error('[smp] Received an unexpected notification (LL_START_ENC_RSP)')
 
