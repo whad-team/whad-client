@@ -1,7 +1,8 @@
 """Bluetooth Low Energy device abstraction
 """
 
-from whad.ble.profile.characteristic import CharacteristicProperties
+from whad.ble.profile.service import Service
+from whad.ble.profile.characteristic import CharacteristicDescriptor, CharacteristicProperties, Characteristic
 from whad.ble.profile import GenericProfile
 from whad.ble.stack.att.constants import BleAttProperties
 from whad.ble.profile.attribute import UUID
@@ -23,8 +24,11 @@ class PeripheralCharacteristicDescriptor:
     def read(self):
         return self.__gatt.read(self.__descriptor.handle)
 
-    def write(self, value):
-        self.__gatt.write(self.__descriptor.handle, value)
+    def write(self, value, without_response=False):
+        if without_response:
+            self.__gatt.write_command(self.__descriptor.handle, value)
+        else:
+            self.__gatt.write(self.__descriptor.handle, value)
 
 class PeripheralCharacteristic:
     """Characteristic wrapper for peripheral devices
@@ -88,13 +92,22 @@ class PeripheralCharacteristic:
         """
         return self.__gatt.read_long(self.__characteristic.value_handle)
 
-    def write(self, value):
+    def write(self, value, without_response=False):
         """Set characteristic value
 
         TODO: handle prepared write !
         """
         if isinstance(value, bytes):
-            return self.__gatt.write(self.__characteristic.value_handle, value)
+            if without_response:
+                return self.__gatt.write_command(
+                    self.__characteristic.value_handle,
+                    value
+                )
+            else:
+                return self.__gatt.write(
+                    self.__characteristic.value_handle,
+                    value
+                )
         else:
             print('NOPE')
 
@@ -128,9 +141,6 @@ class PeripheralCharacteristic:
             # Look for CCCD
             desc = self.get_descriptor(UUID(0x2902))
             if desc is not None:
-                # Enable notification
-                desc.write(bytes([0x01, 0x00]))
-
                 # wrap our callback to provide more details about the concerned
                 # characteristic
                 def wrapped_cb(handle, value, indication=False):
@@ -146,22 +156,28 @@ class PeripheralCharacteristic:
                         self.__characteristic.value_handle,
                         wrapped_cb
                     )
+
+                # Enable notification
+                desc.write(bytes([0x01, 0x00]))
+
                 return True
             else:
+                print('descriptor not found')
                 return False
         elif indication:
             # Look for CCCD
             desc = self.get_descriptor(UUID(0x2902))
             if desc is not None:
-                # Enable indication
-                desc.write(bytes([0x02, 0x00]))
-
                 # Register our callback
                 if callback is not None:
                     self.__gatt.register_notification_callback(
                         self.__characteristic.value_handle,
                         callback
                     )
+
+                # Enable indication
+                desc.write(bytes([0x02, 0x00]))
+
                 return True
             else:
                 return False
@@ -240,11 +256,11 @@ class PeripheralDevice(GenericProfile):
     characteristics and descriptors.
     """
 
-    def __init__(self,  central, gatt_client, conn_handle):
+    def __init__(self,  central, gatt_client, conn_handle, from_json=None):
         self.__gatt = gatt_client
         self.__conn_handle = conn_handle
         self.__central = central
-        super().__init__()
+        super().__init__(from_json=from_json)
 
     @property
     def conn_handle(self):
@@ -275,11 +291,24 @@ class PeripheralDevice(GenericProfile):
         else:
             return None
 
+    """
     def services(self):
-        """Enumerate device services.
-        """
-        for service in self.__gatt.services():
+        for service in super().services():
             yield PeripheralService(service, self.__gatt)
+    """
+
+    def find_object_by_handle(self, handle):
+        obj = super().find_object_by_handle(handle)
+        if isinstance(obj, Characteristic):
+            return PeripheralCharacteristic(
+                obj,
+                self.__gatt
+            )
+        elif isinstance(obj, Service):
+            return PeripheralService(
+                obj,
+                self.__gatt
+            )
 
     def get_characteristic(self, service_uuid, charac_uuid):
         """Get a PeripheralCharacteristic object representing a characteristic

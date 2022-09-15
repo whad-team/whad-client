@@ -21,7 +21,7 @@ class Peripheral(BLE):
     defined by a specific profile.    
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None):
         """Create a peripheral device.
 
         :param WhadDevice device: WHAD device to use as a peripheral
@@ -48,6 +48,12 @@ class Peripheral(BLE):
             logger.info('Capability MasterRole not supported by this WHAD device')
             raise UnsupportedCapability("Peripheral")
         else:
+            # Set bd address if provided
+            if bd_address is not None:
+                logger.info('Set BD address to %s' % bd_address)
+                self.set_bd_address(bd_address)
+
+            # Enable peripheral mode
             logger.info('Enable peripheral mode with advertising data: %s' % adv_data)
             self.enable_peripheral_mode(adv_data, scan_data)
 
