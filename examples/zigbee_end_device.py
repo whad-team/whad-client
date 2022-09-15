@@ -13,6 +13,8 @@ import logging
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
 logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.aps').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -29,16 +31,9 @@ if __name__ == '__main__':
             endDevice.start()
             #endDevice.stack.nwk.database.set("nwkSecurityLevel", 5)
             #endDevice.stack.nwk.add_key("44:81:97:51:b6:02:04:91:81:dc:8b:c2:71:4d:f0:9d")
-            management_service = endDevice.stack.nwk.get_service("management")
-            print("========================================= Discovered networks:=======================================================")
-            for network in management_service.network_discovery():
-                print(network)
-            print("========================================= Join =======================================================")
-            management_service.join(extended_pan_id=0xf4ce364269d30198)
-            print("========================================= Key =======================================================")
-            #management_service = endDevice.stack.mac.get_service("management")
-            #management_service.associate(coordinator_pan_id=0x2699, coordinator_address=0x0, channel_page=0, channel=16)
-
+            zdo = endDevice.stack.apl.get_service("zdo")
+            zdo.configure()
+            zdo.network_manager.start()
             input()
         except (KeyboardInterrupt, SystemExit):
             dev.close()
