@@ -297,7 +297,12 @@ class NWKManagementService(NWKService):
         self.add_packet_to_queue(beacon_payload)
 
     def on_command_npdu(self, npdu, link_quality):
-        pass
+        security_use = ZigbeeSecurityHeader in npdu and npdu[ZigbeeSecurityHeader].underlayer.__class__ is ZigbeeNWK
+        if security_use:
+            nsdu = ZigbeeNWKCommandPayload(npdu.data)
+        else:
+            nsdu = npdu[ZigbeeNWKCommandPayload]
+        nsdu.show()
 
 class NWKInterpanService(NWKService):
 
@@ -357,6 +362,10 @@ class NWKManager(Dot15d4Manager):
             upper_layer=APSManager(self),
             lower_layer=mac
         )
+
+    @property
+    def aps(self):
+        return self.upper_layer
 
     @property
     def mac(self):

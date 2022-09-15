@@ -53,6 +53,14 @@ class ZigbeeStack:
     def nwk(self):
         return self.__nwk
 
+    @property
+    def aps(self):
+        return self.__nwk.aps
+
+    @property
+    def apl(self):
+        return self.__nwk.aps.apl
+
     #############################
     # Incoming messages
     #############################

@@ -3,6 +3,7 @@ from scapy.layers.zigbee import ZigbeeSecurityHeader, ZigbeeAppDataPayload, \
 from whad.zigbee.stack.service import Dot15d4Service
 from whad.zigbee.stack.manager import Dot15d4Manager
 from whad.zigbee.stack.database import Dot15d4Database
+from whad.zigbee.stack.apl import APLManager
 from whad.zigbee.crypto import ApplicationSubLayerCryptoManager
 from .exceptions import APSTimeoutException
 from .constants import APSKeyPairSet, APSSecurityStatus, APSTrustCenterLinkKeyData, \
@@ -20,7 +21,7 @@ class APSIB(Dot15d4Database):
 
         self.apsDesignatedCoordinator = False
         self.apsChannelMask = 0x7fff800
-        self.apsUseExtendedPANID = None
+        self.apsUseExtendedPANID = 0x0000000000000000
         self.apsUseInsecureJoin = False
 
 class APSService(Dot15d4Service):
@@ -37,8 +38,17 @@ class APSDataService(APSService):
     def __init__(self, manager):
         super().__init__(manager, name="aps_data")
 
+    @Dot15d4Service.indication("APSDE-DATA")
+    def indicate_data(self, apdu, destination_address_mode, destination_address, source_address, security_status, link_quality):
+        if ZigbeeSecurityHeader in apdu:
+            pdu = ZigbeeAppDataPayload(apdu.data)
+        else:
+            pdu = apdu
+
+        pdu.show()
+
     def on_data_apdu(self, apdu, destination_address_mode, destination_address, source_address, security_status, link_quality):
-        pass
+        self.indicate_data(apdu, destination_address_mode, destination_address, source_address, security_status, link_quality)
 
 class APSManagementService(APSService):
     """
@@ -61,7 +71,7 @@ class APSManagementService(APSService):
         """
         return self.database.set(attribute, value)
 
-    @Dot15d4Service.request("APSME-TRANSPORT-KEY")
+    @Dot15d4Service.indication("APSME-TRANSPORT-KEY")
     def indicate_transport_key(self, source_address, standard_key_type, transport_key_data):
         """
         Implement the APSME-TRANSPORT-KEY indication operation.
@@ -139,9 +149,13 @@ class APSManager(Dot15d4Manager):
                         "data": APSDataService(self)
             },
             database=APSIB(),
-            upper_layer=None,
+            upper_layer=APLManager(self),
             lower_layer=nwk
         )
+
+    @property
+    def apl(self):
+        return self.upper_layer
 
     @property
     def nwk(self):
