@@ -18,6 +18,10 @@ class APSIB(Dot15d4Database):
         self.apsSecurityTimeOutPeriod = None
         self.trustCenterPolicies = None
 
+        self.apsDesignatedCoordinator = False
+        self.apsChannelMask = 0x7fff800
+        self.apsUseExtendedPANID = None
+        self.apsUseInsecureJoin = False
 
 class APSService(Dot15d4Service):
     """
