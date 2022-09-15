@@ -357,7 +357,6 @@ class NWKManager(Dot15d4Manager):
             upper_layer=APSManager(self),
             lower_layer=mac
         )
-        self._crypto_managers = []
 
     @property
     def mac(self):

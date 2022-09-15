@@ -138,7 +138,6 @@ class APSManager(Dot15d4Manager):
             upper_layer=None,
             lower_layer=nwk
         )
-        self._crypto_managers = []
 
     @property
     def nwk(self):
