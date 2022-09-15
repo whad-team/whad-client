@@ -3,7 +3,7 @@ from whad.common.monitors import WiresharkMonitor
 from whad.ble.profile.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
-from whad.device.uart import UartDevice
+from whad.device import WhadDevice
 from time import sleep
 
 class MyPeripheral(GenericProfile):
@@ -20,14 +20,14 @@ class MyPeripheral(GenericProfile):
     )
 
 my_profile = MyPeripheral()
-periph = Peripheral(UartDevice('/dev/ttyUSB0', 115200), profile=my_profile)
+periph = Peripheral(WhadDevice.create('hci0'), profile=my_profile)
 
 periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
     AdvCompleteLocalName(b'TestMe!'),
     AdvFlagsField()
 ))
-
 # Sleep 10 seconds and update device name
 print('Press a key to update device name')
 input()
 my_profile.device.device_name.value = b'TestDeviceChanged'
+input()

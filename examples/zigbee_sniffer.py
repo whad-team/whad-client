@@ -1,7 +1,7 @@
 from whad.zigbee import Sniffer
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
-from whad.common.monitors import PcapWriterMonitor
+from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
 from time import time,sleep
 from scapy.compat import raw
 from scapy.layers.dot15d4 import Dot15d4
@@ -16,10 +16,10 @@ if __name__ == '__main__':
         try:
             dev = WhadDevice.create(interface)
             sniffer = Sniffer(dev)
-            monitor = PcapWriterMonitor("/tmp/zigbeepcap.pcap")
+            monitor = WiresharkMonitor()
             monitor.attach(sniffer)
             monitor.start()
-            sniffer.channel = 11
+            sniffer.channel = 16
             sniffer.start()
             for i in sniffer.sniff():
                 print(i.metadata, repr(i))

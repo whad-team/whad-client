@@ -61,6 +61,7 @@ BLE_COMMANDS = {
 ZIGBEE_COMMANDS = {
     ZigbeeCommand.SetNodeAddress: "SetNodeAddress: can set Node address",
     ZigbeeCommand.Sniff: "Sniff: can sniff Zigbee packets",
+    ZigbeeCommand.EnergyDetection: "EnergyDetection: can perform energy detection scans",
     ZigbeeCommand.Jam: "Jam: can jam Zigbee packets",
     ZigbeeCommand.Send: "Send: can transmit Zigbee packets",
     ZigbeeCommand.EndDeviceMode: "EndDeviceMode: can act as an End Device",

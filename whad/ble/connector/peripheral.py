@@ -18,7 +18,7 @@ class Peripheral(BLE):
 
     A peripheral device exposes some services and characteristics that may
     be accessed by a central device. These services and characteristics are
-    defined by a specific profile.    
+    defined by a specific profile.
     """
 
     def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None):
@@ -61,8 +61,8 @@ class Peripheral(BLE):
             if existing_connection is not None:
                 self.on_connected(existing_connection)
 
-    
-    def send_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None):
+
+    def send_data_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None):
         """Send a PDU to the central device this peripheral device is connected to.
 
         Sending direction is set to ̀ BleDirection.SLAVE_TO_MASTER` as we need to send PDUs to a central device.
@@ -73,8 +73,21 @@ class Peripheral(BLE):
         :param access_address: Target access address
         :type access_address: int, optional
         """
-        super().send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
-    
+        super().send_data_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
+
+    def send_ctrl_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None):
+        """Send a PDU to the central device this peripheral device is connected to.
+
+        Sending direction is set to ̀ BleDirection.SLAVE_TO_MASTER` as we need to send PDUs to a central device.
+
+        :param bytes pdu: PDU to send
+        :param int conn_handle: Connection handle
+        :param int direction: Sending direction (to master or slave)
+        :param access_address: Target access address
+        :type access_address: int, optional
+        """
+        super().send_ctrl_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
+
     def use_stack(self, clazz=BleStack):
         """Specify a stack class to use for BLE. By default, our own stack (BleStack) is used.
         """
@@ -132,7 +145,6 @@ class Peripheral(BLE):
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
             logger.info('Data PDU comes from master, forward to peripheral')
             self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
-
 
     def on_new_connection(self, connection):
         """On new connection, discover primary services

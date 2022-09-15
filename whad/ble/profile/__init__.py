@@ -24,7 +24,7 @@ class Characteristic(object):
 
     def get_required_handles(self):
         """Compute the number of handles this characteristic will consume
-        """    
+        """
         handles = 2
         # A more handle as we may need a ClientCharacteristicConfiguration descriptor
         if self.__notify or self.__indicate:
@@ -136,7 +136,7 @@ class ServiceModel(object):
     @handle.setter
     def handle(self, value):
         self.__handle = value
-    
+
     def characteristics(self):
         for charac in self.__characteristics:
             yield charac
@@ -200,7 +200,7 @@ class GenericProfile(object):
                                 value=b'',
                                 properties=charac['properties']
                             )
-                            
+
                             # Loop on descriptors, only support CCC at the moment
                             for desc in charac['descriptors']:
                                 if UUID(desc['uuid']) == UUID(0x2902):
@@ -221,7 +221,7 @@ class GenericProfile(object):
                             service_obj.add_characteristic(charac_obj)
 
                     self.register_attribute(service_obj)
-                    self.add_service(service_obj)  
+                    self.add_service(service_obj)
 
         else:
             # Introspect this class definition and build model
@@ -252,7 +252,7 @@ class GenericProfile(object):
                     )
                     self.__attr_db[service_obj.handle] = service_obj
                 else:
-                    continue 
+                    continue
 
                 # Create the corresponding instance property
                 setattr(self, service.name, service_obj)
@@ -268,7 +268,7 @@ class GenericProfile(object):
                         charac_props |= CharacteristicProperties.NOTIFY
                     if charac.must_indicate:
                         charac_props |= CharacteristicProperties.INDICATE
-                        
+
                     charac_obj = BleCharacteristic(
                         uuid=charac.uuid,
                         handle=self.__alloc_handle(1),
@@ -360,20 +360,20 @@ class GenericProfile(object):
         for charac in service.characteristics():
             self.register_attribute(charac)
             self.__service_by_characteristic_handle[charac.handle] = service
-        
+
 
     def find_object_by_handle(self, handle):
         """Find an object by its handle value
 
         :param int handle: Object handle
         :return: Object if handle is valid, or raise an IndexError exception otherwise
-        :raises: IndexError 
+        :raises: IndexError
         """
         if handle in self.__attr_db:
             return self.__attr_db[handle]
         else:
             raise IndexError
-    
+
     def find_objects_by_range(self, start, end):
         """Find attributes with handles belonging in the [start, end+1] interval.
         """
@@ -384,7 +384,7 @@ class GenericProfile(object):
         handles.sort()
         return [self.find_object_by_handle(handle) for handle in handles]
 
-    
+
     def find_characteristic_end_handle(self, handle):
         try:
             # Find service owning the characteristic
@@ -394,7 +394,7 @@ class GenericProfile(object):
             service_char_handles=[]
             for characteristic in service.characteristics():
                 service_char_handles.append(characteristic.handle)
-            
+
             # Sort handles
             service_char_handles.sort()
             idx = service_char_handles.index(handle)
@@ -500,7 +500,7 @@ class GenericProfile(object):
         If this method returns a byte array, this byte array will be sent back to the
         GATT client. If this method returns None, then the read operation will return an
         error (not allowed to read characteristic value).
-        
+
 
         :param BlePrimaryService service: Service owning the characteristic
         :param BleCharacteristic characteristic: Characteristic object
