@@ -19,7 +19,7 @@ if __name__ == '__main__':
             monitor = WiresharkMonitor()
             monitor.attach(sniffer)
             monitor.start()
-            sniffer.channel = 16
+            sniffer.channel = 25
             sniffer.start()
             for i in sniffer.sniff():
                 print(i.metadata, repr(i))

@@ -1,4 +1,4 @@
-from whad.zigbee.crypto import NetworkLayerCryptoManager
+from whad.zigbee.crypto import NetworkLayerCryptoManager, ApplicationSubLayerCryptoManager
 from scapy.compat import raw
 import pytest
 
@@ -18,4 +18,20 @@ def test_NetworkLayerCryptoManager(test_input, expected):
 
     decryption_ok = raw(decrypted) == expected and valid_mic
     encryption_ok = raw(ciphertext_generated) == ciphertext
-    assert  decryption_ok# and encryption_ok
+    assert  decryption_ok and encryption_ok
+
+@pytest.mark.parametrize("test_input, expected", [
+(("814286865dc1c8b2c8cbc52e5d65d1b8", "61887c803104000100080004000100013521b83001000200ce99430501881700f47c78a38c74072b1380763ae007df4346c92f7f127eba41be454ebdbe106c37ae161efe4d3718"), "61887c803104000100080004000100013521b83001000200ce99430501881700050102398409245156e31d98a92157a8a66f0033d1b90401881700ffffffffffffffff2a117c60"),
+])
+def test_ApplicationSubLayerCryptoManager(test_input, expected):
+    key, ciphertext = test_input
+    key = bytes.fromhex(key)
+    ciphertext = bytes.fromhex(ciphertext)
+    expected = bytes.fromhex(expected)
+    aslcm = ApplicationSubLayerCryptoManager(key, 0)
+    decrypted, valid_mic = aslcm.decrypt(ciphertext)
+    ciphertext_generated = aslcm.encrypt(expected)
+
+    decryption_ok = raw(decrypted) == expected and valid_mic
+    encryption_ok = raw(ciphertext_generated) == ciphertext
+    assert  decryption_ok and encryption_ok

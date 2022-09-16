@@ -59,6 +59,8 @@ class NWKIB(Dot15d4Database):
         self.nwkCapabilityInformation = None
         self.nwkAddressMap = {}
 
+        self.nwkUseMulticast = False
+
 class NWKService(Dot15d4Service):
     """
     This class represents a NWK service, exposing a standardized API.
