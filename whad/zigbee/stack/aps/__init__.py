@@ -6,6 +6,7 @@ from whad.zigbee.stack.database import Dot15d4Database
 from whad.zigbee.stack.apl import APLManager
 from whad.zigbee.stack.nwk.constants import NWKAddressMode
 from whad.zigbee.stack.mac.helpers import is_short_address
+from whad.zigbee.stack.mac.constants import MACAddressMode
 from whad.zigbee.crypto import ApplicationSubLayerCryptoManager
 from whad.exceptions import RequiredImplementation
 from .exceptions import APSTimeoutException
@@ -30,6 +31,7 @@ class APSIB(Dot15d4Database):
         self.apsUseInsecureJoin = False
 
         self.apsNonmemberRadius = 7
+        self.apsCounter = 0
 
 class APSService(Dot15d4Service):
     """
@@ -66,8 +68,20 @@ class APSDataService(APSService):
             crypto_manager = ApplicationSubLayerCryptoManager(candidate_key.key, None)
             asdu = crypto_manager.encrypt(asdu)
 
+
         if destination_address_mode == APSDestinationAddressMode.DST_ADDRESS_AND_DST_ENDPOINT_NOT_PRESENT:
             raise RequiredImplementation("BindingTableSearch")
+
+        elif destination_address_mode == APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT:
+            apdu = ZigbeeAppDataPayload(
+                delivery_mode = 0,
+                dst_endpoint = destination_endpoint,
+                src_endpoint = source_endpoint,
+                profile=profile_id,
+                cluster=cluster_id,
+                counter=self.manager.database.get("apsCounter")
+            )/asdu
+
         elif destination_address_mode == APSDestinationAddressMode.EXTENDED_ADDRESS_DST_ENDPOINT_PRESENT:
             nwkAddressMap = self.manager.nwk.database.get("nwkAddressMap")
             short_destination_address = None
@@ -79,7 +93,8 @@ class APSDataService(APSService):
                 dst_endpoint=destination_endpoint,
                 cluster=cluster_id,
                 profile=profile_id,
-                src_endpoint=source_endpoint
+                src_endpoint=source_endpoint,
+                counter=self.manager.database.get("apsCounter")
             )/asdu
         elif destination_address_mode == APSDestinationAddressMode.SHORT_GROUP_ADDRESS_DST_ENDPOINT_NOT_PRESENT:
             apdu = ZigbeeAppDataPayload(
@@ -87,7 +102,8 @@ class APSDataService(APSService):
                 group_addr = destination_address,
                 src_endpoint = source_endpoint,
                 profile=profile_id,
-                cluster=cluster_id
+                cluster=cluster_id,
+                counter=self.manager.database.get("apsCounter")
             )/asdu
             if self.manager.database.get("nwkUseMulticast"):
                 multicast = True
@@ -96,7 +112,8 @@ class APSDataService(APSService):
                     dst_endpoint = 0xFF,
                     src_endpoint = source_endpoint,
                     profile=profile_id,
-                    cluster=cluster_id
+                    cluster=cluster_id,
+                    counter=self.manager.database.get("apsCounter")
                 )/asdu
 
             else:
@@ -107,15 +124,26 @@ class APSDataService(APSService):
                     group_addr = destination_address,
                     src_endpoint = source_endpoint,
                     profile=profile_id,
-                    cluster=cluster_id
+                    cluster=cluster_id,
+                    counter=self.manager.database.get("apsCounter")
                 )/asdu
 
         if alias_address is not None and acknowledged_transmission:
             return False
 
         if acknowledged_transmission:
-            apdu.frame_control.append("ack_req")
+            apdu.frame_control.ack_req = True
             raise RequiredImplementation("APSAckImplementation")
+        else:
+            apdu.frame_control.ack_req = False
+
+        if security_enabled_transmission:
+            apdu.frame_control.security = True
+        else:
+            apdu.frame_control.security = False
+
+        counter = self.manager.database.get("apsCounter")
+        self.manager.database.set("apsCounter", counter+1)
         return self.manager.nwk.get_service("data").data(
             apdu,
             nsdu_handle=0,
@@ -297,6 +325,28 @@ class APSManagementService(APSService):
         if asdu.cmd_identifier == 5: # APS_CMD_TRANSPORT_KEY
             self.process_transport_key(nsdu, source_address, security_status)
 
+class APSInterpanPseudoService(APSService):
+    """
+    APS pseudo service forwarding interpan operations.
+    """
+    @Dot15d4Service.request("INTRP-DATA")
+    def interpan_data(self,asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, profile_id=0, cluster_id=0):
+        return self.manager.nwk.get_service("interpan").interpan_data(asdu, asdu_handle=asdu_handle, source_address_mode=source_address_mode, destination_pan_id=destination_pan_id, destination_address=destination_address, profile_id=profile_id, cluster_id=cluster_id)
+
+    @Dot15d4Service.indication("INTRP-DATA")
+    def indicate_interpan_data(self, asdu, profile_id=0, cluster_id=0, destination_pan_id=0xFFFF, destination_address=0xFFFF, source_pan_id=0xFFFF, source_address=0xFFFF, link_quality=255):
+        return {
+            "asdu":asdu,
+            "profile_id":profile_id,
+            "cluster_id":cluster_id,
+            "destination_pan_id":destination_pan_id,
+            "destination_address":destination_address,
+            "source_pan_id":source_pan_id,
+            "source_address":source_address,
+            "link_quality":link_quality
+        }
+
+
 class APSManager(Dot15d4Manager):
     """
     This class implements the Zigbee Application Support Sub-layer manager (APS).
@@ -309,7 +359,9 @@ class APSManager(Dot15d4Manager):
         super().__init__(
             services={
                         "management": APSManagementService(self),
-                        "data": APSDataService(self)
+                        "data": APSDataService(self),
+                        "interpan": APSInterpanPseudoService(self)
+
             },
             database=APSIB(),
             upper_layer=APLManager(self),
@@ -382,3 +434,6 @@ class APSManager(Dot15d4Manager):
                 self.get_service("management").on_command_apdu(nsdu, destination_address_mode, destination_address, source_address, security_status, link_quality)
             elif nsdu.aps_frametype == 2: # ack
                 pass
+
+    def on_intrp_data(self, asdu, profile_id=0, cluster_id=0, destination_pan_id=0xFFFF, destination_address=0xFFFF, source_pan_id=0xFFFF, source_address=0xFFFF, link_quality=255):
+        self.get_service("interpan").indicate_interpan_data(asdu, profile_id=profile_id, cluster_id=cluster_id, destination_pan_id=destination_pan_id, destination_address=destination_address, source_pan_id=source_pan_id, source_address=source_address, link_quality=link_quality)

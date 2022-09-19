@@ -64,12 +64,14 @@ class MACDataService(MACService):
             data.dest_addr = destination_address
         if not pan_id_suppressed:
             data.src_panid = self.database.get("macPanId")
+
         if source_address_mode == MACAddressMode.SHORT:
             data.src_addr = self.database.get("macShortAddress")
         elif source_address_mode == MACAddressMode.EXTENDED:
             data.src_addr = self.database.get("macExtendedAddress")
 
-        ack = self.manager.send_data(data, wait_for_ack=wait_for_ack)
+        data = data/msdu
+        ack = self.manager.send_data(data, wait_for_ack=wait_for_ack, source_address_mode=source_address_mode)
         return ack
 
     def on_data_pdu(self, pdu):
@@ -385,7 +387,8 @@ class MACManager(Dot15d4Manager):
                 self.get_service("management").on_beacon_pdu(pdu)
             else:
                 logger.warning("[mac_manager] Malformed PDU received: {}".format(repr(pdu)))
-
+        else:
+            logger.warning("[mac_manager] PDU dropped: {}".format(repr(pdu)) + "({})".format(bytes(pdu).hex()))
             #if hasattr(pdu, "fcf_ackreq") and pdu.fcf_ackreq:
             #    self.send_ack(pdu)
 

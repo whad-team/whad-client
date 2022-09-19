@@ -1,6 +1,7 @@
 from scapy.layers.zigbee import ZigBeeBeacon, ZigbeeNWKStub, ZigbeeNWK, \
     ZigbeeSecurityHeader, ZigbeeNWKCommandPayload, ZigbeeAppDataPayload, \
     ZigbeeAppDataPayloadStub
+from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster
 from scapy.fields import FlagValueIter
 from whad.zigbee.crypto import NetworkLayerCryptoManager
 from .exceptions import NWKTimeoutException
@@ -59,7 +60,7 @@ class NWKIB(Dot15d4Database):
         self.nwkCapabilityInformation = None
         self.nwkAddressMap = {}
 
-        self.nwkUseMulticast = False
+        self.nwkUseMulticast = True
 
 class NWKService(Dot15d4Service):
     """
@@ -109,8 +110,10 @@ class NWKDataService(NWKService):
             acknowledged = True
 
         if self.database.get("nwkSecurityLevel") != 0 and security_enable:
-            npdu.flags.append("security")
+            npdu.flags.security = True
             selected_key_material = None
+
+            security_material_set = self.database.get("nwkSecurityMaterialSet")
             for key_material in security_material_set:
                 if key_material.key_sequence_number == self.database.get("nwkActiveKeySeqNumber"):
                     selected_key_material = key_material
@@ -118,6 +121,7 @@ class NWKDataService(NWKService):
             if selected_key_material is None:
                 return False
 
+            print("data",bytes(nsdu).hex())
             msdu = npdu / ZigbeeSecurityHeader(
                 nwk_seclevel = self.database.get("nwkSecurityLevel"),
                 source = self.database.get("nwkIeeeAddress"),
@@ -261,7 +265,7 @@ class NWKManagementService(NWKService):
                     self.database.set("nwkPANId", selected_parent.pan_id)
                     self.database.set("nwkExtendedPANID", extended_pan_id)
                     selected_parent.relationship = ZigbeeRelationship.IS_PARENT
-
+                    print("networkAddress",self.database.get("nwkNetworkAddress"))
                     if selected_parent.extended_address is not None and selected_parent.address is not None:
                         nwkAddressMap = self.database.get("nwkAddressMap")
                         nwkAddressMap[selected_parent.extended_address] = selected_parent.address
@@ -304,7 +308,7 @@ class NWKManagementService(NWKService):
             nsdu = ZigbeeNWKCommandPayload(npdu.data)
         else:
             nsdu = npdu[ZigbeeNWKCommandPayload]
-        nsdu.show()
+        #nsdu.show()
 
 class NWKInterpanService(NWKService):
 
@@ -313,9 +317,14 @@ class NWKInterpanService(NWKService):
 
     @Dot15d4Service.request("INTRP-DATA")
     def interpan_data(self,asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, profile_id=0, cluster_id=0):
+        if destination_address == 0xFFFF:
+            delivery_mode = 2
+        else:
+            delivery_mode = 0
         data = ZigbeeNWKStub()/ZigbeeAppDataPayloadStub(
             cluster=cluster_id,
             profile=profile_id,
+            delivery_mode=delivery_mode,
             data=asdu
         )
         self.manager.mac.get_service("data").data(
@@ -330,6 +339,9 @@ class NWKInterpanService(NWKService):
         profile_id = pdu.profile
         cluster_id = pdu.cluster
         asdu = pdu[ZigbeeAppDataPayloadStub].data
+
+        if profile_id == 0xc05e and cluster_id == 0x1000:
+            asdu = ZigbeeZLLCommissioningCluster(asdu)
         self.indicate_interpan_data(asdu, profile_id=profile_id, cluster_id=cluster_id, destination_pan_id=destination_pan_id, destination_address=destination_address, source_pan_id=source_pan_id, source_address=source_address, link_quality=link_quality)
 
     @Dot15d4Service.indication("INTRP-DATA")
@@ -380,7 +392,8 @@ class NWKManager(Dot15d4Manager):
             key_sequence_number=key_sequence_number,
             outgoing_frame_counter=outgoing_frame_counter
         )
-        networkSecurityMaterialSet.append(securityMaterial)
+        if securityMaterial not in networkSecurityMaterialSet:
+            networkSecurityMaterialSet.append(securityMaterial)
         logger.info("[nwk] new security material added: {}".format(str(securityMaterial)))
         self.database.set("nwkSecurityMaterialSet", networkSecurityMaterialSet)
 
@@ -394,8 +407,8 @@ class NWKManager(Dot15d4Manager):
         if securityLevel == 0:
             logger.info("[nwk] decryption failure - attempt to decrypt a pdu with nwkSecurityLevel set to 0.")
             return pdu, False
-        else:
-            pdu.nwk_seclevel = securityLevel
+        #else:
+        #    pdu.nwk_seclevel = securityLevel
 
         if (
                 not hasattr(pdu[ZigbeeSecurityHeader], "fc") or

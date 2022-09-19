@@ -109,8 +109,8 @@ class CryptoManager:
 
     def extractCiphertextPayload(self, packet):
         if self.encryption:
-            message = packet[ZigbeeSecurityHeader].data[:-self.M] if len(packet.mic) == 0 else packet.data
-            mic = packet[ZigbeeSecurityHeader].data[-self.M:] if len(packet.mic) == 0 else packet.mic
+            message = packet[ZigbeeSecurityHeader].data[:-self.M] if len(packet.mic) == 0 and self.patched else packet.data
+            mic = packet[ZigbeeSecurityHeader].data[-self.M:] if len(packet.mic) == 0 and self.patched else packet.mic
         else:
             mic = raw(packet[self.base_class:])[-self.M:]
             message = b""
@@ -118,7 +118,7 @@ class CryptoManager:
 
     def generateMIC(self,packet):
         self.auth = self.generateAuth(packet)
-        plaintext = packet.data if len(packet.mic) == 0 else packet.data + packet.mic
+        plaintext = packet.data if len(packet.mic) == 0 and self.patched else packet.data + packet.mic
         auth = len(self.auth).to_bytes(2, byteorder = 'big')+self.auth
         auth = auth + (32 - len(auth))*b"\x00" + plaintext+(16 - len(plaintext))*b"\x00"
         flags = (0 << 7) | ((0 if len(self.auth) == 0 else 1) << 6 ) | ((2 - 1) << 3) | ((self.M-2)//2 if self.M else 0)
@@ -157,7 +157,7 @@ class CryptoManager:
         self.auth = self.generateAuth(packet)
 
         # Extract plaintext
-        plaintext = packet.data[:-self.M] if len(packet.mic) == 0 else packet.data
+        plaintext = packet.data[:-self.M] if len(packet.mic) == 0 and self.patched else packet.data
 
         # Encrypt and generate MIC
         cipher = AES.new(self.key, AES.MODE_CCM, nonce=self.nonce, mac_len=self.M)
@@ -239,3 +239,18 @@ class ApplicationSubLayerCryptoManager(CryptoManager):
             generated_key = hash_key(key, self.input)
         super().__init__(generated_key)
         self.base_class = ZigbeeAppDataPayload
+
+"""
+touchlink_master_key = bytes.fromhex("9F5595F10257C8A469CBF42BC93FEE31")
+transaction_id = bytes.fromhex("2199133d")[::-1]
+response_id = bytes.fromhex("81bdd729")[::-1]
+
+data = transaction_id + transaction_id + response_id + response_id
+
+cipher = AES.new(touchlink_master_key, AES.MODE_ECB)
+key = cipher.encrypt(data)
+
+enckey = bytes.fromhex("b498756ee6a6b9d02600476fc515c890")
+cipher = AES.new(key, AES.MODE_ECB)
+print(":".join(["{:02x}".format(i) for i in cipher.decrypt(enckey)]))
+"""

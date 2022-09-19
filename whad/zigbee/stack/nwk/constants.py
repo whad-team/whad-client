@@ -28,6 +28,9 @@ class NetworkSecurityMaterial:
     def add_incoming_frame_counter(self, device_address, frame_counter):
         self.incoming_frame_counters[device_address] = frame_counter
 
+    def __eq__(self, other):
+        return self.key == other.key
+
     def __repr__(self):
         printable_key = ":".join(["{:02X}".format(i) for i in self.key])
         return "NetworkSecurityMaterial(Key #{}, '{}')".format(self.key_sequence_number, printable_key)
