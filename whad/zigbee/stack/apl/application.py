@@ -1,12 +1,12 @@
 from whad.zigbee.stack.mac.constants import MACAddressMode
 
 class ApplicationObject:
-    def __init__(self, name, application_profile_identifier, application_device_identifier, application_device_version=0, input_clusters=[], output_clusters=[]):
+    def __init__(self, name, profile_id, device_id, device_version=0, input_clusters=[], output_clusters=[]):
         self.manager = None
         self.name = name
-        self.application_profile_identifier = application_profile_identifier
-        self.application_device_identifier = application_device_identifier
-        self.application_device_version = application_device_version
+        self.profile_id = profile_id
+        self.device_id = device_id
+        self.device_version = device_version
         self.input_clusters = input_clusters
         self.output_clusters = output_clusters
         for cluster in self.input_clusters + self.output_clusters:
@@ -30,12 +30,12 @@ class ApplicationObject:
             fragmentation_permitted=fragmentation_permitted,
             include_extended_nonce=include_extended_nonce,
             cluster_id=cluster_id,
-            profile_id=self.application_profile_identifier,
+            profile_id=self.profile_id,
             application=self
         )
 
     def send_interpan_data(self, asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, cluster_id=0):
-        return self.manager.send_interpan_data(asdu, asdu_handle=asdu_handle, source_address_mode=source_address_mode, destination_pan_id=destination_pan_id, destination_address=destination_address, profile_id=self.application_profile_identifier, cluster_id=cluster_id)
+        return self.manager.send_interpan_data(asdu, asdu_handle=asdu_handle, source_address_mode=source_address_mode, destination_pan_id=destination_pan_id, destination_address=destination_address, profile_id=self.profile_id, cluster_id=cluster_id)
 
     def on_interpan_data(self, asdu, cluster_id=0, destination_pan_id=0xFFFF, destination_address=0xFFFF, source_pan_id=0xFFFF, source_address=0xFFFF, link_quality=255):
         for cluster in self.input_clusters:

@@ -239,18 +239,3 @@ class ApplicationSubLayerCryptoManager(CryptoManager):
             generated_key = hash_key(key, self.input)
         super().__init__(generated_key)
         self.base_class = ZigbeeAppDataPayload
-
-"""
-touchlink_master_key = bytes.fromhex("9F5595F10257C8A469CBF42BC93FEE31")
-transaction_id = bytes.fromhex("2199133d")[::-1]
-response_id = bytes.fromhex("81bdd729")[::-1]
-
-data = transaction_id + transaction_id + response_id + response_id
-
-cipher = AES.new(touchlink_master_key, AES.MODE_ECB)
-key = cipher.encrypt(data)
-
-enckey = bytes.fromhex("b498756ee6a6b9d02600476fc515c890")
-cipher = AES.new(key, AES.MODE_ECB)
-print(":".join(["{:02x}".format(i) for i in cipher.decrypt(enckey)]))
-"""

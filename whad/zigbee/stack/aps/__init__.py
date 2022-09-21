@@ -368,6 +368,7 @@ class APSManager(Dot15d4Manager):
             lower_layer=nwk
         )
 
+
     @property
     def apl(self):
         return self.upper_layer

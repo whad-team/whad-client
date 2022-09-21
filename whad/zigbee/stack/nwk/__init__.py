@@ -52,7 +52,8 @@ class NWKIB(Dot15d4Database):
         self.nwkSecurityLevel = 0
         self.nwkSecurityMaterialSet = []
         self.nwkActiveKeySeqNumber = 0
-
+        self.nwkSecureAllFrames = True
+        self.nwkAllFresh = False
         self.nwkLinkStatusPeriod = 0x0f
         self.nwkRouterAgeLimit = 3
 
@@ -273,6 +274,32 @@ class NWKManagementService(NWKService):
                 else:
                     selected_parent.potential_parent = 0
 
+        elif association_type == NWKJoinMode.REJOIN:
+
+            if self.database.get("nwkNetworkAddress") > 0 and self.database.get("nwkNetworkAddress") < 0xFFF0:
+                network_address = self.database.get("nwkNetworkAddress")
+            else:
+                network_address = random.randint(1,0xFFF0)
+
+                confirm = self.manager.mac.get_service("management").scan(
+                    scan_type=MACScanType.ACTIVE,
+                    channel_page=0,
+                    scan_channels=scan_channels,
+                    scan_duration=scan_duration
+                )
+                zigbee_networks = []
+                notifications_left = True
+                while notifications_left:
+                    try:
+                        beacon = self.wait_for_packet(lambda pkt:ZigBeeBeacon in pkt, timeout=0.1)
+                        if beacon.pan_descriptor in confirm and beacon.extended_pan_id == extended_pan_id:
+                            network = ZigbeeNetwork(beacon)
+                            if network not in zigbee_networks:
+                                zigbee_networks.append(network)
+                    except NWKTimeoutException:
+                        notifications_left = False
+
+
     @Dot15d4Service.request("NLME-NETWORK-DISCOVERY")
     def network_discovery(self, scan_channels=0x7fff800, scan_duration=4):
         """
@@ -435,7 +462,8 @@ class NWKManager(Dot15d4Manager):
 
         if (
             sender_address in selected_key_material.incoming_frame_counters and
-            received_frame_count < selected_key_material.incoming_frame_counters[sender_address]
+            received_frame_count < selected_key_material.incoming_frame_counters[sender_address] and
+            self.database.get("nwkAllFresh")
         ):
             logger.info("[nwk] decryption failure - bad frame counter.")
             return pdu, False
@@ -454,6 +482,10 @@ class NWKManager(Dot15d4Manager):
         if ZigbeeNWKStub in pdu and ZigbeeAppDataPayloadStub in pdu:
             self.get_service("interpan").on_interpan_npdu(pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality)
         elif ZigbeeNWK in pdu:
+            if ZigbeeSecurityHeader not in pdu and self.database.get("nwkSecureAllFrames"):
+                logger.info("[nwk] nwkSecureAllFrames attribute indicates that we only accept security enabled frames.")
+                return
+
             if ZigbeeSecurityHeader in pdu and pdu[ZigbeeSecurityHeader].underlayer.__class__ is ZigbeeNWK:
                 decrypted, success = self.decrypt(pdu)
                 if success:

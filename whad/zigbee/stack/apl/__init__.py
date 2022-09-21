@@ -81,7 +81,7 @@ class APLManager(Dot15d4Manager):
 
     def on_intrp_data(self, asdu, profile_id=0, cluster_id=0, destination_pan_id=0xFFFF, destination_address=0xFFFF, source_pan_id=0xFFFF, source_address=0xFFFF, link_quality=255):
         for application in self.endpoints.values():
-            if application.application_profile_identifier == profile_id:
+            if application.profile_id == profile_id:
                 application.on_interpan_data(asdu, cluster_id=cluster_id, destination_pan_id=destination_pan_id, destination_address=destination_address, source_pan_id=source_pan_id, source_address=source_address, link_quality=link_quality)
 
     def on_apsde_data(self, asdu, destination_address, destination_address_mode, destination_endpoint, source_address, source_address_mode, source_endpoint, profile_id, cluster_id, security_status, link_quality):
@@ -94,7 +94,7 @@ class APLManager(Dot15d4Manager):
         application = self.endpoints[destination_endpoint]
 
         # Checks if the profile id matches the one used by the application
-        if application.application_profile_identifier != profile_id:
+        if application.profile_id != profile_id:
             logger.info("[apl] profile identifier doesn't match the application profile.")
             return
 

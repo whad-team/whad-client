@@ -5,7 +5,7 @@ from whad.device import WhadDevice
 from whad.zigbee.crypto import NetworkLayerCryptoManager
 from whad.exceptions import WhadDeviceNotFound
 from whad.zigbee.stack.apl.application import ApplicationObject
-from whad.zigbee.stack.apl.zcl import ZCLOnOff, ZCLTouchLink
+from whad.zigbee.stack.apl.zcl.clusters import ZCLOnOff, ZCLTouchLink
 from time import time,sleep
 from whad.common.monitors import PcapWriterMonitor
 from scapy.compat import raw
@@ -31,19 +31,11 @@ if __name__ == '__main__':
             endDevice = EndDevice(dev)
             #monitor.attach(endDevice)
             #monitor.start()
-            endDevice.set_channel(25)
+            endDevice.set_channel(15)
             endDevice.start()
-            #endDevice.stack.nwk.database.set("nwkSecurityLevel", 5)
-            #endDevice.stack.nwk.add_key("44:81:97:51:b6:02:04:91:81:dc:8b:c2:71:4d:f0:9d")
-            onoff = ZCLOnOff()
-            touchlink = ZCLTouchLink()
-            myApp1 = ApplicationObject("commissioning", 0xc05e, 0x0100, application_device_version=0, input_clusters=[touchlink], output_clusters=[touchlink])
-            myApp2 = ApplicationObject("onoff", 0x0104, 0x0100, application_device_version=0, input_clusters=[], output_clusters=[onoff])
-            endDevice.stack.apl.attach_application(myApp1, endpoint=1)
-            endDevice.stack.apl.attach_application(myApp2, endpoint=2)
-            while True:
-                touchlink.scan_request()
-                input()
+            zdo = endDevice.stack.apl.get_application_by_name("zdo")
+            zdo.start()
+            input()
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 

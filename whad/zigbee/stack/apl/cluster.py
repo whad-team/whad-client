@@ -23,7 +23,14 @@ class Cluster:
         )
 
     def send_interpan_data(self, asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF):
-        return self.application.send_interpan_data(asdu, asdu_handle=asdu_handle, source_address_mode=source_address_mode, destination_pan_id=destination_pan_id, destination_address=destination_address, cluster_id=self.cluster_id)
+        return self.application.send_interpan_data(
+            asdu,
+            asdu_handle=asdu_handle,
+            source_address_mode=source_address_mode,
+            destination_pan_id=destination_pan_id,
+            destination_address=destination_address,
+            cluster_id=self.cluster_id
+        )
 
     def on_data(self, asdu, source_address, source_address_mode, security_status, link_quality):
         pass
