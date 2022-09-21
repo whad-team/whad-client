@@ -25,7 +25,7 @@ class MACPIB(Dot15d4Database):
         """
         Reset the PIB database to its default value.
         """
-        self.macExtendedAddress = 0x1122334455667788
+        self.macExtendedAddress = 0xabcdabcdabcdabcd
         self.macAssociatedPanCoord = False
         self.macAssociationPermit = False
         self.macAutoRequest = False

@@ -1,4 +1,6 @@
 from whad.zigbee.stack.apl.cluster import Cluster
+from whad.zigbee.stack.apl.zcl.attributes import ZCLAttributes
+from whad.zigbee.stack.apl.zcl.commands import ZCLCommands
 from scapy.layers.zigbee import ZigbeeClusterLibrary
 import logging
 

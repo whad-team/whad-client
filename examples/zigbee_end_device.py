@@ -31,11 +31,16 @@ if __name__ == '__main__':
             endDevice = EndDevice(dev)
             #monitor.attach(endDevice)
             #monitor.start()
-            endDevice.set_channel(15)
             endDevice.start()
+            onoff = ZCLOnOff()
+            myApp2 = ApplicationObject("onoff", 0x0104, 0x0100, device_version=0, input_clusters=[], output_clusters=[onoff])
+            endDevice.stack.apl.attach_application(myApp2, endpoint=1)
             zdo = endDevice.stack.apl.get_application_by_name("zdo")
             zdo.start()
             input()
+            while True:
+                onoff.toggle(0x0006, 11)
+                input()
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 
