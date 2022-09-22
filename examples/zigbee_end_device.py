@@ -29,6 +29,8 @@ if __name__ == '__main__':
 
             dev = WhadDevice.create(interface)
             endDevice = EndDevice(dev)
+
+
             #monitor.attach(endDevice)
             #monitor.start()
             endDevice.start()
@@ -38,8 +40,12 @@ if __name__ == '__main__':
             zdo = endDevice.stack.apl.get_application_by_name("zdo")
             zdo.start()
             input()
+            print("Leaving")
+            endDevice.stack.nwk.get_service("management").leave()
+            input()
+            exit()
             while True:
-                onoff.toggle(0x0006, 11)
+                onoff.toggle(0x3f00, 10)
                 input()
         except (KeyboardInterrupt, SystemExit):
             dev.close()
