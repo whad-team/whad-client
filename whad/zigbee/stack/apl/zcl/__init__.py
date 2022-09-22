@@ -6,6 +6,58 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class ZCLClusterMetaclass(type):
+
+    def __init__(cls, name, bases, attrs):
+        commands = {}
+        if name != "ZCLCluster":
+            print(cls.__annotations__)
+            for key, val in attrs.items():
+                receive_property = getattr(val, "_command_receive", None)
+                generate_property = getattr(val, "_command_generate", None)
+                if receive_property is not None:
+                    command_id, command_name = receive_property
+                    if command_id in commands:
+                        commands[command_id]["name"] = command_name
+                        commands[command_id]["receive_callback"] = key
+                    else:
+                        commands[command_id] = {"name":command_name, "receive_callback": key, "generate_callback":None}
+
+                if generate_property is not None:
+                    command_id, command_name = generate_property
+                    if command_id in commands:
+                        commands[command_id]["name"] = command_name
+                        commands[command_id]["generate_callback"] = key
+                    else:
+                        commands[command_id] = {"name":command_name, "receive_callback": None, "generate_callback": key}
+            print(bases, attrs)
+        '''
+        zcl_commands = ZCLCommands()
+        for command_id, command in commands.items():
+            zcl_commands.add_command(command_id, command["name"], generate_callback=getattr(instance, command["generate_callback"]), receive_callback=getattr(instance, command["receive_callback"]))
+        print(attrs)
+        '''
+
+class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
+    def __init__(self, cluster_id):
+        super().__init__(cluster_id)
+        self.attributes = ZCLAttributes()
+        self.commands = ZCLCommands()
+
+
+    def command_receive(command_id, command_name):
+        def receive_decorator(f):
+            f._command_receive = (command_id, command_name)
+            return f
+        return receive_decorator
+
+    def command_generate(command_id, command_name):
+        def generate_decorator(f):
+            f._command_generate = (command_id, command_name)
+            return f
+        return generate_decorator
+
+'''
 class ZCLCluster(Cluster):
     zcl_transaction_counter = 1
 
@@ -46,3 +98,4 @@ class ZCLCluster(Cluster):
 
         except ZCLCommandNotFound:
             logger.info("[zcl] command not found (command_identifier = 0x{:02x})".format(command_identifier))
+'''

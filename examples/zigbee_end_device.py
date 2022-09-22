@@ -43,9 +43,9 @@ if __name__ == '__main__':
             print("Leaving")
             endDevice.stack.nwk.get_service("management").leave()
             input()
-            exit()
+            #exit()
             while True:
-                onoff.toggle(0x3f00, 10)
+                onoff.toggle(0x0006, 11)
                 input()
         except (KeyboardInterrupt, SystemExit):
             dev.close()

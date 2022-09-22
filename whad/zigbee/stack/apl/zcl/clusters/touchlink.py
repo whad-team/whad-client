@@ -2,7 +2,7 @@ from whad.zigbee.stack.apl.zcl import ZCLCluster
 from whad.zigbee.stack.mac.constants import MACAddressMode
 from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster, ZLLScanRequest
 from random import randint
-
+'''
 class ZCLTouchLink(ZCLCluster):
     def __init__(self):
         super().__init__(cluster_id=0x1000)
@@ -52,3 +52,4 @@ class ZCLTouchLink(ZCLCluster):
 
         except ZCLCommandNotFound:
             logger.info("[zcl] command not found (command_identifier = 0x{:02x})".format(command_identifier))
+'''

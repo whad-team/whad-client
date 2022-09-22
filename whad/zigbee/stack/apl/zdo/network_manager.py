@@ -11,11 +11,11 @@ class ZDONetworkManager(ZDOObject):
 
     def initialize(self):
         if self.zdo.configuration.get("configNodeDescriptor").logical_type == LogicalDeviceType.END_DEVICE:
-            self.zdo.manager.nwk.database.set("nwkNetworkAddress", 0x22e7)
+            self.zdo.manager.nwk.database.set("nwkNetworkAddress", 0x0000)
             self.zdo.manager.nwk.database.set("nwkExtendedPANID", 0x0000000000000000)
             self.zdo.manager.aps.database.set("apsDesignatedCoordinator", False)
             self.zdo.manager.aps.database.set("apsChannelMask", 0x7fff800)
-            self.zdo.manager.aps.database.set("apsUseExtendedPANID", 0xf4ce364269d30198)
+            self.zdo.manager.aps.database.set("apsUseExtendedPANID", 0x940843f53270013)
             self.zdo.manager.aps.database.set("apsUseInsecureJoin", True)
 
     def on_authorization(self):
