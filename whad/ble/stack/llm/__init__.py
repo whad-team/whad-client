@@ -383,6 +383,7 @@ class BleLinkLayerManager(object):
 
     def on_disconnect(self, conn_handle):
         if conn_handle in self.__connections:
+            print('[llm] connection %d has just terminated' % conn_handle)
             self.__connections[conn_handle].on_disconnect()
             del self.__connections[conn_handle]
 
