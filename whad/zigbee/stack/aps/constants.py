@@ -1,5 +1,25 @@
 from enum import IntEnum
 
+class APSSourceAddressMode(IntEnum):
+    """
+    Enum representing the different APS source address modes supported by Zigbee.
+    """
+    SHORT_ADDRESS_SRC_ENDPOINT_PRESENT = 0x02
+    EXTENDED_ADDRESS_SRC_ENDPOINT_PRESENT = 0x03
+    EXTENDED_ADDRESS_SRC_ENDPOINT_NOT_PRESENT = 0x04
+
+
+class APSDestinationAddressMode(IntEnum):
+    """
+    Enum representing the different APS destination address modes supported by Zigbee.
+    """
+    DST_ADDRESS_AND_DST_ENDPOINT_NOT_PRESENT = 0x00
+    SHORT_GROUP_ADDRESS_DST_ENDPOINT_NOT_PRESENT = 0x01
+    SHORT_ADDRESS_DST_ENDPOINT_PRESENT = 0x02
+    EXTENDED_ADDRESS_DST_ENDPOINT_PRESENT = 0x03
+    EXTENDED_ADDRESS_DST_ENDPOINT_NOT_PRESENT = 0x04
+
+
 class APSKeyAttribute(IntEnum):
     """
     This enum stores the different possible values for the APS key attribute.
@@ -83,14 +103,15 @@ class APSKeyPairSet:
                 )
             )
 
-    def select(self, address):
+    def select(self, address, unverified=True):
         matching_key_pairs = []
         preinstalled_keys = []
         for key_pair in self.key_pair_set:
-            if key_pair.device_address == address:
-                matching_key_pairs.append(key_pair)
-            elif key_pair.device_address is None:
-                preinstalled_keys.append(key_pair)
+            if unverified or not unverified and key_pair.key_attributes in (APSKeyAttribute.PROVISIONAL_KEY, APSKeyAttribute.VERIFIED_KEY):
+                if key_pair.device_address == address:
+                    matching_key_pairs.append(key_pair)
+                elif key_pair.device_address is None:
+                    preinstalled_keys.append(key_pair)
 
         if len(matching_key_pairs) == 0:
             matching_key_pairs += preinstalled_keys

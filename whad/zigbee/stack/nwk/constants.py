@@ -28,6 +28,9 @@ class NetworkSecurityMaterial:
     def add_incoming_frame_counter(self, device_address, frame_counter):
         self.incoming_frame_counters[device_address] = frame_counter
 
+    def __eq__(self, other):
+        return self.key == other.key
+
     def __repr__(self):
         printable_key = ":".join(["{:02X}".format(i) for i in self.key])
         return "NetworkSecurityMaterial(Key #{}, '{}')".format(self.key_sequence_number, printable_key)
@@ -103,6 +106,7 @@ class ZigbeeNode:
         self.beacon_order = beacon_order
         self.permit_joining = permit_joining
         self.potential_parent = potential_parent
+        self.relationship = ZigbeeRelationship.NONE
         self.pan_id = pan_id
         self.lqis = [lqi] if lqi is not None else []
         self.last_update = time()
@@ -176,18 +180,24 @@ class NWKNeighborTable:
                 return False
             return True
 
-    def select_suitable_parent(self, extended_pan_id, nwk_update_id):
+    def select_suitable_parent(self, extended_pan_id, nwk_update_id, no_permit_check=False):
         selected_devices = []
         for address, device in self.table.items():
             if (
                 device.extended_pan_id == extended_pan_id and #the device belongs to the right network
-                device.permit_joining and  # the device allows joining
+                (device.permit_joining or no_permit_check) and  # the device allows joining
                 device.outgoing_cost <= 3 and # the total cost is under 3
                 device.potential_parent and # it is a potential parent
                 device.update_id >= nwk_update_id
             ):
                 selected_devices.append(device)
         return selected_devices
+
+    def get_parent(self):
+        for device in self.table.values():
+            if device.relationship == ZigbeeRelationship.IS_PARENT:
+                return device
+        return None
 
     def delete(self, address):
         del self.table[address]

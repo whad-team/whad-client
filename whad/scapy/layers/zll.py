@@ -1,0 +1,290 @@
+from scapy.layers.zigbee import ZigbeeDeviceProfile, ZigbeeAppDataPayloadStub, _zcl_profile_identifier
+from scapy.fields import BitEnumField, BitField, ByteEnumField, ByteField, ConditionalField, \
+    FlagsField, XBitField, XLEIntField, XLEShortField, EnumField, XShortField
+from scapy.layers.dot15d4 import dot15d4AddressField
+from scapy.packet import Packet
+
+class ZigbeeZLLCommissioningCluster(Packet):
+    name = "Zigbee LightLink Commissioning Cluster Frame"
+    fields_desc = [
+        # Frame control (8 bits)
+        BitField("reserved", 0, 3),
+        BitField("disable_default_response", 1, 1), # 1 not default response command will be returned
+        BitEnumField("direction", 0, 1, ['client2server', 'server2client']),
+        BitField("manufacturer_specific", 0, 1), # 0 manufacturer code shall not be included in the ZCL frame
+        # Frame Type
+        # 0b00 command acts across the entire profile
+        # 0b01 command is specific to a cluster
+        # 0b10 - 0b11 reserved
+        BitField("zcl_frametype", 1, 2),
+        # Manufacturer code (0/16 bits) only present then manufacturer_specific field is set to 1
+        ConditionalField(XLEShortField("manufacturer_code", 0x0),
+            lambda pkt:pkt.getfieldval("manufacturer_specific") == 1
+        ),
+        # Transaction sequence number (8 bits)
+        ByteField("transaction_sequence", 0),
+        # Command identifier (8 bits): the cluster command
+        ByteEnumField("command_identifier", 0x00, {}),
+    ]
+
+    def guess_payload_class(self, payload):
+        if self.command_identifier == 0x00:# and pkt.cluster == 0x1000:
+            return ZLLScanRequest
+        elif self.command_identifier == 0x01:# and pkt.cluster == 0x1000:
+            return ZLLScanResponse
+        else:
+            return Packet.guess_payload_class(self, payload)
+
+class ZLLScanRequest(Packet):
+    name = "ZLL: Scan Request"
+    fields_desc = [
+        # Inter-PAN transaction identifier (4 octets)
+        XLEIntField("inter_pan_transaction_id", 0x66666666), # Unsigned 32-bit Integer (4 octets)
+	# ZigBee information (1 octet)
+        BitField("reserved", 0, 5),
+        BitEnumField("rx_on_when_idle", 1, 1, [False, True]),
+        BitEnumField("logical_type", 1, 2, {
+            0:"coordinator", 1:"router", 2:"end device", 3:"reserved"}
+        ),
+	# ZLL information (1 octet)
+        #FlagsField("ZLL information", 0, 8, [ 'factory_new', 'address_assignment', 'reserved1', 'reserved2', 'link_initiator', 'undefined', 'reserved3', 'reserved4' ]),
+        BitField("reserved1", 0, 2),
+        BitField("undefined", 0, 1),
+        BitEnumField("link_initiator", 0, 1, [False, True]),
+        BitField("reserved2", 0, 2),
+        BitEnumField("address_assignment", 0, 1, [False, True]),
+        BitEnumField("factory_new", 0, 1, [False, True]),
+    ]
+    def answers(self, other):
+        if isinstance(other, ZLLScanResponse):
+            return self.inter_pan_transaction_id == other.inter_pan_transaction_id
+        return 0
+
+class ZLLScanResponse(Packet):
+    name = "ZLL: Scan Response"
+    fields_desc = [
+        # Inter-PAN transaction identifier (4 octets)
+        XLEIntField("inter_pan_transaction_id", 0x66666666),
+        ByteField("rssi_correction", 0x00), # range 0x00 - 0x20 (1 octet)
+	# ZigBee information (1 octet)
+        # HiddenField(BitField("reserved", 0, 5)),
+        BitField("reserved", 0, 5),
+        BitEnumField("rx_on_when_idle", 1, 1, [False, True]),
+        BitEnumField("logical_type", 1, 2, {
+            0:"coordinator", 1:"router", 2:"end device", 3:"reserved"}
+        ),
+	# ZLL information (1 octet)
+        # HiddenField(BitField("reserved1", 0, 2)),
+        BitField("reserved1", 0, 2),
+        BitEnumField("touchlink_priority_request", 0, 1, [False, True]),
+        BitEnumField("touchlink_initiator", 0, 1, [False, True]),
+        # HiddenField(BitField("reserved2", 0, 2)),
+        BitField("reserved2", 0, 2),
+        BitEnumField("address_assignment", 0, 1, [False, True]),
+        BitEnumField("factory_new", 0, 1, [False, True]),
+        # Key bitmask (2 octets)
+        FlagsField("key_bitmask", 0, 16, ["reserved_key_8", "reserved_key_9",
+            "reserved_key_10", "reserved_key_11", "reserved_key_12",
+            "reserved_key_13", "reserved_key_14", "certification_key",
+            "development_key", "reserved_key_1", "reserved_key_2", "reserved_key_3",
+            "master_key", "reserved_key_5", "reserved_key_6",
+            "reserved_key_7"]),
+        # BitField("reserved3", 0, 3),
+        # BitEnumField("master_key", 0, 1, [False, True]),
+        # BitField("reserved4", 0, 3),
+        # BitEnumField("development_key", 0, 1, [False, True]),
+        # BitEnumField("certification_key", 0, 1, [False, True]),
+        # BitField("reserved5", 0, 3),
+        # BitField("reserved6", 0, 4),
+
+        # Response identifier (4 octets)
+        XLEIntField("response_id", 0x66666666),
+        # Extended PAN identifier (8 octets)
+        dot15d4AddressField("pan_id_ext", 0, adjust=lambda pkt,x: 8),
+        # Network update identifier (1 octet)
+        ByteField("network_update_id", 0),
+        # Logical channel (1 octet)
+        ByteField("channel", 11),
+        # PAN identifier (2 octets)
+        XLEShortField("pan_id", 0x0000),
+        # Network address (2 octets)
+        XLEShortField("network_address", 0xffff),
+        # Number of sub-devices (1 octet)
+        ByteField("number_of_sub_devices", 1),
+        # Total group identifiers (1 octet)
+        ByteField("number_of_group_ids", 0),
+        # Endpoint identifier (0/1 octets)
+        ConditionalField(ByteField("endpoint_id", 0x00), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
+        # Profile identifier (0/2 octets)
+        #ConditionalField(XShortField("profile_id", 0x0000)
+        ConditionalField(EnumField("profile_id", 0, _zcl_profile_identifier, fmt = "<H"), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
+        # Device identifier (0/2 octets)
+        ConditionalField(XShortField("device_id", 0x0000), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
+        # Version (0/1 octets)
+        # HiddenField(ConditionalField(BitField("0x0", 0, 4), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1))),
+        ConditionalField(BitField("0x0", 0, 4), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
+        ConditionalField(BitField("application_device_version", 2, 4), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
+        # Group identifier count (0/1 octets)
+        ConditionalField(ByteField("group_id_count", 0x00), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
+    ]
+
+class ZLLDeviceInformationRequest(Packet):
+    name = "ZLL: Device Information Request"
+    fields_desc = [
+        # Inter-PAN transaction identifier (4 octets)
+        XLEIntField("inter_pan_transaction_id", 0x66666666),
+	# Start index of device table (1 octet)
+        ByteField("start_index", 0),
+    ]
+
+class ZLLIdentifyRequest(Packet):
+    name = "ZLL: Identify Request"
+    fields_desc = [
+        # Inter-PAN transaction identifier (4 octets)
+        XLEIntField("inter_pan_transaction_id", 0x66666666),
+        # Identify duration (1 octet):
+        #   0x0000: Exit identify mode
+        #   0x0001 - 0xfffe: Number of seconds to remain in identify mode
+        #   0xffff: Remain in identify mode for a default time known by the receiver
+        XLEShortField("identify_duration", 0xffff),
+    ]
+
+class ZLLResetToFactoryNewRequest(Packet):
+    name = "ZLL: Reset to Factory New Request"
+    fields_desc = [
+        # Inter-PAN transaction identifier (4 octets)
+        XLEIntField("inter_pan_transaction_id", 0x66666666),
+    ]
+
+class ZLLNetworkStartRequest(Packet):
+    name = "ZLL: Network Start Request"
+    fields_desc = [
+        # Inter-PAN transaction identifier (4 octets)
+        XLEIntField("inter_pan_transaction_id", 0x66666666),
+        # Extended PAN identifier (8 octets)
+        dot15d4AddressField("pan_id_ext", 0, adjust=lambda pkt,x: 8),
+        # Key index (1 octets)
+        ByteField("key_index", 4),  # default: Master key
+        # Encrypted network key (16 octets)
+        XBitField("encrypted_network_key", 0, 128),
+        # Logical channel (1 octet)
+        ByteField("channel", 0),
+        # PAN identifier (2 octets)
+        XLEShortField("pan_id", 0x0000),
+        # Network address (2 octets)
+        XLEShortField("network_address", 0x0001),
+        # Group identifiers begin (2 octets)
+        XLEShortField("group_id_begin", 0),
+        # Group identifiers end (2 octets)
+        XLEShortField("group_id_end", 0),
+        # Free network address range begin (2 octets)
+        XLEShortField("free_network_address_range_begin", 0),
+        # Free network address range end (2 octets)
+        XLEShortField("free_network_address_range_end", 0),
+        # Free group address range begin (2 octets)
+        XLEShortField("free_group_address_range_begin", 0),
+        # Free group address range end (2 octets)
+        XLEShortField("free_group_address_range_end", 0),
+        # Initiator IEEE address (8 octet)
+        XBitField("initiator_ieee_address", 0, 64),
+        # Initiator network address (2 octets)
+        XLEShortField("initiator_network_address", 0),
+    ]
+
+class ZLLNetworkStartResponse(Packet):
+    name = "ZLL: Network Start Response"
+    fields_desc = [
+        # Inter-PAN transaction identifier (4 octets)
+        XLEIntField("inter_pan_transaction_id", 0x66666666),
+        # Status (1 octet)
+        ByteEnumField("status", 0, {0: "success", 1: "failure",
+            2: "reserved_status_2", 3: "reserved_status_3",
+            4: "reserved_status_4", 5: "reserved_status_5",
+            6: "reserved_status_6", 7: "reserved_status_7",
+            8: "reserved_status_8", 9: "reserved_status_9",
+            10: "reserved_status_10", 11: "reserved_status_11",
+            12: "reserved_status_12", 13: "reserved_status_13",
+            14: "reserved_status_14", 15: "reserved_status_15"}),
+        # Extended PAN identifier (8 octets)
+        dot15d4AddressField("pan_id_ext", 0, adjust=lambda pkt,x: 8),
+        # Network update identifier (1 octet)
+        ByteField("network_update_id", 0x00),
+        # Logical channel (1 octet)
+        ByteField("channel", 11),
+        # PAN identifier (2 octets)
+        XLEShortField("pan_id", 0x0000),
+    ]
+
+class ZLLNetworkJoinRouterRequest(Packet):
+    name = "ZLL: Network Join Router Request"
+    fields_desc = [
+        # Inter-PAN transaction identifier (4 octets)
+        XLEIntField("inter_pan_transaction_id", 0x66666666),
+        # Extended PAN identifier (8 octets)
+        dot15d4AddressField("pan_id_ext", 0, adjust=lambda pkt,x: 8),
+        # Key index (1 octets)
+        ByteField("key_index", 4),  # default: Master key
+        # Encrypted network key (16 octets)
+        XBitField("encrypted_network_key", 0, 128),
+        # Network update identifier (1 octet)
+        ByteField("network_update_id", 0x00),
+        # Logical channel (1 octet)
+        ByteField("channel", 0),
+        # PAN identifier (2 octets)
+        XLEShortField("pan_id", 0x0000),
+        # Network address (2 octets)
+        XLEShortField("network_address", 0x0001),
+        # Group identifiers begin (2 octets)
+        XLEShortField("group_id_begin", 0),
+        # Group identifiers end (2 octets)
+        XLEShortField("group_id_end", 0),
+        # Free network address range begin (2 octets)
+        XLEShortField("free_network_address_range_begin", 0),
+        # Free network address range end (2 octets)
+        XLEShortField("free_network_address_range_end", 0),
+        # Free group address range begin (2 octets)
+        XLEShortField("free_group_address_range_begin", 0),
+        # Free group address range end (2 octets)
+        XLEShortField("free_group_address_range_end", 0),
+    ]
+
+class ZLLNetworkJoinRouterResponse(Packet):
+    name = "ZLL: Network Join Router Response"
+    fields_desc = [
+        # Inter-PAN transaction identifier (4 octets)
+        XLEIntField("inter_pan_transaction_id", 0x66666666),
+        # Status (1 octet)
+        ByteEnumField("status", 0, {0: "success", 1: "failure",
+            2: "reserved_status_2", 3: "reserved_status_3",
+            4: "reserved_status_4", 5: "reserved_status_5",
+            6: "reserved_status_6", 7: "reserved_status_7",
+            8: "reserved_status_8", 9: "reserved_status_9",
+            10: "reserved_status_10", 11: "reserved_status_11",
+            12: "reserved_status_12", 13: "reserved_status_13",
+            14: "reserved_status_14", 15: "reserved_status_15"}),
+    ]
+
+class ZLLNetworkUpdateRequest(Packet):
+    name = "ZLL: Network Update Request"
+    fields_desc = [
+        # Inter-PAN transaction identifier (4 octets)
+        XLEIntField("inter_pan_transaction_id", 0x66666666),
+        # Extended PAN identifier (8 octets)
+        dot15d4AddressField("pan_id_ext", 0, adjust=lambda pkt,x: 8),
+        # Network update identifier (1 octet)
+        ByteField("network_update_id", 0x00),
+        # Logical Channel (1 octet)
+        ByteField("channel", 11),
+        # PAN identifier (2 octets)
+        XLEShortField("pan_id", 0x0000),
+        # Network address (2 octets)
+        XLEShortField("network_address", 0xffff),
+    ]
+
+def interpan_guess_payload_class(self, payload):
+    if self.frametype == 3 and self.profile == 0xc05e and self.cluster == 0x1000:
+        return ZigbeeZLLCommissioningCluster
+    else:
+        return Packet.guess_payload_class(self, payload)
+
+ZigbeeAppDataPayloadStub.guess_payload_class = interpan_guess_payload_class

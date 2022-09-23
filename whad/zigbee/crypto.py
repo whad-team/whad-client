@@ -101,14 +101,16 @@ class CryptoManager:
     def generateAuth(self, packet):
         if self.encryption:
             auth = raw(packet[self.base_class:]).replace(packet.data,b"")
+            if len(packet.mic) != 0:
+                auth = auth.replace(packet.mic, b"")
         else:
             auth = raw(packet[self.base_class:])[:-self.M]
         return auth
 
     def extractCiphertextPayload(self, packet):
         if self.encryption:
-            message = packet[ZigbeeSecurityHeader].data[:-self.M]
-            mic = packet[ZigbeeSecurityHeader].data[-self.M:]
+            message = packet[ZigbeeSecurityHeader].data[:-self.M] if len(packet.mic) == 0 and self.patched else packet.data
+            mic = packet[ZigbeeSecurityHeader].data[-self.M:] if len(packet.mic) == 0 and self.patched else packet.mic
         else:
             mic = raw(packet[self.base_class:])[-self.M:]
             message = b""
@@ -116,7 +118,7 @@ class CryptoManager:
 
     def generateMIC(self,packet):
         self.auth = self.generateAuth(packet)
-        plaintext = packet.data
+        plaintext = packet.data if len(packet.mic) == 0 and self.patched else packet.data + packet.mic
         auth = len(self.auth).to_bytes(2, byteorder = 'big')+self.auth
         auth = auth + (32 - len(auth))*b"\x00" + plaintext+(16 - len(plaintext))*b"\x00"
         flags = (0 << 7) | ((0 if len(self.auth) == 0 else 1) << 6 ) | ((2 - 1) << 3) | ((self.M-2)//2 if self.M else 0)
@@ -155,7 +157,7 @@ class CryptoManager:
         self.auth = self.generateAuth(packet)
 
         # Extract plaintext
-        plaintext = packet.data[:-self.M]
+        plaintext = packet.data[:-self.M] if len(packet.mic) == 0 and self.patched else packet.data
 
         # Encrypt and generate MIC
         cipher = AES.new(self.key, AES.MODE_CCM, nonce=self.nonce, mac_len=self.M)
@@ -204,21 +206,21 @@ class CryptoManager:
         cipher.update(self.auth)
 
         plaintext = cipher.decrypt(ciphertext)
-        #try:
-        cipher.verify(mic)
-        packet.data = plaintext
-        packet.mic = self.generateMIC(packet)
-        # Reverse patching if needed
-        if self.patched:
-            packet[ZigbeeSecurityHeader].nwk_seclevel = 0
+        try:
+            cipher.verify(mic)
+            packet.data = plaintext
+            packet.mic = self.generateMIC(packet)
+            # Reverse patching if needed
+            if self.patched:
+                packet[ZigbeeSecurityHeader].nwk_seclevel = 0
 
-        return (packet, True)
+            return (packet, True)
 
-        #except ValueError:
-        # Reverse patching if needed
-        #    if self.patched:
-        #        packet[ZigbeeSecurityHeader].nwk_seclevel = 0
-        #    return (packet, False) # integrity check
+        except ValueError:
+            # Reverse patching if needed
+            if self.patched:
+                packet[ZigbeeSecurityHeader].nwk_seclevel = 0
+            return (packet, False) # integrity check
 
 class NetworkLayerCryptoManager(CryptoManager):
 

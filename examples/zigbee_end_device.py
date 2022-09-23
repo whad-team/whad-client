@@ -1,8 +1,11 @@
 from whad.zigbee import EndDevice
+from whad.zigbee.stack.aps.constants import APSDestinationAddressMode
 from whad.zigbee.stack.mac.constants import MACScanType
 from whad.device import WhadDevice
 from whad.zigbee.crypto import NetworkLayerCryptoManager
 from whad.exceptions import WhadDeviceNotFound
+from whad.zigbee.stack.apl.application import ApplicationObject
+from whad.zigbee.stack.apl.zcl.clusters import ZCLOnOff, ZCLTouchLink
 from time import time,sleep
 from whad.common.monitors import PcapWriterMonitor
 from scapy.compat import raw
@@ -13,6 +16,8 @@ import logging
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
 logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.aps').setLevel(logging.INFO)
+#logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -24,22 +29,24 @@ if __name__ == '__main__':
 
             dev = WhadDevice.create(interface)
             endDevice = EndDevice(dev)
+
+
             #monitor.attach(endDevice)
             #monitor.start()
             endDevice.start()
-            #endDevice.stack.nwk.database.set("nwkSecurityLevel", 5)
-            #endDevice.stack.nwk.add_key("44:81:97:51:b6:02:04:91:81:dc:8b:c2:71:4d:f0:9d")
-            management_service = endDevice.stack.nwk.get_service("management")
-            print("========================================= Discovered networks:=======================================================")
-            for network in management_service.network_discovery():
-                print(network)
-            print("========================================= Join =======================================================")
-            management_service.join(extended_pan_id=0xf4ce364269d30198)
-            print("========================================= Key =======================================================")
-            #management_service = endDevice.stack.mac.get_service("management")
-            #management_service.associate(coordinator_pan_id=0x2699, coordinator_address=0x0, channel_page=0, channel=16)
-
+            onoff = ZCLOnOff()
+            myApp2 = ApplicationObject("onoff", 0x0104, 0x0100, device_version=0, input_clusters=[], output_clusters=[onoff])
+            endDevice.stack.apl.attach_application(myApp2, endpoint=1)
+            zdo = endDevice.stack.apl.get_application_by_name("zdo")
+            zdo.start()
             input()
+            print("Leaving")
+            endDevice.stack.nwk.get_service("management").leave()
+            input()
+            #exit()
+            while True:
+                onoff.toggle(0x0006, 11)
+                input()
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 
