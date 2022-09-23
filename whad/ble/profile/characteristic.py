@@ -178,7 +178,10 @@ class Characteristic(Attribute):
         return (self.properties & CharacteristicProperties.READ) != 0
 
     def writeable(self):
-        return (self.properties & CharacteristicProperties.WRITE) != 0
+        return (
+            ((self.properties & CharacteristicProperties.WRITE) != 0) or 
+            ((self.properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE) != 0)
+        )
 
     def must_notify(self):
         """Determine if a notification must be sent for this characteristic.
