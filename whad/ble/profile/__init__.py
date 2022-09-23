@@ -9,6 +9,97 @@ from whad.ble.profile.service import PrimaryService as BlePrimaryService, \
 from whad.ble.exceptions import InvalidHandleValueException
 from whad.ble.stack.att.constants import BleAttProperties
 
+###################################
+# Decorators for GenericProfile
+###################################
+
+class CharacteristicHook(object):
+
+    def __init__(self, *args):
+        if len(args) == 1:
+            characteristic = args[0]
+            if isinstance(characteristic, Characteristic):
+                self.__characteristic = str(characteristic.service.uuid)+':'+str(characteristic.uuid)
+            else:
+                raise TypeError
+        elif len(args) == 2:
+            service = args[0]
+            charac = args[1]
+            if isinstance(service, str) and isinstance(charac, str):
+                self.__characteristic = str(UUID(service)) + ':' + str(UUID(charac))
+            elif isinstance(service, UUID) and isinstance(charac, UUID):
+                self.__characteristic = str(service) + ':' + str(charac)
+
+    def __call__(self, method):
+        if not hasattr(method, 'hooks'):
+            method.hooks = []
+        if not hasattr(method, 'characteristic'):
+            method.characteristic = self.__characteristic
+        return method
+
+class read(CharacteristicHook):
+    """Read hook decorator
+
+    This decorator is used to declare a callback method for read operations
+    on a specific characteristic.
+    """
+
+    def __call__(self, method):
+        """Add a specific hook to the method
+        """
+        super().__call__(method)
+        if 'read' not in method.hooks:
+            method.hooks.append('read')
+        return method
+
+class write(CharacteristicHook):
+
+    def __call__(self, method):
+        """Add a specific hook to the method
+        """
+        super().__call__(method)
+        if 'write' not in method.hooks:
+            method.hooks.append('write')
+        return method
+
+class written(CharacteristicHook):
+
+    def __call__(self, method):
+        """Add a specific hook to the method
+        """
+        super().__call__(method)
+        if 'written' not in method.hooks:
+            method.hooks.append('written')
+        return method
+
+class subscribed(CharacteristicHook):
+
+    def __call__(self, method):
+        """Add a specific hook to the method
+        """
+        super().__call__(method)
+        if 'sub' not in method.hooks:
+            method.hooks.append('sub')
+        return method
+
+class unsubscribed(CharacteristicHook):
+
+    def __call__(self, method):
+        """Add a specific hook to the method
+        """
+        super().__call__(method)
+        if 'unsub' not in method.hooks:
+            method.hooks.append('unsub')
+        return method
+
+def is_method_hook(method):
+    """Determine if a method is a characteristic operation hook
+    """
+    if hasattr(method, 'hooks') and hasattr(method, 'characteristic'):
+        return (len(method.hooks) > 0)
+    return False
+
+
 class Characteristic(object):
     """Characteristic model
     """
@@ -21,6 +112,7 @@ class Characteristic(object):
         self.__perms = permissions
         self.__notify = notify
         self.__indicate = indicate
+        self.__service = None
 
     def get_required_handles(self):
         """Compute the number of handles this characteristic will consume
@@ -30,6 +122,11 @@ class Characteristic(object):
         if self.__notify or self.__indicate:
             handles += 1
         return handles
+
+    def attach(self, service):
+        """Attach this characteristic to the corresponding service
+        """
+        self.__service = service
 
     @property
     def handle(self):
@@ -70,6 +167,9 @@ class Characteristic(object):
     def must_indicate(self):
         return self.__indicate
 
+    @property
+    def service(self):
+        return self.__service
 
 
 class ServiceModel(object):
@@ -101,6 +201,11 @@ class ServiceModel(object):
                 charac.handle = 0
                 charac.name = arg
                 self.add_characteristic(charac)
+                charac.attach(self)
+                
+                # Add characteristic to a property to this ServiceModel instance
+                if not hasattr(self, arg):
+                    setattr(self, arg, charac)
 
 
     def add_characteristic(self, characteristic_model):
@@ -165,6 +270,8 @@ class GenericProfile(object):
 
         self.__start_handle = start_handle
         self.__handle = self.__start_handle
+
+        self.__hooks = {}
 
         # Populate attribute database and model from JSON export if provided
         if from_json is not None:
@@ -298,6 +405,21 @@ class GenericProfile(object):
                     service_obj.add_characteristic(charac_obj)
 
                 self.add_service(service_obj)
+
+        # Register any hook function
+        props = dir(self)
+        for prop in props:
+            prop_obj = getattr(self, prop)
+            # Is this property a callable hook ?
+            if callable(prop_obj) and is_method_hook(prop_obj):
+                print('method %s is a hook for %s' % (prop, prop_obj.hooks))
+                # Associate hook method with each operation
+                if prop_obj.characteristic not in self.__hooks:
+                    self.__hooks[prop_obj.characteristic] = {}
+                for operation in prop_obj.hooks:
+                    self.__hooks[prop_obj.characteristic][operation] = prop_obj
+        print(self.__hooks)
+
 
     def __alloc_handle(self, number=1):
         """Allocate one or more handle values.
@@ -470,6 +592,13 @@ class GenericProfile(object):
             profile_dict['services'].append(service_dict)
         return json.dumps(profile_dict)
 
+    def find_hook(self, service, characteristic, operation):
+        hook_key = str(service.uuid) + ':' + str(characteristic.uuid)
+        if hook_key in self.__hooks:
+            if operation in self.__hooks[hook_key]:
+                return self.__hooks[hook_key][operation]
+        return None
+
 
     ################################################
     # Connection/disconnection hooks
@@ -509,6 +638,12 @@ class GenericProfile(object):
         :param int length: Max read length
         :return: Value to return to the GATT client
         """
+        # Check if we have a hook to call
+        hook = self.find_hook(service, characteristic, 'read')
+        if hook is not None:
+            return hook(offset, length)
+
+        # If no hook registered, then return the characteristic value
         return characteristic.value[offset:offset + length]
 
     def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
@@ -517,7 +652,13 @@ class GenericProfile(object):
         This hook is called whenever a charactertistic is about to be written by a GATT
         client.
         """
-        pass
+        hook = self.find_hook(service, characteristic, 'write')
+        if hook is not None:
+            return hook(
+                offset,
+                value,
+                without_response=without_response
+            )
 
     def on_characteristic_written(self, service, characteristic, offset=0, value=b'', without_response=False):
         """Characteristic written hook
@@ -525,13 +666,32 @@ class GenericProfile(object):
         This hook is called whenever a charactertistic has been written by a GATT
         client.
         """
-        pass
+        # Check if we have a hook to call
+        hook = self.find_hook(service, characteristic, 'written')
+        if hook is not None:
+            # Call our hook
+            return hook(
+                offset,
+                value,
+                without_response=without_response
+            )
 
     def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
-        pass
+        # Check if we have a hook to call
+        hook = self.find_hook(service, characteristic, 'sub')
+        if hook is not None:
+            # Call our hook
+            return hook(
+                notification=notification,
+                indication=indication
+            )
 
     def on_characteristic_unsubscribed(self, service, characteristic):
-        pass
+        # Check if we have a hook to call
+        hook = self.find_hook(service, characteristic, 'unsub')
+        if hook is not None:
+            # Call our hook
+            return hook()
 
     def on_notification(self, service, characteristic, value):
         pass
