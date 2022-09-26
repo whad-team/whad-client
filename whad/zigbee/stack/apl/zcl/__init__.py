@@ -2,7 +2,7 @@ from whad.zigbee.stack.apl.cluster import Cluster
 from whad.zigbee.stack.apl.zcl.attributes import ZCLAttributes
 from whad.zigbee.stack.apl.zcl.commands import ZCLCommands
 from scapy.layers.zigbee import ZigbeeClusterLibrary
-from inspect import stack
+from inspect import stack,signature
 from enum import IntEnum
 import logging
 
@@ -73,6 +73,8 @@ class ZCLClusterConfiguration:
         self.disable_default_response = disable_default_response
 
 class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
+    _transaction_counter = 0
+
     def __init__(self, cluster_id, type, default_configuration=ZCLClusterConfiguration()):
         super().__init__(cluster_id)
         self.type = type
@@ -140,16 +142,80 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
             disable_default_response = disable_default_response
         )
 
-    def send_command(self, data):
-        caller_function = stack()[0].function
+    def send_command(self, command):
         if len(stack() == 0):
             return False
+
+        caller_function = stack()[0].function
 
         if not hasattr(caller_function, "_command_generate"):
             return False
 
-        print(dir(caller_function))
-        print(caller_function._command_generate)
+        command_id, command_name = caller_function._command_generate
+
+        current_configuration = self.configuration
+
+        if current_configuration.transaction is None:
+            transaction = ZCLCluster._transaction_counter
+            ZCLCluster._transaction_counter += 1
+        else:
+            transaction = current_configuration.transaction
+
+        asdu = ZigbeeClusterLibrary(
+                zcl_frametype=1,
+                command_direction=0 if self.type == ZCLClusterType.CLIENT else 1,
+                command_identifier=command_id,
+                transaction_sequence=transaction,
+                disable_default_response=current_configuration.disable_default_response
+        ) / command
+
+        return self.send_data(
+            asdu,
+            current_configuration.destination_address_mode,
+            current_configuration.destination_address,
+            current_configuration.destination_endpoint,
+            alias_address=current_configuration.alias_address,
+            alias_sequence_number=current_configuration.alias_sequence_number,
+            radius=current_configuration.radius,
+            security_enabled_transmission=current_configuration.security_enabled_transmission,
+            use_network_key=current_configuration.use_network_key,
+            acknowledged_transmission=current_configuration.acknowledged_transmission,
+            fragmentation_permitted=current_configuration.fragmentation_permitted,
+            include_extended_nonce=current_configuration.include_extended_nonce
+        )
+
+    def on_data(self, asdu, source_address, source_address_mode, security_status, link_quality):
+        command_identifier = asdu.command_identifier
+
+        try:
+            command = self.commands.get_command(command_identifier)
+            # Adapt informations to callbacks parameters
+            parameters = []
+            callback_parameters = signature(command.receive_callback).parameters
+            for name, parameter in callback_parameters.items():
+                if int(parameter.kind) == 1:
+                    if name in ("payload","command"):
+                        parameters += [asdu[ZigbeeClusterLibrary].payload]
+                    elif name in ("source","src", "source_address"):
+                        parameters += [source_address]
+                    elif name in ("source_mode","source_address_mode","mode"):
+                        parameters += [source_address_mode]
+                    elif name in ("security", "security_status"):
+                        parameters += [security_status]
+                    elif name in ("link_quality", "lki"):
+                        parameters += [link_quality]
+                    elif name in ("transaction", "transaction_sequence"):
+                        parameters += [asdu[ZigbeeClusterLibrary].transaction_sequence]
+                    elif name in ("no_response", "disable_default_response"):
+                        parameters += [asdu[ZigbeeClusterLibrary].disable_default_response]
+
+            command.receive_callback(*parameters)
+
+        except ZCLCommandNotFound:
+            logger.info("[zcl] command not found (command_identifier = 0x{:02x})".format(command_identifier))
+
+
+    # Decorators
     def command_receive(command_id, command_name):
         def receive_decorator(f):
             f._command_receive = (command_id, command_name)
