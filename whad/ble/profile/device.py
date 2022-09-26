@@ -132,7 +132,10 @@ class PeripheralCharacteristic:
         return ((self.__characteristic.properties & CharacteristicProperties.READ) != 0)
 
     def writeable(self):
-        return ((self.__characteristic.properties & CharacteristicProperties.WRITE) != 0)
+        return (
+            ((self.__characteristic.properties & CharacteristicProperties.WRITE) != 0) or 
+            ((self.__characteristic.properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE) != 0)
+        )
 
     def subscribe(self, notification=True, indication=False, callback=None):
         """Subscribe for notification/indication
@@ -324,7 +327,14 @@ class PeripheralDevice(GenericProfile):
     def get_service(self, uuid):
         """Retrieve a PeripheralService object given its UUID.
         """
+
+        """
         for service in self.__gatt.services():
+            if service.uuid == uuid:
+                return PeripheralService(service, self.__gatt)
+        return None
+        """
+        for service in self.services():
             if service.uuid == uuid:
                 return PeripheralService(service, self.__gatt)
         return None

@@ -415,6 +415,11 @@ class GattClient(Gatt):
     def unregister_notification_callback(self, handle):
         del self.__notification_callbacks[handle]
 
+    def clear_notification_callbacks(self):
+        """Clear all notification callbacks.
+        """
+        self.__notification_callbacks = {}
+
     def discover_primary_service_by_uuid(self, uuid):
         """Discover a primary service by its UUID.
 
@@ -699,6 +704,10 @@ class GattClient(Gatt):
 
     def services(self):
         return self.__model.services()
+
+    def on_terminated(self):
+        # Remove all notification/indication callbacks
+        self.clear_notification_callbacks()
 
 
 class GattServer(Gatt):
@@ -1039,10 +1048,29 @@ class GattServer(Gatt):
                         attr.value = request.value
                         self.att.write_response()
 
+                        # Trigger our written hook (after charac has been written)
+                        value =  self.__model.on_characteristic_written(
+                            service,
+                            charac,
+                            0,
+                            attr.value,
+                            True
+                        )
+
                     except HookReturnValue as force_value:
                         # Make sure the returned value matches the boundaries
                         attr.value = force_value.value
                         self.att.write_response()
+
+                        # Trigger our written hook (after charac has been written)
+                        value =  self.__model.on_characteristic_written(
+                            service,
+                            charac,
+                            0,
+                            attr.value,
+                            True
+                        )
+
                     except HookReturnAuthRequired as auth_error:
                         self.error(
                             BleAttOpcode.WRITE_REQUEST,
@@ -1156,9 +1184,29 @@ class GattServer(Gatt):
 
                         # Update attribute value
                         attr.value = request.value
+
+                        # Trigger our written hook (after charac has been written)
+                        value =  self.__model.on_characteristic_written(
+                            service,
+                            charac,
+                            0,
+                            attr.value,
+                            True
+                        )
+
                     except HookReturnValue as force_value:
                         # Make sure the returned value matches the boundaries
                         attr.value = force_value.value
+
+                        # Trigger our written hook (after charac has been written)
+                        value =  self.__model.on_characteristic_written(
+                            service,
+                            charac,
+                            0,
+                            attr.value,
+                            True
+                        )
+
                     except HookReturnAuthRequired as auth_error:
                         self.error(
                             BleAttOpcode.WRITE_COMMAND,
@@ -1460,6 +1508,7 @@ class GattServer(Gatt):
     def on_terminated(self):
         """Connection has been terminated, remove characteristics subscriptions.
         """
+        # Unsubscribe from everything and remove callbacks again
         for charac in self.__subscribed_characs:
             charac.set_notification_callback(None)
             charac.set_indication_callback(None)

@@ -519,9 +519,9 @@ class ImportedDevice(GenericProfile):
             )
 
             # Write value to target device
-            c.write(value)
+            c.write(value, without_response=without_response)
         except HookReturnValue as write_override:
-            c.write(write_override.value)
+            c.write(write_override.value, without_response=without_response)
         except GattTimeoutException as gatt_error:
             logger.error('GATT timeout during characteristic write')
             pass
@@ -532,7 +532,7 @@ class ImportedDevice(GenericProfile):
         """
         try:
             c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
-            if notification:
+            if notification and c is not None:
                 # Forward callback
                 def notif_cb(charac, value, indication=False):
                     try:
@@ -553,9 +553,9 @@ class ImportedDevice(GenericProfile):
                     except HookDontForward as block:
                         # Don't forward notification
                         pass
-
+                logger.info('[proxy] subscribe to characteristic %s' % characteristic.uuid)
                 c.subscribe(callback=notif_cb, notification=True)
-            elif indication:
+            elif indication and c is not None:
                 # Forward callback
                 def indicate_cb(charac, value, indication=True):
                     try:
@@ -577,7 +577,11 @@ class ImportedDevice(GenericProfile):
                         # Don't forward notification
                         pass
 
+                logger.info('[proxy] subscribe to characteristic %s (indication)' % characteristic.uuid)
                 c.subscribe(callback=indicate_cb, indication=True)
+
+            else:
+                logger.error('[proxy] cannot find characteristic %s' % characteristic.uuid)
 
             # No action possible here (for now)
             self.__proxy.on_characteristic_subscribed(
@@ -610,11 +614,13 @@ class GattProxy(object):
     """GATT Proxy
     """
 
-    def __init__(self, proxy=None, target=None, adv_data=None, bd_address=None):
+    def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None, spoof=False, profile=None):
         self.__central = None
         self.__peripheral = None
         self.__proxy_dev = proxy
         self.__target_dev = target
+        self.__spoof = spoof
+        self.__profile = profile
         if adv_data is None:
             self.__adv_data = AdvDataFieldList(
                 AdvFlagsField(),
@@ -622,8 +628,20 @@ class GattProxy(object):
             )
         else:
             self.__adv_data = adv_data
+        self.__scan_data = scan_data
         self.__target_bd_addr = bd_address
 
+    @property
+    def target(self):
+        return self.__target
+
+    @property
+    def central(self):
+        return self.__central
+
+    @property
+    def peripheral(self):
+        return self.__profile
 
     def get_wireshark_monitor(self):
         """Attach a Wireshark monitor to the our proxy.
@@ -722,22 +740,31 @@ class GattProxy(object):
         """Start our GATT Proxy
         """
         logger.info('create our central device')
-        self.__central = Central(self.__target_dev)
+        self.__central = Central(self.__target_dev, from_json=self.__profile)
         logger.info('connect to target device')
         self.__target = self.__central.connect(self.__target_bd_addr)
         if self.__target is not None:
-            logger.info('connected to target device, discover services and characteristics ...')
-            self.__target.discover()
-            logger.info('services and characs discovered')
-            target_profile = self.__target.export_json()
+            if self.__profile is not None:
+                logger.info('use the provided profile (json) ...')
+                target_profile = self.__profile
+            else:
+                logger.info('connected to target device, discover services and characteristics ...')
+                self.__target.discover()
+                logger.info('services and characs discovered')
+                target_profile = self.__target.export_json()
             
             # Once connected, we start our peripheral
             logger.info('create a peripheral with similar profile ...')
-            self.__peripheral = Peripheral(self.__proxy_dev, profile=ImportedDevice(
-                self,
-                self.__target,
-                target_profile
-            ))
+            self.__profile = ImportedDevice(
+                    self,
+                    self.__target,
+                    target_profile
+            )
+            self.__peripheral = Peripheral(self.__proxy_dev, profile=self.__profile,
+                adv_data=self.__adv_data,
+                scan_data=self.__scan_data,
+                bd_address=self.__target_bd_addr if self.__spoof else None
+            )
             self.__peripheral.enable_peripheral_mode(adv_data=self.__adv_data)
 
             # Start advertising
