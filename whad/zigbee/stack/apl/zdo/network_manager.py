@@ -15,7 +15,7 @@ class ZDONetworkManager(ZDOObject):
             self.zdo.manager.nwk.database.set("nwkExtendedPANID", 0x0000000000000000)
             self.zdo.manager.aps.database.set("apsDesignatedCoordinator", False)
             self.zdo.manager.aps.database.set("apsChannelMask", 0x7fff800)
-            self.zdo.manager.aps.database.set("apsUseExtendedPANID", 0x940843f53270013)
+            self.zdo.manager.aps.database.set("apsUseExtendedPANID", 0x0000000000000000)
             self.zdo.manager.aps.database.set("apsUseInsecureJoin", True)
 
     def on_authorization(self):
@@ -38,7 +38,6 @@ class ZDONetworkManager(ZDOObject):
 
         else:
             # We are a router or an end device, attempt to join or rejoin a network
-            print(apsUseExtendedPANID)
             if apsUseExtendedPANID != 0:
                 rejoin_success = self.zdo.nwk_management.join(
                     apsUseExtendedPANID,

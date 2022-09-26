@@ -12,8 +12,3 @@ class ZCLCommands:
 
     def add_command(self, id, name, generate_callback=None, receive_callback=None):
         self.commands[id] = ZCLCommand(name, generate_callback, receive_callback)
-
-    def get_command(self, id):
-        if id in self.commands:
-            return self.commands[id]
-        raise ZCLCommandNotFound()
