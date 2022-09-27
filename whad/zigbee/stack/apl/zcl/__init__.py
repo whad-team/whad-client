@@ -1,6 +1,7 @@
 from whad.zigbee.stack.apl.cluster import Cluster
 from whad.zigbee.stack.apl.zcl.attributes import ZCLAttributes
 from whad.zigbee.stack.apl.zcl.commands import ZCLCommands
+from whad.zigbee.stack.aps.constants import APSDestinationAddressMode
 from scapy.layers.zigbee import ZigbeeClusterLibrary
 from inspect import stack,signature
 from enum import IntEnum
@@ -143,7 +144,7 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
         )
 
     def send_command(self, command):
-        if len(stack() == 0):
+        if len(stack()) == 0:
             return False
 
         caller_function = stack()[0].function
@@ -169,20 +170,37 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                 disable_default_response=current_configuration.disable_default_response
         ) / command
 
-        return self.send_data(
-            asdu,
-            current_configuration.destination_address_mode,
-            current_configuration.destination_address,
-            current_configuration.destination_endpoint,
-            alias_address=current_configuration.alias_address,
-            alias_sequence_number=current_configuration.alias_sequence_number,
-            radius=current_configuration.radius,
-            security_enabled_transmission=current_configuration.security_enabled_transmission,
-            use_network_key=current_configuration.use_network_key,
-            acknowledged_transmission=current_configuration.acknowledged_transmission,
-            fragmentation_permitted=current_configuration.fragmentation_permitted,
-            include_extended_nonce=current_configuration.include_extended_nonce
-        )
+        if current_configuration.destination_address is not None:
+            return self.send_data(
+                asdu,
+                current_configuration.destination_address_mode,
+                current_configuration.destination_address,
+                current_configuration.destination_endpoint,
+                alias_address=current_configuration.alias_address,
+                alias_sequence_number=current_configuration.alias_sequence_number,
+                radius=current_configuration.radius,
+                security_enabled_transmission=current_configuration.security_enabled_transmission,
+                use_network_key=current_configuration.use_network_key,
+                acknowledged_transmission=current_configuration.acknowledged_transmission,
+                fragmentation_permitted=current_configuration.fragmentation_permitted,
+                include_extended_nonce=current_configuration.include_extended_nonce
+            )
+        else:
+            for destination in self.destinations:
+                self.send_data(
+                    asdu,
+                    APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT,
+                    destination["address"],
+                    destination["endpoint"],
+                    alias_address=current_configuration.alias_address,
+                    alias_sequence_number=current_configuration.alias_sequence_number,
+                    radius=current_configuration.radius,
+                    security_enabled_transmission=current_configuration.security_enabled_transmission,
+                    use_network_key=current_configuration.use_network_key,
+                    acknowledged_transmission=current_configuration.acknowledged_transmission,
+                    fragmentation_permitted=current_configuration.fragmentation_permitted,
+                    include_extended_nonce=current_configuration.include_extended_nonce
+                )
 
     def on_data(self, asdu, source_address, source_address_mode, security_status, link_quality):
         command_identifier = asdu.command_identifier

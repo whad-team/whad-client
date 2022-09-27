@@ -37,15 +37,13 @@ if __name__ == '__main__':
             onoff = ZCLOnOff()
             myApp2 = ApplicationObject("onoff", 0x0104, 0x0100, device_version=0, input_clusters=[], output_clusters=[onoff])
             endDevice.stack.apl.attach_application(myApp2, endpoint=1)
+
             zdo = endDevice.stack.apl.get_application_by_name("zdo")
             zdo.start()
             input()
-            print("Leaving")
-            endDevice.stack.nwk.get_service("management").leave()
-            input()
-            #exit()
+            onoff.connect(0x0006,11)
             while True:
-                onoff.toggle(0x0006, 11)
+                onoff.toggle()
                 input()
         except (KeyboardInterrupt, SystemExit):
             dev.close()

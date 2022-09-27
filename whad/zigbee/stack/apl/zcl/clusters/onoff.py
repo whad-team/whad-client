@@ -8,10 +8,21 @@ class ZCLOnOff(ZCLClientCluster):
     def __init__(self):
         super().__init__(cluster_id=0x0006)
 
+    @ZCLCluster.command_generate(0x00, "Off")
+    def off(self):
+        command = b""
+        self.send_command(command)
+
     @ZCLCluster.command_generate(0x01, "On")
     def on(self):
-        apdu = 3
-        self.send_command(apdu)
+        command = b""
+        self.send_command(command)
+
+    @ZCLCluster.command_generate(0x02, "Toggle")
+    def toggle(self):
+        command = b""
+        self.send_command(command)
+
 
     '''
     @ZCLCluster.command_generate(0x00, "Off")
