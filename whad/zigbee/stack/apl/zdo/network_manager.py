@@ -3,6 +3,7 @@ from whad.zigbee.stack.nwk.constants import NWKJoinMode
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.constants import SYMBOL_DURATION, Dot15d4Phy
 from time import sleep
+from random import randint
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,6 +12,11 @@ class ZDONetworkManager(ZDOObject):
 
     def initialize(self):
         if self.zdo.configuration.get("configNodeDescriptor").logical_type == LogicalDeviceType.END_DEVICE:
+            address = randint(0, 0xffffffffffffffff)
+            # TODO: refactor to simplify access to different stack layers
+            self.zdo.manager.nwk.database.set("nwkIeeeAddress", address)
+            self.zdo.manager.nwk.mac.database.set("macExtendedAddress", address)
+            self.zdo.manager.nwk.mac.stack.set_extended_address(address)
             self.zdo.manager.nwk.database.set("nwkNetworkAddress", 0x0000)
             self.zdo.manager.nwk.database.set("nwkExtendedPANID", 0x0000000000000000)
             self.zdo.manager.aps.database.set("apsDesignatedCoordinator", False)

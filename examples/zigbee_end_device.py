@@ -14,10 +14,11 @@ import sys
 
 import logging
 logging.basicConfig(level=logging.WARNING)
-logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
+#logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
 logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
 logging.getLogger('whad.zigbee.stack.aps').setLevel(logging.INFO)
-#logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.apl.zcl').setLevel(logging.INFO)
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -40,8 +41,9 @@ if __name__ == '__main__':
 
             zdo = endDevice.stack.apl.get_application_by_name("zdo")
             zdo.start()
-            input()
             onoff.connect(0x0006,11)
+            input()
+            onoff.read_attributes(0x4242, 0x4343, 0x4444)
             while True:
                 onoff.toggle()
                 input()

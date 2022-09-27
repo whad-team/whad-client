@@ -388,7 +388,8 @@ class MACManager(Dot15d4Manager):
             else:
                 logger.warning("[mac_manager] Malformed PDU received: {}".format(repr(pdu)))
         else:
-            logger.warning("[mac_manager] PDU dropped: {}".format(repr(pdu)) + "({})".format(bytes(pdu).hex()))
+            pass
+            #logger.warning("[mac_manager] PDU dropped: {}".format(repr(pdu)) + "({})".format(bytes(pdu).hex()))
             #if hasattr(pdu, "fcf_ackreq") and pdu.fcf_ackreq:
             #    self.send_ack(pdu)
 

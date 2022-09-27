@@ -1,8 +1,9 @@
 from whad.zigbee.stack.apl.cluster import Cluster
 from whad.zigbee.stack.apl.zcl.attributes import ZCLAttributes
 from whad.zigbee.stack.apl.zcl.commands import ZCLCommands
+from whad.zigbee.stack.apl.zcl.exceptions import ZCLCommandNotFound
 from whad.zigbee.stack.aps.constants import APSDestinationAddressMode
-from scapy.layers.zigbee import ZigbeeClusterLibrary
+from scapy.layers.zigbee import ZigbeeClusterLibrary, ZCLGeneralReadAttributes
 from inspect import stack,signature
 from enum import IntEnum
 import logging
@@ -12,12 +13,15 @@ logger = logging.getLogger(__name__)
 class ZCLClusterMetaclass(type):
 
     def __new__(cls, name, bases, attrs):
-        commands = {}
+        cluster_specific_commands = {}
+        profile_wide_commands = {}
+
         for key, val in attrs.items():
             receive_property = getattr(val, "_command_receive", None)
             generate_property = getattr(val, "_command_generate", None)
             if receive_property is not None:
-                command_id, command_name = receive_property
+                command_id, command_name, profile_wide = receive_property
+                commands = profile_wide_commands if profile_wide else cluster_specific_commands
                 if command_id in commands:
                     commands[command_id]["name"] = command_name
                     commands[command_id]["receive_callback"] = val
@@ -25,19 +29,22 @@ class ZCLClusterMetaclass(type):
                     commands[command_id] = {"name":command_name, "receive_callback": val, "generate_callback":None}
 
             if generate_property is not None:
-                command_id, command_name = generate_property
+                command_id, command_name, profile_wide = generate_property
+                commands = profile_wide_commands if profile_wide else cluster_specific_commands
                 if command_id in commands:
                     commands[command_id]["name"] = command_name
                     commands[command_id]["generate_callback"] = val
                 else:
                     commands[command_id] = {"name":command_name, "receive_callback": None, "generate_callback": val}
-        attrs["COMMANDS"] = commands
 
+        if cluster_specific_commands != {}:
+            attrs["CLUSTER_SPECIFIC_COMMANDS"] = cluster_specific_commands
+        if profile_wide_commands != {}:
+            attrs["PROFILE_WIDE_COMMANDS"] = profile_wide_commands
         attrs["ATTRIBUTES"] = {}
         if "__annotations__" in attrs:
             for attribute, properties in attrs["__annotations__"].items():
                  attrs["ATTRIBUTES"][attribute] = {"id":properties[0], "permissions":properties[1], "value":attrs[attribute]}
-
         return super().__new__(cls, name, bases, attrs)
 
 class ZCLClusterType(IntEnum):
@@ -65,6 +72,7 @@ class ZCLClusterConfiguration:
         self.destination_endpoint = destination_endpoint
         self.transaction = transaction
         self.alias_address = alias_address
+        self.alias_sequence_number = alias_sequence_number
         self.radius = radius
         self.security_enabled_transmission = security_enabled_transmission
         self.use_network_key = use_network_key
@@ -80,12 +88,45 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
         super().__init__(cluster_id)
         self.type = type
         self.attributes = ZCLAttributes()
-        self.commands = ZCLCommands()
-        for command_id, command in self.COMMANDS.items():
-            self.commands.add_command(command_id, command["name"],generate_callback=command["generate_callback"], receive_callback=command["receive_callback"])
+        self.cluster_specific_commands = ZCLCommands()
+        self.profile_wide_commands = ZCLCommands()
+
+        for command_id, command in self.CLUSTER_SPECIFIC_COMMANDS.items():
+            generate_callback = None
+            receive_callback = None
+
+            if command["generate_callback"] is not None:
+                generate_callback = getattr(self, command["generate_callback"].__name__)
+            if command["receive_callback"] is not None:
+                receive_callback = getattr(self, command["receive_callback"].__name__)
+
+            self.cluster_specific_commands.add_command(
+                command_id,
+                command["name"],
+                generate_callback=generate_callback,
+                receive_callback=receive_callback
+            )
+
+        for command_id, command in self.PROFILE_WIDE_COMMANDS.items():
+            generate_callback = None
+            receive_callback = None
+
+            if command["generate_callback"] is not None:
+                generate_callback = getattr(self, command["generate_callback"].__name__)
+            if command["receive_callback"] is not None:
+                receive_callback = getattr(self, command["receive_callback"].__name__)
+
+            self.profile_wide_commands.add_command(
+                command_id,
+                command["name"],
+                generate_callback=generate_callback,
+                receive_callback=receive_callback
+            )
         for attribute, properties in self.ATTRIBUTES.items():
             self.attributes.add_attribute(properties["id"], attribute, properties["value"], properties["permissions"])
 
+        print(self.cluster_specific_commands)
+        print(self.profile_wide_commands)
         self.default_configuration = default_configuration
         self.active_configuration = None
 
@@ -144,16 +185,36 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
         )
 
     def send_command(self, command):
-        if len(stack()) == 0:
+        found_calling_callback = False
+
+        caller_function = getattr(self, stack()[1][3])
+        cluster_specific = False
+
+        try:
+            command_id, command_structure = self.cluster_specific_commands.get_command_by_callback(caller_function)
+            cluster_specific = True
+            found_calling_callback = True
+        except ZCLCommandNotFound:
+            pass
+
+        if not cluster_specific:
+            try:
+                command_id, command_structure = self.profile_wide_commands.get_command_by_callback(caller_function)
+                cluster_specific = False
+                found_calling_callback = True
+            except ZCLCommandNotFound:
+                pass
+
+        if not found_calling_callback:
             return False
 
-        caller_function = stack()[0].function
-
-        if not hasattr(caller_function, "_command_generate"):
-            return False
-
-        command_id, command_name = caller_function._command_generate
-
+        logger.info("[zcl] Cluster {} (cluster_id={}) Transmitting {} command '{}' (command_id={})".format(
+            self.__class__.__name__,
+            hex(self.cluster_id),
+            "cluster specific" if cluster_specific else "profile wide",
+            command_structure.name,
+            hex(command_id))
+        )
         current_configuration = self.configuration
 
         if current_configuration.transaction is None:
@@ -163,7 +224,7 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
             transaction = current_configuration.transaction
 
         asdu = ZigbeeClusterLibrary(
-                zcl_frametype=1,
+                zcl_frametype=1 if cluster_specific else 0,
                 command_direction=0 if self.type == ZCLClusterType.CLIENT else 1,
                 command_identifier=command_id,
                 transaction_sequence=transaction,
@@ -204,9 +265,9 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
 
     def on_data(self, asdu, source_address, source_address_mode, security_status, link_quality):
         command_identifier = asdu.command_identifier
-
+        commands = self.cluster_specific_commands if asdu.zcl_frametype == 1 else self.profile_wide_commands
         try:
-            command = self.commands.get_command(command_identifier)
+            command = commands.get_command_by_id(command_identifier)
             # Adapt informations to callbacks parameters
             parameters = []
             callback_parameters = signature(command.receive_callback).parameters
@@ -227,25 +288,42 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                     elif name in ("no_response", "disable_default_response"):
                         parameters += [asdu[ZigbeeClusterLibrary].disable_default_response]
 
+            logger.info("[zcl] Cluster {} (cluster_id={}) Receiving {} command '{}' (command_id={})".format(
+                self.__class__.__name__,
+                hex(self.cluster_id),
+                "cluster specific" if asdu.zcl_frametype == 1 else "profile wide",
+                command.name,
+                hex(command_identifier))
+            )
             command.receive_callback(*parameters)
 
         except ZCLCommandNotFound:
             logger.info("[zcl] command not found (command_identifier = 0x{:02x})".format(command_identifier))
 
-
     # Decorators
-    def command_receive(command_id, command_name):
+    def command_receive(command_id, command_name, profile_wide=False):
         def receive_decorator(f):
-            f._command_receive = (command_id, command_name)
+            f._command_receive = (command_id, command_name, profile_wide)
             return f
         return receive_decorator
 
-    def command_generate(command_id, command_name):
+    def command_generate(command_id, command_name, profile_wide=False):
         def generate_decorator(f):
-            print(f)
-            f._command_generate = (command_id, command_name)
+            f._command_generate = (command_id, command_name, profile_wide)
             return f
         return generate_decorator
+
+    # profile wide commands
+    @command_generate(0x00, "Read Attributes", profile_wide=True)
+    def read_attributes(self, *attributes):
+        command = ZCLGeneralReadAttributes(attribute_identifiers=list(attributes))
+        self.send_command(command)
+
+    # profile wide commands
+    @command_receive(0x01, "Read Attributes Response", profile_wide=True)
+    def on_read_attributes_response(self, command):
+        command.show()
+
 
 class ZCLClientCluster(ZCLCluster):
     def __init__(self, cluster_id, default_configuration=ZCLClusterConfiguration()):
