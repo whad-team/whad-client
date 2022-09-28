@@ -34,6 +34,14 @@ class APLManager(Dot15d4Manager):
     def nwk(self):
         return self.lower_layer.nwk
 
+    def initialize(self):
+        for app in self.endpoints.values():
+            app.initialize()
+
+    def start(self):
+        for app in self.endpoints.values():
+            app.start()
+
     def attach_application(self, app, endpoint):
         app.manager = self
         self._services[app.name] = app

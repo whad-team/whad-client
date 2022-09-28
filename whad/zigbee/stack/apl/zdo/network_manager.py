@@ -10,15 +10,25 @@ logger = logging.getLogger(__name__)
 
 class ZDONetworkManager(ZDOObject):
 
+    def configure_extended_address(self, extended_address):
+        self.zdo.manager.nwk.database.set("nwkIeeeAddress", extended_address)
+        self.zdo.manager.nwk.mac.database.set("macExtendedAddress", extended_address)
+        self.zdo.manager.nwk.mac.stack.set_extended_address(extended_address)
+
+    def configure_short_address(self, short_address):
+        self.zdo.manager.nwk.database.set("nwkNetworkAddress", short_address)
+        self.zdo.manager.nwk.mac.database.set("macShortAddress", short_address)
+        self.zdo.manager.nwk.mac.stack.set_short_address(short_address)
+
+    def configure_extended_pan_id(self, extended_pan_id):
+        self.zdo.manager.nwk.database.set("nwkExtendedPANID", extended_pan_id)
+
     def initialize(self):
         if self.zdo.configuration.get("configNodeDescriptor").logical_type == LogicalDeviceType.END_DEVICE:
-            address = randint(0, 0xffffffffffffffff)
             # TODO: refactor to simplify access to different stack layers
-            self.zdo.manager.nwk.database.set("nwkIeeeAddress", address)
-            self.zdo.manager.nwk.mac.database.set("macExtendedAddress", address)
-            self.zdo.manager.nwk.mac.stack.set_extended_address(address)
-            self.zdo.manager.nwk.database.set("nwkNetworkAddress", 0x0000)
-            self.zdo.manager.nwk.database.set("nwkExtendedPANID", 0x0000000000000000)
+            self.configure_extended_address(randint(0, 0xffffffffffffffff))
+            self.configure_short_address(0xFFFF)
+            self.configure_extended_pan_id(0x0000000000000000)
             self.zdo.manager.aps.database.set("apsDesignatedCoordinator", False)
             self.zdo.manager.aps.database.set("apsChannelMask", 0x7fff800)
             self.zdo.manager.aps.database.set("apsUseExtendedPANID", 0x0000000000000000)
@@ -28,7 +38,6 @@ class ZDONetworkManager(ZDOObject):
         self.zdo.device_and_service_discovery.device_annce()
 
     def startup(self):
-        self.initialize()
         nwkExtendedPANID = self.zdo.nwk_management.get("nwkExtendedPANID")
         apsDesignatedCoordinator = self.zdo.aps_management.get("apsDesignatedCoordinator")
         apsUseExtendedPANID = self.zdo.aps_management.get("apsUseExtendedPANID")

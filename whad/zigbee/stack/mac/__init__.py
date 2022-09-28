@@ -57,6 +57,7 @@ class MACDataService(MACService):
 
     @Dot15d4Service.request("MCPS-DATA")
     def data(self, msdu, msdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, pan_id_suppressed=False, sequence_number_suppressed=False, wait_for_ack=False):
+
         data = Dot15d4Data()
         if destination_pan_id is not None:
             data.dest_panid = destination_pan_id
@@ -452,7 +453,7 @@ class MACManager(Dot15d4Manager):
     def perform_ed_scan(self, channel):
         self.stack.perform_ed_scan(channel)
 
-    def wait_for_ack(self, timeout=0.5):
+    def wait_for_ack(self, timeout=1):
         """Wait for a ACK or error.
 
         :param float timeout: Timeout value (default: 30 seconds)
@@ -491,10 +492,10 @@ class MACManager(Dot15d4Manager):
         self.stack.send(packet)
         if wait_for_ack:
             try:
-                ack = self.wait_for_ack()
-                if return_ack:
-                    return ack
-                return ack.seqnum == sequence_number
+                ack = None
+                while ack is None or ack.seqnum != sequence_number:
+                    ack = self.wait_for_ack()
+                return True
             except MACTimeoutException:
                 if return_ack:
                     return None

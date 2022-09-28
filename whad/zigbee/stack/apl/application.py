@@ -12,6 +12,9 @@ class ApplicationObject:
         for cluster in self.input_clusters + self.output_clusters:
             cluster.application = self
 
+    def initialize(self):
+        pass
+
     def start(self):
         pass
 

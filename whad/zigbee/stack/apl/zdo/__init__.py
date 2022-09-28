@@ -47,8 +47,12 @@ class ZigbeeDeviceObjects(ApplicationObject):
         self.network_manager = ZDONetworkManager(self)
         self.device_and_service_discovery = ZDODeviceAndServiceDiscovery(self)
 
+
     def configure(self, attribute_name, attribute_value):
         return self.configuration.set(attribute_name, attribute_value)
+
+    def initialize(self):
+        self.network_manager.initialize()
 
     def start(self):
         self.network_manager.startup()

@@ -4,9 +4,11 @@ from whad.zigbee.stack.apl.zcl.commands import ZCLCommands
 from whad.zigbee.stack.apl.zcl.exceptions import ZCLCommandNotFound
 from whad.zigbee.stack.aps.constants import APSDestinationAddressMode
 from scapy.layers.zigbee import ZigbeeClusterLibrary, ZCLGeneralReadAttributes
+from whad.scapy.layers.zll import ZCLGeneralDiscoverAttributes, ZCLGeneralDiscoverAttributesResponse
 from inspect import stack,signature
 from enum import IntEnum
 import logging
+from time import time
 
 logger = logging.getLogger(__name__)
 
@@ -125,11 +127,11 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
         for attribute, properties in self.ATTRIBUTES.items():
             self.attributes.add_attribute(properties["id"], attribute, properties["value"], properties["permissions"])
 
-        print(self.cluster_specific_commands)
-        print(self.profile_wide_commands)
         self.default_configuration = default_configuration
         self.active_configuration = None
 
+        self.pending_responses = {}
+        self.last_transaction = None
         self.destinations = []
 
     @property
@@ -151,6 +153,20 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                 removed_indexes.append(i)
         for i in removed_indexes:
             del self.destinations[i]
+
+    def wait_response(self, transaction=None, timeout=2):
+        if transaction is None:
+            transaction = self.last_transaction
+        self.pending_responses[transaction] = None
+        start = time()
+        while self.pending_responses[transaction] is None and time() - start < timeout:
+            pass
+        if self.pending_responses[transaction] is not None:
+            return_value = self.pending_responses[transaction]
+        else:
+            return_value = None
+        del self.pending_responses[transaction]
+        return return_value
 
     def configure(
                     self,
@@ -223,6 +239,8 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
         else:
             transaction = current_configuration.transaction
 
+        self.last_transaction = transaction
+
         asdu = ZigbeeClusterLibrary(
                 zcl_frametype=1 if cluster_specific else 0,
                 command_direction=0 if self.type == ZCLClusterType.CLIENT else 1,
@@ -263,11 +281,14 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                     include_extended_nonce=current_configuration.include_extended_nonce
                 )
 
+
     def on_data(self, asdu, source_address, source_address_mode, security_status, link_quality):
         command_identifier = asdu.command_identifier
         commands = self.cluster_specific_commands if asdu.zcl_frametype == 1 else self.profile_wide_commands
         try:
             command = commands.get_command_by_id(command_identifier)
+            if command.receive_callback is None:
+                raise ZCLCommandNotFound
             # Adapt informations to callbacks parameters
             parameters = []
             callback_parameters = signature(command.receive_callback).parameters
@@ -295,7 +316,9 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                 command.name,
                 hex(command_identifier))
             )
-            command.receive_callback(*parameters)
+            return_value = command.receive_callback(*parameters)
+            if asdu.transaction_sequence in self.pending_responses:
+                self.pending_responses[asdu.transaction_sequence] = return_value
 
         except ZCLCommandNotFound:
             logger.info("[zcl] command not found (command_identifier = 0x{:02x})".format(command_identifier))
@@ -318,12 +341,29 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
     def read_attributes(self, *attributes):
         command = ZCLGeneralReadAttributes(attribute_identifiers=list(attributes))
         self.send_command(command)
+        attributes = self.wait_response()
+        return attributes
 
-    # profile wide commands
     @command_receive(0x01, "Read Attributes Response", profile_wide=True)
     def on_read_attributes_response(self, command):
-        command.show()
+        attributes = []
+        for attribute in command.read_attribute_status_record:
+            attributes.append((attribute.attribute_identifier, attribute.status, attribute.attribute_value if attribute.status == 0 else None))
+        return attributes
 
+    @command_generate(0x0c, "Discover Attributes", profile_wide=True)
+    def discover_attributes(self, start_identifier=0, max_reports=0xFFFF):
+        attributes = []
+        command = ZCLGeneralDiscoverAttributes(start_attribute_identifier=start_identifier, max_attribute_identifiers=max_reports)
+        self.send_command(command)
+        return self.wait_response()
+
+    @command_receive(0x0d, "Discover Attributes Response", profile_wide=True)
+    def on_discover_attributes(self, command):
+        attributes = []
+        for attribute in command.attribute_records:
+            attributes.append((attribute.attribute_identifier, attribute.attribute_data_type))
+        return (0 == command.discovery_complete, attributes)
 
 class ZCLClientCluster(ZCLCluster):
     def __init__(self, cluster_id, default_configuration=ZCLClusterConfiguration()):

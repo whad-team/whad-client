@@ -125,7 +125,6 @@ class NWKDataService(NWKService):
             if selected_key_material is None:
                 return False
 
-            print("data",bytes(nsdu).hex())
             msdu = npdu / ZigbeeSecurityHeader(
                 nwk_seclevel = self.database.get("nwkSecurityLevel"),
                 source = self.database.get("nwkIeeeAddress"),
