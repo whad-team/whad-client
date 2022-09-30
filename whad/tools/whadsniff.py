@@ -65,6 +65,7 @@ def build_arguments(environment):
         type=str,
         help='Output PCAP file'
     )
+
     parser.add_argument(
         '-w',
         '--wireshark',
@@ -72,18 +73,21 @@ def build_arguments(environment):
         action='store_true',
         help='Enable wireshark monitoring'
     )
+
     parser.add_argument(
         '--raw',
         dest='raw',
         action="store_true",
         help='Display raw packets (hexadecimal)'
     )
+
     parser.add_argument(
         '--hide_metadata',
         dest='metadata',
         action="store_false",
         help='Hide packets metadata'
     )
+
     subparsers = parser.add_subparsers(
         required=True,
         dest="protocol",
@@ -107,10 +111,18 @@ def build_arguments(environment):
                     def auto_int(x):
                         return int(x, 0)
                     parameter_type = auto_int # allow to provide hex arguments
+
+                if parameter_type == list:
+                    parameter_default=[]
+                    parameter_type=str
+                    action = "append"
+                else:
+                    action = "store"
                 environment[protocol_name]["subparser"].add_argument(
                     "--"+parameter_name,
                     *parameter_shortnames,
                     default=parameter_default,
+                    action=action,
                     type=parameter_type,
                     dest=dest,
                     help=parameter_help
@@ -161,10 +173,18 @@ def display(pkt, args):
     if args.show:
         print(metadata)
         pkt.show()
+        if hasattr(pkt, "decrypted"):
+            print("[i] Decrypted payload:")
+            pkt.decrypted.show()
     elif args.raw:
         print(metadata, bytes(pkt).hex())
+        if hasattr(pkt, "decrypted"):
+            print("[i] Decrypted payload:", bytes(pkt.decrypted).hex())
     else:
         print(metadata, repr(pkt))
+        if hasattr(pkt, "decrypted"):
+            print("[i] Decrypted payload:", repr(pkt.decrypted))
+    print()
 
 def main():
     environment = list_implemented_environment()

@@ -26,7 +26,7 @@ CAPABILITIES = {
     WhadCapability.Hijack: 'can hijack connections',
     WhadCapability.Hook: 'can hook packets',
     WhadCapability.Inject: 'can inject packets',
-    WhadCapability.Jam: 'can jam connections',
+    WhadCapability.Jam: 'can jam communications',
     WhadCapability.MasterRole: 'can act as a master',
     WhadCapability.SlaveRole: 'can act as a slave',
     WhadCapability.EndDeviceRole: 'can act as an end device',

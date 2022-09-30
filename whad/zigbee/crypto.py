@@ -1,7 +1,7 @@
 from whad.zigbee.exceptions import MissingNetworkSecurityHeader
 from Cryptodome.Cipher import AES
 from scapy.layers.dot15d4 import Dot15d4,Dot15d4FCS
-from scapy.layers.zigbee import ZigbeeSecurityHeader,ZigbeeNWK, ZigbeeAppDataPayload
+from scapy.layers.zigbee import ZigbeeSecurityHeader,ZigbeeNWK, ZigbeeAppDataPayload, ZigbeeNWKCommandPayload
 from scapy.compat import raw
 from scapy.config import conf
 from struct import pack
@@ -239,3 +239,75 @@ class ApplicationSubLayerCryptoManager(CryptoManager):
             generated_key = hash_key(key, self.input)
         super().__init__(generated_key)
         self.base_class = ZigbeeAppDataPayload
+
+class ZigbeeDecryptor:
+    def __init__(self, *keys):
+        self.keys = list(keys)
+
+    def add_key(self, key):
+        if isinstance(key, str):
+            if len(key) == 16:
+                key = key.encode('ascii')
+            else:
+                try:
+                    key = bytes.fromhex(key.replace(":",""))
+                except ValueError:
+                    return False
+
+        if not isinstance(key, bytes) or len(key) != 16:
+            return False
+
+        if key not in self.keys:
+            self.keys.append(key)
+            return True
+        return False
+
+    def attempt_to_decrypt(self, packet):
+
+        if ZigbeeSecurityHeader not in packet:
+            raise MissingNetworkSecurityHeader()
+
+        if packet[ZigbeeSecurityHeader].underlayer.__class__ == ZigbeeNWK:
+            for key in self.keys:
+                manager = NetworkLayerCryptoManager(key)
+                decrypted, success = manager.decrypt(packet)
+                if success:
+                    if packet.frametype == 0:
+                        return ZigbeeAppDataPayload(decrypted.data), True
+                    elif packet.frametype == 1:
+                        return ZigbeeNWKCommandPayload(decrypted.data), True
+                    else:
+                        return decrypted.data, True
+        else:
+            for key in self.keys:
+                manager = ApplicationSubLayerCryptoManager(key)
+                decrypted, success = manager.decrypt(packet)
+                if success:
+                    if packet.frametype == 0:
+                        return ZigbeeAppDataPayload(decrypted.data), True
+                    elif packet.frametype == 1:
+                        return ZigbeeNWKCommandPayload(decrypted.data), True
+                    else:
+                        return decrypted.data, True
+
+                manager = ApplicationSubLayerCryptoManager(key, 0)
+                decrypted, success = manager.decrypt(packet)
+                if success:
+                    if packet.frametype == 0:
+                        return ZigbeeAppDataPayload(decrypted.data), True
+                    elif packet.frametype == 1:
+                        return ZigbeeNWKCommandPayload(decrypted.data), True
+                    else:
+                        return decrypted.data, True
+
+                manager = ApplicationSubLayerCryptoManager(key, 2)
+                decrypted, success = manager.decrypt(packet)
+                if success:
+                    if packet.frametype == 0:
+                        return ZigbeeAppDataPayload(decrypted.data), True
+                    elif packet.frametype == 1:
+                        return ZigbeeNWKCommandPayload(decrypted.data), True
+                    else:
+                        return decrypted.data, True
+
+        return packet, False
