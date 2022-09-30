@@ -100,7 +100,7 @@ def get_domain_supported_commands(domain, commands):
         return get_zigbee_supported_commands(commands)
     return []
 
-if __name__ == '__main__':
+def main():
     if len(sys.argv) >= 2:
         # Retrieve target interface
         interface = sys.argv[1]
@@ -161,3 +161,6 @@ if __name__ == '__main__':
             print("  Index:", device.index)
             print("  Identifier:", device.identifier)
             print()
+
+if __name__ == '__main__':
+    main()

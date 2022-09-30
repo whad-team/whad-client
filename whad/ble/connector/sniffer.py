@@ -1,71 +1,7 @@
-from dataclasses import dataclass
-from whad.ble.exceptions import InvalidAccessAddressException
 from whad.ble.connector import BLE, Injector, Hijacker
 from whad.ble.utils.phy import is_access_address_valid
+from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress
 from whad.ble import UnsupportedCapability, message_filter
-
-@dataclass
-class SynchronizedConnection:
-    access_address : int = None
-    crc_init : int = None
-    hop_interval : int = None
-    hop_increment : int = None
-    channel_map : int = None
-
-@dataclass
-class SnifferConfiguration:
-    show_advertisements : bool = True
-    follow_connection : bool = False
-    show_empty_packets : bool = False
-    access_addresses_discovery : bool = False
-    active_connection : int = None
-    channel : int = 37
-    filter : str = "FF:FF:FF:FF:FF:FF"
-
-class AccessAddress:
-    def __init__(self, access_address, timestamp=None, rssi=None):
-        if not is_access_address_valid(access_address):
-            raise InvalidAccessAddressException()
-
-        self.__access_address = access_address
-        self.__timestamp = timestamp
-        self.__rssi = rssi
-        self.__count = 1
-
-    def __int__(self):
-        return self.__access_address
-
-    def __eq__(self, other):
-        return int(other) == int(self)
-
-    def update(self, timestamp=None, rssi=None):
-        self.__count += 1
-        if timestamp is not None:
-            self.__timestamp = timestamp
-        if rssi is not None:
-            self.__rssi = rssi
-
-    @property
-    def last_timestamp(self):
-        return self.__timestamp
-
-    @property
-    def last_rssi(self):
-        return self.__rssi
-
-    @property
-    def count(self):
-        return self.__count
-
-    def __repr__(self):
-        printable_string =  ("0x{:08x}".format(self.__access_address) +
-                            " (seen "+str(self.__count)+" times" +
-                            (", rssi = "+str(self.__rssi) if self.__rssi is not None else "") +
-                            (", last_timestamp = "+str(self.__timestamp) if self.__timestamp is not None else "") +
-                            ")")
-        return printable_string
-
-
 
 class Sniffer(BLE):
     """
@@ -175,7 +111,17 @@ class Sniffer(BLE):
                 )
 
 
-    def configure(self,active_connection=None, access_addresses_discovery=False, advertisements=True, connection=True, empty_packets=False):
+    @property
+    def configuration(self):
+        return self.__configuration
+
+    @configuration.setter
+    def configuration(self, new_configuration):
+        self.stop()
+        self.__configuration = new_configuration
+        self._enable_sniffing()
+
+    def configure(self, active_connection=None, access_addresses_discovery=False, advertisements=True, connection=True, empty_packets=False):
         self.stop()
         self.__configuration.active_connection = active_connection if active_connection is not None else None
         self.__configuration.access_addresses_discovery = access_addresses_discovery

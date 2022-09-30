@@ -23,6 +23,10 @@ class UnsupportedCapability(Exception):
         super().__init__()
         self.__capability = capability
 
+    @property
+    def capability(self):
+        return self.__capability
+
     def __str__(self):
         return 'UnsupportedCapability(%s)' % self.__capability
 

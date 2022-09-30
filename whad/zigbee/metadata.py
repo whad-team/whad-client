@@ -5,7 +5,7 @@ from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr,\
     Dot15d4TAP_Channel_Center_Frequency, Dot15d4TAP_Link_Quality_Indicator
 from dataclasses import dataclass
 
-@dataclass
+@dataclass(repr=False)
 class ZigbeeMetadata(Metadata):
     is_fcs_valid : bool = None
     lqi : int = None

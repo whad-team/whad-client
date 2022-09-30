@@ -1,0 +1,86 @@
+from whad.ble.exceptions import InvalidAccessAddressException
+from dataclasses import dataclass
+
+@dataclass
+class SynchronizedConnection:
+    access_address : int = None
+    crc_init : int = None
+    hop_interval : int = None
+    hop_increment : int = None
+    channel_map : int = None
+
+class ConnectionConfiguration(SynchronizedConnection):
+    """
+    Configuration for sniffing an existing Bluetooth Low Energy.
+
+    :param access_address: indicate access address of the targeted connection (aa)
+    :param crc_init: indicate CRCInit of the targeted connection (k)
+    :param hop_interval: indicate Hop Interval of the targeted connection (int)
+    :param hop_increment: indicate Hop Increment of the targeted connection (inc)
+    :param channel_map: indicate Channel Map of the targeted connection (chm)
+    """
+    pass
+
+@dataclass
+class SnifferConfiguration:
+    """
+    Configuration for the Bluetooth Low Energy sniffer.
+
+    :param show_advertisements: enable advertisement sniffing (a)
+    :param follow_connection: enable new connection sniffing (f)
+    :param show_empty_packets: display empty packets during connection (e)
+    :param access_addresses_discovery: discover access addresses of existing connections (d)
+    :param active_connection: enable and configure existing connection sniffing
+    :param channel: select the channel to sniff (c)
+    :param filter: display only the packets matching the filter BD address (m)
+    """
+    show_advertisements : bool = True
+    follow_connection : bool = False
+    show_empty_packets : bool = False
+    access_addresses_discovery : bool = False
+    active_connection : ConnectionConfiguration = None
+    channel : int = 37
+    filter : str = "FF:FF:FF:FF:FF:FF"
+
+class AccessAddress:
+    def __init__(self, access_address, timestamp=None, rssi=None):
+        if not is_access_address_valid(access_address):
+            raise InvalidAccessAddressException()
+
+        self.__access_address = access_address
+        self.__timestamp = timestamp
+        self.__rssi = rssi
+        self.__count = 1
+
+    def __int__(self):
+        return self.__access_address
+
+    def __eq__(self, other):
+        return int(other) == int(self)
+
+    def update(self, timestamp=None, rssi=None):
+        self.__count += 1
+        if timestamp is not None:
+            self.__timestamp = timestamp
+        if rssi is not None:
+            self.__rssi = rssi
+
+    @property
+    def last_timestamp(self):
+        return self.__timestamp
+
+    @property
+    def last_rssi(self):
+        return self.__rssi
+
+    @property
+    def count(self):
+        return self.__count
+
+    def __repr__(self):
+        printable_string =  ("0x{:08x}".format(self.__access_address) +
+                            " (seen "+str(self.__count)+" times" +
+                            (", rssi = "+str(self.__rssi) if self.__rssi is not None else "") +
+                            (", last_timestamp = "+str(self.__timestamp) if self.__timestamp is not None else "") +
+                            ")")
+        return printable_string
