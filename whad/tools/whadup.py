@@ -23,15 +23,11 @@ DOMAINS = {
 
 CAPABILITIES = {
     WhadCapability.Scan: 'can scan devices',
-    WhadCapability.Hijack: 'can hijack connections',
+    WhadCapability.Hijack: 'can hijack communication',
     WhadCapability.Hook: 'can hook packets',
     WhadCapability.Inject: 'can inject packets',
     WhadCapability.Jam: 'can jam communications',
-    WhadCapability.MasterRole: 'can act as a master',
-    WhadCapability.SlaveRole: 'can act as a slave',
-    WhadCapability.EndDeviceRole: 'can act as an end device',
-    WhadCapability.RouterRole: 'can act as a router',
-    WhadCapability.CoordinatorRole: 'can act as a coordinator',
+    WhadCapability.SimulateRole: 'can simulate a role in a communication',
     WhadCapability.Sniff: 'can sniff data',
     WhadCapability.NoRawData: 'can not read/write raw packet'
 }

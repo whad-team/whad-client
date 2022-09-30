@@ -26,12 +26,8 @@ class WhadCapability(object):
     Jam = Capability.Jam
     Hijack = Capability.Hijack
     Hook = Capability.Hook
-    MasterRole = Capability.MasterRole
-    SlaveRole = Capability.SlaveRole
+    SimulateRole = Capability.SimulateRole
     NoRawData = Capability.NoRawData
-    EndDeviceRole = Capability.EndDeviceRole
-    RouterRole = Capability.RouterRole
-    CoordinatorRole = Capability.CoordinatorRole
 
 # Import device related classes
 from whad.device import UartDevice, VirtualDevice
