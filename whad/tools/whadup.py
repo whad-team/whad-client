@@ -6,6 +6,7 @@ from whad.exceptions import WhadDeviceNotFound
 from whad.device import WhadDevice
 from whad.protocol.ble.ble_pb2 import BleCommand
 from whad.protocol.zigbee.zigbee_pb2 import ZigbeeCommand
+from whad.protocol.esb.esb_pb2 import ESBCommand
 from whad import WhadDomain, WhadCapability
 
 DOMAINS = {
@@ -68,6 +69,25 @@ ZIGBEE_COMMANDS = {
     ZigbeeCommand.ManInTheMiddle: "ManInTheMiddle: can perform a Man-in-the-Middle attack",
 }
 
+
+ESB_COMMANDS = {
+    ESBCommand.SetNodeAddress: "SetNodeAddress: can set Node address",
+    ESBCommand.Sniff: "Sniff: can sniff Enhanced ShockBurst packets",
+    ESBCommand.Jam: "Jam: can jam Enhanced ShockBurst packets",
+    ESBCommand.Send: "Send: can transmit Enhanced ShockBurst packets",
+    ESBCommand.PrimaryReceiverMode: "PrimaryReceiverMode: can act as a Primary Receiver (PRX)",
+    ESBCommand.PrimaryTransmitterMode: "PrimaryReceiverMode: can act as a Primary Receiver (PTX)",
+    ESBCommand.Start: "Start: can start depending on the current mode",
+    ESBCommand.Stop: "Stop: can stop depending on the current mode"
+}
+
+COMMANDS = {
+    WhadDomain.BtLE: BLE_COMMANDS,
+    WhadDomain.Esb: ESB_COMMANDS,
+    WhadDomain.Zigbee: ZIGBEE_COMMANDS
+}
+
+
 def get_readable_capabilities(caps):
     capabilities = []
     for i in range(24):
@@ -75,26 +95,13 @@ def get_readable_capabilities(caps):
             capabilities.append(CAPABILITIES[caps & (1 << i)])
     return capabilities
 
-def get_ble_supported_commands(commands):
-    supp_commands = []
-    for i in BLE_COMMANDS.keys():
-        if commands & (1 << i):
-            supp_commands.append(BLE_COMMANDS[i])
-    return supp_commands
-
-def get_zigbee_supported_commands(commands):
-    supp_commands = []
-    for i in ZIGBEE_COMMANDS.keys():
-        if commands & (1 << i):
-            supp_commands.append(ZIGBEE_COMMANDS[i])
-    return supp_commands
-
 def get_domain_supported_commands(domain, commands):
-    if domain == WhadDomain.BtLE:
-        return get_ble_supported_commands(commands)
-    elif domain == WhadDomain.Zigbee:
-        return get_zigbee_supported_commands(commands)
-    return []
+    supp_commands = []
+    if domain in COMMANDS:
+        for i in COMMANDS[domain].keys():
+            if commands & (1 << i):
+                supp_commands.append(COMMANDS[domain][i])
+    return supp_commands
 
 def main():
     if len(sys.argv) >= 2:
