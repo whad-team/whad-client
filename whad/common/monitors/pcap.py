@@ -29,7 +29,6 @@ class PcapWriterMonitor(WhadMonitor):
         self._start_time = None
 
     def setup(self):
-        print("setup pcap")
         # First, we check if the pcap already exists
         existing_pcap_file = exists(self._pcap_file)
         sync = False

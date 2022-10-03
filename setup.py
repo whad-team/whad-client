@@ -21,8 +21,8 @@ class DevicesInstall(install):
         print("Installing rules for %s device ..." % name)
         matching_rules = [udev_name for udev_name in self.udev_rules if name in udev_name]
         if len(matching_rules) == 0:
-            if exists("rules/"+name+".rules"):
-                copy("rules/"+name+".rules", "/usr/lib/udev/rules.d/40-"+name+".rules")
+            if exists("ressources/rules/"+name+".rules"):
+                copy("ressources/rules/"+name+".rules", "/usr/lib/udev/rules.d/40-"+name+".rules")
                 return True
             else:
                 print("Rule not found, skipping.")

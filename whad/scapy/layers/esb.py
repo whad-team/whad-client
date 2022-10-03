@@ -68,7 +68,6 @@ class ESB_Hdr(Packet):
     ESB_CRC_SIZE = 16
     ESB_PAYLEN_SIZE = 6
 
-    linktype = 147
     name = "Enhanced ShockBurst packet"
     fields_desc = [
             XByteField("preamble",0xAA),
@@ -80,7 +79,26 @@ class ESB_Hdr(Packet):
             BitField("padding",0,6),
             BitEnumField("valid_crc",0,1,{0:"no",1:"yes"}),
             XShortField("crc",None)
-        ]
+    ]
+
+    def post_build(self,p,pay):
+        preamble = bytes_to_bits(p[0:1])
+        addrLen = unpack('>H',p[1:3])[0]
+
+        address = bytes_to_bits(p[3:3+addrLen])
+        header = bytes_to_bits(p[3+addrLen:3+addrLen+2])[:9]
+        if self.payload_length is None:
+            payLen = bytes_to_bits(pack('B',len(pay)))[2:]
+            header = payLen + header[6:]
+        payload = bytes_to_bits(pay)
+        packet = bits_to_bytes(preamble + address + header + payload)
+        if self.crc is None:
+            crc = calculate_crc(packet[1:])
+        else:
+            crc = p[-2:]
+        crc = bytes_to_bits(crc)
+        return bits_to_bytes(preamble + address + header + payload + crc)
+
 
     def pre_dissect(self,s):
         if s[0] != 0xAA: # Dirty patch if no preamble is included
@@ -127,28 +145,10 @@ class ESB_Hdr(Packet):
 
         return bits_to_bytes(preamble + bytes_to_bits(bytes([0,addrLen])) + address + pcf + padding + validCrc + crc + payload)
 
-    def post_build(self,p,pay):
-        preamble = bytes_to_bits(p[0:1])
-        addrLen = unpack('>H',p[1:3])[0]
-
-        address = bytes_to_bits(p[3:3+addrLen])
-        header = bytes_to_bits(p[3+addrLen:3+addrLen+2])[:9]
-        if self.payload_length is None:
-            payLen = bytes_to_bits(pack('B',len(pay)))[2:]
-            header = payLen + header[6:]
-        payload = bytes_to_bits(pay)
-        packet = bits_to_bytes(preamble + address + header + payload)
-        if self.crc is None:
-            crc = calculate_crc(packet[1:])
-        else:
-            crc = p[-2:]
-        crc = bytes_to_bits(crc)
-        return bits_to_bytes(preamble + address + header + payload + crc)
-
 
 class ESB_Payload_Hdr(Packet):
     name = "ESB Payload"
-
+    fields_desc = []
     def guess_payload_class(self, payload):
         if b"\x0f\x0f\x0f\x0f" == payload[:4]:
             return ESB_Ping_Request
@@ -165,5 +165,11 @@ class ESB_Ack_Response(Packet):
         name = "ESB Ack Response"
         fields_desc = [StrField('ack_payload', '')]
 
+
+class ESB_Pseudo_Packet(Packet):
+    name = "ESB Pseudo packet"
+    fields_desc = []
+
 bind_layers(ESB_Hdr,ESB_Payload_Hdr)
 conf.l2types.register(USER_DLT, ESB_Hdr)
+conf.l2types.register(USER_DLT, ESB_Pseudo_Packet)

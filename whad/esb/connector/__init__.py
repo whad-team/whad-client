@@ -3,7 +3,7 @@ from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.esb.metadata import ESBMetadata, generate_esb_metadata
-from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr
+from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Pseudo_Packet
 #from whad.scapy.layers.unifying import *
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
@@ -40,6 +40,20 @@ class ESB(WhadDeviceConnector):
             raise UnsupportedDomain()
         else:
             self.__ready = True
+
+    def format(self, packet):
+        """
+        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
+        the appropriate header and the timestamp in microseconds.
+        """
+        packet.preamble = 0xAA
+        formatted_packet = ESB_Pseudo_Packet(bytes(packet)[1:])
+
+        timestamp = None
+        if hasattr(packet, "metadata"):
+            timestamp = packet.metadata.timestamp
+
+        return formatted_packet, timestamp
 
     def _build_scapy_packet_from_message(self, message, msg_type):
         try:
