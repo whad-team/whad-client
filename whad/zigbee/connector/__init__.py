@@ -13,7 +13,7 @@ from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.zigbee.zigbee_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
     Send, SendCmd, EnergyDetection, EnergyDetectionCmd, EndDeviceMode, SetNodeAddress, \
-    AddressType
+    AddressType, SendRawCmd, SendRaw
 
 class Zigbee(WhadDeviceConnector):
     """
@@ -142,7 +142,7 @@ class Zigbee(WhadDeviceConnector):
         """
         if self.__can_send is None:
             commands = self.device.get_domain_commands(WhadDomain.Zigbee)
-            self.__can_send =  (commands & (1 << Send)) > 0
+            self.__can_send = ((commands & (1 << Send))>0 or (commands & (1 << SendRaw)))
         return self.__can_send
 
 

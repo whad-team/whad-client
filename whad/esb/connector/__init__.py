@@ -8,7 +8,7 @@ from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Pseudo_Packet
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.esb.esb_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
-    Send, SendCmd
+    Send, SendCmd, SendRawCmd, SendRaw, PrimaryReceiverMode, SetNodeAddress
 
 class ESB(WhadDeviceConnector):
     """
@@ -46,7 +46,10 @@ class ESB(WhadDeviceConnector):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
-        packet.preamble = 0xAA
+        if ESB_Hdr not in packet:
+            packet = ESB_Hdr(address="01:02:03:04:05")/packet
+
+        packet.preamble = 0xAA # force a rebuild
         formatted_packet = ESB_Pseudo_Packet(bytes(packet)[1:])
 
         timestamp = None
@@ -59,6 +62,7 @@ class ESB(WhadDeviceConnector):
         try:
             if msg_type == 'raw_pdu':
                 packet = ESB_Hdr(bytes(message.raw_pdu.pdu))
+                packet.preamble = 0xAA # force a rebuild
                 packet.metadata = generate_esb_metadata(message, msg_type)
                 self._signal_packet_reception(packet)
                 return packet
@@ -72,6 +76,24 @@ class ESB(WhadDeviceConnector):
         except AttributeError:
             return None
 
+    def _build_message_from_scapy_packet(self, packet, channel=None):
+        msg = Message()
+
+        self._signal_packet_transmission(packet)
+
+        if ESB_Hdr in packet:
+            packet.preamble = 0xAA
+            msg.esb.send_raw.channel = channel if channel is not None else 0xFF
+            print(">", bytes(packet).hex())
+            msg.esb.send_raw.pdu = bytes(packet)
+
+        elif ESB_Payload_Hdr in packet:
+            msg.esb.send.channel = channel
+            msg.esb.send.pdu = bytes(packet)
+
+        else:
+            msg = None
+        return msg
 
     def close(self):
         self.stop()
@@ -89,6 +111,35 @@ class ESB(WhadDeviceConnector):
             (commands & (1 << Stop))>0
         )
 
+    def can_send(self):
+        """
+        Determine if the device can transmit packets.
+        """
+        if self.__can_send is None:
+            commands = self.device.get_domain_commands(WhadDomain.Esb)
+            self.__can_send = ((commands & (1 << Send))>0 or (commands & (1 << SendRaw)))
+        return self.__can_send
+
+    def send(self,pdu, address="11:22:33:44:55", channel=None):
+        """
+        Send Enhanced ShockBurst packets (on a single channel).
+        """
+        if self.can_send():
+            if self.support_raw_pdu():
+                if ESB_Hdr not in pdu:
+                    packet = ESB_Hdr(address) / pacjet
+                else:
+                    packet = pdu
+            elif ESB_Hdr in pdu:
+                pdu = pdu[ESB_Payload_Hdr:]
+            else:
+                packet = pdu
+            msg = self._build_message_from_scapy_packet(packet, channel)
+            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+        else:
+            return False
     def support_raw_pdu(self):
         """
         Determine if the device supports raw PDU.
@@ -125,6 +176,51 @@ class ESB(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
+
+    def can_be_prx(self):
+        """
+        Determine if the device implements a Primary Receiver role mode.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Esb)
+        return (
+            (commands & (1 << PrimaryReceiverMode)) > 0 and
+            (commands & (1 << Start))>0 and
+            (commands & (1 << Stop))>0
+        )
+
+    def enable_prx_mode(self, channel):
+        """
+        Enable Enhanced ShockBurst primary receiver (PRX) mode.
+        """
+        if not self.can_be_prx():
+            raise UnsupportedCapability("PrimaryReceiverMode")
+
+        msg = Message()
+        msg.esb.prx.channel = channel
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+
+    def can_set_node_address(self):
+        """
+        Determine if the device can configure a Node address.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Esb)
+        return (
+            (commands & (1 << SetNodeAddress)) > 0
+        )
+
+    def set_node_address(self, address):
+        """
+        Enable Enhanced ShockBurst primary receiver (PRX) mode.
+        """
+        if not self.can_set_node_address():
+            raise UnsupportedCapability("SetNodeAddress")
+
+        msg = Message()
+        msg.esb.set_node_addr.address = bytes.fromhex(address.replace(":", ""))
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def start(self):
         """
@@ -163,7 +259,10 @@ class ESB(WhadDeviceConnector):
 
 
     def on_raw_pdu(self, packet):
-        pdu = packet[ESB_Payload_Hdr:]
+        if ESB_Payload_Hdr in packet:
+            pdu = packet[ESB_Payload_Hdr:]
+        else:
+            pdu = b""
         pdu.metadata = packet.metadata
         self.on_pdu(pdu)
 

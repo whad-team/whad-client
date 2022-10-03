@@ -1,8 +1,14 @@
 from whad.esb import ESB
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
+from whad.scapy.layers.esb import ESB_Hdr
 from scapy.compat import raw
 import sys
+
+def show(pkt):
+    if hasattr(pkt, "metadata"):
+        print(pkt.metadata)
+    print(bytes(pkt).hex(), repr(pkt))
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -13,9 +19,15 @@ if __name__ == '__main__':
         try:
             dev = WhadDevice.create(interface)
             connector = ESB(dev)
-            connector.sniff_esb(channel=5, address="ca:e9:06:ec:a4")
+            connector.attach_callback(show, on_reception = True)
+            connector.set_node_address("ca:e9:06:ec:a4")
+            connector.enable_prx_mode(channel=8)
+            #connector.sniff_esb(channel=None, address="ca:e9:06:ec:a4")
             connector.start()
             input()
+            while True:
+                connector2.send(ESB_Hdr(bytes.fromhex("cae906eca42a0061010000000000001e5c2980")), channel=5)
+
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 
