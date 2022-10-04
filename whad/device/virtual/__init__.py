@@ -89,3 +89,4 @@ from .ubertooth import UbertoothDevice
 from .rzusbstick import RZUSBStickDevice
 from .apimote import APIMoteDevice
 from .hci import HCIDevice
+from .rfstorm import RFStormDevice

@@ -75,6 +75,7 @@ class DevicesInstall(install):
 
             self.install_udev_rule("ubertooth")
             self.install_udev_rule("rzusbstick")
+            self.install_udev_rule("rfstorm")
 
             if not self.reload_udev_rules():
                 print("An error occured during udev rules reload.")
