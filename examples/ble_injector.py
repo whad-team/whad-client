@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
             sniffer = Sniffer(dev)
             sniffer.attach_callback(show)
-            sniffer.configure(advertisements=False, connection=True, empty_packets=False)
+            sniffer.configure(advertisements=False, connection=True, empty_packets=True)
             sniffer.start()
             while not sniffer.is_synchronized():
                 sleep(1)
