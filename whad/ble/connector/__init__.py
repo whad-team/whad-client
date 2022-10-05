@@ -1,7 +1,7 @@
 import struct
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
-    BTLE_RF
+    BTLE_RF, BTLE_CTRL
 from scapy.compat import raw
 
 from whad.device import WhadDeviceConnector
@@ -139,6 +139,8 @@ class BLE(WhadDeviceConnector):
 
             if BTLE_DATA in packet:
                 msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_DATA:])
+            elif BTLE_CTRL in packet:
+                msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_CTRL:])
             elif BTLE_ADV in packet:
                 msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_ADV:])
             else:
@@ -151,6 +153,8 @@ class BLE(WhadDeviceConnector):
 
             if BTLE_DATA in packet:
                 msg.ble.send_pdu.pdu = raw(packet[BTLE_DATA:])
+            elif BTLE_CTRL in packet:
+                msg.ble.send_pdu.pdu = raw(packet[BTLE_CTRL:])
             elif BTLE_ADV in packet:
                 msg.ble.send_pdu.pdu = raw(packet[BTLE_ADV:])
             else:
