@@ -5,7 +5,8 @@ from whad.protocol.whad_pb2 import Message
 from whad.device.virtual.rfstorm.constants import RFStormId, RFStormCommands, \
     RFStormDataRate, RFStormEndPoints, RFStormInternalStates
 from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.esb.esb_pb2 import Sniff, Send, Start, Stop
+from whad.protocol.esb.esb_pb2 import Sniff, Send, Start, Stop, SetNodeAddress, \
+    PrimaryReceiverMode, PrimaryTransmitterMode
 from whad import WhadCapability, WhadDomain
 
 from threading import Thread, Lock
@@ -64,6 +65,8 @@ class RFStormDevice(VirtualDevice):
         self.__channel = 0
         self.__address = b"\xFF\xFF\xFF\xFF\xFF"
         self.__scanning = False
+        self.__acking = False
+        self.__check_ack = False
         self.__internal_state = RFStormInternalStates.NONE
         self.__index, self.__rfstorm = device
         self.__last_packet_timestamp = 0
@@ -108,7 +111,7 @@ class RFStormDevice(VirtualDevice):
         capabilities = {
             WhadDomain.Esb : (
                                 (WhadCapability.Sniff | WhadCapability.Inject | WhadCapability.SimulateRole | WhadCapability.NoRawData),
-                                [Sniff, Send, Start, Stop]
+                                [Sniff, Send, Start, Stop, SetNodeAddress, PrimaryReceiverMode, PrimaryTransmitterMode]
             )
         }
         return capabilities
@@ -132,7 +135,10 @@ class RFStormDevice(VirtualDevice):
 
     def _rfstorm_send_command(self, command, data=b"", timeout=200, no_response=False):
         data = [command] + list(data)
-        self.__rfstorm.write(RFStormEndPoints.RFSTORM_COMMAND_ENDPOINT, data, timeout=timeout)
+        try:
+            self.__rfstorm.write(RFStormEndPoints.RFSTORM_COMMAND_ENDPOINT, data, timeout=timeout)
+        except USBTimeoutError:
+            return False
         response = self._rfstorm_read_response()
         #print(">", response.hex())
         if not no_response:
@@ -141,7 +147,10 @@ class RFStormDevice(VirtualDevice):
             return True
 
     def _rfstorm_read_response(self, timeout=200):
-        return bytes(self.__rfstorm.read(RFStormEndPoints.RFSTORM_RESPONSE_ENDPOINT, 64, timeout=timeout))
+        try:
+            return bytes(self.__rfstorm.read(RFStormEndPoints.RFSTORM_RESPONSE_ENDPOINT, 64, timeout=timeout))
+        except USBTimeoutError:
+            return None
 
     def _rfstorm_check_success(self, data):
         return len(data) > 0 and data[0] > 0
@@ -205,7 +214,7 @@ class RFStormDevice(VirtualDevice):
             raise WhadDeviceNotReady()
         if self.__opened_stream:
             if self.__scanning:
-                if time() - self.__last_packet_timestamp > 3:
+                if time() - self.__last_packet_timestamp > 1:
                     if self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
                         self.__channel = (self.__channel + 1) % 100
                         self._rfstorm_set_channel(self.__channel)
@@ -222,7 +231,9 @@ class RFStormDevice(VirtualDevice):
             except USBTimeoutError:
                 data = b""
 
-            if len(data) >= 1 and data != b"\xFF":
+            if data is not None and len(data) >= 1 and data != b"\xFF":
+                if self.__acking:
+                    self._rfstorm_transmit_ack_payload(b"")
                 self.__last_packet_timestamp = time()
                 if self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
                     self._send_whad_esb_pdu(data[5:], data[:5])
@@ -242,6 +253,39 @@ class RFStormDevice(VirtualDevice):
         self._send_whad_message(msg)
 
 
+    def _on_whad_esb_send(self, message):
+        channel = message.channel if message.channel != 0xFF else self.__channel
+        pdu = message.pdu
+        ack = self._rfstorm_transmit_payload(pdu, 1, 1)
+        if self.__check_ack and ack:
+                self._send_whad_esb_pdu(b"", address=self.__address)
+
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+    def _on_whad_esb_set_node_addr(self, message):
+        self.__address = message.address[::-1]
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+    def _on_whad_esb_ptx(self, message):
+        self.__internal_state = RFStormInternalStates.SNIFFING
+        self.__acking = False
+        self.__channel = message.channel
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+    def _on_whad_esb_prx(self, message):
+        self.__internal_state = RFStormInternalStates.SNIFFING
+        self.__acking = True
+        self.__channel = message.channel
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+
+    def _on_whad_esb_ptx(self, message):
+        self.__internal_state = RFStormInternalStates.SNIFFING
+        self.__channel = message.channel
+        self.__check_ack = True
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+
     def _on_whad_esb_sniff(self, message):
         channel = message.channel
         show_acknowledgements = message.show_acknowledgements
@@ -249,6 +293,7 @@ class RFStormDevice(VirtualDevice):
 
         self.__channel = channel
 
+        self.__acking = False
         if address == b"\xFF\xFF\xFF\xFF\xFF":
             self.__internal_state = RFStormInternalStates.PROMISCUOUS_SNIFFING
         else:

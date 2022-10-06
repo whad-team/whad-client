@@ -3,12 +3,13 @@ from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.esb.metadata import ESBMetadata, generate_esb_metadata
-from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Pseudo_Packet
+from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
 #from whad.scapy.layers.unifying import *
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.esb.esb_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
-    Send, SendCmd, SendRawCmd, SendRaw, PrimaryReceiverMode, SetNodeAddress
+    Send, SendCmd, SendRawCmd, SendRaw, PrimaryReceiverMode, PrimaryTransmitterMode, \
+    SetNodeAddress
 
 class ESB(WhadDeviceConnector):
     """
@@ -82,13 +83,13 @@ class ESB(WhadDeviceConnector):
         self._signal_packet_transmission(packet)
 
         if ESB_Hdr in packet:
-            packet.preamble = 0xAA
             msg.esb.send_raw.channel = channel if channel is not None else 0xFF
-            print(">", bytes(packet).hex())
+            packet.preamble = 0xAA
+            # print(">", bytes(packet).hex())
             msg.esb.send_raw.pdu = bytes(packet)
 
         elif ESB_Payload_Hdr in packet:
-            msg.esb.send.channel = channel
+            msg.esb.send.channel = channel if channel is not None else 0xFF
             msg.esb.send.pdu = bytes(packet)
 
         else:
@@ -131,7 +132,7 @@ class ESB(WhadDeviceConnector):
                 else:
                     packet = pdu
             elif ESB_Hdr in pdu:
-                pdu = pdu[ESB_Payload_Hdr:]
+                packet = pdu[ESB_Payload_Hdr:]
             else:
                 packet = pdu
             msg = self._build_message_from_scapy_packet(packet, channel)
@@ -179,7 +180,7 @@ class ESB(WhadDeviceConnector):
 
     def can_be_prx(self):
         """
-        Determine if the device implements a Primary Receiver role mode.
+        Determine if the device implements a Primary Receiver (PRX) role mode.
         """
         commands = self.device.get_domain_commands(WhadDomain.Esb)
         return (
@@ -195,8 +196,35 @@ class ESB(WhadDeviceConnector):
         if not self.can_be_prx():
             raise UnsupportedCapability("PrimaryReceiverMode")
 
+        if channel is None:
+            return False
+
         msg = Message()
         msg.esb.prx.channel = channel
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+
+    def can_be_ptx(self):
+        """
+        Determine if the device implements a Primary Transmitter (PTX) role mode.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Esb)
+        return (
+            (commands & (1 << PrimaryTransmitterMode)) > 0 and
+            (commands & (1 << Start))>0 and
+            (commands & (1 << Stop))>0
+        )
+
+    def enable_ptx_mode(self, channel):
+        """
+        Enable Enhanced ShockBurst primary transmitter (PTX) mode.
+        """
+        if not self.can_be_prx():
+            raise UnsupportedCapability("PrimaryTransmitterMode")
+
+        msg = Message()
+        msg.esb.ptx.channel = channel if channel is not None else 0xFF
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -262,9 +290,13 @@ class ESB(WhadDeviceConnector):
         if ESB_Payload_Hdr in packet:
             pdu = packet[ESB_Payload_Hdr:]
         else:
-            pdu = b""
+            pdu = ESB_Payload_Hdr()/ESB_Ack_Response()
         pdu.metadata = packet.metadata
         self.on_pdu(pdu)
 
     def on_pdu(self, packet):
         pass
+
+from whad.esb.connector.sniffer import Sniffer
+from whad.esb.connector.prx import PRX
+from whad.esb.connector.ptx import PTX

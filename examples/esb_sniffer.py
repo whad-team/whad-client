@@ -1,4 +1,4 @@
-from whad.esb import ESB
+from whad.esb import ESB, PRX, PTX
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from whad.scapy.layers.esb import ESB_Hdr
@@ -18,15 +18,17 @@ if __name__ == '__main__':
         # Connect to target device and performs discovery
         try:
             dev = WhadDevice.create(interface)
-            connector = ESB(dev)
+            connector = PTX(dev)
+            connector.address = "ca:e9:06:ec:a4"
+            connector.channel = None
             connector.attach_callback(show, on_reception = True)
-            connector.set_node_address("ca:e9:06:ec:a4")
-            connector.enable_prx_mode(channel=8)
+            #connector.set_node_address("ca:e9:06:ec:a4")
+            #connector.enable_prx_mode(channel=8)
             #connector.sniff_esb(channel=None, address="ca:e9:06:ec:a4")
             connector.start()
-            input()
             while True:
-                connector2.send(ESB_Hdr(bytes.fromhex("cae906eca42a0061010000000000001e5c2980")), channel=5)
+                input()
+                connector.send(ESB_Hdr(bytes.fromhex("cae906eca42a0061010000000000001e5c2980")))
 
         except (KeyboardInterrupt, SystemExit):
             dev.close()

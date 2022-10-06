@@ -1,5 +1,8 @@
-from whad.esb.connector import ESB
+from whad.esb.connector import ESB, Sniffer, PRX, PTX
 
 __all__ = [
-    'ESB'
+    'ESB',
+    'Sniffer',
+    'PRX',
+    'PTX'
 ]
