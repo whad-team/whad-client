@@ -9,7 +9,8 @@ from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCm
     ScanMode, Start, Stop, BleAdvType, ConnectTo, CentralModeCmd, PeripheralMode, \
     PeripheralModeCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
     HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
-    SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd, BleAddrType
+    SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd, BleAddrType, ReactiveJam, \
+    JamAdvOnChannel
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
@@ -208,6 +209,14 @@ class BLE(WhadDeviceConnector):
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (commands & (1 << ConnectTo))>0
 
+    def can_jam_advertisement_on_channel(self):
+        """
+        Determine if the device can jam advertisements on a specific channel.
+        """
+        # Retrieve supported commands
+        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        return (commands & (1 << JamAdvOnChannel))>0
+
     def can_be_central(self):
         """
         Determine if the device implements a central mode.
@@ -305,6 +314,47 @@ class BLE(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (commands & (1 << HijackBoth)) > 0
+
+
+    def can_reactive_jam(self):
+        """
+        Determine if the device implements a reactive jamming mode.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        return (commands & (1 << ReactiveJam)) > 0
+
+
+    def reactive_jam(self, pattern, position=0, channel=37):
+        """
+        Performs a reactive jamming attack on provided pattern and channel.
+        """
+        if not self.can_reactive_jam():
+            raise UnsupportedCapability("ReactiveJam")
+
+        msg = Message()
+        msg.ble.reactive_jam.channel = channel
+        msg.ble.reactive_jam.pattern = pattern
+        msg.ble.reactive_jam.position = position
+
+        print(msg)
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+
+
+    def jam_advertisement_on_channel(self, channel=37):
+        """
+        Jam advertisements on a single channel.
+        """
+        if not self.can_jam_advertisement_on_channel():
+            raise UnsupportedCapability("JamAdvOnChannel")
+
+        msg = Message()
+        msg.ble.jam_adv_chan.channel = channel
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+
 
     def hijack_master(self, access_address):
         """
