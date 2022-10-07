@@ -16,6 +16,7 @@ class PTX(ESB):
         self.__channel = 8
         self.__address = "11:22:33:44:55"
 
+        self.__started = False
         if not self.can_set_node_address():
             raise UnsupportedCapability("SetNodeAddress")
 
@@ -26,7 +27,8 @@ class PTX(ESB):
     def _enable_role(self):
         self.set_node_address(self.__address)
         self.enable_ptx_mode(self.__channel)
-        self.start() # TODO: check if it was previously started before running this command ...
+        if self.__started:
+            self.start()
 
     @property
     def stack(self):
@@ -51,6 +53,14 @@ class PTX(ESB):
         self.stop()
         self.__address = address
         self._enable_role()
+
+    def start(self):
+        super().start()
+        self.__started = True
+
+    def stop(self):
+        super().stop()
+        self.__started = False
 
     def on_pdu(self, pdu):
         self.__stack.on_pdu(pdu)

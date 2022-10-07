@@ -66,6 +66,7 @@ class RFStormDevice(VirtualDevice):
         self.__address = b"\xFF\xFF\xFF\xFF\xFF"
         self.__scanning = False
         self.__acking = False
+        self.__ack_payload = None
         self.__check_ack = False
         self.__internal_state = RFStormInternalStates.NONE
         self.__index, self.__rfstorm = device
@@ -140,7 +141,7 @@ class RFStormDevice(VirtualDevice):
         except USBTimeoutError:
             return False
         response = self._rfstorm_read_response()
-        #print(">", response.hex())
+        #print(">", response, command)
         if not no_response:
             return response
         else:
@@ -186,16 +187,15 @@ class RFStormDevice(VirtualDevice):
 
     def _rfstorm_transmit_ack_payload(self, payload):
         data = bytes([len(payload)]) + payload
-        return self._rfstorm_check_success(
-            self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_TRANSMIT_ACK, data)
-        )
+        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_TRANSMIT_ACK, data, no_response=True)
 
     def _rfstorm_set_channel(self, channel):
         if channel < 0 or channel > 125:
             return False
 
         data = bytes([channel])
-        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_SET_CHANNEL, data)[0] == channel
+        response = self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_SET_CHANNEL, data)
+        return response is not None and len(response) > 0 and response[0] == channel
 
     def _rfstorm_get_channel(self, channel):
         return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_GET_CHANNEL)[0]
@@ -231,9 +231,13 @@ class RFStormDevice(VirtualDevice):
             except USBTimeoutError:
                 data = b""
 
-            if data is not None and len(data) >= 1 and data != b"\xFF":
+            if data is not None and isinstance(data, bytes) and len(data) >= 1 and data != b"\xFF":
                 if self.__acking:
-                    self._rfstorm_transmit_ack_payload(b"")
+                    if self.__ack_payload is not None:
+                        self._rfstorm_transmit_ack_payload(self.__ack_payload)
+                        self.__ack_payload = None
+                    else:
+                        self._rfstorm_transmit_ack_payload(b"")
                 self.__last_packet_timestamp = time()
                 if self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
                     self._send_whad_esb_pdu(data[5:], data[:5])
@@ -256,9 +260,12 @@ class RFStormDevice(VirtualDevice):
     def _on_whad_esb_send(self, message):
         channel = message.channel if message.channel != 0xFF else self.__channel
         pdu = message.pdu
-        ack = self._rfstorm_transmit_payload(pdu, 1, 1)
-        if self.__check_ack and ack:
-                self._send_whad_esb_pdu(b"", address=self.__address)
+        if self.__acking:
+            self.__ack_payload = pdu
+        else:
+            ack = self._rfstorm_transmit_payload(pdu, 1, 1)
+            if self.__check_ack and ack:
+                    self._send_whad_esb_pdu(b"", address=self.__address)
 
         self._send_whad_command_result(ResultCode.SUCCESS)
 

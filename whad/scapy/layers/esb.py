@@ -152,7 +152,7 @@ class ESB_Payload_Hdr(Packet):
     def guess_payload_class(self, payload):
         if b"\x0f\x0f\x0f\x0f" == payload[:4]:
             return ESB_Ping_Request
-        elif len(payload) == 0:
+        elif len(payload) == 0 or self.underlayer is not None and self.underlayer.no_ack == 1:
             return ESB_Ack_Response
         else:
             return Packet.guess_payload_class(self, payload)

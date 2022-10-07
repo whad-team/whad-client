@@ -336,7 +336,6 @@ class BLE(WhadDeviceConnector):
         msg.ble.reactive_jam.pattern = pattern
         msg.ble.reactive_jam.position = position
 
-        print(msg)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 

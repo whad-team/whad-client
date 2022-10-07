@@ -18,16 +18,16 @@ if __name__ == '__main__':
         # Connect to target device and performs discovery
         try:
             dev = WhadDevice.create(interface)
-            connector = PTX(dev)
+            connector = PRX(dev)
             connector.address = "ca:e9:06:ec:a4"
-            connector.channel = 0
+            connector.channel = 8
             connector.attach_callback(show, on_reception = True)
             connector.start()
 
-            print("sync:", connector.stack.ll.synchronize())
+            #print("sync:", connector.stack.ll.synchronize())
             while True:
                 input()
-                print("send:", connector.stack.ll.send_data(bytes.fromhex("00c2020000000000003c")))
+                print("send:", connector.stack.ll.prepare_acknowledgment(bytes.fromhex("4142434445464748")))
 
             #connector.set_node_address("ca:e9:06:ec:a4")
             #connector.enable_prx_mode(channel=8)

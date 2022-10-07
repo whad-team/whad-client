@@ -287,6 +287,7 @@ class ESB(WhadDeviceConnector):
 
 
     def on_raw_pdu(self, packet):
+
         if ESB_Payload_Hdr in packet:
             pdu = packet[ESB_Payload_Hdr:]
         else:
