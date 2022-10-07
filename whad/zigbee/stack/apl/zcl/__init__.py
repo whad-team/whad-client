@@ -302,7 +302,7 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                         parameters += [source_address_mode]
                     elif name in ("security", "security_status"):
                         parameters += [security_status]
-                    elif name in ("link_quality", "lki"):
+                    elif name in ("link_quality", "lqi"):
                         parameters += [link_quality]
                     elif name in ("transaction", "transaction_sequence"):
                         parameters += [asdu[ZigbeeClusterLibrary].transaction_sequence]
