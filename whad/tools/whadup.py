@@ -7,6 +7,7 @@ from whad.device import WhadDevice
 from whad.protocol.ble.ble_pb2 import BleCommand
 from whad.protocol.zigbee.zigbee_pb2 import ZigbeeCommand
 from whad.protocol.esb.esb_pb2 import ESBCommand
+from whad.protocol.unifying.unifying_pb2 import UnifyingCommand
 from whad import WhadDomain, WhadCapability
 
 DOMAINS = {
@@ -69,7 +70,6 @@ ZIGBEE_COMMANDS = {
     ZigbeeCommand.ManInTheMiddle: "ManInTheMiddle: can perform a Man-in-the-Middle attack",
 }
 
-
 ESB_COMMANDS = {
     ESBCommand.SetNodeAddress: "SetNodeAddress: can set Node address",
     ESBCommand.Sniff: "Sniff: can sniff Enhanced ShockBurst packets",
@@ -81,10 +81,23 @@ ESB_COMMANDS = {
     ESBCommand.Stop: "Stop: can stop depending on the current mode"
 }
 
+UNIFYING_COMMANDS = {
+    UnifyingCommand.SetNodeAddress: "SetNodeAddress: can set Node address",
+    UnifyingCommand.Sniff: "Sniff: can sniff Logitech Unifying packets",
+    UnifyingCommand.Jam: "Jam: can jam Logitech Unifying packets",
+    UnifyingCommand.Send: "Send: can transmit Logitech Unifying packets",
+    UnifyingCommand.LogitechDongleMode: "PrimaryReceiverMode: can act as a Logitech Dongle (ESB PRX)",
+    UnifyingCommand.LogitechKeyboardMode: "PrimaryReceiverMode: can act as a Logitech Keyboard (ESB PTX)",
+    UnifyingCommand.LogitechMouseMode: "LogitechMouseMode: can act as a Logitech Mouse (ESB PTX)",
+    UnifyingCommand.Start: "Start: can start depending on the current mode",
+    UnifyingCommand.Stop: "Stop: can stop depending on the current mode"
+}
+
 COMMANDS = {
     WhadDomain.BtLE: BLE_COMMANDS,
     WhadDomain.Esb: ESB_COMMANDS,
-    WhadDomain.Zigbee: ZIGBEE_COMMANDS
+    WhadDomain.Zigbee: ZIGBEE_COMMANDS,
+    WhadDomain.LogitechUnifying: UNIFYING_COMMANDS
 }
 
 
