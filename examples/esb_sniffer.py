@@ -20,12 +20,18 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
             connector = PTX(dev)
             connector.address = "ca:e9:06:ec:a4"
-            connector.channel = None
+            connector.channel = 0
             connector.attach_callback(show, on_reception = True)
+            connector.start()
+
+            print("sync:", connector.stack.ll.synchronize())
+            while True:
+                input()
+                print("send:", connector.stack.ll.send_data(bytes.fromhex("00c2020000000000003c")))
+
             #connector.set_node_address("ca:e9:06:ec:a4")
             #connector.enable_prx_mode(channel=8)
             #connector.sniff_esb(channel=None, address="ca:e9:06:ec:a4")
-            connector.start()
             while True:
                 input()
                 connector.send(ESB_Hdr(bytes.fromhex("cae906eca42a0061010000000000001e5c2980")))
