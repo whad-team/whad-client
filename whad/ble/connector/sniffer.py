@@ -199,7 +199,7 @@ class Sniffer(BLE):
         return self.__configuration.channel
 
     @channel.setter
-    def set_channel(self, channel=37):
+    def channel(self, channel=37):
         self.stop()
         self.__configuration.channel = channel
         self._enable_sniffing()
