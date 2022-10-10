@@ -3,7 +3,7 @@ from scapy.fields import ByteField, XByteField, X3BytesField, IntField, \
     StrFixedLenField, ShortField
 from struct import pack
 
-from whad.scapy.layers.esb import ESB_Payload_Hdr
+from whad.scapy.layers.esb import ESB_Payload_Hdr, guess_payload_class_esb
 
 class Logitech_Unifying_Hdr(Packet):
     name = "Logitech Unifying Payload"
@@ -80,7 +80,8 @@ class Logitech_Mouse_Payload(Packet):
             ByteField("wheel_y",0x00),
             ByteField("wheel_x",0x00)]
 
-def guess_payload_class(self, payload):
+
+def guess_payload_class_unifying(self, payload):
     if b"\x0f\x0f\x0f\x0f" == payload[:4]:
         return ESB_Ping_Request
     elif len(payload) == 0:
@@ -90,13 +91,25 @@ def guess_payload_class(self, payload):
     else:
         return Packet.guess_payload_class(self, payload)
 
-ESB_Payload_Hdr.guess_payload_class = guess_payload_class
+def bind():
+    ESB_Payload_Hdr.guess_payload_class = guess_payload_class_unifying
 
-# Logitech Unifying protocol
-bind_layers(Logitech_Unifying_Hdr, Logitech_Wake_Up,                frame_type = 0x51)
-bind_layers(Logitech_Unifying_Hdr, Logitech_Mouse_Payload,            frame_type = 0xC2)
-bind_layers(Logitech_Unifying_Hdr, Logitech_Keepalive_Payload,             frame_type = 0x40)
-bind_layers(Logitech_Unifying_Hdr, Logitech_Set_Keepalive_Payload,         frame_type = 0x4F)
-bind_layers(Logitech_Unifying_Hdr, Logitech_Encrypted_Keystroke_Payload,     frame_type = 0xD3)
-bind_layers(Logitech_Unifying_Hdr, Logitech_Unencrypted_Keystroke_Payload,     frame_type = 0xC1)
-bind_layers(Logitech_Unifying_Hdr, Logitech_Multimedia_Key_Payload,         frame_type = 0xC3)
+    # Logitech Unifying protocol
+    bind_layers(Logitech_Unifying_Hdr, Logitech_Wake_Up,                frame_type = 0x51)
+    bind_layers(Logitech_Unifying_Hdr, Logitech_Mouse_Payload,            frame_type = 0xC2)
+    bind_layers(Logitech_Unifying_Hdr, Logitech_Keepalive_Payload,             frame_type = 0x40)
+    bind_layers(Logitech_Unifying_Hdr, Logitech_Set_Keepalive_Payload,         frame_type = 0x4F)
+    bind_layers(Logitech_Unifying_Hdr, Logitech_Encrypted_Keystroke_Payload,     frame_type = 0xD3)
+    bind_layers(Logitech_Unifying_Hdr, Logitech_Unencrypted_Keystroke_Payload,     frame_type = 0xC1)
+    bind_layers(Logitech_Unifying_Hdr, Logitech_Multimedia_Key_Payload,         frame_type = 0xC3)
+
+def unbind():
+    ESB_Payload_Hdr.guess_payload_class = guess_payload_class_esb
+
+    unbind_layers(Logitech_Unifying_Hdr, Logitech_Wake_Up)
+    unbind_layers(Logitech_Unifying_Hdr, Logitech_Mouse_Payload)
+    unbind_layers(Logitech_Unifying_Hdr, Logitech_Keepalive_Payload)
+    unbind_layers(Logitech_Unifying_Hdr, Logitech_Set_Keepalive_Payload)
+    unbind_layers(Logitech_Unifying_Hdr, Logitech_Encrypted_Keystroke_Payload)
+    unbind_layers(Logitech_Unifying_Hdr, Logitech_Unencrypted_Keystroke_Payload)
+    unbind_layers(Logitech_Unifying_Hdr, Logitech_Multimedia_Key_Payload)
