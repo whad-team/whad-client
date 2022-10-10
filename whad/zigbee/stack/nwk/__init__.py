@@ -125,7 +125,6 @@ class NWKDataService(NWKService):
             if selected_key_material is None:
                 return False
 
-            print("data",bytes(nsdu).hex())
             msdu = npdu / ZigbeeSecurityHeader(
                 nwk_seclevel = self.database.get("nwkSecurityLevel"),
                 source = self.database.get("nwkIeeeAddress"),
@@ -344,10 +343,8 @@ class NWKManagementService(NWKService):
             while True:
                 candidate_parents = table.select_suitable_parent(extended_pan_id, self.database.get("nwkUpdateId"), no_permit_check=True)
                 if len(candidate_parents) == 0:
-                    print("EXITING")
                     return False
                 selected_parent = candidate_parents[0]
-                print("SELECTED:", selected_parent)
                 for candidate_parent in candidate_parents[1:]:
                     if candidate_parent.depth < selected_parent.depth:
                         selected_parent = candidate_parent
@@ -631,7 +628,6 @@ class NWKManager(Dot15d4Manager):
             self.get_service("management").on_beacon_npdu(pan_descriptor, beacon_payload)
             # Update the neighbor table
             table = self.database.get("nwkNeighborTable")
-            print("TABLE UPDATE")
             table.update(
                 pan_descriptor.coord_addr,
                 device_type=ZigbeeDeviceType.COORDINATOR,

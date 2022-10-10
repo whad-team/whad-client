@@ -12,6 +12,9 @@ class ApplicationObject:
         for cluster in self.input_clusters + self.output_clusters:
             cluster.application = self
 
+    def initialize(self):
+        pass
+
     def start(self):
         pass
 
@@ -46,7 +49,7 @@ class ApplicationObject:
 
     def on_data(self, asdu, source_address, source_address_mode, cluster_id, security_status, link_quality):
         # Checks if the application exposes a cluster matching the cluster id
-        for cluster in self.input_clusters:
+        for cluster in self.input_clusters + self.output_clusters:
             if cluster.cluster_id == cluster_id:
                 cluster.on_data(asdu, source_address, source_address_mode, security_status, link_quality)
                 return True

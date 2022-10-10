@@ -6,6 +6,8 @@ from whad.exceptions import WhadDeviceNotFound
 from whad.device import WhadDevice
 from whad.protocol.ble.ble_pb2 import BleCommand
 from whad.protocol.zigbee.zigbee_pb2 import ZigbeeCommand
+from whad.protocol.esb.esb_pb2 import ESBCommand
+from whad.protocol.unifying.unifying_pb2 import UnifyingCommand
 from whad import WhadDomain, WhadCapability
 
 DOMAINS = {
@@ -23,15 +25,11 @@ DOMAINS = {
 
 CAPABILITIES = {
     WhadCapability.Scan: 'can scan devices',
-    WhadCapability.Hijack: 'can hijack connections',
+    WhadCapability.Hijack: 'can hijack communication',
     WhadCapability.Hook: 'can hook packets',
     WhadCapability.Inject: 'can inject packets',
-    WhadCapability.Jam: 'can jam connections',
-    WhadCapability.MasterRole: 'can act as a master',
-    WhadCapability.SlaveRole: 'can act as a slave',
-    WhadCapability.EndDeviceRole: 'can act as an end device',
-    WhadCapability.RouterRole: 'can act as a router',
-    WhadCapability.CoordinatorRole: 'can act as a coordinator',
+    WhadCapability.Jam: 'can jam communications',
+    WhadCapability.SimulateRole: 'can simulate a role in a communication',
     WhadCapability.Sniff: 'can sniff data',
     WhadCapability.NoRawData: 'can not read/write raw packet'
 }
@@ -72,6 +70,37 @@ ZIGBEE_COMMANDS = {
     ZigbeeCommand.ManInTheMiddle: "ManInTheMiddle: can perform a Man-in-the-Middle attack",
 }
 
+ESB_COMMANDS = {
+    ESBCommand.SetNodeAddress: "SetNodeAddress: can set Node address",
+    ESBCommand.Sniff: "Sniff: can sniff Enhanced ShockBurst packets",
+    ESBCommand.Jam: "Jam: can jam Enhanced ShockBurst packets",
+    ESBCommand.Send: "Send: can transmit Enhanced ShockBurst packets",
+    ESBCommand.PrimaryReceiverMode: "PrimaryReceiverMode: can act as a Primary Receiver (PRX)",
+    ESBCommand.PrimaryTransmitterMode: "PrimaryReceiverMode: can act as a Primary Receiver (PTX)",
+    ESBCommand.Start: "Start: can start depending on the current mode",
+    ESBCommand.Stop: "Stop: can stop depending on the current mode"
+}
+
+UNIFYING_COMMANDS = {
+    UnifyingCommand.SetNodeAddress: "SetNodeAddress: can set Node address",
+    UnifyingCommand.Sniff: "Sniff: can sniff Logitech Unifying packets",
+    UnifyingCommand.Jam: "Jam: can jam Logitech Unifying packets",
+    UnifyingCommand.Send: "Send: can transmit Logitech Unifying packets",
+    UnifyingCommand.LogitechDongleMode: "PrimaryReceiverMode: can act as a Logitech Dongle (ESB PRX)",
+    UnifyingCommand.LogitechKeyboardMode: "PrimaryReceiverMode: can act as a Logitech Keyboard (ESB PTX)",
+    UnifyingCommand.LogitechMouseMode: "LogitechMouseMode: can act as a Logitech Mouse (ESB PTX)",
+    UnifyingCommand.Start: "Start: can start depending on the current mode",
+    UnifyingCommand.Stop: "Stop: can stop depending on the current mode"
+}
+
+COMMANDS = {
+    WhadDomain.BtLE: BLE_COMMANDS,
+    WhadDomain.Esb: ESB_COMMANDS,
+    WhadDomain.Zigbee: ZIGBEE_COMMANDS,
+    WhadDomain.LogitechUnifying: UNIFYING_COMMANDS
+}
+
+
 def get_readable_capabilities(caps):
     capabilities = []
     for i in range(24):
@@ -79,28 +108,15 @@ def get_readable_capabilities(caps):
             capabilities.append(CAPABILITIES[caps & (1 << i)])
     return capabilities
 
-def get_ble_supported_commands(commands):
-    supp_commands = []
-    for i in BLE_COMMANDS.keys():
-        if commands & (1 << i):
-            supp_commands.append(BLE_COMMANDS[i])
-    return supp_commands
-
-def get_zigbee_supported_commands(commands):
-    supp_commands = []
-    for i in ZIGBEE_COMMANDS.keys():
-        if commands & (1 << i):
-            supp_commands.append(ZIGBEE_COMMANDS[i])
-    return supp_commands
-
 def get_domain_supported_commands(domain, commands):
-    if domain == WhadDomain.BtLE:
-        return get_ble_supported_commands(commands)
-    elif domain == WhadDomain.Zigbee:
-        return get_zigbee_supported_commands(commands)
-    return []
+    supp_commands = []
+    if domain in COMMANDS:
+        for i in COMMANDS[domain].keys():
+            if commands & (1 << i):
+                supp_commands.append(COMMANDS[domain][i])
+    return supp_commands
 
-if __name__ == '__main__':
+def main():
     if len(sys.argv) >= 2:
         # Retrieve target interface
         interface = sys.argv[1]
@@ -161,3 +177,6 @@ if __name__ == '__main__':
             print("  Index:", device.index)
             print("  Identifier:", device.identifier)
             print()
+
+if __name__ == '__main__':
+    main()

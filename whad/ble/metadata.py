@@ -4,7 +4,7 @@ from whad.ble.utils.phy import channel_to_frequency
 from whad.common.metadata import Metadata
 from dataclasses import dataclass
 
-@dataclass
+@dataclass(repr=False)
 class BLEMetadata(Metadata):
     direction : BleDirection = None
     connection_handle : int = None

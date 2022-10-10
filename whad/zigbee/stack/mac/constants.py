@@ -84,7 +84,10 @@ class Dot15d4PANNetwork:
     Represents a 802.15.4 PAN network.
     """
     def __init__(self, beacon, channel_page, channel):
-        self.coord_addr_mode = MACAddressMode(beacon.fcf_srcaddrmode)
+        try:
+            self.coord_addr_mode = MACAddressMode(beacon.fcf_srcaddrmode)
+        except:
+            self.coord_addr_mode = None
         self.coord_pan_id = beacon.src_panid
         self.coord_addr = beacon.src_addr
         self.channel = channel

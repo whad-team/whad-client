@@ -13,12 +13,12 @@ class HCIInternalState(IntEnum):
 LE_STATES = {
     0 : ("Non-connectable Advertising State", 0 , [Start, Stop, AdvMode, SetAdvData]),
     1 : ("Scannable Advertising State", 0, [Start, Stop, AdvMode, SetAdvData]),
-    2 : ("Connectable Advertising State", WhadCapability.SlaveRole, [Start, Stop, AdvMode, SetAdvData]),
+    2 : ("Connectable Advertising State", WhadCapability.SimulateRole, [Start, Stop, AdvMode, SetAdvData]),
     3 : ("High Duty Cycle Directed Advertising State", 0,  [Start, Stop, AdvMode, SetAdvData]),
     4 : ("Passive Scanning State", WhadCapability.Scan, [Start, Stop, ScanMode]),
     5 : ("Active Scanning State", WhadCapability.Scan,[Start, Stop, ScanMode]),
-    6 : ("Initiating State and Connection State (Central Role)", WhadCapability.MasterRole, [Start, Stop, CentralMode, ConnectTo,Disconnect, SendPDU]),
-    7 : ("Connection State (Peripheral Role)", WhadCapability.SlaveRole,  [Start, Stop, PeripheralMode, SendPDU, Disconnect])
+    6 : ("Initiating State and Connection State (Central Role)", WhadCapability.SimulateRole, [Start, Stop, CentralMode, ConnectTo,Disconnect, SendPDU]),
+    7 : ("Connection State (Peripheral Role)", WhadCapability.SimulateRole,  [Start, Stop, PeripheralMode, SendPDU, Disconnect])
 }
 
 ADDRESS_MODIFICATION_VENDORS = [

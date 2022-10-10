@@ -1,8 +1,9 @@
-from scapy.layers.zigbee import ZigbeeDeviceProfile, ZigbeeAppDataPayloadStub, _zcl_profile_identifier
+from scapy.layers.zigbee import ZigbeeDeviceProfile, ZigbeeAppDataPayloadStub, ZigbeeClusterLibrary, \
+    _zcl_profile_identifier, _zcl_attribute_data_types, _zcl_enumerated_status_values, _DiscreteString
 from scapy.fields import BitEnumField, BitField, ByteEnumField, ByteField, ConditionalField, \
-    FlagsField, XBitField, XLEIntField, XLEShortField, EnumField, XShortField
+    FlagsField, XBitField, XLEIntField, XLEShortField, EnumField, XShortField, PacketListField
 from scapy.layers.dot15d4 import dot15d4AddressField
-from scapy.packet import Packet
+from scapy.packet import Packet, bind_layers
 
 class ZigbeeZLLCommissioningCluster(Packet):
     name = "Zigbee LightLink Commissioning Cluster Frame"
@@ -288,3 +289,137 @@ def interpan_guess_payload_class(self, payload):
         return Packet.guess_payload_class(self, payload)
 
 ZigbeeAppDataPayloadStub.guess_payload_class = interpan_guess_payload_class
+
+
+class ZCLWriteAttributeRecord(Packet):
+    name = "ZCL Write Attribute Record"
+    fields_desc = [
+        # Attribute Identifier (2 octets)
+        XLEShortField("attribute_identifier", 0),
+        # Attribute Data Type (1 octet)
+        ByteEnumField("attribute_data_type", 0, _zcl_attribute_data_types),
+        # Attribute Data (variable)
+        _DiscreteString("attribute_data", ""),
+    ]
+
+    def extract_padding(self, s):
+        return "", s
+
+class ZCLGeneralWriteAttributesUndivided(Packet):
+    name = "General Domain: Command Frame Payload: write_attributes_undivided"
+    fields_desc = [
+        PacketListField("write_records", [], ZCLWriteAttributeRecord),
+    ]
+
+class ZCLGeneralWriteAttributesNoResponse(Packet):
+    name = "General Domain: Command Frame Payload: write_attributes_no_response"
+    fields_desc = [
+        PacketListField("write_records", [], ZCLWriteAttributeRecord),
+    ]
+
+
+
+class ZCLConfigureReportingConfigurationRecord(Packet):
+    name = "ZCL Configure Reporting Configuration Record"
+    fields_desc = [
+        # Direction (0/1 octet)
+        ByteField("attribute_direction", 0),
+        XLEShortField("attribute_identifier", 0)
+    ]
+
+    def extract_padding(self, s):
+        return "", s
+
+
+class ZCLGeneralReadReportingConfiguration(Packet):
+    name = "General Domain: Command Frame Payload: read_reporting_configuration"
+    fields_desc = [
+        PacketListField("write_records", [], ZCLConfigureReportingConfigurationRecord),
+    ]
+
+
+class ZCLConfigureReportingConfigurationResponseRecord(Packet):
+    name = "ZCL Reporting Configuration Response Record"
+    fields_desc = [
+        # Status (1 octet)
+        ByteEnumField("status", 0, _zcl_enumerated_status_values),
+        # Direction (0/1 octet)
+        ConditionalField(
+            ByteField("attribute_direction", 0),
+            lambda pkt:pkt.status != 0x00
+        ),
+        # Attribute Identifier (0/2 octets)
+        ConditionalField(
+            XLEShortField("attribute_identifier", 0),
+            lambda pkt:pkt.status != 0x00
+        ),
+        # Attribute Data Type (0/1 octets)
+        ConditionalField(
+            ByteEnumField("attribute_data_type", 0, _zcl_attribute_data_types),
+            lambda pkt:pkt.status != 0x00
+        ),
+        # Minimum Reporting Interval (0/2 octets)
+        ConditionalField(
+            XLEShortField("min_reporting_interval", 0),
+            lambda pkt:pkt.status != 0x00
+        ),
+        # Maximum Reporting Interval (0/2 octets)
+        ConditionalField(
+            XLEShortField("max_reporting_interval", 0),
+            lambda pkt:pkt.status != 0x00
+        ),
+        # Reportable Change (variable)
+        ConditionalField(
+            _DiscreteString("reportable_change", ""),
+            lambda pkt:pkt.status != 0x00
+        ),
+        # Timeout Period (0/2 octets)
+        ConditionalField(
+            XLEShortField("timeout_period", 0),
+            lambda pkt:pkt.status != 0x00
+        ),
+    ]
+
+    def extract_padding(self, s):
+        return "", s
+
+class ZCLGeneralReadReportingConfigurationResponse(Packet):
+    name = "General Domain: Command Frame Payload: read_reporting_configuration_response"
+    fields_desc = [
+        PacketListField("write_records", [], ZCLConfigureReportingConfigurationResponseRecord),
+    ]
+
+
+class ZCLGeneralDiscoverAttributes(Packet):
+    name = "General Domain: Command Frame Payload: discover_attributes"
+    fields_desc = [
+        XLEShortField("start_attribute_identifier", 0),
+        XLEShortField("max_attribute_identifiers", 0)
+    ]
+
+
+class ZCLDiscoverAttributesRecord(Packet):
+    name = "ZCL Discover Attributes Record"
+    fields_desc = [
+        # Attribute Identifier
+        XLEShortField("attribute_identifier", 0),
+        ByteEnumField("attribute_data_type", 0, _zcl_attribute_data_types)
+    ]
+
+    def extract_padding(self, s):
+        return "", s
+
+class ZCLGeneralDiscoverAttributesResponse(Packet):
+    name = "General Domain: Command Frame Payload: discover_attributes_response"
+    fields_desc = [
+        ByteEnumField("discovery_complete", 0, {0: "complete", 1:"incomplete", 0xFF:"invalid"}),
+        PacketListField("attribute_records", [], ZCLDiscoverAttributesRecord),
+    ]
+
+
+bind_layers(ZigbeeClusterLibrary, ZCLGeneralWriteAttributesUndivided, zcl_frametype=0x00, command_identifier=0x03)
+bind_layers(ZigbeeClusterLibrary, ZCLGeneralWriteAttributesNoResponse, zcl_frametype=0x00, command_identifier=0x05)
+bind_layers(ZigbeeClusterLibrary, ZCLGeneralReadReportingConfiguration, zcl_frametype=0x00, command_identifier=0x08)
+bind_layers(ZigbeeClusterLibrary, ZCLGeneralReadReportingConfigurationResponse, zcl_frametype=0x00, command_identifier=0x09)
+bind_layers(ZigbeeClusterLibrary, ZCLGeneralDiscoverAttributes, zcl_frametype=0x00, command_identifier=0x0c)
+bind_layers(ZigbeeClusterLibrary, ZCLGeneralDiscoverAttributesResponse, zcl_frametype=0x00, command_identifier=0x0d)

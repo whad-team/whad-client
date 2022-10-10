@@ -1,7 +1,7 @@
 import struct
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
-    BTLE_RF
+    BTLE_RF, BTLE_CTRL
 from scapy.compat import raw
 
 from whad.device import WhadDeviceConnector
@@ -9,7 +9,8 @@ from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCm
     ScanMode, Start, Stop, BleAdvType, ConnectTo, CentralModeCmd, PeripheralMode, \
     PeripheralModeCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
     HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
-    SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd, BleAddrType
+    SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd, BleAddrType, ReactiveJam, \
+    JamAdvOnChannel
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
@@ -139,6 +140,8 @@ class BLE(WhadDeviceConnector):
 
             if BTLE_DATA in packet:
                 msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_DATA:])
+            elif BTLE_CTRL in packet:
+                msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_CTRL:])
             elif BTLE_ADV in packet:
                 msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_ADV:])
             else:
@@ -151,6 +154,8 @@ class BLE(WhadDeviceConnector):
 
             if BTLE_DATA in packet:
                 msg.ble.send_pdu.pdu = raw(packet[BTLE_DATA:])
+            elif BTLE_CTRL in packet:
+                msg.ble.send_pdu.pdu = raw(packet[BTLE_CTRL:])
             elif BTLE_ADV in packet:
                 msg.ble.send_pdu.pdu = raw(packet[BTLE_ADV:])
             else:
@@ -203,6 +208,14 @@ class BLE(WhadDeviceConnector):
         # Retrieve supported commands
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (commands & (1 << ConnectTo))>0
+
+    def can_jam_advertisement_on_channel(self):
+        """
+        Determine if the device can jam advertisements on a specific channel.
+        """
+        # Retrieve supported commands
+        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        return (commands & (1 << JamAdvOnChannel))>0
 
     def can_be_central(self):
         """
@@ -301,6 +314,46 @@ class BLE(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (commands & (1 << HijackBoth)) > 0
+
+
+    def can_reactive_jam(self):
+        """
+        Determine if the device implements a reactive jamming mode.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        return (commands & (1 << ReactiveJam)) > 0
+
+
+    def reactive_jam(self, pattern, position=0, channel=37):
+        """
+        Performs a reactive jamming attack on provided pattern and channel.
+        """
+        if not self.can_reactive_jam():
+            raise UnsupportedCapability("ReactiveJam")
+
+        msg = Message()
+        msg.ble.reactive_jam.channel = channel
+        msg.ble.reactive_jam.pattern = pattern
+        msg.ble.reactive_jam.position = position
+
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+
+
+    def jam_advertisement_on_channel(self, channel=37):
+        """
+        Jam advertisements on a single channel.
+        """
+        if not self.can_jam_advertisement_on_channel():
+            raise UnsupportedCapability("JamAdvOnChannel")
+
+        msg = Message()
+        msg.ble.jam_adv_chan.channel = channel
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+
 
     def hijack_master(self, access_address):
         """

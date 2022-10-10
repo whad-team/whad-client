@@ -117,6 +117,7 @@ class RZUSBStickDevice(VirtualDevice):
                     packet = self.__input_buffer[:-1]
                     link_quality_indicator = self.__input_buffer[-1]
                     self._send_whad_zigbee_raw_pdu(packet, rssi=rssi, is_fcs_valid=valid_fcs)
+
     def reset(self):
         self.__rzusbstick.reset()
 
@@ -172,7 +173,7 @@ class RZUSBStickDevice(VirtualDevice):
             self._send_whad_command_result(ResultCode.SUCCESS)
         else:
             self._send_whad_command_result(ResultCode.ERROR)
-            
+
     # RZUSBStick low level communication primitives
 
     def __rzusbstick_read_packet(self, timeout=200):
