@@ -90,7 +90,9 @@ UNIFYING_COMMANDS = {
     UnifyingCommand.LogitechKeyboardMode: "PrimaryReceiverMode: can act as a Logitech Keyboard (ESB PTX)",
     UnifyingCommand.LogitechMouseMode: "LogitechMouseMode: can act as a Logitech Mouse (ESB PTX)",
     UnifyingCommand.Start: "Start: can start depending on the current mode",
-    UnifyingCommand.Stop: "Stop: can stop depending on the current mode"
+    UnifyingCommand.Stop: "Stop: can stop depending on the current mode",
+    UnifyingCommand.SniffPairing: "SniffPairing: can sniff a pairing process"
+
 }
 
 COMMANDS = {

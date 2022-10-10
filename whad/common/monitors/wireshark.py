@@ -1,6 +1,7 @@
 from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.exceptions import ExternalToolNotFound
 from whad.esb.connector import ESB
+from whad.unifying.connector import Unifying
 from tempfile import gettempdir, _get_candidate_names
 from subprocess import Popen, DEVNULL
 import whad
@@ -41,7 +42,7 @@ class WiresharkMonitor(PcapWriterMonitor):
         )
 
     def attach(self, connector):
-        if isinstance(connector, ESB):
+        if isinstance(connector, ESB) or isinstance(connector, Unifying):
                 self.dissector = WiresharkMonitor.get_dissector("esb")
         return super().attach(connector)
 

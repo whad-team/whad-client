@@ -9,7 +9,7 @@ from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.unifying.unifying_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
     Send, SendCmd, SendRawCmd, SendRaw, LogitechDongleMode, LogitechMouseMode, LogitechKeyboardMode, \
-    SetNodeAddress
+    SetNodeAddress, SniffPairingCmd, SniffPairing
 from whad.scapy.layers.unifying import bind
 
 class Unifying(WhadDeviceConnector):
@@ -281,6 +281,27 @@ class Unifying(WhadDeviceConnector):
         msg.unifying.set_node_addr.address = bytes.fromhex(address.replace(":", ""))
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+
+    def can_sniff_pairing(self):
+        """
+        Determine if the device can follow a pairing procedure.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
+        return (
+            (commands & (1 << SniffPairing)) > 0
+        )
+
+
+    def sniff_pairing(self):
+        """
+        Follow a pairing procedure.
+        """
+        msg = Message()
+        msg.unifying.sniff_pairing.CopyFrom(SniffPairingCmd())
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
 
     def start(self):
         """
