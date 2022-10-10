@@ -12,6 +12,7 @@ Welcome to WHAD's documentation!
 
     intro.rst
     ble/index.rst
+    device/index.rst
     api.rst
 
 
