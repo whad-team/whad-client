@@ -350,3 +350,6 @@ class Unifying(WhadDeviceConnector):
 
     def on_pdu(self, packet):
         pass
+
+
+from whad.unifying.connector.sniffer import Sniffer
