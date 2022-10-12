@@ -1,7 +1,10 @@
 from whad.unifying.connector import Unifying
 from whad.unifying.sniffing import SnifferConfiguration
+from whad.unifying.crypto import LogitechUnifyingDecryptor
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
+
+from whad.scapy.layers.unifying import Logitech_Encrypted_Keystroke_Payload
 
 class Sniffer(Unifying):
     """
@@ -11,12 +14,17 @@ class Sniffer(Unifying):
         super().__init__(device)
 
         self.__configuration = SnifferConfiguration()
+        self.__decryptor = LogitechUnifyingDecryptor()
 
         # Check if device can perform sniffing
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
 
+
     def _enable_sniffing(self):
+        for key in self.__configuration.keys:
+            self.__decryptor.add_key(key)
+
         if self.__configuration.scanning:
             channel = None
         else:
@@ -61,5 +69,10 @@ class Sniffer(Unifying):
 
             message = self.wait_for_message(filter=message_filter('unifying', message_type))
             packet = self._build_scapy_packet_from_message(message.unifying, message_type)
+
+            if Logitech_Encrypted_Keystroke_Payload in packet and self.__configuration.decrypt:
+                decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
+                if success:
+                    packet.decrypted = decrypted
 
             yield packet
