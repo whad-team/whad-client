@@ -144,7 +144,7 @@ class Logitech_Pairing_Response_1_Payload(Packet):
     fields_desc = [
         SBAddressField("rf_address", None, length_from=lambda _ : 5),
         ByteField("unknown1", 0x08),
-        ShortField("device_wpid", None),
+        ShortField("dongle_wpid", None),
         ByteEnumField("protocol_id", None, {0x04: "unifying"}),
         ByteField("unknown2", None),
         ByteField("unknown3", None),
@@ -162,10 +162,18 @@ class Logitech_Pairing_Response_2_Payload(Packet):
         StrFixedLenField("unknown", b"\x00\x00\x00\x00\x00\x00\x00\x00", length=8),
     ]
 
-class Logitech_Pairing_Complete_Header(Packet):
-    name = "Logitech Pairing Complete Header"
+class Logitech_Pairing_Confirm_Payload(Packet):
+    name = "Logitech Pairing Confirm Payload"
     fields_desc = [
+        StrFixedLenField("unknown", None, length=3),
+        StrFixedLenField("nonce_fragment", None, length=2),
+        StrFixedLenField("serial_fragment", None, length=2),
+    ]
 
+class Logitech_Pairing_Complete_Payload(Packet):
+    name = "Logitech Pairing Complete Payload"
+    fields_desc = [
+        StrFixedLenField("padding", b"\x00\x00\x00\x00\x00\x00\x00", length=7)
     ]
 
 def guess_payload_class_unifying(self, payload):
@@ -173,7 +181,7 @@ def guess_payload_class_unifying(self, payload):
         return ESB_Ping_Request
     elif len(payload) == 0:
         return ESB_Ack_Response
-    elif len(payload) >= 2 and payload[1] in (0x51,0xC2,0x40,0x4F,0xD3,0xC1,0xC3,0x5F,0x1F):
+    elif len(payload) >= 2 and payload[1] in (0x51,0xC2,0x40,0x4F,0xD3,0xC1,0xC3,0x5F,0x1F, 0x0F, 0x0E):
         return Logitech_Unifying_Hdr
     else:
         return Packet.guess_payload_class(self, payload)
@@ -197,6 +205,9 @@ def bind():
     bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Response_Header,         frame_type = 0x1F)
     bind_layers( Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_1_Payload,  pairing_phase = 0x01)
     bind_layers( Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_2_Payload,  pairing_phase = 0x02)
+
+    bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Confirm_Payload,          frame_type = 0x0F)
+    bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Complete_Payload,         frame_type = 0x0E)
 
 def unbind():
     ESB_Payload_Hdr.guess_payload_class = guess_payload_class_esb
