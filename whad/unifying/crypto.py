@@ -5,7 +5,9 @@ from copy import copy
 from whad.unifying.exceptions import MissingEncryptedKeystrokePayload
 from whad.scapy.layers.esb import ESB_Hdr
 from whad.scapy.layers.unifying import bind, Logitech_Unifying_Hdr, \
-    Logitech_Unencrypted_Keystroke_Payload, Logitech_Encrypted_Keystroke_Payload
+    Logitech_Unencrypted_Keystroke_Payload, Logitech_Encrypted_Keystroke_Payload, \
+    Logitech_Pairing_Request_1_Payload, Logitech_Pairing_Request_2_Payload, \
+    Logitech_Pairing_Response_1_Payload, Logitech_Pairing_Response_2_Payload
 
 
 class LogitechUnifyingCryptoManager:
@@ -73,6 +75,61 @@ class LogitechUnifyingCryptoManager:
         encrypted_packet.hid_data = result[:7]
         encrypted_packet.unknown = result[7]
         return encrypted_packet
+
+class LogitechUnifyingKeyDerivation:
+    def __init__(self, address=None, dongle_wpid=None, device_wpid=None, dongle_nonce=None, device_nonce=None):
+        self.address = address
+        self.dongle_wpid = dongle_wpid
+        self.device_wpid = device_wpid
+        self.dongle_nonce = dongle_nonce
+        self.device_nonce = device_nonce
+
+    def process_packet(self, packet):
+        if Logitech_Pairing_Request_1_Payload in packet:
+            self.device_wpid = pack(">H", packet.device_wpid)
+        elif Logitech_Pairing_Response_1_Payload in packet:
+            self.address = bytes.fromhex(packet.rf_address.replace(":", ""))
+            self.dongle_wpid = pack(">H", packet.dongle_wpid)
+        elif Logitech_Pairing_Request_2_Payload in packet:
+            self.device_nonce = packet.device_nonce
+        elif Logitech_Pairing_Response_2_Payload in packet:
+            self.dongle_nonce = packet.dongle_nonce
+
+    @property
+    def key(self):
+        if (
+                self.address is not None and
+                self.dongle_wpid is not None and
+                self.device_wpid is not None and
+                self.dongle_nonce is not None and
+                self.device_nonce is not None
+        ):
+            return self._generate_key()
+        else:
+            return None
+
+    def _generate_key(self):
+        raw_key_material = self.address[:4] + self.device_wpid + self.dongle_wpid + self.device_nonce + self.dongle_nonce
+        key = [0 for _ in range(16)]
+
+        key[0] = raw_key_material[7]
+        key[1] = raw_key_material[1] ^ 0xff
+        key[2] = raw_key_material[0]
+        key[3] = raw_key_material[3]
+        key[4] = raw_key_material[10]
+        key[5] = raw_key_material[2] ^ 0xff
+        key[6] = raw_key_material[9] ^ 0x55
+        key[7] = raw_key_material[14]
+        key[8] = raw_key_material[8]
+        key[9] = raw_key_material[6]
+        key[10] = raw_key_material[12] ^ 0xff
+        key[11] = raw_key_material[5]
+        key[12] = raw_key_material[13]
+        key[13] = raw_key_material[15] ^ 0x55
+        key[14] = raw_key_material[4]
+        key[15] = raw_key_material[11]
+
+        return bytes(key)
 
 class LogitechUnifyingDecryptor:
     def __init__(self, *keys):
