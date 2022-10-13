@@ -1,15 +1,19 @@
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteField, XByteField, X3BytesField, IntField, \
-    StrFixedLenField, ShortField
+    StrFixedLenField, ShortField, ByteEnumField, XShortField, XShortEnumField, \
+    FieldLenField, StrLenField, StrField
 from struct import pack
 
-from whad.scapy.layers.esb import ESB_Payload_Hdr, guess_payload_class_esb
+from whad.scapy.layers.esb import ESB_Payload_Hdr, SBAddressField, \
+    guess_payload_class_esb
 
 class Logitech_Unifying_Hdr(Packet):
     name = "Logitech Unifying Payload"
-    fields_desc = [    XByteField("dev_index",0x00),
-            XByteField("frame_type",  0x00),
-            XByteField("checksum",None)]
+    fields_desc = [
+        XByteField("dev_index",0x00),
+        XByteField("frame_type",  0x00),
+        XByteField("checksum",None)
+    ]
 
     def pre_dissect(self,s):
         calcCksum = 0xFF
@@ -37,56 +41,139 @@ class Logitech_Unifying_Hdr(Packet):
 
 class Logitech_Wake_Up(Packet):
     name = "Logitech Wake Up Payload"
-    fields_desc = [ XByteField("dev_index",0x00),
-            ByteField("???(1)",  0x00),
-            ByteField("???(2)",  0x00),
-            X3BytesField("???(3)",  "\x01\x01\x01"),
-            ByteField("unused", 13)
-            ]
+    fields_desc = [
+        XByteField("dev_index",0x00),
+        ByteField("???(1)",  0x00),
+        ByteField("???(2)",  0x00),
+        X3BytesField("???(3)",  "\x01\x01\x01"),
+        ByteField("unused", 13)
+    ]
 
 
 class Logitech_Encrypted_Keystroke_Payload(Packet):
     name = "Logitech Encrypted Keystroke Payload"
-    fields_desc = [        StrFixedLenField('hid_data', '\0\0\0\0\0\0\0', length=7),
-                ByteField("unknown",0x00),
-                IntField('aes_counter',None),
-                StrFixedLenField('unused', '\0\0\0\0\0\0\0', length=7)
+    fields_desc = [
+        StrFixedLenField('hid_data', '\0\0\0\0\0\0\0', length=7),
+        ByteField("unknown",0x00),
+        IntField('aes_counter',None),
+        StrFixedLenField('unused', '\0\0\0\0\0\0\0', length=7)
     ]
 
 class Logitech_Unencrypted_Keystroke_Payload(Packet):
     name = "Logitech Unencrypted Keystroke Payload"
-    fields_desc = [     StrFixedLenField('hid_data', '\0\0\0\0\0\0\0', length=7)]
+    fields_desc = [
+        StrFixedLenField('hid_data', '\0\0\0\0\0\0\0', length=7)
+    ]
 
 class Logitech_Multimedia_Key_Payload(Packet):
     name = "Multimedia Key Payload"
-    fields_desc = [         StrFixedLenField('hid_key_scan_code', '\0\0\0\0', length=4),
-                StrFixedLenField('unused','\0\0\0', length=3)]
+    fields_desc = [
+        StrFixedLenField('hid_key_scan_code', '\0\0\0\0', length=4),
+        StrFixedLenField('unused','\0\0\0', length=3)
+    ]
 
 class Logitech_Keepalive_Payload(Packet):
     name = "Logitech Keepalive Payload"
-    fields_desc = [        ShortField('timeout',None)]
+    fields_desc = [
+        ShortField('timeout',None)
+    ]
 
 class Logitech_Set_Keepalive_Payload(Packet):
     name = "Logitech Set Keepalive Payload"
-    fields_desc = [        ByteField("unused", None),
-                ShortField('timeout',1200),
-                IntField("unused_2",0x10000000)]
+    fields_desc = [
+        ByteField("unused", None),
+        ShortField('timeout',1200),
+        IntField("unused_2",0x10000000)
+    ]
 
 class Logitech_Mouse_Payload(Packet):
     name = "Logitech Mouse Payload"
-    fields_desc = [    XByteField("button_mask",0x00),
-            ByteField("unused",0x00),
-            StrFixedLenField("movement","",length=3),
-            ByteField("wheel_y",0x00),
-            ByteField("wheel_x",0x00)]
+    fields_desc = [
+        XByteField("button_mask",0x00),
+        ByteField("unused",0x00),
+        StrFixedLenField("movement","",length=3),
+        ByteField("wheel_y",0x00),
+        ByteField("wheel_x",0x00)
+    ]
 
+class Logitech_Pairing_Request_Header(Packet):
+    name = "Logitech Pairing Request Header"
+    fields_desc = [
+        ByteEnumField("pairing_phase", None, { 1 : "first_phase", 2 : "second_phase"}),
+    ]
+
+class Logitech_Pairing_Request_1_Payload(Packet):
+    name = "Logitech Pairing Request 1 Payload"
+    fields_desc = [
+        SBAddressField("rf_address", None, length_from=lambda _ : 5),
+        ByteField("unknown1", 0x08),
+        ShortField("device_wpid", None),
+        ByteEnumField("protocol_id", None, {0x04: "unifying"}),
+        ByteField("unknown2", None),
+        XShortEnumField("device_type", None, {0x020c: "mouse", 0x0147: "keyboard"}),
+        ByteField("unknown3", None),
+        StrFixedLenField("padding", b"\x00\x00\x00\x00\x00", length=5)
+    ]
+
+class Logitech_Pairing_Request_2_Payload(Packet):
+    name = "Logitech Pairing Request 2 Payload"
+    fields_desc = [
+        StrFixedLenField("device_nonce", b"\x00\x00\x00\x00", length=4),
+        StrFixedLenField("device_serial", b"\x00\x00\x00\x00", length=4),
+        XShortEnumField("capabilities", None, {0x0400 : "mouse", 0x1e40: "keyboard"}),
+        StrFixedLenField("unknown", b"\x00\x00\x00\x00\x00\x00\x00\x00", length=8),
+    ]
+class Logitech_Pairing_Request_3_Payload(Packet):
+    name = "Logitech Pairing Request 3 Payload"
+    fields_desc = [
+        ByteField("type", None),
+        FieldLenField("length", None, length_of="device_name", fmt="B"),
+        StrLenField("device_name",None, length_from=lambda pkt:pkt.length),
+        StrField("padding", None)
+
+    ]
+
+class Logitech_Pairing_Response_Header(Packet):
+    name = "Logitech Pairing Response Header"
+    fields_desc = [
+        ByteEnumField("pairing_phase", None, { 1 : "first_phase", 2 : "second_phase", 3 : "final_phase"}),
+    ]
+
+class Logitech_Pairing_Response_1_Payload(Packet):
+    name = "Logitech Pairing Response 1 Payload"
+    fields_desc = [
+        SBAddressField("rf_address", None, length_from=lambda _ : 5),
+        ByteField("unknown1", 0x08),
+        ShortField("device_wpid", None),
+        ByteEnumField("protocol_id", None, {0x04: "unifying"}),
+        ByteField("unknown2", None),
+        ByteField("unknown3", None),
+        ByteField("unknown4", None),
+        StrFixedLenField("padding", b"\x00\x00\x00\x00\x00", length=6)
+    ]
+
+
+class Logitech_Pairing_Response_2_Payload(Packet):
+    name = "Logitech Pairing Response 2 Payload"
+    fields_desc = [
+        StrFixedLenField("dongle_nonce", b"\x00\x00\x00\x00", length=4),
+        StrFixedLenField("dongle_serial", b"\x00\x00\x00\x00", length=4),
+        XShortEnumField("capabilities", None, {0x0400 : "mouse", 0x1e40: "keyboard"}),
+        StrFixedLenField("unknown", b"\x00\x00\x00\x00\x00\x00\x00\x00", length=8),
+    ]
+
+class Logitech_Pairing_Complete_Header(Packet):
+    name = "Logitech Pairing Complete Header"
+    fields_desc = [
+
+    ]
 
 def guess_payload_class_unifying(self, payload):
     if b"\x0f\x0f\x0f\x0f" == payload[:4]:
         return ESB_Ping_Request
     elif len(payload) == 0:
         return ESB_Ack_Response
-    elif len(payload) >= 2 and payload[1] in (0x51,0xC2,0x40,0x4F,0xD3,0xC1,0xC3):
+    elif len(payload) >= 2 and payload[1] in (0x51,0xC2,0x40,0x4F,0xD3,0xC1,0xC3,0x5F,0x1F):
         return Logitech_Unifying_Hdr
     else:
         return Packet.guess_payload_class(self, payload)
@@ -102,6 +189,14 @@ def bind():
     bind_layers(Logitech_Unifying_Hdr, Logitech_Encrypted_Keystroke_Payload,     frame_type = 0xD3)
     bind_layers(Logitech_Unifying_Hdr, Logitech_Unencrypted_Keystroke_Payload,     frame_type = 0xC1)
     bind_layers(Logitech_Unifying_Hdr, Logitech_Multimedia_Key_Payload,         frame_type = 0xC3)
+    bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Request_Header,         frame_type = 0x5F)
+    bind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_1_Payload,  pairing_phase = 0x01)
+    bind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_2_Payload,  pairing_phase = 0x02)
+    bind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_3_Payload,  pairing_phase = 0x03)
+
+    bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Response_Header,         frame_type = 0x1F)
+    bind_layers( Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_1_Payload,  pairing_phase = 0x01)
+    bind_layers( Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_2_Payload,  pairing_phase = 0x02)
 
 def unbind():
     ESB_Payload_Hdr.guess_payload_class = guess_payload_class_esb
@@ -113,3 +208,9 @@ def unbind():
     unbind_layers(Logitech_Unifying_Hdr, Logitech_Encrypted_Keystroke_Payload)
     unbind_layers(Logitech_Unifying_Hdr, Logitech_Unencrypted_Keystroke_Payload)
     unbind_layers(Logitech_Unifying_Hdr, Logitech_Multimedia_Key_Payload)
+    unbind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Request_Header)
+    unbind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Response_Header)
+    unbind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_1_Payload)
+    unbind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_2_Payload)
+    unbind_layers( Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_1_Payload)
+    unbind_layers( Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_2_Payload)
