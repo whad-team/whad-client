@@ -1,6 +1,8 @@
-from whad.unifying.connector import Unifying, Sniffer
+from whad.unifying.connector import Unifying, Sniffer, Keylogger, Mouselogger
 
 __all__ = [
     'Unifying',
-    'Sniffer'
+    'Sniffer',
+    'Keylogger',
+    'Mouselogger'
 ]

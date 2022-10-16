@@ -25,6 +25,20 @@ class Sniffer(Zigbee):
             self.__decryptor.add_key(key)
         self.sniff_zigbee(channel=self.__configuration.channel)
 
+    def add_key(self, key):
+        self.__configuration.keys.append(key)
+
+    def clear_keys(self):
+        self.__configuration.keys = []
+
+    @property
+    def decrypt(self):
+        return self.__configuration.decrypt
+
+    @decrypt.setter
+    def decrypt(self, decrypt):
+        self.__configuration.decrypt = decrypt
+
     @property
     def configuration(self):
         return self.__configuration

@@ -108,6 +108,13 @@ class LogitechUnifyingKeyDerivation:
         else:
             return None
 
+    def reset(self):
+        self.address = None
+        self.dongle_wpid = None
+        self.device_wpid = None
+        self.dongle_nonce = None
+        self.device_nonce = None
+
     def _generate_key(self):
         raw_key_material = self.address[:4] + self.device_wpid + self.dongle_wpid + self.device_nonce + self.dongle_nonce
         key = [0 for _ in range(16)]

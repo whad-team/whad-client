@@ -353,3 +353,5 @@ class Unifying(WhadDeviceConnector):
 
 
 from whad.unifying.connector.sniffer import Sniffer
+from whad.unifying.connector.keylogger import Keylogger
+from whad.unifying.connector.mouselogger import Mouselogger

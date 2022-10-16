@@ -186,42 +186,30 @@ def guess_payload_class_unifying(self, payload):
     else:
         return Packet.guess_payload_class(self, payload)
 
+
+# Logitech Unifying protocol
+bind_layers(Logitech_Unifying_Hdr, Logitech_Wake_Up,                frame_type = 0x51)
+bind_layers(Logitech_Unifying_Hdr, Logitech_Mouse_Payload,            frame_type = 0xC2)
+bind_layers(Logitech_Unifying_Hdr, Logitech_Keepalive_Payload,             frame_type = 0x40)
+bind_layers(Logitech_Unifying_Hdr, Logitech_Set_Keepalive_Payload,         frame_type = 0x4F)
+bind_layers(Logitech_Unifying_Hdr, Logitech_Encrypted_Keystroke_Payload,     frame_type = 0xD3)
+bind_layers(Logitech_Unifying_Hdr, Logitech_Unencrypted_Keystroke_Payload,     frame_type = 0xC1)
+bind_layers(Logitech_Unifying_Hdr, Logitech_Multimedia_Key_Payload,         frame_type = 0xC3)
+bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Request_Header,         frame_type = 0x5F)
+bind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_1_Payload,  pairing_phase = 0x01)
+bind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_2_Payload,  pairing_phase = 0x02)
+bind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_3_Payload,  pairing_phase = 0x03)
+
+bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Response_Header,         frame_type = 0x1F)
+bind_layers(Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_1_Payload,  pairing_phase = 0x01)
+bind_layers(Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_2_Payload,  pairing_phase = 0x02)
+
+bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Confirm_Payload,          frame_type = 0x0F)
+bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Complete_Payload,         frame_type = 0x0E)
+
+
 def bind():
     ESB_Payload_Hdr.guess_payload_class = guess_payload_class_unifying
 
-    # Logitech Unifying protocol
-    bind_layers(Logitech_Unifying_Hdr, Logitech_Wake_Up,                frame_type = 0x51)
-    bind_layers(Logitech_Unifying_Hdr, Logitech_Mouse_Payload,            frame_type = 0xC2)
-    bind_layers(Logitech_Unifying_Hdr, Logitech_Keepalive_Payload,             frame_type = 0x40)
-    bind_layers(Logitech_Unifying_Hdr, Logitech_Set_Keepalive_Payload,         frame_type = 0x4F)
-    bind_layers(Logitech_Unifying_Hdr, Logitech_Encrypted_Keystroke_Payload,     frame_type = 0xD3)
-    bind_layers(Logitech_Unifying_Hdr, Logitech_Unencrypted_Keystroke_Payload,     frame_type = 0xC1)
-    bind_layers(Logitech_Unifying_Hdr, Logitech_Multimedia_Key_Payload,         frame_type = 0xC3)
-    bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Request_Header,         frame_type = 0x5F)
-    bind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_1_Payload,  pairing_phase = 0x01)
-    bind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_2_Payload,  pairing_phase = 0x02)
-    bind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_3_Payload,  pairing_phase = 0x03)
-
-    bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Response_Header,         frame_type = 0x1F)
-    bind_layers( Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_1_Payload,  pairing_phase = 0x01)
-    bind_layers( Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_2_Payload,  pairing_phase = 0x02)
-
-    bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Confirm_Payload,          frame_type = 0x0F)
-    bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Complete_Payload,         frame_type = 0x0E)
-
 def unbind():
     ESB_Payload_Hdr.guess_payload_class = guess_payload_class_esb
-
-    unbind_layers(Logitech_Unifying_Hdr, Logitech_Wake_Up)
-    unbind_layers(Logitech_Unifying_Hdr, Logitech_Mouse_Payload)
-    unbind_layers(Logitech_Unifying_Hdr, Logitech_Keepalive_Payload)
-    unbind_layers(Logitech_Unifying_Hdr, Logitech_Set_Keepalive_Payload)
-    unbind_layers(Logitech_Unifying_Hdr, Logitech_Encrypted_Keystroke_Payload)
-    unbind_layers(Logitech_Unifying_Hdr, Logitech_Unencrypted_Keystroke_Payload)
-    unbind_layers(Logitech_Unifying_Hdr, Logitech_Multimedia_Key_Payload)
-    unbind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Request_Header)
-    unbind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Response_Header)
-    unbind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_1_Payload)
-    unbind_layers( Logitech_Pairing_Request_Header,  Logitech_Pairing_Request_2_Payload)
-    unbind_layers( Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_1_Payload)
-    unbind_layers( Logitech_Pairing_Response_Header,  Logitech_Pairing_Response_2_Payload)

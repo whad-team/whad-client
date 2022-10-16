@@ -26,7 +26,6 @@ class Sniffer(Unifying):
     def _enable_sniffing(self):
         for key in self.__configuration.keys:
             self.__decryptor.add_key(key)
-
         if self.__configuration.scanning:
             channel = None
         else:
@@ -60,6 +59,45 @@ class Sniffer(Unifying):
         self.__configuration.channel = channel
         self._enable_sniffing()
 
+    def add_key(self, key):
+        self.stop()
+        self.__configuration.keys.append(key)
+        self._enable_sniffing()
+
+    def clear_keys(self):
+        self.stop()
+        self.__configuration.keys = []
+        self._enable_sniffing()
+
+    @property
+    def decrypt(self):
+        return self.__configuration.decrypt
+
+    @decrypt.setter
+    def decrypt(self, decrypt):
+        self.stop()
+        self.__configuration.decrypt = decrypt
+        self._enable_sniffing()
+
+    @property
+    def address(self):
+        return self.__configuration.address
+
+    @address.setter
+    def address(self, address):
+        self.stop()
+        self.__configuration.address = address
+        self._enable_sniffing()
+
+    @property
+    def scanning(self):
+        return self.__configuration.scanning
+
+    @scanning.setter
+    def scanning(self, scanning):
+        self.stop()
+        self.__configuration.scanning = scanning
+        self._enable_sniffing()
 
     def available_actions(self, filter=None):
         actions = []
@@ -79,6 +117,7 @@ class Sniffer(Unifying):
                 self.__key_derivation.process_packet(packet)
                 if self.__key_derivation.key is not None:
                     print("[i] New key extracted: ", self.__key_derivation.key.hex())
+                    self.__key_derivation.reset()
 
             if Logitech_Encrypted_Keystroke_Payload in packet and self.__configuration.decrypt:
                 decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
