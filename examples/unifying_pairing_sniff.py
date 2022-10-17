@@ -13,6 +13,7 @@ if __name__ == '__main__':
         # Connect to target device and performs discovery
         try:
             dev = WhadDevice.create(interface)
+            
             connector = Mouselogger(dev)
             connector.address = "ca:e9:06:ec:a4"
             connector.scanning  = True

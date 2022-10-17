@@ -4,7 +4,7 @@ class WhadDomain(object):
     """
     Domain wrappers (mask protocol).
     """
-    Generic = Domain.Generic
+    Phy = Domain.Phy
     BtClassic = Domain.BtClassic
     BtLE = Domain.BtLE
     Zigbee = Domain.Zigbee

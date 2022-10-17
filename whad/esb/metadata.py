@@ -5,7 +5,7 @@ from dataclasses import dataclass
 class ESBMetadata(Metadata):
     is_crc_valid : bool = None
     address : str = None
-    
+
     def convert_to_header(self):
         return None, timestamp
 

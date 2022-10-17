@@ -4,7 +4,6 @@ from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.esb.metadata import ESBMetadata, generate_esb_metadata
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
-#from whad.scapy.layers.unifying import *
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.unifying.unifying_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \

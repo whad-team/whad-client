@@ -8,9 +8,11 @@ from whad.protocol.ble.ble_pb2 import BleCommand
 from whad.protocol.zigbee.zigbee_pb2 import ZigbeeCommand
 from whad.protocol.esb.esb_pb2 import ESBCommand
 from whad.protocol.unifying.unifying_pb2 import UnifyingCommand
+from whad.protocol.phy.phy_pb2 import PhyCommand
 from whad import WhadDomain, WhadCapability
 
 DOMAINS = {
+    WhadDomain.Phy: 'Physical Layer',
     WhadDomain.ANT: 'ANT',
     WhadDomain.ANT_FS: 'ANT FS',
     WhadDomain.ANT_Plus: 'ANT+',
@@ -92,14 +94,37 @@ UNIFYING_COMMANDS = {
     UnifyingCommand.Start: "Start: can start depending on the current mode",
     UnifyingCommand.Stop: "Stop: can stop depending on the current mode",
     UnifyingCommand.SniffPairing: "SniffPairing: can sniff a pairing process"
-
 }
 
+PHY_COMMANDS = {
+    PhyCommand.SetASKModulation: "SetASKModulation: can use Amplitude Shift Keying modulation scheme",
+    PhyCommand.SetFSKModulation: "SetFSKModulation: can use Frequency Shift Keying modulation scheme",
+    PhyCommand.SetGFSKModulation: "SetGFSKModulation: can use Gaussian Frequency Shift Keying modulation scheme",
+    PhyCommand.SetBPSKModulation: "SetBPSKModulation: can use Binary Phase Shift Keying modulation scheme",
+    PhyCommand.SetQPSKModulation: "SetQPSKModulation: can use Quadrature Phase Shift Keying modulation scheme",
+    PhyCommand.SetSubGhzFrequency: "SetSubGhzFrequency: can interact with SubGHz frequency bands",
+    PhyCommand.SetTwoDotFourGhzFrequency: "SetTwoDotFourGhzFrequency: can interact with 2.4 GHz ISM frequency band",
+    PhyCommand.SetFiveGhzFrequency: "SetFiveGhzFrequency: can interact with 5 GHz frequency band",
+    PhyCommand.SetDataRate: "SetDataRate: can configure the datarate",
+    PhyCommand.SetEndianness: "SetEndianness: can configure the endianness",
+    PhyCommand.SetTXPower: "SetTXPower: can configure the transmission power level",
+    PhyCommand.SetPacketSize: "SetPacketSize: can configure the packet size",
+    PhyCommand.SetSyncWord: "SetSyncWord: can configure the synchronization word",
+    PhyCommand.Sniff: "Sniff: can receive arbitrary packets",
+    PhyCommand.Send: "Send: can transmit arbitrary packets",
+    PhyCommand.SendRaw: "SendRaw: can transmit arbitrary IQ streams" ,
+    PhyCommand.Jam: "Jam: can jam a physical medium",
+    PhyCommand.Monitor: "Monitor: can monitor a physical medium",
+    PhyCommand.Start: "Start: can start depending on the current mode",
+    PhyCommand.Stop: "Stop: can stop depending on the current mode"
+}
 COMMANDS = {
     WhadDomain.BtLE: BLE_COMMANDS,
     WhadDomain.Esb: ESB_COMMANDS,
     WhadDomain.Zigbee: ZIGBEE_COMMANDS,
-    WhadDomain.LogitechUnifying: UNIFYING_COMMANDS
+    WhadDomain.LogitechUnifying: UNIFYING_COMMANDS,
+    WhadDomain.Phy: PHY_COMMANDS
+
 }
 
 
