@@ -1,17 +1,17 @@
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
+from whad.phy.metadata import generate_phy_metadata, PhyMetadata
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.protocol.phy.phy_pb2 import SetASKModulation, SetFSKModulation, \
     SetGFSKModulation, SetBPSKModulation, SetQPSKModulation, Start, Stop, \
     SetBPSKModulationCmd, SetQPSKModulationCmd, SetSubGhzFrequency, \
     SetTwoDotFourGhzFrequency, SetFiveGhzFrequency, SetDataRate, SetEndianness, \
-    Endianness, SetTXPower, TXPower, SetPacketSize, SetSyncWord
+    Endianness, SetTXPower, TXPower, SetPacketSize, SetSyncWord, StartCmd, StopCmd
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.exceptions import RequiredImplementation, UnsupportedCapability, UnsupportedDomain
 from whad.scapy.layers.phy import Phy_Packet
-
 class Phy(WhadDeviceConnector):
     """
     Physical layer connector.
@@ -143,7 +143,7 @@ class Phy(WhadDeviceConnector):
         - ESB_2MBPS_PHY: 320000 Hz
         - BLE_2MBPS_PHY: 500000 Hz
         """
-        if not self.can_use_fsk():
+        if not self.can_use_gfsk():
             raise UnsupportedCapability("GFSKModulation")
 
         msg = Message()
@@ -218,7 +218,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("TwoDotFourGHzBand")
 
         msg = Message()
-        msg.phy.freq_twodotfour.frequency_offset = (2400 - frequency)
+        msg.phy.freq_twodotfourghz.frequency_offset = (frequency - 2400)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 

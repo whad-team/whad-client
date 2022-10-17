@@ -1,9 +1,9 @@
 from scapy.packet import Packet
-from scapy.fields import StrField
+from scapy.fields import XStrField
 
 
 class Phy_Packet(Packet):
     name = "Physical layer generic Packet"
     fields_desc = [
-        StrField("data", None)
+        XStrField("data", None)
     ]
