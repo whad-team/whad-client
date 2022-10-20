@@ -71,7 +71,7 @@ def dewhitening(data, channel):
       i >>=1
     ret.append(swap_bits(d))
 
-  return ret
+  return bytes(ret)
 
 
 
