@@ -329,7 +329,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("PacketSize")
 
         msg = Message()
-        msg.phy.packet_size.packet_size = size
+        msg.phy.packet_size.size = size
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
