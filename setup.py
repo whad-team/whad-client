@@ -5,7 +5,7 @@ try:
     from subprocess import Popen, DEVNULL, PIPE
     from os.path import exists, realpath
     from shutil import copy
-    from os import listdir, geteuid
+    from os import listdir, geteuid, getlogin
 except ImportError:
     print("Your operating system is not supported.")
 
@@ -47,8 +47,9 @@ class DevicesInstall(install):
 
     def install_serial_port_capabilities(self):
         print("Installing serial port capabilities...")
-        process = Popen(['usermod', '-a', '-G', 'dialout', '$USER'], stdout=PIPE, stderr=PIPE)
+        process = Popen(['usermod', '-a', '-G', 'dialout', getlogin()], stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
+
         if len(stderr) > 0:
             return False
         return True
