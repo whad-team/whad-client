@@ -45,6 +45,14 @@ class DevicesInstall(install):
 
         return True
 
+    def install_serial_port_capabilities(self):
+        print("Installing serial port capabilities...")
+        process = Popen(['usermod', '-a', '-G', 'dialout', '$USER'], stdout=PIPE, stderr=PIPE)
+        stdout, stderr = process.communicate()
+        if len(stderr) > 0:
+            return False
+        return True
+
     def install_hci_capabilities(self, interpreter):
         print("Installing HCI capabilities...")
         process = Popen(['getcap', interpreter], stdout=PIPE, stderr=PIPE)
@@ -84,6 +92,8 @@ class DevicesInstall(install):
             if not self.install_hci_capabilities(python_interpreter):
                 print("An error occured during HCI capabilities installation.")
 
+            if not self.install_serial_port_capabilities():
+                print("An error occured during Serial port capabilities installation.")
 
         else:
             print("Automatic device installation is not supported on your operating system.")
