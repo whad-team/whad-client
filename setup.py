@@ -95,7 +95,8 @@ class DevicesInstall(install):
 
             if not self.install_serial_port_capabilities():
                 print("An error occured during Serial port capabilities installation.")
-
+            else:
+                print("User added to group 'dialout', please logout to take the modification into account.")
         else:
             print("Automatic device installation is not supported on your operating system.")
             exit(1)
