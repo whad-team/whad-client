@@ -10,8 +10,9 @@ central = Central(WhadDevice.create('uart0'))
 central.attach_callback(show)
 
 print('Using device: %s' % central.device.device_id)
-device = central.connect('c5:61:42:e9:f6:f4', random=True)
+device = central.connect('74:da:ea:91:47:e3', random=False)
 print("here")
+input()
 # Discover
 device.discover()
 for service in device.services():
