@@ -17,6 +17,7 @@ from whad.ble.profile import GenericProfile
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvDataField, AdvCompleteLocalName, \
     AdvManufacturerSpecificData, AdvShortenedLocalName, AdvTxPowerLevel, AdvDataFieldListOverflow, AdvDataError
 from whad.ble.connector import BLE, Central, Peripheral, Sniffer, Hijacker, Injector, Scanner
+from whad.ble.utils.phy import PHYS
 
 __all__ = [
     'GattClient',
@@ -37,5 +38,6 @@ __all__ = [
     'Sniffer',
     'Hijacker',
     'Injector',
-    'Scanner'
+    'Scanner',
+    'PHYS'
 ]

@@ -10,9 +10,9 @@ if __name__ == '__main__':
         def show_packet(pkt):
             pkt.show()
 
-        dev = WhadDevice.create("uart1")
+        dev = WhadDevice.create("uart0")
         sniffer1 = Sniffer(dev)
-        sniffer1.reactive_jam(pattern=b"\xe3\x47\x91", position=2, channel=37)
+        sniffer1.reactive_jam(pattern=b"\x04\x00\x0a", position=4, channel=0)
         while True:
             input()
 

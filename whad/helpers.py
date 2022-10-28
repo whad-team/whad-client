@@ -1,3 +1,6 @@
+from pkgutil import iter_modules
+import whad
+
 def message_filter(category, message):
     return lambda x: x.WhichOneof('msg') == category and getattr(x, category).WhichOneof('msg')==message
 
@@ -101,3 +104,16 @@ def bitwise_xor(a,b):
 		valB = b[i] == "1"
 		result += "1" if valA ^ valB else "0"
 	return result
+
+def list_domains():
+    '''
+    Returns a list of implemented domains.
+    '''
+    domains = []
+    for submodule in iter_modules(whad.__path__):
+        try:
+            candidate = __import__("whad.{}.connector".format(submodule.name))
+            domains.append(submodule.name)
+        except ModuleNotFoundError:
+            pass
+    return domains

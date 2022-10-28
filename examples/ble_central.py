@@ -3,10 +3,16 @@ from whad.ble.profile import UUID
 from whad.device import WhadDevice
 from time import sleep
 
-central = Central(WhadDevice.create('hci1'))
-print('Using device: %s' % central.device.device_id)
-device = central.connect('ff:ff:ff:f0:08:a3')
+def show(packet):
+    packet.show()
 
+central = Central(WhadDevice.create('uart0'))
+central.attach_callback(show)
+
+print('Using device: %s' % central.device.device_id)
+device = central.connect('74:da:ea:91:47:e3', random=False)
+print("here")
+input()
 # Discover
 device.discover()
 for service in device.services():

@@ -2,10 +2,13 @@
 This module provides some helpers functions and constants related to Bluetooth Low Energy physical layer.
 '''
 from whad.helpers import swap_bits
+from whad.phy import Endianness, GFSKModulationScheme, PhysicalLayer
 from enum import IntEnum
 
-# Size of major BLE fields (in bytes)
 class FieldsSize(IntEnum):
+    '''
+    Size of major BLE fields (in bytes).
+    '''
     ACCESS_ADDRESS_SIZE = 4
     HEADER_SIZE = 2
     CRC_SIZE = 3
@@ -51,12 +54,10 @@ def channel_to_frequency(channel):
 
     return 2400 + freq_offset
 
-# Swap bits of a 8-bit value
-def swap_bits(value):
-    return (value * 0x0202020202  & 0x010884422010) % 1023
-
-# (De)Whiten data based on BLE channel
 def dewhitening(data, channel):
+  '''
+  Dewhiten data based on BLE channel.
+  '''
   ret = []
   lfsr = swap_bits(channel) | 2
 
@@ -71,9 +72,13 @@ def dewhitening(data, channel):
       i >>=1
     ret.append(swap_bits(d))
 
-  return ret
+  return bytes(ret)
 
-
+def whitening(data, channel):
+    '''
+    Whiten data based on a BLE channel.
+    '''
+    return dewhitening(data, channel)
 
 def crc(data, init=0x555555):
     '''
@@ -135,3 +140,33 @@ def is_access_address_valid(aa):
         if (i<26) and (t<2):
             return False
     return True
+
+PHYS = {
+    "LE-1M": PhysicalLayer(
+                modulation=GFSKModulationScheme(deviation=250000),
+                datarate=1000000,
+                endianness=Endianness.LITTLE,
+                frequency_range=(2402, 2480),
+                maximum_packet_size=255,
+                synchronization_word=b"\xAA",
+                frequency_to_channel_function=frequency_to_channel,
+                channel_to_frequency_function=channel_to_frequency,
+                integrity_function=crc,
+                encoding_function=whitening,
+                decoding_function=dewhitening
+            ),
+
+    "LE-2M": PhysicalLayer(
+                modulation=GFSKModulationScheme(deviation=500000),
+                datarate=2000000,
+                endianness=Endianness.LITTLE,
+                frequency_range=(2402, 2480), 
+                maximum_packet_size=255,
+                synchronization_word=b"\xAA\xAA",
+                frequency_to_channel_function=frequency_to_channel,
+                channel_to_frequency_function=channel_to_frequency,
+                integrity_function=crc,
+                encoding_function=whitening,
+                decoding_function=dewhitening
+            )
+}

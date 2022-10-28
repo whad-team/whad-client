@@ -149,13 +149,6 @@ class ESB_Hdr(Packet):
 class ESB_Payload_Hdr(Packet):
     name = "ESB Payload"
     fields_desc = []
-    def guess_payload_class(self, payload):
-        if b"\x0f\x0f\x0f\x0f" == payload[:4]:
-            return ESB_Ping_Request
-        elif len(payload) == 0 or self.underlayer is not None and self.underlayer.no_ack == 1:
-            return ESB_Ack_Response
-        else:
-            return Packet.guess_payload_class(self, payload)
 
 class ESB_Ping_Request(Packet):
         name = "ESB Ping Request"
@@ -169,6 +162,16 @@ class ESB_Ack_Response(Packet):
 class ESB_Pseudo_Packet(Packet):
     name = "ESB Pseudo packet"
     fields_desc = []
+
+def guess_payload_class_esb(self, payload):
+    if b"\x0f\x0f\x0f\x0f" == payload[:4]:
+        return ESB_Ping_Request
+    elif len(payload) == 0 or self.underlayer is not None and self.underlayer.no_ack == 1:
+        return ESB_Ack_Response
+    else:
+        return Packet.guess_payload_class(self, payload)
+
+ESB_Payload_Hdr.guess_payload_class = guess_payload_class_esb
 
 bind_layers(ESB_Hdr,ESB_Payload_Hdr)
 conf.l2types.register(USER_DLT, ESB_Hdr)

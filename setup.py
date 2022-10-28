@@ -5,7 +5,7 @@ try:
     from subprocess import Popen, DEVNULL, PIPE
     from os.path import exists, realpath
     from shutil import copy
-    from os import listdir, geteuid
+    from os import listdir, geteuid, getlogin
 except ImportError:
     print("Your operating system is not supported.")
 
@@ -43,6 +43,15 @@ class DevicesInstall(install):
         if len(stderr) > 0:
             return False
 
+        return True
+
+    def install_serial_port_capabilities(self):
+        print("Installing serial port capabilities...")
+        process = Popen(['usermod', '-a', '-G', 'dialout', getlogin()], stdout=PIPE, stderr=PIPE)
+        stdout, stderr = process.communicate()
+
+        if len(stderr) > 0:
+            return False
         return True
 
     def install_hci_capabilities(self, interpreter):
@@ -84,7 +93,10 @@ class DevicesInstall(install):
             if not self.install_hci_capabilities(python_interpreter):
                 print("An error occured during HCI capabilities installation.")
 
-
+            if not self.install_serial_port_capabilities():
+                print("An error occured during Serial port capabilities installation.")
+            else:
+                print("User added to group 'dialout', please logout to take the modification into account.")
         else:
             print("Automatic device installation is not supported on your operating system.")
             exit(1)
