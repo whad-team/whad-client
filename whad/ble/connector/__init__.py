@@ -10,7 +10,7 @@ from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCm
     PeripheralModeCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
     HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
     SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd, BleAddrType, ReactiveJam, \
-    JamAdvOnChannel
+    JamAdvOnChannel, PrepareSequence
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
@@ -323,6 +323,19 @@ class BLE(WhadDeviceConnector):
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (commands & (1 << ReactiveJam)) > 0
 
+
+    def can_prepare(self):
+        """
+        Determine if the device can prepare a sequence of packets associated with a trigger.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        return (commands & (1 << PrepareSequence)) > 0
+
+    def prepare(self, trigger, *packets, direction=BleDirection.MASTER_TO_SLAVE):
+        """
+        Prepare a sequence of packets and associate a trigger on it.
+        """
+        pass
 
     def reactive_jam(self, pattern, position=0, channel=37):
         """
