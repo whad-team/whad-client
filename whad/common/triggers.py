@@ -9,6 +9,15 @@ class Trigger:
     def __init__(self):
         self._connector = None
         self._triggered = False
+        self._identifier = None
+
+    @property
+    def identifier(self):
+        return self._identifier
+
+    @identifier.setter
+    def identifier(self, id):
+        self._identifier = id
 
     @property
     def triggered(self):
@@ -26,17 +35,15 @@ class Trigger:
     def connector(self, connector):
         self._connector = connector
 
-    def to_message(self):
-        return None
 
 class ManualTrigger(Trigger):
     def __init__(self):
         super().__init__()
 
     def trigger(self):
-        if self._connector is None:
+        if self._connector is None or self._identifier is None:
             raise TriggerNotAssociated()
-        self._connector.trigger()
+        self._connector.trigger(self)
 
 class ConnectionEventTrigger(Trigger):
     def __init__(self, connection_event):
@@ -63,8 +70,10 @@ class ReceptionTrigger(Trigger):
                 raise InvalidTriggerPattern()
 
         elif packet is not None and isinstance(packet, Packet):
-            scapy_packet_to_pattern(packet, selected_fields, selected_layers)
-
+            try:
+                self._pattern, self._mask, self._offset = scapy_packet_to_pattern(packet, selected_fields, selected_layers)
+            except:
+                raise InvalidTriggerPattern()
         else:
             raise InvalidTriggerPattern()
 
@@ -79,7 +88,3 @@ class ReceptionTrigger(Trigger):
     @property
     def offset(self):
         return self._offset
-
-from scapy.all import *
-t = ReceptionTrigger(packet=BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Read_Response(value=b"ABCD"),selected_fields=("len", "value"))#, selected_layers=(L2CAP_Hdr,))
-print(t.pattern, t.mask, t.offset)

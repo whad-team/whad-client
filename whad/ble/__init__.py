@@ -4,6 +4,7 @@ Bluetooth Low Energy
 from time import time
 from whad.ble.stack.gatt import GattClient, GattServer
 from whad.helpers import message_filter
+from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import BleDirection, BleAdvType, Connected
@@ -39,5 +40,8 @@ __all__ = [
     'Hijacker',
     'Injector',
     'Scanner',
-    'PHYS'
+    'PHYS',
+    'ConnectionEventTrigger',
+    'ManualTrigger',
+    'ReceptionTrigger'
 ]

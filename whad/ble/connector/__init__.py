@@ -10,7 +10,7 @@ from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCm
     PeripheralModeCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
     HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
     SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd, BleAddrType, ReactiveJam, \
-    JamAdvOnChannel, PrepareSequence
+    JamAdvOnChannel, PrepareSequence, PrepareSequenceCmd, TriggerSequence
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
@@ -18,6 +18,7 @@ from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.ble.metadata import generate_ble_metadata, BLEMetadata
 from whad.helpers import message_filter, bd_addr_to_bytes
 from whad.ble.profile.advdata import AdvDataFieldList
+from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
 
 # Logging
 import logging
@@ -331,22 +332,67 @@ class BLE(WhadDeviceConnector):
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (commands & (1 << PrepareSequence)) > 0
 
-    def prepare(self, *packets,trigger, direction=BleDirection.MASTER_TO_SLAVE):
+    def can_trigger(self):
         """
-        Prepare a sequence of packets and associate a trigger on it.
+        Determine if the device can manually trigger a sequence of packets.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        return (commands & (1 << TriggerSequence)) > 0
+
+    def trigger(self, trigger):
+        '''
+        Trigger a sequence of packets linked to a Manual Trigger object.
+        '''
+        if not self.can_trigger():
+            raise UnsupportedCapability("Trigger")
+
+        if not isinstance(trigger, ManualTrigger):
+            return False
+
+        if trigger.identifier is None:
+            return False
+
+        msg = Message()
+        msg.ble.trigger.id = trigger.identifier
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return resp.generic.cmd_result.result == ResultCode.SUCCESS
+
+    def prepare(self, *packets, trigger=ManualTrigger(), direction=BleDirection.MASTER_TO_SLAVE):
+        """
+        Prepare a sequence of packets and associate a trigger to it.
         """
         if not self.can_prepare():
             raise UnsupportedCapability("Prepare")
         msg = Message()
         msg.ble.prepare.direction = direction
-        msg.ble.prepare.trigger.connection_event.connection_event = 130
-        packet = msg.ble.prepare.sequence.add()
-        packet.packet = bytes([0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x01,0x00])
-        packet = msg.ble.prepare.sequence.add()
-        packet.packet = bytes([0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x41,0x00])
+
+        if isinstance(trigger, ManualTrigger):
+            msg.ble.prepare.trigger.manual.CopyFrom(PrepareSequenceCmd.ManualTrigger())
+        elif isinstance(trigger, ConnectionEventTrigger):
+            msg.ble.prepare.trigger.connection_event.connection_event = trigger.connection_event
+        elif isinstance(trigger, ReceptionTrigger):
+            msg.ble.prepare.trigger.reception.pattern = trigger.pattern
+            msg.ble.prepare.trigger.reception.mask = trigger.mask
+            msg.ble.prepare.trigger.reception.offset = trigger.offset
+        else:
+            return False
+
+        trigger.connector = self
+        for packet in packets:
+            if BTLE_DATA in packet:
+                packet = packet[BTLE_DATA:]
+                pkt_msg = msg.ble.prepare.sequence.add()
+                pkt_msg.packet = bytes(packet)
+            else:
+                return False
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if (resp.generic.cmd_result.result == ResultCode.SUCCESS):
+            trigger_change = self.wait_for_message(filter=message_filter('ble', 'trigger_change'))
+            trigger.identifier = trigger_change.ble.trigger_change.id
+            return True
+        else:
+            return False
 
     def reactive_jam(self, pattern, position=0, channel=37):
         """

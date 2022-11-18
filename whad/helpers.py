@@ -120,7 +120,12 @@ def list_domains():
             pass
     return domains
 
-def scapy_packet_to_pattern(packet, selected_fields, selected_layers):
+def scapy_packet_to_pattern(packet, selected_fields=None, selected_layers=None):
+    '''
+    This function converts a scapy packet into a pattern, a mask and an offset.
+    '''
+
+    # Format arguments to be iterable
     if isinstance(selected_fields, str):
         selected_fields = (selected_fields,)
 
@@ -155,6 +160,8 @@ def scapy_packet_to_pattern(packet, selected_fields, selected_layers):
     pattern = bits_to_bytes(pattern)
     mask = bits_to_bytes(mask)
     print(pattern.hex(), mask.hex())
+
+    # Crop leading zero bytes and adjust offset
     for i in range(len(mask)):
         if mask[i] == 0:
             offset += 1
@@ -162,6 +169,11 @@ def scapy_packet_to_pattern(packet, selected_fields, selected_layers):
             break
     pattern = pattern[offset:]
     mask = mask[offset:]
-    print(pattern.hex(), mask.hex(), offset)
 
-#0205010004000b
+    # Crop ending zero bytes and adjust size
+    size = len(mask) - 1
+    while size > 0 and mask[size] == 0:
+        mask = mask[:-1]
+        pattern = pattern[:-1]
+        size-=1
+    return (pattern, mask, offset)
