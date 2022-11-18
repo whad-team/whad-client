@@ -63,17 +63,8 @@ class ReceptionTrigger(Trigger):
                 raise InvalidTriggerPattern()
 
         elif packet is not None and isinstance(packet, Packet):
-            self._pattern = bytes(packet)
-            if selected_fields is None:
-                self._offset = 0
-                self._mask = bytes([0xFF for _ in range(len(self._pattern))])
-            elif hasattr(selected_fields, '__iter__'):
-                if isinstance(selected_fields, str):
-                    selected_fields = (selected_fields,)
-                scapy_packet_to_pattern(packet, selected_fields, selected_layers)
+            scapy_packet_to_pattern(packet, selected_fields, selected_layers)
 
-            else:
-                raise InvalidTriggerPattern()
         else:
             raise InvalidTriggerPattern()
 
@@ -90,5 +81,5 @@ class ReceptionTrigger(Trigger):
         return self._offset
 
 from scapy.all import *
-t = ReceptionTrigger(packet=BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Read_Response(value=b"ABCD"), selected_fields=("opcode") , selected_layers=(L2CAP_Hdr,))
+t = ReceptionTrigger(packet=BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Read_Response(value=b"ABCD"),selected_fields=("len", "value"))#, selected_layers=(L2CAP_Hdr,))
 print(t.pattern, t.mask, t.offset)
