@@ -117,3 +117,26 @@ def list_domains():
         except ModuleNotFoundError:
             pass
     return domains
+
+from scapy.fields import StrField
+def scapy_packet_to_pattern(packet, selected_fields, selected_layers):
+    packet.show()
+    print(bytes(packet).hex())
+    pattern = bytes_to_bits(bytes(packet))
+    mask = ""
+    offset = 0
+
+    for layer in packet.layers():
+        print("LAYER", layer)
+        for field in layer.fields_desc:
+            field_size = int(field.sz*8) if not isinstance(getattr(packet, field.name), bytes) else len(getattr(packet, field.name))*8
+            if selected_fields is None or layer in selected_layers:
+                mask += "1"*field_size
+            elif field.name in selected_fields:
+                mask += "1"*field_size
+            else:
+                mask += "0"*field_size
+
+    print(bits_to_bytes(pattern).hex())
+    print(bits_to_bytes(mask).hex())
+#0205010004000b

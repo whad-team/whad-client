@@ -344,6 +344,7 @@ class BLE(WhadDeviceConnector):
         packet.packet = bytes([0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x01,0x00])
         packet = msg.ble.prepare.sequence.add()
         packet.packet = bytes([0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x41,0x00])
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
