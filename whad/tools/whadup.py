@@ -55,7 +55,8 @@ BLE_COMMANDS = {
     BleCommand.Start: 'Start: can start depending on the current mode',
     BleCommand.Stop: 'Stop: can stop depending on the current mode',
     BleCommand.HijackMaster: 'HijackMaster: can hijack the Master role in an active connection',
-    BleCommand.HijackSlave: 'HijackSlave: can hijack the Slave role in an active connection'
+    BleCommand.HijackSlave: 'HijackSlave: can hijack the Slave role in an active connection',
+    BleCommand.PrepareSequence: 'PrepareSequence: prepare a sequence of packets and associate a trigger'
 }
 
 ZIGBEE_COMMANDS = {

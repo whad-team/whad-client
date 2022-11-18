@@ -4,13 +4,13 @@ from whad.device import WhadDevice
 from time import sleep
 
 def show(packet):
-    packet.show()
+    print(packet.metadata, repr(packet))
 
 central = Central(WhadDevice.create('uart0'))
 central.attach_callback(show)
-
-print('Using device: %s' % central.device.device_id)
-device = central.connect('74:da:ea:91:47:e3', random=False)
+central.prepare(trigger=None)
+#print('Using device: %s' % central.device.device_id)
+device = central.connect('A4:C1:38:22:01:64', random=False)
 print("here")
 input()
 # Discover

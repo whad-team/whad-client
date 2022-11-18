@@ -1,4 +1,6 @@
 from pkgutil import iter_modules
+from scapy.fields import StrField
+from scapy.packet import Packet_metaclass
 import whad
 
 def message_filter(category, message):
@@ -117,3 +119,49 @@ def list_domains():
         except ModuleNotFoundError:
             pass
     return domains
+
+def scapy_packet_to_pattern(packet, selected_fields, selected_layers):
+    if isinstance(selected_fields, str):
+        selected_fields = (selected_fields,)
+
+    if isinstance(selected_layers, Packet_metaclass):
+        selected_layers = (selected_layers, )
+    # convert packet to bitstring
+    pattern = bytes_to_bits(bytes(packet))
+    mask = ""
+    offset = 0
+
+    # iterate over layers and fields to keep those selected
+    for layer in packet.layers():
+        use_layer = False
+
+        if selected_layers is None and selected_fields is None:
+            use_layer = True
+        elif selected_layers is not None and layer in selected_layers:
+            use_layer = True
+        for field in layer.fields_desc:
+            field_size = int(field.sz*8) if not isinstance(getattr(packet, field.name), bytes) else len(getattr(packet, field.name))*8
+            if use_layer:
+                mask += "1" * field_size
+            else:
+                if selected_fields is None:
+                    mask += "0" * field_size
+                elif field.name in selected_fields:
+                    mask += "1" * field_size
+                else:
+                    mask += "0" * field_size
+
+    # Convert bitstrings to bytes
+    pattern = bits_to_bytes(pattern)
+    mask = bits_to_bytes(mask)
+    print(pattern.hex(), mask.hex())
+    for i in range(len(mask)):
+        if mask[i] == 0:
+            offset += 1
+        else:
+            break
+    pattern = pattern[offset:]
+    mask = mask[offset:]
+    print(pattern.hex(), mask.hex(), offset)
+
+#0205010004000b

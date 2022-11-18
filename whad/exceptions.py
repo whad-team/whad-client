@@ -64,3 +64,12 @@ class ExternalToolNotFound(Exception):
 
     def __repr__(self):
         return str(self)
+
+# Triggers exception
+class TriggerNotAssociated(Exception):
+    def __init__(self):
+        super().__init__()
+
+class InvalidTriggerPattern(Exception):
+    def __init__(self):
+        super().__init__()

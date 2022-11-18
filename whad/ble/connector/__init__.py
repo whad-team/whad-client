@@ -10,7 +10,7 @@ from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCm
     PeripheralModeCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
     HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
     SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd, BleAddrType, ReactiveJam, \
-    JamAdvOnChannel
+    JamAdvOnChannel, PrepareSequence
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
@@ -323,6 +323,30 @@ class BLE(WhadDeviceConnector):
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (commands & (1 << ReactiveJam)) > 0
 
+
+    def can_prepare(self):
+        """
+        Determine if the device can prepare a sequence of packets associated with a trigger.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        return (commands & (1 << PrepareSequence)) > 0
+
+    def prepare(self, *packets,trigger, direction=BleDirection.MASTER_TO_SLAVE):
+        """
+        Prepare a sequence of packets and associate a trigger on it.
+        """
+        if not self.can_prepare():
+            raise UnsupportedCapability("Prepare")
+        msg = Message()
+        msg.ble.prepare.direction = direction
+        msg.ble.prepare.trigger.connection_event.connection_event = 130
+        packet = msg.ble.prepare.sequence.add()
+        packet.packet = bytes([0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x01,0x00])
+        packet = msg.ble.prepare.sequence.add()
+        packet.packet = bytes([0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x41,0x00])
+
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def reactive_jam(self, pattern, position=0, channel=37):
         """
