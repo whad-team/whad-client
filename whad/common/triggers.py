@@ -6,18 +6,17 @@ from whad.helpers import scapy_packet_to_pattern
 from scapy.packet import Packet
 
 class Trigger:
+    IDENTIFIER_COUNT = 0
+
     def __init__(self):
         self._connector = None
         self._triggered = False
-        self._identifier = None
+        self._identifier = Trigger.IDENTIFIER_COUNT
+        Trigger.IDENTIFIER_COUNT += 1
 
     @property
     def identifier(self):
         return self._identifier
-
-    @identifier.setter
-    def identifier(self, id):
-        self._identifier = id
 
     @property
     def triggered(self):
@@ -25,7 +24,7 @@ class Trigger:
 
     @triggered.setter
     def triggered(self, triggered):
-        self._connector = triggered
+        self._triggered = triggered
 
     @property
     def connector(self):
@@ -41,14 +40,14 @@ class ManualTrigger(Trigger):
         super().__init__()
 
     def trigger(self):
-        if self._connector is None or self._identifier is None:
+        if self._connector is None:
             raise TriggerNotAssociated()
         self._connector.trigger(self)
 
 class ConnectionEventTrigger(Trigger):
     def __init__(self, connection_event):
-        super().__init__()
         self._connection_event = connection_event
+        super().__init__()
 
     @property
     def connection_event(self):
@@ -76,6 +75,7 @@ class ReceptionTrigger(Trigger):
                 raise InvalidTriggerPattern()
         else:
             raise InvalidTriggerPattern()
+        super().__init__()
 
     @property
     def pattern(self):

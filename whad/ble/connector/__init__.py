@@ -79,6 +79,9 @@ class BLE(WhadDeviceConnector):
             # Link-layer encryption
             self.__encrypted = False
 
+            # List of active triggers
+            self.__triggers = []
+
             # Open device and make sure it is compatible
             self.device.open()
             self.device.discover()
@@ -365,7 +368,7 @@ class BLE(WhadDeviceConnector):
             raise UnsupportedCapability("Prepare")
         msg = Message()
         msg.ble.prepare.direction = direction
-
+        msg.ble.prepare.id = trigger.identifier
         if isinstance(trigger, ManualTrigger):
             msg.ble.prepare.trigger.manual.CopyFrom(PrepareSequenceCmd.ManualTrigger())
         elif isinstance(trigger, ConnectionEventTrigger):
@@ -387,12 +390,10 @@ class BLE(WhadDeviceConnector):
                 return False
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        if (resp.generic.cmd_result.result == ResultCode.SUCCESS):
-            trigger_change = self.wait_for_message(filter=message_filter('ble', 'trigger_change'))
-            trigger.identifier = trigger_change.ble.trigger_change.id
-            return True
-        else:
-            return False
+        success = resp.generic.cmd_result.result == ResultCode.SUCCESS
+        if success:
+            self.__triggers.append(trigger)
+        return success
 
     def reactive_jam(self, pattern, position=0, channel=37):
         """
@@ -636,6 +637,9 @@ class BLE(WhadDeviceConnector):
         msg = Message()
         msg.ble.stop.CopyFrom(StopCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+
+        # Remove all triggers
+        self.__triggers = []
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def set_encryption(self, enabled=False, key=None, iv=None):
@@ -714,6 +718,9 @@ class BLE(WhadDeviceConnector):
             elif msg_type == 'disconnected':
                 self.on_disconnected(message.disconnected)
 
+            elif msg_type == 'triggered':
+                self.on_triggered(message.triggered.id)
+
 
     def on_synchronized(self, access_address=None, crc_init=None, hop_increment=None, hop_interval=None, channel_map=None):
         pass
@@ -729,6 +736,11 @@ class BLE(WhadDeviceConnector):
         logger.debug(
             'connection handle: %d' % connection_data.handle if connection_data.handle is not None else 0
         )
+
+    def on_triggered(self, identifier):
+        for trigger in self.__triggers:
+            if trigger.identifier == identifier:
+                trigger.triggered = True
 
     def on_disconnected(self, disconnection_data):
         logger.info('a connection has been terminated')

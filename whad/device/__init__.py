@@ -765,7 +765,6 @@ class WhadDevice(object):
                         _msg.ParseFromString(bytes(raw_message))
                         logger.debug('WHAD message successfully parsed')
                         self.on_message_received(_msg)
-
                         # Chomp
                         self.__inpipe = self.__inpipe[msg_size + 4:]
                     else:

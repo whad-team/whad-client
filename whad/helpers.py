@@ -159,7 +159,6 @@ def scapy_packet_to_pattern(packet, selected_fields=None, selected_layers=None):
     # Convert bitstrings to bytes
     pattern = bits_to_bytes(pattern)
     mask = bits_to_bytes(mask)
-    print(pattern.hex(), mask.hex())
 
     # Crop leading zero bytes and adjust offset
     for i in range(len(mask)):
