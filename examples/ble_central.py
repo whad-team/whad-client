@@ -1,18 +1,18 @@
-from whad.ble import Central
+from whad.ble import Central, ConnectionEventTrigger, ReceptionTrigger, ManualTrigger
 from whad.ble.profile import UUID
 from whad.device import WhadDevice
 from time import sleep
+from scapy.all import BTLE_DATA, ATT_Hdr, L2CAP_Hdr, ATT_Read_Request, ATT_Write_Request, ATT_Error_Response, BTLE_EMPTY_PDU, BTLE_CTRL, LL_ENC_REQ
 
 def show(packet):
     print(packet.metadata, repr(packet))
 
 central = Central(WhadDevice.create('uart0'))
 central.attach_callback(show)
-central.prepare(trigger=None)
+
+
 #print('Using device: %s' % central.device.device_id)
-device = central.connect('A4:C1:38:22:01:64', random=False)
-print("here")
-input()
+device = central.connect('74:da:ea:91:47:e3', random=False)
 # Discover
 device.discover()
 for service in device.services():
