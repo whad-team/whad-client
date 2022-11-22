@@ -10,7 +10,7 @@ from time import sleep
 from scapy.layers.bluetooth4LE import *
 
 from whad.ble.stack.l2cap import BleL2CAP
-from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, e 
+from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, e
 
 import logging
 logger = logging.getLogger(__name__)
@@ -238,7 +238,7 @@ class BleConnection(object):
                 BTLE_CTRL() / LL_START_ENC_REQ(),
                 encrypt=False
             )
-            
+
         else:
             self.send_control(
 
@@ -316,7 +316,7 @@ class BleConnection(object):
         pass
 
     def on_slave_feature_req(self, feature_req):
-        pass
+        self.on_unsupported_opcode(FEATURE_REQ)
 
     def on_connection_param_req(self, conn_param_req):
         self.on_unsupported_opcode(CONNECTION_PARAM_REQ)
