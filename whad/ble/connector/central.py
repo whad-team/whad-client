@@ -42,15 +42,29 @@ class Central(BLE):
             if existing_connection is not None:
                 self.on_connected(existing_connection)
 
-    def connect(self, bd_address, random=False, timeout=30):
+    def connect(self, bd_address, random=False, timeout=30, access_address=None, channel_map=None, crc_init=None, hop_interval=None, hop_increment=None):
         """Connect to a target device
 
         :param string bd_address: Bluetooth device address (in format 'xx:xx:xx:xx:xx:xx')
         :param int timeout: Connection timeout
+        :param access_address: Access address to use (optional)
+        :param channel_map: Channel map to use (optional)
+        :param crc_init: CRC Initialization value to use (optional)
+        :param hop_interval: Hop interval to use (optional)
+        :param hop_increment: Hop increment to use (optional)
         :returns: An instance of `PeripheralDevice` on success, `None` on failure.
         """
         if self.can_connect():
-            self.connect_to(bd_address, random=random)
+            self.connect_to(
+                bd_address,
+                random=random,
+                access_address=access_address,
+                channel_map=channel_map,
+                crc_init=crc_init,
+                hop_interval=hop_interval,
+                hop_increment=hop_increment
+            )
+
             self.start()
             start_time=time()
             while not self.is_connected():
@@ -103,7 +117,7 @@ class Central(BLE):
         )
 
         self.__connected = False
-        
+
         # Notify peripheral device about this disconnection
         if self.__peripheral is not None:
             self.__peripheral.on_disconnect(disconnection_data.conn_handle)
@@ -114,7 +128,7 @@ class Central(BLE):
 
         Central devices act as master, so we only forward slave to master
         messages to the stack.
-        
+
         :param pdu: BLE Control PDU
         """
         logger.info('received control PDU')
@@ -127,7 +141,7 @@ class Central(BLE):
 
         Central devices act as master, so we only forward slave to master
         messages to the stack.
-        
+
         :param pdu: BLE Control PDU
         """
         logger.info('received data PDU')
