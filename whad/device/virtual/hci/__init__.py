@@ -20,11 +20,12 @@ from whad.scapy.layers.hci import HCI_Cmd_Read_Local_Version_Information, \
     HCI_Cmd_Read_Local_Name, HCI_Cmd_Complete_Read_Local_Name, HCI_Cmd_LE_Read_Supported_States, \
     HCI_Cmd_Complete_LE_Read_Supported_States, HCI_Cmd_CSR_Write_BD_Address, HCI_Cmd_CSR_Reset, \
     HCI_Cmd_TI_Write_BD_Address, HCI_Cmd_BCM_Write_BD_Address, HCI_Cmd_Zeevo_Write_BD_Address, \
-    HCI_Cmd_Ericsson_Write_BD_Address, HCI_Cmd_ST_Write_BD_Address
+    HCI_Cmd_Ericsson_Write_BD_Address, HCI_Cmd_ST_Write_BD_Address, HCI_Cmd_LE_Set_Host_Channel_Classification
 from select import select
 from os import read, write
 from time import sleep
 from queue import Queue
+from struct import unpack
 
 def get_hci(index):
     '''
@@ -386,12 +387,18 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_LE_Set_Scan_Enable(enable=int(enable), filter_dups=False))
         return response.status == 0x00
 
-    def _connect(self, bd_address, bd_address_type=BleAddrType.PUBLIC):
+    def _connect(self, bd_address, bd_address_type=BleAddrType.PUBLIC, hop_interval=96, channel_map=None):
         """
         Establish a connection using HCI device.
         """
         patype = 0 if bd_address_type == BleAddrType.PUBLIC else 1
-        response = self._write_command(HCI_Cmd_LE_Create_Connection(paddr=bd_address, patype=patype))
+        if channel_map is not None:
+            print(channel_map)
+            formatted_channel_map = unpack("<Q",channel_map+ b"\x00\x00\x00")[0]
+            response = self._write_command(HCI_Cmd_LE_Set_Host_Channel_Classification(chM=formatted_channel_map))
+            if response.status != 0x00:
+                return False
+        response = self._write_command(HCI_Cmd_LE_Create_Connection(paddr=bd_address, patype=patype, min_interval=hop_interval, max_interval=hop_interval))
         return response.status == 0x00
 
     def _disconnect(self, handle):
@@ -450,10 +457,13 @@ class HCIDevice(VirtualDevice):
         self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_ble_connect(self, message):
+        print(message)
         if ConnectTo in self._dev_capabilities[WhadDomain.BtLE][1]:
             bd_address = message.bd_address
             bd_address_type = message.addr_type
-            if self._connect(bd_address, bd_address_type):
+            channel_map = message.channel_map if message.HasField("channel_map") else None
+            hop_interval = message.hop_interval if message.HasField("hop_interval") else 96
+            if self._connect(bd_address, bd_address_type, hop_interval=hop_interval, channel_map=channel_map):
                 self._send_whad_command_result(ResultCode.SUCCESS)
                 return
         self._send_whad_command_result(ResultCode.ERROR)

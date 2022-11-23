@@ -3,6 +3,7 @@ from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteEnumField, ByteField, LEShortEnumField, LEShortField, \
     StrField, StrNullField, LELongField
 from scapy.layers.bluetooth import HCI_Command_Hdr, HCI_Event_Command_Complete, LEMACField
+from scapy.layers.bluetooth4LE import BTLEChanMapField
 
 HCI_VERSIONS = LMP_VERSIONS = {
     0x00:   "1.0b",
@@ -127,6 +128,11 @@ class HCI_Cmd_ST_Write_BD_Address(Packet):
     ]
 
 
+class HCI_Cmd_LE_Set_Host_Channel_Classification(Packet):
+	name = "HCI Command LE Set Host Channel Classification"
+	fields_desc = [
+		BTLEChanMapField("chM" ,None)
+	]
 
 
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Version_Information,                        opcode=0x1001)
@@ -135,6 +141,7 @@ bind_layers(HCI_Command_Hdr,HCI_Cmd_Read_Local_Name,			                         
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Local_Name,                   opcode=0x0c14)
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Supported_States,                              opcode=0x201c)
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_LE_Read_Supported_States,          opcode=0x201c)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Host_Channel_Classification,                    opcode=0x2014)
 
 bind_layers(HCI_Command_Hdr, HCI_Cmd_ST_Write_BD_Address,                                   opcode=0xfc22)
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Zeevo_Write_BD_Address,                                opcode=0xfc01)
