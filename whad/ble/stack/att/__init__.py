@@ -26,7 +26,8 @@ from whad.ble.stack.gatt.message import GattExecuteWriteRequest, GattExecuteWrit
     GattFindByTypeValueRequest, GattFindByTypeValueResponse, GattFindInfoRequest, GattReadByTypeResponse, \
     GattReadRequest, GattReadResponse, GattReadBlobRequest, GattReadBlobResponse, GattReadMultipleRequest, \
     GattReadMultipleResponse, GattWriteCommand, GattWriteRequest, GattWriteResponse, GattPrepareWriteRequest, \
-    GattPrepareWriteResponse, GattExecuteWriteRequest, GattExecuteWriteResponse
+    GattPrepareWriteResponse, GattExecuteWriteRequest, GattExecuteWriteResponse, \
+    GattExchangeMtuResponse
 
 # Add missing ATT_Handle_Value_Confirmation class
 class ATT_Handle_Value_Confirmation(Packet):
@@ -133,6 +134,9 @@ class BleATT(object):
         # Read Response has no body
         elif att_pkt.opcode == BleAttOpcode.READ_RESPONSE:
             self.on_read_response(None)
+        # Execute write request
+        elif att_pkt.opcode == BleAttOpcode.EXECUTE_WRITE_RESPONSE:
+            self.on_execute_write_response(None)
 
     def on_error_response(self, error_resp):
         self.__gatt.on_error_response(
@@ -149,7 +153,6 @@ class BleATT(object):
 
         :param ATT_Exchange_MTU_Request mtu_req: MTU request
         """
-        print('> exchange MTU request')
         # Update L2CAP Client MTU
         self.__l2cap.remote_mtu = mtu_req.mtu
         
@@ -164,6 +167,9 @@ class BleATT(object):
         :param mtu_resp ATT_Exchange_MTU_Response: MTU response
         """
         self.__l2cap.remote_mtu = mtu_resp.mtu
+        self.__gatt.on_exch_mtu_response(GattExchangeMtuResponse(
+            mtu=mtu_resp.mtu
+        ))
 
     def on_find_info_request(self, request):
         """Handle ATT Find Information Request
@@ -376,7 +382,7 @@ class BleATT(object):
     def on_execute_write_response(self, response):
         """Handle ATT Execute Write Response
         """
-        self.__gatt.on_execute_write_response(GattExecuteWriteResponse)
+        self.__gatt.on_execute_write_response(GattExecuteWriteResponse())
 
     def on_handle_value_notification(self, notif):
         """Handle ATT Handle Value Notification
@@ -423,6 +429,8 @@ class BleATT(object):
 
         :param int mtu: Maximum Transmission Unit
         """
+        # Update local MTU first
+        self.__l2cap.local_mtu = mtu
         self.send(ATT_Exchange_MTU_Request(
             mtu=mtu
         ))

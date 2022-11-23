@@ -223,3 +223,9 @@ class GattHandleValueIndication(GattDataHolder):
 class GattHandleValueConfirmation(GattDataHolder):
     def __init__(self):
         super().__init__()
+
+class GattExchangeMtuResponse(GattDataHolder):
+    def __init__(self, mtu: int):
+        super().__init__(
+            mtu=mtu
+        )

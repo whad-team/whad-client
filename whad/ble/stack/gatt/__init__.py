@@ -297,6 +297,13 @@ class Gatt(object):
         """
         pass
 
+    def on_exch_mtu_response(self, response):
+        """ATT MTU exchange response
+
+        :param GattExchangeMtuResponse response: response from remote device
+        """
+        pass
+
     def on_terminated(self):
         """Called when the underlying connection has been terminated.
         """
@@ -329,12 +336,14 @@ class GattClient(Gatt):
         """
         self.on_gatt_message(response)
 
+
     def on_read_by_type_response(self, response):
         """ATT Read By Type Response callback
 
         :param GattReadByTypeResponse response: Response
         """
         self.on_gatt_message(response)
+
 
     def on_find_info_response(self, response):
         """ATT Find Information Response callback
@@ -344,12 +353,14 @@ class GattClient(Gatt):
         """
         self.on_gatt_message(response)
 
+
     def on_read_response(self, response):
         """ATT Read Response callback
 
         :param value: Attribute value
         """
         self.on_gatt_message(response)
+
 
     def on_read_by_type_response(self, response):
         """ATT Read By Type Response callback
@@ -358,6 +369,7 @@ class GattClient(Gatt):
         """
         self.on_gatt_message(response)
 
+
     def on_read_blob_response(self, response):
         """ATT Read Blob Response callback
 
@@ -365,8 +377,24 @@ class GattClient(Gatt):
         """
         self.on_gatt_message(response)
 
+
     def on_write_response(self, response):
         """ATT Write Response callback
+        """
+        self.on_gatt_message(response)
+
+
+    def on_prepare_write_response(self, response):
+        """ATT Prepare Write Response Callback
+
+        :param GattPrepareWriteResponse response: Response message
+        """
+        self.on_gatt_message(response)
+
+    def on_execute_write_response(self, response):
+        """ATT Execute Write Response Callback
+
+        :param GattExecuteWriteResponse response: Response message
         """
         self.on_gatt_message(response)
 
@@ -404,6 +432,14 @@ class GattClient(Gatt):
                 indication=True
             )
         self.att.handle_value_confirmation()
+
+    def on_exch_mtu_response(self, response):
+        """ATT MTU exchange response
+
+        :param GattExchangeMtuResponse response: response from remote device
+        """
+        self.on_gatt_message(response)
+
 
     ###################################
     # GATT procedures
@@ -531,7 +567,8 @@ class GattClient(Gatt):
                 0x2803
             )
 
-            msg =self.wait_for_message(GattReadByTypeResponse)
+            msg = self.wait_for_message(GattReadByTypeResponse)
+            print(msg)
             if isinstance(msg, GattReadByTypeResponse):
                 for item in msg:
                     charac_properties = item.value[0]
@@ -643,11 +680,12 @@ class GattClient(Gatt):
             self.att.read_blob_request(handle, offset)
             msg = self.wait_for_message(GattReadBlobResponse)
             if isinstance(msg, GattReadBlobResponse):
-                if msg.value is not None:
+                if len(msg.value) < (self.att.local_mtu - 1):
+                    value += msg.value
+                    break
+                else:
                     value += msg.value
                     offset += len(msg.value)
-                else:
-                    break
             elif isinstance(msg, GattErrorResponse):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
         return value
@@ -658,15 +696,21 @@ class GattClient(Gatt):
         :param int handle: Target characteristic or descriptor handle
         :param bytes value: Data to write
         """
-        self.att.write_request(
-            handle,
-            value
-        )
-        msg = self.wait_for_message(GattWriteResponse)
-        if isinstance(msg, GattWriteResponse):
-            return True
-        elif isinstance(msg, GattErrorResponse):
-            raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+        # Check if data to write is longer than MTU
+        if len(value) > (self.att.local_mtu - 3):
+            return self.write_long(handle, value)
+        else:
+            # If data can be sent in a single write request, just send it :)
+            self.att.write_request(
+                handle,
+                value
+            )
+            msg = self.wait_for_message(GattWriteResponse)
+            if isinstance(msg, GattWriteResponse):
+                return True
+            elif isinstance(msg, GattErrorResponse):
+                raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+
 
     def write_command(self, handle, value):
         """Write data to a characteristic or a descriptor, do not expect an answer.
@@ -681,6 +725,46 @@ class GattClient(Gatt):
 
         # Write command does not cause the GATT server to return a response.
         return True
+
+
+    def write_long(self, handle, value):
+        """Write long data (size > ATT_MTU-2) to a characteristic value.
+
+        This method uses Prepared Write requests as described in Vol 3, Part G,
+        section 4.9.5. 
+
+        :param int handle: Target characteristic value handle
+        :param bytes value: Data to write
+        """
+        # We need to determine how many prepared write requests we should issue
+        # to the target device
+        data_len = len(value)
+        nb_chunks = int(data_len / (self.att.local_mtu - 5))
+        if nb_chunks % (self.att.local_mtu - 5) > 0:
+            nb_chunks += 1
+        chunk_size = self.att.local_mtu - 5
+        
+        # Send prepared write requests
+        offset = 0
+        for i in range(nb_chunks):
+            self.att.prepare_write_request(handle, offset, value[offset:offset + chunk_size])
+            msg = self.wait_for_message(GattPrepareWriteResponse)
+            if isinstance(msg, GattPrepareWriteResponse):
+                if msg.value is not None:
+                    offset += len(msg.value)
+                else:
+                    break
+            elif isinstance(msg, GattErrorResponse):
+                raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+        
+        # Execute write request
+        self.att.execute_write_request(1)
+        msg = self.wait_for_message(GattExecuteWriteResponse)
+        if isinstance(msg, GattExecuteWriteResponse):
+            return True
+        elif isinstance(msg, GattErrorResponse):
+            raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+
 
     def read_characteristic_by_uuid(self, uuid, start=1, end=0xFFFF):
         """Read a characteristic given its UUID if its handle is comprised in a given range.
@@ -701,6 +785,27 @@ class GattClient(Gatt):
                 return output
         elif isinstance(msg, GattErrorResponse):
             raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+
+
+    def set_mtu(self, mtu):
+        '''Set (G)ATT client MTU (must be >= ATT_MTU, i.e. 23).
+
+        This method is exposed in GattClient but really interact with the underlying
+        ATT layer, and checks if we receive an answer from the remote device.
+
+        :param int mtu: ATT MTU to use
+        :return int: remote device MTU
+        '''
+        if mtu >= 23:
+            self.att.exch_mtu_request(mtu)
+            msg = self.wait_for_message(GattExchangeMtuResponse)
+            if isinstance(msg, GattExchangeMtuResponse):
+                return msg.mtu
+            elif isinstance(msg, GattErrorResponse):
+                raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+        else:
+            return None
+           
 
     def services(self):
         return self.__model.services()
