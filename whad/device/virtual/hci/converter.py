@@ -50,6 +50,13 @@ class HCIConverter:
         if L2CAP_Hdr in event:
             msg = Message()
             pdu = BTLE_DATA()/event[L2CAP_Hdr:]
+
+            # If HCI ACL Data PB flag==1 then it is a continued fragment.
+            # We make sure BTLE_DATA.LLID is then 0x01 (Continuation
+            # of a L2CAP message), our stack will take care of packet reassembly.
+            if event.PB == 0x01:
+                pdu.LLID = 1
+
             direction = (BleDirection.SLAVE_TO_MASTER if
                          self.role == HCIRole.CENTRAL else
                          BleDirection.MASTER_TO_SLAVE
