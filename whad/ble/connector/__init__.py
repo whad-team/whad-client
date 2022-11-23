@@ -594,7 +594,7 @@ class BLE(WhadDeviceConnector):
             msg.ble.periph_mode.CopyFrom(PeripheralModeCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
-    def connect_to(self, bd_addr, random=False):
+    def connect_to(self, bd_addr, random=False, access_address=None, channel_map=None, crc_init=None, hop_interval=None, hop_increment=None):
         """
         Initiate a Bluetooth Low Energy connection.
         """
@@ -604,6 +604,17 @@ class BLE(WhadDeviceConnector):
             msg.ble.connect.addr_type = BleAddrType.RANDOM
         else:
             msg.ble.connect.addr_type = BleAddrType.PUBLIC
+
+        if access_address is not None:
+            msg.ble.connect.access_address = access_address
+        if channel_map is not None and channel_map >= 1 and channel_map <= 0x1fffffffff:
+            msg.ble.connect.channel_map = struct.pack("<Q", channel_map)[:5]
+        if crc_init is not None:
+            msg.ble.connect.crc_init = crc_init
+        if hop_interval is not None:
+            msg.ble.connect.hop_interval = hop_interval
+        if hop_increment is not None:
+            msg.ble.connect.hop_increment = hop_increment
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
     def start(self):
