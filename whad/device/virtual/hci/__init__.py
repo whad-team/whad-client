@@ -393,7 +393,6 @@ class HCIDevice(VirtualDevice):
         """
         patype = 0 if bd_address_type == BleAddrType.PUBLIC else 1
         if channel_map is not None:
-            print(channel_map)
             formatted_channel_map = unpack("<Q",channel_map+ b"\x00\x00\x00")[0]
             response = self._write_command(HCI_Cmd_LE_Set_Host_Channel_Classification(chM=formatted_channel_map))
             if response.status != 0x00:
@@ -457,7 +456,6 @@ class HCIDevice(VirtualDevice):
         self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_ble_connect(self, message):
-        print(message)
         if ConnectTo in self._dev_capabilities[WhadDomain.BtLE][1]:
             bd_address = message.bd_address
             bd_address_type = message.addr_type
