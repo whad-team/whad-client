@@ -1,4 +1,33 @@
 """Bluetooth Low Energy device abstraction
+
+This module provides the PeripheralDevice class used to wrap all GATT operations
+for a given connected device. This class wraps all the following operations:
+
+* service and characteristics discovery
+* ATT MTU exchange
+* characteristic and descriptor read
+* characteristic and descriptor write
+
+For instance, a `Central` object can be used to initiate a BLE connection to a
+target, and will return a `PeripheralDevice` object, as shown below::
+
+    central = Central(...)
+    target = central.connect('00:11:22:33:44:55')
+    
+One can then use this object to discover all the services and characteristics::
+
+    target.discover()
+
+And look for a specific characteristic and read it::
+
+    device_name = target.get_characteristic(UUID('1800'), UUID('2A00'))
+    if device_name is not None:
+        print('Device name is {}'.format(device_name.read()))
+
+It is also possible to write to a characteristic (if writeable)::
+
+    device_name.value = b'MyNewDeviceName'
+
 """
 
 from whad.ble.profile.service import Service
@@ -8,27 +37,52 @@ from whad.ble.stack.att.constants import BleAttProperties
 from whad.ble.profile.attribute import UUID
 
 class PeripheralCharacteristicDescriptor:
+    """Wrapper for a peripheral characteristic descriptor.
+    """
 
     def __init__(self, descriptor, gatt):
+        """Initialize a PeripheralCharacteristicDescriptor.
+
+        :param CharacteristicDescriptor descriptor: Descriptor to wrap.
+        :param GattClient gatt: GATT client to use for GATT operations (read/write).
+        """
         self.__descriptor = descriptor
         self.__gatt = gatt
 
     @property
     def handle(self):
+        """Return this characteristic descriptor handle.
+
+        :return int: Descriptor handle
+        """
         return self.__descriptor.handle
 
     @property
     def type_uuid(self):
+        """Return this attribute type UUID.
+        
+        :return UUID: Attribute type UUID
+        """
         return self.__descriptor.type_uuid
 
     def read(self):
+        """Read descriptor value.
+
+        :return bytes: Descriptor value
+        """
         return self.__gatt.read(self.__descriptor.handle)
 
     def write(self, value, without_response=False):
+        """Write descriptor value.
+
+        :param bytes value: Value to write to this descriptor.
+        :param bool without_response: If set, use a GATT write command request to write to this descriptor.
+        """
         if without_response:
             self.__gatt.write_command(self.__descriptor.handle, value)
         else:
             self.__gatt.write(self.__descriptor.handle, value)
+
 
 class PeripheralCharacteristic:
     """Characteristic wrapper for peripheral devices
@@ -41,7 +95,7 @@ class PeripheralCharacteristic:
 
     @property
     def value(self):
-        """Transparent characteristic read
+        """Transparent characteristic read.
 
         :return bytes: Characteristic value
         """
@@ -49,7 +103,7 @@ class PeripheralCharacteristic:
 
     @value.setter
     def value(self, val):
-        """Transparent characteristic write
+        """Transparent characteristic write.
 
         :param bytes val: Value to write into this characteristic
         """
@@ -94,8 +148,6 @@ class PeripheralCharacteristic:
 
     def write(self, value, without_response=False):
         """Set characteristic value
-
-        TODO: handle prepared write !
         """
         if isinstance(value, bytes):
             if without_response:
@@ -108,10 +160,13 @@ class PeripheralCharacteristic:
                     self.__characteristic.value_handle,
                     value
                 )
-        else:
-            print('NOPE')
 
     def descriptors(self):
+        """Return all the descriptors associated with this characteristic.
+
+        This method is a generator and will yield all the descriptors registered
+        with this characteristic.
+        """
         for desc in self.__characteristic.descriptors():
             yield PeripheralCharacteristicDescriptor(
                 desc,
@@ -119,7 +174,10 @@ class PeripheralCharacteristic:
             )
 
     def get_descriptor(self, type_uuid):
-        """Get descriptor of a given type
+        """Get descriptor of a given type.
+
+        :param UUID type_uuid: Descriptor type UUID
+        :return PeripheralCharacteristicDescriptor: Return descriptor if found, `None` otherwise
         """
         for desc in self.__characteristic.descriptors():
             if desc.type_uuid == type_uuid:
@@ -129,16 +187,29 @@ class PeripheralCharacteristic:
                 )
 
     def readable(self):
+        """Check if this characteristic is readable.
+
+        :return bool: True if readable, False otherwise.
+        """
         return ((self.__characteristic.properties & CharacteristicProperties.READ) != 0)
 
     def writeable(self):
+        """Check if this characteristic is writeable.
+
+        :return bool: True if writeable, False otherwise.
+        """
         return (
             ((self.__characteristic.properties & CharacteristicProperties.WRITE) != 0) or 
             ((self.__characteristic.properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE) != 0)
         )
 
     def subscribe(self, notification=True, indication=False, callback=None):
-        """Subscribe for notification/indication
+        """Subscribe for notification/indication.
+
+        :param bool notification: If set, subscribe for notification
+        :param bool indication: If set, subscribe for indication (cannot be used when notification is set)
+        :param callable callback: Callback function to be called on indication/notification event
+        :return bool: True if subscription has successfully been performed, False otherwise.
         """
         if notification:
             # Look for CCCD
@@ -186,7 +257,7 @@ class PeripheralCharacteristic:
                 return False
     
     def unsubscribe(self):
-        """Unsubscribe to this characteristic
+        """Unsubscribe from this characteristic.
         """
         # Look for CCCD
         desc = self.get_descriptor(UUID(0x2902))
@@ -214,21 +285,42 @@ class PeripheralService:
 
     @property
     def handle(self):
+        """Return this service handle.
+
+        :param int: service handle
+        """
         return self.__service.handle
 
     @property
     def end_handle(self):
+        """Return this service end handle.
+
+        :return int: end handle
+        """
         return self.__service.end_handle
 
     @property
     def uuid(self):
+        """Return this service UUID.
+
+        :param UUID: Service UUID
+        """
         return self.__service.uuid
 
     @property
     def type_uuid(self):
+        """Return this service type UUID
+
+        :return UUID: Service type UUID
+        """
         return self.__service.type_uuid
 
     def read_characteristic_by_uuid(self, uuid):
+        """Read a characteristic belonging to this service identified by its UUID.
+
+        :param UUID uuid: Characteristic UUID
+        :return bytes: Characteristic value
+        """
         return self.__gatt.read_characteristic_by_uuid(
             uuid,
             self.__service.handle,
@@ -236,6 +328,11 @@ class PeripheralService:
         )
 
     def get_characteristic(self, uuid):
+        """Look for a specific characteristic belonging to this service, identified by its UUID.
+
+        :param UUID uuid: Characteristic UUID
+        :return PeripheralCharacteristic: Found characteristic if any, `None` otherwise.
+        """
         for charac in self.__service.characteristics():
             if charac.uuid == uuid:
                 return PeripheralCharacteristic(
@@ -245,6 +342,8 @@ class PeripheralService:
         return None
 
     def characteristics(self):
+        """Enumerate this service's characteristics (generator).
+        """
         for characteristic in self.__service.characteristics():
             yield PeripheralCharacteristic(
                 characteristic,
@@ -260,20 +359,43 @@ class PeripheralDevice(GenericProfile):
     """
 
     def __init__(self,  central, gatt_client, conn_handle, from_json=None):
+        """Create a peripheral device from a Central and a GATT client.
+
+        :param Central central: Central instance used to connect to a target device.
+        :param GattClient gatt_client: GATT client connected to a target device.
+        :param int conn_handle: Current connection handle.
+        :param str from_json: GATT profile (JSON) to be used when instanciating the underlying GattProfile.
+        """
         self.__gatt = gatt_client
         self.__conn_handle = conn_handle
         self.__central = central
         super().__init__(from_json=from_json)
 
+
     @property
     def conn_handle(self):
+        """Return the current connection handle.
+
+        :return int: current connection handle.
+        """
         return self.__conn_handle
+
+
+    def set_mtu(self, mtu: int):
+        """Update connection MTU.
+
+        :param int mtu: ATT MTU to use for this connection.
+        :return int: Remote device MTU.
+        """
+        return self.__gatt.set_mtu(mtu)
+
 
     def disconnect(self):
         """Terminate the connection to this device
         """
         # Ask associated central to disconnect this peripheral device.
         self.__central.disconnect(self.__conn_handle)
+
 
     def discover(self):
         """Discovers services, characteristics and descriptors.
@@ -284,7 +406,13 @@ class PeripheralDevice(GenericProfile):
         # Discover
         self.__gatt.discover()
 
-    def find_service_by_uuid(self, uuid):
+
+    def find_service_by_uuid(self, uuid: UUID):
+        """Find service by its UUID
+
+        :param UUID uuid: Service UUID
+        :return PeripheralService: An instance of PeripheralService if service has been found, None otherwise.
+        """
         service = self.__gatt.discover_primary_service_by_uuid(uuid)
         if service is not None:
             return PeripheralService(
@@ -294,13 +422,13 @@ class PeripheralDevice(GenericProfile):
         else:
             return None
 
-    """
-    def services(self):
-        for service in super().services():
-            yield PeripheralService(service, self.__gatt)
-    """
 
     def find_object_by_handle(self, handle):
+        """Find an existing object (service, attribute, descriptor) based on its handle,
+        it known from the underlying GenericProfile.
+
+        :param int handle: Object handle
+        """
         obj = super().find_object_by_handle(handle)
         if isinstance(obj, Characteristic):
             return PeripheralCharacteristic(
@@ -313,10 +441,12 @@ class PeripheralDevice(GenericProfile):
                 self.__gatt
             )
 
-    def get_characteristic(self, service_uuid, charac_uuid):
+    def get_characteristic(self, service_uuid: UUID, charac_uuid: UUID):
         """Get a PeripheralCharacteristic object representing a characteristic
         defined by the given service UUID and characteristic UUID.
 
+        :param UUID service_uuid: Service UUID
+        :param UUID charac_uuid: Characteristic UUID
         :return: PeripheralCharacteristic object on success, None if not found.
         """
         service = self.get_service(service_uuid)
@@ -326,18 +456,76 @@ class PeripheralDevice(GenericProfile):
 
     def get_service(self, uuid):
         """Retrieve a PeripheralService object given its UUID.
+
+        :param UUID uuid: Service UUID
+        :return PeripheralService: Corresponding PeripheralService object if found, None otherwise.
         """
 
-        """
-        for service in self.__gatt.services():
-            if service.uuid == uuid:
-                return PeripheralService(service, self.__gatt)
-        return None
-        """
         for service in self.services():
             if service.uuid == uuid:
                 return PeripheralService(service, self.__gatt)
         return None
+
+
+    def write(self, handle, value):
+        """Perform a write operation on an attribute based on its handle.
+
+        This method allows to interact with characteristics and descriptors without
+        having performing a GATT services and characteristics discovery. One just need
+        to specify the handle corresponding to a characteristic value or descriptor and the
+        value to write to it, and our GATT stack will handle it.
+
+        Note that there is absolutely no check on corresponding characteristic permissions
+        (meaning you can try to write on a read-only characteristic value) and that this
+        method may raise exceptions due to potential GATT errors the remote device may
+        return.
+
+        :param int handle: Characteristic or descriptor handle to write.
+        :param bytes value: Bytes to write into this characteristic.
+        """
+        return self.__gatt.write(handle, value)
+
+    def write_command(self, handle, value, without_response=False):
+        """Perform a write command operation (no write response will be sent) on
+        an attribute based on its handle.
+
+        This method allows to interact with characteristics and descriptors without
+        having performing a GATT services and characteristics discovery. One just need
+        to specify the handle corresponding to a characteristic value or descriptor and the
+        value to write to it, and our GATT stack will handle it.
+
+        Note that there is absolutely no check on corresponding characteristic permissions
+        (meaning you can try to write on a read-only characteristic value) and that this
+        method may raise exceptions due to potential GATT errors the remote device may
+        return.
+
+        :param int handle: Characteristic or descriptor handle to write.
+        :param bytes value: Bytes to write into this characteristic.
+        """
+        return self.__gatt.write_command(handle, value)
+
+    def read(self, handle, offset=0, long=False):
+        """Perform a read operation on an attribute based on its handle.
+
+        This method allows to interact with characteristics and descriptors without
+        having performing a GATT services and characteristics discovery. One just need
+        to specify the handle corresponding to a characteristic value or descriptor
+        and our GATT stack will handle it.
+
+        Note that there is absolutely no check on corresponding characteristic permissions
+        (meaning you can try to read from a write-only characteristic value) and that this
+        method may raise exceptions due to potential GATT errors the remote device may
+        return.
+
+        :param int handle: Characteristic or descriptor handle.
+        :param int offset: Offset applied when reading data from characteristic or descriptor (default: 0).
+        :param bool long: use GATT long read procedure if set to True (default: False)
+        :return bytes: Content of the characteristic or descriptor.
+        """
+        if not long:
+            return self.__gatt.read(handle, offset=offset)
+        else:
+            return self.__gatt.read_long(handle)
 
     
 
