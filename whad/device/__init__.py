@@ -288,34 +288,34 @@ class WhadDeviceConnector(object):
         return self.__device.wait_for_message(timeout=timeout, filter=filter)
 
     # Message callbacks
-    def on_discovery_message(self, message):
+    def on_discovery_msg(self, message):
         """Callback function to process incoming discovery messages.
 
         This method MUST be overriden by inherited classes.
 
         :param message: Discovery message
         """
-        logger.error('method `on_discovery_message` must be implemented in inherited classes')
+        logger.error('method `on_discovery_msg` must be implemented in inherited classes')
         raise RequiredImplementation()
 
-    def on_generic_message(self, message):
+    def on_generic_msg(self, message):
         """Callback function to process incoming generic messages.
 
         This method MUST be overriden by inherited classes.
 
         :param message: Generic message
         """
-        logger.error('method `on_generic_message` must be implemented in inherited classes')
+        logger.error('method `on_generic_msg` must be implemented in inherited classes')
         raise RequiredImplementation()
 
-    def on_domain_message(self, domain, message):
+    def on_domain_msg(self, domain, message):
         """Callback function to process incoming domain-related messages.
 
         This method MUST be overriden by inherited classes.
 
         :param message: Domain message
         """
-        logger.error('method `on_domain_message` must be implemented in inherited classes')
+        logger.error('method `on_domain_msg` must be implemented in inherited classes')
         raise RequiredImplementation()
 
 
