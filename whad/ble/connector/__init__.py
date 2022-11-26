@@ -473,7 +473,6 @@ class BLE(WhadDeviceConnector):
             msg.ble.sniff_conn.hop_increment = hop_increment
 
         msg.ble.sniff_conn.monitored_channels = b"\xFF\xFF\xFF\xFF\x1F"
-        print(msg)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -671,10 +670,7 @@ class BLE(WhadDeviceConnector):
             logger.info('[ble connector] encryption is now: %s' % self.__encrypted)
 
         # Return command result
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
-    def process_messages(self):
-        self.device.process_messages()
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)    
 
     def on_generic_msg(self, message):
         logger.info('generic message: %s' % message)
@@ -683,7 +679,6 @@ class BLE(WhadDeviceConnector):
     def on_discovery_msg(self, message):
         logger.info('discovery message: %s' % message)
         pass
-
 
     def on_domain_msg(self, domain, message):
         if not self.__ready:
