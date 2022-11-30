@@ -244,9 +244,9 @@ class Unifying(WhadDeviceConnector):
             (commands & (1 << Stop))>0
         )
 
-    def enable_keyboard_mode(self, channel):
+    def enable_mouse_mode(self, channel):
         """
-        Enable Logitech Unifying keyboard mode.
+        Enable Logitech Unifying mouse mode.
         """
         if not self.can_be_mouse():
             raise UnsupportedCapability("LogitechMouseMode")
@@ -271,7 +271,7 @@ class Unifying(WhadDeviceConnector):
 
     def set_node_address(self, address):
         """
-        Enable Enhanced ShockBurst primary receiver (PRX) mode.
+        Select a specific node address.
         """
         if not self.can_set_node_address():
             raise UnsupportedCapability("SetNodeAddress")
@@ -357,3 +357,4 @@ class Unifying(WhadDeviceConnector):
 from whad.unifying.connector.sniffer import Sniffer
 from whad.unifying.connector.keylogger import Keylogger
 from whad.unifying.connector.mouselogger import Mouselogger
+from whad.unifying.connector.mouse import Mouse
