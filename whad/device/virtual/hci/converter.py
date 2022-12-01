@@ -47,7 +47,7 @@ class HCIConverter:
             return self.process_disconnection_complete(event[HCI_Event_Disconnection_Complete:])
 
     def process_acl_data(self, event):
-        if L2CAP_Hdr in event:
+        if event.PB == 2 and L2CAP_Hdr in event:
             msg = Message()
             pdu = BTLE_DATA()/event[L2CAP_Hdr:]
 
@@ -56,6 +56,28 @@ class HCIConverter:
             # of a L2CAP message), our stack will take care of packet reassembly.
             if event.PB == 0x01:
                 pdu.LLID = 1
+
+            direction = (BleDirection.SLAVE_TO_MASTER if
+                         self.role == HCIRole.CENTRAL else
+                         BleDirection.MASTER_TO_SLAVE
+            )
+            processed = False
+            conn_handle = event.handle
+
+            msg.ble.pdu.direction = direction
+            msg.ble.pdu.conn_handle = conn_handle
+            msg.ble.pdu.pdu = raw(pdu)
+            msg.ble.pdu.processed = processed
+            return [msg]
+            
+        elif event.PB == 1:
+            msg = Message()
+            pdu = BTLE_DATA()/event[HCI_ACL_Hdr:].payload
+
+            # If HCI ACL Data PB flag==1 then it is a continued fragment.
+            # We make sure BTLE_DATA.LLID is then 0x01 (Continuation
+            # of a L2CAP message), our stack will take care of packet reassembly.
+            pdu.LLID = 1
 
             direction = (BleDirection.SLAVE_TO_MASTER if
                          self.role == HCIRole.CENTRAL else
