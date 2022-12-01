@@ -320,6 +320,9 @@ class Unifying(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
+    def on_discovery_msg(self, message):
+        pass
+
     def on_generic_msg(self, message):
         pass
 
