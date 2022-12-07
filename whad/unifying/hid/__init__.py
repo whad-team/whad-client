@@ -4,7 +4,8 @@ from whad.helpers import bytes_to_bits
 from struct import pack
 
 class LogitechUnifyingKeystrokeConverter(HIDConverter):
-    def get_key_from_hid_data(self, hid_data):
+    @classmethod
+    def get_key_from_hid_data(cls, hid_data):
 
         if not isinstance(hid_data, bytes):
             raise InvalidHIDData(hid_data)
@@ -25,8 +26,8 @@ class LogitechUnifyingKeystrokeConverter(HIDConverter):
         return hid_data
 
 class LogitechUnifyingMouseMovementConverter:
-
-    def get_coordinates_from_hid_data(self, hid_data):
+    @classmethod
+    def get_coordinates_from_hid_data(cls, hid_data):
 
         if not isinstance(hid_data, bytes):
             raise InvalidHIDData(hid_data)
@@ -50,7 +51,8 @@ class LogitechUnifyingMouseMovementConverter:
 
         return (x, y)
 
-    def get_hid_data_from_coordinates(self, x, y):
+    @classmethod
+    def get_hid_data_from_coordinates(cls, x, y):
         if (y < 0):
             y += 4096
         if (x < 0):
