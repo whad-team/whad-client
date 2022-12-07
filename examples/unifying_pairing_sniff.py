@@ -26,7 +26,7 @@ if __name__ == '__main__':
             while True:
                 print("move")
                 connector.move(2, -1)
-                time.sleep(1)
+                time.sleep(0.1)
             '''
             connector = Keylogger(dev)
             connector.address = "9b:0a:90:42:8c"

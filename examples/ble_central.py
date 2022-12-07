@@ -10,21 +10,24 @@ def show(packet):
 central = Central(WhadDevice.create('uart0'))
 central.attach_callback(show)
 
+while True:
+    print("New connection")
+    #print('Using device: %s' % central.device.device_id)
+    device = central.connect('C9:31:40:92:AD:F6', random=False, hop_interval=56, channel_map=0x00000300)
+    input()
+    # Discover
+    device.discover()
+    for service in device.services():
+        print('-- Service %s' % service.uuid)
+        for charac in service.characteristics():
+            print(' + Characteristic %s' % charac.uuid)
 
-#print('Using device: %s' % central.device.device_id)
-device = central.connect('74:da:ea:91:47:e3', random=False)
-# Discover
-device.discover()
-for service in device.services():
-    print('-- Service %s' % service.uuid)
-    for charac in service.characteristics():
-        print(' + Characteristic %s' % charac.uuid)
+    # Read Device Name characteristic (Generic Access Service)
+    c = device.get_characteristic(UUID('1800'), UUID('2A00'))
+    print(c.value)
 
-# Read Device Name characteristic (Generic Access Service)
-c = device.get_characteristic(UUID('1800'), UUID('2A00'))
-print(c.value)
-
-# Disconnect
-device.disconnect()
+    # Disconnect
+    print("Stop connection")
+    device.disconnect()
 central.stop()
 central.close()

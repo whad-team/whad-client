@@ -225,11 +225,8 @@ class Unifying(WhadDeviceConnector):
         if not self.can_be_keyboard():
             raise UnsupportedCapability("LogitechKeyboardMode")
 
-        if channel is None:
-            return False
-
         msg = Message()
-        msg.unifying.keyboard.channel = channel
+        msg.unifying.keyboard.channel = channel if channel is not None else 0xFF
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -251,11 +248,8 @@ class Unifying(WhadDeviceConnector):
         if not self.can_be_mouse():
             raise UnsupportedCapability("LogitechMouseMode")
 
-        if channel is None:
-            return False
-
         msg = Message()
-        msg.unifying.mouse.channel = channel
+        msg.unifying.mouse.channel = channel if channel is not None else 0xFF
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 

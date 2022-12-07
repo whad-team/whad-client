@@ -19,9 +19,12 @@ class MyPeripheral(GenericProfile):
         ),
     )
 
-my_profile = MyPeripheral()
-periph = Peripheral(WhadDevice.create('hci0'), profile=my_profile)
+def show(packet):
+    print(packet.metadata, repr(packet))
 
+my_profile = MyPeripheral()
+periph = Peripheral(WhadDevice.create('uart0'), profile=my_profile)
+periph.attach_callback(callback=show)
 periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
     AdvCompleteLocalName(b'TestMe!'),
     AdvFlagsField()
