@@ -71,7 +71,7 @@ class EsbLinkLayerManager:
         packet = ESB_Hdr(
                 pid=self.__pid,
                 address=self.__stack.get_address(),
-                no_ack=not acknowledged
+                no_ack=int(not acknowledged)
         ) / ESB_Payload_Hdr() / data
 
         self.__ack_queue.queue.clear()

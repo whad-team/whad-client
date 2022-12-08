@@ -2,7 +2,7 @@
 Logitech Unifying applicative layer.
 """
 from enum import IntEnum
-from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Mouse_Payload, Logitech_Set_Keepalive_Payload
+from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Mouse_Payload, Logitech_Set_Keepalive_Payload, Logitech_Keepalive_Payload
 from whad.unifying.hid import LogitechUnifyingMouseMovementConverter
 from time import sleep
 from threading import Thread
@@ -25,8 +25,9 @@ class UnifyingApplicativeLayerManager:
 
     def _start_timeout_thread(self):
         self._stop_timeout_thread()
-        self._transmit_timeouts = True
-        self.__timeout_thread = Thread(func=self._transmit_timeouts_thread)
+        self.__transmit_timeouts = True
+        self.__timeout_thread = Thread(target=self._transmit_timeouts_thread)
+        self.__timeout_thread.run()
 
     def _stop_timeout_thread(self):
         if self.__timeout_thread is not None:
@@ -35,13 +36,14 @@ class UnifyingApplicativeLayerManager:
             self.__timeout_thread = None
 
     def _transmit_timeouts_thread(self):
+        print("starting thread")
         if self.__transmit_timeouts:
             self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250))
 
         while self.__transmit_timeouts:
-            sleep(0.5)
+            print("timeout send")
             self.send_message(Logitech_Keepalive_Payload(timeout=1250))
-
+            sleep(0.5)
     def send_message(self, message):
         return self.__llm.send_data(Logitech_Unifying_Hdr()/message)
 
@@ -60,8 +62,9 @@ class UnifyingApplicativeLayerManager:
             self._start_timeout_thread()
 
     def move_mouse(self, x, y):
-
-        self.send_message(
+        if self.__timeout_thread is None:
+            self.enable_timeouts()
+        answer = self.send_message(
             Logitech_Mouse_Payload(
                 movement=LogitechUnifyingMouseMovementConverter.get_hid_data_from_coordinates(x, y)
             )

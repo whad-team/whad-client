@@ -129,7 +129,7 @@ class Unifying(WhadDeviceConnector):
         if self.can_send():
             if self.support_raw_pdu():
                 if ESB_Hdr not in pdu:
-                    packet = ESB_Hdr(address) / pacjet
+                    packet = ESB_Hdr(address) / pdu
                 else:
                     packet = pdu
             elif ESB_Hdr in pdu:
@@ -137,6 +137,7 @@ class Unifying(WhadDeviceConnector):
             else:
                 packet = pdu
             msg = self._build_message_from_scapy_packet(packet, channel)
+            print(msg)
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
