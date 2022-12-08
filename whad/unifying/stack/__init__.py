@@ -27,7 +27,7 @@ class UnifyingApplicativeLayerManager:
         self._stop_timeout_thread()
         self.__transmit_timeouts = True
         self.__timeout_thread = Thread(target=self._transmit_timeouts_thread)
-        self.__timeout_thread.run()
+        self.__timeout_thread.start()
 
     def _stop_timeout_thread(self):
         if self.__timeout_thread is not None:
@@ -43,7 +43,7 @@ class UnifyingApplicativeLayerManager:
         while self.__transmit_timeouts:
             print("timeout send")
             self.send_message(Logitech_Keepalive_Payload(timeout=1250))
-            sleep(0.5)
+            sleep(0.01)
     def send_message(self, message):
         return self.__llm.send_data(Logitech_Unifying_Hdr()/message)
 

@@ -23,6 +23,7 @@ if __name__ == '__main__':
             connector.start()
             connector.address = "ca:e9:06:ec:a4"
             connector.synchronize()
+            
 
             '''
             for _ in range(50):
@@ -33,6 +34,7 @@ if __name__ == '__main__':
             while True:
                 print("move")
                 connector.move(20, -1)
+                time.sleep(0.1)
             '''
             connector = Keylogger(dev)
             connector.address = "9b:0a:90:42:8c"
