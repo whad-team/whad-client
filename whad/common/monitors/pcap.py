@@ -70,7 +70,10 @@ class PcapWriterMonitor(WhadMonitor):
 
     def close(self):
         if hasattr(self, "_writer") and self._writer is not None:
-            self._writer.close()
+            try:
+                self._writer.close()
+            except BrokenPipeError:
+                pass
             self._writer = None
 
     def default_formatter(self, packet):
