@@ -1,5 +1,6 @@
 from scapy.layers.zigbee import ZigbeeDeviceProfile, ZigbeeAppDataPayloadStub, ZigbeeClusterLibrary, \
-    _zcl_profile_identifier, _zcl_attribute_data_types, _zcl_enumerated_status_values, _DiscreteString
+    _zcl_profile_identifier, _zcl_attribute_data_types, _zcl_enumerated_status_values, _DiscreteString, \
+    _zcl_cluster_identifier, ZigbeeNWKStub
 from scapy.fields import BitEnumField, BitField, ByteEnumField, ByteField, ConditionalField, \
     FlagsField, XBitField, XLEIntField, XLEShortField, EnumField, XShortField, PacketListField
 from scapy.layers.dot15d4 import dot15d4AddressField
@@ -27,14 +28,6 @@ class ZigbeeZLLCommissioningCluster(Packet):
         # Command identifier (8 bits): the cluster command
         ByteEnumField("command_identifier", 0x00, {}),
     ]
-
-    def guess_payload_class(self, payload):
-        if self.command_identifier == 0x00:# and pkt.cluster == 0x1000:
-            return ZLLScanRequest
-        elif self.command_identifier == 0x01:# and pkt.cluster == 0x1000:
-            return ZLLScanResponse
-        else:
-            return Packet.guess_payload_class(self, payload)
 
 class ZLLScanRequest(Packet):
     name = "ZLL: Scan Request"
@@ -282,13 +275,40 @@ class ZLLNetworkUpdateRequest(Packet):
         XLEShortField("network_address", 0xffff),
     ]
 
-def interpan_guess_payload_class(self, payload):
-    if self.frametype == 3 and self.profile == 0xc05e and self.cluster == 0x1000:
-        return ZigbeeZLLCommissioningCluster
+def nwk_stub_guess_payload_class(self, payload):
+    if self.frametype == 0b11:
+        return NewZigbeeAppDataPayloadStub
     else:
         return Packet.guess_payload_class(self, payload)
 
-ZigbeeAppDataPayloadStub.guess_payload_class = interpan_guess_payload_class
+ZigbeeNWKStub.guess_payload_class = nwk_stub_guess_payload_class
+
+class NewZigbeeAppDataPayloadStub(Packet):
+    name = "Zigbee Application Layer Data Payload for Inter-PAN Transmission"
+    fields_desc = [
+        FlagsField("frame_control", 0, 4, [ 'reserved1', 'security', 'ack_req', 'extended_hdr' ]),
+        BitEnumField("delivery_mode", 0, 2, {0:'unicast', 2:'broadcast', 3:'group'}),
+        BitField("frametype", 3, 2), # value 0b11 (3) is a reserved frame type
+        # Group Address present only when delivery mode field has a value of 0b11 (group delivery mode)
+        ConditionalField(
+            XLEShortField("group_addr", 0x0), # 16-bit identifier of the group
+            lambda pkt:pkt.getfieldval("delivery_mode") == 0b11
+        ),
+        # Cluster identifier
+        EnumField("cluster", 0, _zcl_cluster_identifier, fmt = "<H"), # unsigned short (little-endian)
+        # Profile identifier
+        EnumField("profile", 0, _zcl_profile_identifier, fmt = "<H"),
+        # ZigBee Payload
+#        ConditionalField(
+#            ZigbeePayloadField("data", "", length_from=lambda pkt, s:len(s)),
+#            lambda pkt:pkt.frametype == 3
+#        ),
+    ]
+    def guess_payload_class(self, payload):
+        if self.frametype == 3 and self.profile == 0xc05e and self.cluster == 0x1000:
+            return ZigbeeZLLCommissioningCluster
+        else:
+            return Packet.guess_payload_class(self, payload)
 
 
 class ZCLWriteAttributeRecord(Packet):
@@ -423,3 +443,25 @@ bind_layers(ZigbeeClusterLibrary, ZCLGeneralReadReportingConfiguration, zcl_fram
 bind_layers(ZigbeeClusterLibrary, ZCLGeneralReadReportingConfigurationResponse, zcl_frametype=0x00, command_identifier=0x09)
 bind_layers(ZigbeeClusterLibrary, ZCLGeneralDiscoverAttributes, zcl_frametype=0x00, command_identifier=0x0c)
 bind_layers(ZigbeeClusterLibrary, ZCLGeneralDiscoverAttributesResponse, zcl_frametype=0x00, command_identifier=0x0d)
+
+
+bind_layers( ZigbeeZLLCommissioningCluster, ZLLScanRequest,
+        command_identifier=0x00, direction=0)
+bind_layers( ZigbeeZLLCommissioningCluster, ZLLScanResponse,
+        command_identifier=0x01, direction=1)
+bind_layers( ZigbeeZLLCommissioningCluster, ZLLDeviceInformationRequest,
+        command_identifier=0x03, direction=0)
+bind_layers( ZigbeeZLLCommissioningCluster, ZLLIdentifyRequest,
+        command_identifier=0x06, direction=0)
+bind_layers( ZigbeeZLLCommissioningCluster, ZLLResetToFactoryNewRequest,
+        command_identifier=0x07, direction=0)
+bind_layers( ZigbeeZLLCommissioningCluster, ZLLNetworkStartRequest,
+        command_identifier=0x10, direction=0)
+bind_layers( ZigbeeZLLCommissioningCluster, ZLLNetworkStartResponse,
+        command_identifier=0x11, direction=1)
+bind_layers( ZigbeeZLLCommissioningCluster, ZLLNetworkJoinRouterRequest,
+        command_identifier=0x12, direction=0)
+bind_layers( ZigbeeZLLCommissioningCluster, ZLLNetworkJoinRouterResponse,
+        command_identifier=0x13, direction=1)
+bind_layers( ZigbeeZLLCommissioningCluster, ZLLNetworkUpdateRequest,
+        command_identifier=0x16, direction=0)
