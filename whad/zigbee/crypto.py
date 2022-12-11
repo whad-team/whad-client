@@ -2,6 +2,7 @@ from whad.zigbee.exceptions import MissingNetworkSecurityHeader
 from Cryptodome.Cipher import AES
 from scapy.layers.dot15d4 import Dot15d4,Dot15d4FCS
 from scapy.layers.zigbee import ZigbeeSecurityHeader,ZigbeeNWK, ZigbeeAppDataPayload, ZigbeeNWKCommandPayload
+from whad.scapy.layers.zll import ZLLScanRequest, ZLLScanResponse, ZLLNetworkJoinRouterRequest
 from scapy.compat import raw
 from scapy.config import conf
 from struct import pack
@@ -311,3 +312,123 @@ class ZigbeeDecryptor:
                         return decrypted.data, True
 
         return packet, False
+
+
+ZIGBEE_ZLL_KEYS = {
+    "master_key":           b"\x9F\x55\x95\xF1\x02\x57\xC8\xA4\x69\xCB\xF4\x2B\xC9\x3F\xEE\x31",
+    "certification_key":    b"\xC0\xC1\xC2\xC3\xC4\xC5\xC6\xC7\xC8\xC9\xCA\xCB\xCC\xCD\xCE\xCF",
+}
+
+
+class TouchlinkKeyManager:
+    def __init__(self, encrypted_key=None, unencrypted_key=None, transaction_id=None, response_id=None, key_index=None):
+        self.transaction_id = transaction_id
+        self.response_id = response_id
+        self.key_index = key_index
+        self._encrypted_key = encrypted_key
+        self._unencrypted_key = unencrypted_key
+
+    def process_packet(self, packet):
+        if ZLLScanRequest in packet:
+            self.transaction_id = packet.inter_pan_transaction_id
+        elif ZLLScanResponse in packet:
+            self.response_id = packet.response_id
+        elif ZLLNetworkJoinRouterRequest in packet:
+            self.key_index = packet.key_index
+            self._encrypted_key = packet.encrypted_network_key.to_bytes(16, "big")
+
+    @property
+    def encrypted_key(self):
+        if self._encrypted_key is not None:
+            return self._encrypted_key
+        elif (
+                self.transaction_id is not None and
+                self.response_id is not None and
+                self.key_index is not None and
+                self._unencrypted_key is not None
+        ):
+            return self._encrypt_key()
+        else:
+            return None
+
+    @property
+    def unencrypted_key(self):
+        if self._unencrypted_key is not None:
+            return self._unencrypted_key
+        elif (
+                self.transaction_id is not None and
+                self.response_id is not None and
+                self.key_index is not None and
+                self._encrypted_key is not None
+        ):
+            return self._decrypt_key()
+        else:
+            return None
+
+    def reset(self):
+        self.transaction_id = None
+        self.response_id = None
+        self.key_index = None
+        self._unencrypted_key = None
+        self._encrypted_key = None
+
+
+    def _encrypt_key(self):
+        # If key index equals to zero, the key is encrypted using one single step with a key generated from transaction_id and response_id
+        # (see Zigbee Cluster Specification v1.0 rev.6, section 13.3.4.10.4)
+        if self.key_index == 0:
+            # Generate the key
+            development_key = b"PhLi" + pack(">I",self.transaction_id) + b"CLSN" + pack(">I",self.response_id)
+            # Encrypt the unencrypted_key
+            encryptor = AES.new(development_key, mode=AES.MODE_ECB)
+            return encryptor.encrypt(self._unencrypted_key)
+        else:
+            # Select the right main key according to key index
+            if self.key_index == 4:
+                main_key = ZIGBEE_ZLL_KEYS["master_key"]
+            elif self.key_index == 15:
+                main_key = ZIGBEE_ZLL_KEYS["certification_key"]
+            else:
+                # No key found, return None and don't process further
+                return None
+
+            # Generate the plaintext vector
+            plaintext = pack(">I",self.transaction_id)*2 + pack(">I",self.response_id)*2
+            # Generate transport key
+            step1 = AES.new(main_key, mode=AES.MODE_ECB)
+            transport_key = step1.encrypt(plaintext)
+            # Use transport key to decrypt network key
+            step2 = AES.new(transport_key, mode=AES.MODE_ECB)
+            return step2.encrypt(self._unencrypted_key)
+
+
+    def _decrypt_key(self):
+        # If key index equals to zero, the key is decrypted using one single step with a key generated from transaction_id and response_id
+        # (see Zigbee Cluster Specification v1.0 rev.6, section 13.3.4.10.4)
+        if self.key_index == 0:
+            # Generate the key
+            development_key = b"PhLi" + pack(">I",self.transaction_id) + b"CLSN" + pack(">I",self.response_id)
+            # Decrypt the encrypted_key
+            decryptor = AES.new(development_key, mode=AES.MODE_ECB)
+            return decryptor.decrypt(self._encrypted_key)
+
+        # If key not equals to zero, use a two-step decryption algorithm with known key
+        # (see Zigbee Cluster Specification v1.0 rev.6, section 13.3.4.10.5)
+        else:
+            # Select the right main key according to key index
+            if self.key_index == 4:
+                main_key = ZIGBEE_ZLL_KEYS["master_key"]
+            elif self.key_index == 15:
+                main_key = ZIGBEE_ZLL_KEYS["certification_key"]
+            else:
+                # No key found, return None and don't process further
+                return None
+
+            # Generate the plaintext vector
+            plaintext = pack(">I",self.transaction_id)*2 + pack(">I",self.response_id)*2
+            # Generate transport key
+            step1 = AES.new(main_key, mode=AES.MODE_ECB)
+            transport_key = step1.encrypt(plaintext)
+            # Use transport key to decrypt network key
+            step2 = AES.new(transport_key, mode=AES.MODE_ECB)
+            return step2.decrypt(self._encrypted_key)
