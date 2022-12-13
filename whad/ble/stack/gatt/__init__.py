@@ -568,7 +568,7 @@ class GattClient(Gatt):
             )
 
             msg = self.wait_for_message(GattReadByTypeResponse)
-            print(msg)
+            
             if isinstance(msg, GattReadByTypeResponse):
                 for item in msg:
                     charac_properties = item.value[0]
@@ -731,7 +731,7 @@ class GattClient(Gatt):
         """Write long data (size > ATT_MTU-2) to a characteristic value.
 
         This method uses Prepared Write requests as described in Vol 3, Part G,
-        section 4.9.5. 
+        section 4.9.5.
 
         :param int handle: Target characteristic value handle
         :param bytes value: Data to write
@@ -743,7 +743,7 @@ class GattClient(Gatt):
         if nb_chunks % (self.att.local_mtu - 5) > 0:
             nb_chunks += 1
         chunk_size = self.att.local_mtu - 5
-        
+
         # Send prepared write requests
         offset = 0
         for i in range(nb_chunks):
@@ -756,7 +756,7 @@ class GattClient(Gatt):
                     break
             elif isinstance(msg, GattErrorResponse):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
-        
+
         # Execute write request
         self.att.execute_write_request(1)
         msg = self.wait_for_message(GattExecuteWriteResponse)
@@ -805,7 +805,7 @@ class GattClient(Gatt):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
         else:
             return None
-           
+
 
     def services(self):
         return self.__model.services()
@@ -908,7 +908,7 @@ class GattServer(Gatt):
 
         # If we have at least one item to return
         if len(attrs_handles) > 0:
-            
+
             # Get MTU
             mtu = self.att.local_mtu
 
@@ -920,7 +920,7 @@ class GattServer(Gatt):
                 item_format = 2
             item_size = uuid_size + 2
             max_nb_items = int((mtu - 2) / item_size)
-            
+
             # Create our datalist
             datalist = GattAttributeDataList(item_size)
 
@@ -938,7 +938,7 @@ class GattServer(Gatt):
                         )
                 else:
                     break
-            
+
             # Once datalist created, send answer
             datalist_raw = datalist.to_bytes()
             self.att.find_info_response(item_format, datalist_raw)
@@ -974,7 +974,7 @@ class GattServer(Gatt):
                             0,
                             self.att.local_mtu - 1
                         )
-                        
+
                         # Make sure the returned value matches the boundaries
                         value = charac.value[:self.att.local_mtu - 1]
 
@@ -1069,7 +1069,7 @@ class GattServer(Gatt):
 
                         self.att.read_blob_response(
                             value
-                        ) 
+                        )
 
                     except HookReturnValue as force_value:
                         # Make sure the returned value matches the boundaries
@@ -1101,7 +1101,7 @@ class GattServer(Gatt):
                             gatt_error.request if gatt_error.request is not None else BleAttOpcode.READ_REQUEST,
                             gatt_error.handle if gatt_error.handle is not None else request.handle,
                             gatt_error.error if gatt_error.error is not None else BleAttErrorCode.ATTRIBUTE_NOT_FOUND
-                        )                
+                        )
                 elif isinstance(attr, CharacteristicDescriptor):
                     # Valid offset, return data[offset:offset + MTU - 1]
                     self.att.read_blob_response(
@@ -1124,7 +1124,7 @@ class GattServer(Gatt):
                 request.handle,
                 BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
-        
+
 
     def on_write_request(self, request):
         """Write request for characteristic or descriptor value
@@ -1384,7 +1384,7 @@ class GattServer(Gatt):
                         # Unset characteristic indication and notification callbacks
                         charac.set_notification_callback(None)
                         charac.set_indication_callback(None)
-                        
+
                         if charac in self.__subscribed_characs:
                             self.__subscribed_characs.remove(charac)
 
@@ -1455,7 +1455,7 @@ class GattServer(Gatt):
                             if write_req.offset > len(attr_value):
                                 # Clear queues
                                 self.__write_queues = {}
-                                
+
                                 # Send error
                                 self.error(
                                     BleAttOpcode.EXECUTE_WRITE_REQUEST,
@@ -1508,7 +1508,7 @@ class GattServer(Gatt):
 
         # If we have at least one item to return
         if len(attrs_handles) > 0:
-            
+
             # Get MTU
             mtu = self.att.local_mtu
 
@@ -1516,7 +1516,7 @@ class GattServer(Gatt):
             uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
             item_size = uuid_size + 5
             max_nb_items = int((mtu - 2) / item_size)
-            
+
             # Create our datalist
             datalist = GattAttributeDataList(item_size)
 
@@ -1539,7 +1539,7 @@ class GattServer(Gatt):
                             )
                 else:
                     break
-            
+
             # Check that our result datalist does contain something
             if len(datalist) > 0:
                 # Once datalist created, send answer
@@ -1575,7 +1575,7 @@ class GattServer(Gatt):
 
         # If we have at least one item to return
         if len(attrs_handles) > 0:
-            
+
             # Get MTU
             mtu = self.att.local_mtu
 
@@ -1583,7 +1583,7 @@ class GattServer(Gatt):
             uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
             item_size = uuid_size + 4
             max_nb_items = int((mtu - 2) / item_size)
-            
+
             # Create our datalist
             datalist = GattAttributeDataList(item_size)
 
@@ -1599,7 +1599,7 @@ class GattServer(Gatt):
                         )
                 else:
                     break
-            
+
             # Once datalist created, send answer
             datalist_raw = datalist.to_bytes()
             self.att.read_by_group_type_response(item_size, datalist_raw)
@@ -1618,9 +1618,3 @@ class GattServer(Gatt):
             charac.set_notification_callback(None)
             charac.set_indication_callback(None)
         self.__subscribed_characs = []
-
-
-        
-
-
-        
