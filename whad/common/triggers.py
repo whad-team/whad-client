@@ -1,7 +1,7 @@
 '''
 Triggers used to indicate when a packets sequence must be transmitted.
 '''
-from whad.exceptions import TriggerNotAssociated, InvalidTriggerPattern
+from whad.exceptions import TriggerNotAssociated, InvalidTriggerPattern, WhadDeviceNotReady
 from whad.helpers import scapy_packet_to_pattern
 from scapy.packet import Packet
 
@@ -33,6 +33,10 @@ class Trigger:
     @connector.setter
     def connector(self, connector):
         self._connector = connector
+
+    def __del__(self):
+        if self._connector is not None:
+            self._connector.delete_sequence(self)
 
 
 class ManualTrigger(Trigger):
