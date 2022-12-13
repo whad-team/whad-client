@@ -775,7 +775,9 @@ class BLE(WhadDeviceConnector):
 
     def on_disconnected(self, disconnection_data):
         logger.info('a connection has been terminated')
-
+        for trigger in self.__triggers:
+            self.delete_sequence(trigger)
+            
     def on_raw_pdu(self, packet):
 
         if BTLE_ADV in packet:
