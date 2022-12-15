@@ -31,8 +31,39 @@ class AdvertisingDevice(object):
         return self.__rssi
 
     @property
+    def adv_records(self):
+        return self.__adv_data
+
+    @property
     def got_scan_rsp(self):
         return self.__got_scan_rsp
+
+    @property
+    def name(self):
+        """Return the device name, if any.
+
+        @return str: Device name or None if no name has been advertised.
+        """
+        complete_name = None
+        short_name = None
+        for record in self.__adv_data:
+            # Do we have a name ?
+            complete_name = None
+            short_name = None
+            for record in self.__adv_data:
+                if isinstance(record, AdvShortenedLocalName):
+                    short_name = record.name.decode('utf-8')
+                elif isinstance(record, AdvCompleteLocalName):
+                    complete_name = record.name.decode('utf-8')
+        
+        # Return discovered name (if any)
+        if complete_name is not None:
+            return complete_name
+        elif short_name is not None:
+            return short_name
+        else:
+            return None
+
 
     def __repr__(self):
         """Show device information

@@ -33,6 +33,10 @@ class BtVersion(object):
         # Unknown major/minor version, return 0
         return 0
 
+    def __repr__(self):
+        return self.desc
+
+
 
 
 BT_VERSIONS = {

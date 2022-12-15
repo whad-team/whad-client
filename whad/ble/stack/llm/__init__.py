@@ -363,7 +363,7 @@ class BleLinkLayerManager(object):
         """Handles BLE connection
         """
         if conn_handle not in self.__connections:
-            print('[llm] registers new connection %d with %s' % (conn_handle, remote_peer_addr))
+            logger.info('[llm] registers new connection %d with %s' % (conn_handle, remote_peer_addr))
             self.__connections[conn_handle] = BleConnection(
                 self,
                 conn_handle,
@@ -372,7 +372,7 @@ class BleLinkLayerManager(object):
             )
             return self.__connections[conn_handle]
         else:
-            print('[!] Connection already exists')
+            logger.error('[!] Connection already exists')
             self.__connections[conn_handle] = BleConnection(
                 self,
                 conn_handle,
@@ -383,7 +383,7 @@ class BleLinkLayerManager(object):
 
     def on_disconnect(self, conn_handle):
         if conn_handle in self.__connections:
-            print('[llm] connection %d has just terminated' % conn_handle)
+            logger.info('[llm] connection %d has just terminated' % conn_handle)
             self.__connections[conn_handle].on_disconnect()
             del self.__connections[conn_handle]
 
@@ -394,7 +394,7 @@ class BleLinkLayerManager(object):
             conn = self.__connections[conn_handle]
             conn.on_ctrl_pdu(control)
         else:
-            print('[!] Wrong connection handle: %d', conn_handle)
+            logger.error('[!] Wrong connection handle: %d', conn_handle)
 
     def on_data_pdu(self, conn_handle, data):
         """Manages Data PDU.

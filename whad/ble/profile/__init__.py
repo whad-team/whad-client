@@ -418,7 +418,6 @@ class GenericProfile(object):
                     self.__hooks[prop_obj.characteristic] = {}
                 for operation in prop_obj.hooks:
                     self.__hooks[prop_obj.characteristic][operation] = prop_obj
-        print(self.__hooks)
 
 
     def __alloc_handle(self, number=1):

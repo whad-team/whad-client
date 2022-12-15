@@ -422,6 +422,20 @@ class PeripheralDevice(GenericProfile):
         else:
             return None
 
+    def find_characteristic_by_uuid(self, uuid: UUID):
+        """Find characteristic by its UUID
+
+        :param UUID uuid: Characteristic UUID
+        :return PeripheralCharacteristic: An instance of PeripheralCharacteristic if characteristic has been found, None otherwise.
+        """
+        for service in self.services():
+            for charac in service.characteristics():
+                if charac.uuid == uuid:
+                    return PeripheralCharacteristic(
+                        charac,
+                        self.__gatt
+                    )  
+
 
     def find_object_by_handle(self, handle):
         """Find an existing object (service, attribute, descriptor) based on its handle,

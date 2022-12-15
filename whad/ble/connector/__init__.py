@@ -765,7 +765,7 @@ class BLE(WhadDeviceConnector):
     def on_connected(self, connection_data):
         logger.info('a connection has been established')
         logger.debug(
-            'connection handle: %d' % connection_data.handle if connection_data.handle is not None else 0
+            'connection handle: %d' % connection_data.conn_handle if connection_data.conn_handle is not None else 0
         )
 
     def on_triggered(self, identifier):
