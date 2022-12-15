@@ -568,7 +568,6 @@ class GattClient(Gatt):
             )
 
             msg = self.wait_for_message(GattReadByTypeResponse)
-            print(msg)
             if isinstance(msg, GattReadByTypeResponse):
                 for item in msg:
                     charac_properties = item.value[0]

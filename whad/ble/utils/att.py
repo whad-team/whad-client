@@ -81,7 +81,8 @@ class UUID:
             self.type = UUID.TYPE_16
         elif len(uuid) == 16:
             r = uuid[::-1]
-            self.uuid = '-'.join(map(lambda x: hexlify(x), (r[0:4], r[4:6], r[6:8], r[8:10], r[10:])))
+            self.uuid = b'-'.join(map(lambda x: hexlify(x), (r[0:4], r[4:6], r[6:8], r[8:10], r[10:])))
+            self.uuid = self.uuid.decode('utf-8')
             self.packed = uuid
             self.type = UUID.TYPE_128
 
