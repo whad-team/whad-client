@@ -57,7 +57,8 @@ BLE_COMMANDS = {
     BleCommand.HijackMaster: 'HijackMaster: can hijack the Master role in an active connection',
     BleCommand.HijackSlave: 'HijackSlave: can hijack the Slave role in an active connection',
     BleCommand.PrepareSequence: 'PrepareSequence: can prepare a sequence of packets and associate a trigger',
-    BleCommand.TriggerSequence: 'TriggerSequence: can manually trigger the transmission of a sequence of packets'
+    BleCommand.TriggerSequence: 'TriggerSequence: can manually trigger the transmission of a sequence of packets',
+    BleCommand.DeleteSequence: 'DeleteSequence: can delete a prepared sequence of packets'
 
 }
 

@@ -10,7 +10,7 @@ from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCm
     PeripheralModeCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
     HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
     SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd, BleAddrType, ReactiveJam, \
-    JamAdvOnChannel, PrepareSequence, PrepareSequenceCmd, TriggerSequence
+    JamAdvOnChannel, PrepareSequence, PrepareSequenceCmd, TriggerSequence, DeleteSequence
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
@@ -360,6 +360,29 @@ class BLE(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return resp.generic.cmd_result.result == ResultCode.SUCCESS
 
+    def can_delete_sequence(self):
+        """
+        Determine if the device can delete a sequence of packets.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        return (commands & (1 << DeleteSequence)) > 0
+
+    def delete_sequence(self, trigger):
+        '''
+        Delete a sequence of packets linked to a Trigger object.
+        '''
+        if not self.can_delete_sequence():
+            raise UnsupportedCapability("DeleteSequence")
+
+        if trigger.identifier is None:
+            return False
+
+        msg = Message()
+        msg.ble.delete_seq.id = trigger.identifier
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return resp.generic.cmd_result.result == ResultCode.SUCCESS
+
+
     def prepare(self, *packets, trigger=ManualTrigger(), direction=BleDirection.MASTER_TO_SLAVE):
         """
         Prepare a sequence of packets and associate a trigger to it.
@@ -649,6 +672,8 @@ class BLE(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
         # Remove all triggers
+        for trigger in self.__triggers:
+            trigger.connector = None
         self.__triggers = []
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -670,7 +695,7 @@ class BLE(WhadDeviceConnector):
             logger.info('[ble connector] encryption is now: %s' % self.__encrypted)
 
         # Return command result
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)    
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def on_generic_msg(self, message):
         logger.info('generic message: %s' % message)
@@ -750,7 +775,9 @@ class BLE(WhadDeviceConnector):
 
     def on_disconnected(self, disconnection_data):
         logger.info('a connection has been terminated')
-
+        for trigger in self.__triggers:
+            self.delete_sequence(trigger)
+            
     def on_raw_pdu(self, packet):
 
         if BTLE_ADV in packet:

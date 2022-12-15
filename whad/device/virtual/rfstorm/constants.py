@@ -41,3 +41,8 @@ class RFStormDataRate(IntEnum):
     RF_250KBPS = 0
     RF_1MBPS = 1
     RF_2MBPS = 2
+
+# Supported domains
+class RFStormDomains(IntEnum):
+    RFSTORM_RAW_ESB = 0
+    RFSTORM_UNIFYING = 1
