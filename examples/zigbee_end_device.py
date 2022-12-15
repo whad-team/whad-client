@@ -35,31 +35,44 @@ if __name__ == '__main__':
             #monitor.attach(endDevice)
             #monitor.start()
             endDevice.start()
-            endDevice.stack.set_channel(15)
+            zdo = endDevice.stack.apl.get_application_by_name("zdo")
+            endDevice.stack.apl.initialize()
+            endDevice.stack.apl.start()
+            input()
+            while True:
+                zdo.device_and_service_discovery.nwk_addr_req(0xf4ce3673877b2d89)
+                input()
+            '''
             onoff = ZCLOnOff()
             myApp2 = ApplicationObject("onoff", 0x0104, 0x0100, device_version=0, input_clusters=[], output_clusters=[onoff])
+
             endDevice.stack.apl.attach_application(myApp2, endpoint=1)
 
-            zdo = endDevice.stack.apl.get_application_by_name("zdo")
-
-            endDevice.stack.apl.initialize()
-
-            '''
-            zdo.network_manager.configure_extended_address(0x00178801026e61e4)
-            zdo.network_manager.configure_short_address(0x729b)
-            zdo.network_manager.configure_extended_pan_id(0x0940843f53270013)
-            zdo.security_manager.provision_network_key('02:39:84:09:24:51:56:E3:1D:98:A9:21:57:A8:A6:6F')
-            '''
-            endDevice.stack.apl.start()
-
-            onoff.connect(0x3f00,10)
-            input()
-            complete, attributes = onoff.discover_attributes(0, 10)
-            print(complete, attributes)
-            
+            onoff.connect(0xde04,10)
             while True:
                 onoff.toggle()
                 input()
+            input()
+            '''
+
+            '''
+            zdo.network_manager.configure_extended_address(0x000b57fffe209d2a)
+            zdo.network_manager.configure_sequence_numbers(72,207, 50)
+            zdo.network_manager.configure_short_address(0x0001)
+            zdo.network_manager.configure_extended_pan_id(0x78a2c3ba68773ae3)
+            zdo.security_manager.provision_network_key('16:0c:f2:9d:d4:da:92:37:4f:c0:fb:66:f4:27:af:12')
+
+
+            endDevice.stack.apl.start()
+
+
+            #onoff.connect(0x0018,255)
+
+            input()
+            while True:
+                onoff.toggle()
+                input()
+            '''
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 

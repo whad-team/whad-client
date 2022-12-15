@@ -1,6 +1,6 @@
 from whad.zigbee.stack.apl.zdo.object import ZDOObject
 from scapy.layers.zigbee import  ZigbeeDeviceProfile
-from whad.scapy.layers.zdp import ZDPDeviceAnnce, ZDPNodeDescReq, ZDPNodeDescRsp
+from whad.scapy.layers.zdp import ZDPDeviceAnnce, ZDPNodeDescReq, ZDPNodeDescRsp, ZDPNWKAddrReq
 from whad.zigbee.stack.aps.constants import APSDestinationAddressMode
 from whad.zigbee.stack.apl.cluster import Cluster
 import logging
@@ -8,6 +8,21 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ZDODeviceAndServiceDiscovery(ZDOObject):
+
+    class ZDONWKAddrReq(Cluster):
+        def __init__(self):
+            super().__init__(cluster_id=0x0000)
+
+        def generate(self, address, request_type=0, start_index=0, transaction=0):
+            command = ZigbeeDeviceProfile(trans_seqnum=transaction)/ZDPNWKAddrReq(
+                ieee_addr=address,
+                request_type=request_type,
+                start_index=start_index
+            )
+            self.send_data(command, destination_address_mode=APSDestinationAddressMode.EXTENDED_ADDRESS_DST_ENDPOINT_PRESENT, destination_address=address, use_network_key=True, destination_endpoint=0)
+
+    def nwk_addr_req(self, address, request_type=0, start_index=0, transaction=0):
+        self.zdo.clusters["zdo_nwk_addr_req"].generate(address, request_type, start_index, transaction)
 
     def device_annce(self, transaction=0):
         self.zdo.clusters["zdo_device_annce"].generate(transaction)
