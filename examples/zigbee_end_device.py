@@ -40,7 +40,7 @@ if __name__ == '__main__':
             endDevice.stack.apl.start()
             input()
             while True:
-                zdo.device_and_service_discovery.nwk_addr_req(0xf4ce3673877b2d89)
+                zdo.device_and_service_discovery.ieee_addr_req(0x0000)
                 input()
             '''
             onoff = ZCLOnOff()

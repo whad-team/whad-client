@@ -1,6 +1,7 @@
 from whad.zigbee.stack.apl.zdo.object import ZDOObject
 from scapy.layers.zigbee import  ZigbeeDeviceProfile
-from whad.scapy.layers.zdp import ZDPDeviceAnnce, ZDPNodeDescReq, ZDPNodeDescRsp, ZDPNWKAddrReq
+from whad.scapy.layers.zdp import ZDPDeviceAnnce, ZDPNodeDescReq, ZDPNodeDescRsp, ZDPNWKAddrReq, \
+    ZDPIEEEAddrReq
 from whad.zigbee.stack.aps.constants import APSDestinationAddressMode
 from whad.zigbee.stack.apl.cluster import Cluster
 import logging
@@ -13,16 +14,32 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         def __init__(self):
             super().__init__(cluster_id=0x0000)
 
-        def generate(self, address, request_type=0, start_index=0, transaction=0):
+        def generate(self, address, request_type=1, start_index=0, transaction=0):
             command = ZigbeeDeviceProfile(trans_seqnum=transaction)/ZDPNWKAddrReq(
                 ieee_addr=address,
                 request_type=request_type,
                 start_index=start_index
             )
-            self.send_data(command, destination_address_mode=APSDestinationAddressMode.EXTENDED_ADDRESS_DST_ENDPOINT_PRESENT, destination_address=address, use_network_key=True, destination_endpoint=0)
+            self.send_data(command, destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT, destination_address=0xfffd, use_network_key=True, destination_endpoint=0)
 
     def nwk_addr_req(self, address, request_type=0, start_index=0, transaction=0):
         self.zdo.clusters["zdo_nwk_addr_req"].generate(address, request_type, start_index, transaction)
+
+    class ZDOIEEEAddrReq(Cluster):
+        def __init__(self):
+            super().__init__(cluster_id=0x0001)
+
+        def generate(self, address, request_type=1, start_index=0, transaction=0):
+            command = ZigbeeDeviceProfile(trans_seqnum=transaction)/ZDPIEEEAddrReq(
+                nwk_addr=address,
+                request_type=request_type,
+                start_index=start_index
+            )
+            self.send_data(command, destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT, destination_address=address, use_network_key=True, destination_endpoint=0)
+
+    def ieee_addr_req(self, address, request_type=1, start_index=0, transaction=0):
+        self.zdo.clusters["zdo_ieee_addr_req"].generate(address, request_type, start_index, transaction)
+
 
     def device_annce(self, transaction=0):
         self.zdo.clusters["zdo_device_annce"].generate(transaction)
@@ -44,6 +61,10 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 alternate_pan_coordinator = int(node_descriptor.alternate_pan_coordinator)
             )
             self.send_data(command, destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT, destination_address=0xfffd, use_network_key=True, destination_endpoint=0)
+        '''
+        def on_data(self, asdu, source_address, source_address_mode, security_status, link_quality):
+            asdu.show()
+        '''
 
     def node_desc_req(self, address, transaction=0):
         self.zdo.clusters["zdo_node_desc_req"].generate(address, transaction)
