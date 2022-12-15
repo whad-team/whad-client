@@ -224,6 +224,29 @@ class APSDataService(APSService):
         else:
             payload = asdu[ZigbeeClusterLibrary]
 
+        if 'ack_req' in asdu.frame_control:
+            acknowledgement = ZigbeeAppDataPayload(
+                frame_control = 0,
+                delivery_mode = 0,
+                aps_frametype = 2,
+                dst_endpoint = src_endpoint,
+                src_endpoint = dst_endpoint,
+                profile=profile_id,
+                cluster=cluster_id,
+                counter=asdu.counter
+            )
+
+            self.manager.nwk.get_service("data").data(
+                acknowledgement,
+                nsdu_handle=0,
+                destination_address_mode=NWKAddressMode.UNICAST,
+                destination_address=source_address,
+                radius=30,
+                non_member_radius=self.database.get("apsNonmemberRadius"),
+                discover_route=False,
+                security_enable=True
+            )
+
         return {
             "asdu":payload,
             "destination_address":destination,
