@@ -28,20 +28,23 @@ The approach is the following:
 NB: Control PDUs are not processed for the moment.
 """
 
-from scapy.all import *
+from scapy.all import rdpcap
 from scapy.layers.bluetooth4LE import BTLE_CONNECT_REQ, LL_FEATURE_REQ, \
     LL_FEATURE_RSP, LL_SLAVE_FEATURE_REQ, LL_VERSION_IND, BTLE_ADV, \
-    BTLE_DATA
+    BTLE_DATA, BTLE
 from scapy.layers.bluetooth import ATT_Read_Request, ATT_Read_Blob_Request, \
-    ATT_Write_Command, ATT_Write_Request, ATT_Write_Response, ATT_Read_Blob_Response, \
-    ATT_Read_Response, ATT_Read_By_Group_Type_Response, ATT_Read_By_Type_Response, \
+    ATT_Write_Command, ATT_Write_Request, ATT_Write_Response, \
+    ATT_Read_Blob_Response, ATT_Read_Response, \
+    ATT_Read_By_Group_Type_Response, ATT_Read_By_Type_Response, \
     ATT_Find_Information_Response, ATT_Read_By_Group_Type_Request, \
-    ATT_Error_Response, ATT_Read_By_Type_Request, ATT_Find_Information_Request, \
-    L2CAP_Hdr, ATT_Hdr, ATT_Handle_Value_Indication, ATT_Handle_Value_Notification
-from struct import unpack
+    ATT_Error_Response, ATT_Read_By_Type_Request, \
+    ATT_Find_Information_Request, L2CAP_Hdr, ATT_Hdr, \
+    ATT_Handle_Value_Indication, ATT_Handle_Value_Notification
+from struct import unpack, pack
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
 
+# Whad imports
 import whad.scapy.layers.nordic
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, \
@@ -53,8 +56,12 @@ from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
 from whad.ble.stack.att.constants import BleAttErrorCode
 from whad.ble.utils.att import UUID
 
+# Logging
 import logging
 logger = logging.getLogger(__name__)
+
+def le2be(v):
+    return unpack('>I', pack('<I', v))[0]
 
 class PeerInfo(object):
     """BLE Peer information
@@ -188,8 +195,8 @@ class ConnectionInfo(object):
             else:
                 self.slave = PeerInfo(None, rxadd, None, slave_version)
 
-        self.access_address = conn_req.AA
-            
+        self.access_address = le2be(conn_req.AA)
+
 
     def __repr__(self):
         desc  = 'BLE Connection information:\n'
@@ -199,7 +206,7 @@ class ConnectionInfo(object):
             desc += ' Master info:\n'
             desc += '  - BD address: %s (%s)\n' % (
                 self.master.address,
-                'public' if self.master.address_type == 1 else 'random'
+                'public' if self.master.address_type == 0 else 'random'
             )
         if self.master.company is not None:
             desc += '  - Company: %04x\n' % self.master.company
@@ -211,7 +218,7 @@ class ConnectionInfo(object):
             desc += ' Slave info:\n'
             desc += '  - BD address: %s (%s)\n' % (
                 self.slave.address,
-                'public' if self.slave.address_type == 1 else 'random'
+                'public' if self.slave.address_type == 0 else 'random'
             )
         if self.slave.company is not None:
             desc += '  - Company: %04x\n' % self.slave.company
@@ -225,6 +232,8 @@ def find_conn_info(packets):
     """Find information about master and slave based on captured packets,
     as well as connection information.
     """
+    connections = []
+
     conn_request = None
     conn_request_meta = None
     feature_req = None
@@ -239,27 +248,58 @@ def find_conn_info(packets):
     for packet in packets:
         # Do we have a connection request ?
         if packet.haslayer(BTLE_CONNECT_REQ):
-            logger.info('Found CONN_REQ packet')
+            logger.info('found CONN_REQ packet')
+
+            if conn_request is not None:
+                logger.debug('a connection was already detected, save it')
+
+                # A new connection has started, store information about
+                # the previous connection
+                connections.append(ConnectionInfo(
+                    conn_request,
+                    conn_request_meta,
+                    feature_req,
+                    feature_resp,
+                    slave_feature_req,
+                    slave_feature_resp,
+                    master_version_ind,
+                    slave_version_ind
+                ))
+                
             # Keep track of master device and connreq
             conn_request = packet[BTLE_CONNECT_REQ]
             conn_request_meta = packet[BTLE_ADV]
+
+            # Reset other tracked packets
+            feature_req = None
+            feature_resp = None
+            slave_feature_req = None
+            slave_feature_resp = None
+            master_version_ind = None
+            slave_version_ind = None
+
         elif packet.haslayer(LL_VERSION_IND):
             # Usually, version is queried by the master.
             if master_version_ind is None:
+                logger.debug('found an LL_VERSION_IND control PDU, assumed to be from initiator')
                 master_version_ind = packet[LL_VERSION_IND]
             else:
+                logger.debug('found an LL_VERSION_IND control PDU, assumed to be from advertiser')
                 slave_version_ind = packet[LL_VERSION_IND]
         elif packet.haslayer(LL_FEATURE_REQ):
+            logger.debug('found an LL_FEATURE_REQ control PDU')
             feature_req = packet[LL_FEATURE_REQ]
         elif packet.haslayer(LL_SLAVE_FEATURE_REQ):
+            logger.debug('found an LL_SLAVE_FEATURE_REQ control PDU')
             slave_feature_req = packet[LL_SLAVE_FEATURE_REQ]
         elif packet.haslayer(LL_FEATURE_RSP):
+            logger.debug('found an LL_FEATURE_RSP control PDU')
             if slave_feature_req is not None and slave_feature_resp is None:
                 slave_feature_resp = packet[LL_FEATURE_RSP]
             else:
                 feature_resp = packet[LL_FEATURE_RSP]
 
-    return ConnectionInfo(
+    connections.append(ConnectionInfo(
         conn_request,
         conn_request_meta,
         feature_req,
@@ -268,10 +308,12 @@ def find_conn_info(packets):
         slave_feature_resp,
         master_version_ind,
         slave_version_ind
-    )
+    ))
+
+    return connections
 
 
-def recover_profile(packets):
+def recover_profile(connection, packets):
     """Parse BLE packets and try to rebuild the device profile.
 
     This method parses the provided BLE packets to identify service
@@ -286,6 +328,10 @@ def recover_profile(packets):
     We follow the packet flow and use a very small state machine to
     analyze the GATT procedures and deduce services, characteristics and CCCD.
     """
+    logging.debug('recovering GATT profile for connection with AA 0x%08x' % (
+        connection.access_address)
+    )
+
     in_service_discovery = False
     in_charac_discovery = False
     in_desc_discovery = False
@@ -304,14 +350,31 @@ def recover_profile(packets):
     # We build a generic profile, it will be populated later.
     profile = GenericProfile()
     for packet in packets:
+
+        # Do not track packets that do not match our connection Access Address
+        if packet.haslayer(BTLE):
+            access_address = packet[BTLE].access_addr
+            if access_address != connection.access_address:
+                logger.debug('packet access address does not match')
+                continue
+
         if packet.haslayer(ATT_Read_By_Group_Type_Request):
+            logger.debug('found ATT_Read_By_group_Type_Request')
             req:ATT_Read_By_Group_Type_Request = packet[ATT_Read_By_Group_Type_Request]
 
             # Are we looking for services ?
             if req.uuid == 0x2800:
+                logger.debug('client is looking for primary services declaration')
+                logger.debug('switch state to service discovery')
                 in_service_discovery = True
+            else:
+                logger.debug('request does not search for services (%s)' % (
+                    UUID(req.uuid)
+                ))
 
         elif packet.haslayer(ATT_Read_By_Group_Type_Response) and in_service_discovery:
+            logger.debug('found ATT_Read_By_Group_Type_Response during service discovery')
+
             # Parse response if we are currently searching for services
             resp = packet[ATT_Read_By_Group_Type_Response]
             gatt_resp = GattReadByGroupTypeResponse.from_bytes(
@@ -320,8 +383,8 @@ def recover_profile(packets):
             )
 
             # Iterate over services
+            logger.debug('iterate over service declarations')
             for item in gatt_resp:
-                print('Found service %s' % str(UUID(item.value)))
                 services.append(PrimaryService(
                     uuid=UUID(item.value),
                     handle=item.handle,
@@ -330,17 +393,22 @@ def recover_profile(packets):
             
             # Stop processing this type of packet if end_handle == 0xffff
             if item.end == 0xffff:
+                logger.debug('service has end handle 0xffff, service discovery done.')
                 in_service_discovery = False
 
         elif packet.haslayer(ATT_Read_By_Type_Request) and not in_charac_discovery:
+            logger.debug('found ATT_Read_By_Type_Request')
             # Read by type request, we check if it is dealing with characteristics
             req = packet[ATT_Read_By_Type_Request]
             if req.uuid == 0x2803:
+                logger.debug('client is looking for characterstic declarations')
+                logger.debug('switch state to characteristic discovery')
                 # Yes, keep track of end handle and enable characteristic discovery
                 end_handle = req.end
                 in_charac_discovery = True
 
         elif packet.haslayer(ATT_Read_By_Type_Response) and in_charac_discovery:
+            logger.debug('found ATT_Read_By_Type_Response packet')
             # Read by type response received
             resp = packet[ATT_Read_By_Type_Response]
 
@@ -352,6 +420,7 @@ def recover_profile(packets):
             )
 
             # Iterate over items
+            logger.debug('iterate over characteristic declarations')
             for item in gatt_resp:
                 # Build characteristic object
                 charac_properties = item.value[0]
@@ -375,17 +444,22 @@ def recover_profile(packets):
                 # Consider charac discovery done when we reach the request
                 # end handle
                 if item.handle == end_handle:
+                    logger.debug('characteristic discovery done')
                     in_charac_discovery = False
 
         elif packet.haslayer(ATT_Find_Information_Request):
+            logger.debug('found ATT_Find_Information_Request')
             # Generally used to discover descriptors
             req = packet[ATT_Find_Information_Request]
             if req.start not in characs:
                 # Are we discovering a descriptor of a known characteristic ?
                 if req.start - 2 in characs:
+                    logger.debug('client is looking for information on descriptors')
                     in_desc_discovery = True
 
         elif packet.haslayer(ATT_Find_Information_Response) and in_desc_discovery:
+            logger.debug('found ATT_Find_Information_Response packet')
+
             # Parse characteristic descriptors
             resp = packet[ATT_Find_Information_Response]
             handles = b''.join([item.build() for item in resp.handles])
@@ -395,6 +469,7 @@ def recover_profile(packets):
             )
 
             # Iterate over information, keep only CCCD descriptors.
+            logger.debug('iterate over descriptors declaration')
             for descriptor in gatt_resp:
                 handle = descriptor.handle
                 if descriptor.uuid == UUID(0x2902) and (handle-2) in characs:
@@ -409,20 +484,25 @@ def recover_profile(packets):
                     )
                 # End discovery if returned handle is Ending Handle (0xFFFF)
                 if handle == 0xFFFF:
+                    logger.debug('descriptor discovery done')
                     in_desc_discovery = False
 
         elif packet.haslayer(ATT_Error_Response):
+            logger.debug('found ATT_Error_Response packet')
             # We received an error message
             error = packet[ATT_Error_Response]
 
             # If we were trying to discover a service, then consider discovery over
             if error.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND and in_service_discovery:
+                logger.debug('Received ATTRIBUTE_NOT_FOUND, service discovery done')
                 in_service_discovery = False
             # If we were trying to discover a characteristic, then consider discovery over
             elif error.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND and in_charac_discovery:
+                logger.debug('Received ATTRIBUTE_NOT_FOUND, characteristic discovery done')
                 in_charac_discovery = False
             # If we were trying to discover a descriptor, then consider discovery over
             elif error.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND and in_desc_discovery:
+                logger.debug('Received ATTRIBUTE_NOT_FOUND, descriptor discovery done')
                 in_desc_discovery = False
 
     # Add discovered services and characteristics
@@ -447,15 +527,20 @@ def conn_summary(conn_meta, profile, packets):
     # First, we display a small summary about peers.
     print_formatted_text(HTML('<b><ansigreen>Information about peers</ansigreen></b>'))
     print('')
+
     if conn_meta.master.address is not None:
+        logger.debug('initiator is known, display BD address')
         print_formatted_text(HTML('<ansicyan>Initiator</ansicyan>'))
         print_formatted_text(HTML('<b>BD address:</b> %s <b>(%s)</b>' % (
             conn_meta.master.address,
             'public' if conn_meta.master.address_type == 0 else 'random'
         )))
+        
         if conn_meta.master.company is not None:
-            print_formatted_text(HTML('<b>Baseband vendor:</b> %s' %(
-                BT_MANUFACTURERS[conn_meta.master.company]
+            logger.debug('initiator has version information, showing company and fw/ble versions')
+            print_formatted_text(HTML('<b>Baseband vendor:</b> %s (%04x)' %(
+                BT_MANUFACTURERS[conn_meta.master.company],
+                conn_meta.master.company
             )))
             print_formatted_text(HTML('<b>Supported BLE version:</b> %s' % (
                 BT_VERSIONS[conn_meta.master.ble_version]
@@ -466,14 +551,17 @@ def conn_summary(conn_meta, profile, packets):
         print('')
 
     if conn_meta.slave.address is not None:
+        logger.debug('advertiser is known, display BD address')
         print_formatted_text(HTML('<ansicyan>Advertiser</ansicyan>'))
         print_formatted_text(HTML('<b>BD address:</b> %s <b>(%s)</b>' % (
             conn_meta.slave.address,
             'public' if conn_meta.slave.address_type == 0 else 'random'
         )))
         if conn_meta.slave.company is not None:
-            print_formatted_text(HTML('<b>Baseband vendor:</b> %s' %(
-                BT_MANUFACTURERS[conn_meta.slave.company]
+            logger.debug('advertiser has version information, showing company and fw/ble versions')
+            print_formatted_text(HTML('<b>Baseband vendor:</b> %s (%04x)' %(
+                BT_MANUFACTURERS[conn_meta.slave.company],
+                conn_meta.slave.company
             )))
             print_formatted_text(HTML('<b>Supported BLE version:</b> %s' % (
                 BT_VERSIONS[conn_meta.slave.ble_version]
@@ -485,6 +573,7 @@ def conn_summary(conn_meta, profile, packets):
 
     # Then, displayed recovered profile (if any)
     if len(list(profile.services())) > 0:
+        logger.debug('at least one service has been detected, display GATT profile')
         print_formatted_text(HTML('<ansigreen><b>GATT Profile</b></ansigreen>\n'))
         print(profile)
 
@@ -494,6 +583,7 @@ def conn_summary(conn_meta, profile, packets):
     l2cap_pending_pkt = None
     l2cap_exp_len = -1
     cur_att_handle = None
+
     for ble_packet in packets:
 
         packet = None
@@ -503,15 +593,31 @@ def conn_summary(conn_meta, profile, packets):
             btle_hdr = ble_packet[BTLE_DATA]
 
             if btle_hdr.LLID == 2:
+                logger.debug('L2CAP start of fragment received')
                 l2cap_hdr = ble_packet[L2CAP_Hdr]
                 if l2cap_hdr.len == len(l2cap_hdr.payload):
+                    logger.debug('L2CAP packet is complete')
                     # Packet is complete.
                     packet = ble_packet
                 else:
+                    logger.debug('L2CAP packet is incomplete, missing %d bytes' % (
+                        l2cap_exp_len - len(ble_packet[L2CAP_Hdr].payload)
+                    ))
                     # Start of fragmented packet
                     l2cap_pending_pkt = ble_packet[L2CAP_Hdr]
                     l2cap_exp_len = l2cap_pending_pkt.len
             elif btle_hdr.LLID == 1:
+                logger.debug(
+                    'L2CAP packet continuation received (%d bytes)' % (
+                        len(btle_hdr.payload)
+                    )
+                )
+                logger.debug(
+                    'L2CAP packet reassembled fragment size: %d bytes' % (
+                        len(l2cap_pending_pkt.payload) + len(btle_hdr.payload)
+                    )
+                )
+
                 # Packet continuation, update packet
                 l2cap_pending_pkt = L2CAP_Hdr(
                     len=len(l2cap_pending_pkt.payload) + len(btle_hdr.payload),
@@ -520,6 +626,7 @@ def conn_summary(conn_meta, profile, packets):
 
                 # Do we have a complete packet ?
                 if len(l2cap_pending_pkt.payload) == l2cap_exp_len:
+                    logger.debug('L2CAP packet reassembled, process it')
                     packet = L2CAP_Hdr(
                         len=l2cap_pending_pkt.len,
                         cid=l2cap_pending_pkt.cid,
@@ -530,15 +637,22 @@ def conn_summary(conn_meta, profile, packets):
 
             # Read request
             if packet.haslayer(ATT_Read_Request):
+                logger.debug('received an ATT_Read_Request packet')
+                logger.debug('update current ATT handle to %d' % req.gatt_handle)
                 req = packet[ATT_Read_Request]
                 cur_att_handle = req.gatt_handle
 
             # Read response
             elif packet.haslayer(ATT_Read_Response) and cur_att_handle is not None:
+                logger.debug('received an ATT_Read_Response packet')
                 resp = packet[ATT_Read_Response]
                 try:
+                    logger.debug('resolving characteristic from handle ...')
                     # Find the characteristic this value belongs to
                     charac = profile.find_object_by_handle(cur_att_handle - 1)
+                    logger.debug('found matching characteristic with UUID %s' % (
+                        charac.uuid
+                    ))
 
                     # Are we reading a characteristic ?
                     if isinstance(charac, Characteristic):
@@ -551,6 +665,7 @@ def conn_summary(conn_meta, profile, packets):
 
                     cur_att_handle = None
                 except IndexError as oopsie:
+                    logger.debug('no characteristic found, considering handle only')
                     # Characteristic is unknown, consider attribute handle only
                     print_formatted_text(HTML('<ansimagenta>Reading</ansimagenta> handle <ansicyan>%d</ansicyan>' % (
                         cur_att_handle
@@ -561,22 +676,24 @@ def conn_summary(conn_meta, profile, packets):
 
             # Write command
             elif packet.haslayer(ATT_Write_Command):
+                logger.debug('received an ATT_Write_Command packet')
                 req = packet[ATT_Write_Command]
                 try:
-                    try:
-                        # Find the characteristic this value belongs to
-                        charac = profile.find_object_by_handle(req.gatt_handle - 1)
-                    except IndexError as not_value:
-                        # Is it a CCCD ?
-                        charac = profile.find_object_by_handle(req.gatt_handle - 2)
-                    
+                    logger.debug('resolving characteristic from handle %d' % req.gatt_handle)
                     is_cccd = False
                     try:
                         # Find the characteristic this value belongs to
                         charac = profile.find_object_by_handle(req.gatt_handle - 1)
+                        logger.debug('found matching characteristic with UUID %s' % (
+                            charac.uuid
+                        ))
                     except IndexError as not_value:
+                        logger.debug('no characteristic found, looking for CCCD')
                         # Is it a CCCD ?
                         charac = profile.find_object_by_handle(req.gatt_handle - 2)
+                        logger.debug('found matching CCCD for characteristic %s' % (
+                            charac.uuid
+                        ))
                         is_cccd = True
 
                     if is_cccd:
@@ -585,18 +702,24 @@ def conn_summary(conn_meta, profile, packets):
                         # Writing to CCCD
                         value = unpack('<H', bytes(req.data)[:2])[0]
                         if value == 0x0002:
+                            logger.debug('client wrote 0x0002 to CCCD: indication')
+
                             # Client subscribes for indication
                             print_formatted_text(HTML('<ansimagenta>Subscribe for indication</ansimagenta> to characteristic <ansicyan>%s</ansicyan> from service <ansicyan>%s</ansicyan>' % (
                                 charac.uuid, 
                                 service.uuid 
                             )))
                         elif value == 0x0001:
+                            logger.debug('client wrote 0x0001 to CCCD: notification')
+
                             # Client subscribes for notification
                             print_formatted_text(HTML('<ansimagenta>Subscribe for notification</ansimagenta> to characteristic <ansicyan>%s</ansicyan> from service <ansicyan>%s</ansicyan>' % (
                                 charac.uuid, 
                                 service.uuid 
                             )))
                         elif value == 0x0000:
+                            logger.debug('client wrote 0x0000 to CCCD: disabled')
+
                             # Client unsubscribes
                             print_formatted_text(HTML('<ansimagenta>Unsubscribe</ansimagenta> from characteristic <ansicyan>%s</ansicyan> from service <ansicyan>%s</ansicyan>' % (
                                 charac.uuid, 
@@ -612,6 +735,10 @@ def conn_summary(conn_meta, profile, packets):
 
                     cur_att_handle = None
                 except IndexError as oops:
+                    logger.debug('unable to find a matching characteristic or CCCD for handle %d' % (
+                        req.gatt_handle
+                    ))
+
                     # Characteristic is unknown, consider attribute handle only
                     print_formatted_text(HTML('<ansimagenta>Writing</ansimagenta> to handle <ansicyan>%d</ansicyan> (without response)' % (
                         req.gatt_handle
@@ -622,15 +749,24 @@ def conn_summary(conn_meta, profile, packets):
 
             # Write request
             elif packet.haslayer(ATT_Write_Request):
+                logger.debug('received an ATT_Write_Request packet')
                 req = packet[ATT_Write_Request]
                 try:
+                    logger.debug('resolving characteristic from handle %d' % req.gatt_handle)
                     is_cccd = False
                     try:
                         # Find the characteristic this value belongs to
                         charac = profile.find_object_by_handle(req.gatt_handle - 1)
+                        
+                        logger.debug('found matching characteristic with UUID %s' % (
+                            charac.uuid
+                        ))
                     except IndexError as not_value:
                         # Is it a CCCD ?
                         charac = profile.find_object_by_handle(req.gatt_handle - 2)
+                        logger.debug('found matching CCCD for characteristic %s' % (
+                            charac.uuid
+                        ))
                         is_cccd = True
 
                     if is_cccd:
@@ -639,18 +775,24 @@ def conn_summary(conn_meta, profile, packets):
                         # Writing to CCCD
                         value = unpack('<H', bytes(req.data)[:2])[0]
                         if value == 0x0002:
+                            logger.debug('client wrote 0x0002 to CCCD: indication')
+
                             # Client subscribes for indication
                             print_formatted_text(HTML('<ansimagenta>Subscribe for indication</ansimagenta> to characteristic <ansicyan>%s</ansicyan> from service <ansicyan>%s</ansicyan>' % (
                                 charac.uuid, 
                                 service.uuid 
                             )))
                         elif value == 0x0001:
+                            logger.debug('client wrote 0x0001 to CCCD: notification')
+
                             # Client subscribes for notification
                             print_formatted_text(HTML('<ansimagenta>Subscribe for notification</ansimagenta> to characteristic <ansicyan>%s</ansicyan> from service <ansicyan>%s</ansicyan>' % (
                                 charac.uuid, 
                                 service.uuid 
                             )))
                         elif value == 0x0000:
+                            logger.debug('client wrote 0x0000 to CCCD: disabled')
+
                             # Client unsubscribes
                             print_formatted_text(HTML('<ansimagenta>Unsubscribe</ansimagenta> from characteristic <ansicyan>%s</ansicyan> from service <ansicyan>%s</ansicyan>' % (
                                 charac.uuid, 
@@ -664,6 +806,10 @@ def conn_summary(conn_meta, profile, packets):
                         )))
                         hexdump(req.data)
                 except IndexError as oops:
+                    logger.debug('unable to find a matching characteristic or CCCD for handle %d' % (
+                        req.gatt_handle
+                    ))
+
                     # Characteristic is unknown, consider attribute handle only
                     print_formatted_text(HTML('<ansimagenta>Writing</ansimagenta> to handle <ansicyan>%d</ansicyan>' % (
                         req.gatt_handle
@@ -723,7 +869,7 @@ def interpret_pcap(pcap_file: str):
     :param str pcap_file: Path to a valid PCAP file containing BLE packets
     """
     # Read pcap packets
-    logger.info('Read packets from PCAP ...')
+    logger.info('read packets from PCAP ...')
     packets = rdpcap(pcap_file)    
 
     # First, look for connection-related packets:
@@ -731,13 +877,24 @@ def interpret_pcap(pcap_file: str):
     # - feature request/response
     # - slave feature request/response
     # - version_ind
-    logger.info('Analyzing global connection and deduce information about peers')
-    conn_meta = find_conn_info(packets)
-    
-    # Then, we look for services/characteristics discovery packets
-    logger.info('Retrieving GATT profile from our analysis')
-    profile = recover_profile(packets)
+    logger.info('analyzing global connections and deduce information about peers')
+    connections = find_conn_info(packets)
+    logger.info('found %d connections in PCAP' % len(connections))
 
-    # Based on the recovered profile, interpret all the characteristics
-    # and descriptors operations
-    conn_summary(conn_meta, profile, packets)
+    for conn_id, connection in enumerate(connections):
+        logger.info('processing connection %d with AA %08x' % (
+            conn_id, connection.access_address
+        ))
+
+        print_formatted_text(HTML("<ansiblue><b><u>Connection #%d</u></b></ansiblue>\n" % (
+            conn_id + 1
+        )))
+
+        # Then, we look for services/characteristics discovery packets
+        logger.info('retrieving GATT profile from our analysis')
+        profile = recover_profile(connection, packets)
+
+        # Based on the recovered profile, interpret all the characteristics
+        # and descriptors operations
+        logger.info('displaying a connection summary')
+        conn_summary(connection, profile, packets)
