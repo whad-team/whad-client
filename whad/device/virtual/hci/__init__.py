@@ -109,7 +109,8 @@ class HCIDevice(VirtualDevice):
         super().close()
 
         # Close underlying device.
-        self.__socket.close()
+        if self.__socket is not None:
+            self.__socket.close()
         self.__opened = False
 
 
