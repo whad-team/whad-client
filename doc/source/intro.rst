@@ -50,16 +50,4 @@ Some other devices were made compatible with WHAD through an adaptation layer (n
 * Bluetooth HCI dongles
 
 
-Supported wireless protocols
-----------------------------
-
-WHAD supports the following protocols:
-
-* Bluetooth Low Energy (version 4.x, features from version 5.x are not yet implemented)
-* ZigBee
-* ANT
-* ANT+
-* Mosart
-
-
 

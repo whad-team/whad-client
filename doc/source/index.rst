@@ -8,12 +8,20 @@ Welcome to WHAD's documentation!
 
 .. toctree::
     :maxdepth: 2
-    :caption: Contents:
+    :caption: General documentation
 
-    intro.rst
-    ble/index.rst
-    device/index.rst
-    api.rst
+    intro
+    install
+    getting_started
+    wireless_protocols
+    
+.. toctree::
+    :maxdepth: 2
+    :caption: Command-line Tools
+
+    cli/generic
+    cli/bluetooth
+    cli/zigbee
 
 
 

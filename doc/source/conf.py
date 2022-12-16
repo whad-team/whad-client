@@ -41,13 +41,13 @@ release = '1.0'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
+    #'sphinx.ext.autosummary',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
     'sphinxcontrib.mermaid'
 ]
 
-autosummary_generate = True
+#autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -182,6 +182,8 @@ epub_exclude_files = ['search.html']
 
 
 # -- Extension configuration -------------------------------------------------
+
+#autosummary_imported_members = True
 
 # -- Options for todo extension ----------------------------------------------
 
