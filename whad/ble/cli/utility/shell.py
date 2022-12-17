@@ -1,22 +1,17 @@
-from cmd import Cmd
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
 
-from whad.ble.profile.characteristic import CharacteristicProperties
-
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Scanner, Central
+from whad.ble.profile.characteristic import CharacteristicProperties
 from whad.ble.utils.att import UUID
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.utility.cache import BleDevicesCache
 
+from whad.cli.shell import InteractiveShell
+
 INTRO='''
- __    __ _               _ 
-/ / /\ \ \ |__   __ _  __| |
-\ \/  \/ / '_ \ / _` |/ _` |
- \  /\  /| | | | (_| | (_| |
-  \/  \/ |_| |_|\__,_|\__,_|
-                            
+whad-ble, the WHAD Bluetooth Low Energy utility
 '''
 
 def show_adv_record(offset, raw_record):
@@ -36,12 +31,12 @@ def show_adv_record(offset, raw_record):
         
 
 
-class BleUtilityShell(Cmd):
+class BleUtilityShell(InteractiveShell):
     """Bluetooth Low Energy interactive shell
     """
 
     def __init__(self, interface: WhadDevice = None):
-        super().__init__()
+        super().__init__(HTML('<b>whad-ble></b> '))
 
         # If interface is None, pick the first matching our needs
         self.__interface = interface
@@ -59,9 +54,9 @@ class BleUtilityShell(Cmd):
         """Update prompt to reflect current state
         """
         if not self.__target_bd:
-            self.prompt = 'whad-ble> '
+            self.set_prompt(HTML('<b>whad-ble></b> '))
         else:
-            self.prompt = 'whad-ble|%s> ' % self.__target_bd
+            self.set_prompt(HTML('<b>whad-ble|<ansicyan>%s</ansicyan>></b> ' % self.__target_bd))
 
 
     def switch_role(self, new_role):
@@ -73,6 +68,19 @@ class BleUtilityShell(Cmd):
 
     def do_scan(self, args):
         """scan surrounding devices and show a small summary
+
+        <ansicyan><b>scan</b></ansicyan>
+
+        Scan devices and report them in this console in real-time.
+        
+        The following information is provided:
+         - <b>RSSI:</b> represents the strength of the signal in dBm
+         - <b>Address type:</b> address is either public or random
+         - <b>BD address:</b> device Bluetooth address (a.k.a MAC address)
+         - <b>Extra info:</b> device name is provided in advertising packet
+
+        You can stop a scan by hitting <b>CTL-c</b> at any time, the discovered devices are kept in
+        memory and would be available in autocompletion.
         """
         # Switch role to scanner
         self.switch_role(Scanner)
@@ -93,35 +101,51 @@ class BleUtilityShell(Cmd):
 
     def do_devices(self, arg):
         """list discovered devices
+
+        <ansicyan><b>devices</b></ansicyan>
+
+        List every discovered device so far, through the <ansicyan>scan</ansicyan> command.
+        This command displays the content of the console device cache.
         """
         print_formatted_text(HTML('<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>'))
         for device in self.__cache.iterate():
             print(device['info'])
 
-    def do_info(self, arg):
+    def do_info(self, args):
         """show detailed device information
+
+        <ansicyan><b>info</b> <i>[ BD address ]</i></ansicyan>
+
+        This command displays all the information discovered when scanning a given device:
+         - <b>RSSI:</b> represents the strength of the signal in dBm
+         - <b>Address type:</b> address is either public or random
+         - <b>BD address:</b> device Bluetooth address (a.k.a MAC address)
+         - <b>All the advertising records</b> returned in advertising packets and scan responses
         """
-        address = arg
-        try:
-            # Retrieve device from cache
-            device = self.__cache[address]
-            
-            # Show detailed information about the selected device
-            dev_info = device['info']
+        if len(args) >= 1:
+            address = args[0]
+            try:
+                # Retrieve device from cache
+                device = self.__cache[address]
+                
+                # Show detailed information about the selected device
+                dev_info = device['info']
 
-            print_formatted_text(HTML('<ansigreen><b>Device %s</b></ansigreen>' % dev_info.address))
+                print_formatted_text(HTML('<ansigreen><b>Device %s</b></ansigreen>' % dev_info.address))
 
-            print_formatted_text(HTML('<b>RSSI:</b>\t\t\t%4d dBm' % dev_info.rssi))
-            print_formatted_text(HTML('<b>Address type:</b>\t\t%s' % 'public' if dev_info.address_type == 0 else 'random'))
-            print('')
-            print_formatted_text(HTML('<ansicyan><u>Raw advertising records</u></ansicyan>\n'))
-            offset = 0
-            for adv_record in dev_info.adv_records:
-                show_adv_record(offset, adv_record.to_bytes())
-                offset += 1
+                print_formatted_text(HTML('<b>RSSI:</b>\t\t\t%4d dBm' % dev_info.rssi))
+                print_formatted_text(HTML('<b>Address type:</b>\t\t%s' % 'public' if dev_info.address_type == 0 else 'random'))
                 print('')
-        except IndexError as notfound:
-            print('!!! Specified BD address has not been discovered')
+                print_formatted_text(HTML('<ansicyan><u>Raw advertising records</u></ansicyan>\n'))
+                offset = 0
+                for adv_record in dev_info.adv_records:
+                    show_adv_record(offset, adv_record.to_bytes())
+                    offset += 1
+                    print('')
+            except IndexError as notfound:
+                print('!!! Specified BD address has not been discovered')
+        else:
+            self.error('<u>info</u> requires a single parameter (device name or BD address).')
 
     def get_cache_targets(self):
         # Keep track of BD addresses and names
@@ -129,39 +153,40 @@ class BleUtilityShell(Cmd):
         targets.extend([dev['info'].name for dev in self.__cache.iterate() if dev['info'].name is not None])
         return targets
 
-    def complete_info(self, text, line, begidx, endidx):
+    def complete_info(self):
         """Autocomplete the 'info' command, providing bd addresses of discovered devices.
         """
         # Keep track of BD addresses and names
         targets = self.get_cache_targets()
-        if text:
-            return [
-                address for address in targets
-                if address.startswith(text)
-            ]
-        else:
-            return targets
+        completions = {}
+        for address in targets:
+            completions[address] = None
+        return completions
 
-    def complete_connect(self, text, line, begidx, endidx):
+
+    def complete_connect(self):
         # Keep track of BD addresses and names
         targets = self.get_cache_targets()
-        if text:
-            return [
-                address for address in targets
-                if address.startswith(text)
-            ]
-        else:
-            return targets
+        completions = {}
+        for address in targets:
+            completions[address] = None
+        return completions
 
-    def do_connect(self, arg):
+    def do_connect(self, args):
         """connect to a device
+
+        <ansicyan><b>connect</b> <i>[ BD address or device name ]</i></ansicyan>
 
         Initiate a Bluetooth Low Energy connection to a specific device by its
         Bluetooth Device address or its name. If multiple devices have the same
         name, the first one will be picked for connect.
         """
+        if len(args) < 1:
+            self.error('<u>connect</u> requires a single parameter (device name or BD address).\ntype \'help connect\' for more details.')
+            return
+
         try:
-            target = self.__cache[arg]
+            target = self.__cache[args[0]]
         
             # Switch role to Central
             self.switch_role(Central)
@@ -182,20 +207,38 @@ class BleUtilityShell(Cmd):
                 self.__target_bd = None
 
         except IndexError as notfound:
-            print('Device %s not found' % arg)
+            print('Device %s not found' % args[0])
 
     def do_disconnect(self, arg):
         """disconnect from device
+
+        <ansicyan><b>disconnect</b></ansicyan>
+
+        Disconnect from current connected device, if any.
         """
         if self.__target is not None:
             self.__target.disconnect()
             self.__target_bd = None
+        else:
+            self.warning('not connected to a device, aborted.')
         
         # Update prompt
         self.update_prompt()
 
-    def do_profile(self, arg):
+    def do_profile(self, args):
         """discover device services and characteristics
+
+        <ansicyan><b>profile</b></ansicyan>
+
+        This command performs a GATT services and characteristics discovery,
+        collecting all this information and keeping it in a dedicated <b>cache</b>.
+
+        This <b>cached information</b> is then used by commands <ansicyan>read</ansicyan>, <ansicyan>services</ansicyan>,
+        and <ansicyan>characteristics</ansicyan> to speed up the process.
+        
+        <aaa fg="orange">Sometimes this discovery process may cause an error
+        and produces incomplete information, in this case try again and cross
+        fingers</aaa>
         """
         if self.__target is not None:
             try:
@@ -230,11 +273,13 @@ class BleUtilityShell(Cmd):
             except GattTimeoutException as timeout:
                 print('GATT timeout occured')
 
-    def do_services(self, arg):
+    def do_services(self, args):
         """discover/show current device services
 
-        This command should only be used when connected to a device, as it will
-        discover its exposed primary services.
+        <ansicyan><b>services</b></ansicyan>
+
+        This command shows the discovered primary services of a connected BLE
+        device, and <u>will only work if a device is connected</u>.
         """
         if self.__target_bd is not None:
 
@@ -249,7 +294,7 @@ class BleUtilityShell(Cmd):
         else:
             self.error('No device connected.')
 
-    def do_characteristics(self, arg):
+    def do_characteristics(self, args):
         """discover/show current device characteristics
         """
         if self.__target_bd is not None:
@@ -287,7 +332,6 @@ class BleUtilityShell(Cmd):
         if self.__target_bd:
             if self.__cache.is_discovered(self.__target_bd):
                 # parse target arguments
-                args = list(filter(lambda x: x!='', args.split(' ')))
                 if len(args) == 0:
                     self.error('You must provide at least a characteristic value handle or characteristic UUID.')
                 else:
@@ -365,49 +409,6 @@ class BleUtilityShell(Cmd):
                 self.error('Device has not been discovered yet')
         else:
             self.error('No device connected.')
-
-
-    def error(self, message):
-        print_formatted_text(HTML('<b><ansired>%s</ansired></b>' % message))
-
-    def do_help(self, arg):
-        '''show this help screen
-        '''
-        if arg=='':
-            # Show help with HTML formatted docstrings
-            print_formatted_text(HTML('<ansigreen><b>Help</b></ansigreen>'))
-            print('')
-
-            # Loop on commands
-            commands = []
-            for prop in dir(self):
-                p = getattr(self, prop)
-                if callable(p) and prop.startswith('do_') and hasattr(p, '__doc__'):
-                    command = prop[3:]
-                    commands.append((prop[3:], p.__doc__.splitlines()[0]))
-            
-            # Compute the longest command
-            max_cmd_size = max([len(cmd) for cmd,doc in commands])
-            cmd_fmt = "<ansicyan>{0:<%d}</ansicyan>\t\t{1}" % max_cmd_size
-            for cmd, doc in commands:
-                print_formatted_text(HTML(cmd_fmt.format(cmd, doc)))
-        else:
-            try:
-                # Retrieve command documentation
-                prop = getattr(self, 'do_'+arg)
-
-                if hasattr(prop, '__doc__'):
-                    doc = prop.__doc__.splitlines()
-                    print_formatted_text(HTML('<ansicyan><b>%s</b></ansicyan> - <b>%s</b>' % (
-                        arg, doc[0]
-                    )))
-                    if len(doc) >= 2:
-                        print('')
-                        for extra_line in doc[1:]:
-                            print_formatted_text(HTML(extra_line.strip()))
-
-            except AttributeError as error:
-                print_formatted_text(HTML('<ansired><b>Cannot get help for an invalid command.</b></ansired>'))
 
     def do_quit(self, arg):
         """close whad-ble

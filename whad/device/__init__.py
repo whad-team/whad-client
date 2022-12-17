@@ -620,7 +620,8 @@ class WhadDevice(object):
         logger.info('closing WHAD device')
 
         # Cancel I/O thread
-        self.__io_thread.cancel()
+        if self.__io_thread is not None:
+            self.__io_thread.cancel()
 
         # Send a NOP message to unlock process_messages()
         msg = Message()
@@ -628,7 +629,8 @@ class WhadDevice(object):
         self.on_message_received(msg)
 
         # Wait for the thread to terminate nicely.
-        self.__io_thread.join()
+        if self.__io_thread is not None:
+            self.__io_thread.join()
 
 
     def __write(self, data):
