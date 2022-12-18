@@ -153,7 +153,9 @@ class ConnectionInfo(object):
     Holds all the required information about a connection, its master and slave.
     """
 
-    def __init__(self, conn_req, conn_req_meta, feature_req, feature_resp, slave_feature_req, slave_feature_resp, master_version, slave_version):
+    def __init__(self, access_address, conn_req, conn_req_meta, feature_req, feature_resp, slave_feature_req, slave_feature_resp, master_version, slave_version):
+        self.access_address = access_address
+
         if conn_req_meta is not None:
             txadd = conn_req_meta.TxAdd
             rxadd = conn_req_meta.RxAdd
@@ -163,6 +165,7 @@ class ConnectionInfo(object):
 
         if conn_req is not None:
             txadd = conn_req
+
             # Save master information
             if feature_req is not None:
                 self.master = PeerInfo(conn_req.InitA, txadd, feature_req, master_version)
@@ -178,9 +181,6 @@ class ConnectionInfo(object):
                 self.slave = PeerInfo(conn_req.AdvA, rxadd, slave_feature_resp, slave_version)
             else:
                 self.slave = PeerInfo(conn_req.AdvA, rxadd, None, slave_version)
-            
-            # Save access address
-            self.access_address = le2be(conn_req.AA)
         else:
             # Save master information
             if feature_req is not None:
@@ -197,9 +197,6 @@ class ConnectionInfo(object):
                 self.slave = PeerInfo(None, rxadd, slave_feature_resp, slave_version)
             else:
                 self.slave = PeerInfo(None, rxadd, None, slave_version)
-            
-            # No access address
-            self.access_address = None
 
 
     def __repr__(self):
@@ -236,6 +233,7 @@ def find_conn_info(packets):
     """Find information about master and slave based on captured packets,
     as well as connection information.
     """
+    access_addresses = []
     connections = []
 
     conn_request = None
@@ -247,73 +245,93 @@ def find_conn_info(packets):
     master_version_ind = None
     slave_version_ind = None
 
-    # We extract every interesting packet that may be useful to gather
-    # information about the connection
+    # Loop on all BLE packets and extract access addresses
     for packet in packets:
-        # Do we have a connection request ?
-        if packet.haslayer(BTLE_CONNECT_REQ):
-            logger.info('found CONN_REQ packet')
+        if packet.haslayer(BTLE):
+            btle_pkt = packet[BTLE]
+            
+            # If access address is not advertising and not known,
+            # add it to our list
+            if btle_pkt.access_addr != 0x8e89bed6:
+                if btle_pkt.access_addr not in access_addresses:
+                    access_addresses.append(btle_pkt.access_addr)
 
-            if conn_request is not None:
-                logger.debug('a connection was already detected, save it')
+    # For every found access address we try to get as much information
+    # as possible:
+    for access_addr in access_addresses:
+        for packet in packets:
 
-                # A new connection has started, store information about
-                # the previous connection
-                connections.append(ConnectionInfo(
-                    conn_request,
-                    conn_request_meta,
-                    feature_req,
-                    feature_resp,
-                    slave_feature_req,
-                    slave_feature_resp,
-                    master_version_ind,
-                    slave_version_ind
-                ))
-                
-            # Keep track of master device and connreq
-            conn_request = packet[BTLE_CONNECT_REQ]
-            conn_request_meta = packet[BTLE_ADV]
+            # Only keep packets with our wanted access address
+            if packet.haslayer(BTLE):
+                if packet[BTLE].access_addr != access_addr and packet[BTLE].access_addr!=0x8e89bed6:
+                    continue
 
-            # Reset other tracked packets
-            feature_req = None
-            feature_resp = None
-            slave_feature_req = None
-            slave_feature_resp = None
-            master_version_ind = None
-            slave_version_ind = None
+            # Do we have a connection request ?
+            if packet.haslayer(BTLE_CONNECT_REQ):
+                logger.info('found CONN_REQ packet')
 
-        elif packet.haslayer(LL_VERSION_IND):
-            # Usually, version is queried by the master.
-            if master_version_ind is None:
-                logger.debug('found an LL_VERSION_IND control PDU, assumed to be from initiator')
-                master_version_ind = packet[LL_VERSION_IND]
-            else:
-                logger.debug('found an LL_VERSION_IND control PDU, assumed to be from advertiser')
-                slave_version_ind = packet[LL_VERSION_IND]
-        elif packet.haslayer(LL_FEATURE_REQ):
-            logger.debug('found an LL_FEATURE_REQ control PDU')
-            feature_req = packet[LL_FEATURE_REQ]
-        elif packet.haslayer(LL_SLAVE_FEATURE_REQ):
-            logger.debug('found an LL_SLAVE_FEATURE_REQ control PDU')
-            slave_feature_req = packet[LL_SLAVE_FEATURE_REQ]
-        elif packet.haslayer(LL_FEATURE_RSP):
-            logger.debug('found an LL_FEATURE_RSP control PDU')
-            if slave_feature_req is not None and slave_feature_resp is None:
-                slave_feature_resp = packet[LL_FEATURE_RSP]
-            else:
-                feature_resp = packet[LL_FEATURE_RSP]
+                if conn_request is not None:
+                    logger.debug('a connection was already detected, save it')
 
-    connections.append(ConnectionInfo(
-        conn_request,
-        conn_request_meta,
-        feature_req,
-        feature_resp,
-        slave_feature_req,
-        slave_feature_resp,
-        master_version_ind,
-        slave_version_ind
-    ))
+                    # A new connection has started, store information about
+                    # the previous connection
+                    connections.append(ConnectionInfo(
+                        access_addr,
+                        conn_request,
+                        conn_request_meta,
+                        feature_req,
+                        feature_resp,
+                        slave_feature_req,
+                        slave_feature_resp,
+                        master_version_ind,
+                        slave_version_ind
+                    ))
+                    
+                # Keep track of master device and connreq
+                conn_request = packet[BTLE_CONNECT_REQ]
+                conn_request_meta = packet[BTLE_ADV]
 
+                # Reset other tracked packets
+                feature_req = None
+                feature_resp = None
+                slave_feature_req = None
+                slave_feature_resp = None
+                master_version_ind = None
+                slave_version_ind = None
+
+            elif packet.haslayer(LL_VERSION_IND):
+                # Usually, version is queried by the master.
+                if master_version_ind is None:
+                    logger.debug('found an LL_VERSION_IND control PDU, assumed to be from initiator')
+                    master_version_ind = packet[LL_VERSION_IND]
+                else:
+                    logger.debug('found an LL_VERSION_IND control PDU, assumed to be from advertiser')
+                    slave_version_ind = packet[LL_VERSION_IND]
+            elif packet.haslayer(LL_FEATURE_REQ):
+                logger.debug('found an LL_FEATURE_REQ control PDU')
+                feature_req = packet[LL_FEATURE_REQ]
+            elif packet.haslayer(LL_SLAVE_FEATURE_REQ):
+                logger.debug('found an LL_SLAVE_FEATURE_REQ control PDU')
+                slave_feature_req = packet[LL_SLAVE_FEATURE_REQ]
+            elif packet.haslayer(LL_FEATURE_RSP):
+                logger.debug('found an LL_FEATURE_RSP control PDU')
+                if slave_feature_req is not None and slave_feature_resp is None:
+                    slave_feature_resp = packet[LL_FEATURE_RSP]
+                else:
+                    feature_resp = packet[LL_FEATURE_RSP]
+
+        connections.append(ConnectionInfo(
+            access_addr,
+            conn_request,
+            conn_request_meta,
+            feature_req,
+            feature_resp,
+            slave_feature_req,
+            slave_feature_resp,
+            master_version_ind,
+            slave_version_ind
+        ))
+    
     return connections
 
 
