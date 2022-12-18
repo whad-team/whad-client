@@ -1,6 +1,7 @@
 """WHAD CLI Interactive shell module
 """
 import os
+import shlex
 from prompt_toolkit import PromptSession, HTML, print_formatted_text
 from prompt_toolkit.completion import NestedCompleter, DynamicCompleter
 
@@ -87,10 +88,12 @@ class InteractiveShell(object):
         """Process input commands.
         """
         # Dispatch commands
-        command = input.split(' ')[0]
-        if command in self.__commands:
-            # Command is supported, follow to method
-            return self.__commands[command]([arg for arg in input.split(' ')[1:] if arg != ''])
+        tokens = shlex.split(input)
+        if len(tokens) >= 1:
+            command = tokens[0]
+            if command in self.__commands:
+                # Command is supported, follow to method
+                return self.__commands[command](tokens[1:])
 
     def run(self):
         """Run the interactive shell.
