@@ -178,6 +178,9 @@ class ConnectionInfo(object):
                 self.slave = PeerInfo(conn_req.AdvA, rxadd, slave_feature_resp, slave_version)
             else:
                 self.slave = PeerInfo(conn_req.AdvA, rxadd, None, slave_version)
+            
+            # Save access address
+            self.access_address = le2be(conn_req.AA)
         else:
             # Save master information
             if feature_req is not None:
@@ -194,8 +197,9 @@ class ConnectionInfo(object):
                 self.slave = PeerInfo(None, rxadd, slave_feature_resp, slave_version)
             else:
                 self.slave = PeerInfo(None, rxadd, None, slave_version)
-
-        self.access_address = le2be(conn_req.AA)
+            
+            # No access address
+            self.access_address = None
 
 
     def __repr__(self):
@@ -637,9 +641,9 @@ def conn_summary(conn_meta, profile, packets):
 
             # Read request
             if packet.haslayer(ATT_Read_Request):
+                req = packet[ATT_Read_Request]
                 logger.debug('received an ATT_Read_Request packet')
                 logger.debug('update current ATT handle to %d' % req.gatt_handle)
-                req = packet[ATT_Read_Request]
                 cur_att_handle = req.gatt_handle
 
             # Read response
