@@ -1,5 +1,6 @@
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
+from binascii import unhexlify, Error as BinasciiError
 
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Scanner, Central
@@ -409,6 +410,84 @@ class BleUtilityShell(InteractiveShell):
                 self.error('Device has not been discovered yet')
         else:
             self.error('No device connected.')
+
+    def do_write(self, args):
+        """Write data to a characteristic
+        """
+        if self.__target_bd:
+            if self.__cache.is_discovered(self.__target_bd):
+                # parse target arguments
+                if len(args) <2:
+                    self.error('You must provide at least a characteristic value handle or characteristic UUID, and a value to write.')
+                else:
+                    handle = None
+                    offset = None
+                    uuid = None
+
+                    # Figure out what the handle is
+                    if args[0].lower().startswith('0x'):
+                        try:
+                            handle = int(args[0].lower(), 16)
+                        except ValueError as badval:
+                            self.error('Wrong handle: %s' % args[0])
+                            return
+                    else:
+                        try:
+                            handle = int(args[0])
+                        except ValueError as badval:
+                            try:
+                                handle = UUID(args[0].replace('-',''))
+                            except:
+                                self.error('Wrong UUID: %s' % args[0])
+                                return
+
+                    # Do we have hex data ?
+                    if args[1].lower() == 'hex':
+                        # Decode hex data
+                        hex_data = ''.join(args[2:])
+                        try:
+                            char_value = unhexlify(hex_data.replace('\t',''))
+                        except BinasciiError as err:
+                            self.error('Provided hex value contains non-hex characters.')
+                            return
+                    else:
+                        char_value = args[1]
+
+                    if not isinstance(char_value, bytes):
+                        char_value = bytes(char_value,'utf-8')
+                        
+                    # Perform characteristic write by handle
+                    if not isinstance(handle, UUID):
+                        attrib = self.__target.find_object_by_handle(handle)
+                        if attrib is None:
+                            self.error('No characteristic found with handle %d' % handle)
+                        else:
+                            try:
+                                # Write data
+                                attrib.value = char_value
+                            except GattTimeoutException as timeout:
+                                self.error('GATT timeout while writing.')
+                    else:
+                        # Perform discovery if required
+                        if not self.__cache.is_discovered(self.__target_bd):
+                            self.__target.discover()
+                            self.__cache.mark_as_discovered(self.__target_bd)
+
+                        # Search characteristic from its UUID
+                        target_charac = self.__target.find_characteristic_by_uuid(handle)                       
+                        if target_charac is not None:
+                            try:
+                                # Write data
+                                attrib.value = char_value
+                            except GattTimeoutException as timeout:
+                                self.error('GATT timeout while writing.')
+                        else:
+                            self.error('No characteristic found with UUID %s' % handle)
+            else:
+                self.error('Device has not been discovered yet')
+        else:
+            self.error('No device connected.')
+
 
     def do_quit(self, arg):
         """close whad-ble
