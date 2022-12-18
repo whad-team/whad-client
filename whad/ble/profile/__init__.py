@@ -99,7 +99,6 @@ def is_method_hook(method):
         return (len(method.hooks) > 0)
     return False
 
-
 class Characteristic(object):
     """Characteristic model
     """
@@ -139,6 +138,7 @@ class Characteristic(object):
     @property
     def end_handle(self):
         return self.handle + self.get_required_handles()
+
     @property
     def name(self):
         return self.__name
