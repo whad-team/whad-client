@@ -9,10 +9,11 @@ class AdvertisingDevice(object):
     """Store information about a device
     """
 
-    def __init__(self, rssi, address_type, bd_address, adv_data, undirected=True, connectable=True):
+    def __init__(self, rssi, address_type, bd_address, adv_data, rsp_data=None, undirected=True, connectable=True):
         self.__address_type = address_type
         self.__bd_address = bd_address
         self.__adv_data = adv_data
+        self.__rsp_data = rsp_data
         self.__rssi = rssi
         self.__got_scan_rsp = False
         self.__undirected = undirected
@@ -32,7 +33,29 @@ class AdvertisingDevice(object):
 
     @property
     def adv_records(self):
+        """Return only advertising records
+        """
         return self.__adv_data
+
+    @property
+    def scan_rsp_records(self):
+        """Return only scan response records
+        """
+        return self.__rsp_data
+
+    @property
+    def ad_records(self):
+        """Return both advertising records and scan response records
+
+        :return list: list of advertising data records
+        """
+        out = AdvDataFieldList()
+        for record in self.__adv_data:
+            out.add(record)
+        if self.__rsp_data is not None:
+            for record in self.__rsp_data:
+                out.add(record)
+        return out
 
     @property
     def got_scan_rsp(self):
@@ -44,17 +67,14 @@ class AdvertisingDevice(object):
 
         @return str: Device name or None if no name has been advertised.
         """
+        # Do we have a name ?
         complete_name = None
         short_name = None
-        for record in self.__adv_data:
-            # Do we have a name ?
-            complete_name = None
-            short_name = None
-            for record in self.__adv_data:
-                if isinstance(record, AdvShortenedLocalName):
-                    short_name = record.name.decode('utf-8')
-                elif isinstance(record, AdvCompleteLocalName):
-                    complete_name = record.name.decode('utf-8')
+        for record in self.ad_records:
+            if isinstance(record, AdvShortenedLocalName):
+                short_name = record.name.decode('utf-8')
+            elif isinstance(record, AdvCompleteLocalName):
+                complete_name = record.name.decode('utf-8')
         
         # Return discovered name (if any)
         if complete_name is not None:
@@ -71,7 +91,7 @@ class AdvertisingDevice(object):
         # Do we have a name ?
         complete_name = None
         short_name = None
-        for record in self.__adv_data:
+        for record in self.ad_records:
             if isinstance(record, AdvShortenedLocalName):
                 short_name = record.name.decode('utf-8')
             elif isinstance(record, AdvCompleteLocalName):
@@ -108,9 +128,14 @@ class AdvertisingDevice(object):
     def set_scan_rsp(self, scan_rsp):
         """Update device advertisement data
         """
+        """
         if not self.__got_scan_rsp:
             for record in scan_rsp:
-                self.__adv_data.add(record)
+                self.__rsp_data.add(record)
+            self.__got_scan_rsp = True
+        """
+        if not self.__got_scan_rsp:
+            self.__rsp_data = scan_rsp
             self.__got_scan_rsp = True
 
 
