@@ -51,8 +51,13 @@ class ClientCharacteristicConfig(CharacteristicDescriptor):
 
 
 class CharacteristicValue(Attribute):
-    def __init__(self, uuid, handle=None, value=b''):
+    def __init__(self, uuid, handle=None, value=b'', characteristic=None):
         super().__init__(uuid=uuid, handle=handle, value=value)
+        self.__characteristic = characteristic
+
+    @property
+    def characteristic(self):
+        return self.__characteristic
 
     @property
     def uuid(self):
@@ -85,11 +90,11 @@ class Characteristic(Attribute):
 
         if isinstance(handle, int):
             self.__value_handle = handle + 1
-            self.__value = CharacteristicValue(uuid, self.__value_handle, value)
+            self.__value = CharacteristicValue(uuid, self.__value_handle, value, self)
             self.__end_handle = self.__value_handle
         else:
             self.__value_handle = None
-            self.__value = CharacteristicValue(uuid, self.__value_handle, value)
+            self.__value = CharacteristicValue(uuid, self.__value_handle, value, self)
 
         # Permissions
         self.__properties = properties
@@ -135,6 +140,7 @@ class Characteristic(Attribute):
     @value_handle.setter
     def value_handle(self, value):
         self.__value_handle = value
+        self.__value.handle = value
     
     @value.setter
     def value(self, new_value):

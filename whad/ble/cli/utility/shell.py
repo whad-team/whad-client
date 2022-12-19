@@ -1,11 +1,16 @@
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
 from binascii import unhexlify, Error as BinasciiError
+from whad.ble.exceptions import InvalidHandleValueException
 
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Scanner, Central
 from whad.ble.profile.characteristic import CharacteristicProperties
 from whad.ble.utils.att import UUID
+from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
+    InsufficientAuthenticationError, InsufficientAuthorizationError, \
+    InsufficientEncryptionKeySize, ReadNotPermittedError, \
+    WriteNotPermittedError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.utility.cache import BleDevicesCache
 
@@ -66,6 +71,24 @@ class BleUtilityShell(InteractiveShell):
         if self.__connector is not None:
             self.__connector.stop()
         self.__connector = new_role(self.__interface)
+
+    def show_att_error(self, error: AttError):
+        """Parse ATT error and show exception.
+        """
+        if isinstance(error, InvalidHandleValueException):
+            self.error('ATT Error: wrong value handle')
+        elif isinstance(error, ReadNotPermittedError):
+            self.error('ATT error: read operation not allowed')
+        elif isinstance(error, WriteNotPermittedError):
+            self.error('ATT error: write operation not allowed')
+        elif isinstance(error, InsufficientAuthenticationError):
+            self.error('ATT error: insufficient authentication')
+        elif isinstance(error, InsufficientAuthorizationError):
+            self.error('ATT error: insufficient authorization')
+        elif isinstance(error, AttributeNotFoundError):
+            self.error('ATT error: attribute not found')
+        elif isinstance(error, InsufficientEncryptionKeySize):
+            self.error('ATT error: insufficient encryption')
 
     def do_scan(self, args):
         """scan surrounding devices and show a small summary
@@ -159,7 +182,7 @@ class BleUtilityShell(InteractiveShell):
         """
         # Keep track of BD addresses and names
         targets = self.get_cache_targets()
-        completions = {}
+        completions = self.autocomplete_env('^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$')
         for address in targets:
             completions[address] = None
         return completions
@@ -168,7 +191,7 @@ class BleUtilityShell(InteractiveShell):
     def complete_connect(self):
         # Keep track of BD addresses and names
         targets = self.get_cache_targets()
-        completions = {}
+        completions = self.autocomplete_env()
         for address in targets:
             completions[address] = None
         return completions
@@ -297,6 +320,11 @@ class BleUtilityShell(InteractiveShell):
 
     def do_characteristics(self, args):
         """discover/show current device characteristics
+
+        <ansicyan><b>characteristics</b></ansicyan>
+
+        This command shows the services and characteristics of the connected
+        device, with their handles and properties.
         """
         if self.__target_bd is not None:
 
@@ -326,168 +354,344 @@ class BleUtilityShell(InteractiveShell):
             self.error('No device connected.')
     
     def do_read(self, args):
-        """read a characteristic
+        """read a GATT attribute
 
-        This command reads the content of a GATT characteristic value or descriptor.
+        <ansicyan><b>read</b> <i>[UUID | handle] ([offset])</i></ansicyan>
+
+        Read an attribute identified by its handle, or read the value of a characteristic
+        identified by its UUID (if unique). An optional offset can be provided
+        to start reading from the specified byte position (it will issue a
+        <i>ReadBlob</i> operation).
+
+        Result is displayed as an hexadecimal dump with corresponding ASCII text:
+
+        > read 41
+        00000000: 74 68 69 73 20 69 73 20  61 20 74 65 73 74        this is a test
+
         """
         if self.__target_bd:
-            if self.__cache.is_discovered(self.__target_bd):
-                # parse target arguments
-                if len(args) == 0:
-                    self.error('You must provide at least a characteristic value handle or characteristic UUID.')
-                else:
-                    handle = None
-                    offset = None
-                    uuid = None
-
-                    # figure out what the handle is
-                    if args[0].lower().startswith('0x'):
-                        try:
-                            handle = int(args[0].lower(), 16)
-                        except ValueError as badval:
-                            self.error('Wrong handle: %s' % args[0])
-                            return
-                    else:
-                        try:
-                            handle = int(args[0])
-                        except ValueError as badval:
-                            try:
-                                handle = UUID(args[0].replace('-',''))
-                            except:
-                                self.error('Wrong UUID: %s' % args[0])
-                                return
-
-                    # Check offset and length
-                    if len(args) >= 2:
-                        try:
-                            offset = int(args[1])
-                        except ValueError as badval:
-                            self.error('Wrong offset value, will use 0 instead.')
-                            offset = None
-                        
-                    # Perform characteristic read by handle
-                    if not isinstance(handle, UUID):
-                        attrib = self.__target.find_object_by_handle(handle)
-                        if attrib is None:
-                            self.error('No characteristic found with handle %d' % handle)
-                        else:
-                            try:
-                                # Read data
-                                if offset is not None:
-                                    value = attrib.read(offset=offset)
-                                else:
-                                    value = attrib.read()
-
-                                # Display result as hexdump
-                                hexdump(value)
-                                
-                            except GattTimeoutException as timeout:
-                                self.error('GATT timeout while reading.')
-                    else:
-                        # Perform discovery if required
-                        if not self.__cache.is_discovered(self.__target_bd):
-                            self.__target.discover()
-                            self.__cache.mark_as_discovered(self.__target_bd)
-
-                        # Search characteristic from its UUID
-                        target_charac = self.__target.find_characteristic_by_uuid(handle)                       
-                        if target_charac is not None:
-                            try:
-                                # Read data
-                                if offset is not None:
-                                    value = target_charac.read(offset=offset)
-                                else:
-                                    value = target_charac.read()
-
-                                # Display result as hexdump
-                                hexdump(value)
-                                
-                            except GattTimeoutException as timeout:
-                                self.error('GATT timeout while reading.')
-                        else:
-                            self.error('No characteristic found with UUID %s' % handle)
+            # parse target arguments
+            if len(args) == 0:
+                self.error('You must provide at least a characteristic value handle or characteristic UUID.')
+                return
             else:
-                self.error('Device has not been discovered yet')
+                handle = None
+                offset = None
+                uuid = None
+
+            # figure out what the handle is
+            if args[0].lower().startswith('0x'):
+                try:
+                    handle = int(args[0].lower(), 16)
+                except ValueError as badval:
+                    self.error('Wrong handle: %s' % args[0])
+                    return
+            else:
+                try:
+                    handle = int(args[0])
+                except ValueError as badval:
+                    try:
+                        handle = UUID(args[0].replace('-',''))
+                    except:
+                        self.error('Wrong UUID: %s' % args[0])
+                        return
+
+            # Check offset and length
+            if len(args) >= 2:
+                try:
+                    offset = int(args[1])
+                except ValueError as badval:
+                    self.error('Wrong offset value, will use 0 instead.')
+                    offset = None
+                
+            # Perform characteristic read by handle
+            if not isinstance(handle, UUID):
+                try:
+                    value = self.__target.read(handle, offset=offset)
+
+                    # Display result as hexdump
+                    hexdump(value)
+                except AttError as att_err:
+                    self.show_att_error(att_err)
+                except GattTimeoutException as timeout:
+                    self.error('GATT timeout while reading.')
+
+            else:
+                # Perform discovery if required
+                if not self.__cache.is_discovered(self.__target_bd):
+                    self.__target.discover()
+                    self.__cache.mark_as_discovered(self.__target_bd)
+
+                # Search characteristic from its UUID
+                target_charac = self.__target.find_characteristic_by_uuid(handle)                       
+                if target_charac is not None:
+                    try:
+                        # Read data
+                        if offset is not None:
+                            value = target_charac.read(offset=offset)
+                        else:
+                            value = target_charac.read()
+
+                        # Display result as hexdump
+                        hexdump(value)
+                    
+                    except AttError as att_err:
+                        self.show_att_error(att_err)
+                    except GattTimeoutException as timeout:
+                        self.error('GATT timeout while reading.')
+                else:
+                    self.error('No characteristic found with UUID %s' % handle)
         else:
             self.error('No device connected.')
+
+    def perform_write(self, args, without_response=False):
+        """Perform attribute/handle characteristic
+        """
+        # parse target arguments
+        if len(args) <2:
+            self.error('You must provide at least a characteristic value handle or characteristic UUID, and a value to write.')
+            return
+        else:
+            handle = None
+            offset = None
+            uuid = None
+
+        # Figure out what the handle is
+        if args[0].lower().startswith('0x'):
+            try:
+                handle = int(args[0].lower(), 16)
+            except ValueError as badval:
+                self.error('Wrong handle: %s' % args[0])
+                return
+        else:
+            try:
+                handle = int(args[0])
+            except ValueError as badval:
+                try:
+                    handle = UUID(args[0].replace('-',''))
+                except:
+                    self.error('Wrong UUID: %s' % args[0])
+                    return
+
+        # Do we have hex data ?
+        if args[1].lower() == 'hex':
+            # Decode hex data
+            hex_data = ''.join(args[2:])
+            try:
+                char_value = unhexlify(hex_data.replace('\t',''))
+            except BinasciiError as err:
+                self.error('Provided hex value contains non-hex characters.')
+                return
+        else:
+            char_value = args[1]
+
+        if not isinstance(char_value, bytes):
+            char_value = bytes(char_value,'utf-8')
+            
+        # Perform ATT write by handle
+        if not isinstance(handle, UUID):
+            try:
+                if without_response:
+                    self.__target.write_command(handle, char_value)
+                else:
+                    self.__target.write(handle, char_value)
+            except AttError as att_err:
+                self.show_att_error(att_err)
+            except GattTimeoutException as timeout:
+                self.error('GATT timeout while writing.')
+        else:
+            # Perform discovery if required
+            if not self.__cache.is_discovered(self.__target_bd):
+                self.__target.discover()
+                self.__cache.mark_as_discovered(self.__target_bd)
+
+            # Search characteristic from its UUID
+            target_charac = self.__target.find_characteristic_by_uuid(handle)                       
+            if target_charac is not None:
+                try:
+                    if without_response:
+                        target_charac.write(char_value, without_response=True)
+                    else:
+                        target_charac.value = char_value
+                except AttError as att_err:
+                    self.show_att_error(att_err)
+                except GattTimeoutException as timeout:
+                    self.error('GATT timeout while writing.')
+            else:
+                self.error('No characteristic found with UUID %s' % handle)
+
+    def do_writecmd(self, args):
+        """write data to a GATT attribute without waiting for a response.
+
+        <ansicyan><b>writecmd</b> <i>[UUID | handle] [hex [value] | value ]</i></ansicyan>
+
+        Write data to the specified GATT attribute (identified by its handle) or to
+        a characteristic value (identified by its UUID, if unique) without waiting
+        for a response.
+
+        Data can be provided hex-encoded if prefixed by "hex":
+
+        > writecmd 41 hex 41 42 43
+
+        The command above will write 'ABC' to attribute identified by the handle 41.
+        
+        Data can also be provided as text:
+
+        > writecmd 41 ABC
+        """
+        if self.__target_bd:
+            self.perform_write(args, without_response=True)
+        else:
+            self.error('No device connected.')  
 
     def do_write(self, args):
-        """Write data to a characteristic
+        """write data to a a GATT attribute.
+
+        <ansicyan><b>write</b> <i>[UUID | handle] [hex [value] | value ]</i></ansicyan>
+
+        Write data to the specified GATT attribute (identified by its handle) or to
+        a characteristic value (identified by its UUID, if unique).
+
+        Data can be provided hex-encoded if prefixed by "hex":
+
+        > write 41 hex 41 42 43
+
+        The command above will write 'ABC' to attribute identified by the handle 41.
+        
+        Data can also be provided as text:
+
+        > write 41 ABC
+
         """
         if self.__target_bd:
-            if self.__cache.is_discovered(self.__target_bd):
-                # parse target arguments
-                if len(args) <2:
-                    self.error('You must provide at least a characteristic value handle or characteristic UUID, and a value to write.')
-                else:
-                    handle = None
-                    offset = None
-                    uuid = None
-
-                    # Figure out what the handle is
-                    if args[0].lower().startswith('0x'):
-                        try:
-                            handle = int(args[0].lower(), 16)
-                        except ValueError as badval:
-                            self.error('Wrong handle: %s' % args[0])
-                            return
-                    else:
-                        try:
-                            handle = int(args[0])
-                        except ValueError as badval:
-                            try:
-                                handle = UUID(args[0].replace('-',''))
-                            except:
-                                self.error('Wrong UUID: %s' % args[0])
-                                return
-
-                    # Do we have hex data ?
-                    if args[1].lower() == 'hex':
-                        # Decode hex data
-                        hex_data = ''.join(args[2:])
-                        try:
-                            char_value = unhexlify(hex_data.replace('\t',''))
-                        except BinasciiError as err:
-                            self.error('Provided hex value contains non-hex characters.')
-                            return
-                    else:
-                        char_value = args[1]
-
-                    if not isinstance(char_value, bytes):
-                        char_value = bytes(char_value,'utf-8')
-                        
-                    # Perform characteristic write by handle
-                    if not isinstance(handle, UUID):
-                        attrib = self.__target.find_object_by_handle(handle)
-                        if attrib is None:
-                            self.error('No characteristic found with handle %d' % handle)
-                        else:
-                            try:
-                                # Write data
-                                attrib.value = char_value
-                            except GattTimeoutException as timeout:
-                                self.error('GATT timeout while writing.')
-                    else:
-                        # Perform discovery if required
-                        if not self.__cache.is_discovered(self.__target_bd):
-                            self.__target.discover()
-                            self.__cache.mark_as_discovered(self.__target_bd)
-
-                        # Search characteristic from its UUID
-                        target_charac = self.__target.find_characteristic_by_uuid(handle)                       
-                        if target_charac is not None:
-                            try:
-                                # Write data
-                                attrib.value = char_value
-                            except GattTimeoutException as timeout:
-                                self.error('GATT timeout while writing.')
-                        else:
-                            self.error('No characteristic found with UUID %s' % handle)
-            else:
-                self.error('Device has not been discovered yet')
+            self.perform_write(args, without_response=False)
         else:
             self.error('No device connected.')
 
+    def do_sub(self, args):
+        """subscribe to a characteristic
+
+        <ansicyan><b>sub</b> <i>[UUID | handle]</i></ansicyan>
+
+        Subscribe to characteristic notifications/indications, based on a GATT
+        characteristic handle or UUID (if unique).
+
+        Once subscribed, notifications and indications will be displayed in the
+        console.
+
+        > sub 41
+        """
+        if self.__target_bd:
+            # Figure out what the handle is
+            if args[0].lower().startswith('0x'):
+                try:
+                    handle = int(args[0].lower(), 16)
+                except ValueError as badval:
+                    self.error('Wrong handle: %s' % args[0])
+                    return
+            else:
+                try:
+                    handle = int(args[0])
+                except ValueError as badval:
+                    try:
+                        handle = UUID(args[0].replace('-',''))
+                    except:
+                        self.error('Wrong UUID: %s' % args[0])
+                        return
+
+            # If UUID is provided
+            if isinstance(handle, UUID):
+                target_charac = self.__target.find_characteristic_by_uuid(handle)      
+
+                def on_charac_notified(charac, value, indication):
+                    if indication:
+                        print_formatted_text(HTML(
+                            '<ansimagenta>Indication</ansimagenta> received from characteristic with handle %d' % (
+                                charac.handle
+                            )
+                        ))
+                        hexdump(value)
+                    else:
+                        print_formatted_text(HTML(
+                            '<ansimagenta>Notification</ansimagenta> received from characteristic with handle %d' % (
+                                charac.handle
+                            )
+                        ))
+                        hexdump(value)
+            
+                if target_charac is not None:
+                    try:
+                        if not target_charac.must_notify():
+                            if target_charac.must_indicate():
+                                target_charac.subscribe(
+                                    indication=True,
+                                    callback=on_charac_notified
+                                )
+                            else:
+                                self.error('Characteristic does not send notification nor indication.')
+                        else:
+                            target_charac.subscribe(
+                                callback=on_charac_notified
+                            )
+                    except AttError as att_err:
+                        self.show_att_error(att_err)
+                    except GattTimeoutException as timeout:
+                        self.error('GATT timeout while writing.')
+                else:
+                    self.error('No characteristic found with UUID %s' % handle)
+
+        else:
+            self.error('No device connected.')
+
+    def do_unsub(self, args):
+        """unsubscribe from a characteristic
+
+        <ansicyan><b>sub</b> <i>[UUID | handle]</i></ansicyan>
+
+        Unsubscribe to characteristic notifications/indications, based on a GATT
+        characteristic handle or UUID (if unique).
+
+        Once unsubscribed, no more notifications and indications will be displayed in the
+        console.
+        
+        Example:
+
+        > unsub 41
+        """
+        if self.__target_bd:
+            # Figure out what the handle is
+            if args[0].lower().startswith('0x'):
+                try:
+                    handle = int(args[0].lower(), 16)
+                except ValueError as badval:
+                    self.error('Wrong handle: %s' % args[0])
+                    return
+            else:
+                try:
+                    handle = int(args[0])
+                except ValueError as badval:
+                    try:
+                        handle = UUID(args[0].replace('-',''))
+                    except:
+                        self.error('Wrong UUID: %s' % args[0])
+                        return
+
+            # If UUID is provided
+            if isinstance(handle, UUID):
+                target_charac = self.__target.find_characteristic_by_uuid(handle)      
+            
+                if target_charac is not None:
+                    try:
+                        target_charac.unsubscribe()
+                    except AttError as att_err:
+                        self.show_att_error(att_err)
+                    except GattTimeoutException as timeout:
+                        self.error('GATT timeout.')
+                else:
+                    self.error('No characteristic found with UUID %s' % handle)
+
+        else:
+            self.error('No device connected.')
 
     def do_quit(self, arg):
         """close whad-ble

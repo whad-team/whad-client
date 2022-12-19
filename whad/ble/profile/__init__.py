@@ -3,7 +3,8 @@
 import json
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,\
-    CharacteristicProperties, ClientCharacteristicConfig
+    CharacteristicProperties, ClientCharacteristicConfig, \
+    CharacteristicValue as BleCharacteristicValue
 from whad.ble.profile.service import PrimaryService as BlePrimaryService, \
     SecondaryService as BleSecondaryService
 from whad.ble.exceptions import InvalidHandleValueException
@@ -480,7 +481,11 @@ class GenericProfile(object):
 
         # Register all its characteristics
         for charac in service.characteristics():
+            # Register Characteristic and its CharacteristicValue
             self.register_attribute(charac)
+            self.register_attribute(charac.value_attr)
+
+            # Add characteristic in our lookup table
             self.__service_by_characteristic_handle[charac.handle] = service
         
 
@@ -507,6 +512,21 @@ class GenericProfile(object):
         return [self.find_object_by_handle(handle) for handle in handles]
 
     
+    def find_characteristic_by_value_handle(self, value_handle):
+        """Find characteristic object by its value handle.
+
+        :param int value_handle: Characteristic value handle
+        :return Characteristic: Corresponding characteristic object or None if not found.
+        """
+        try:
+            char_value = self.find_object_by_handle(value_handle)
+            if char_value is not None and hasattr(char_value, 'characteristic'):
+                return char_value.characteristic
+            else:
+                return None
+        except InvalidHandleValueException as bad_handle:
+            return None
+
     def find_characteristic_end_handle(self, handle):
         try:
             # Find service owning the characteristic

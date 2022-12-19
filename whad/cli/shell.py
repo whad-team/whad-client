@@ -1,6 +1,7 @@
 """WHAD CLI Interactive shell module
 """
 import os
+import re
 import shlex
 from prompt_toolkit import PromptSession, HTML, print_formatted_text
 from prompt_toolkit.completion import NestedCompleter, DynamicCompleter
@@ -37,6 +38,7 @@ class InteractiveShell(object):
         self.__commands_ac = {}
         self.__prompt = default_prompt
         self.__quit = False
+        self.__env = {}
 
         # Search specific commands named 'do_$command$'
         for member_name in dir(self):
@@ -84,6 +86,20 @@ class InteractiveShell(object):
                 commands_autocomplete[command] = {}
         return NestedCompleter.from_nested_dict(commands_autocomplete)
 
+    def autocomplete_env(self, pattern=None):
+        """Return a list of current environment variables.
+
+        :param str pattern: regular expression to filter variables
+        """
+        completions = {}
+        for var in self.__env:
+            if pattern is not None:
+                if re.match(pattern, self.__env[var]):
+                    completions['$'+var] = {}
+            else:
+                completions['$'+var] = {}
+        return completions
+
     def process(self, input):
         """Process input commands.
         """
@@ -92,17 +108,30 @@ class InteractiveShell(object):
         if len(tokens) >= 1:
             command = tokens[0]
             if command in self.__commands:
+                resolved_args = [self.resolve(arg) for arg in tokens[1:]]
                 # Command is supported, follow to method
-                return self.__commands[command](tokens[1:])
+                return self.__commands[command](resolved_args)
 
     def run(self):
         """Run the interactive shell.
         """
-        while not self.__quit:
-            input = self.__session.prompt(self.__prompt)
-            res = self.process(input)
-            if res:
-                break
+        try:
+            while not self.__quit:
+                input = self.__session.prompt(self.__prompt)
+                res = self.process(input)
+                if res:
+                    break
+        except KeyboardInterrupt as kbd:
+            # Call do_quit() to terminate
+            self.do_quit([])
+        except EOFError as eof: 
+            # Call do_quit() to terminate
+            self.do_quit([])
+
+    def do_quit(self, args):
+        """This method must be overriden to handle tool termination.
+        """
+        pass
 
     def stop(self):
         """Stop the interactive shell.
@@ -136,6 +165,7 @@ class InteractiveShell(object):
                     docstr = getattr(handler,'__doc__')
                     desc = '\n'.join([l.lstrip() for l in docstr.splitlines()[1:]])
                     print_formatted_text(HTML(desc.strip()))
+                    print('')
                 else:
                     self.warning('command <u>%s</u> is not documented' % command)
             else:
@@ -160,6 +190,74 @@ class InteractiveShell(object):
             for cmd, doc in commands:
                 print_formatted_text(HTML(cmd_fmt.format(cmd, doc)))
 
+
+    def resolve(self, arg):
+        """Resolve a shell parameter.
+
+        This method checks if parameter is an environment variable and replace
+        it with its value, or return the original parameter.
+
+        :param str arg: shell parameter to resolve
+        :return str: resolved parameter
+        """
+        if arg.startswith('$'):
+            if arg[1:] in self.__env:
+                return self.__env[arg[1:]]
+            else:
+                return arg
+        elif arg.startswith('\\$'):
+            return arg[1:]
+        else:
+            return arg
+
+    def do_set(self, args):
+        """set environment variable
+
+        <ansicyan><b>set</b> <i>ENV_VAR</i> <i>value</i></ansicyan>
+
+        Set <i>ENV_VAR</i> environment variable to <i>value</i> and keep it in
+        memory for the current session. This variable can be recalled with the
+        following notation: <i>$ENV_VAR</i>.
+
+        Variable's name cannot include digits, and only '_' is allowed as special
+        char.
+        """
+        if len(args)>=2:
+            varname = args[0]
+            varval = args[1]
+
+            # make sure name matches requirements
+            if re.match('^[a-zA-Z_]+$', varname):
+                # Store variable in environment
+                self.__env[varname] = self.resolve(varval)
+            else:
+                self.error('Variable name contains an invalid character')
+        else:
+            self.error('Missing argument (see help)')
+
+    def do_env(self, args):
+        """show environment variables
+
+        <ansicyan><b>env</b></ansicyan>
+
+        List environment variables.
+        """
+        for var in self.__env:
+            print_formatted_text(HTML('<ansicyan>%s</ansicyan>=%s' % (
+                var, self.__env[var]
+            )))
+
+    def do_unset(self, args):
+        """remove environment variable
+
+        <ansicyan><b>unset</b> <i>VAR_NAME</i></ansicyan>
+
+        Remove <i>VAR_NAME</i> from environment.
+        """
+        if len(args)>=1:
+            varname = args[0]
+            if varname in self.__env:
+                del self.__env[varname]
 
     def warning(self, message):
         """Display a warning message in orange (if color is enabled)
