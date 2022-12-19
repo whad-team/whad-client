@@ -99,6 +99,7 @@ def show_default_help(app, args):
         commands = []
         for command, short_desc, _ in CommandsRegistry.enumerate():
             commands.append((command, short_desc))
+        commands.sort()
 
         # Compute the longest command
         max_cmd_size = max([len(cmd) for cmd,doc in commands])

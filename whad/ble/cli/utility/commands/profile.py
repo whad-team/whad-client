@@ -17,12 +17,12 @@ from whad.ble.cli.utility.helpers import show_att_error
 def profile_handler(app, command_args):
     """discover services and characteristics
     
-    <ansicyan><b>profile</b> <i>([export file path])</i></ansicyan>
+    <ansicyan><b>profile</b> <i>([JSON_PROFILE])</i></ansicyan>
 
     This command connects to a target device, discover its services and characteristics,
-    and optionnaly export the device's profile into a JSON file. This JSON file may be
-    used later for emulating a similar device with the exact same properties and
-    profile.
+    and optionnaly exports the device's profile into a <i>JSON_PROFILE</i> file. This JSON
+    file may be used later for emulating a similar device with the exact same properties
+    and profile, see <ansicyan>emulate</ansicyan> command.
     """
     # We need to have an interface specified
     if app.interface is not None and app.args.bdaddr is not None:
@@ -69,7 +69,7 @@ def profile_handler(app, command_args):
             for service in device.services():
                 print_formatted_text(HTML(
                     '<ansicyan><b>Service %s</b></ansicyan> (handle 0x%04x to 0x%04x)' % (
-                        service.uuid,
+                        service.name,
                         service.handle,
                         service.end_handle
                     )
@@ -88,7 +88,7 @@ def profile_handler(app, command_args):
                     
                     print_formatted_text(HTML(
                         '  <b>%s</b> %s, handle 0x%04x, value handle 0x%04x' % (
-                            charac.uuid,
+                            charac.name,
                             rights,
                             charac.handle,
                             charac.value_handle

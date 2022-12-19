@@ -1,6 +1,7 @@
 """Bluetooth Low Energy Characteristic Abstraction
 """
 from whad.ble.stack.att.constants import BleAttProperties
+from whad.ble.stack.gatt.helpers import get_uuid_alias
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.exceptions import InvalidHandleValueException
 from struct import pack, unpack
@@ -175,6 +176,17 @@ class Characteristic(Attribute):
     @property
     def end_handle(self):
         return self.__end_handle
+
+    @property
+    def name(self):
+        alias = get_uuid_alias(self.__charac_uuid)
+        if alias is not None:
+            return '%s (0x%s)' % (
+                alias,
+                str(self.__charac_uuid)
+            )
+        else:
+            return str(self.__charac_uuid)
 
     ##########################
     # Methods

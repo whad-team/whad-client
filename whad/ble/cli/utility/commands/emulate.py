@@ -125,9 +125,16 @@ def check_profile(profile):
 
 @command('emulate')
 def emulate_handler(app, command_args):
-    """emulate a device from its exported profile
+    """emulate a device from an exported profile
     
     <ansicyan><b>emulate</b> <i>[profile JSON file]</i></ansicyan>
+
+    This command will emulate a device from its exported GATT profile (using
+    the <ansicyan>profile</ansicyan> command). It will try to spoof its BD address (if possible),
+    and will expose the exact same services and characteristics as the original one.
+
+    If a GATT client connects to the emulated device, all the operations will
+    be logged and detailed.
     """
     # We need to have an interface specified
     if app.interface is not None:

@@ -1,6 +1,7 @@
 """Bluetooth Low Energy Service class
 """
 from whad.ble.profile.attribute import Attribute, UUID
+from whad.ble.stack.gatt.helpers import get_uuid_alias
 
 class Service(Attribute):
     def __init__(self, uuid, type_uuid, handle=0, end_handle=0):
@@ -21,6 +22,17 @@ class Service(Attribute):
     @end_handle.setter
     def end_handle(self, value):
         self.__end_handle = value
+
+    @property
+    def name(self):
+        alias = get_uuid_alias(self.__service_uuid)
+        if alias is not None:
+            return '%s (0x%s)' % (
+                alias,
+                str(self.__service_uuid)
+            )
+        else:
+            return str(self.__service_uuid)
 
     def payload(self):
         return self.__service_uuid.to_bytes()
