@@ -146,6 +146,7 @@ class CommandLineApp(ArgumentParser):
         super().__init__(program_name, usage=usage, description=description)
 
         self.__interface = None
+        self.__args = None
 
         # Add our default option --interface/-i
         self.add_argument(
@@ -193,8 +194,12 @@ class CommandLineApp(ArgumentParser):
         """
         return self.__args
 
-    def run(self):
-        """Run the main application
+    def pre_run(self):
+        """Prepare run for this application
+
+        - parses arguments
+        - handling color settings
+        - resolve WHAD interface
         """
         # First we need to parse the main arguments
         self.__args = self.parse_args()
@@ -218,6 +223,17 @@ class CommandLineApp(ArgumentParser):
                 self.error('WHAD device is not ready.')
                 return self.DEV_NOT_READY_ERR
 
+    def post_run(self):
+        """Implement pos-run tasks.
+        """
+        pass
+
+    def run(self):
+        """Run the main application
+        """
+        # Launch pre-run tasks
+        self.pre_run()
+
         # If we support first positional arg as command, parse the command
         if self.__has_command:
             if self.__args.command is not None:
@@ -228,6 +244,9 @@ class CommandLineApp(ArgumentParser):
 
             # By default, print help
             self.print_help()
+
+        # Launch post-run tasks
+        self.post_run()
 
     def warning(self, message):
         """Display a warning message in orange (if color is enabled)

@@ -1,3 +1,5 @@
+import re
+
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
 from binascii import unhexlify, Error as BinasciiError
@@ -19,6 +21,8 @@ from whad.cli.shell import InteractiveShell
 INTRO='''
 whad-ble, the WHAD Bluetooth Low Energy utility
 '''
+
+BDADDR_REGEXP = '^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$'
 
 def show_adv_record(offset, raw_record):
     """Display advertising record as hexdump.
@@ -182,7 +186,7 @@ class BleUtilityShell(InteractiveShell):
         """
         # Keep track of BD addresses and names
         targets = self.get_cache_targets()
-        completions = self.autocomplete_env('^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$')
+        completions = self.autocomplete_env(BDADDR_REGEXP)
         for address in targets:
             completions[address] = None
         return completions
@@ -210,7 +214,16 @@ class BleUtilityShell(InteractiveShell):
             return
 
         try:
-            target = self.__cache[args[0]]
+            try:
+                target = self.__cache[args[0]]
+                target_bd_addr = self.__cache[args[0]]['info'].address
+            except IndexError as notfound:
+                # If target not in cache, we are expecting a BD address
+                if re.match(BDADDR_REGEXP, args[0]):
+                    target_bd_addr = args[0]
+                else:
+                    self.error('You must provide a valid BD address.')
+                    return
         
             # Switch role to Central
             self.switch_role(Central)
@@ -219,15 +232,15 @@ class BleUtilityShell(InteractiveShell):
             self.__connector.start()
 
             # Try to connect to our target device
-            self.__target = self.__connector.connect(target['info'].address)
-            self.__target_bd = target['info'].address
+            self.__target = self.__connector.connect(target_bd_addr)
+            self.__target_bd = target_bd_addr
 
             # Check connection is OK
             if self.__target is not None:
-                print('Successfully connected to target %s' % target['info'].address)
+                print('Successfully connected to target %s' % target_bd_addr)
                 self.update_prompt()
             else:
-                print('Unable to connect to device %s' % target['info'].address)
+                print('Unable to connect to device %s' % target_bd_addr)
                 self.__target_bd = None
 
         except IndexError as notfound:

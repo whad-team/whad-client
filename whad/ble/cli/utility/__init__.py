@@ -33,6 +33,32 @@ class BleUtilityApp(CommandLineApp):
             help='Specify target BD address'
         )
 
+        self.add_argument(
+            '--file',
+            '-f',
+            dest='script',
+            help='Specify a script to run'
+        )
+
+    def run(self):
+        """Override App's run() method to handle scripting feature.
+        """
+        # Launch pre-run tasks
+        self.pre_run()
+
+        if self.args.script is not None:
+            # We need to have an interface specified
+            if self.interface is not None:
+                # Launch an interactive shell (well, driven by our script)
+                myshell = BleUtilityShell(self.interface)
+                myshell.run_script(self.args.script)
+            else:
+                self.error('You need to specify an interface with option --interface.')
+        else:
+            super().run()
+
+        # Launch post-run tasks
+        self.post_run()
 
 def ble_tool_main():
     app = BleUtilityApp()

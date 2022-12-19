@@ -128,6 +128,20 @@ class InteractiveShell(object):
             # Call do_quit() to terminate
             self.do_quit([])
 
+    def run_script(self, script_path):
+        """Run a script
+
+        :param str script_path: path to a script file
+        """
+        try:
+            commands = open(script_path,'r').readlines()
+            for command in commands:
+                res = self.process(command)
+                if res:
+                    break
+        except IOError as ioerr:
+            self.error('Cannot access script file "%s"' % script_path)
+
     def do_quit(self, args):
         """This method must be overriden to handle tool termination.
         """
