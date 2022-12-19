@@ -21,6 +21,9 @@ from whad.protocol.device_pb2 import DeviceResetQuery,DeviceType
 from whad.protocol.generic_pb2 import ResultCode
 from whad.exceptions import WhadDeviceNotFound
 
+import logging
+logger = logging.getLogger(__name__)
+
 class VirtualDevice(WhadDevice):
     """
     AdapterDevice device class.
@@ -48,8 +51,7 @@ class VirtualDevice(WhadDevice):
             inner_message = getattr(getattr(message,category), message_type)
             getattr(self, callback_name)(inner_message)
         else:
-            print("[i] Unhandled message:")
-            print(message)
+            logger.info("unhandled message: %s" % message)
             self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_discovery_info_query(self, message):
