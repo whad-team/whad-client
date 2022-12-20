@@ -4,10 +4,6 @@ from time import time
 from queue import Queue, Empty
 from struct import unpack, pack
 
-import logging
-logging.basicConfig(level=logging.WARNING)
-logging.getLogger('whad.ble.stack.gatt').setLevel(logging.INFO)
-
 from whad.ble.exceptions import HookReturnValue, HookReturnAuthRequired,\
     HookReturnAccessDenied, HookReturnGattError, HookReturnNotFound
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
