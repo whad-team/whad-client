@@ -1,19 +1,19 @@
 """Bluetooth Low Energy utility for WHAD
 
-This utility is exposed in WHAD as `whad-ble` and provides the following
+This utility is exposed in WHAD as `ble-central` and provides the following
 features:
 
 - BLE scanning
 - GATT client
 - Device emulation
 
-$ whad-ble scan    -> find the first usable BLE-capable device
-$ whad-ble -i uart scan
-$ whad-ble connect <bd address> <random/public>
+$ ble-central scan    -> find the first usable BLE-capable device
+$ ble-central -i uart scan
+$ ble-central connect <bd address> <random/public>
  -> gatttool like, spawns a shell
-$ whad-ble -> spawns a shell
-$ whad-ble emulate myfile.json
-$ whad-ble sniff <bd address> -> capture connections to this device and save to a pcap
+$ ble-central -> spawns a shell
+$ ble-central emulate myfile.json
+$ ble-central sniff <bd address> -> capture connections to this device and save to a pcap
 
 """
 from whad.ble.cli.utility.shell import BleUtilityShell
@@ -60,6 +60,6 @@ class BleUtilityApp(CommandLineApp):
         # Launch post-run tasks
         self.post_run()
 
-def ble_tool_main():
+def ble_central_main():
     app = BleUtilityApp()
     app.run()

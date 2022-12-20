@@ -1,1 +1,1 @@
-from whad.ble.cli.utility import ble_tool_main
+from whad.ble.cli.utility import ble_central_main
