@@ -1,10 +1,11 @@
 """Bluetooth Low Energy device model
 """
 import json
+
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,\
     CharacteristicProperties, ClientCharacteristicConfig, \
-    CharacteristicValue as BleCharacteristicValue
+    CharacteristicValue as BleCharacteristicValue, CharacteristicDescriptor
 from whad.ble.profile.service import PrimaryService as BlePrimaryService, \
     SecondaryService as BleSecondaryService
 from whad.ble.exceptions import InvalidHandleValueException
