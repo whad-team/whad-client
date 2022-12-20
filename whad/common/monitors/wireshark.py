@@ -53,7 +53,6 @@ class WiresharkMonitor(PcapWriterMonitor):
     def _start_wireshark(self, fifo, dissector=None):
         if dissector is None:
             self._wireshark_process = Popen([self._wireshark_path, "-k", "-i", fifo], stderr=DEVNULL, stdout=DEVNULL)
-
         else:
             with open(dissector, "r") as f:
                 conf_line = [line for line in f.readlines() if "Proto(" in line][0]
@@ -62,6 +61,7 @@ class WiresharkMonitor(PcapWriterMonitor):
 
     def close(self):
         super().close()
-        self._wireshark_process.terminate()
+        if self._wireshark_process is not None:
+            self._wireshark_process.terminate()
         if exists(self.fifo_name):
             unlink(self.fifo_name)
