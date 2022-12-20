@@ -6,6 +6,9 @@ from scapy.layers.bluetooth import L2CAP_Hdr, ATT_Hdr, SM_Hdr
 from whad.ble.stack.att import BleATT
 from whad.ble.stack.smp import BleSMP
 
+import logging
+logger = logging.getLogger(__name__)
+
 class BleL2CAP(object):
 
     def __init__(self, connection):
@@ -57,19 +60,31 @@ class BleL2CAP(object):
     def on_data_received(self, l2cap_data, fragment=False):
         """Handles incoming L2CAP data"""
         if fragment and self.__packet is not None:
+            logger.debug('[l2cap] Received a L2CAP fragment of %d bytes' % len(l2cap_data))
             self.__packet += l2cap_data
+            logger.debug('[l2cap] L2CAP packet size so far: %d' % len(self.__packet))
+
+            if len(self.__packet) >= self.__expected_length:
+                # We have received a complete L2CAP packet, process it
+                logger.debug('[l2cap] Received a complete L2CAP packet, process it')
+                self.on_l2cap_packet(L2CAP_Hdr(self.__packet[:self.__expected_length]))
+                self.__packet = None
+
         elif len(l2cap_data) >= 2:
             # Start of L2CAP or complete L2CAP message
             self.__packet = l2cap_data
+            logger.debug('[l2cap] received start of fragmented or complete message')
             
             # Check if we have a complete L2CAP message
             self.__expected_length = unpack('<H', self.__packet[:2])[0] + 4
+            logger.debug('[l2cap] expected l2cap length: %d' % self.__expected_length)
+            logger.debug('[l2cap] actual l2cap length: %d' % len(self.__packet))
             
             if len(self.__packet) >= self.__expected_length:
                 # We have received a complete L2CAP packet, process it
+                logger.debug('[l2cap] Received a complete L2CAP packet, process it')
                 self.on_l2cap_packet(L2CAP_Hdr(self.__packet[:self.__expected_length]))
-            
-            self.__packet = None
+                self.__packet = None
 
     def on_l2cap_packet(self, packet):
         """Process incoming L2CAP packets.
