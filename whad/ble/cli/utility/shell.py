@@ -5,6 +5,7 @@ from hexdump import hexdump
 from binascii import unhexlify, Error as BinasciiError
 from whad.ble.exceptions import InvalidHandleValueException
 
+from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Scanner, Central
 from whad.ble.profile.characteristic import CharacteristicProperties
@@ -15,6 +16,7 @@ from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
     WriteNotPermittedError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.utility.cache import BleDevicesCache
+from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
 
 from whad.cli.shell import InteractiveShell
 
@@ -55,6 +57,7 @@ class BleUtilityShell(InteractiveShell):
 
         self.__target = None
         self.__target_bd = None
+        self.__wireshark = None
 
         self.intro = INTRO
 
@@ -74,7 +77,13 @@ class BleUtilityShell(InteractiveShell):
         """
         if self.__connector is not None:
             self.__connector.stop()
+            if self.__wireshark is not None:
+                self.__wireshark.detach()
         self.__connector = new_role(self.__interface)
+        if self.__wireshark is not None:
+            print(self.__connector)
+            self.__wireshark.attach(self.__connector)
+            self.__wireshark.start()
 
     def show_att_error(self, error: AttError):
         """Parse ATT error and show exception.
@@ -125,6 +134,10 @@ class BleUtilityShell(InteractiveShell):
                 self.__cache.add(device)
         except KeyboardInterrupt as keybd_int:
             print('\rScan terminated by user')
+
+        if self.__wireshark is not None:
+            self.__wireshark.detach()
+
         self.__connector.stop()
 
     def do_devices(self, arg):
@@ -238,6 +251,12 @@ class BleUtilityShell(InteractiveShell):
             # Check connection is OK
             if self.__target is not None:
                 print('Successfully connected to target %s' % target_bd_addr)
+                
+                # Attach our wireshark monitor, if any
+                if self.__wireshark is not None:
+                    self.__wireshark.attach(self.__connector)
+                
+                # Update prompt
                 self.update_prompt()
             else:
                 print('Unable to connect to device %s' % target_bd_addr)
@@ -256,6 +275,10 @@ class BleUtilityShell(InteractiveShell):
         if self.__target is not None:
             self.__target.disconnect()
             self.__target_bd = None
+
+            # detach wireshark
+            if self.__wireshark is not None:
+                self.__wireshark.detach()
         else:
             self.warning('not connected to a device, aborted.')
         
@@ -705,6 +728,73 @@ class BleUtilityShell(InteractiveShell):
 
         else:
             self.error('No device connected.')
+
+    def complete_wireshark(self):
+        """Autocomplete wireshark command
+        """
+        completions = {}
+        if self.__wireshark is not None:
+            completions['off'] = {}
+        else:
+            completions['on'] = {}
+        return completions
+
+    def do_wireshark(self, arg):
+        """launch wireshark to monitor packets
+
+        <ansicyan><b>wireshark</b> <i>["on" | "off"]</i></ansicyan>
+
+        This command launches a wireshark that will display all the packets sent
+        and received in the active connection. 
+        """
+        if len(arg) >=1:
+            enabled = arg[0].lower()=="on"
+            if enabled:
+                if self.__wireshark is None:
+                    try:
+                        self.__wireshark = WiresharkMonitor()
+                        if self.__connector is not None:
+                            self.__wireshark.attach(self.__connector)
+                            self.__wireshark.start()
+                    except ExternalToolNotFound as notfound:
+                        self.error('Cannot launch Wireshark, please make sure it is installed.')
+                else:
+                    self.error('Wireshark is already launched, see <ansicyan>wireshark off</ansicyan>')
+            else:
+                # Detach monitor if any
+                if self.__wireshark is not None:
+                    self.__wireshark.detach()
+                    self.__wireshark.close()
+                    self.__wireshark = None
+        else:
+            self.error('Missing arguments, see <ansicyan>help wireshark</ansicyan>.')
+
+    def do_mtu(self, arg):
+        """set ATT MTU
+
+        <ansicyan><b>mtu</b> <i>[MTU]</i></ansicyan>
+
+        Set ATT MTU to <i>MTU</i>. <i>MTU</i> must be an integer value.
+        """
+        if self.__target_bd:
+            # check MTU
+            if len(arg) >= 1:
+                # parse mtu
+                try:
+                    mtu = int(arg[0])
+                    try:
+                        self.__target.set_mtu(mtu)
+                    except AttError as att_err:
+                        self.show_att_error(att_err)
+                    except GattTimeoutException as timeout:
+                        self.error('GATT timeout while exchanging new MTU.')
+                except ValueError as err:
+                    self.error('Provided MTU is not a valid decimal integer.')
+            else:
+                self.error('You must provide the MTU parameter (integer value).')
+        else:
+            self.error('Not connected to a remote device.')
+
 
     def do_quit(self, arg):
         """close whad-ble
