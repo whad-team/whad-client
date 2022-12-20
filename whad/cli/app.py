@@ -1,6 +1,7 @@
 """Command-line interface application module
 """
 import os
+import sys
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
 from prompt_toolkit.styles import Style
@@ -248,6 +249,23 @@ class CommandLineApp(ArgumentParser):
 
         # Launch post-run tasks
         self.post_run()
+
+
+    def is_stdout_piped(self):
+        """Checks if stdout is piped to another process
+
+        :return bool: True if stdout is piped, False otherwise
+        """
+        return (not sys.stdout.isatty())
+
+
+    def is_stdin_piped(self):
+        """Checks if stdin is piped by another process
+
+        :return bool: True if stdin is piped, False otherwise
+        """
+        return (not sys.stdin.isatty())
+
 
     def warning(self, message):
         """Display a warning message in orange (if color is enabled)
