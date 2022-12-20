@@ -21,7 +21,7 @@ from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
 from whad.cli.shell import InteractiveShell
 
 INTRO='''
-whad-ble, the WHAD Bluetooth Low Energy utility
+ble-central, the WHAD Bluetooth Low Energy central utility
 '''
 
 BDADDR_REGEXP = '^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$'
@@ -48,7 +48,7 @@ class BleUtilityShell(InteractiveShell):
     """
 
     def __init__(self, interface: WhadDevice = None):
-        super().__init__(HTML('<b>whad-ble></b> '))
+        super().__init__(HTML('<b>ble-central></b> '))
 
         # If interface is None, pick the first matching our needs
         self.__interface = interface
@@ -67,9 +67,9 @@ class BleUtilityShell(InteractiveShell):
         """Update prompt to reflect current state
         """
         if not self.__target_bd:
-            self.set_prompt(HTML('<b>whad-ble></b> '))
+            self.set_prompt(HTML('<b>ble-central></b> '))
         else:
-            self.set_prompt(HTML('<b>whad-ble|<ansicyan>%s</ansicyan>></b> ' % self.__target_bd))
+            self.set_prompt(HTML('<b>ble-central|<ansicyan>%s</ansicyan>></b> ' % self.__target_bd))
 
 
     def switch_role(self, new_role):
@@ -797,7 +797,7 @@ class BleUtilityShell(InteractiveShell):
 
 
     def do_quit(self, arg):
-        """close whad-ble
+        """close ble-central
         """
         if self.__target_bd is not None:
             self.__target.disconnect()

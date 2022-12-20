@@ -24,7 +24,7 @@ from .commands import *
 class BleUtilityApp(CommandLineApp):
 
     def __init__(self):
-        super().__init__(self,'whad-ble', description='WHAD Bluetooth Low Energy utility')
+        super().__init__(self,'ble-central', description='WHAD Bluetooth Low Energy central utility')
         
         self.add_argument(
             '--bdaddr',
