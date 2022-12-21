@@ -173,7 +173,8 @@ class UartDevice(WhadDevice):
         super().close()
 
         # Close underlying device.
-        self.__uart.close()
+        if self.__uart is not None:
+            self.__uart.close()
         self.__uart = None
         self.__fileno = None
         self.__opened = False

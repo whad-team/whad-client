@@ -31,7 +31,8 @@ It is also possible to write to a characteristic (if writeable)::
 """
 
 from whad.ble.profile.service import Service
-from whad.ble.profile.characteristic import CharacteristicDescriptor, CharacteristicProperties, Characteristic
+from whad.ble.profile.characteristic import CharacteristicDescriptor, \
+    CharacteristicProperties, Characteristic, CharacteristicValue
 from whad.ble.profile import GenericProfile
 from whad.ble.stack.att.constants import BleAttProperties
 from whad.ble.profile.attribute import UUID
@@ -83,6 +84,58 @@ class PeripheralCharacteristicDescriptor:
         else:
             self.__gatt.write(self.__descriptor.handle, value)
 
+class PeripheralCharacteristicValue:
+    """CharacteristicValue wrapper for peripheral devices
+
+    Forward all read/write operations to PeripheralCharacteristic wrapper
+    because initially access to characteristic has been implemented there.
+
+    Could be interesting in the future to implement all these operations here
+    and to forward from characteristic wrapper to characteristic value wrapper
+    because it makes more sense.
+
+    Anyway, this code just works but from an architectural point-of-view is
+    a bit crappy.
+    """
+
+    def __init__(self, char_value, gatt):
+        self.__characteristic = PeripheralCharacteristic(
+            char_value.characteristic,
+            gatt
+        )
+        self.__gatt = gatt
+
+    @property
+    def characteristic(self):
+        return self.__characteristic
+
+    @property
+    def value(self):
+        """Transparent characteristic read.
+
+        :return bytes: Characteristic value
+        """
+        return self.__characteristic.read()
+
+    @value.setter
+    def value(self, val):
+        """Transparent characteristic write.
+
+        :param bytes val: Value to write into this characteristic
+        """
+        return self.__characteristic.write(val)
+
+    def read(self, offset=0):
+        """Read characteristic value
+        """
+        return self.__characteristic.read(offset=offset)
+
+    def read_long(self):
+        return self.__characteristic.read_long()
+
+    def write(self, value, without_response=False):
+        return self.__characteristic.write(value, without_response=without_response)
+
 
 class PeripheralCharacteristic:
     """Characteristic wrapper for peripheral devices
@@ -132,6 +185,12 @@ class PeripheralCharacteristic:
     @property
     def value_handle(self):
         return self.__characteristic.value_handle
+
+    def must_notify(self):
+        return self.__characteristic.must_notify()
+
+    def must_indicate(self):
+        return self.__characteristic.must_indicate()
 
     def read(self, offset=0):
         """Read characteristic value
@@ -454,6 +513,11 @@ class PeripheralDevice(GenericProfile):
                 obj,
                 self.__gatt
             )
+        elif isinstance(obj, CharacteristicValue):
+            return PeripheralCharacteristicValue(
+                obj,
+                self.__gatt
+            )
 
     def get_characteristic(self, service_uuid: UUID, charac_uuid: UUID):
         """Get a PeripheralCharacteristic object representing a characteristic
@@ -518,7 +582,7 @@ class PeripheralDevice(GenericProfile):
         """
         return self.__gatt.write_command(handle, value)
 
-    def read(self, handle, offset=0, long=False):
+    def read(self, handle, offset=None, long=False):
         """Perform a read operation on an attribute based on its handle.
 
         This method allows to interact with characteristics and descriptors without
@@ -537,7 +601,10 @@ class PeripheralDevice(GenericProfile):
         :return bytes: Content of the characteristic or descriptor.
         """
         if not long:
-            return self.__gatt.read(handle, offset=offset)
+            if offset is None:
+                return self.__gatt.read(handle)
+            else:
+                return self.__gatt.read_blob(handle, offset=offset)
         else:
             return self.__gatt.read_long(handle)
 

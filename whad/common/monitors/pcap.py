@@ -1,10 +1,14 @@
 from whad.common.monitors import WhadMonitor
+from scapy.all import conf
+from scapy.layers.bluetooth4LE import *
 from scapy.utils import PcapWriter,PcapReader
 from os.path import exists
-from scapy.all import BTLE_RF
 from time import time
 from os import stat, remove
 from stat import S_ISFIFO
+
+import logging
+logger = logging.getLogger(__name__)
 
 class PcapWriterMonitor(WhadMonitor):
     """
@@ -39,11 +43,11 @@ class PcapWriterMonitor(WhadMonitor):
         if existing_pcap_file:
             # Checks if it is a named FIFO
             if S_ISFIFO(stat(self._pcap_file).st_mode):
-                print("[i] Named pipe %s detected, syncing." % self._pcap_file)
+                logger.info("[i] Named pipe %s detected, syncing." % self._pcap_file)
                 sync = True
             else:
                 # Checks if it is an already existing pcap file.
-                print("[i] PCAP file %s exists, appending new packets."  % self._pcap_file)
+                logger.info("[i] PCAP file %s exists, appending new packets."  % self._pcap_file)
                 try:
                     # We collect the first packet timestamp to use it as reference time
                     self._start_time = PcapReader(self._pcap_file).read_packet().time * 1000000
@@ -67,6 +71,7 @@ class PcapWriterMonitor(WhadMonitor):
             callable(getattr(self._connector, "format"))
         ):
             self._formatter = getattr(self._connector, "format")
+
 
     def close(self):
         if hasattr(self, "_writer") and self._writer is not None:

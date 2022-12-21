@@ -19,7 +19,6 @@ class AttErrorCode:
     UNSUPPORTED_GROUP_TYPES = 0x10
     INSUFFICIENT_RES = 0x11
 
-
 class AttError(Exception):
     """ATT generic exception
     """

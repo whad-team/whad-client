@@ -1,6 +1,7 @@
 """Bluetooth Low Energy Characteristic Abstraction
 """
 from whad.ble.stack.att.constants import BleAttProperties
+from whad.ble.stack.gatt.helpers import get_uuid_alias
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.exceptions import InvalidHandleValueException
 from struct import pack, unpack
@@ -51,8 +52,13 @@ class ClientCharacteristicConfig(CharacteristicDescriptor):
 
 
 class CharacteristicValue(Attribute):
-    def __init__(self, uuid, handle=None, value=b''):
+    def __init__(self, uuid, handle=None, value=b'', characteristic=None):
         super().__init__(uuid=uuid, handle=handle, value=value)
+        self.__characteristic = characteristic
+
+    @property
+    def characteristic(self):
+        return self.__characteristic
 
     @property
     def uuid(self):
@@ -85,11 +91,11 @@ class Characteristic(Attribute):
 
         if isinstance(handle, int):
             self.__value_handle = handle + 1
-            self.__value = CharacteristicValue(uuid, self.__value_handle, value)
+            self.__value = CharacteristicValue(uuid, self.__value_handle, value, self)
             self.__end_handle = self.__value_handle
         else:
             self.__value_handle = None
-            self.__value = CharacteristicValue(uuid, self.__value_handle, value)
+            self.__value = CharacteristicValue(uuid, self.__value_handle, value, self)
 
         # Permissions
         self.__properties = properties
@@ -135,6 +141,7 @@ class Characteristic(Attribute):
     @value_handle.setter
     def value_handle(self, value):
         self.__value_handle = value
+        self.__value.handle = value
     
     @value.setter
     def value(self, new_value):
@@ -169,6 +176,17 @@ class Characteristic(Attribute):
     @property
     def end_handle(self):
         return self.__end_handle
+
+    @property
+    def name(self):
+        alias = get_uuid_alias(self.__charac_uuid)
+        if alias is not None:
+            return '%s (0x%s)' % (
+                alias,
+                str(self.__charac_uuid)
+            )
+        else:
+            return str(self.__charac_uuid)
 
     ##########################
     # Methods
