@@ -1,6 +1,7 @@
 from scapy.layers.zigbee import ZigbeeDeviceProfile
 from scapy.fields import BitField, XLEShortField, ByteEnumField, \
-    XLEShortField, ByteField, ConditionalField, FieldListField
+    XLEShortField, ByteField, ConditionalField, FieldListField, \
+    FieldLenField
 from scapy.layers.dot15d4 import dot15d4AddressField
 from scapy.packet import Packet
 
@@ -11,6 +12,21 @@ class ZDPActiveEPReq(Packet):
         XLEShortField("nwk_addr", 0),
     ]
 
+class ZDPActiveEPRsp(Packet):
+    name = "ZDP Transaction Data: Active_EP_rsp"
+    fields_desc = [
+        ByteEnumField("status", 0, {0:"success", 1:"device_not_found", 2:"inv_requesttype", 3:"no_descriptor"}),
+        # NWK Address (2 octets)
+        XLEShortField("nwk_addr", 0),
+        ConditionalField(FieldLenField("num_active_endpoints", None, length_of="endpoints", fmt="B"),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            FieldListField("active_endpoints",[],ByteField("", 0), length_from=lambda p:p.num_active_endpoints),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+
+    ]
 
 class ZDPDeviceAnnce(Packet):
     name = "ZDP Transaction Data: Device_annce"
@@ -95,14 +111,14 @@ class ZDPNWKAddrRsp(Packet):
         ByteEnumField("status", 0, {0:"success", 1:"device_not_found", 2:"inv_requesttype", 3:"no_descriptor"}),
         dot15d4AddressField("ieee_addr", 0, adjust=lambda pkt, x: 8),
         XLEShortField("nwk_addr", 0),
-        ConditionalField(ByteField("num_assoc_dev", 0x0),
+        ConditionalField(FieldLenField("num_assoc_dev", None, length_of="associated_devices"),
             lambda pkt:pkt.getfieldval("status") == 0
         ),
         ConditionalField(ByteField("start_index", 0x0),
             lambda pkt:pkt.getfieldval("status") == 0
         ),
         ConditionalField(
-            FieldListField("associated_devices",[],XLEShortField("nwk_addr", 0), length_from=lambda p:p.num_assoc_dev),
+            FieldListField("associated_devices",[],XLEShortField("", 0), length_from=lambda p:p.num_assoc_dev),
             lambda pkt:pkt.getfieldval("status") == 0
         ),
 
@@ -123,33 +139,85 @@ class ZDPIEEEAddrRsp(Packet):
         ByteEnumField("status", 0, {0:"success", 1:"device_not_found", 2:"inv_requesttype", 3:"no_descriptor"}),
         dot15d4AddressField("ieee_addr", 0, adjust=lambda pkt, x: 8),
         XLEShortField("nwk_addr", 0),
-        ConditionalField(ByteField("num_assoc_dev", 0x0),
+        ConditionalField(ByteField("num_assoc_dev", None),
             lambda pkt:pkt.getfieldval("status") == 0
         ),
         ConditionalField(ByteField("start_index", 0x0),
             lambda pkt:pkt.getfieldval("status") == 0
         ),
         ConditionalField(
-            FieldListField("associated_devices",[],XLEShortField("nwk_addr", 0), length_from=lambda p:p.num_assoc_dev),
+            FieldListField("associated_devices",[],XLEShortField("", 0), length_from=lambda p:p.num_assoc_dev * 2),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+    ]
+
+class ZDPSimpleDescReq(Packet):
+    name = "ZDP Transaction Data: Simple_Desc_Req"
+    fields_desc = [
+        # IEEE Address (8 octets)
+        XLEShortField("nwk_addr", 0),
+        ByteField("endpoint", 0)
+    ]
+
+class ZDPSimpleDescRsp(Packet):
+    name = "ZDP Transaction Data: Simple_Desc_Rsp"
+    fields_desc = [
+        ByteEnumField("status", 0, {0:"success", 1:"device_not_found", 2:"inv_requesttype", 3:"no_descriptor"}),
+        # IEEE Address (8 octets)
+        XLEShortField("nwk_addr", 0),
+        ByteField("descriptor_length", 0),
+        ConditionalField(ByteField("endpoint", 0x0),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(XLEShortField("profile_identifier", 0x0),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(XLEShortField("device_identifier", 0x0),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(BitField("device_version", 0 , 4),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(BitField("reserved", 0 , 4),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(FieldLenField("input_clusters_count", None, length_of="input_clusters", fmt="B"),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            FieldListField("input_clusters",[],XLEShortField("", 0), length_from=lambda p:p.input_clusters_count * 2),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(FieldLenField("output_clusters_count", None, length_of="output_clusters", fmt="B"),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            FieldListField("output_clusters",[],XLEShortField("", 0), length_from=lambda p:p.output_clusters_count * 2),
             lambda pkt:pkt.getfieldval("status") == 0
         ),
     ]
 
 def guess_payload_class(self, payload):
-    if self.underlayer.cluster == 0x0002:
-        return ZDPNodeDescReq
-    elif self.underlayer.cluster == 0x8002:
-        return ZDPNodeDescRsp
-    elif self.underlayer.cluster == 0x0000:
+    if self.underlayer.cluster == 0x0000:
         return ZDPNWKAddrReq
-    elif self.underlayer.cluster == 0x8000:
-        return ZDPNWKAddrRsp
     elif self.underlayer.cluster == 0x0001:
         return ZDPIEEEAddrReq
-    elif self.underlayer.cluster == 0x8001:
-        return ZDPIEEEAddrRsp
+    elif self.underlayer.cluster == 0x0002:
+        return ZDPNodeDescReq
+    elif self.underlayer.cluster == 0x0004:
+        return ZDPSimpleDescReq
     elif self.underlayer.cluster == 0x0005:
         return ZDPActiveEPReq
+    elif self.underlayer.cluster == 0x8000:
+        return ZDPNWKAddrRsp
+    elif self.underlayer.cluster == 0x8001:
+        return ZDPIEEEAddrRsp
+    elif self.underlayer.cluster == 0x8002:
+        return ZDPNodeDescRsp
+    elif self.underlayer.cluster == 0x8004:
+        return ZDPSimpleDescRsp
+    elif self.underlayer.cluster == 0x8005:
+        return ZDPActiveEPRsp
     elif self.underlayer.cluster == 0x0013:
         return ZDPDeviceAnnce
     return Packet.guess_payload_class(self, payload)

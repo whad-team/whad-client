@@ -12,12 +12,13 @@ class ZDOSecurityManager(ZDOObject):
 
     def provision_network_key(self, key, key_sequence_number=0):
             nwkSecurityMaterialSet = self.zdo.nwk_management.get("nwkSecurityMaterialSet")
-            nwkSecurityMaterialSet.append(
-                NetworkSecurityMaterial(
-                    key,
-                    key_sequence_number
-                )
+            new_key = NetworkSecurityMaterial(
+                key,
+                key_sequence_number
             )
+            if new_key not in nwkSecurityMaterialSet:
+                nwkSecurityMaterialSet.append(new_key)
+
             self.zdo.nwk_management.set("nwkSecurityMaterialSet", nwkSecurityMaterialSet)
             logger.info("[zdo_security_manager] new network key provisioned.")
             self.zdo.nwk_management.set("nwkSecurityLevel", 5)

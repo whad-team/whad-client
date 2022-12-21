@@ -2,9 +2,13 @@ from whad.zigbee.stack.apl.zdo.object import ZDOObject
 from whad.zigbee.stack.nwk.constants import NWKJoinMode
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.constants import SYMBOL_DURATION, Dot15d4Phy
+
 from time import sleep
 from random import randint
 import logging
+# Wrappers
+from whad.zigbee.profile.network import Network
+from whad.zigbee.profile.device import Coordinator, EndDevice, Router
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +28,8 @@ class ZDONetworkManager(ZDOObject):
         self.zdo.manager.nwk.database.set("nwkExtendedPANID", extended_pan_id)
 
     def initialize(self):
+        self.network = None
+        self.authorized = False
         if self.zdo.configuration.get("configNodeDescriptor").logical_type == LogicalDeviceType.END_DEVICE:
             # TODO: refactor to simplify access to different stack layers
             self.configure_extended_address(randint(0, 0xffffffffffffffff))
@@ -35,7 +41,45 @@ class ZDONetworkManager(ZDOObject):
             self.zdo.manager.aps.database.set("apsUseInsecureJoin", True)
 
     def on_authorization(self):
+        self.authorized = True
         self.zdo.device_and_service_discovery.device_annce()
+
+    def discover_networks(self):
+        logger.info("[zdo_network_manager] Discovering networks.")
+        networks = {}
+        for network in self.zdo.nwk_management.network_discovery():
+            # Create a wrapper for network
+
+            networks[network.extended_pan_id] = Network(
+                    network,
+                    stack = self.zdo.manager.nwk.mac.stack
+            )
+            # Loop over identified neighbors matching the current network
+            for device_address, device in self.zdo.manager.nwk.database.get("nwkNeighborTable").table.items():
+                if device.extended_pan_id == network.extended_pan_id:
+                    if device.address == 0:
+                        networks[network.extended_pan_id].coordinator = Coordinator(
+                            device.address,
+                            extended_address=device.extended_address,
+                            network=networks[network.extended_pan_id]
+                        )
+                    else:
+                        networks[network.extended_pan_id].routers.append(
+                            Router(
+                                device.address,
+                                extended_address=device.extended_address,
+                                network=networks[network.extended_pan_id]
+                            )
+                        )
+        return networks.values()
+
+    def join(self, network=None):
+        if network is not None:
+            self.zdo.manager.aps.database.set("apsUseExtendedPANID", network.extended_pan_id)
+            logger.info("[zdo_network_manager] Joining specific network: %s.", repr(network))
+        else:
+            logger.info("[zdo_network_manager] Joining the first available network.")
+        return self.startup()
 
     def startup(self):
         nwkExtendedPANID = self.zdo.nwk_management.get("nwkExtendedPANID")
@@ -84,7 +128,10 @@ class ZDONetworkManager(ZDOObject):
                 )
                 if not join_success:
                     logger.info("[zdo_network_manager] failure during network join, exiting.")
-
+                self.network = Network(
+                        selected_zigbee_network,
+                        stack = self.zdo.manager.nwk.mac.stack
+                )
                 return join_success
 
             else:
@@ -111,5 +158,8 @@ class ZDONetworkManager(ZDOObject):
                 )
                 if not join_success:
                     logger.info("[zdo_network_manager] failure during network join, exiting.")
-
+                self.network = Network(
+                        selected_zigbee_network,
+                        stack = self.zdo.manager.nwk.mac.stack
+                )
                 return join_success

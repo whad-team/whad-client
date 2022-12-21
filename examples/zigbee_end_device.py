@@ -10,15 +10,16 @@ from time import time,sleep
 from whad.common.monitors import PcapWriterMonitor
 from scapy.compat import raw
 from scapy.layers.dot15d4 import Dot15d4
+from whad.zigbee.profile.device import Router
 import sys
 
 import logging
 logging.basicConfig(level=logging.WARNING)
-#logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
-logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
+#logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
 #logging.getLogger('whad.zigbee.stack.aps').setLevel(logging.INFO)
 logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
-logging.getLogger('whad.zigbee.stack.apl.zcl').setLevel(logging.INFO)
+#logging.getLogger('whad.zigbee.stack.apl.zcl').setLevel(logging.INFO)
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -30,18 +31,56 @@ if __name__ == '__main__':
 
             dev = WhadDevice.create(interface)
             endDevice = EndDevice(dev)
+            endDevice.start()
+            selected_network = None
+            '''
+            for network in endDevice.discover_networks():
+                if network.extended_pan_id == 0xf4ce3673877b2d89:
+                    selected_network = network
+                    break
+            '''
+            # TODO: find a way to discover routers
+            selected_network = endDevice.join(0xf4ce3673877b2d89)
+            print(selected_network.network_key)
+            print(selected_network.devices)
+            devices = selected_network.discover()
+            for device in selected_network.devices:
+                if isinstance(device, Router):
+                    for endpoint in device.endpoints:
+                        if endpoint.profile_id == 0x0104 and 6 in endpoint.input_clusters:
+                            onoff = endpoint.attach_to_input_cluster(6)
+                            while True:
+                                onoff.toggle()
+                                input()
+            #discover()
+            #print(selected_network.devices)
 
+            '''
+            for network in endDevice.discover_networks():
+                if network.extended_pan_id == 0xf4ce3673877b2d89:
+                    endDevice.join(network)
 
+            print(endDevice.stack.apl.get_application_by_name("zdo").device_and_service_discovery.get_node_descriptor(0))
+            '''
+            '''
+            for device in endDevice.discover_devices():
+                print("> ", repr(device))
+            '''
             #monitor.attach(endDevice)
             #monitor.start()
-            endDevice.start()
-            zdo = endDevice.stack.apl.get_application_by_name("zdo")
+
+            '''
+            zdo = endDevice.stack.apl.get_application_by_name("zdo").discovery_manager.discover_devices()
             endDevice.stack.apl.initialize()
             endDevice.stack.apl.start()
             input()
-            while True:
-                zdo.device_and_service_discovery.ieee_addr_req(0x0000)
+            print(endDevice.stack.nwk.database.get("nwkNeighborTable").table)
+            for address in endDevice.stack.nwk.database.get("nwkNeighborTable").table:
+                print(hex(address))
+                zdo.device_and_service_discovery.ieee_addr_req(address, request_type=1)
+
                 input()
+            '''
             '''
             onoff = ZCLOnOff()
             myApp2 = ApplicationObject("onoff", 0x0104, 0x0100, device_version=0, input_clusters=[], output_clusters=[onoff])

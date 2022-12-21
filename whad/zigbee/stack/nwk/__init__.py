@@ -304,7 +304,6 @@ class NWKManagementService(NWKService):
                     self.database.set("nwkPANId", selected_parent.pan_id)
                     self.database.set("nwkExtendedPANID", extended_pan_id)
                     selected_parent.relationship = ZigbeeRelationship.IS_PARENT
-                    print("networkAddress",self.database.get("nwkNetworkAddress"))
                     if selected_parent.extended_address is not None and selected_parent.address is not None:
                         nwkAddressMap = self.database.get("nwkAddressMap")
                         nwkAddressMap[selected_parent.extended_address] = selected_parent.address
@@ -389,7 +388,7 @@ class NWKManagementService(NWKService):
                     device_type=int(device_type),
                     alternate_pan_coordinator=0
                 )
-                rejoin_request.show()
+
                 self.manager.mac.get_service("data").data(
                     rejoin_request,
                     source_address_mode=MACAddressMode.SHORT,
@@ -405,7 +404,6 @@ class NWKManagementService(NWKService):
                 except NWKTimeoutException:
                     selected_parent.potential_parent = 0
 
-                # TODO: check that it works
                 if rejoin_response is not None and rejoin_response.rejoin_status == 0:
                     self.database.set("nwkNetworkAddress", rejoin_response.network_address)
                     self.manager.mac.database.set("macShortAddress", rejoin_response.network_address)
@@ -413,7 +411,6 @@ class NWKManagementService(NWKService):
                     self.database.set("nwkPANId", selected_parent.pan_id)
                     self.database.set("nwkExtendedPANID", extended_pan_id)
                     selected_parent.relationship = ZigbeeRelationship.IS_PARENT
-                    print("networkAddress",self.database.get("nwkNetworkAddress"))
                     if selected_parent.extended_address is not None and selected_parent.address is not None:
                         nwkAddressMap = self.database.get("nwkAddressMap")
                         nwkAddressMap[selected_parent.extended_address] = selected_parent.address
@@ -422,7 +419,7 @@ class NWKManagementService(NWKService):
                     selected_parent.potential_parent = 0
 
     @Dot15d4Service.request("NLME-NETWORK-DISCOVERY")
-    def network_discovery(self, scan_channels=0x7fff800, scan_duration=4):
+    def network_discovery(self, scan_channels=0x7fff800, scan_duration=6):
         """
         Implements the NLME-NETWORK-DISCOVERY request.
         """
@@ -628,9 +625,10 @@ class NWKManager(Dot15d4Manager):
             self.get_service("management").on_beacon_npdu(pan_descriptor, beacon_payload)
             # Update the neighbor table
             table = self.database.get("nwkNeighborTable")
+
             table.update(
                 pan_descriptor.coord_addr,
-                device_type=ZigbeeDeviceType.COORDINATOR,
+                device_type=ZigbeeDeviceType.COORDINATOR if pan_descriptor.coord_addr == 0 else ZigbeeDeviceType.ROUTER,
                 transmit_failure=0,
                 lqi=pan_descriptor.link_quality,
                 outgoing_cost=0,
