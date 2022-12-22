@@ -4,7 +4,7 @@
 from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import command
 from whad.ble import Scanner
-from whad.ble.cli.utility.shell import BleUtilityShell
+from whad.ble.cli.central.shell import BleCentralShell
 
 @command('interactive')
 def interactive_handler(app, command_args):
@@ -21,7 +21,7 @@ def interactive_handler(app, command_args):
     # We need to have an interface specified
     if app.interface is not None:
         # Launch an interactive shell
-        myshell = BleUtilityShell(app.interface)
+        myshell = BleCentralShell(app.interface)
         myshell.run()
     else:
         app.error('You need to specify an interface with option --interface.')

@@ -11,7 +11,7 @@ from hexdump import hexdump
 from whad.ble.utils.att import UUID
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
-from whad.ble.cli.utility.helpers import show_att_error
+from whad.ble.cli.central.helpers import show_att_error
 
 class MonitoringProfile(GenericProfile):
 

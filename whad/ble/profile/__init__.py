@@ -5,11 +5,16 @@ import json
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,\
     CharacteristicProperties, ClientCharacteristicConfig, \
-    CharacteristicValue as BleCharacteristicValue, CharacteristicDescriptor
+    CharacteristicValue as BleCharacteristicValue, \
+    CharacteristicDescriptor as BleCharacteristicDescriptor, \
+    ReportReferenceDescriptor as BleReportReferenceDescriptor
 from whad.ble.profile.service import PrimaryService as BlePrimaryService, \
     SecondaryService as BleSecondaryService
 from whad.ble.exceptions import InvalidHandleValueException
 from whad.ble.stack.att.constants import BleAttProperties
+
+import logging
+logger = logging.getLogger(__name__)
 
 ###################################
 # Decorators for GenericProfile
@@ -101,11 +106,53 @@ def is_method_hook(method):
         return (len(method.hooks) > 0)
     return False
 
+################################
+# Descriptors model
+#
+# This section contains all the descriptor models to use while creating
+# a profile from Python code. It contains a set of alternative classes
+# used by GenericProfile to build the attribute database and populate an
+# instance with the corresponding properties and objects.
+################################
+
+class CharacteristicDescriptor(object):
+    """Generic CharacteristicDescriptor model
+    """
+    def __init__(self, bleclass=None):
+        """Instanciate a characteristic descriptor model
+
+        :param str name: attribute name to access this descriptor
+        :param class bleclass: BLE descriptor class to use when instanciating the model
+        :param list permissions: descriptor permissions (read/write/notify/indicate)
+        """
+        self.__handle = 0
+        self.__class = bleclass
+
+    @property
+    def handle(self):
+        return self.__handle
+
+    @handle.setter
+    def handle(self, value):
+        self.__handle = value
+
+    @property
+    def bleclass(self):
+        return self.__class
+
+
+class ReportReferenceDescriptor(CharacteristicDescriptor):
+    """Report Reference Descriptor model
+    """
+    def __init__(self, permissions=None):
+        super().__init__(BleReportReferenceDescriptor)
+
+
 class Characteristic(object):
     """Characteristic model
     """
 
-    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False):
+    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False, **kwargs):
         self.__handle = 0
         self.__name = name
         self.__uuid = uuid
@@ -114,6 +161,30 @@ class Characteristic(object):
         self.__notify = notify
         self.__indicate = indicate
         self.__service = None
+        self.__descriptors = []
+
+        # Loop on kwargs to find descriptos
+        for arg in kwargs:
+            if isinstance(kwargs[arg], CharacteristicDescriptor):
+                descriptor = kwargs[arg]
+                descriptor.handle = 0
+                descriptor.name = arg
+                self.add_descriptor(descriptor)
+                
+                # Add descriptor to a property to this ServiceModel instance
+                if not hasattr(self, arg):
+                    setattr(self, arg, descriptor)
+
+    def add_descriptor(self, descriptor_model):
+        """Add descriptor to our descriptor list
+        """
+        self.__descriptors.append(descriptor_model)
+
+    def descriptors(self):
+        """Enumerate descriptors attached to this characteristic
+        """
+        for descriptor in self.__descriptors:
+            yield descriptor
 
     def get_required_handles(self):
         """Compute the number of handles this characteristic will consume
@@ -346,6 +417,7 @@ class GenericProfile(object):
             # characteristics
             for service in services:
                 if isinstance(service, PrimaryService):
+                    logger.info('creating primary service %s' % service.uuid)
                     # Create service
                     service_obj = BlePrimaryService(
                         uuid=service.uuid,
@@ -353,6 +425,7 @@ class GenericProfile(object):
                     )
 
                 elif isinstance(service, SecondaryService):
+                    logger.info('creating secondary service %s' % service.uuid)
                     # Create service
                     service_obj = BleSecondaryService(
                         uuid=service.uuid,
@@ -378,13 +451,15 @@ class GenericProfile(object):
                         charac_props |= CharacteristicProperties.NOTIFY
                     if charac.must_indicate:
                         charac_props |= CharacteristicProperties.INDICATE
-                        
                     charac_obj = BleCharacteristic(
                         uuid=charac.uuid,
                         handle=self.__alloc_handle(1),
                         value=charac.value,
                         properties=charac_props
                     )
+                    logger.info(' creating characteristic %s (handle:%d)' % (
+                        charac_obj.uuid, charac_obj.handle
+                    ))
                     self.__handle = charac_obj.end_handle
 
                     # Register this characteristic
@@ -399,8 +474,24 @@ class GenericProfile(object):
                             notify=charac.must_notify,
                             indicate=charac.must_indicate
                         )
+                        logger.info('  creating cccd (handle:%d)' % (
+                            ccc_desc.handle
+                        ))
                         charac_obj.add_descriptor(ccc_desc)
                         self.register_attribute(ccc_desc)
+
+                    # Loop on other characteristic descriptors and add them
+                    for descriptor in charac.descriptors():
+                        desc = descriptor.bleclass(
+                            charac_obj,
+                            handle=self.__alloc_handle()
+                        )
+                        logger.info('  creating %s descriptor (handle:%d)' % (
+                            type(desc),
+                            desc.handle
+                        ))
+                        charac_obj.add_descriptor(desc)
+                        self.register_attribute(desc)
 
                     # Add our characteristic object to the corresponding service
                     setattr(service_obj, charac.name, charac_obj)

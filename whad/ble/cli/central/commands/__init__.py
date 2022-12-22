@@ -1,7 +1,6 @@
 """Custom commands and related handlers.
 """
 
-from .interpret import *
 from .scan import *
 from .shell import *
 from .read import *

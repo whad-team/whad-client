@@ -15,7 +15,7 @@ from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
     InsufficientEncryptionKeySize, ReadNotPermittedError, \
     WriteNotPermittedError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
-from whad.ble.cli.utility.cache import BleDevicesCache
+from whad.ble.cli.central.cache import BleDevicesCache
 from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
 
 from whad.cli.shell import InteractiveShell
@@ -43,7 +43,7 @@ def show_adv_record(offset, raw_record):
         
 
 
-class BleUtilityShell(InteractiveShell):
+class BleCentralShell(InteractiveShell):
     """Bluetooth Low Energy interactive shell
     """
 

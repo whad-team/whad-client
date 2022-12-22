@@ -48,7 +48,7 @@ from hexdump import hexdump
 import whad.scapy.layers.nordic
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, \
-    ClientCharacteristicConfig
+    ClientCharacteristicConfig, CharacteristicValue
 from whad.ble.profile.service import PrimaryService
 from whad.ble.stack.gatt import GattReadByGroupTypeResponse, GattReadByTypeResponse, \
     GattFindInfoResponse
@@ -791,8 +791,14 @@ def conn_summary(conn_meta, profile, packets):
                         ))
                         is_cccd = True
 
+                    # Make sure charac is a characteristic
+                    if isinstance(charac, CharacteristicValue):
+                        print(charac)
+                        charac = profile.find_object_by_handle(charac.handle - 1)
+                        print(charac)
+
                     if is_cccd:
-                        service = profile.find_service_by_characteristic_handle(charac.handle - 2)
+                        service = profile.find_service_by_characteristic_handle(charac.handle)
 
                         # Writing to CCCD
                         value = unpack('<H', bytes(req.data)[:2])[0]

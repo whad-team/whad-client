@@ -1015,6 +1015,16 @@ class GattServer(Gatt):
                         request.handle,
                         BleAttErrorCode.READ_NOT_PERMITTED
                     )
+            elif isinstance(attr, Characteristic):
+                # Return characteristic value
+                self.att.read_response(
+                    attr.payload()
+                )
+            elif isinstance(attr, PrimaryService):
+                # Return primary service value
+                self.att.read_response(
+                    attr.payload()
+                )
             elif isinstance(attr, CharacteristicDescriptor):
                 # Make sure the returned value matches the boundaries
                 self.att.read_response(
