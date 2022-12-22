@@ -16,15 +16,21 @@ $ ble-central emulate myfile.json
 $ ble-central sniff <bd address> -> capture connections to this device and save to a pcap
 
 """
-from whad.ble.cli.utility.shell import BleUtilityShell
-
 from whad.cli.app import CommandLineApp
+
+from .shell import BleCentralShell
 from .commands import *
 
-class BleUtilityApp(CommandLineApp):
+class BleCentralApp(CommandLineApp):
 
     def __init__(self):
-        super().__init__(self,'ble-central', description='WHAD Bluetooth Low Energy central utility')
+        """Application uses an interface and has commands.
+        """
+        super().__init__(
+            description='WHAD Bluetooth Low Energy central utility',
+            interface=True,
+            commands=True
+        )
         
         self.add_argument(
             '--bdaddr',
@@ -50,7 +56,7 @@ class BleUtilityApp(CommandLineApp):
             # We need to have an interface specified
             if self.interface is not None:
                 # Launch an interactive shell (well, driven by our script)
-                myshell = BleUtilityShell(self.interface)
+                myshell = BleCentralShell(self.interface)
                 myshell.run_script(self.args.script)
             else:
                 self.error('You need to specify an interface with option --interface.')
@@ -61,5 +67,5 @@ class BleUtilityApp(CommandLineApp):
         self.post_run()
 
 def ble_central_main():
-    app = BleUtilityApp()
+    app = BleCentralApp()
     app.run()
