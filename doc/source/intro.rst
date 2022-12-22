@@ -14,7 +14,7 @@ communicate with a computer in a generic way, thus allowing generic tools to use
 them ?
 
 WHAD stands for *Wireless HAcking Devices* and is an attempt to unify the way
-wireless hacking hardware communicates with computers in order to make them
+wireless hacking hardware devices communicate with computers in order to make them
 compatible with generic tools provided in this framework. 
 
 

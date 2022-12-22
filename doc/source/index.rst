@@ -11,23 +11,10 @@ Welcome to WHAD's documentation!
     :caption: General documentation
 
     intro
-    install
-    getting_started
-    wireless_protocols
     
 .. toctree::
-    :maxdepth: 2
-    :caption: Command-line Tools
+    :maxdepth: 1
+    :caption: BLE Command-line Tools
 
-    cli/generic
-    cli/bluetooth
-    cli/zigbee
+    cli/ble/ble-central
 
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
