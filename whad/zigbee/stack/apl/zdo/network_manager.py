@@ -73,13 +73,30 @@ class ZDONetworkManager(ZDOObject):
                         )
         return networks.values()
 
-    def join(self, network=None):
-        if network is not None:
-            self.zdo.manager.aps.database.set("apsUseExtendedPANID", network.extended_pan_id)
-            logger.info("[zdo_network_manager] Joining specific network: %s.", repr(network))
-        else:
-            logger.info("[zdo_network_manager] Joining the first available network.")
-        return self.startup()
+    def join(self, network):
+        nwkExtendedPANID = self.zdo.nwk_management.get("nwkExtendedPANID")
+        apsDesignatedCoordinator = self.zdo.aps_management.get("apsDesignatedCoordinator")
+        apsUseInsecureJoin = self.zdo.aps_management.get("apsUseInsecureJoin")
+        apsChannelMask = self.zdo.aps_management.get("apsChannelMask")
+
+        self.zdo.manager.aps.database.set("apsUseExtendedPANID", network.extended_pan_id)
+        apsUseExtendedPANID = self.zdo.aps_management.get("apsUseExtendedPANID")
+        logger.info("[zdo_network_manager] Joining specific network: %s.", repr(network))
+
+        join_success = self.zdo.nwk_management.join(
+            apsUseExtendedPANID,
+            association_type=NWKJoinMode.NEW_JOIN,
+            scan_channels=apsChannelMask
+        )
+        if not join_success:
+            logger.info("[zdo_network_manager] failure during network join, exiting.")
+            return False
+
+        self.network = network
+        return True
+
+    def leave(self):
+        return self.zdo.nwk_management.leave()
 
     def startup(self):
         nwkExtendedPANID = self.zdo.nwk_management.get("nwkExtendedPANID")

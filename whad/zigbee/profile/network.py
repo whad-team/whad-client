@@ -21,7 +21,7 @@ class Network:
 
     @property
     def devices(self):
-        return [self.coordinator] + self.routers + self.end_devices
+        return ([self.coordinator] if self.coordinator is not None else []) + self.routers + self.end_devices
 
     @property
     def stack(self):
@@ -45,52 +45,11 @@ class Network:
         if not self.is_authorized():
             raise NotAuthorized
         devices = self.stack.apl.get_application_by_name("zdo").device_and_service_discovery.discover_devices()
-        for device in devices:
-            if device.device_type == ZigbeeDeviceType.COORDINATOR:
-                if self.coordinator is None:
-                    self.coordinator = Coordinator(device.address, device.extended_address, self)
-                else:
-                    self.coordinator.address = device.address
-                    self.coordinator.extended_address = device.extended_address
-            elif device.device_type == ZigbeeDeviceType.ROUTER:
-                selected = None
-                for candidate in self.routers:
-                        if candidate.address == device.address:
-                            selected = candidate
-                            break
-                if selected is None:
-                    self.routers.append(
-                        Router(
-                            device.address,
-                            device.extended_address,
-                            self
-                        )
-                    )
-                else:
-                    selected.address = device.address
-                    selected.extended_address = device.extended_address
-            elif device.device_type == ZigbeeDeviceType.END_DEVICE:
-                selected = None
-                for candidate in self.end_devices:
-                        if candidate.address == device.address:
-                            selected = candidate
-                            break
-                if selected is None:
-                    self.end_devices.append(
-                        EndDevice(
-                            device.address,
-                            device.extended_address,
-                            self
-                        )
-                    )
-                else:
-                    selected.address = device.address
-                    selected.extended_address = device.extended_address
         return self.devices
 
     def join(self):
         if self.is_joining_permitted():
-            join_success = self.stack.apl.get_application_by_name("zdo").network_manager.join(self.__nwk_object)
+            join_success = self.stack.apl.get_application_by_name("zdo").network_manager.join(self)
             if join_success:
                 while not self.is_authorized():
                     sleep(0.1)
@@ -116,6 +75,8 @@ class Network:
         else:
             return None
 
+    def leave(self):
+        return self.stack.apl.get_application_by_name("zdo").network_manager.leave()
 
     def __eq__(self, other):
         return self.extended_pan_id == other.extended_pan_id
@@ -127,7 +88,7 @@ class Network:
             "extended_pan_id=" + hex(self.extended_pan_id) + ", " +
             "channel="+str(self.channel) + ", " +
             "joining="+ ("allowed" if self.is_joining_permitted() else "forbidden") + ", " +
-            "associated="+ ("yes" if self.is_associated() else "no") +
+            "associated="+ ("yes" if self.is_associated() else "no") + ", "
             "authorized="+ ("yes" if self.is_authorized() else "no") +
 
             ")"
