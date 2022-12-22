@@ -17,16 +17,27 @@ class ConfigurationDatabase(Dot15d4Database):
         self.configNWKTimeBetweenScans = 0xc35
 
 class ZigbeeDeviceObjects(ApplicationObject):
-
     def setup_clusters(self):
         self.clusters = {
-            "zdo_device_annce": ZDODeviceAndServiceDiscovery.ZDODeviceAnnce(),
-            "zdo_node_desc_req": ZDODeviceAndServiceDiscovery.ZDONodeDescReq(),
-            "zdo_node_desc_rsp": ZDODeviceAndServiceDiscovery.ZDONodeDescRsp(),
-            "zdo_nwk_addr_req":ZDODeviceAndServiceDiscovery.ZDONWKAddrReq()
+            "zdo_device_annce": ZDODeviceAndServiceDiscovery.ZDODeviceAnnce(self.device_and_service_discovery),
+            "zdo_node_desc_req": ZDODeviceAndServiceDiscovery.ZDONodeDescReq(self.device_and_service_discovery),
+            "zdo_node_desc_rsp": ZDODeviceAndServiceDiscovery.ZDONodeDescRsp(self.device_and_service_discovery),
+            "zdo_nwk_addr_req":ZDODeviceAndServiceDiscovery.ZDONWKAddrReq(self.device_and_service_discovery),
+            "zdo_ieee_addr_req":ZDODeviceAndServiceDiscovery.ZDOIEEEAddrReq(self.device_and_service_discovery),
+            "zdo_ieee_addr_rsp":ZDODeviceAndServiceDiscovery.ZDOIEEEAddrRsp(self.device_and_service_discovery),
+            "zdo_active_ep_req":ZDODeviceAndServiceDiscovery.ZDOActiveEPReq(self.device_and_service_discovery),
+            "zdo_active_ep_rsp":ZDODeviceAndServiceDiscovery.ZDOActiveEPRsp(self.device_and_service_discovery),
+            "zdo_simple_desc_req":ZDODeviceAndServiceDiscovery.ZDOSimpleDescReq(self.device_and_service_discovery),
+            "zdo_simple_desc_rsp":ZDODeviceAndServiceDiscovery.ZDOSimpleDescRsp(self.device_and_service_discovery),
         }
 
     def __init__(self):
+
+        self.configuration = ConfigurationDatabase()
+        self.security_manager = ZDOSecurityManager(self)
+        self.network_manager = ZDONetworkManager(self)
+        self.device_and_service_discovery = ZDODeviceAndServiceDiscovery(self)
+
         self.setup_clusters()
         super().__init__(
             "zdo",
@@ -34,19 +45,22 @@ class ZigbeeDeviceObjects(ApplicationObject):
             0x0000,
             device_version=0,
             input_clusters=[
-                            self.clusters["zdo_node_desc_req"]
+                            self.clusters["zdo_node_desc_req"],
+                            self.clusters["zdo_ieee_addr_rsp"],
+                            self.clusters["zdo_node_desc_rsp"],
+                            self.clusters["zdo_active_ep_rsp"],
+                            self.clusters["zdo_simple_desc_rsp"],
+
             ],
             output_clusters=[
                             self.clusters["zdo_nwk_addr_req"],
+                            self.clusters["zdo_active_ep_req"],
+                            self.clusters["zdo_ieee_addr_req"],
                             self.clusters["zdo_device_annce"],
                             self.clusters["zdo_node_desc_rsp"],
-
+                            self.clusters["zdo_simple_desc_req"],
             ]
         )
-        self.configuration = ConfigurationDatabase()
-        self.security_manager = ZDOSecurityManager(self)
-        self.network_manager = ZDONetworkManager(self)
-        self.device_and_service_discovery = ZDODeviceAndServiceDiscovery(self)
 
 
     def configure(self, attribute_name, attribute_value):

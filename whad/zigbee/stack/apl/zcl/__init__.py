@@ -366,6 +366,18 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
         return (0 == command.discovery_complete, attributes)
 
 class ZCLClientCluster(ZCLCluster):
+    @classmethod
+    def child_clusters(cls):
+        subclasses = set()
+        work = [cls]
+        while work:
+            parent = work.pop()
+            for child in parent.__subclasses__():
+                if child not in subclasses:
+                    print(child.__subclasses__)
+                    subclasses.add(child)
+                    work.append(child)
+        return subclasses
     def __init__(self, cluster_id, default_configuration=ZCLClusterConfiguration()):
         super().__init__(cluster_id, ZCLClusterType.CLIENT)
 

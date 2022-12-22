@@ -11,7 +11,7 @@ class LEMACField(Field):
     def m2i(self, pkt, x):
         return str2mac(x[::-1])
     def any2i(self, pkt, x):
-        if type(x) is str and len(x) is 6:
+        if type(x) is str and len(x) == 6:
             x = self.m2i(pkt, x)
         return x
     def i2repr(self, pkt, x):
