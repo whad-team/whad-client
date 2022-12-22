@@ -1020,6 +1020,11 @@ class GattServer(Gatt):
                 self.att.read_response(
                     attr.payload()
                 )
+            elif isinstance(attr, PrimaryService):
+                # Return primary service value
+                self.att.read_response(
+                    attr.payload()
+                )
             elif isinstance(attr, CharacteristicDescriptor):
                 # Make sure the returned value matches the boundaries
                 self.att.read_response(

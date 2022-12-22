@@ -35,7 +35,9 @@ class Service(Attribute):
             return str(self.__service_uuid)
 
     def payload(self):
-        return self.__service_uuid.to_bytes()
+        """Return service UUID as bytes
+        """
+        return self.__service_uuid.packed
 
     def add_characteristic(self, characteristic):
         """Add characteristic, update end handle
