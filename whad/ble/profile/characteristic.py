@@ -27,7 +27,10 @@ class CharacteristicDescriptor(Attribute):
     def characteristic(self):
         return self.__characteristic
 
+
 class ClientCharacteristicConfig(CharacteristicDescriptor):
+    """Client Characteristic Configuration Descriptor
+    """
 
     def __init__(self, characteristic, handle=None, notify=False, indicate=False):
         """Instanciate a Client Characteristic Configuration Descriptor
@@ -49,6 +52,24 @@ class ClientCharacteristicConfig(CharacteristicDescriptor):
     @config.setter
     def config(self, val):
         super().value = pack('<H', val)
+
+
+class ReportReferenceDescriptor(CharacteristicDescriptor):
+    """Report Reference Descriptor, used in HID profile
+    """
+
+    def __init__(self, characteristic, handle=None, notify=False, indicate=False):
+        """Instanciate a Report Reference Descriptor
+
+        :param bool notify: Set to True to get the corresponding characteristic notified on change
+        :param bool indicate: Set to True to get the corresponding characteristic indicated on change
+        """
+        super().__init__(
+            characteristic,
+            uuid=UUID(0x2908),
+            handle=handle,
+            value=b''
+        )
 
 
 class CharacteristicValue(Attribute):
@@ -104,7 +125,10 @@ class Characteristic(Attribute):
         self.__descriptors = []
 
     def payload(self):
-        return bytes([self.__properties, self.__value_handle]) + self.__value.uuid.to_bytes()
+        """Return characteristic payload
+        """
+        #return bytes([self.__properties, self.__value_handle]) + self.__value.uuid.to_bytes()
+        return pack('<BH', self.__properties, self.__value_handle) + self.__value.uuid.packed
 
     def set_notification_callback(self, callback):
         self.__notification_callback = callback
