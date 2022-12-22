@@ -137,25 +137,29 @@ class CommandLineApp(ArgumentParser):
     DEV_NOT_READY_ERR = -2
     DEV_ACCESS_ERR = -3
 
-    def __init__(self, program_name: str, usage: str = None, description: str = None, no_command: bool=False):
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True):
         """Instanciate a CommandLineApp
 
         :param str program_name: program (app) name
         :param str usage: usage string
         :param str description: program description
-        :param bool no_command: if enabled, the application will not consider first positional argument as a command
+        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool interface: if enabled, the application will resolve a WHAD interface
         """
-        super().__init__(program_name, usage=usage, description=description)
+        super().__init__(description=description)
 
         self.__interface = None
         self.__args = None
+        self.__has_interface = interface
+        self.__has_commands = commands
 
         # Add our default option --interface/-i
-        self.add_argument(
-            '--interface', '-i',
-            dest='interface',
-            help='specifies the WHAD interface to use',
-        )
+        if self.__has_interface:
+            self.add_argument(
+                '--interface', '-i',
+                dest='interface',
+                help='specifies the WHAD interface to use',
+            )
 
         # Add our default option --no-color
         self.add_argument(
@@ -167,8 +171,7 @@ class CommandLineApp(ArgumentParser):
         )
 
         # Save application type
-        self.__has_command = (not no_command)
-        if not no_command:
+        if self.__has_commands:
             self.add_argument(
                 'command',
                 metavar='COMMAND',
@@ -211,19 +214,20 @@ class CommandLineApp(ArgumentParser):
             os.environ['PROMPT_TOOLKIT_COLOR_DEPTH']='DEPTH_1_BIT'
 
         # If interface is provided, instanciate it and make it available
-        if self.__args.interface is not None:
-            try:
-                # Create WHAD interface
-                self.__interface = WhadDevice.create(self.__args.interface)
-            except WhadDeviceNotFound as dev_404:
-                self.error('WHAD device not found.')
-                return self.DEV_NOT_FOUND_ERR
-            except WhadDeviceAccessDenied as dev_403:
-                self.error('Cannot access WHAD device, please check permissions.')
-                return self.DEV_ACCESS_ERR
-            except WhadDeviceNotReady as dev_500:
-                self.error('WHAD device is not ready.')
-                return self.DEV_NOT_READY_ERR
+        if self.__has_interface:
+            if self.__args.interface is not None:
+                try:
+                    # Create WHAD interface
+                    self.__interface = WhadDevice.create(self.__args.interface)
+                except WhadDeviceNotFound as dev_404:
+                    self.error('WHAD device not found.')
+                    return self.DEV_NOT_FOUND_ERR
+                except WhadDeviceAccessDenied as dev_403:
+                    self.error('Cannot access WHAD device, please check permissions.')
+                    return self.DEV_ACCESS_ERR
+                except WhadDeviceNotReady as dev_500:
+                    self.error('WHAD device is not ready.')
+                    return self.DEV_NOT_READY_ERR
 
     def post_run(self):
         """Implement pos-run tasks.
@@ -237,7 +241,7 @@ class CommandLineApp(ArgumentParser):
         self.pre_run()
 
         # If we support first positional arg as command, parse the command
-        if self.__has_command:
+        if self.__has_commands:
             if self.__args.command is not None:
                 command = self.__args.command
                 handler = CommandsRegistry.get_handler(command)
