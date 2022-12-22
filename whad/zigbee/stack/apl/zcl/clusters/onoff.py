@@ -1,9 +1,9 @@
-from whad.zigbee.stack.apl.zcl import ZCLCluster, ZCLClientCluster
+from whad.zigbee.stack.apl.zcl import ZCLCluster, ZCLClientCluster, ZCLServerCluster
 from whad.zigbee.stack.aps.constants import APSDestinationAddressMode
 
-class ZCLOnOff(ZCLClientCluster):
-    attribute1: (0x0000, ["read"]) = 12
-    attribute2: (0x0001, ["read", "write"]) = "coucou"
+# TODO: Find a wrapper to access server and client clusters easily ?
+
+class OnOffClient(ZCLClientCluster):
 
     def __init__(self):
         super().__init__(cluster_id=0x0006)
@@ -12,28 +12,42 @@ class ZCLOnOff(ZCLClientCluster):
     def off(self):
         command = b""
         self.send_command(command)
+        status = self.wait_response()
+        return status == 0
 
     @ZCLCluster.command_generate(0x01, "On")
     def on(self):
         command = b""
         self.send_command(command)
+        status = self.wait_response()
+        return status == 0
 
     @ZCLCluster.command_generate(0x02, "Toggle")
     def toggle(self):
         command = b""
         self.send_command(command)
+        status = self.wait_response()
+        return status == 0
 
+class OnOffServer(ZCLServerCluster):
 
-    '''
-    @ZCLCluster.command_generate(0x00, "Off")
-    def off(self, address):
-        return self.send_command(0x00, b"", destination_address_mode, destination_address, destination_endpoint, transaction=transaction)
+    OnOff: (0x0000, ["read", "report", "scene"]) = 0
+    GlobalSceneControl: (0x4000, ["read"]) = 1
+    OnTime: (0x4001, ["read", "write"]) = 0
+    OffWaitTime: (0x4002, ["read", "write"]) = 0
+
 
     @ZCLCluster.command_receive(0x00, "Off")
-    def on_off(self):
-        return self.send_command(0x00, b"", destination_address_mode, destination_address, destination_endpoint, transaction=transaction)
+    def on_off(self, command):
+        self.OnOff = 0
+        # default response ?
 
-    @ZCLCluster.command_generate(0x02, "Toggle")
-    def toggle(self, destination_address, destination_endpoint, destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT, transaction=None):
-        return self.send_command(0x02, b"", destination_address_mode, destination_address, destination_endpoint, transaction=transaction)
-    '''
+    @ZCLCluster.command_receive(0x01, "On")
+    def on_off(self, command):
+        self.OnOff = 1
+        # default response ?
+
+    @ZCLCluster.command_receive(0x02, "Toggle")
+    def on_off(self, command):
+        self.OnOff = 1 - self.OnOff
+        # default response ?

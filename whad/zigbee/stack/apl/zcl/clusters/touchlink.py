@@ -2,6 +2,8 @@ from whad.zigbee.stack.apl.zcl import ZCLCluster
 from whad.zigbee.stack.mac.constants import MACAddressMode
 from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster, ZLLScanRequest
 from random import randint
+# TODO: old version, refactoring needed
+
 '''
 class ZCLTouchLink(ZCLCluster):
     def __init__(self):

@@ -5,7 +5,6 @@ from whad.device import WhadDevice
 from whad.zigbee.crypto import NetworkLayerCryptoManager
 from whad.exceptions import WhadDeviceNotFound
 from whad.zigbee.stack.apl.application import ApplicationObject
-from whad.zigbee.stack.apl.zcl.clusters import ZCLOnOff#, ZCLTouchLink
 from time import time,sleep
 from whad.common.monitors import PcapWriterMonitor
 from scapy.compat import raw
@@ -39,7 +38,7 @@ if __name__ == '__main__':
                 print("[i] Network detected: ", network)
                 if network.extended_pan_id == 0xf4ce3673877b2d89:
                     selected_network = network
-            input()
+
             print("[i] Joining network: ", selected_network)
             selected_network.join()
             try:

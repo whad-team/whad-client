@@ -158,33 +158,34 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 (asdu, source_address, source_address_mode, security_status, link_quality) = response
 
                 descriptor = self.get_node_descriptor(address)
-                if descriptor.logical_type == LogicalDeviceType.COORDINATOR:
-                    new_device = Coordinator(
-                        address,
-                        extended_address=asdu.ieee_addr,
-                        descriptor=descriptor,
-                        network=network
-                    )
-                    network.coordinator = new_device
-                elif descriptor.logical_type == LogicalDeviceType.ROUTER:
-                    new_device = Router(
-                        address,
-                        extended_address=asdu.ieee_addr,
-                        descriptor=descriptor,
-                        network=network
-                    )
-                    if new_device not in network.routers:
-                        network.routers.append(new_device)
-                else:
-                    new_device = EndDevice(
-                        address,
-                        extended_address=asdu.ieee_addr,
-                        descriptor=descriptor,
-                        network=network
-                    )
-                    if new_device not in network.end_devices:
-                        network.end_devices.append(new_device)
-                scanned_devices.append(new_device)
+                if descriptor is not None:
+                    if descriptor.logical_type == LogicalDeviceType.COORDINATOR:
+                        new_device = Coordinator(
+                            address,
+                            extended_address=asdu.ieee_addr,
+                            descriptor=descriptor,
+                            network=network
+                        )
+                        network.coordinator = new_device
+                    elif descriptor.logical_type == LogicalDeviceType.ROUTER:
+                        new_device = Router(
+                            address,
+                            extended_address=asdu.ieee_addr,
+                            descriptor=descriptor,
+                            network=network
+                        )
+                        if new_device not in network.routers:
+                            network.routers.append(new_device)
+                    else:
+                        new_device = EndDevice(
+                            address,
+                            extended_address=asdu.ieee_addr,
+                            descriptor=descriptor,
+                            network=network
+                        )
+                        if new_device not in network.end_devices:
+                            network.end_devices.append(new_device)
+                    scanned_devices.append(new_device)
 
             except ZDODeviceAndServiceDiscoveryTimeoutException:
                 pass

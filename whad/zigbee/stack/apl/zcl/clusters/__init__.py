@@ -1,2 +1,2 @@
 #from .touchlink import ZCLTouchLink
-from .onoff import ZCLOnOff
+from .onoff import OnOffClient, OnOffServer
