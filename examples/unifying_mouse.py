@@ -19,23 +19,34 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             connector = Mouse(dev)
-            connector.attach_callback(show)
+            #connector.attach_callback(show, on_reception=True, on_transmission=True)
             connector.start()
+            connector.channel = 5
             connector.address = "ca:e9:06:ec:a4"
             connector.synchronize()
-            
-
             '''
-            for _ in range(50):
-                connector.send(ESB_Hdr(bytes.fromhex("aacae906eca42b0061010000000000001e0c7000")), channel=71)
-                print("ok")
-                time.sleep(1)
+            pid = 0
+            while True:
+                connector.send(ESB_Hdr(address=connector.address, pid=pid)/ESB_Payload_Hdr()/Logitech_Unifying_Hdr()/Logitech_Mouse_Payload(button_mask=2), channel=5)
+                input()
+                pid = (pid + 1) % 4
+
+            exit()
+            '''
+            #connector.synchronize()
+
+            #for _ in range(5):
+            #    connector.stack.ll.send_data(ESB_Hdr(b"\244\321\244\006\000\001\001\001\000\000\000\000\000\000\000\000\000\000\000\000\000\336"))
+            #    time.sleep(0.1)
+            #input()
+            while True:
+                connector.move(20, -1)
+                input()
             '''
             while True:
                 print("move")
-                connector.move(20, -1)
                 time.sleep(0.1)
-            '''
+
             connector = Keylogger(dev)
             connector.address = "9b:0a:90:42:8c"
             connector.scanning = True

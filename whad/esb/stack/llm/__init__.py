@@ -52,12 +52,14 @@ class EsbLinkLayerManager:
         self.__populate_ack_queue = True
         self.__stack.set_channel(None)
         start_time = time()
-        queue = self.__data_queue
+        queue = self.__ack_queue
         while (time() - start_time) < timeout:
             try:
-                queue = self.__ack_queue if queue == self.__data_queue else self.__data_queue
+                queue = self.__ack_queue
                 msg = queue.get(block=False,timeout=0.1)
+                print(msg)
                 if hasattr(msg, "metadata") and hasattr(msg.metadata, "channel"):
+                    print(msg.metadata.channel)
                     self.__stack.set_channel(msg.metadata.channel)
                     self.__populate_ack_queue = False
                     self.__synchronized = True
@@ -71,31 +73,33 @@ class EsbLinkLayerManager:
         packet = ESB_Hdr(
                 pid=self.__pid,
                 address=self.__stack.get_address(),
-                no_ack=int(not acknowledged)
+                no_ack=0
         ) / ESB_Payload_Hdr() / data
 
-        self.__ack_queue.queue.clear()
-        self.__populate_ack_queue = True
-        self.__stack.send(packet, channel=self.__stack.get_channel())
         if acknowledged:
-            try:
-                message = self.wait_for_ack()
+                self.__ack_queue.queue.clear()
+                self.__populate_ack_queue = True
+                self.__stack.send(packet, channel=self.__stack.get_channel())
                 self._increment_pid()
-                self.__populate_ack_queue = False
-                return message
-            except LinkLayerTimeoutException:
-                self.__populate_ack_queue = False
-                return None
+                try:
+                    ack = self.wait_for_ack()
+                    print(ack)
+                    self.__populate_ack_queue = False
+                    return ack
+                except LinkLayerTimeoutException:
+                    self.__populate_ack_queue = False
+                    return None
         else:
-            self._increment_pid()
             self.__populate_ack_queue = False
+            self.__stack.send(packet, channel=self.__stack.get_channel())
+            self._increment_pid()
             return None
 
-    def wait_for_ack(self, timeout=1):
+    def wait_for_ack(self, timeout=0.05):
         start_time = time()
         while (time() - start_time) < timeout:
             try:
-                msg = self.__ack_queue.get(block=False,timeout=0.1)
+                msg = self.__ack_queue.get(block=False,timeout=0.01)
                 print("received ack !")
                 return msg
             except Empty:
@@ -112,10 +116,12 @@ class EsbLinkLayerManager:
         self.__stack.send(packet)
 
     def on_pdu(self, pdu):
+
         if ESB_Ack_Response in pdu or len(bytes(pdu)) == 0:
-            if (self.__role == ESBRole.PTX or self.__promiscuous) and self.__populate_ack_queue:
-                print("ACK: ", pdu)
-                self.__ack_queue.put(pdu)
+            self.acked = True
+            if (self.__role == ESBRole.PTX or self.__promiscuous):
+                if self.__populate_ack_queue:
+                    self.__ack_queue.put(pdu)
                 if self.__app is not None and len(bytes(pdu)) > 0:
                     self.__app.on_acknowledgement(pdu[ESB_Payload_Hdr:])
         else:

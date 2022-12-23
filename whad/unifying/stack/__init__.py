@@ -26,7 +26,7 @@ class UnifyingApplicativeLayerManager:
     def _start_timeout_thread(self):
         self._stop_timeout_thread()
         self.__transmit_timeouts = True
-        self.__timeout_thread = Thread(target=self._transmit_timeouts_thread)
+        self.__timeout_thread = Thread(target=self._transmit_timeouts_thread, daemon=True)
         self.__timeout_thread.start()
 
     def _stop_timeout_thread(self):
@@ -36,16 +36,20 @@ class UnifyingApplicativeLayerManager:
             self.__timeout_thread = None
 
     def _transmit_timeouts_thread(self):
-        print("starting thread")
-        if self.__transmit_timeouts:
-            self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250))
+        try:
+            if self.__transmit_timeouts:
+                self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250), acknowledged=False)
+            while self.__transmit_timeouts:
+                self.send_message(Logitech_Keepalive_Payload(timeout=1250), acknowledged=False)
+                sleep(0.01)
+        except:
+            pass
 
-        while self.__transmit_timeouts:
-            print("timeout send")
-            self.send_message(Logitech_Keepalive_Payload(timeout=1250))
-            sleep(0.01)
-    def send_message(self, message):
-        return self.__llm.send_data(Logitech_Unifying_Hdr()/message)
+    def send_message(self, message, acknowledged=True):
+        return self.__llm.send_data(Logitech_Unifying_Hdr()/message, acknowledged=acknowledged)
+
+    def __del__(self):
+        self._stop_timeout_thread()
 
     @property
     def role(self):
@@ -64,11 +68,14 @@ class UnifyingApplicativeLayerManager:
     def move_mouse(self, x, y):
         if self.__timeout_thread is None:
             self.enable_timeouts()
+
         answer = self.send_message(
             Logitech_Mouse_Payload(
                 movement=LogitechUnifyingMouseMovementConverter.get_hid_data_from_coordinates(x, y)
             )
         )
+        if answer:
+            print("acked :)")
 
     def on_data(self, data):
         pass

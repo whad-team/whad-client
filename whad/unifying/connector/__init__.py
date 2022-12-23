@@ -137,7 +137,6 @@ class Unifying(WhadDeviceConnector):
             else:
                 packet = pdu
             msg = self._build_message_from_scapy_packet(packet, channel)
-            print(msg)
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -272,7 +271,10 @@ class Unifying(WhadDeviceConnector):
             raise UnsupportedCapability("SetNodeAddress")
 
         msg = Message()
-        msg.unifying.set_node_addr.address = bytes.fromhex(address.replace(":", ""))
+        try:
+            msg.unifying.set_node_addr.address = bytes.fromhex(address.replace(":", ""))
+        except ValueError:
+            return False
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 

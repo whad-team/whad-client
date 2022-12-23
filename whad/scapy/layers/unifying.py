@@ -25,9 +25,6 @@ class Logitech_Unifying_Hdr(Packet):
             return s
         return  s[:2] + s[currentByte:currentByte+1] + s[2:currentByte] + s[currentByte+1:]
 
-    def post_dissect(self,s):
-        self.checksum = None
-        return s
     def post_build(self,p,pay):
         if self.checksum is None:
             cksum = 0xFF

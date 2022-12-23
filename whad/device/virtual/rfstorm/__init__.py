@@ -299,10 +299,11 @@ class RFStormDevice(VirtualDevice):
     def _on_whad_send(self, message):
         channel = message.channel if message.channel != 0xFF else self.__channel
         pdu = message.pdu
+
         if self.__acking:
             self.__ack_payload = pdu
         else:
-            ack = self._rfstorm_transmit_payload(pdu, 1, 1)
+            ack = self._rfstorm_transmit_payload(pdu)
             if self.__check_ack and ack:
                 self._send_whad_pdu(b"", address=self.__address)
 
@@ -317,7 +318,7 @@ class RFStormDevice(VirtualDevice):
         self._on_whad_send(message)
 
     def _on_whad_set_node_addr(self, message):
-        self.__address = message.address[::-1]
+        self.__address = message.address
         self._send_whad_command_result(ResultCode.SUCCESS)
 
     def _on_whad_esb_set_node_addr(self, message):

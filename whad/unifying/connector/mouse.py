@@ -36,8 +36,7 @@ class Mouse(Unifying):
         self.enable_mouse_mode(channel=self.__channel)
         self.__stack.app.role = UnifyingRole.MOUSE
         if self.__started:
-            self.start()
-
+            super().start()
     @property
     def channel(self):
         return self.__channel
@@ -49,11 +48,15 @@ class Mouse(Unifying):
 
     def start(self):
         self.__started = True
-        super().start()
+        self._enable_role()
 
     def stop(self):
         self.__started = False
         super().stop()
+
+    @property
+    def stack(self):
+        return self.__stack
 
     @property
     def address(self):
