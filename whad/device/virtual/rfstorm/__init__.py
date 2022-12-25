@@ -247,6 +247,7 @@ class RFStormDevice(VirtualDevice):
                             if self._rfstorm_transmit_payload(b"\x0f\x0f\x0f\x0f",1,1):
                                 self.__last_packet_timestamp = time()
                                 self.__channel = i
+                                self._send_whad_pdu(b"", address=self.__address)
                                 break
             try:
                 data = self._rfstorm_read_packet()

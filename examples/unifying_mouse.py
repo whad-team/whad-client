@@ -19,7 +19,7 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             connector = Mouse(dev)
-            #connector.attach_callback(show, on_reception=True, on_transmission=True)
+            connector.attach_callback(show, on_reception=True, on_transmission=True)
             connector.start()
             connector.channel = 5
             connector.address = "ca:e9:06:ec:a4"

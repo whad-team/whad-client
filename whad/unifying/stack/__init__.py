@@ -74,8 +74,7 @@ class UnifyingApplicativeLayerManager:
                 movement=LogitechUnifyingMouseMovementConverter.get_hid_data_from_coordinates(x, y)
             )
         )
-        if answer:
-            print("acked :)")
+        return answer
 
     def on_data(self, data):
         pass

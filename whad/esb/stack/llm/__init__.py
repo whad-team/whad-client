@@ -118,15 +118,15 @@ class EsbLinkLayerManager:
     def on_pdu(self, pdu):
 
         if ESB_Ack_Response in pdu or len(bytes(pdu)) == 0:
-            self.acked = True
             if (self.__role == ESBRole.PTX or self.__promiscuous):
                 if self.__populate_ack_queue:
                     self.__ack_queue.put(pdu)
                 if self.__app is not None and len(bytes(pdu)) > 0:
                     self.__app.on_acknowledgement(pdu[ESB_Payload_Hdr:])
         else:
-            if (self.__role == ESBRole.PRX or self.__promiscuous) and self.__populate_data_queue:
+            if (self.__role == ESBRole.PRX or self.__promiscuous):
                 print("DATA: ", pdu)
-                self.__data_queue.put(pdu)
+                if self.__populate_ack_queue:
+                    self.__data_queue.put(pdu)
                 if self.__app is not None:
                     self.__app.on_data(pdu[ESB_Payload_Hdr:])
