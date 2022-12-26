@@ -28,6 +28,10 @@ class ESB(WhadDeviceConnector):
         self.__ready = False
         super().__init__(device)
 
+        # Metadata cache
+        self.__cached_channel = None
+        self.__cached_address = None
+
         # Capability cache
         self.__can_send = None
         self.__can_send_raw = None
@@ -48,7 +52,7 @@ class ESB(WhadDeviceConnector):
         the appropriate header and the timestamp in microseconds.
         """
         if ESB_Hdr not in packet:
-            packet = ESB_Hdr(address="01:02:03:04:05")/packet
+            packet = ESB_Hdr(address=self.__cached_address)/packet
 
         packet.preamble = 0xAA # force a rebuild
         formatted_packet = ESB_Pseudo_Packet(bytes(packet)[1:])
@@ -121,7 +125,7 @@ class ESB(WhadDeviceConnector):
             self.__can_send = ((commands & (1 << Send))>0 or (commands & (1 << SendRaw)))
         return self.__can_send
 
-    def send(self,pdu, address="11:22:33:44:55", channel=None):
+    def send(self,pdu, address=None, channel=None):
         """
         Send Enhanced ShockBurst packets (on a single channel).
         """
@@ -135,6 +139,11 @@ class ESB(WhadDeviceConnector):
                 packet = pdu[ESB_Payload_Hdr:]
             else:
                 packet = pdu
+
+            packet.metadata = ESBMetadata()
+            packet.metadata.channel = self.__cached_channel if channel is None else channel
+            packet.metadata.address = self.__cached_address if address is None else address
+
             msg = self._build_message_from_scapy_packet(packet, channel)
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
@@ -169,6 +178,9 @@ class ESB(WhadDeviceConnector):
 
         msg = Message()
         msg.esb.sniff.channel = channel if channel is not None else 0xFF
+        self.__cached_channel = channel
+        self.__cached_address = address
+
         try:
             msg.esb.sniff.address = bytes.fromhex(address.replace(":", ""))
         except ValueError:
@@ -199,6 +211,7 @@ class ESB(WhadDeviceConnector):
         if channel is None:
             return False
 
+        self.__cached_channel = channel
         msg = Message()
         msg.esb.prx.channel = channel
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
@@ -223,6 +236,8 @@ class ESB(WhadDeviceConnector):
         if not self.can_be_prx():
             raise UnsupportedCapability("PrimaryTransmitterMode")
 
+        self.__cached_channel = channel
+
         msg = Message()
         msg.esb.ptx.channel = channel if channel is not None else 0xFF
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
@@ -246,6 +261,7 @@ class ESB(WhadDeviceConnector):
             raise UnsupportedCapability("SetNodeAddress")
 
         msg = Message()
+        self.__cached_address = address
         msg.esb.set_node_addr.address = bytes.fromhex(address.replace(":", ""))
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
