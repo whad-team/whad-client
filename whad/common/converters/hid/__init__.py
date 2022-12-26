@@ -5,11 +5,8 @@ class HIDConverter:
     '''
     This class provides a basic API to convert an HID code to an human friendly keystroke and vice versa.
     '''
-
-    def __init__(self, locale="fr"):
-        self.locale = locale
-
-    def get_hid_code_from_key(self, key, alt=False, ctrl=False, shift=False, gui=False):
+    @classmethod
+    def get_hid_code_from_key(self, key, alt=False, ctrl=False, shift=False, gui=False, locale="fr"):
         '''
         This function converts a key to a tuple composed of HID code and HID modifiers.
 
@@ -20,11 +17,11 @@ class HIDConverter:
         :param gui: gui key is pressed
 
         '''
-        if self.locale not in HID_MAP:
-            raise HIDLocaleNotFound(self.locale)
+        if locale not in HID_MAP:
+            raise HIDLocaleNotFound(locale)
 
-        if key in HID_MAP[self.locale]:
-            hid_code, modifiers = HID_MAP[self.locale][key]
+        if key in HID_MAP[locale]:
+            hid_code, modifiers = HID_MAP[locale][key]
         elif key in HID_SPECIALS:
             hid_code, modifiers = HID_SPECIALS[key]
         else:
@@ -43,7 +40,8 @@ class HIDConverter:
 
         return (hid_code, modifiers)
 
-    def get_key_from_hid_code(self, hid_code = 0, modifiers = 0):
+    @classmethod
+    def get_key_from_hid_code(self, hid_code = 0, modifiers = 0, locale="fr"):
         '''
         This function converts an HID code and HID modifiers to the corresponding keystroke.
 
@@ -51,7 +49,7 @@ class HIDConverter:
         :param hid_modifiers: HID modifiers to convert
         '''
 
-        for key, value in HID_MAP[self.locale].items():
+        for key, value in HID_MAP[locale].items():
             if value == (hid_code, modifiers):
                 return key
 
