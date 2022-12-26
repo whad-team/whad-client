@@ -18,8 +18,9 @@ class LogitechUnifyingKeystrokeConverter(HIDConverter):
 
         return super().get_key_from_hid_code(hid_code, modifiers)
 
-    def get_hid_data_from_key(self, key, ctrl=False, alt=False, shift=False, gui=False):
-        (hid_code, modifiers) = super().get_hid_code_from_key(key, ctrl=ctrl, alt=alt, shift=shift, gui=gui)
+    @classmethod
+    def get_hid_data_from_key(cls, key, ctrl=False, alt=False, shift=False, gui=False, locale="fr"):
+        (hid_code, modifiers) = super().get_hid_code_from_key(key, ctrl=ctrl, alt=alt, shift=shift, gui=gui, locale=locale)
 
         hid_data = pack("B", modifiers) + pack("B", hid_code) + b"\x00"*5
 

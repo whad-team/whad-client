@@ -1,12 +1,12 @@
 from whad.unifying.connector import Unifying
 from whad.esb.stack import ESBStack
-from whad.unifying.stack import UnifyingApplicativeLayerManager, UnifyingRole, ClickType
+from whad.unifying.stack import UnifyingApplicativeLayerManager, UnifyingRole
 from whad.exceptions import UnsupportedCapability
 
 
-class Mouse(Unifying):
+class Keyboard(Unifying):
     """
-    Logitech Unifying Mouse interface for compatible WHAD device.
+    Logitech Unifying Keyboard interface for compatible WHAD device.
     """
     def __init__(self, device):
         super().__init__(device)
@@ -22,9 +22,9 @@ class Mouse(Unifying):
         if not self.can_set_node_address():
             raise UnsupportedCapability("SetNodeAddress")
 
-        # Check if device can perform mouse simulation
-        if not self.can_be_mouse():
-            raise UnsupportedCapability("MouseSimulation")
+        # Check if device can perform keyboard simulation
+        if not self.can_be_keyboard():
+            raise UnsupportedCapability("KeyboardSimulation")
 
         self._enable_role()
 
@@ -33,8 +33,8 @@ class Mouse(Unifying):
         if self.__started:
             super().stop()
         self.set_node_address(self.__address)
-        self.enable_mouse_mode(channel=self.__channel)
-        self.__stack.app.role = UnifyingRole.MOUSE
+        self.enable_keyboard_mode(channel=self.__channel)
+        self.__stack.app.role = UnifyingRole.KEYBOARD
         if self.__started:
             super().start()
     @property
@@ -73,26 +73,5 @@ class Mouse(Unifying):
     def synchronize(self, autosync=True, timeout=10):
         return self.__stack.ll.synchronize(autosync=True, timeout=10)
 
-    def move(self, x, y):
-        return self.__stack.app.move_mouse(x, y)
-
-    def left_click(self):
-        return self.__stack.app.click_mouse(type=ClickType.LEFT)
-
-    def right_click(self):
-        return self.__stack.app.click_mouse(type=ClickType.RIGHT)
-
-    def middle_click(self):
-        return self.__stack.app.click_mouse(type=ClickType.MIDDLE)
-
-    def wheel_up(self):
-        return self.__stack.app.wheel_mouse(x=0, y=1)
-
-    def wheel_down(self):
-        return self.__stack.app.wheel_mouse(x=0, y=-1)
-
-    def wheel_right(self):
-        return self.__stack.app.wheel_mouse(x=1, y=0)
-
-    def wheel_left(self):
-        return self.__stack.app.wheel_mouse(x=-1, y=0)
+    def send_key(self, key, ctrl=False, alt=False, shift=False, gui=False):
+        return self.__stack.app.unencrypted_keystroke(key, ctrl=ctrl, alt=alt, shift=shift, gui=gui)

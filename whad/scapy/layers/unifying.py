@@ -1,7 +1,7 @@
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteField, XByteField, X3BytesField, IntField, \
     StrFixedLenField, ShortField, ByteEnumField, XShortField, XShortEnumField, \
-    FieldLenField, StrLenField, StrField
+    FieldLenField, StrLenField, StrField, SignedByteField
 from struct import pack
 
 from whad.scapy.layers.esb import ESB_Payload_Hdr, SBAddressField, \
@@ -89,8 +89,8 @@ class Logitech_Mouse_Payload(Packet):
         XByteField("button_mask",0x00),
         ByteField("unused",0x00),
         StrFixedLenField("movement","",length=3),
-        ByteField("wheel_y",0x00),
-        ByteField("wheel_x",0x00)
+        SignedByteField("wheel_y",0x00),
+        SignedByteField("wheel_x",0x00)
     ]
 
 class Logitech_Pairing_Request_Header(Packet):
