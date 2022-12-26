@@ -18,13 +18,21 @@ class EsbLinkLayerManager:
         self.__stack = stack
         self.__app = app_class(self) if app_class is not None else None
         self.__pid = 0
+        self.__last_timestamp = time()
         self.__role = ESBRole.PTX
         self.__synchronized = False
         self.__promiscuous = False
-        self.__populate_ack_queue = False
-        self.__populate_data_queue = False
+        self.__autosync = False
         self.__ack_queue = Queue()
         self.__data_queue = Queue()
+
+    @property
+    def autosync(self):
+        return self.__autosync
+
+    @autosync.setter
+    def autosync(self, value):
+        self.__autosync = value
 
 
     @property
@@ -40,16 +48,19 @@ class EsbLinkLayerManager:
         self.__promiscuous = promiscuous
 
     @property
+    def synchronized(self):
+        return self.synchronized
+
+    @property
     def role(self):
         return self.__role
 
     def _increment_pid(self):
         self.__pid = (self.__pid + 1) % 4
 
-    def synchronize(self, timeout=10):
+    def synchronize(self, autosync=False, timeout=10):
         self.__role = ESBRole.PTX
         self.__ack_queue.queue.clear()
-        self.__populate_ack_queue = True
         self.__stack.set_channel(None)
         start_time = time()
         queue = self.__ack_queue
@@ -61,8 +72,9 @@ class EsbLinkLayerManager:
                 if hasattr(msg, "metadata") and hasattr(msg.metadata, "channel"):
                     print(msg.metadata.channel)
                     self.__stack.set_channel(msg.metadata.channel)
-                    self.__populate_ack_queue = False
-                    self.__synchronized = True
+                    if not self.__synchronized:
+                        self.__synchronized = True
+                        self.on_synchronized()
                     break
             except Empty:
                 pass
@@ -73,34 +85,30 @@ class EsbLinkLayerManager:
         packet = ESB_Hdr(
                 pid=self.__pid,
                 address=self.__stack.get_address(),
-                no_ack=0
+                no_ack=int(not acknowledged)
         ) / ESB_Payload_Hdr() / data
 
         if acknowledged:
                 self.__ack_queue.queue.clear()
-                self.__populate_ack_queue = True
                 self.__stack.send(packet, channel=self.__stack.get_channel())
                 self._increment_pid()
                 try:
                     ack = self.wait_for_ack()
-                    print(ack)
-                    self.__populate_ack_queue = False
                     return ack
                 except LinkLayerTimeoutException:
-                    self.__populate_ack_queue = False
+                    self.__synchronized = False
+                    self.on_desynchronized()
                     return None
         else:
-            self.__populate_ack_queue = False
             self.__stack.send(packet, channel=self.__stack.get_channel())
             self._increment_pid()
             return None
 
-    def wait_for_ack(self, timeout=0.05):
+    def wait_for_ack(self, timeout=0.1):
         start_time = time()
         while (time() - start_time) < timeout:
             try:
-                msg = self.__ack_queue.get(block=False,timeout=0.01)
-                print("received ack !")
+                msg = self.__ack_queue.get(block=False,timeout=0.001)
                 return msg
             except Empty:
                 pass
@@ -115,18 +123,27 @@ class EsbLinkLayerManager:
         ) / ESB_Payload_Hdr() / data
         self.__stack.send(packet)
 
+    def on_synchronized(self):
+        if self.__app is not None:
+            self.__app.on_synchronized()
+
+
+    def on_desynchronized(self):
+        if self.__app is not None:
+            self.__app.on_desynchronized()
+        if self.__autosync:
+            self.synchronize(autosync=self.__autosync)
+
     def on_pdu(self, pdu):
+        self.__last_timestamp = time()
 
         if ESB_Ack_Response in pdu or len(bytes(pdu)) == 0:
             if (self.__role == ESBRole.PTX or self.__promiscuous):
-                if self.__populate_ack_queue:
-                    self.__ack_queue.put(pdu)
+                self.__ack_queue.put(pdu)
                 if self.__app is not None and len(bytes(pdu)) > 0:
                     self.__app.on_acknowledgement(pdu[ESB_Payload_Hdr:])
         else:
             if (self.__role == ESBRole.PRX or self.__promiscuous):
-                print("DATA: ", pdu)
-                if self.__populate_ack_queue:
-                    self.__data_queue.put(pdu)
+                self.__data_queue.put(pdu)
                 if self.__app is not None:
                     self.__app.on_data(pdu[ESB_Payload_Hdr:])
