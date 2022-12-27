@@ -307,6 +307,9 @@ class Unifying(WhadDeviceConnector):
         """
         Follow a pairing procedure.
         """
+        if not self.can_sniff_pairing():
+            raise UnsupportedCapability("SniffPairing")
+
         msg = Message()
         msg.unifying.sniff_pairing.CopyFrom(SniffPairingCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
