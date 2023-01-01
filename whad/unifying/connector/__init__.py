@@ -82,7 +82,7 @@ class Unifying(WhadDeviceConnector):
         except AttributeError:
             return None
 
-    def _build_message_from_scapy_packet(self, packet, channel=None):
+    def _build_message_from_scapy_packet(self, packet, channel=None, retransmission_count=15):
         msg = Message()
         self._signal_packet_transmission(packet)
 
@@ -91,11 +91,11 @@ class Unifying(WhadDeviceConnector):
             packet.preamble = 0xAA
             # print(">", bytes(packet).hex())
             msg.unifying.send_raw.pdu = bytes(packet)
-
+            msg.unifying.send_raw.retransmission_count = retransmission_count
         elif ESB_Payload_Hdr in packet:
             msg.unifying.send.channel = channel if channel is not None else 0xFF
             msg.unifying.send.pdu = bytes(packet)
-
+            msg.unifying.send.retransmission_count = retransmission_count
         else:
             msg = None
         return msg
@@ -125,7 +125,7 @@ class Unifying(WhadDeviceConnector):
             self.__can_send = ((commands & (1 << Send))>0 or (commands & (1 << SendRaw)))
         return self.__can_send
 
-    def send(self,pdu, address=None, channel=None):
+    def send(self,pdu, address=None, channel=None, retransmission_count=15):
         """
         Send Logitech Unifying packets (on a single channel).
         """
@@ -144,12 +144,13 @@ class Unifying(WhadDeviceConnector):
             packet.metadata.channel = self.__cached_channel if channel is None else channel
             packet.metadata.address = self.__cached_address if address is None else address
 
-            msg = self._build_message_from_scapy_packet(packet, channel)
+            msg = self._build_message_from_scapy_packet(packet, channel, retransmission_count)
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
         else:
             return False
+
 
     def support_raw_pdu(self):
         """

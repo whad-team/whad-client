@@ -70,8 +70,8 @@ class Mouse(Unifying):
     def on_pdu(self, packet):
         self.__stack.on_pdu(packet)
 
-    def synchronize(self, autosync=True, timeout=10):
-        return self.__stack.ll.synchronize(autosync=True, timeout=10)
+    def synchronize(self, timeout=10):
+        return self.__stack.ll.synchronize(timeout=10)
 
     def move(self, x, y):
         return self.__stack.app.move_mouse(x, y)

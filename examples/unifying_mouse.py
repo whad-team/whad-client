@@ -19,15 +19,15 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             connector = Mouse(dev)
-            connector.attach_callback(show, on_reception=False, on_transmission=True)
+            #connector.attach_callback(show, on_reception=True, on_transmission=False)
             connector.start()
             connector.channel = 5
-            connector.address = "ca:e9:06:ec:a4"
+            connector.address = "ca:e9:06:ec:a4"#"9b:0a:90:42:93"
             connector.synchronize()
 
             while True:
-                time.sleep(0.1)
-                connector.move(0, 12)
+                print(connector.move(-10, 0))
+
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 

@@ -19,7 +19,7 @@ class Keylogger(Sniffer):
     def locale(self, locale):
         self.__locale = locale
 
-    def key_stream(self):
+    def stream(self):
         for packet in super().sniff():
             hid_data = None
             if Logitech_Unencrypted_Keystroke_Payload in packet:

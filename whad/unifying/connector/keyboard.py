@@ -1,6 +1,6 @@
 from whad.unifying.connector import Unifying
 from whad.esb.stack import ESBStack
-from whad.unifying.stack import UnifyingApplicativeLayerManager, UnifyingRole
+from whad.unifying.stack import UnifyingApplicativeLayerManager, UnifyingRole, MultimediaKey
 from whad.exceptions import UnsupportedCapability
 
 
@@ -37,6 +37,7 @@ class Keyboard(Unifying):
         self.__stack.app.role = UnifyingRole.KEYBOARD
         if self.__started:
             super().start()
+
     @property
     def channel(self):
         return self.__channel
@@ -45,6 +46,22 @@ class Keyboard(Unifying):
     def channel(self, channel=5):
         self.__channel = channel
         self._enable_role()
+
+    @property
+    def key(self):
+        return self.__stack.app.key
+
+    @key.setter
+    def key(self, key):
+        self.__stack.app.key = key
+
+    @property
+    def aes_counter(self):
+        return self.__stack.app.aes_counter
+
+    @aes_counter.setter
+    def aes_counter(self,aes_counter):
+        self.__stack.app.aes_counter = aes_counter
 
     def start(self):
         self.__started = True
@@ -70,8 +87,24 @@ class Keyboard(Unifying):
     def on_pdu(self, packet):
         self.__stack.on_pdu(packet)
 
-    def synchronize(self, autosync=True, timeout=10):
-        return self.__stack.ll.synchronize(autosync=True, timeout=10)
+    def synchronize(self,timeout=10):
+        return self.__stack.ll.synchronize(timeout=10)
+
+    def send_text(self, text):
+        for key in text:
+            self.send_key(key)
 
     def send_key(self, key, ctrl=False, alt=False, shift=False, gui=False):
-        return self.__stack.app.unencrypted_keystroke(key, ctrl=ctrl, alt=alt, shift=shift, gui=gui)
+        if self.key is not None:
+            return self.__stack.app.encrypted_keystroke(key, ctrl=ctrl, alt=alt, shift=shift, gui=gui)
+        else:
+            return self.__stack.app.unencrypted_keystroke(key, ctrl=ctrl, alt=alt, shift=shift, gui=gui)
+
+    def volume_up(self):
+        return self.__stack.app.multimedia_keystroke(MultimediaKey.VOLUME_UP)
+
+    def volume_down(self):
+        return self.__stack.app.multimedia_keystroke(MultimediaKey.VOLUME_DOWN)
+
+    def volume_toggle(self):
+        return self.__stack.app.multimedia_keystroke(MultimediaKey.VOLUME_TOGGLE)

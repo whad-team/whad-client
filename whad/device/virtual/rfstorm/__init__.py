@@ -300,13 +300,17 @@ class RFStormDevice(VirtualDevice):
     def _on_whad_send(self, message):
         channel = message.channel if message.channel != 0xFF else self.__channel
         pdu = message.pdu
-
+        retransmission_count = message.retransmission_count
         if self.__acking:
             self.__ack_payload = pdu
         else:
-            ack = self._rfstorm_transmit_payload(pdu)
-            if self.__check_ack and ack:
-                self._send_whad_pdu(b"", address=self.__address)
+            ack = self._rfstorm_transmit_payload(pdu, retransmits=retransmission_count)
+            if self.__check_ack:
+                if ack:
+                    self._send_whad_pdu(b"", address=self.__address)
+                    self._send_whad_command_result(ResultCode.SUCCESS)
+                else:
+                    self._send_whad_command_result(ResultCode.SUCCESS)
 
         self._send_whad_command_result(ResultCode.SUCCESS)
 
