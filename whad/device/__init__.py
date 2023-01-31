@@ -161,6 +161,7 @@ class WhadDeviceConnector(object):
             self.__device.set_connector(self)
 
         # Packet callbacks
+        self.__callbacks_lock = Lock()
         self.__reception_callbacks = {}
         self.__transmission_callbacks = {}
 
@@ -175,12 +176,18 @@ class WhadDeviceConnector(object):
         :param filter: Lambda function filtering packets matching the callback.
         :returns: Boolean indicating if the callback has been successfully attached.
         """
+        # Enter critical section
+        self.__callbacks_lock.acquire()
+
         callbacks_dicts = (
             ([self.__reception_callbacks] if on_reception else []) +
             ([self.__transmission_callbacks] if on_transmission else [])
         )
         for callback_dict in callbacks_dicts:
             callback_dict[callback] = filter
+        
+        # Leave critical section
+        self.__callbacks_lock.release()
 
         return len(callbacks_dicts) > 0
 
@@ -193,6 +200,9 @@ class WhadDeviceConnector(object):
         :param on_transmission: Boolean indicating if the callback was monitoring transmission.
         :returns: Boolean indicating if the callback has been successfully detached.
         """
+        # Enter critical section
+        self.__callbacks_lock.acquire()
+
         removed = False
         callbacks_dicts = (
             ([self.__reception_callbacks] if on_reception else []) +
@@ -202,6 +212,10 @@ class WhadDeviceConnector(object):
             if callback in callback_dict:
                 del callback_dict[callback]
                 removed = True
+
+        # Leave critical section
+        self.__callbacks_lock.release()
+
         return removed
 
     def reset_callbacks(self, reception = True, transmission = True):
@@ -212,14 +226,22 @@ class WhadDeviceConnector(object):
         :param on_transmission: Boolean indicating if the callbacks monitoring transmission are detached.
         :returns: Boolean indicating if callbacks have been successfully detached.
         """
+
+        # Enter critical section
+        self.__callbacks_lock.acquire()
+
         callbacks_dicts = (
-            ([self.__reception_callbacks] if on_reception else []) +
-            ([self.__transmission_callbacks] if on_transmission else [])
+            ([self.__reception_callbacks] if reception else []) +
+            ([self.__transmission_callbacks] if transmission else [])
         )
         for callback_dict in callbacks_dicts:
             callback_dict = {}
 
+        # Leave critical section
+        self.__callbacks_lock.release()
+
         return len(callbacks_dicts) > 0
+
 
     def _signal_packet_transmission(self, packet):
         """
@@ -227,9 +249,16 @@ class WhadDeviceConnector(object):
 
         :param packet: scapy packet being transmitted from whad-client.
         """
+        # Enter critical section
+        self.__callbacks_lock.acquire()
+
         for callback,packet_filter in self.__transmission_callbacks.items():
             if packet_filter(packet):
                 callback(packet)
+
+        # Leave critical section
+        self.__callbacks_lock.release()
+
 
     def _signal_packet_reception(self, packet):
         """
@@ -237,9 +266,15 @@ class WhadDeviceConnector(object):
 
         :param packet: scapy packet being received by whad-client.
         """
+        # Enter critical section
+        self.__callbacks_lock.acquire()
+
         for callback,packet_filter in self.__reception_callbacks.items():
             if packet_filter(packet):
                 callback(packet)
+
+        # Leave critical section
+        self.__callbacks_lock.release()
 
 
     def set_device(self, device=None):
@@ -560,7 +595,7 @@ class WhadDevice(object):
         self.__discovered = False
 
         # Device connectors
-        self.__connectors = []
+        self.__connector = None
 
         # Device IO thread
         self.__io_thread = None
@@ -590,7 +625,7 @@ class WhadDevice(object):
 
         :param WhadDeviceConnector connector: connector to be used with this device.
         """
-        self.__connectors.append(connector)
+        self.__connector = connector
 
     ######################################
     # Device I/O operations
@@ -844,10 +879,9 @@ class WhadDevice(object):
                 logger.error('domain not supported by this device')
                 raise UnsupportedDomain()
 
-        # Forward everything to the connectors, if any
-        if len(self.__connectors) != 0:
-            for connector in self.__connectors:
-                connector.on_generic_msg(message)
+        # Forward everything to the connector, if any
+        if self.__connector is not None:
+            self.__connector.on_generic_msg(message)
 
 
     ######################################
@@ -860,10 +894,9 @@ class WhadDevice(object):
         been associated with the device, forward this message to this connector.
         """
 
-        # Forward everything to the connectors, if any
-        if len(self.__connectors) != 0:
-            for connector in self.__connectors:
-                connector.on_discovery_msg(message)
+        # Forward everything to the connector, if any
+        if self.__connector is not None:
+            self.__connector.on_discovery_msg(message)
 
     def has_domain(self, domain):
         """Checks if device supports a specific domain.
@@ -1018,10 +1051,9 @@ class WhadDevice(object):
         :param Message message: Domain-related message received
         """
 
-        # Forward everything to the connectors, if any
-        if len(self.__connectors) != 0:
-            for connector in self.__connectors:
-                connector.on_domain_msg(domain, message)
+        # Forward everything to the connector, if any
+        if self.__connector is not None:
+            self.__connector.on_domain_msg(domain, message)
         return False
 
 
