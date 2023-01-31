@@ -63,13 +63,16 @@ class InteractiveShell(object):
         self.__session = PromptSession(completer=DynamicCompleter(self.update_autocomplete))
 
 
-    def set_prompt(self, prompt):
+    def set_prompt(self, prompt, force_update=False):
         """Set interactive shell prompt.
 
         :param str prompt: Prompt
         """
         self.__prompt = prompt
-
+        if force_update:
+            # We modify the `_message` attribute of our session
+            # from the outside
+            self.__session.message = self.__prompt
 
     def update_autocomplete(self):
         """Update nested autocompleter.
