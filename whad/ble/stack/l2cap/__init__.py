@@ -2,7 +2,8 @@
 Bluetooth LE Stack L2CAP manager
 """
 from struct import unpack, pack
-from scapy.layers.bluetooth import L2CAP_Hdr, ATT_Hdr, SM_Hdr
+from scapy.layers.bluetooth import L2CAP_Hdr, ATT_Hdr, SM_Hdr, L2CAP_CmdHdr, \
+    L2CAP_Connection_Parameter_Update_Request, L2CAP_CmdRej
 from whad.ble.stack.att import BleATT
 from whad.ble.stack.smp import BleSMP
 
@@ -25,29 +26,36 @@ class BleL2CAP(object):
         self.__remote_mtu = 23
         self.__local_mtu = 23
 
+
     @property
     def smp(self):
         return self.__smp
+
 
     @property
     def connection(self):
         return self.__connection
 
+
     @property
     def att(self):
         return self.__att
+
 
     @property
     def gatt(self):
         return self.__att.gatt
 
+
     @property
     def remote_mtu(self):
         return self.__remote_mtu
 
+
     @remote_mtu.setter
     def remote_mtu(self, mtu):
         self.__remote_mtu = mtu
+
 
     @property
     def local_mtu(self):
@@ -56,6 +64,7 @@ class BleL2CAP(object):
     @local_mtu.setter
     def local_mtu(self, mtu):
         self.__local_mtu = mtu
+
 
     def on_data_received(self, l2cap_data, fragment=False):
         """Handles incoming L2CAP data"""
@@ -86,6 +95,7 @@ class BleL2CAP(object):
                 self.on_l2cap_packet(L2CAP_Hdr(self.__packet[:self.__expected_length]))
                 self.__packet = None
 
+
     def on_l2cap_packet(self, packet):
         """Process incoming L2CAP packets.
         """
@@ -93,6 +103,21 @@ class BleL2CAP(object):
             self.__att.on_packet(packet.getlayer(ATT_Hdr))
         elif SM_Hdr in packet:
             self.__smp.on_smp_packet(packet.getlayer(SM_Hdr))
+        elif L2CAP_CmdHdr in packet:
+            self.on_cmd_packet(packet.getlayer(L2CAP_CmdHdr))
+
+    def on_cmd_packet(self, packet):
+        """Handle L2CAP Connection Parameter Update Requests.
+
+        This command is rejected by default.
+        """
+        if L2CAP_Connection_Parameter_Update_Request in packet:
+            logger.debug('[l2cap] Received a L2CAP Connection Parameter Update Request, rejecting')
+            
+            # Reject this request
+            self.__connection.send_l2cap_data(
+                L2CAP_Hdr()/L2CAP_CmdHdr(id=packet[L2CAP_CmdHdr].id)/L2CAP_CmdRej(0)
+            )
 
     def send(self, data, channel='attribute'):
         """Send data
