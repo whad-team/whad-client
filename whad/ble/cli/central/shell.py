@@ -3,12 +3,15 @@ import re
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
 from binascii import unhexlify, Error as BinasciiError
-from whad.ble.exceptions import InvalidHandleValueException
 
+from scapy.layers.bluetooth4LE import *
+
+from whad.ble.exceptions import InvalidHandleValueException
 from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Scanner, Central
 from whad.ble.profile.characteristic import CharacteristicProperties
+from whad.ble.profile.advdata import AdvDataFieldList
 from whad.ble.utils.att import UUID
 from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
     InsufficientAuthenticationError, InsufficientAuthorizationError, \
@@ -16,6 +19,7 @@ from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
     WriteNotPermittedError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.central.cache import BleDevicesCache
+from whad.ble.scanning import AdvertisingDevice
 from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
 
 from whad.cli.shell import InteractiveShell
@@ -63,13 +67,13 @@ class BleCentralShell(InteractiveShell):
 
         self.update_prompt()
 
-    def update_prompt(self):
+    def update_prompt(self, force=False):
         """Update prompt to reflect current state
         """
         if not self.__target_bd:
-            self.set_prompt(HTML('<b>ble-central></b> '))
+            self.set_prompt(HTML('<b>ble-central></b> '), force)
         else:
-            self.set_prompt(HTML('<b>ble-central|<ansicyan>%s</ansicyan>></b> ' % self.__target_bd))
+            self.set_prompt(HTML('<b>ble-central|<ansicyan>%s</ansicyan>></b> ' % self.__target_bd), force)
 
 
     def switch_role(self, new_role):
@@ -81,7 +85,6 @@ class BleCentralShell(InteractiveShell):
                 self.__wireshark.detach()
         self.__connector = new_role(self.__interface)
         if self.__wireshark is not None:
-            print(self.__connector)
             self.__wireshark.attach(self.__connector)
             self.__wireshark.start()
 
@@ -241,10 +244,7 @@ class BleCentralShell(InteractiveShell):
             # Switch role to Central
             self.switch_role(Central)
 
-            # Start central role
-            self.__connector.start()
-
-            # Try to connect to our target device
+            # Try to connect to our target device (central role is started here)
             self.__target = self.__connector.connect(target_bd_addr)
             self.__target_bd = target_bd_addr
 
@@ -255,6 +255,26 @@ class BleCentralShell(InteractiveShell):
                 # Attach our wireshark monitor, if any
                 if self.__wireshark is not None:
                     self.__wireshark.attach(self.__connector)
+
+                # Detach any previous callback
+                self.__connector.detach_callback(self.on_disconnect, on_reception=True, on_transmission=False)
+
+                # Attach our packet monitor callback (to detect disconnection)
+                self.__connector.attach_callback(
+                    self.on_disconnect,
+                    on_transmission=False,
+                    on_reception=True,
+                    filter=lambda pkt: pkt.haslayer(LL_TERMINATE_IND)
+                )
+
+                # Create our cached device if non-existing
+                if self.__target_bd not in self.__cache:
+                    self.__cache.add(AdvertisingDevice(
+                        -50,
+                        0,
+                        self.__target_bd,
+                        AdvDataFieldList()
+                    ))
                 
                 # Update prompt
                 self.update_prompt()
@@ -264,6 +284,28 @@ class BleCentralShell(InteractiveShell):
 
         except IndexError as notfound:
             print('Device %s not found' % args[0])
+
+
+    def on_disconnect(self, packet):
+        """Disconnection callback
+
+        This callback is called when a BLE peripheral disconnects our central.
+        """
+        # Process disconnection
+        self.__target_bd = None
+        if self.__target is not None:
+
+            # detach wireshark
+            if self.__wireshark is not None:
+                self.__wireshark.detach()
+
+            self.__target = None
+
+        # Update prompt
+        self.update_prompt(force=True)
+
+        # Show disconnection
+        print_formatted_text(HTML('<ansired>Peripheral has just disconnected</ansired>'))        
 
     def do_disconnect(self, arg):
         """disconnect from device
