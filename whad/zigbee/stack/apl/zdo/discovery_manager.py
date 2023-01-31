@@ -7,7 +7,7 @@ from whad.zigbee.stack.apl.cluster import Cluster
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.mac.constants import MACDeviceType, MACPowerSource
 from whad.zigbee.stack.apl.zdo.descriptors import NodeDescriptor, SimpleDescriptor
-from whad.zigbee.stack.nwk.constants import ZigbeeEndDevice
+from whad.zigbee.profile.device import Coordinator, EndDevice, Router
 from queue import Queue, Empty
 from time import time, sleep
 import logging
@@ -40,14 +40,16 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         self.transaction += 1
         try:
             response = self.wait_for_response(filter_function=lambda pkt:ZDPSimpleDescRsp in pkt and pkt.trans_seqnum == transaction)
-            if response.status == 0:
+            (asdu, source_address, source_address_mode, security_status, link_quality) = response
+
+            if asdu.status == 0:
                 return SimpleDescriptor(
-                        endpoint=response.endpoint,
-                        profile_identifier=response.profile_identifier,
-                        device_identifier=response.device_identifier,
-                        device_version=response.device_version,
-                        input_clusters=response.input_clusters,
-                        output_clusters=response.output_clusters
+                        endpoint=asdu.endpoint,
+                        profile_identifier=asdu.profile_identifier,
+                        device_identifier=asdu.device_identifier,
+                        device_version=asdu.device_version,
+                        input_clusters=asdu.input_clusters,
+                        output_clusters=asdu.output_clusters
                 )
             return None
 
@@ -65,8 +67,10 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         self.transaction += 1
         try:
             response = self.wait_for_response(filter_function=lambda pkt:ZDPActiveEPRsp in pkt and pkt.trans_seqnum == transaction)
-            if response.status == 0:
-                return response.active_endpoints
+            (asdu, source_address, source_address_mode, security_status, link_quality) = response
+
+            if asdu.status == 0:
+                return asdu.active_endpoints
             return []
 
         except ZDODeviceAndServiceDiscoveryTimeoutException:
@@ -83,35 +87,36 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         self.transaction += 1
         try:
             response = self.wait_for_response(filter_function=lambda pkt:ZDPNodeDescRsp in pkt and pkt.trans_seqnum == transaction)
-            if response.status == 0:
+            (asdu, source_address, source_address_mode, security_status, link_quality) = response
+            if asdu.status == 0:
                 return NodeDescriptor(
-                    logical_type=LogicalDeviceType(response.logical_type),
-                    complex_descriptor_available=bool(response.complex_descriptor_available),
-                    user_descriptor_available=bool(response.user_descriptor_available),
-                    aps_flags=response.aps_flags,
-                    support_868_mhz=bool(response.support_868_mhz),
-                    support_902_mhz=bool(response.support_902_mhz),
-                    support_2400_mhz=bool(response.support_2400_mhz),
-                    alternate_pan_coordinator=bool(response.alternate_pan_coordinator),
-                    device_type=MACDeviceType(response.device_type),
-                    power_source=MACPowerSource(response.power_source),
-                    receiver_on_when_idle=bool(response.receiver_on_when_idle),
-                    security_capability=bool(response.security_capability),
-                    allocate_address=bool(response.allocate_address),
-                    manufacturer_code=response.manufacturer_code,
-                    max_buffer_size=response.max_buffer_size,
-                    max_incoming_transfer_size=response.max_incoming_transfer_size,
-                    server_primary_trust_center = bool(response.server_primary_trust_center),
-                    server_backup_trust_center = bool(response.server_backup_trust_center),
-                    server_primary_binding_table_cache = bool(response.server_primary_binding_table_cache),
-                    server_backup_binding_table_cache = bool(response.server_backup_binding_table_cache),
-                    server_primary_discovery_cache = bool(response.server_primary_discovery_cache),
-                    server_backup_discovery_cache = bool(response.server_backup_discovery_cache),
-                    network_manager = bool(response.network_manager),
-                    stack_compliance_revision = response.stack_compliance_revision,
-                    max_outgoing_transfer_size = response.max_outgoing_transfer_size,
-                    extended_active_endpoint_list_available = bool(response.extended_active_endpoint_list_available),
-                    extended_simple_descriptors_list_available = bool(response.extended_simple_descriptors_list_available)
+                    logical_type=LogicalDeviceType(asdu.logical_type),
+                    complex_descriptor_available=bool(asdu.complex_descriptor_available),
+                    user_descriptor_available=bool(asdu.user_descriptor_available),
+                    aps_flags=asdu.aps_flags,
+                    support_868_mhz=bool(asdu.support_868_mhz),
+                    support_902_mhz=bool(asdu.support_902_mhz),
+                    support_2400_mhz=bool(asdu.support_2400_mhz),
+                    alternate_pan_coordinator=bool(asdu.alternate_pan_coordinator),
+                    device_type=MACDeviceType(asdu.device_type),
+                    power_source=MACPowerSource(asdu.power_source),
+                    receiver_on_when_idle=bool(asdu.receiver_on_when_idle),
+                    security_capability=bool(asdu.security_capability),
+                    allocate_address=bool(asdu.allocate_address),
+                    manufacturer_code=asdu.manufacturer_code,
+                    max_buffer_size=asdu.max_buffer_size,
+                    max_incoming_transfer_size=asdu.max_incoming_transfer_size,
+                    server_primary_trust_center = bool(asdu.server_primary_trust_center),
+                    server_backup_trust_center = bool(asdu.server_backup_trust_center),
+                    server_primary_binding_table_cache = bool(asdu.server_primary_binding_table_cache),
+                    server_backup_binding_table_cache = bool(asdu.server_backup_binding_table_cache),
+                    server_primary_discovery_cache = bool(asdu.server_primary_discovery_cache),
+                    server_backup_discovery_cache = bool(asdu.server_backup_discovery_cache),
+                    network_manager = bool(asdu.network_manager),
+                    stack_compliance_revision = asdu.stack_compliance_revision,
+                    max_outgoing_transfer_size = asdu.max_outgoing_transfer_size,
+                    extended_active_endpoint_list_available = bool(asdu.extended_active_endpoint_list_available),
+                    extended_simple_descriptors_list_available = bool(asdu.extended_simple_descriptors_list_available)
                 )
             return None
 
@@ -124,64 +129,67 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
             logger.info("[zdo_device_and_service_discovery_manager] Devices discovery failure, no associated network.")
             return []
 
-        devices = {}
-        extended_pan_id = self.zdo.manager.nwk.database.get("nwkExtendedPANID")
+        network = self.zdo.network_manager.network
+        addresses = [device.address for device in network.devices]
 
-        # Loop over identified neighbors matching the current network
-        for device_address, device in self.zdo.manager.nwk.database.get("nwkNeighborTable").table.items():
-            if device.extended_pan_id == extended_pan_id:
-                devices[device_address] = device
+        transaction = self.transaction
+        self.ieee_addr_req(0xFFFF, request_type=1, transaction=transaction)
+        self.transaction += 1
+
+        try:
+            while True:
+                response = self.wait_for_response(filter_function=lambda pkt:ZDPIEEEAddrRsp in pkt and pkt.trans_seqnum == transaction)
+                (asdu, source_address, source_address_mode, security_status, link_quality) = response
+                if source_address not in addresses:
+                    addresses.append(source_address)
+        except ZDODeviceAndServiceDiscoveryTimeoutException:
+            pass
 
         scanned_devices = []
 
-        # For each router or coordinator, send an extended IEEE address request
-        for device_addr, device in devices.items():
-            # Add the device to the list
-            scanned_devices.append(device)
+        for address in addresses:
+            new_device = None
+            # Generate a request
             transaction = self.transaction
-            self.ieee_addr_req(device.address, request_type=1, transaction=transaction)
+            self.ieee_addr_req(address, request_type=1, transaction=transaction)
             self.transaction += 1
             try:
                 response = self.wait_for_response(filter_function=lambda pkt:ZDPIEEEAddrRsp in pkt and pkt.trans_seqnum == transaction)
-                # If we receive a response, extract the relevant information
-                # If we didn't know extended address, update the node
-                if device.extended_address is None:
-                    device.extended_address = response.ieee_addr
+                (asdu, source_address, source_address_mode, security_status, link_quality) = response
 
-                # Iterate over the children
-                for child_address in response.associated_devices:
-                    # If we don't already know the child, send a request
-                    if child_address not in devices:
-                        try:
-                            transaction = self.transaction
-                            self.ieee_addr_req(child_address, request_type=1, transaction=transaction)
-                            self.transaction += 1
+                descriptor = self.get_node_descriptor(address)
+                if descriptor is not None:
+                    if descriptor.logical_type == LogicalDeviceType.COORDINATOR:
+                        new_device = Coordinator(
+                            address,
+                            extended_address=asdu.ieee_addr,
+                            descriptor=descriptor,
+                            network=network
+                        )
+                        network.coordinator = new_device
+                    elif descriptor.logical_type == LogicalDeviceType.ROUTER:
+                        new_device = Router(
+                            address,
+                            extended_address=asdu.ieee_addr,
+                            descriptor=descriptor,
+                            network=network
+                        )
+                        if new_device not in network.routers:
+                            network.routers.append(new_device)
+                    else:
+                        new_device = EndDevice(
+                            address,
+                            extended_address=asdu.ieee_addr,
+                            descriptor=descriptor,
+                            network=network
+                        )
+                        if new_device not in network.end_devices:
+                            network.end_devices.append(new_device)
+                    scanned_devices.append(new_device)
 
-                            response_end_device = self.wait_for_response(filter_function=lambda pkt:ZDPIEEEAddrRsp in pkt and pkt.trans_seqnum==transaction)
-                            # If we receive a response, the node is associated AND active, so create a new end device
-                            # and add it to the new devices list
-                            end_device = ZigbeeEndDevice(
-                                child_address,
-                                extended_address=response.ieee_addr,
-                                rx_on_when_idle=False,
-                                extended_pan_id=device.extended_pan_id,
-                                logical_channel=device.logical_channel,
-                                depth=None,
-                                beacon_order=None,
-                                permit_joining=False,
-                                potential_parent=False,
-                                pan_id=device.pan_id
-                            )
-                            scanned_devices.append(end_device)
-
-                        except ZDODeviceAndServiceDiscoveryTimeoutException:
-                            pass
             except ZDODeviceAndServiceDiscoveryTimeoutException:
                 pass
-
         return scanned_devices
-
-
 
 
     # Synchronous response waiting function
@@ -189,9 +197,9 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         start_time = time()
         while (time() - start_time) < timeout:
             try:
-                msg = self.input_queue.get(block=False,timeout=0.1)
-                if filter_function(msg):
-                    return msg
+                (asdu, source_address, source_address_mode, security_status, link_quality) = self.input_queue.get(block=False,timeout=0.1)
+                if filter_function(asdu):
+                    return (asdu, source_address, source_address_mode, security_status, link_quality)
             except Empty:
                 pass
         raise ZDODeviceAndServiceDiscoveryTimeoutException
@@ -220,17 +228,20 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
 
 
     # Cluster reception helpers
+    def on_nwk_addr_rsp(self, asdu, source_address, source_address_mode, security_status, link_quality):
+        self.input_queue.put((asdu, source_address, source_address_mode, security_status, link_quality))
+
     def on_ieee_addr_rsp(self, asdu, source_address, source_address_mode, security_status, link_quality):
-        self.input_queue.put(asdu)
+        self.input_queue.put((asdu, source_address, source_address_mode, security_status, link_quality))
 
     def on_node_desc_rsp(self,  asdu, source_address, source_address_mode, security_status, link_quality):
-        self.input_queue.put(asdu)
+        self.input_queue.put((asdu, source_address, source_address_mode, security_status, link_quality))
 
     def on_active_ep_rsp(self, asdu, source_address, source_address_mode, security_status, link_quality):
-        self.input_queue.put(asdu)
+        self.input_queue.put((asdu, source_address, source_address_mode, security_status, link_quality))
 
     def on_simple_desc_rsp(self, asdu, source_address, source_address_mode, security_status, link_quality):
-        self.input_queue.put(asdu)
+        self.input_queue.put((asdu, source_address, source_address_mode, security_status, link_quality))
 
     # Cluster definitions
     class ZDONWKAddrReq(Cluster):
@@ -245,6 +256,16 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 start_index=start_index
             )
             self.send_data(command, destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT, destination_address=0xfffd, use_network_key=True, destination_endpoint=0)
+
+    class ZDONWKAddrRsp(Cluster):
+        def __init__(self, zdo_object):
+            super().__init__(cluster_id=0x8000)
+            self.zdo_object = zdo_object
+
+        def on_data(self, asdu, source_address, source_address_mode, security_status, link_quality):
+            asdu.show()
+            print(hex(source_address))
+            self.zdo_object.on_nwk_addr_rsp(asdu, source_address, source_address_mode, security_status, link_quality)
 
 
     class ZDOIEEEAddrReq(Cluster):
@@ -305,6 +326,39 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         def __init__(self, zdo_object):
             super().__init__(cluster_id=0x8002)
             self.zdo_object = zdo_object
+
+        def generate(address, transaction):
+            node_descriptor = self.zdo_object.zdo.configuration.get("configNodeDescriptor")
+            command =  ZigbeeDeviceProfile(trans_seqnum=transaction)/ZDPNodeDescRsp(
+                logical_type=int(node_descriptor.logical_type),
+                complex_descriptor_available=int(node_descriptor.complex_descriptor_available),
+                user_descriptor_available=int(node_descriptor.user_descriptor_available),
+                aps_flags=node_descriptor.aps_flags,
+                support_868_mhz=int(node_descriptor.support_868_mhz),
+                support_902_mhz=int(node_descriptor.support_902_mhz),
+                support_2400_mhz=int(node_descriptor.support_2400_mhz),
+                alternate_pan_coordinator=int(node_descriptor.alternate_pan_coordinator),
+                device_type=int(node_descriptor.device_type),
+                power_source=int(node_descriptor.power_source),
+                receiver_on_when_idle=int(node_descriptor.receiver_on_when_idle),
+                security_capability=int(node_descriptor.security_capability),
+                allocate_address=int(node_descriptor.allocate_address),
+                manufacturer_code=node_descriptor.manufacturer_code,
+                max_buffer_size=node_descriptor.max_buffer_size,
+                max_incoming_transfer_size=node_descriptor.max_incoming_transfer_size,
+                server_primary_trust_center = int(node_descriptor.server_primary_trust_center),
+                server_backup_trust_center = int(node_descriptor.server_backup_trust_center),
+                server_primary_binding_table_cache = int(node_descriptor.server_primary_binding_table_cache),
+                server_backup_binding_table_cache = int(node_descriptor.server_backup_binding_table_cache),
+                server_primary_discovery_cache = int(node_descriptor.server_primary_discovery_cache),
+                server_backup_discovery_cache = int(node_descriptor.server_backup_discovery_cache),
+                network_manager = int(node_descriptor.network_manager),
+                stack_compliance_revision = node_descriptor.stack_compliance_revision,
+                max_outgoing_transfer_size = node_descriptor.max_outgoing_transfer_size,
+                extended_active_endpoint_list_available = int(node_descriptor.extended_active_endpoint_list_available),
+                extended_simple_descriptors_list_available = int(node_descriptor.extended_simple_descriptors_list_available)
+            )
+            self.send_data(command, destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT, destination_address=address, use_network_key=True, destination_endpoint=0)
 
         def on_data(self, asdu, source_address, source_address_mode, security_status, link_quality):
             self.zdo_object.on_node_desc_rsp(asdu, source_address, source_address_mode, security_status, link_quality)

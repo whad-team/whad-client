@@ -1,12 +1,12 @@
 from whad.unifying.connector import Unifying
 from whad.esb.stack import ESBStack
-from whad.unifying.stack import UnifyingApplicativeLayerManager, UnifyingRole
+from whad.unifying.stack import UnifyingApplicativeLayerManager, UnifyingRole, ClickType
 from whad.exceptions import UnsupportedCapability
 
 
 class Mouse(Unifying):
     """
-    Logitech Unifying Sniffer interface for compatible WHAD device.
+    Logitech Unifying Mouse interface for compatible WHAD device.
     """
     def __init__(self, device):
         super().__init__(device)
@@ -36,8 +36,7 @@ class Mouse(Unifying):
         self.enable_mouse_mode(channel=self.__channel)
         self.__stack.app.role = UnifyingRole.MOUSE
         if self.__started:
-            self.start()
-
+            super().start()
     @property
     def channel(self):
         return self.__channel
@@ -49,11 +48,15 @@ class Mouse(Unifying):
 
     def start(self):
         self.__started = True
-        super().start()
+        self._enable_role()
 
     def stop(self):
         self.__started = False
         super().stop()
+
+    @property
+    def stack(self):
+        return self.__stack
 
     @property
     def address(self):
@@ -71,4 +74,25 @@ class Mouse(Unifying):
         return self.__stack.ll.synchronize(timeout=10)
 
     def move(self, x, y):
-        self.__stack.app.move_mouse(x, y)
+        return self.__stack.app.move_mouse(x, y)
+
+    def left_click(self):
+        return self.__stack.app.click_mouse(type=ClickType.LEFT)
+
+    def right_click(self):
+        return self.__stack.app.click_mouse(type=ClickType.RIGHT)
+
+    def middle_click(self):
+        return self.__stack.app.click_mouse(type=ClickType.MIDDLE)
+
+    def wheel_up(self):
+        return self.__stack.app.wheel_mouse(x=0, y=1)
+
+    def wheel_down(self):
+        return self.__stack.app.wheel_mouse(x=0, y=-1)
+
+    def wheel_right(self):
+        return self.__stack.app.wheel_mouse(x=1, y=0)
+
+    def wheel_left(self):
+        return self.__stack.app.wheel_mouse(x=-1, y=0)

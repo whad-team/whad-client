@@ -67,8 +67,9 @@ class Endpoint:
                     break
 
         if selected_cluster is not None:
-            selected_application.output_clusters.append(selected_cluster)
+            selected_application.add_output_cluster(selected_cluster)
             selected_cluster.connect(self.device.address, self.number)
+            
         return selected_cluster
 
 

@@ -1,11 +1,11 @@
 from whad.zigbee.stack.nwk.constants import ZigbeeDeviceType
 from whad.zigbee.profile.endpoint import Endpoint
 class Device:
-    def __init__(self,device_type, address, extended_address=None, network=None):
+    def __init__(self,device_type, address, extended_address=None, descriptor=None, network=None):
         self.__device_type = device_type
         self.__address = address
         self.__extended_address = extended_address
-        self.__node_descriptor = None
+        self.__node_descriptor = descriptor
         self.__active_endpoints = None
         self.__network = network
 
@@ -57,8 +57,8 @@ class Device:
         return self.address == other.address
 
 class Coordinator(Device):
-    def __init__(self, address, extended_address=None, network=None):
-        super().__init__(ZigbeeDeviceType.COORDINATOR, address, extended_address=extended_address, network=network)
+    def __init__(self, address, extended_address=None, descriptor=None, network=None):
+        super().__init__(ZigbeeDeviceType.COORDINATOR, address, extended_address=extended_address,descriptor=descriptor, network=network)
 
     def __repr__(self):
         return (
@@ -69,8 +69,8 @@ class Coordinator(Device):
             ")"
         )
 class Router(Device):
-    def __init__(self, address, extended_address=None, network=None):
-        super().__init__(ZigbeeDeviceType.ROUTER, address, extended_address=extended_address, network=network)
+    def __init__(self, address, extended_address=None, descriptor=None, network=None):
+        super().__init__(ZigbeeDeviceType.ROUTER, address, extended_address=extended_address,descriptor=descriptor, network=network)
 
     def __repr__(self):
         return (
@@ -82,8 +82,8 @@ class Router(Device):
         )
 
 class EndDevice(Device):
-    def __init__(self, address, extended_address=None, network=None):
-        super().__init__(ZigbeeDeviceType.END_DEVICE, address, extended_address=extended_address, network=network)
+    def __init__(self, address, extended_address=None,descriptor=None, network=None):
+        super().__init__(ZigbeeDeviceType.END_DEVICE, address, extended_address=extended_address,descriptor=descriptor, network=network)
 
     def __repr__(self):
         return (

@@ -344,6 +344,10 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
         attributes = self.wait_response()
         return attributes
 
+    @command_receive(0x0b, "Default Response", profile_wide=True)
+    def on_default_response(self, command):
+        return command.status
+
     @command_receive(0x01, "Read Attributes Response", profile_wide=True)
     def on_read_attributes_response(self, command):
         attributes = []
@@ -365,6 +369,21 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
             attributes.append((attribute.attribute_identifier, attribute.attribute_data_type))
         return (0 == command.discovery_complete, attributes)
 
+    # Dirty magic to keep attributes database consistent with local variable
+    def __setattr__(self, att, value):
+        if "attributes" in self.__dict__:
+            for attribute in self.__dict__["attributes"].attributes.values():
+                if attribute.name == att:
+                    attribute.value = value
+        return super().__setattr__(att, value)
+
+    def __getattribute__(self, att):
+        if att != "__dict__" and "attributes" in self.__dict__:
+            for attribute in self.__dict__["attributes"].attributes.values():
+                if attribute.name == att:
+                    super().__setattr__(att, attribute.value)
+        return super().__getattribute__(att)
+
 class ZCLClientCluster(ZCLCluster):
     @classmethod
     def child_clusters(cls):
@@ -374,56 +393,13 @@ class ZCLClientCluster(ZCLCluster):
             parent = work.pop()
             for child in parent.__subclasses__():
                 if child not in subclasses:
-                    print(child.__subclasses__)
                     subclasses.add(child)
                     work.append(child)
         return subclasses
+
     def __init__(self, cluster_id, default_configuration=ZCLClusterConfiguration()):
         super().__init__(cluster_id, ZCLClusterType.CLIENT)
 
 class ZCLServerCluster(ZCLCluster):
     def __init__(self, cluster_id, default_configuration=ZCLClusterConfiguration()):
         super().__init__(cluster_id, ZCLClusterType.SERVER)
-
-'''
-class ZCLCluster(Cluster):
-    zcl_transaction_counter = 1
-
-    def __init__(self, cluster_id):
-        super().__init__(cluster_id)
-        self.attributes = ZCLAttributes()
-        self.commands = ZCLCommands()
-        self.register_attributes()
-        self.register_commands()
-
-    def register_attributes(self):
-        pass
-
-    def register_commands(self):
-        pass
-
-    def send_command(self, command_identifier, command, destination_address_mode, destination_address, destination_endpoint, transaction=None, alias_address=None, alias_sequence_number=0, radius=30, security_enabled_transmission=False, use_network_key=True, acknowledged_transmission=False, fragmentation_permitted=False, include_extended_nonce=False, disable_default_response=False):
-        if transaction is None:
-            transaction = ZCLCluster.zcl_transaction_counter
-            ZCLCluster.zcl_transaction_counter += 1
-
-        asdu = ZigbeeClusterLibrary(
-                zcl_frametype=1,
-                command_direction=0,
-                command_identifier=command_identifier,
-                transaction_sequence=transaction,
-                disable_default_response=disable_default_response
-        ) / command
-
-        return self.send_data(asdu, destination_address_mode, destination_address, destination_endpoint, alias_address=alias_address, alias_sequence_number=alias_sequence_number, radius=radius, security_enabled_transmission=security_enabled_transmission, use_network_key=use_network_key, acknowledged_transmission=acknowledged_transmission, fragmentation_permitted=fragmentation_permitted, include_extended_nonce=include_extended_nonce)
-
-    def on_data(self, asdu, source_address, source_address_mode, security_status, link_quality):
-        command_identifier = asdu.command_identifier
-
-        try:
-            command = self.commands.get_command(command_identifier)
-            command.receive_callback(asdu[ZigbeeClusterLibrary].payload, transaction=asdu.transaction_sequence, no_response=asdu.disable_default_response)
-
-        except ZCLCommandNotFound:
-            logger.info("[zcl] command not found (command_identifier = 0x{:02x})".format(command_identifier))
-'''

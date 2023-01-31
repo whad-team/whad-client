@@ -23,6 +23,7 @@ class ZigbeeDeviceObjects(ApplicationObject):
             "zdo_node_desc_req": ZDODeviceAndServiceDiscovery.ZDONodeDescReq(self.device_and_service_discovery),
             "zdo_node_desc_rsp": ZDODeviceAndServiceDiscovery.ZDONodeDescRsp(self.device_and_service_discovery),
             "zdo_nwk_addr_req":ZDODeviceAndServiceDiscovery.ZDONWKAddrReq(self.device_and_service_discovery),
+            "zdo_nwk_addr_rsp":ZDODeviceAndServiceDiscovery.ZDONWKAddrRsp(self.device_and_service_discovery),
             "zdo_ieee_addr_req":ZDODeviceAndServiceDiscovery.ZDOIEEEAddrReq(self.device_and_service_discovery),
             "zdo_ieee_addr_rsp":ZDODeviceAndServiceDiscovery.ZDOIEEEAddrRsp(self.device_and_service_discovery),
             "zdo_active_ep_req":ZDODeviceAndServiceDiscovery.ZDOActiveEPReq(self.device_and_service_discovery),
@@ -46,6 +47,7 @@ class ZigbeeDeviceObjects(ApplicationObject):
             device_version=0,
             input_clusters=[
                             self.clusters["zdo_node_desc_req"],
+                            self.clusters["zdo_nwk_addr_rsp"],
                             self.clusters["zdo_ieee_addr_rsp"],
                             self.clusters["zdo_node_desc_rsp"],
                             self.clusters["zdo_active_ep_rsp"],

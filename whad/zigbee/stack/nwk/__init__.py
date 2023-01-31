@@ -1,6 +1,6 @@
 from scapy.layers.zigbee import ZigBeeBeacon, ZigbeeNWKStub, ZigbeeNWK, \
     ZigbeeSecurityHeader, ZigbeeNWKCommandPayload, ZigbeeAppDataPayload, \
-    ZigbeeAppDataPayloadStub
+    ZigbeeAppDataPayloadStub, LinkStatusEntry
 from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster
 from scapy.fields import FlagValueIter
 from whad.zigbee.crypto import NetworkLayerCryptoManager

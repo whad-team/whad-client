@@ -18,6 +18,15 @@ class ApplicationObject:
     def start(self):
         pass
 
+    def add_input_cluster(self, cluster):
+        self.input_clusters.append(cluster)
+        cluster.application = self
+
+    def add_output_cluster(self, cluster):
+        self.output_clusters.append(cluster)
+        cluster.application = self
+
+
     def send_data(self, asdu, destination_address_mode, destination_address, destination_endpoint, alias_address=None, alias_sequence_number=0, radius=30, security_enabled_transmission=False, use_network_key=False, acknowledged_transmission=False, fragmentation_permitted=False, include_extended_nonce=False, cluster_id=None):
         return self.manager.send_data(
             asdu,

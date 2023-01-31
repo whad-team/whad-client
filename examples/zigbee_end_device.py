@@ -5,7 +5,6 @@ from whad.device import WhadDevice
 from whad.zigbee.crypto import NetworkLayerCryptoManager
 from whad.exceptions import WhadDeviceNotFound
 from whad.zigbee.stack.apl.application import ApplicationObject
-from whad.zigbee.stack.apl.zcl.clusters import ZCLOnOff#, ZCLTouchLink
 from time import time,sleep
 from whad.common.monitors import PcapWriterMonitor
 from scapy.compat import raw
@@ -15,7 +14,7 @@ import sys
 
 import logging
 logging.basicConfig(level=logging.WARNING)
-logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
+#logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
 #logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
 #logging.getLogger('whad.zigbee.stack.aps').setLevel(logging.INFO)
 logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
@@ -33,25 +32,32 @@ if __name__ == '__main__':
             endDevice = EndDevice(dev)
             endDevice.start()
             selected_network = None
-            '''
+
+            print("[i] Discovering networks.")
             for network in endDevice.discover_networks():
+                print("[i] Network detected: ", network)
                 if network.extended_pan_id == 0xf4ce3673877b2d89:
                     selected_network = network
-                    break
-            '''
-            # TODO: find a way to discover routers
-            selected_network = endDevice.join(0xf4ce3673877b2d89)
-            print(selected_network.network_key)
-            print(selected_network.devices)
-            devices = selected_network.discover()
-            for device in selected_network.devices:
-                if isinstance(device, Router):
+
+            print("[i] Joining network: ", selected_network)
+            selected_network.join()
+            try:
+                print("[i] Network key:", selected_network.network_key)
+
+                devices = selected_network.discover()
+                for device in devices:
+                    print("[i] New device discovered:", device)
+
+                for device in selected_network.devices:
                     for endpoint in device.endpoints:
                         if endpoint.profile_id == 0x0104 and 6 in endpoint.input_clusters:
                             onoff = endpoint.attach_to_input_cluster(6)
                             while True:
-                                onoff.toggle()
                                 input()
+                                print("[i] lightbulb toggled")
+                                onoff.toggle()
+            except KeyboardInterrupt:
+                selected_network.leave()
             #discover()
             #print(selected_network.devices)
 

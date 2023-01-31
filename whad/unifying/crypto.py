@@ -51,6 +51,7 @@ class LogitechUnifyingCryptoManager:
         decrypted_packet = copy(packet)
         decrypted_packet.hid_data = result[:7]
         decrypted_packet.unknown = result[7]
+        decrypted_packet.aes_counter = counter
         return decrypted_packet
 
     def encrypt(self, packet):
@@ -74,6 +75,7 @@ class LogitechUnifyingCryptoManager:
         encrypted_packet = copy(packet)
         encrypted_packet.hid_data = result[:7]
         encrypted_packet.unknown = result[7]
+        encrypted_packet.aes_counter = counter
         return encrypted_packet
 
 class LogitechUnifyingKeyDerivation:

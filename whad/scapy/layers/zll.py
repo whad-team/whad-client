@@ -436,6 +436,12 @@ class ZCLGeneralDiscoverAttributesResponse(Packet):
         PacketListField("attribute_records", [], ZCLDiscoverAttributesRecord),
     ]
 
+class ZCLGeneralDefaultResponse(Packet):
+    name = "General Domain: Command Frame Payload: default_response"
+    fields_desc = [
+        ByteField("response_to_command", None), 
+        ByteEnumField("status", 0, _zcl_enumerated_status_values),
+    ]
 
 bind_layers(ZigbeeClusterLibrary, ZCLGeneralWriteAttributesUndivided, zcl_frametype=0x00, command_identifier=0x03)
 bind_layers(ZigbeeClusterLibrary, ZCLGeneralWriteAttributesNoResponse, zcl_frametype=0x00, command_identifier=0x05)
@@ -443,6 +449,7 @@ bind_layers(ZigbeeClusterLibrary, ZCLGeneralReadReportingConfiguration, zcl_fram
 bind_layers(ZigbeeClusterLibrary, ZCLGeneralReadReportingConfigurationResponse, zcl_frametype=0x00, command_identifier=0x09)
 bind_layers(ZigbeeClusterLibrary, ZCLGeneralDiscoverAttributes, zcl_frametype=0x00, command_identifier=0x0c)
 bind_layers(ZigbeeClusterLibrary, ZCLGeneralDiscoverAttributesResponse, zcl_frametype=0x00, command_identifier=0x0d)
+bind_layers(ZigbeeClusterLibrary, ZCLGeneralDefaultResponse, zcl_frametype=0x00, command_identifier=0x0b)
 
 
 bind_layers( ZigbeeZLLCommissioningCluster, ZLLScanRequest,

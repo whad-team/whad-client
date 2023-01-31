@@ -1,7 +1,7 @@
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteField, XByteField, X3BytesField, IntField, \
     StrFixedLenField, ShortField, ByteEnumField, XShortField, XShortEnumField, \
-    FieldLenField, StrLenField, StrField
+    FieldLenField, StrLenField, StrField, SignedByteField
 from struct import pack
 
 from whad.scapy.layers.esb import ESB_Payload_Hdr, SBAddressField, \
@@ -25,9 +25,6 @@ class Logitech_Unifying_Hdr(Packet):
             return s
         return  s[:2] + s[currentByte:currentByte+1] + s[2:currentByte] + s[currentByte+1:]
 
-    def post_dissect(self,s):
-        self.checksum = None
-        return s
     def post_build(self,p,pay):
         if self.checksum is None:
             cksum = 0xFF
@@ -43,10 +40,7 @@ class Logitech_Wake_Up(Packet):
     name = "Logitech Wake Up Payload"
     fields_desc = [
         XByteField("dev_index",0x00),
-        ByteField("unknown1",  0x00),
-        ByteField("unknown2",  0x00),
-        X3BytesField("unknown3",  "\x01\x01\x01"),
-        ByteField("unused", 13)
+        StrField("unknown2", b"")
     ]
 
 
@@ -92,8 +86,8 @@ class Logitech_Mouse_Payload(Packet):
         XByteField("button_mask",0x00),
         ByteField("unused",0x00),
         StrFixedLenField("movement","",length=3),
-        ByteField("wheel_y",0x00),
-        ByteField("wheel_x",0x00)
+        SignedByteField("wheel_y",0x00),
+        SignedByteField("wheel_x",0x00)
     ]
 
 class Logitech_Pairing_Request_Header(Packet):

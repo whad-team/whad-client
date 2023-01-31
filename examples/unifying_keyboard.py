@@ -1,4 +1,4 @@
-from whad.unifying import Keylogger, Mouselogger, Mouse
+from whad.unifying import Keyboard
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from whad.scapy.layers.esb import *
@@ -18,15 +18,30 @@ if __name__ == '__main__':
         try:
             dev = WhadDevice.create(interface)
 
-            connector = Mouse(dev)
-            #connector.attach_callback(show, on_reception=True, on_transmission=False)
+            connector = Keyboard(dev)
             connector.start()
+            #connector.attach_callback(show, on_reception=True, on_transmission=False)
             connector.channel = 5
-            connector.address = "ca:e9:06:ec:a4"#"9b:0a:90:42:93"
+            connector.address = "ca:e9:06:ec:a4"#"9b:0a:90:42:96"
+
+            #connector.key = bytes.fromhex("08f59b42d06fd3bdc588cd4d1c244018")
+            #connector.aes_counter = 0
+
             connector.synchronize()
 
             while True:
-                print(connector.move(-10, 0))
+                time.sleep(1)
+                connector.volume_up()
+                time.sleep(1)
+                connector.volume_down()
+                time.sleep(1)
+                connector.volume_toggle()
+                time.sleep(1)
+                connector.volume_toggle()
+                time.sleep(1)
+                connector.send_text("le petit bonhomme en mousse qui s'échappe et puis qui saute le plongeoir")
+                time.sleep(1)
+                connector.send_key("ENTER")
 
         except (KeyboardInterrupt, SystemExit):
             dev.close()

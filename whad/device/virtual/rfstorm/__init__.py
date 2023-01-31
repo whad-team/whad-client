@@ -80,6 +80,7 @@ class RFStormDevice(VirtualDevice):
         self.__opened = False
         self.__channel = 0
         self.__address = b"\xFF\xFF\xFF\xFF\xFF"
+        self.__ptx = False
         self.__scanning = False
         self.__acking = False
         self.__ack_payload = None
@@ -88,6 +89,7 @@ class RFStormDevice(VirtualDevice):
         self.__domain = RFStormDomains.RFSTORM_RAW_ESB
         self.__index, self.__rfstorm = device
         self.__last_packet_timestamp = 0
+        self.__lock = Lock()
         super().__init__()
 
     def reset(self):
@@ -159,10 +161,13 @@ class RFStormDevice(VirtualDevice):
     def _rfstorm_send_command(self, command, data=b"", timeout=200, no_response=False):
         data = [command] + list(data)
         try:
+            self.__lock.acquire()
             self.__rfstorm.write(RFStormEndPoints.RFSTORM_COMMAND_ENDPOINT, data, timeout=timeout)
         except USBTimeoutError:
+            self.__lock.release()
             return False
         response = self._rfstorm_read_response()
+        self.__lock.release()
         #print(">", response, command)
         if not no_response:
             return response
@@ -247,26 +252,30 @@ class RFStormDevice(VirtualDevice):
                             if self._rfstorm_transmit_payload(b"\x0f\x0f\x0f\x0f",1,1):
                                 self.__last_packet_timestamp = time()
                                 self.__channel = i
+                                self._send_whad_pdu(b"", address=self.__address)
                                 break
-            try:
-                data = self._rfstorm_read_packet()
-            except USBTimeoutError:
-                data = b""
 
-            if data is not None and isinstance(data, bytes) and len(data) >= 1 and data != b"\xFF":
-                if self.__acking:
-                    if self.__ack_payload is not None:
-                        self._rfstorm_transmit_ack_payload(self.__ack_payload)
-                        self.__ack_payload = None
-                    else:
-                        self._rfstorm_transmit_ack_payload(b"")
-                self.__last_packet_timestamp = time()
-                if self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
-                    if len(data[:5]) >= 3:
-                        self._send_whad_pdu(data[5:], data[:5])
-                elif self.__internal_state == RFStormInternalStates.SNIFFING:
-                    self._send_whad_pdu(data[1:], self.__address)
+            if not self.__ptx:
+                try:
+                    data = self._rfstorm_read_packet()
+                except USBTimeoutError:
+                    data = b""
 
+                if data is not None and isinstance(data, bytes) and len(data) >= 1 and data != b"\xFF":
+                    if self.__acking:
+                        if self.__ack_payload is not None:
+                            self._rfstorm_transmit_ack_payload(self.__ack_payload)
+                            self.__ack_payload = None
+                        else:
+                            self._rfstorm_transmit_ack_payload(b"")
+                    self.__last_packet_timestamp = time()
+                    if self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
+                        if len(data[:5]) >= 3:
+                            self._send_whad_pdu(data[5:], data[:5])
+                    elif self.__internal_state == RFStormInternalStates.SNIFFING:
+                        self._send_whad_pdu(data[1:], self.__address)
+            else:
+                sleep(0.1)
 
 
     # Virtual device whad message builder
@@ -299,12 +308,17 @@ class RFStormDevice(VirtualDevice):
     def _on_whad_send(self, message):
         channel = message.channel if message.channel != 0xFF else self.__channel
         pdu = message.pdu
+        retransmission_count = message.retransmission_count
         if self.__acking:
             self.__ack_payload = pdu
         else:
-            ack = self._rfstorm_transmit_payload(pdu, 1, 1)
-            if self.__check_ack and ack:
-                self._send_whad_pdu(b"", address=self.__address)
+            ack = self._rfstorm_transmit_payload(pdu, retransmits=retransmission_count)
+            if self.__check_ack:
+                if ack:
+                    self._send_whad_pdu(b"", address=self.__address)
+                    self._send_whad_command_result(ResultCode.SUCCESS)
+                else:
+                    self._send_whad_command_result(ResultCode.SUCCESS)
 
         self._send_whad_command_result(ResultCode.SUCCESS)
 
@@ -317,7 +331,7 @@ class RFStormDevice(VirtualDevice):
         self._on_whad_send(message)
 
     def _on_whad_set_node_addr(self, message):
-        self.__address = message.address[::-1]
+        self.__address = message.address
         self._send_whad_command_result(ResultCode.SUCCESS)
 
     def _on_whad_esb_set_node_addr(self, message):
@@ -332,6 +346,7 @@ class RFStormDevice(VirtualDevice):
         self.__internal_state = RFStormInternalStates.SNIFFING
         self.__acking = False
         self.__check_ack = True
+        self.__ptx = True
         self.__channel = message.channel
         self._send_whad_command_result(ResultCode.SUCCESS)
 
@@ -351,6 +366,7 @@ class RFStormDevice(VirtualDevice):
         self.__internal_state = RFStormInternalStates.SNIFFING
         self.__acking = True
         self.__check_ack = False
+        self.__ptx = False
         self.__channel = message.channel
         self._send_whad_command_result(ResultCode.SUCCESS)
 
@@ -366,7 +382,7 @@ class RFStormDevice(VirtualDevice):
         channel = message.channel
         show_acknowledgements = message.show_acknowledgements
         address = message.address
-
+        self.__ptx = False
         self.__channel = channel
 
         self.__acking = False

@@ -1,11 +1,11 @@
 from whad.unifying.hid.exceptions import InvalidHIDData
-from whad.common.converters.hid import HIDConverter
+from whad.common.converters.hid import HIDConverter, HIDLocaleNotFound, HIDCodeNotFound
 from whad.helpers import bytes_to_bits
 from struct import pack
 
 class LogitechUnifyingKeystrokeConverter(HIDConverter):
     @classmethod
-    def get_key_from_hid_data(cls, hid_data):
+    def get_key_from_hid_data(cls, hid_data, locale="fr"):
 
         if not isinstance(hid_data, bytes):
             raise InvalidHIDData(hid_data)
@@ -15,11 +15,11 @@ class LogitechUnifyingKeystrokeConverter(HIDConverter):
 
         modifiers = hid_data[0]
         hid_code = hid_data[1]
+        return super().get_key_from_hid_code(hid_code, modifiers, locale=locale)
 
-        return super().get_key_from_hid_code(hid_code, modifiers)
-
-    def get_hid_data_from_key(self, key, ctrl=False, alt=False, shift=False, gui=False):
-        (hid_code, modifiers) = super().get_hid_code_from_key(key, ctrl=ctrl, alt=alt, shift=shift, gui=gui)
+    @classmethod
+    def get_hid_data_from_key(cls, key, ctrl=False, alt=False, shift=False, gui=False, locale="fr"):
+        (hid_code, modifiers) = super().get_hid_code_from_key(key, ctrl=ctrl, alt=alt, shift=shift, gui=gui, locale=locale)
 
         hid_data = pack("B", modifiers) + pack("B", hid_code) + b"\x00"*5
 

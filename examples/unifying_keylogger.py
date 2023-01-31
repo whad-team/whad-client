@@ -1,13 +1,10 @@
-from whad.unifying import Keylogger, Mouselogger, Mouse
+from whad.unifying import Keylogger, Mouselogger
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
-from whad.scapy.layers.esb import *
-from whad.scapy.layers.unifying import *
-from scapy.compat import raw
 import sys,time
 
 def show(pkt):
-    print(pkt.metadata, repr(pkt))
+    print(repr(pkt))
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -18,15 +15,19 @@ if __name__ == '__main__':
         try:
             dev = WhadDevice.create(interface)
 
-            connector = Mouse(dev)
-            #connector.attach_callback(show, on_reception=True, on_transmission=False)
-            connector.start()
-            connector.channel = 5
-            connector.address = "ca:e9:06:ec:a4"#"9b:0a:90:42:93"
-            connector.synchronize()
+            connector = Mouselogger(dev)
+            connector.address = "ca:e9:06:ec:a4"#"9b:0a:90:42:96"
+            connector.scanning = True
+            connector.decrypt = True
 
-            while True:
-                print(connector.move(-10, 0))
+            #connector.add_key(bytes.fromhex("08f59b42d06fd3bdc588cd4d1c244018"))
+            connector.start()
+            out = ""
+            for i in connector.sniff():
+                print(i)
+                #key_stream():
+                #out += i
+                #print(out)
 
         except (KeyboardInterrupt, SystemExit):
             dev.close()
