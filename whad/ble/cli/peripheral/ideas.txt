@@ -1,0 +1,26 @@
+Ideas regarging `ble-periph`
+============================
+
+Usage:
+
+$ ble-periph -i <interface> [profile json]
+
+Editing services and characteristics
+
+* service add UUID
+* service remove UUID
+* service list
+* char add <service UUID> <char UUID> permissions
+* char remove <service UUID> <char UUID>
+
+Editing advertising records
+
+* ad add <record type> <record param>
+* ad list
+
+While emulating a device, allow characteristic read/write
+
+* write/writecmd <uuid|handle> set <value|hex>
+* read <uuid|handle>
+* disconnect
+
