@@ -1,7 +1,7 @@
 from whad.ble.stack.att.constants import BleAttSecurityMode
 from whad.ble.utils.validators import InvalidUUIDException
 from struct import pack, unpack
-from binascii import hexlify, unhexlify
+from binascii import hexlify, unhexlify, Error as BinasciiError
 
 def get_att_security_mode_from_mode_and_level(mode, level):
     """
@@ -32,7 +32,6 @@ def get_att_security_mode_from_mode_and_level(mode, level):
 
     return False
 
-
 class UUID:
     TYPE_16 = 1
     TYPE_128 = 2
@@ -42,49 +41,54 @@ class UUID:
     type = None
 
     def __init__(self, uuid):
-        if isinstance(uuid, UUID):
-            self.uuid = uuid.uuid
-            self.packed = uuid.packed
-            self.type = uuid.type
+        try:
+            uuid = uuid.upper()
+            if isinstance(uuid, UUID):
+                self.uuid = uuid.uuid
+                self.packed = uuid.packed
+                self.type = uuid.type
 
-        # integer
-        elif isinstance(uuid, int):
-            if 0 <= uuid <= 65536:
-                self.uuid = '%04X' % uuid
-                self.packed = pack('<h', uuid)
-                self.type = UUID.TYPE_16
-            elif 0 <= uuid <= 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:
-                self.uuid = '%032X' % uuid
-                # modified solution from http://www.codegur.site/6877096/how-to-pack-a-uuid-into-a-struct-in-python
-                self.packed = pack('<QQ', uuid & 0xFFFFFFFFFFFFFFFF, (uuid >> 64) & 0xFFFFFFFFFFFFFFFF)
-                self.type = UUID.TYPE_128
+            # integer
+            elif isinstance(uuid, int):
+                if 0 <= uuid <= 65536:
+                    self.uuid = '%04X' % uuid
+                    self.packed = pack('<h', uuid)
+                    self.type = UUID.TYPE_16
+                elif 0 <= uuid <= 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:
+                    self.uuid = '%032X' % uuid
+                    # modified solution from http://www.codegur.site/6877096/how-to-pack-a-uuid-into-a-struct-in-python
+                    self.packed = pack('<QQ', uuid & 0xFFFFFFFFFFFFFFFF, (uuid >> 64) & 0xFFFFFFFFFFFFFFFF)
+                    self.type = UUID.TYPE_128
 
-        elif len(uuid) == 4:
-            self.uuid = uuid
-            self.packed = unhexlify(uuid)[::-1]
-            self.type = UUID.TYPE_16
-        elif len(uuid) == 36:
-            temp = uuid.translate(None, "-")
-
-            if len(temp) == 32:
+            elif len(uuid) == 4:
                 self.uuid = uuid
-                self.packed = unhexlify(temp)[::-1]
+                self.packed = unhexlify(uuid)[::-1]
+                self.type = UUID.TYPE_16
+            elif len(uuid) == 36:
+                temp = uuid.translate(None, "-")
+
+                if len(temp) == 32:
+                    self.uuid = uuid
+                    self.packed = unhexlify(temp)[::-1]
+                    self.type = UUID.TYPE_128
+            elif len(uuid) == 32 and "-" not in uuid:
+                self.uuid = '-'.join((uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]))
+                self.packed = unhexlify(uuid)[::-1]
                 self.type = UUID.TYPE_128
-        elif len(uuid) == 32 and "-" not in uuid:
-            self.uuid = '-'.join((uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]))
-            self.packed = unhexlify(uuid)[::-1]
-            self.type = UUID.TYPE_128
-        # binary
-        elif len(uuid) == 2:
-            self.uuid = '%04X' % unpack('<h', uuid)[0]
-            self.packed = uuid
-            self.type = UUID.TYPE_16
-        elif len(uuid) == 16:
-            r = uuid[::-1]
-            self.uuid = b'-'.join(map(lambda x: hexlify(x), (r[0:4], r[4:6], r[6:8], r[8:10], r[10:])))
-            self.uuid = self.uuid.decode('utf-8')
-            self.packed = uuid
-            self.type = UUID.TYPE_128
+            # binary
+            elif len(uuid) == 2:
+                self.uuid = '%04X' % unpack('<h', uuid)[0]
+                self.packed = uuid
+                self.type = UUID.TYPE_16
+            elif len(uuid) == 16:
+                r = uuid[::-1]
+                self.uuid = b'-'.join(map(lambda x: hexlify(x), (r[0:4], r[4:6], r[6:8], r[8:10], r[10:])))
+                self.uuid = self.uuid.decode('utf-8')
+                self.packed = uuid
+                self.type = UUID.TYPE_128
+
+        except BinasciiError as error:
+            self.uuid = None
 
         if self.uuid is None:
             raise InvalidUUIDException(uuid)
