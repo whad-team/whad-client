@@ -277,7 +277,7 @@ class BleCloneApp(CommandLineApp):
                         profile=device_profile,
                         adv_data=AdvDataFieldList.from_bytes(device_adv_data),
                         scan_data=AdvDataFieldList.from_bytes(device_scan_rsp),
-                        bd_address=profile['devinfo']['bd_addr']
+                        #bd_address=profile['devinfo']['bd_addr']
                     )
                     periph.start()
                     print('Emulation of device %s is active, press any key to stop...' % (

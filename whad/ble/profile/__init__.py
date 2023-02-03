@@ -496,6 +496,7 @@ class GenericProfile(object):
                     # Add our characteristic object to the corresponding service
                     setattr(service_obj, charac.name, charac_obj)
                     service_obj.add_characteristic(charac_obj)
+                    self.register_attribute(charac_obj)
 
                 self.add_service(service_obj)
 
