@@ -276,6 +276,11 @@ class InteractiveShell(object):
             if varname in self.__env:
                 del self.__env[varname]
 
+    def success(self, message):
+        """Display a success message in green (if color is enabled)
+        """
+        print_formatted_text(HTML('<aaa fg="#027923"><b>%s</b></aaa>' % message))
+
     def warning(self, message):
         """Display a warning message in orange (if color is enabled)
         """
