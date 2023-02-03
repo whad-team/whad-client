@@ -6,7 +6,8 @@ from whad.protocol.ble.ble_pb2 import BleDirection, SetBdAddress, ScanMode, Cent
 from whad.protocol.whad_pb2 import Message
 from whad import WhadDomain
 from whad.protocol.generic_pb2 import ResultCode
-from scapy.layers.bluetooth import BluetoothUserSocket, BluetoothSocketError, \
+from whad.scapy.layers.bluetooth import BluetoothUserSocketFixed
+from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Hdr, HCI_Command_Hdr, HCI_Cmd_Reset, HCI_Cmd_Set_Event_Filter, \
     HCI_Cmd_Connect_Accept_Timeout, HCI_Cmd_Set_Event_Mask, HCI_Cmd_LE_Host_Supported, \
     HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
@@ -27,19 +28,31 @@ from time import sleep
 from queue import Queue
 from struct import unpack
 
+import logging
+logger = logging.getLogger(__name__)
+
 def get_hci(index):
     '''
     Returns an HCI socket based on adapter index.
     '''
     try:
-        socket = BluetoothUserSocket(index)
+        logging.debug('Creating bluetooth socket ...')
+        socket = BluetoothUserSocketFixed(index)
+        logging.debug('Bluetooth socket successfully created.')
         return socket
     except BluetoothSocketError as err:
+        logger.error(err)
+        logging.debug('An error occured while creating bluetooth socket')
         try:
+            logging.debug('Shutting down HCI interface #%d' % index)
             HCIConfig.down(index)
-            socket = BluetoothUserSocket(index)
+            logging.debug('HCI interface %d shut down, creating Bluetooth socket ...' % index)
+            socket = BluetoothUserSocketFixed(index)
+            logging.debug('Bluetooth socket successfully created.')
             return socket
         except BluetoothSocketError as err:
+            logger.error(err)
+            logging.error('Cannot create Bluetooth socket !')
             return None
 
 
@@ -93,6 +106,7 @@ class HCIDevice(VirtualDevice):
         if not self.__opened:
             self.__socket = get_hci(self.__index)
             if self.__socket is None:
+                logger.error('Whad device is not ready.')
                 raise WhadDeviceNotReady()
             self.__opened = True
 
@@ -105,12 +119,18 @@ class HCIDevice(VirtualDevice):
         """
         Close current device.
         """
+        logger.debug('Reset bluetooth interface ...')
+        self._reset()
+
         # Ask parent class to stop I/O thread
+        logger.debug('Stopping background IO threads ...')
         super().close()
 
         # Close underlying device.
         if self.__socket is not None:
+            logger.debug('Closing Bluetooth socket ...')
             self.__socket.close()
+            del self.__socket
         self.__opened = False
 
 
@@ -147,7 +167,7 @@ class HCIDevice(VirtualDevice):
                             self._send_whad_message(message)
 
         except (BrokenPipeError, OSError):
-            print("Error, waiting...")
+            logger.error("Error, waiting...")
             sleep(1)
 
     def _wait_response(self, timeout=None):
@@ -315,7 +335,7 @@ class HCIDevice(VirtualDevice):
         if bd_address_type == BleAddrType.PUBLIC:
             _, self._manufacturer = self._read_local_version_information()
             if self._manufacturer in ADDRESS_MODIFICATION_VENDORS:
-                print("[i] Address modification supported !")
+                logger.info("[i] Address modification supported !")
                 if self._manufacturer == b'Qualcomm Technologies International, Ltd. (QTIL)':
                     # Keep in cache existing devices
                     existing_devices = devices = HCIConfig.list()
@@ -366,7 +386,7 @@ class HCIDevice(VirtualDevice):
                 return self._bd_address == bd_address
 
             else:
-                print("[i] Address modification not supported.")
+                logger.error("[i] Address modification not supported.")
                 return False
         else:
             self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
@@ -429,6 +449,7 @@ class HCIDevice(VirtualDevice):
         if self._advertising and enable:
             return True
         else:
+            logger.debug('Enable advertising: %s' % enable)
             response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))
             success = response.status == 0x00
             if success:
@@ -440,9 +461,12 @@ class HCIDevice(VirtualDevice):
             success = True
             if len(message.scan_data) > 0:
                 success = success and self._set_advertising_data(message.scan_data)
+                print('set advertising data: %s' % success)
             if len(message.scanrsp_data) > 0:
                 success = success and self._set_scan_response_data(message.scanrsp_data)
+                print('set scan resp data: %s' % success)
             success = success and self._set_advertising_mode(True)
+            print('set advertising mode: %s' % success)
             if success:
                 self.__internal_state = HCIInternalState.PERIPHERAL
                 self._send_whad_command_result(ResultCode.SUCCESS)
@@ -484,6 +508,7 @@ class HCIDevice(VirtualDevice):
         self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_ble_start(self, message):
+        logger.info('whad internal state: %d' % self.__internal_state)
         if self.__internal_state == HCIInternalState.SCANNING:
             self._set_scan_mode(True)
             self._send_whad_command_result(ResultCode.SUCCESS)
@@ -497,6 +522,10 @@ class HCIDevice(VirtualDevice):
             self._send_whad_command_result(ResultCode.SUCCESS)
         elif self.__internal_state == HCIInternalState.CENTRAL:
             self.__internal_state = HCIInternalState.NONE
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        elif self.__internal_state == HCIInternalState.PERIPHERAL:
+            # We are not advertising anymore
+            self._advertising = False
             self._send_whad_command_result(ResultCode.SUCCESS)
         else:
             self._send_whad_command_result(ResultCode.ERROR)
