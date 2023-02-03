@@ -3,7 +3,7 @@ Bluetooth LE Stack L2CAP manager
 """
 from struct import unpack, pack
 from scapy.layers.bluetooth import L2CAP_Hdr, ATT_Hdr, SM_Hdr, L2CAP_CmdHdr, \
-    L2CAP_Connection_Parameter_Update_Request, L2CAP_CmdRej
+    L2CAP_Connection_Parameter_Update_Request, L2CAP_Connection_Parameter_Update_Response
 from whad.ble.stack.att import BleATT
 from whad.ble.stack.smp import BleSMP
 
@@ -116,7 +116,7 @@ class BleL2CAP(object):
             
             # Reject this request
             self.__connection.send_l2cap_data(
-                L2CAP_Hdr()/L2CAP_CmdHdr(id=packet[L2CAP_CmdHdr].id)/L2CAP_CmdRej(0)
+                L2CAP_Hdr()/L2CAP_CmdHdr(id=packet[L2CAP_CmdHdr].id)/L2CAP_Connection_Parameter_Update_Response(move_result=1)
             )
 
     def send(self, data, channel='attribute'):
