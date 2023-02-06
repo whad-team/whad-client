@@ -99,11 +99,16 @@ class PeripheralCharacteristicValue:
     """
 
     def __init__(self, char_value, gatt):
+        self.__char_value = char_value
         self.__characteristic = PeripheralCharacteristic(
             char_value.characteristic,
             gatt
         )
         self.__gatt = gatt
+
+    @property
+    def handle(self):
+        return self.__char_value.handle
 
     @property
     def characteristic(self):

@@ -339,6 +339,7 @@ class GenericProfile(object):
         :param int start_handle: Start handle value to use (default: 1)
         """
         self.__attr_db = {}
+        self.__services = []
         self.__service_by_characteristic_handle = {}
 
         self.__start_handle = start_handle
@@ -496,7 +497,6 @@ class GenericProfile(object):
                     # Add our characteristic object to the corresponding service
                     setattr(service_obj, charac.name, charac_obj)
                     service_obj.add_characteristic(charac_obj)
-                    self.register_attribute(charac_obj)
 
                 self.add_service(service_obj)
 
@@ -564,11 +564,20 @@ class GenericProfile(object):
         if isinstance(attribute, Attribute):
             self.__attr_db[attribute.handle] = attribute
 
-    def add_service(self, service):
+    def add_service(self, service, handles_only=False):
         """Add a service to the current device
 
         :param service: Service to add to the device
         """
+        if service.handle == 0:
+            # Service has not been fully configured, update its handle
+            # and the handles of its characteristics and descriptors.
+            service.handle = self.__alloc_handle()
+
+        # Append service to the list of our services
+        if not handles_only:
+            self.__services.append(service)
+
         # Register service as an attribute
         self.register_attribute(service)
 
@@ -578,10 +587,81 @@ class GenericProfile(object):
             self.register_attribute(charac)
             self.register_attribute(charac.value_attr)
 
+            # Register characteristic's descriptors
+            for desc in charac.descriptors():
+                self.register_attribute(desc)
+
             # Add characteristic in our lookup table
             self.__service_by_characteristic_handle[charac.handle] = service
-        
 
+        # Update our last handle based on service's end handle
+        self.__handle = service.end_handle
+
+
+    def remove_service(self, service, handles_only=False):
+        """Remove service
+
+        @param  service     Service object or UUID
+        """
+        if isinstance(service, BlePrimaryService) or isinstance(service, BleSecondaryService):
+            service_obj = self.get_service_by_UUID(service.uuid)
+        elif isinstance(service, UUID):
+            service_obj = self.get_service_by_UUID(service)
+        else:
+            service_obj = None
+        
+        # Process service object
+        if service_obj is not None:
+            # Remove service and all its characteristics from the attribute DB
+            for charac in service_obj.characteristics():
+                # Remove characteristic handle
+                if charac.handle in self.__attr_db:
+                    del self.__attr_db[charac.handle]
+
+                # Remove characteristic value handle
+                if charac.value_handle in self.__attr_db:
+                    del self.__attr_db[charac.value_handle]
+
+                # Remove all the attached descriptors
+                for desc in charac.descriptors():
+                    if desc.handle in self.__attr_db:
+                        del self.__attr_db[desc.handle]
+            
+            # Remove service object from attribute db
+            del self.__attr_db[service_obj.handle]
+
+            # Remove service from our list of services (if required)
+            if not handles_only:
+                self.__services.remove(service)
+        else:
+            # Not found, raise IndexError
+            raise IndexError()
+
+    def update_service(self, service):
+        """Update service in profile.
+
+        Keep service in place in the service list,
+        but update all the services declared after this one.
+        """
+        try:
+            service_index = self.__services.index(service)
+
+            # Remove all handles used by this service
+            self.remove_service(service, handles_only=True)
+
+            # Register all the handles back into our attribute DB
+            self.add_service(service, handles_only=True)
+
+            # Update all other services
+            handle = service.end_handle
+            for remaining_service in self.__services[service_index+1:]:
+                remaining_service.handle = handle + 1
+                self.update_service(remaining_service)
+                handle = remaining_service.end_handle
+            self.__handle = handle
+        except IndexError as notfound:
+            return False
+        
     def find_object_by_handle(self, handle):
         """Find an object by its handle value
 
@@ -660,6 +740,33 @@ class GenericProfile(object):
             object = self.__attr_db[handle]
             if isinstance(object, BlePrimaryService) or isinstance(object, BleSecondaryService):
                 yield object
+
+    def get_service_by_UUID(self, service_uuid: UUID):
+        """Get service by its UUID
+
+        @param  service_uuid    UUID    Service UUID to look for
+        @retval Service object if found, None otherwise
+        """
+        for handle in self.__attr_db:
+            object = self.__attr_db[handle]
+            if isinstance(object, BlePrimaryService) or isinstance(object, BleSecondaryService):
+                if object.uuid == service_uuid:
+                    return object
+        
+        # Not found
+        return None
+
+    def get_characteristic_by_UUID(self, charac_uuid: UUID):
+        """Get characteristic by its UUID
+
+        @param  charac_uuid     UUID    Characteristic UUID
+        @retval Characteristic object if found, None otherwise
+        """
+        for handle in self.__attr_db:
+            object = self.__attr_db[handle]
+            if isinstance(object, BleCharacteristic):
+                if object.uuid == charac_uuid:
+                    return object        
 
     def attr_by_type_uuid(self, uuid, start=1, end=0xFFFF):
         for handle in self.__attr_db:

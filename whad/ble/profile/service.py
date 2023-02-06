@@ -1,6 +1,8 @@
 """Bluetooth Low Energy Service class
 """
+from whad.ble.exceptions import InvalidHandleValueException
 from whad.ble.profile.attribute import Attribute, UUID
+from whad.ble.profile.characteristic import Characteristic
 from whad.ble.stack.gatt.helpers import get_uuid_alias
 
 class Service(Attribute):
@@ -9,11 +11,33 @@ class Service(Attribute):
         self.__service_uuid = uuid
         if handle > 0:
             self.__end_handle = end_handle if end_handle > 0 else handle
+        else:
+            self.__end_handle = 0
         self.__characteristics = []
 
     @property
     def uuid(self):
         return self.__service_uuid
+
+
+    @Attribute.handle.setter
+    def handle(self, new_handle):
+        """Overwrite `Attribute` handle setter.
+        """
+        if isinstance(new_handle, int):
+            # Update service handle
+            Attribute.handle.fset(self, new_handle)
+
+            # Update the underlying characteristics
+            char_handle = self.handle
+            for characteristic in self.__characteristics:
+                characteristic.handle = char_handle + 1
+                char_handle = characteristic.end_handle
+            
+            # Update service end_handle value
+            self.__end_handle = char_handle
+        else:
+            raise InvalidHandleValueException
 
     @property
     def end_handle(self):
@@ -42,11 +66,33 @@ class Service(Attribute):
     def add_characteristic(self, characteristic):
         """Add characteristic, update end handle
         """
-        if self.handle == 0:
-            self.handle = characteristic.handle
-        if characteristic.end_handle >= self.__end_handle:
-            self.__end_handle = characteristic.end_handle
+        # Add characteristic, update end handle
+        characteristic.handle = self.end_handle + 1
+        self.__end_handle = characteristic.end_handle
         self.__characteristics.append(characteristic)
+
+    def remove_characteristic(self, characteristic):
+        """Remove a specific characteristic
+        """
+        if isinstance(characteristic, UUID):
+            # Look for characteristic and remove it if found
+            for charac in self.__characteristics:
+                if charac.uuid == characteristic:
+                    self.__characteristics.remove(charac)
+                    break
+        elif isinstance(characteristic, Characteristic):
+            # Look for characteristic object
+            if characteristic in self.__characteristics:
+                self.__characteristics.remove(characteristic)
+        
+        # Update characteristic handles
+        char_handle = self.handle
+        for characteristic in self.__characteristics:
+            characteristic.handle = char_handle + 1
+            char_handle = characteristic.end_handle
+        
+        # Update service end_handle value
+        self.__end_handle = char_handle
 
     def characteristics(self):
         for charac in self.__characteristics:

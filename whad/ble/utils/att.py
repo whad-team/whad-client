@@ -42,7 +42,6 @@ class UUID:
 
     def __init__(self, uuid):
         try:
-            uuid = uuid.upper()
             if isinstance(uuid, UUID):
                 self.uuid = uuid.uuid
                 self.packed = uuid.packed
@@ -61,14 +60,14 @@ class UUID:
                     self.type = UUID.TYPE_128
 
             elif len(uuid) == 4:
-                self.uuid = uuid
+                self.uuid = uuid.upper()
                 self.packed = unhexlify(uuid)[::-1]
                 self.type = UUID.TYPE_16
             elif len(uuid) == 36:
                 temp = uuid.translate(None, "-")
 
                 if len(temp) == 32:
-                    self.uuid = uuid
+                    self.uuid = uuid.upper()
                     self.packed = unhexlify(temp)[::-1]
                     self.type = UUID.TYPE_128
             elif len(uuid) == 32 and "-" not in uuid:

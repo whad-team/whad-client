@@ -19,7 +19,7 @@ class CharacteristicProperties(object):
 class CharacteristicDescriptor(Attribute):
     """BLE Characteristic descriptor
     """
-    def __init__(self, characteristic, uuid, handle=None, value=b''):
+    def __init__(self, characteristic, uuid, handle=0, value=b''):
         super().__init__(uuid=uuid,handle=handle,value=value)
         self.__characteristic = characteristic
 
@@ -32,7 +32,7 @@ class ClientCharacteristicConfig(CharacteristicDescriptor):
     """Client Characteristic Configuration Descriptor
     """
 
-    def __init__(self, characteristic, handle=None, notify=False, indicate=False):
+    def __init__(self, characteristic, handle=0, notify=False, indicate=False):
         """Instanciate a Client Characteristic Configuration Descriptor
 
         :param bool notify: Set to True to get the corresponding characteristic notified on change
@@ -90,7 +90,7 @@ class Characteristic(Attribute):
     """BLE Characteristic
     """
 
-    def __init__(self, uuid, handle=None, end_handle=0, value=b'', properties=BleAttProperties.DEFAULT):
+    def __init__(self, uuid, handle=0, end_handle=0, value=b'', properties=BleAttProperties.DEFAULT):
         """Instanciate a BLE characteristic object
 
         :param uuid: 16-bit or 128-bit UUID
@@ -136,17 +136,25 @@ class Characteristic(Attribute):
     def set_indication_callback(self, callback):
         self.__indication_callback = callback
 
-    @property
-    def handle(self):
-        return self.__handle
-
-    @handle.setter
+    @Attribute.handle.setter
     def handle(self, new_handle):
         if isinstance(new_handle, int):
-            self.__handle = new_handle
-            self.__value_handle = self.__handle + 1
-            if self.__end_handle is None:
-                self.__end_handle = self.__value_handle
+            
+            # Set attribute handle
+            Attribute.handle.fset(self, new_handle)
+
+            self.__value.handle = self.handle + 1
+            self.__value_handle = self.handle + 1
+
+            handle = self.__value_handle
+
+            # Update descriptors handle
+            for descriptor in self.__descriptors:
+                handle += 1
+                descriptor.handle = handle
+
+            # Update end handle
+            self.__end_handle = handle
         else:
             raise InvalidHandleValueException
 
