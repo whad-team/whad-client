@@ -1,9 +1,44 @@
 """BLE Interactive shell
 """
-
+import json
+from binascii import unhexlify
 from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import command
 from whad.ble.cli.peripheral.shell import BlePeriphShell
+
+def check_profile(profile):
+    """Check profile validity.
+
+    :param dict p: Profile
+    :return bool: True if profile format is OK, False otherwise
+    """
+    # Make sure we have a 'devinfo' entry
+    if 'devinfo' not in profile:
+        return False
+
+    # Make sure we have a valid adv_data entry
+    if 'adv_data' not in profile['devinfo']:
+        return False
+    try:
+        unhexlify(profile['devinfo']['adv_data'])
+    except Exception as err:
+        return False
+
+    # Make sure we have a valid scan_rsp entry (if provided)
+    if 'scan_rsp' not in profile['devinfo']:
+        return False
+    if profile['devinfo']['scan_rsp'] is not None:
+        try:
+            unhexlify(profile['devinfo']['scan_rsp'])
+        except Exception as err:
+            return False
+
+    # Make sure we have a BD address
+    if 'bd_addr' not in profile['devinfo']:
+        return False
+
+    # OK
+    return True
 
 @command('interactive')
 def interactive_handler(app, command_args):
@@ -18,8 +53,16 @@ def interactive_handler(app, command_args):
     """
     # We need to have an interface specified
     if app.interface is not None:
+        # If a profile has been provided, load it
+        if app.args.profile is not None:
+            # Read profile
+            profile_json = open(app.args.profile,'rb').read()
+            profile = json.loads(profile_json)
+        else:
+            profile_json = None
+
         # Launch an interactive shell
-        myshell = BlePeriphShell(app.interface)
+        myshell = BlePeriphShell(app.interface, profile_json)
         myshell.run()
     else:
         app.error('You need to specify an interface with option --interface.')

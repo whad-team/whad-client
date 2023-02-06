@@ -14,7 +14,7 @@ from whad.ble import Peripheral, GenericProfile, AdvDataFieldList, \
     AdvCompleteLocalName, AdvShortenedLocalName, AdvFlagsField
 from whad.ble.profile.service import PrimaryService
 from whad.ble.profile.characteristic import Characteristic, CharacteristicProperties, \
-    ClientCharacteristicConfig
+    ClientCharacteristicConfig, CharacteristicValue
 from whad.ble.utils.att import UUID
 from whad.ble.stack.constants import BT_MANUFACTURERS
 from whad.ble.stack.gatt.constants import CHARACS_UUID, SERVICES_UUID
@@ -27,9 +27,6 @@ from whad.common.monitors import WiresharkMonitor
 
 from whad.cli.shell import InteractiveShell
 
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
 INTRO='''
 ble-periph, the WHAD Bluetooth Low Energy peripheral utility
 '''
@@ -40,6 +37,70 @@ ADRECORDS = {
 
 }
 
+class MonitoringProfile(GenericProfile):
+
+
+    def on_characteristic_read(self, service, characteristic, offset=0, length=0):
+        """Characteristic read hook.
+
+        This hook is called whenever a characteristic is about to be read by a GATT client.
+        If this method returns a byte array, this byte array will be sent back to the
+        GATT client. If this method returns None, then the read operation will return an
+        error (not allowed to read characteristic value).
+        
+
+        :param BlePrimaryService service: Service owning the characteristic
+        :param BleCharacteristic characteristic: Characteristic object
+        :param int offset: Read offset (default: 0)
+        :param int length: Max read length
+        :return: Value to return to the GATT client
+        """
+        print_formatted_text(HTML(
+            '<ansigreen>Reading</ansigreen> characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
+                characteristic.uuid,
+                service.uuid
+            )
+        ))
+        if len(characteristic.value) > 0:
+            print_formatted_text(HTML(' <i>%s</i>' % hexdump(characteristic.value, result='return')))
+        else:
+            print_formatted_text(HTML(' <i>Empty value</i>'))
+
+    def on_connect(self, conn_handle):
+        print_formatted_text(HTML('<ansired>New connection</ansired> handle:%d' % conn_handle))
+
+    def on_disconnect(self, conn_handle):
+        print_formatted_text(HTML('<ansired>Disconnection</ansired> handle:%d' % conn_handle))
+
+    def on_characteristic_written(self, service, characteristic, offset=0, value=b'', without_response=False):
+        """Characteristic written hook
+
+        This hook is called whenever a charactertistic has been written by a GATT
+        client.
+        """
+        print_formatted_text(HTML(
+            '<ansimagenta>Wrote</ansimagenta> to characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
+                characteristic.uuid,
+                service.uuid
+            )
+        ))
+        print_formatted_text(HTML(' <i>%s</i>' % hexdump(value, result='return')))
+
+        
+    def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
+        # Check if we have a hook to call
+        print_formatted_text(HTML('<ansicyan>Subscribed</ansicyan> to characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
+            characteristic.uuid,
+            service.uuid
+        )))
+
+    def on_characteristic_unsubscribed(self, service, characteristic):
+        print_formatted_text(HTML('<ansicyan>Unsubscribed</ansicyan> to characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
+            characteristic.uuid,
+            service.uuid
+        )))
+
+
 class BlePeriphShell(InteractiveShell):
     """Bluetooth Low Energy interactive shell
     """
@@ -48,7 +109,7 @@ class BlePeriphShell(InteractiveShell):
     MODE_SERVICE_EDIT = 1
     MODE_STARTED = 2
 
-    def __init__(self, interface: WhadDevice = None):
+    def __init__(self, interface: WhadDevice = None, dev_profile=None):
         super().__init__(HTML('<b>ble-periph></b> '))
 
         self.__current_mode = self.MODE_NORMAL
@@ -62,12 +123,11 @@ class BlePeriphShell(InteractiveShell):
         # If interface is None, pick the first matching our needs
         self.__interface = interface
 
-        # GATT services
-        self.__services = {}
-        self.__ordered_services = []
-
-        # GATT characteristics
-        self.__characteristics = {}
+        # Profile
+        if dev_profile is not None:
+            self.__profile = MonitoringProfile(from_json=dev_profile)
+        else:
+            self.__profile = MonitoringProfile()
 
         self.__selected_service = None
         self.__connector: WhadDeviceConnector = None
@@ -91,6 +151,9 @@ class BlePeriphShell(InteractiveShell):
                 self.set_prompt(HTML('<b>ble-periph></b> '), force)
             else:
                 self.set_prompt(HTML('<b>ble-periph|<ansicyan>%s</ansicyan>></b> ' % self.__central_bd), force)
+        elif self.__current_mode == self.MODE_STARTED:
+            self.set_prompt(HTML('<b>ble-periph<ansimagenta>[running]</ansimagenta>></b>'))
+
 
 
     def switch_role(self, new_role):
@@ -130,13 +193,14 @@ class BlePeriphShell(InteractiveShell):
     def has_service(self, uuid: str):
         """Check if a service is already registered
         """
-        return uuid in self.__services
+        return (self.__profile.get_service_by_UUID(UUID(uuid)) is not None)
 
     def get_service(self, uuid: str):
         """Return service characteristics
         """
-        if self.has_service(uuid):
-            return self.__services[uuid]
+        service_obj = self.__profile.get_service_by_UUID(UUID(uuid))
+        if service_obj is not None:
+            return service_obj
         else:
             raise IndexError
 
@@ -146,9 +210,9 @@ class BlePeriphShell(InteractiveShell):
         @param  str     uuid    Service UUID
         @retval bool    True if service has been successfully registered, False otherwise
         """
-        if not self.has_service(uuid):
-            self.__services[uuid] = []
-            self.__ordered_services.append(uuid)
+        service_obj = self.__profile.get_service_by_UUID(UUID(uuid))
+        if service_obj is None:
+            self.__profile.add_service(PrimaryService(uuid=UUID(uuid)))
             return True
 
         return False
@@ -156,9 +220,9 @@ class BlePeriphShell(InteractiveShell):
     def unregister_service(self, uuid: str):
         """Unregister a service
         """
-        if self.has_service(uuid):
-            del self.__services[uuid]
-            self.__ordered_services.remove(uuid)
+        service_obj = self.__profile.get_service_by_UUID(UUID(uuid))
+        if service_obj is not None:
+            self.__profile.remove_service(service_obj)
             return True
 
         # Fail
@@ -167,8 +231,8 @@ class BlePeriphShell(InteractiveShell):
     def enum_services(self):
         """Enumerate services
         """
-        for service_uuid in self.__ordered_services:
-            yield (service_uuid, self.__services[service_uuid])
+        for service in self.__profile.services():
+            yield (str(service.uuid), service)
 
     def select_service(self, uuid):
         """Select service and switch to edit mode.
@@ -177,10 +241,22 @@ class BlePeriphShell(InteractiveShell):
         self.__current_mode = self.MODE_SERVICE_EDIT
         self.update_prompt()
 
+    def complete_service(self):
+        """auto-completion for 'service' command
+        """
+        services = [str(s.uuid) for s in list(self.__profile.services())]
+        completions = {}
+        for action in ['add', 'edit', 'remove']:
+            completions[action] = {}
+            for service in services:
+                completions[action][service]={}
+        return completions
+
+
     def do_service(self, args):
         """Manage peripheral's GATT services
 
-        <ansicyan><b>services</b> [<i>ACTION</i> <i>[PARAMS, ...]</i>]</ansicyan>
+        <ansicyan><b>service</b> [<i>ACTION</i> <i>[PARAMS, ...]</i>]</ansicyan>
 
         This command manages the registered services, with the following <i>ACTION</i>s:
 
@@ -196,6 +272,13 @@ class BlePeriphShell(InteractiveShell):
 
         By default, this command lists the registered services.
         """
+        if self.__current_mode != self.MODE_NORMAL:
+            if self.__current_mode == self.MODE_SERVICE_EDIT:
+                self.error('Already editing services.')
+            else:
+                self.error('Cannot edit services while peripheral is running.')
+            return
+
         if len(args) > 0:
             action = args[0].lower()
             if action == 'add':
@@ -260,10 +343,14 @@ class BlePeriphShell(InteractiveShell):
             else:
                 self.error('Unknown action <i>%s</i>.' % action)
         else:
-            if len(self.__services) > 0:
-                for service_uuid in self.__ordered_services:
-                    serv_uuid = UUID(service_uuid)
-                    if serv_uuid.type == UUID.TYPE_16:
+            # Enumerate services and store them in a list
+            services = list(self.__profile.services())
+
+            if len(services) > 0:
+                for service in services:
+                    # Resolve service name if 16-bit UUID
+                    service_uuid = str(service.uuid)
+                    if service.uuid.type == UUID.TYPE_16:
                         uuid_val = int(service_uuid, 16)
                         if uuid_val in SERVICES_UUID:
                             service_name = SERVICES_UUID[uuid_val]
@@ -273,36 +360,78 @@ class BlePeriphShell(InteractiveShell):
                         service_name = None
 
                     if service_name is not None:
-                        print_formatted_text(HTML('<ansicyan><b>Service %s (%s)</b></ansicyan>') % (
-                            service_uuid,
-                            service_name
+                        print_formatted_text(HTML(
+                            '<ansicyan><b>Service %s</b> (%s)</ansicyan> (handles from %d to %d):' % (
+                                service.uuid,
+                                service_name,
+                                service.handle,
+                                service.end_handle,
+                            )
                         ))
                     else:
-                        print_formatted_text(HTML('<ansicyan><b>Service %s</b></ansicyan>') % service_uuid)
+                        print_formatted_text(HTML(
+                            '<ansicyan><b>Service %s</b></ansicyan> (handles from %d to %d):' % (
+                                service.uuid,
+                                service.handle,
+                                service.end_handle
+                            )
+                        ))
 
-                    service = self.get_service(service_uuid)
-                    if len(service) > 0:
-                        for charac in service:
-                            charac_uuid = UUID(charac['uuid'])
+                    characteristics = list(service.characteristics())
+                    if len(characteristics) > 0:
+                        for i, charac in enumerate(characteristics):
+
+                            char_chevron = '├' if i < (len(characteristics) - 1) else '└'
+                            handle_chevron = '│' if i < (len(characteristics) - 1) else ' '
+
+
+                            # Retrieve characteristic name if 16-bit UUID
+                            charac_uuid = charac.uuid
                             charac_name = None
                             if charac_uuid.type == UUID.TYPE_16:
                                 uuid_val = int(str(charac_uuid), 16)
                                 if uuid_val in CHARACS_UUID:
                                     charac_name = CHARACS_UUID[uuid_val]
 
+                            properties = charac.properties
+                            perms = []
+                            if properties & CharacteristicProperties.READ != 0:
+                                perms.append('read')
+                            if properties & CharacteristicProperties.WRITE != 0:
+                                perms.append('write')
+                            if properties & CharacteristicProperties.INDICATE != 0:
+                                perms.append('indicate')
+                            if properties & CharacteristicProperties.NOTIFY != 0:
+                                perms.append('notify')
 
                             if charac_name is not None:
-                                print_formatted_text(HTML(' %s (%s): %s' % (
-                                    charac['uuid'],
-                                    charac_name,
-                                    ','.join(['<b>%s</b>' % perm for perm in charac['perms']])
-                                )))
+                                print_formatted_text(HTML(
+                                    '%s─ <ansicyan><b>Characteristic %s</b> (%s)</ansicyan>' % (
+                                        char_chevron,
+                                        charac.uuid,
+                                        charac_name
+                                    )
+                                ))
                             else:
-                                print_formatted_text(HTML(' %s: %s)' % (
-                                    charac['uuid'],
-                                    ','.join(['<b>%s</b>' % perm for perm in charac['perms']])
+                                print_formatted_text(HTML('%s─ <ansicyan><b>Characteristic %s</b></ansicyan>' % (
+                                    char_chevron,
+                                    charac.uuid
                                 )))
+                            print_formatted_text(HTML('%s └─ handle:%d, value handle: %d, props: %s' % (
+                                handle_chevron,
+                                charac.handle,
+                                charac.value_handle,
+                                ','.join(perms)
+                            )))
 
+                            for desc in charac.descriptors():
+                                print_formatted_text(HTML('%s └─ <b>Descriptor %s</b> (handle: %d)' % (
+                                    handle_chevron,
+                                    desc.type_uuid,
+                                    desc.handle
+                                )))
+                    else:
+                        print_formatted_text(HTML(' <i>No characteristics defined</i>'))
             else:
                 self.error('No service registered yet.')
 
@@ -313,15 +442,13 @@ class BlePeriphShell(InteractiveShell):
     def has_service_char(self, service_uuid:str, char_uuid:str):
         """Check if a characteristic is already registered for a specific service
         """
-        if self.has_service(service_uuid):
-            # Loop in service characteristics
-            for char in self.get_service(service_uuid):
-                if char['uuid'] == char_uuid:
-                    # Characteristic found
-                    return True
-
-        # Not found
-        return False
+        service_obj = self.__profile.get_service_by_UUID(UUID(service_uuid))
+        if service_obj is not None:
+            charac = service_obj.get_characteristic(UUID(char_uuid))
+            return (charac is not None)
+        else:
+            # Not found
+            return False
 
 
     def register_char(self, service_uuid: str, char_uuid: str, perms: list):
@@ -334,16 +461,46 @@ class BlePeriphShell(InteractiveShell):
         """
         if not self.has_service_char(service_uuid, char_uuid):
             # Get service
-            service = self.get_service(service_uuid)
+            service_obj = self.get_service(service_uuid)
             
-            # Add a characteristic
-            service.append({
-                'uuid': char_uuid,
-                'perms': perms,
-                'value': b''
-            })
+            # Build charac properties
+            props = 0
+            if 'read' in perms:
+                props |= CharacteristicProperties.READ
+            if 'write' in perms:
+                props |= CharacteristicProperties.WRITE
+            if 'writecmd' in perms:
+                props |= CharacteristicProperties.WRITE_WITHOUT_RESPONSE
+            if 'notify' in perms:
+                props |= CharacteristicProperties.NOTIFY
+            if 'indicate' in perms:
+                props |= CharacteristicProperties.INDICATE
+
+            # Build characteristic object
+            charac_obj = Characteristic(
+                uuid=UUID(char_uuid),
+                properties=props,
+            )
+
+            if 'notify' in perms or 'indicate' in perms:
+                cccd = ClientCharacteristicConfig(
+                    characteristic=charac_obj,
+                    indicate=('indicate' in perms),
+                    notify=('notify' in perms) 
+                )
+
+                charac_obj.add_descriptor(cccd)
+
+                charac_obj.value = b''
+
+            # Add characteristic to service
+            service_obj.add_characteristic(charac_obj)
+
+            # Update service in profile
+            self.__profile.update_service(service_obj)
 
             # Success
+            self.success('Successfully added characteristic %s' % char_uuid)
             return True
         
         # Fail
@@ -353,17 +510,14 @@ class BlePeriphShell(InteractiveShell):
         """Remove characteristic from service
         """
         if self.has_service_char(service_uuid, char_uuid):
-            service = self.get_service(service_uuid)
-            char_obj = None
-            for char in service:
-                if char['uuid'] == char_uuid:
-                    char_obj = char
-                    break
-            if char_obj is not None:
-                service.remove(char_obj)
-
-            # Success
-            return True
+            # Get service
+            service_obj = self.get_service(service_uuid)
+            
+            charac = service_obj.get_characteristic(UUID(char_uuid))
+            if charac is not None:
+                service_obj.remove_characteristic(charac)
+                self.__profile.update_service(service_obj)
+                return True
         
         # Fail
         return False
@@ -386,6 +540,19 @@ class BlePeriphShell(InteractiveShell):
         return out_perms
 
 
+    def complete_char(self):
+        """Auto-complete char command
+        """
+        completions = {}
+        if self.__selected_service is not None:
+            service = self.__profile.get_service_by_UUID(UUID(self.__selected_service))
+            if service is not None:
+                chars = list(service.characteristics())
+                for action in ['add', 'remove']:
+                    completions[action] = {}
+                    for char in chars:
+                        completions[action][str(char.uuid)] = {}
+        return completions
 
     def do_char(self, args):
         """Manage peripheral's GATT characteristics
@@ -448,34 +615,50 @@ class BlePeriphShell(InteractiveShell):
                         ))
             else:
                 # List characteristics
-                if len(self.__services[self.__selected_service]) > 0:
-                    for charac in self.__services[self.__selected_service]:
-                        uuid = UUID(charac['uuid'])
-                        if uuid.type == UUID.TYPE_16:
-                            uuid_val = int(str(uuid), 16)
-                            if uuid_val in CHARACS_UUID:
-                                charac_name = CHARACS_UUID[uuid_val]
+                print_formatted_text(HTML(
+                    '<ansicyan>Characteristics for service %s:</ansicyan>' % (
+                        self.__selected_service
+                    )
+                ))
+                selected_service = self.__profile.get_service_by_UUID(UUID(self.__selected_service))
+                if selected_service is not None:
+                    characs = list(selected_service.characteristics())
+                    if len(characs) > 0:
+                        for charac in characs:
+                            uuid = charac.uuid
+                            if uuid.type == UUID.TYPE_16:
+                                uuid_val = int(str(uuid), 16)
+                                if uuid_val in CHARACS_UUID:
+                                    charac_name = CHARACS_UUID[uuid_val]
+                                else:
+                                    charac_name = None
                             else:
                                 charac_name = None
-                        else:
-                            charac_name = None
 
-                        if charac_name is not None:
-                            print_formatted_text(HTML(' %s (%s): %s' % (
-                                charac['uuid'],
-                                charac_name,
-                                ','.join(['<b>%s</b>' % perm for perm in charac['perms']])
-                            )))
+                            properties = charac.properties
+                            perms = []
+                            if properties & CharacteristicProperties.READ != 0:
+                                perms.append('read')
+                            if properties & CharacteristicProperties.WRITE != 0:
+                                perms.append('write')
+                            if properties & CharacteristicProperties.INDICATE != 0:
+                                perms.append('indicate')
+                            if properties & CharacteristicProperties.NOTIFY != 0:
+                                perms.append('notify')
 
-                        else:
-                            print_formatted_text(HTML(' %s: %s)' % (
-                                charac['uuid'],
-                                ','.join(['<b>%s</b>' % perm for perm in charac['perms']])
-                            )))
-                else:
-                    print_formatted_text(HTML(' No characteristic registered.'))
-        else:
-            self.error('No service selected for modification.')
+                            if charac_name is not None:
+                                print_formatted_text(HTML(' %s (%s): %s' % (
+                                    charac.uuid,
+                                    charac_name,
+                                    ','.join(['<b>%s</b>' % perm for perm in perms])
+                                )))
+                            else:
+                                print_formatted_text(HTML(' %s: %s)' % (
+                                    charac.uuid,
+                                    ','.join(['<b>%s</b>' % perm for perm in perms])
+                                )))
+                    else:
+                        print_formatted_text(HTML(' No characteristic registered.'))
 
 
     def char_set_value(self, handle_uuid, value):
@@ -498,17 +681,16 @@ class BlePeriphShell(InteractiveShell):
             if self.__current_mode == self.MODE_STARTED:
                 # Find characteristic handle
                 for service_uuid, service in self.enum_services():
-                    for charac in service:
-                        if charac['uuid'] == str(handle_uuid):
-                            charac_obj = self.__profile.find_object_by_handle(charac['handle'])
-                            charac_obj.value = value
-                            return
+                    charac_obj = service.get_characteristic(handle_uuid)
+                    if charac_obj is not None:
+                        charac_obj.value = value
+                        return
             else:
                 # Find characteristic handle
                 for service_uuid, service in self.enum_services():
-                    for charac in service:
-                        if charac['uuid'] == str(handle_uuid):
-                            charac['value'] = value
+                    charac_obj = service.get_characteristic(handle_uuid)
+                    if charac_obj is not None:
+                        charac_obj.value = value
 
     def perform_write(self, args, without_response=False):
         """Perform attribute/handle characteristic
@@ -598,7 +780,48 @@ class BlePeriphShell(InteractiveShell):
 
         """
         self.perform_write(args, without_response=False)
-        
+
+    def do_read(self, args):
+        """read a GATT attribute
+
+        <ansicyan><b>read</b> <i>[UUID | handle]</i></ansicyan>
+
+        Read an attribute identified by its handle, or read the value of a characteristic
+        identified by its UUID (if unique). 
+
+        Result is displayed as an hexadecimal dump with corresponding ASCII text:
+
+        > read 41
+         00000000: 74 68 69 73 20 69 73 20  61 20 74 65 73 74        this is a test
+        """
+        if len(args) >= 1:
+            try:
+                charac_uuid = UUID(args[0])
+                charac = self.__profile.get_characteristic_by_UUID(charac_uuid)
+                if charac is not None:
+                    print_formatted_text(HTML(' <i>%s</i>' % hexdump(charac.value, result='return')))
+                else:
+                    self.error('Unknown characteristic %s' % charac_uuid)
+            except InvalidUUIDException as no_uuid:
+                try:
+                    # Decode handle
+                    if args[0].lower().startswith('0x'):
+                        charac_handle = int(args[0], 16)
+                    else:
+                        charac_handle = int(args[0], 10)
+                    
+                    # Retrieve characteristic by handle
+                    charac = self.__profile.find_object_by_handle(charac_handle)
+                    if isinstance(charac, Characteristic):
+                        print_formatted_text(HTML(' <i>%s</i>' % hexdump(charac.value, result='return')))
+                    elif isinstance(charac, CharacteristicValue):
+                        print_formatted_text(HTML(' <i>%s</i>' % hexdump(charac.characteristic.value, result='return')))
+                    else:
+                        self.error('Unknown characteristic with handle %d' % charac_handle)
+                except ValueError as wrong_handle:
+                    self.error("Wrong UUID or handle: %s" % args[0])
+
+
     ##################################################
     # Peripheral emulation
     ##################################################    
@@ -610,55 +833,6 @@ class BlePeriphShell(InteractiveShell):
 
         Starts the peripheral with its configured services and characteristics.
         """
-        # Build our profile from registered services and characteristics
-        handle = 1
-        self.__profile = GenericProfile()
-        for service_uuid, service in self.enum_services():
-            service_obj = PrimaryService(uuid=UUID(service_uuid), handle=handle)
-            handle += 1
-            for charac in service:
-                # Build charac properties
-                props = 0
-                if 'read' in charac['perms']:
-                    props |= CharacteristicProperties.READ
-                if 'write' in charac['perms']:
-                    props |= CharacteristicProperties.WRITE
-                if 'writecmd' in charac['perms']:
-                    props |= CharacteristicProperties.WRITE_WITHOUT_RESPONSE
-                if 'notify' in charac['perms']:
-                    props |= CharacteristicProperties.NOTIFY
-                if 'indicate' in charac['perms']:
-                    props |= CharacteristicProperties.INDICATE
-
-                # Build characteristic object
-                charac_obj = Characteristic(
-                    uuid=UUID(charac['uuid']),
-                    properties=props,
-                    handle=handle
-                )
-                charac['handle']=handle
-                handle += 2
-
-                if 'notify' in charac['perms'] or 'indicate' in charac['perms']:
-                    cccd = ClientCharacteristicConfig(
-                        characteristic=charac_obj,
-                        handle = handle,
-                        indicate=('indicate' in charac['perms']),
-                        notify=('notify' in charac['perms']) 
-                    )
-                    handle += 1
-
-                    charac_obj.add_descriptor(cccd)
-                    self.__profile.register_attribute(cccd)
-
-
-                charac_obj.value = charac['value']
-                service_obj.add_characteristic(charac_obj)
-                self.__profile.register_attribute(charac_obj)
-
-            service_obj.end_handle = handle-1
-            self.__profile.add_service(service_obj)
-            self.__profile.register_attribute(service_obj)
         
         # Generate AD data
         adv_data = AdvDataFieldList()
@@ -676,6 +850,7 @@ class BlePeriphShell(InteractiveShell):
 
         # Switch to emulation mode
         self.__current_mode = self.MODE_STARTED
+        self.update_prompt()
 
         # Instanciate our Peripheral
         self.__connector = Peripheral(
@@ -693,7 +868,7 @@ class BlePeriphShell(InteractiveShell):
             self.__connector.close()
 
         self.__current_mode = self.MODE_NORMAL
-        self.__profile = None
+        self.update_prompt()
 
 
     def complete_wireshark(self):
@@ -821,9 +996,6 @@ class BlePeriphShell(InteractiveShell):
             else:
                 self.error('No manufacturer data has been set yet.')
 
-
-
-
     def do_back(self, arg):
         """Return to normal mode.
 
@@ -834,6 +1006,7 @@ class BlePeriphShell(InteractiveShell):
         """
         if self.__current_mode != self.MODE_NORMAL:
             self.__current_mode = self.MODE_NORMAL
+            self.__selected_service = None
         self.update_prompt()
 
 
@@ -841,8 +1014,8 @@ class BlePeriphShell(InteractiveShell):
     def do_quit(self, arg):
         """close ble-peripheral
         """
-        if self.__interface is not None:
-            self.__interface.close()
+        if self.__connector is not None:
+            self.__connector.close()
         return True
 
     def do_exit(self, arg):
