@@ -19,4 +19,5 @@ Generic tools
 Bluetooth Low Energy tools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* :doc:`ble-central <ble-central>`: Bluetooth Low Energy scanner and GATT client
+* :doc:`ble-central <ble-central>`: Scanner and GATT client
+* :doc:`ble-periph <ble-periph>`: GATT server
