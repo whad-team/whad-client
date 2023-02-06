@@ -34,15 +34,18 @@ class BlePeriphApp(CommandLineApp):
         )
 
         self.add_argument(
+            '--profile',
+            '-p',
+            dest='profile',
+            help='Use a saved device profile'
+        )
+
+        self.add_argument(
             '--file',
             '-f',
             dest='script',
             help='Specify a script to run'
         )
-
-        # Advertising Data fields
-        self.adv_fields = AdvDataFieldList()
-
 
     def run(self):
         """Override App's run() method to handle scripting feature.

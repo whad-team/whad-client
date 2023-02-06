@@ -137,6 +137,7 @@ class InteractiveShell(object):
         :param str script_path: path to a script file
         """
         try:
+            # run script
             commands = open(script_path,'r').readlines()
             for command in commands:
                 res = self.process(command)
@@ -275,6 +276,36 @@ class InteractiveShell(object):
             varname = args[0]
             if varname in self.__env:
                 del self.__env[varname]
+
+    def do_wait(self, args):
+        """show a message and wait for the user to press a key
+
+        <ansicyan><b>wait</b> <i>[MESSAGE]</i></ansicyan>
+
+        Display <i>MESSAGE</i> in the standard output and wait for
+        the user to press ENTER.
+
+        If message is not provided, use a default message.
+        """
+        if len(args)>=1:
+            message = args[0]
+        else:
+            message = "Press ENTER to continue..."
+
+        # Show message and wait for a keypress
+        print_formatted_text(HTML('<i>%s</i>' % message))
+        input()
+
+    def do_echo(self, args):
+        """Display a text in the standard output.
+
+        <ansicyan><b>echo</b> <i>TEXT</i></ansicyan>
+
+        Print <i>TEXT</i> to the standard output.
+        """
+        if len(args)>=1:
+            print(args[0])
+        
 
     def success(self, message):
         """Display a success message in green (if color is enabled)

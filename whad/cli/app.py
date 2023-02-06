@@ -230,7 +230,7 @@ class CommandLineApp(ArgumentParser):
                     return self.DEV_NOT_READY_ERR
 
     def post_run(self):
-        """Implement pos-run tasks.
+        """Implement post-run tasks.
         """
         pass
 
@@ -248,7 +248,7 @@ class CommandLineApp(ArgumentParser):
                 if handler is not None:
                     return handler(self, self.__args.command_args)
 
-            # By default, print help
+            # By default, print help if no script is specified
             self.print_help()
 
         # Launch post-run tasks
