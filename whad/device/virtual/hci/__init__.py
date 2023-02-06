@@ -41,7 +41,6 @@ def get_hci(index):
         logging.debug('Bluetooth socket successfully created.')
         return socket
     except BluetoothSocketError as err:
-        logger.error(err)
         logging.debug('An error occured while creating bluetooth socket')
         try:
             logging.debug('Shutting down HCI interface #%d' % index)
@@ -119,9 +118,6 @@ class HCIDevice(VirtualDevice):
         """
         Close current device.
         """
-        logger.debug('Reset bluetooth interface ...')
-        self._reset()
-
         # Ask parent class to stop I/O thread
         logger.debug('Stopping background IO threads ...')
         super().close()
@@ -131,6 +127,7 @@ class HCIDevice(VirtualDevice):
             logger.debug('Closing Bluetooth socket ...')
             self.__socket.close()
             del self.__socket
+            self.__socket = None
         self.__opened = False
 
 
@@ -166,7 +163,8 @@ class HCIDevice(VirtualDevice):
                         for message in messages:
                             self._send_whad_message(message)
 
-        except (BrokenPipeError, OSError):
+        except (BrokenPipeError, OSError) as err:
+            print(err)
             logger.error("Error, waiting...")
             sleep(1)
 
@@ -461,12 +459,9 @@ class HCIDevice(VirtualDevice):
             success = True
             if len(message.scan_data) > 0:
                 success = success and self._set_advertising_data(message.scan_data)
-                print('set advertising data: %s' % success)
             if len(message.scanrsp_data) > 0:
                 success = success and self._set_scan_response_data(message.scanrsp_data)
-                print('set scan resp data: %s' % success)
             success = success and self._set_advertising_mode(True)
-            print('set advertising mode: %s' % success)
             if success:
                 self.__internal_state = HCIInternalState.PERIPHERAL
                 self._send_whad_command_result(ResultCode.SUCCESS)

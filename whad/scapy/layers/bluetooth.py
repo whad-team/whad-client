@@ -52,7 +52,8 @@ class BluetoothUserSocketFixed(SuperSocket):
         s = socket_c(31, 3, 1)  # (AF_BLUETOOTH, SOCK_RAW, HCI_CHANNEL_USER)
         if s < 0:
             raise BluetoothSocketError("Unable to open PF_BLUETOOTH socket")
-
+        self.hci_fd = s
+        
         sa = sockaddr_hci()
         sa.sin_family = 31  # AF_BLUETOOTH
         sa.hci_dev = adapter_index  # adapter index
@@ -62,7 +63,6 @@ class BluetoothUserSocketFixed(SuperSocket):
         if r != 0:
             raise BluetoothSocketError("Unable to bind")
 
-        self.hci_fd = s
         self.ins = self.outs = socket.fromfd(s, 31, 3, 1)
 
     def send_command(self, cmd):
