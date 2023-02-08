@@ -2,9 +2,13 @@ from scapy.layers.bluetooth import HCI_Event_LE_Meta, HCI_LE_Meta_Advertising_Re
     HCI_LE_Meta_Connection_Complete, L2CAP_Hdr, HCI_Hdr, HCI_ACL_Hdr, HCI_Event_Disconnection_Complete
 from scapy.layers.bluetooth4LE import BTLE_DATA
 from scapy.compat import raw
+from whad.exceptions import WhadDeviceUnsupportedOperation
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import BleAdvType, BleAddrType, BleDirection
 from enum import IntEnum
+
+import logging
+logger = logging.getLogger(__name__)
 
 class HCIRole(IntEnum):
     NONE = 0
@@ -31,6 +35,9 @@ class HCIConverter:
         if L2CAP_Hdr in ll_packet:
             hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle) / ll_packet[L2CAP_Hdr:]
             return [hci_packet]
+        elif ll_packet.LLID == 3:
+            logger.warning("HCI devices cannot send control PDU.")
+            raise WhadDeviceUnsupportedOperation("Device cannot send control PDU, only data PDU.")
 
     def process_event(self, event):
         """

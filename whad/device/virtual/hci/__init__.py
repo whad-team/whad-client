@@ -1,4 +1,5 @@
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
+from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
+    WhadDeviceUnsupportedOperation
 from whad.device.virtual import VirtualDevice
 from whad.protocol.device_pb2 import Capability
 from whad.protocol.ble.ble_pb2 import BleDirection, SetBdAddress, ScanMode, CentralMode, \
@@ -526,16 +527,18 @@ class HCIDevice(VirtualDevice):
             self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_ble_send_pdu(self, message):
-
+        logger.debug('Recevied WHAD BLE send_pdu message')
         if ((self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE) or
            (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
-
-            hci_packets = self.__converter.process_message(message)
-            if hci_packets is not None:
-                success = True
-                for hci_packet in hci_packets:
-                    success = success and self._write_packet(hci_packet)
-                if success:
-                    self._send_whad_command_result(ResultCode.SUCCESS)
-                else:
-                    self._send_whad_command_result(ResultCode.ERROR)
+            try:
+                hci_packets = self.__converter.process_message(message)
+                if hci_packets is not None:
+                    success = True
+                    for hci_packet in hci_packets:
+                        success = success and self._write_packet(hci_packet)
+                    if success:
+                        self._send_whad_command_result(ResultCode.SUCCESS)
+                    else:
+                        self._send_whad_command_result(ResultCode.ERROR)
+            except WhadDeviceUnsupportedOperation as err:
+                self._send_whad_command_result(ResultCode.PARAMETER_ERROR)

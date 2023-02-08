@@ -35,12 +35,14 @@ class VirtualDevice(WhadDevice):
         self._fw_url = None
         self._fw_version = None
         self._dev_capabilities = None
+        self.__lock = Lock()
         super().__init__()
 
     def send_message(self, message, keep=None):
-        # if `keep` is set, configure queue filter
-        self.set_queue_filter(keep)
+        self.__lock.acquire()
+        super().set_queue_filter(keep)
         self._on_whad_message(message)
+        self.__lock.release()
 
     def _on_whad_message(self, message):
         category = message.WhichOneof('msg')
