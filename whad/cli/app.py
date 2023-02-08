@@ -1,14 +1,22 @@
 """Command-line interface application module
 """
+import pty
 import os
 import sys
+import re
+import select
+import fcntl
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
 from prompt_toolkit.styles import Style
+from urllib.parse import urlparse, parse_qsl
 
-from whad.device import WhadDevice
+from whad.device import WhadDevice, UnixSocketDevice
 from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound, \
     WhadDeviceNotReady
+
+import logging
+logger = logging.getLogger(__name__)
 
 class command(object):
     """CommandLineApp command decorator.
@@ -151,6 +159,7 @@ class CommandLineApp(ArgumentParser):
         self.__interface = None
         self.__args = None
         self.__has_interface = interface
+        self.__is_interface_piped = False
         self.__has_commands = commands
 
         # Add our default option --interface/-i
@@ -193,11 +202,15 @@ class CommandLineApp(ArgumentParser):
         """
         return self.__interface
 
+
     @property
     def args(self):
         """Return the parsed arguments Namespace.
         """
         return self.__args
+
+    def is_piped_interface(self):
+        return self.__is_interface_piped
 
     def pre_run(self):
         """Prepare run for this application
@@ -205,6 +218,7 @@ class CommandLineApp(ArgumentParser):
         - parses arguments
         - handling color settings
         - resolve WHAD interface
+        - handles piped interfaces
         """
         # First we need to parse the main arguments
         self.__args = self.parse_args()
@@ -213,32 +227,77 @@ class CommandLineApp(ArgumentParser):
         if self.__args.nocolor:
             os.environ['PROMPT_TOOLKIT_COLOR_DEPTH']='DEPTH_1_BIT'
 
-        # If interface is provided, instanciate it and make it available
-        if self.__has_interface:
-            if self.__args.interface is not None:
-                try:
-                    # Create WHAD interface
-                    self.__interface = WhadDevice.create(self.__args.interface)
-                except WhadDeviceNotFound as dev_404:
-                    self.error('WHAD device not found.')
-                    return self.DEV_NOT_FOUND_ERR
-                except WhadDeviceAccessDenied as dev_403:
-                    self.error('Cannot access WHAD device, please check permissions.')
-                    return self.DEV_ACCESS_ERR
-                except WhadDeviceNotReady as dev_500:
-                    self.error('WHAD device is not ready.')
-                    return self.DEV_NOT_READY_ERR
+        # If stdin is piped, we must wait for a specific URL sent in a single
+        # line that describes the interface to use.
+        if self.is_stdin_piped():
+
+            # Set stdin non-blocking
+            orig_fl = fcntl.fcntl(sys.stdin, fcntl.F_GETFL)
+            fcntl.fcntl(sys.stdin, fcntl.F_SETFL, orig_fl | os.O_NONBLOCK)            
+
+            # Wait an url on stdin to continue
+            logger.debug('Stdin is piped, wait for a valid URL describing our interface.')
+            pending_input = ''
+            while True:
+                # Check if something is available
+                readers, _, errors = select.select([sys.stdin], [], [sys.stdin], .01)
+
+                # Read input from stdin
+                if len(readers) > 0:
+                    pending_input += sys.stdin.read(4096)
+                    # Check if we have a full line
+                    if '\n' in pending_input:
+                        idx = pending_input.index('\n')
+                        line, pending_input = pending_input[:idx], pending_input[idx+1:]
+
+                        # parse URL
+                        url_info = urlparse(line)
+                        if url_info.scheme == 'unix' and url_info.path is not None:
+                            self.__is_interface_piped = True
+
+                            # Create a Unix socket device and connect it to the
+                            # given Unix socket path
+                            self.__interface = UnixSocketDevice(url_info.path)
+                            self.__interface.open()
+
+                            # Copy parameters into our app parameters
+                            params = dict(parse_qsl(url_info.query))
+                            for param in params:
+                                if not hasattr(self.args, param):
+                                    setattr(self.args, param, params[param])
+
+                            # We're done
+                            break
+        else:           
+            # If interface is provided, instantiate it and make it available
+            if self.__has_interface:
+                if self.__args.interface is not None:
+                    try:
+                        # Create WHAD interface
+                        self.__interface = WhadDevice.create(self.__args.interface)
+                    except WhadDeviceNotFound as dev_404:
+                        self.error('WHAD device not found.')
+                        return self.DEV_NOT_FOUND_ERR
+                    except WhadDeviceAccessDenied as dev_403:
+                        self.error('Cannot access WHAD device, please check permissions.')
+                        return self.DEV_ACCESS_ERR
+                    except WhadDeviceNotReady as dev_500:
+                        self.error('WHAD device is not ready.')
+                        return self.DEV_NOT_READY_ERR
+
 
     def post_run(self):
         """Implement post-run tasks.
         """
         pass
 
-    def run(self):
+
+    def run(self, pre=True, post=True):
         """Run the main application
         """
-        # Launch pre-run tasks
-        self.pre_run()
+        # Launch pre-run tasks if required
+        if pre:
+            self.pre_run()
 
         # If we support first positional arg as command, parse the command
         if self.__has_commands:
@@ -252,7 +311,8 @@ class CommandLineApp(ArgumentParser):
             self.print_help()
 
         # Launch post-run tasks
-        self.post_run()
+        if post:
+            self.post_run()
 
 
     def is_stdout_piped(self):

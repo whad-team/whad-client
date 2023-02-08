@@ -1,3 +1,5 @@
+import sys
+import traceback
 from threading import Thread, Lock
 from queue import Queue, Empty
 from binascii import hexlify
@@ -323,6 +325,15 @@ class WhadDeviceConnector(object):
         return self.__device.wait_for_message(timeout=timeout, filter=filter)
 
     # Message callbacks
+    def on_any_msg(self, message):
+        """Callback function to process any incoming messages.
+
+        This method MAY be overriden by inherited classes.
+
+        :param message: WHAD message
+        """
+        pass
+
     def on_discovery_msg(self, message):
         """Callback function to process incoming discovery messages.
 
@@ -593,6 +604,8 @@ class WhadDevice(object):
         # Device information
         self.__info = None
         self.__discovered = False
+        self.__opened = False
+        self.__closing = False
 
         # Device connectors
         self.__connector = None
@@ -608,8 +621,9 @@ class WhadDevice(object):
         # Input pipes
         self.__inpipe = bytearray()
 
-        # Create lock
+        # Create locks
         self.__lock = Lock()
+        self.__tx_lock = Lock()
 
     def lock(self):
         """Locks the pending output data buffer."""
@@ -645,14 +659,16 @@ class WhadDevice(object):
         # Ask firmware for a reset
         logger.info('resetting device (if possible)')
         self.reset()
+        self.__opened = True
 
     def close(self):
         """
         Close device.
 
         This method MUST be overriden by inherited classes.
-        """
+        """       
         logger.info('closing WHAD device')
+        self.__closing = True
 
         # Cancel I/O thread
         if self.__io_thread is not None:
@@ -667,6 +683,13 @@ class WhadDevice(object):
         if self.__io_thread is not None:
             self.__io_thread.join()
 
+        self.__opened = False
+        self.__closing = False
+
+    def is_open(self):
+        """Determine if the device has been opened or not.
+        """
+        return self.__opened
 
     def __write(self, data):
         """
@@ -685,6 +708,7 @@ class WhadDevice(object):
 
         :param filter: filtering function/lambda to be used by our message queue filter.
         """
+        logger.debug('set queue filter: %s' % filter)
         self.__mq_filter = filter
 
     def wait_for_single_message(self, timeout, filter=None):
@@ -735,8 +759,11 @@ class WhadDevice(object):
         :param keep: Message queue filter function
         """
         logger.info('sending message %s to device' % message)
+
         # if `keep` is set, configure queue filter
-        self.set_queue_filter(keep)
+        if keep is not None:
+            logger.debug('send_message:set_queue_filter')
+            self.set_queue_filter(keep)
 
         # Convert message into bytes
         raw_message = message.SerializeToString()
@@ -824,12 +851,18 @@ class WhadDevice(object):
         :param Message message: Message to dispatch
         """
         logger.info('dispatching WHAD message ...')
+        
+        # Allows a connector to catch any message
+        self.on_any_msg(message)
+
+        # Forward to dedicated callbacks
         if message.WhichOneof('msg') == 'discovery':
             logger.info('message is about device discovery, forwarding to discovery handler')
             self.on_discovery_msg(message.discovery)
         elif message.WhichOneof('msg') == 'generic':
             logger.info('message is generic, forwarding to default handler')
             self.on_generic_msg(message.generic)
+            logger.info('on_generic_message called')
         else:
             domain = message.WhichOneof('msg')
             if domain is not None:
@@ -842,6 +875,11 @@ class WhadDevice(object):
 
         :param Message message: Message received
         """
+        if self.__closing:
+            return
+        
+        logger.debug(message)
+        logger.debug(self.__mq_filter)
         # If message queue filter is defined and message matches this filter,
         # move it into our message queue.
         if self.__mq_filter is not None and self.__mq_filter(message):
@@ -856,12 +894,29 @@ class WhadDevice(object):
     def process_messages(self, timeout=1.0):
         """Process pending messages
         """
+        if self.__closing:
+            return
+            
         try:
             message = self.__messages.get(block=True, timeout=timeout)
             if message is not None:
                 self.dispatch_message(message)
         except Empty:
             return None
+
+    ######################################
+    # Any messages
+    ######################################
+
+    def on_any_msg(self, message):
+        """This callback method is called when any message is received
+
+        :param Message message: WHAD message received
+        """
+        # Forward message to the connector, if any
+        if self.__connector is not None:
+            self.__connector.on_any_msg(message)
+
 
     ######################################
     # Generic messages handling
@@ -1060,6 +1115,7 @@ class WhadDevice(object):
 # Defines every supported low-level device
 from whad.device.uart import UartDevice
 from whad.device.virtual import VirtualDevice
+from whad.device.unix import UnixSocketDevice
 
 __all__ = [
     'WhadDeviceConnector',
