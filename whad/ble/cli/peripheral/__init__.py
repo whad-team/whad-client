@@ -1,5 +1,7 @@
 """Bluetooth Low Energy peripheral utility for WHAD
 """
+import logging
+
 from time import time
 from binascii import hexlify, unhexlify
 from os.path import exists, isfile

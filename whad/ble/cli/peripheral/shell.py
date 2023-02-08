@@ -1,4 +1,5 @@
 import re
+import logging
 
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
