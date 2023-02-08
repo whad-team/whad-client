@@ -569,6 +569,7 @@ class GenericProfile(object):
 
         :param service: Service to add to the device
         """
+        logger.debug('add service %s' % service.uuid)
         if service.handle == 0:
             # Service has not been fully configured, update its handle
             # and the handles of its characteristics and descriptors.

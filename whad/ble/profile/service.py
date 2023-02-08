@@ -1,9 +1,13 @@
 """Bluetooth Low Energy Service class
 """
+import logging
+
 from whad.ble.exceptions import InvalidHandleValueException
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.profile.characteristic import Characteristic
 from whad.ble.stack.gatt.helpers import get_uuid_alias
+
+logger = logging.getLogger(__name__)
 
 class Service(Attribute):
     def __init__(self, uuid, type_uuid, handle=0, end_handle=0):
@@ -66,9 +70,13 @@ class Service(Attribute):
     def add_characteristic(self, characteristic):
         """Add characteristic, update end handle
         """
-        # Add characteristic, update end handle
-        characteristic.handle = self.end_handle + 1
-        self.__end_handle = characteristic.end_handle
+        if characteristic.handle == 0:
+            # Add characteristic, set characteristic handle and update end handle if required
+            characteristic.handle = self.end_handle + 1
+            self.__end_handle = characteristic.end_handle
+        elif characteristic.handle > self.__end_handle:
+            # Add characteristic and update end handle if required
+            self.__end_handle = characteristic.end_handle
         self.__characteristics.append(characteristic)
 
     def remove_characteristic(self, characteristic):

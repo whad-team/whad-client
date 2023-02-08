@@ -29,6 +29,7 @@ It is also possible to write to a characteristic (if writeable)::
     device_name.value = b'MyNewDeviceName'
 
 """
+import logging
 
 from whad.ble.profile.service import Service
 from whad.ble.profile.characteristic import CharacteristicDescriptor, \
@@ -36,6 +37,8 @@ from whad.ble.profile.characteristic import CharacteristicDescriptor, \
 from whad.ble.profile import GenericProfile
 from whad.ble.stack.att.constants import BleAttProperties
 from whad.ble.profile.attribute import UUID
+
+logger = logging.getLogger(__name__)
 
 class PeripheralCharacteristicDescriptor:
     """Wrapper for a peripheral characteristic descriptor.
@@ -433,6 +436,7 @@ class PeripheralDevice(GenericProfile):
         self.__gatt = gatt_client
         self.__conn_handle = conn_handle
         self.__central = central
+        self.__disconnect_cb = None
         super().__init__(from_json=from_json)
 
 
@@ -443,6 +447,13 @@ class PeripheralDevice(GenericProfile):
         :return int: current connection handle.
         """
         return self.__conn_handle
+
+    def set_disconnect_cb(self, callback):
+        """Set disconnection callback.
+
+        :param callable callback: Callback function to call on disconnection.
+        """
+        self.__disconnect_cb = callback
 
 
     def set_mtu(self, mtu: int):
@@ -614,7 +625,12 @@ class PeripheralDevice(GenericProfile):
             return self.__gatt.read_long(handle)
 
     
-
+    def on_disconnect(self, conn_handle):
+        """Disconnection callback
+        """
+        logger.debug('PeripheralDevice has disconnected')
+        if self.__disconnect_cb is not None:
+            self.__disconnect_cb()
 
                     
 
