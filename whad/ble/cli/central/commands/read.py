@@ -5,10 +5,91 @@ from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import command
 from whad.ble import Central
 from hexdump import hexdump
+from whad.ble.bdaddr import BDAddress
 from whad.ble.utils.att import UUID
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.central.helpers import show_att_error
+
+from argparse import Namespace
+
+def read_gatt_characteristic(app, command_args, device):
+    # parse target arguments
+    if len(command_args) == 0:
+        app.error('You must provide at least a characteristic value handle or characteristic UUID.')
+        return
+    else:
+        handle = None
+        offset = None
+        uuid = None
+
+    # figure out what the handle is
+    if command_args[0].lower().startswith('0x'):
+        try:
+            handle = int(command_args[0].lower(), 16)
+        except ValueError as badval:
+            app.error('Wrong handle: %s' % command_args[0])
+            return
+    else:
+        try:
+            handle = int(command_args[0])
+        except ValueError as badval:
+            try:
+                handle = UUID(command_args[0].replace('-',''))
+            except:
+                app.error('Wrong UUID: %s' % command_args[0])
+                return
+
+    # Check offset and length
+    if len(command_args) >= 2:
+        try:
+            offset = int(command_args[1])
+        except ValueError as badval:
+            app.error('Wrong offset value, will use 0 instead.')
+            offset = None
+        
+    # Perform characteristic read by handle
+    if not isinstance(handle, UUID):
+        try:
+            value = device.read(handle, offset=offset)
+
+            # Display result as hexdump
+            if len(value) > 0:
+                hexdump(value)
+            else:
+                print_formatted_text(HTML('<i>Empty data</i>'))
+                
+        except AttError as att_err:
+            show_att_error(app, att_err)
+        except GattTimeoutException as timeout:
+            app.error('GATT timeout while reading.')
+
+    else:
+        # Perform discovery if UUID is given
+        device.discover()
+
+        # Search characteristic from its UUID
+        target_charac = device.find_characteristic_by_uuid(handle)                       
+        if target_charac is not None:
+            try:
+                # Read data
+                if offset is not None:
+                    value = target_charac.read(offset=offset)
+                else:
+                    value = target_charac.read()
+
+                # Display result as hexdump
+                if len(value) > 0:
+                    hexdump(value)
+                else:
+                    print_formatted_text(HTML('<i>Empty data</i>'))
+            
+            except AttError as att_err:
+                show_att_error(app, att_err)
+            except GattTimeoutException as timeout:
+                app.error('GATT timeout while reading.')
+        else:
+            app.error('No characteristic found with UUID %s' % handle)
 
 @command('read')
 def read_handler(app, command_args):
@@ -38,76 +119,8 @@ def read_handler(app, command_args):
         if device is None:
             app.error('Cannot connect to %s, device does not respond.' % app.args.bdaddr)
         else:
-            # Connected to target device, read characteristic
-            # parse target arguments
-            if len(command_args) == 0:
-                app.error('You must provide at least a characteristic value handle or characteristic UUID.')
-                return
-            else:
-                handle = None
-                offset = None
-                uuid = None
-
-            # figure out what the handle is
-            if command_args[0].lower().startswith('0x'):
-                try:
-                    handle = int(command_args[0].lower(), 16)
-                except ValueError as badval:
-                    app.error('Wrong handle: %s' % command_args[0])
-                    return
-            else:
-                try:
-                    handle = int(command_args[0])
-                except ValueError as badval:
-                    try:
-                        handle = UUID(command_args[0].replace('-',''))
-                    except:
-                        app.error('Wrong UUID: %s' % command_args[0])
-                        return
-
-            # Check offset and length
-            if len(command_args) >= 2:
-                try:
-                    offset = int(command_args[1])
-                except ValueError as badval:
-                    app.error('Wrong offset value, will use 0 instead.')
-                    offset = None
-                
-            # Perform characteristic read by handle
-            if not isinstance(handle, UUID):
-                try:
-                    value = device.read(handle, offset=offset)
-
-                    # Display result as hexdump
-                    hexdump(value)
-                except AttError as att_err:
-                    show_att_error(app, att_err)
-                except GattTimeoutException as timeout:
-                    app.error('GATT timeout while reading.')
-
-            else:
-                # Perform discovery if UUID is given
-                device.discover()
-
-                # Search characteristic from its UUID
-                target_charac = device.find_characteristic_by_uuid(handle)                       
-                if target_charac is not None:
-                    try:
-                        # Read data
-                        if offset is not None:
-                            value = target_charac.read(offset=offset)
-                        else:
-                            value = target_charac.read()
-
-                        # Display result as hexdump
-                        hexdump(value)
-                    
-                    except AttError as att_err:
-                        show_att_error(app, att_err)
-                    except GattTimeoutException as timeout:
-                        app.error('GATT timeout while reading.')
-                else:
-                    app.error('No characteristic found with UUID %s' % handle)
+            # Read GATT characteristic
+            read_gatt_characteristic(app, command_args, device)
 
             # Disconnect
             device.disconnect()
@@ -117,5 +130,34 @@ def read_handler(app, command_args):
 
     elif app.interface is None:
         app.error('You need to specify an interface with option --interface.')
+    
+    # Piped interface
+    elif app.args.bdaddr is None and app.is_piped_interface():
+
+        # Make sure we have all the required parameters
+        for param in ['initiator_bdaddr', 'initiator_addrtype', 'target_bdaddr', 'target_addrtype', 'conn_handle']:
+            if not hasattr(app.args, param):
+                app.error('Source interface does not provide a BLE connection')
+        
+        initiator = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
+        advertiser = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
+        existing_connection = Namespace(
+            initiator=initiator.value,
+            init_addr_type=int(app.args.initiator_addrtype),
+            advertiser=advertiser.value,
+            adv_addr_type=int(app.args.target_addrtype),
+            conn_handle=int(app.args.conn_handle)
+        )
+   
+        central = Central(app.interface, existing_connection)
+
+        device = central.peripheral()
+
+        # Read GATT characteristic
+        read_gatt_characteristic(app, command_args, device)
+
+        # Disconnect
+        device.disconnect()
+        central.stop()
     else:
         app.error('You need to specify a target device with option --bdaddr.')

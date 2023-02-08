@@ -24,6 +24,9 @@ from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
 
 from whad.cli.shell import InteractiveShell
 
+#import logging
+#logging.basicConfig(level=logging.DEBUG)
+
 INTRO='''
 ble-central, the WHAD Bluetooth Low Energy central utility
 '''
@@ -251,6 +254,9 @@ class BleCentralShell(InteractiveShell):
             # Check connection is OK
             if self.__target is not None:
                 print('Successfully connected to target %s' % target_bd_addr)
+
+                # Attach our disconnection callback
+                self.__target.set_disconnect_cb(self.on_disconnect)
                 
                 # Attach our wireshark monitor, if any
                 if self.__wireshark is not None:
@@ -286,7 +292,7 @@ class BleCentralShell(InteractiveShell):
             print('Device %s not found' % args[0])
 
 
-    def on_disconnect(self, packet):
+    def on_disconnect(self, packet=None):
         """Disconnection callback
 
         This callback is called when a BLE peripheral disconnects our central.
@@ -643,6 +649,37 @@ class BleCentralShell(InteractiveShell):
         """
         if self.__target_bd:
             self.perform_write(args, without_response=False)
+        else:
+            self.error('No device connected.')
+
+    def do_pdu(self, args):
+        """Send raw PDU to a connected device
+
+        <ansicyan><b>pdu</b> <i>[PDU (hex)]</i></ansicyan>
+
+        Send a raw link-layer PDU to the target device:
+
+        > pdu 03 02 02 03
+
+        The command above will send a <i>LL_TERMINATE_IND</i> control PDU to
+        the device.
+
+        """
+        if self.__target_bd:
+            try:
+                if len(args) >= 1:
+                    hex_value = ''.join(args)
+                    raw_pdu = unhexlify(hex_value.replace(' ',''))
+                    res = self.__connector.send_pdu(
+                        BTLE_DATA(raw_pdu),
+                        conn_handle=self.__target.conn_handle
+                    )
+                    if not res:
+                        self.error('An error occured while sending PDU.')
+                else:
+                    self.error('Invalid hex value.')
+            except BinasciiError as err:
+                self.error('Invalid hex value.')
         else:
             self.error('No device connected.')
 

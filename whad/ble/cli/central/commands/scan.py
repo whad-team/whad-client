@@ -14,7 +14,9 @@ def scan_handler(app, command_args):
     This command will scan for BLE devices and show them in a list.
     """
     # We need to have an interface specified
-    if app.interface is not None:
+    if app.is_piped_interface():
+        app.error('This command cannot be used chained with another whad tool.')        
+    elif app.interface is not None:
         # Switch to BLE scan mode
         scanner = Scanner(app.interface)
     

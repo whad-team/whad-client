@@ -5,7 +5,9 @@ from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import command
 from whad.ble import Central
 from binascii import unhexlify, Error as BinasciiError
+from argparse import Namespace
 
+from whad.ble import BDAddress
 from whad.ble.utils.att import UUID
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
@@ -31,8 +33,40 @@ def write_handler(app, command_args):
     > write 41 ABC
 
     """
+    if app.is_piped_interface():
+        # Make sure we have all the required parameters
+        for param in ['initiator_bdaddr', 'initiator_addrtype', 'target_bdaddr', 'target_addrtype', 'conn_handle']:
+            if not hasattr(app.args, param):
+                app.error('Source interface does not provide a BLE connection')
+        
+        initiator = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
+        advertiser = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
+        existing_connection = Namespace(
+            initiator=initiator.value,
+            init_addr_type=int(app.args.initiator_addrtype),
+            advertiser=advertiser.value,
+            adv_addr_type=int(app.args.target_addrtype),
+            conn_handle=int(app.args.conn_handle)
+        )
+   
+        central = Central(app.interface, existing_connection)
+
+        device = central.peripheral()
+
+        # Read GATT characteristic
+        perform_write(
+            app,
+            device,
+            command_args,
+            without_response=False
+        )
+
+        # Disconnect
+        device.disconnect()
+        central.stop()
+
     # We need to have an interface specified
-    if app.interface is not None and app.args.bdaddr is not None:
+    elif app.interface is not None and app.args.bdaddr is not None:
         
         # Switch to central mode
         central = Central(app.interface)
@@ -80,8 +114,40 @@ def writecmd_handler(app, command_args):
 
     > writecmd 41 ABC
     """
+    if app.is_piped_interface():
+        # Make sure we have all the required parameters
+        for param in ['initiator_bdaddr', 'initiator_addrtype', 'target_bdaddr', 'target_addrtype', 'conn_handle']:
+            if not hasattr(app.args, param):
+                app.error('Source interface does not provide a BLE connection')
+        
+        initiator = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
+        advertiser = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
+        existing_connection = Namespace(
+            initiator=initiator.value,
+            init_addr_type=int(app.args.initiator_addrtype),
+            advertiser=advertiser.value,
+            adv_addr_type=int(app.args.target_addrtype),
+            conn_handle=int(app.args.conn_handle)
+        )
+   
+        central = Central(app.interface, existing_connection)
+
+        device = central.peripheral()
+
+        # Read GATT characteristic
+        perform_write(
+            app,
+            device,
+            command_args,
+            without_response=True
+        )
+
+        # Disconnect
+        device.disconnect()
+        central.stop()
+
     # We need to have an interface specified
-    if app.interface is not None and app.args.bdaddr is not None:
+    elif app.interface is not None and app.args.bdaddr is not None:
         
         # Switch to central mode
         central = Central(app.interface)

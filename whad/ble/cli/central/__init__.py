@@ -21,6 +21,9 @@ from whad.cli.app import CommandLineApp
 from .shell import BleCentralShell
 from .commands import *
 
+import logging
+#logging.basicConfig(level=logging.DEBUG)
+
 class BleCentralApp(CommandLineApp):
 
     def __init__(self):
@@ -51,7 +54,7 @@ class BleCentralApp(CommandLineApp):
         """
         # Launch pre-run tasks
         self.pre_run()
-
+        
         if self.args.script is not None:
             # We need to have an interface specified
             if self.interface is not None:
@@ -61,7 +64,7 @@ class BleCentralApp(CommandLineApp):
             else:
                 self.error('You need to specify an interface with option --interface.')
         else:
-            super().run()
+            super().run(pre=False, post=False)
 
         # Launch post-run tasks
         self.post_run()
