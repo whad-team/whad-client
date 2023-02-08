@@ -1,5 +1,7 @@
 """GATT Server and Client implementation
 """
+import logging
+
 from time import time
 from queue import Queue, Empty
 from struct import unpack, pack
@@ -16,6 +18,7 @@ from whad.ble.profile import GenericProfile
 from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
 from whad.ble.profile.service import PrimaryService, SecondaryService
 
+logger = logging.getLogger(__name__)
 
 class Gatt(object):
 
@@ -552,12 +555,17 @@ class GattClient(Gatt):
         """
         Discover service characteristics
         """
+        logger.debug('discover characteristics for service %s' % service.uuid)
+        logger.debug('discover characteristics from handle %d to %d' % (
+            service.handle, service.end_handle
+        ))
         if isinstance(service, PrimaryService):
             handle = service.handle
         else:
             return
 
         while handle <= service.end_handle:
+            logger.debug('service end handle is: %d' % service.end_handle)
             self.att.read_by_type_request(
                 handle,
                 service.end_handle,
@@ -578,7 +586,8 @@ class GattClient(Gatt):
                     )
                     charac.handle = charac_handle
                     charac.value_handle = charac_value_handle
-                    handle = charac.handle+1
+                    handle = charac.handle+2
+                    logger.debug('found characteristic %s with handle %d' % (charac_uuid, charac_value_handle))
                     yield charac
 
             elif isinstance(msg, GattErrorResponse):
@@ -622,6 +631,7 @@ class GattClient(Gatt):
         services = []
         for service in self.discover_primary_services():
             services.append(service)
+
         for service in services:
             for characteristic in self.discover_characteristics(service):
                 service.add_characteristic(characteristic)
