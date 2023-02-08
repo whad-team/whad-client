@@ -31,16 +31,28 @@ class Central(BLE):
         self.__peripheral = None
         self.__random_addr = False
         self.__profile_json = from_json
+        self.__target = None
+        self.__local = None
 
-        # Check device accept central mode
+        # If no connection, check if 
         if not self.can_be_central():
             raise UnsupportedCapability('Central')
+
+        # If a connection already exists, just feed the stack with the parameters
+        if existing_connection is not None:
+            self.on_connected(existing_connection)
         else:
             # self.stop() # ButteRFly doesn't support calling stop when spawning central
             self.enable_central_mode()
-            # If an existing connection is hijacked, simulate a connection
-            if existing_connection is not None:
-                self.on_connected(existing_connection)
+
+
+    @property
+    def local_peer(self):
+        return self.__local
+
+    @property
+    def target_peer(self):
+        return self.__target
 
     def connect(self, bd_address, random=False, timeout=30, access_address=None, channel_map=None, crc_init=None, hop_interval=None, hop_increment=None):
         """Connect to a target device
@@ -96,6 +108,17 @@ class Central(BLE):
     def on_connected(self, connection_data):
         """Callback method to handle connection event.
         """
+        # Save local and target peer info
+        self.__local = BDAddress.from_bytes(
+            connection_data.initiator,
+            addr_type=connection_data.init_addr_type
+        )
+
+        self.__target = BDAddress.from_bytes(
+            connection_data.advertiser,
+            connection_data.adv_addr_type
+        )
+
         self.__stack.on_connection(
             connection_data.conn_handle,
             BDAddress.from_bytes(
@@ -117,6 +140,8 @@ class Central(BLE):
         )
 
         self.__connected = False
+        self.__local = None
+        self.__target = None
 
         # Notify peripheral device about this disconnection
         if self.__peripheral is not None:
