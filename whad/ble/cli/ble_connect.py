@@ -17,7 +17,6 @@ from whad.ble.connector import Central
 from whad.device.unix import UnixSocketProxy
 
 import logging
-#logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 

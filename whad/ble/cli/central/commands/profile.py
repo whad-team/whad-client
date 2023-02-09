@@ -17,12 +17,6 @@ from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.central.helpers import show_att_error
 
-logger = logging.getLogger('whad.ble.profile')
-logger.setLevel(logging.DEBUG)
-
-logger = logging.getLogger('whad.ble.stack.gatt')
-logger.setLevel(logging.DEBUG)
-
 def profile_discover(app, device):
     try:
         device.discover()
