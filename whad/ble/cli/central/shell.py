@@ -22,7 +22,7 @@ from whad.ble.cli.central.cache import BleDevicesCache
 from whad.ble.scanning import AdvertisingDevice
 from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
 
-from whad.cli.shell import InteractiveShell
+from whad.cli.shell import InteractiveShell, category
 
 #import logging
 #logging.basicConfig(level=logging.DEBUG)
@@ -109,6 +109,7 @@ class BleCentralShell(InteractiveShell):
         elif isinstance(error, InsufficientEncryptionKeySize):
             self.error('ATT error: insufficient encryption')
 
+    @category('Devices discovery')
     def do_scan(self, args):
         """scan surrounding devices and show a small summary
 
@@ -146,6 +147,7 @@ class BleCentralShell(InteractiveShell):
 
         self.__connector.stop()
 
+    @category('Devices discovery')
     def do_devices(self, arg):
         """list discovered devices
 
@@ -158,6 +160,7 @@ class BleCentralShell(InteractiveShell):
         for device in self.__cache.iterate():
             print(device['info'])
 
+    @category('Devices discovery')
     def do_info(self, args):
         """show detailed device information
 
@@ -197,7 +200,7 @@ class BleCentralShell(InteractiveShell):
     def get_cache_targets(self):
         # Keep track of BD addresses and names
         targets = [dev['info'].address for dev in self.__cache.iterate()]
-        targets.extend([dev['info'].name for dev in self.__cache.iterate() if dev['info'].name is not None])
+        targets.extend(['"%s"' % dev['info'].name for dev in self.__cache.iterate() if dev['info'].name is not None])
         return targets
 
     def complete_info(self):
@@ -219,6 +222,8 @@ class BleCentralShell(InteractiveShell):
             completions[address] = None
         return completions
 
+
+    @category('GATT client')
     def do_connect(self, args):
         """connect to a device
 
@@ -313,6 +318,8 @@ class BleCentralShell(InteractiveShell):
         # Show disconnection
         print_formatted_text(HTML('<ansired>Peripheral has just disconnected</ansired>'))        
 
+
+    @category('GATT client')
     def do_disconnect(self, arg):
         """disconnect from device
 
@@ -333,6 +340,8 @@ class BleCentralShell(InteractiveShell):
         # Update prompt
         self.update_prompt()
 
+
+    @category('GATT client')
     def do_profile(self, args):
         """discover device services and characteristics
 
@@ -381,6 +390,8 @@ class BleCentralShell(InteractiveShell):
             except GattTimeoutException as timeout:
                 print('GATT timeout occured')
 
+
+    @category('GATT client')
     def do_services(self, args):
         """discover/show current device services
 
@@ -402,6 +413,8 @@ class BleCentralShell(InteractiveShell):
         else:
             self.error('No device connected.')
 
+
+    @category('GATT client')
     def do_characteristics(self, args):
         """discover/show current device characteristics
 
@@ -437,6 +450,7 @@ class BleCentralShell(InteractiveShell):
         else:
             self.error('No device connected.')
     
+    @category('GATT client')
     def do_read(self, args):
         """read a GATT attribute
 
@@ -604,6 +618,8 @@ class BleCentralShell(InteractiveShell):
             else:
                 self.error('No characteristic found with UUID %s' % handle)
 
+
+    @category('GATT client')
     def do_writecmd(self, args):
         """write data to a GATT attribute without waiting for a response.
 
@@ -628,6 +644,8 @@ class BleCentralShell(InteractiveShell):
         else:
             self.error('No device connected.')  
 
+
+    @category('GATT client')
     def do_write(self, args):
         """write data to a a GATT attribute.
 
@@ -652,6 +670,8 @@ class BleCentralShell(InteractiveShell):
         else:
             self.error('No device connected.')
 
+
+    @category('GATT client')
     def do_pdu(self, args):
         """Send raw PDU to a connected device
 
@@ -683,6 +703,8 @@ class BleCentralShell(InteractiveShell):
         else:
             self.error('No device connected.')
 
+
+    @category('GATT client')
     def do_sub(self, args):
         """subscribe to a characteristic
 
@@ -758,6 +780,7 @@ class BleCentralShell(InteractiveShell):
         else:
             self.error('No device connected.')
 
+    @category('GATT client')
     def do_unsub(self, args):
         """unsubscribe from a characteristic
 
@@ -818,6 +841,8 @@ class BleCentralShell(InteractiveShell):
             completions['on'] = {}
         return completions
 
+
+    @category('Monitoring')
     def do_wireshark(self, arg):
         """launch wireshark to monitor packets
 
@@ -848,6 +873,8 @@ class BleCentralShell(InteractiveShell):
         else:
             self.error('Missing arguments, see <ansicyan>help wireshark</ansicyan>.')
 
+
+    @category('GATT client')
     def do_mtu(self, arg):
         """set ATT MTU
 

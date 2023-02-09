@@ -26,15 +26,17 @@ class command(object):
     description of the command (HTML allowed).
     """
 
-    def __init__(self, cmd_name, short_desc=None, desc=None):
+    def __init__(self, cmd_name, short_desc=None, desc=None, category='Generic commands'):
         self.cmd_name = cmd_name
         self.short_desc = short_desc
         self.desc = desc
+        self.category = category
 
     def __call__(self, handler):
         CommandsRegistry.register(
             self.cmd_name,
-            handler
+            handler,
+            self.category
         )
 
 class CommandsRegistry:
@@ -45,10 +47,19 @@ class CommandsRegistry:
     COMMANDS = {}
     CMDS_SHORT_DESC = {}
     CMDS_DESC = {}
+    CATEGORIES = {}
 
     @staticmethod
-    def register(command, handler):
+    def register(command, handler, category):
+        """Register a command
+        """
+        # Add command to our list of known commands
         CommandsRegistry.COMMANDS[command] = handler
+
+        # Add command to the corresponding category
+        if category not in CommandsRegistry.CATEGORIES:
+            CommandsRegistry.CATEGORIES[category] = []
+        CommandsRegistry.CATEGORIES[category].append(command)
 
         # Extract short desc and description from docstring
         if hasattr(handler, '__doc__'):
@@ -86,13 +97,27 @@ class CommandsRegistry:
             return None
 
     @staticmethod
-    def enumerate():
-        for command in CommandsRegistry.COMMANDS:
-            yield (
-                command,
-                CommandsRegistry.get_short_desc(command),
-                CommandsRegistry.get_desc(command)
-            )
+    def enumerate_categories():
+        for category in CommandsRegistry.CATEGORIES:
+            yield category
+
+    @staticmethod
+    def enumerate(category=None):
+        if category is None:
+            for command in CommandsRegistry.COMMANDS:
+                yield (
+                    command,
+                    CommandsRegistry.get_short_desc(command),
+                    CommandsRegistry.get_desc(command)
+                )
+        else:
+            for command in CommandsRegistry.COMMANDS:
+                if command in CommandsRegistry.CATEGORIES[category]:
+                    yield (
+                        command,
+                        CommandsRegistry.get_short_desc(command),
+                        CommandsRegistry.get_desc(command)
+                    )
 
 
 @command('help')
@@ -104,17 +129,20 @@ def show_default_help(app, args):
     Show contextual help for the provided <i>command</i>
     """
     if len(args) == 0:
-        print_formatted_text(HTML('<ansimagenta><b>Available commands:</b></ansimagenta>'))
-        commands = []
-        for command, short_desc, _ in CommandsRegistry.enumerate():
-            commands.append((command, short_desc))
-        commands.sort()
+        # Enumerate commands by group
+        for category in CommandsRegistry.enumerate_categories():
+            print_formatted_text(HTML('<ansimagenta><b>%s:</b></ansimagenta>' % category))
+            commands = []
+            for command, short_desc, _ in CommandsRegistry.enumerate(category):
+                commands.append((command, short_desc))
+            commands.sort()
 
         # Compute the longest command
         max_cmd_size = max([len(cmd) for cmd,doc in commands])
         cmd_fmt = "<ansicyan>{0:<%d}</ansicyan>\t\t{1}" % max_cmd_size
         for cmd, doc in commands:
             print_formatted_text(HTML(cmd_fmt.format(cmd, doc)))
+        print('')
     else:
         cmd = args[0]
         cmd_sd = CommandsRegistry.get_short_desc(cmd)

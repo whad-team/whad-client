@@ -6,6 +6,21 @@ import shlex
 from prompt_toolkit import PromptSession, HTML, print_formatted_text
 from prompt_toolkit.completion import NestedCompleter, DynamicCompleter
 
+class category(object):
+    """Shell command handler decorator.
+
+    This decorator adds a category to the command handler (do_<something>)
+    that will be used to group commands in help menu.
+    """
+
+    def __init__(self, category: str):
+        self.category = category
+
+    def __call__(self, handler):
+        handler.category = self.category
+        return handler
+
+
 class InteractiveShell(object):
 
     """Interactive shell for WHAD CLI applications.
@@ -36,6 +51,7 @@ class InteractiveShell(object):
     def __init__(self, default_prompt='> '):
         self.__commands = {}
         self.__commands_ac = {}
+        self.__categories = {}
         self.__prompt = default_prompt
         self.__quit = False
         self.__env = {}
@@ -49,6 +65,13 @@ class InteractiveShell(object):
                 if len(command) >= 1:
                     # Associate command with method
                     self.__commands[command] = member
+
+                    # Add category if defined
+                    if hasattr(member, 'category'):
+                        member_category = getattr(member, 'category')
+                        if member_category not in self.__categories:
+                            self.__categories[member_category] = []
+                        self.__categories[member_category].append(command)
 
                     # Look for autocomplete method
                     if hasattr(self, 'complete_%s' % command):
@@ -189,22 +212,49 @@ class InteractiveShell(object):
             else:
                 self.error('command <u>%s</u> does not exist.' % command)
         else:
-            # List available commands
+            max_cmd_size = max([len(cmd) for cmd in list(self.__commands.keys())])
+
+            # List available commands, categories first and then uncategorized.
+            categorized_commands = []
+            for category in self.__categories:
+                commands = []
+                for command in self.__categories[category]:
+                    # Get command docstring
+                    handler = self.__commands[command]
+                    if handler is not None and hasattr(handler, '__doc__'):
+                        # Read docstring
+                        docstr = getattr(handler,'__doc__')
+                        short_desc = docstr.splitlines()[0].lstrip()
+                    else:
+                        short_desc = ''
+                    commands.append((command, short_desc))
+                    categorized_commands.append(command)
+
+                # Show commands
+                print_formatted_text(HTML('<ansimagenta><b>%s:</b></ansimagenta>' % category))
+                #max_cmd_size = max([len(cmd) for cmd,doc in commands])
+                cmd_fmt = "  <ansicyan>{0:<%d}</ansicyan>\t\t{1}" % max_cmd_size
+                for cmd, doc in commands:
+                    print_formatted_text(HTML(cmd_fmt.format(cmd, doc)))
+                print('')
+
             commands = []
             for command in self.__commands:
-                # Get command docstring
-                handler = self.__commands[command]
-                if handler is not None and hasattr(handler, '__doc__'):
-                    # Read docstring
-                    docstr = getattr(handler,'__doc__')
-                    short_desc = docstr.splitlines()[0].lstrip()
-                else:
-                    short_desc = ''
-                commands.append((command, short_desc))
+                if command not in categorized_commands:
+                    # Get command docstring
+                    handler = self.__commands[command]
+                    if handler is not None and hasattr(handler, '__doc__'):
+                        # Read docstring
+                        docstr = getattr(handler,'__doc__')
+                        short_desc = docstr.splitlines()[0].lstrip()
+                    else:
+                        short_desc = ''
+                    commands.append((command, short_desc))
             
             # Show commands
-            max_cmd_size = max([len(cmd) for cmd,doc in commands])
-            cmd_fmt = "<ansicyan>{0:<%d}</ansicyan>\t\t{1}" % max_cmd_size
+            print_formatted_text(HTML('<ansimagenta><b>Generic commands:</b></ansimagenta>'))
+            #max_cmd_size = max([len(cmd) for cmd,doc in commands])
+            cmd_fmt = "  <ansicyan>{0:<%d}</ansicyan>\t\t{1}" % max_cmd_size
             for cmd, doc in commands:
                 print_formatted_text(HTML(cmd_fmt.format(cmd, doc)))
 

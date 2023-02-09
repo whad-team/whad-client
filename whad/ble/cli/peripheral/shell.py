@@ -26,7 +26,7 @@ from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.common.monitors import WiresharkMonitor
 
-from whad.cli.shell import InteractiveShell
+from whad.cli.shell import InteractiveShell, category
 
 INTRO='''
 ble-periph, the WHAD Bluetooth Low Energy peripheral utility
@@ -126,6 +126,7 @@ class BlePeriphShell(InteractiveShell):
 
         # Profile
         if dev_profile is not None:
+            # Set profile
             self.__profile = MonitoringProfile(from_json=dev_profile)
         else:
             self.__profile = MonitoringProfile()
@@ -253,7 +254,7 @@ class BlePeriphShell(InteractiveShell):
                 completions[action][service]={}
         return completions
 
-
+    @category('GATT profile')
     def do_service(self, args):
         """Manage peripheral's GATT services
 
@@ -555,6 +556,7 @@ class BlePeriphShell(InteractiveShell):
                         completions[action][str(char.uuid)] = {}
         return completions
 
+    @category('GATT profile')
     def do_char(self, args):
         """Manage peripheral's GATT characteristics
 
@@ -740,6 +742,7 @@ class BlePeriphShell(InteractiveShell):
         # Update characteristic value
         self.char_set_value(handle, char_value)
 
+    @category('GATT profile')
     def do_writecmd(self, args):
         """write data to a GATT attribute without waiting for a response.
 
@@ -761,6 +764,7 @@ class BlePeriphShell(InteractiveShell):
         """
         self.perform_write(args, without_response=True)
 
+    @category('GATT profile')
     def do_write(self, args):
         """write data to a a GATT attribute.
 
@@ -782,6 +786,7 @@ class BlePeriphShell(InteractiveShell):
         """
         self.perform_write(args, without_response=False)
 
+    @category('GATT profile')
     def do_read(self, args):
         """read a GATT attribute
 
@@ -827,6 +832,7 @@ class BlePeriphShell(InteractiveShell):
     # Peripheral emulation
     ##################################################    
 
+    @category('Peripheral control')
     def do_start(self, args):
         """Start peripheral.
 
@@ -861,6 +867,7 @@ class BlePeriphShell(InteractiveShell):
         )
         self.__connector.start()
 
+    @category('Peripheral control')
     def do_stop(self, arg):
         """Stop peripheral
         """
@@ -882,6 +889,7 @@ class BlePeriphShell(InteractiveShell):
             completions['on'] = {}
         return completions
 
+    @category('Monitoring')
     def do_wireshark(self, arg):
         """launch wireshark to monitor packets
 
@@ -912,7 +920,7 @@ class BlePeriphShell(InteractiveShell):
         else:
             self.error('Missing arguments, see <ansicyan>help wireshark</ansicyan>.')
 
-
+    @category('Advertising data')
     def do_name(self, args):
         """Set device advertising complete local name
 
@@ -927,6 +935,7 @@ class BlePeriphShell(InteractiveShell):
             print_formatted_text(HTML('<ansicyan>Device complete name:</ansicyan> %s' % self.__complete_name))
 
 
+    @category('Advertising data')
     def do_shortname(self, args):
         """Set device short name
 
@@ -940,6 +949,7 @@ class BlePeriphShell(InteractiveShell):
         else:
             print_formatted_text(HTML('<ansicyan>Device short name:</ansicyan> %s' % self.__shortened_name))
 
+    @category('Advertising data')
     def do_manuf(self, args):
         """Set device manufacturer company ID and data.
 
@@ -1009,8 +1019,6 @@ class BlePeriphShell(InteractiveShell):
             self.__current_mode = self.MODE_NORMAL
             self.__selected_service = None
         self.update_prompt()
-
-
 
     def do_quit(self, arg):
         """close ble-peripheral
