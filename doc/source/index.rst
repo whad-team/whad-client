@@ -17,4 +17,5 @@ Welcome to WHAD's documentation!
     :caption: BLE Command-line Tools
 
     cli/ble/ble-central
+    cli/ble/ble-periph
 
