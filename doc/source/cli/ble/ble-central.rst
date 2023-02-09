@@ -61,7 +61,7 @@ one.
     $ ble-central -i hci0 interactive
     ble-central>
 
-More information about this interactive shell in the :ref:`dedicated section <interactive-shell>`.
+More information about this interactive shell in the :ref:`dedicated section <central-interactive-shell>`.
 
 profile
 ~~~~~~~
@@ -159,7 +159,7 @@ data has been correctly written.
 Interactive shell
 -----------------
 
-.. _interactive-shell:
+.. _central-interactive-shell:
 
 The interactive shell offers the possibility to dynamically interact with any device,
 with an helpful interface that provides autocompletion. This interactive shell implements
