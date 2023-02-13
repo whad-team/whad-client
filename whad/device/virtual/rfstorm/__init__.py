@@ -201,7 +201,7 @@ class RFStormDevice(VirtualDevice):
     def _rfstorm_tone_mode(self):
             return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_TONE)
 
-    def _rfstorm_transmit_payload(self, payload, timeout=4, retransmits=15):
+    def _rfstorm_transmit_payload(self, payload, timeout=4, retransmits=1):
         data = bytes([len(payload), timeout, retransmits]) + payload
         return self._rfstorm_check_success(
             self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_TRANSMIT, data)

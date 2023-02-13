@@ -24,7 +24,7 @@ class UnifyingApplicativeLayerManager:
         self.__timeout_thread = None
         self.__crypto_manager = None
         self.__aes_counter = 0
-        self.__packets_queue = Queue(5)
+        self.__packets_queue = Queue(10)
 
     @property
     def aes_counter(self):
@@ -45,38 +45,30 @@ class UnifyingApplicativeLayerManager:
     def _start_timeout_thread(self):
         self._stop_timeout_thread()
         self.__transmit_timeouts = True
-        self.__timeout_thread = Thread(target=self._transmit_timeouts_thread, daemon=True)
+        self.__timeout_thread = Thread(target=self._transmit_timeouts_thread)
         self.__timeout_thread.start()
 
     def _stop_timeout_thread(self):
         if self.__timeout_thread is not None:
             self.__transmit_timeouts = False
+            print("here")
             self.__timeout_thread.join()
             self.__timeout_thread = None
 
     def _transmit_timeouts_thread(self):
-        keep_alive_count = 0
-        self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250))
-        last_send = time()
         while self.__transmit_timeouts:
-            if time() - last_send >= 0.001:
-                if keep_alive_count % 10 == 0:
-                    self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250))
-                else:
-                    self.send_message(Logitech_Keepalive_Payload(timeout=1250))
-                    keep_alive_count += 1
-                last_send = time()
-
             try:
-                packet = self.__packets_queue.get(block=False)
+                packet = self.__packets_queue.get(timeout=0.1, block=False)
                 self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250))
                 self.send_message(packet)
                 self.send_message(Logitech_Keepalive_Payload(timeout=1250))
             except Empty:
-                pass
+                self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250))
+                self.send_message(Logitech_Keepalive_Payload(timeout=1250))
+        print("stopped.")
 
     def send_message(self, message, waiting_ack=False):
-        result = self.__llm.send_data(Logitech_Unifying_Hdr()/message, waiting_ack=waiting_ack)
+        result = self.__llm.send_data(Logitech_Unifying_Hdr()/message)
         return result
 
     def prepare_message(self, message):
@@ -84,7 +76,7 @@ class UnifyingApplicativeLayerManager:
         return True
 
     def __del__(self):
-        self._stop_timeout_thread()
+        self.unlock_channel()
 
     @property
     def role(self):
@@ -117,7 +109,13 @@ class UnifyingApplicativeLayerManager:
 
     def lock_channel(self):
         if self.__timeout_thread is None:
+            print("[i] locking channel.")
             self.enable_timeouts()
+
+    def unlock_channel(self):
+        if self.__timeout_thread is not None:
+            print("[i] unlocking channel.")
+            self._stop_timeout_thread()
 
     def move_mouse(self, x, y):
         self.lock_channel()
@@ -127,7 +125,6 @@ class UnifyingApplicativeLayerManager:
                     movement=LogitechUnifyingMouseMovementConverter.get_hid_data_from_coordinates(x, y)
                 )
             )
-            sleep(0.001)
             return answer
         except InvalidHIDData:
             return False
@@ -138,7 +135,6 @@ class UnifyingApplicativeLayerManager:
             Logitech_Mouse_Payload(
                 button_mask=int(type)
             )
-
         )
         return answer
 
@@ -170,7 +166,9 @@ class UnifyingApplicativeLayerManager:
                     )
                 )
             )
-
+            keep_alive = self.prepare_message(
+                Logitech_Keepalive_Payload(timeout=1250)
+            )
             answer_release = self.prepare_message(
                 Logitech_Unencrypted_Keystroke_Payload(
                     hid_data=b"\x00"*7
@@ -189,6 +187,9 @@ class UnifyingApplicativeLayerManager:
                 Logitech_Multimedia_Key_Payload(
                     hid_key_scan_code=b"x\00"+bytes([int(key)])+b"\x00"*2
                 )
+            )
+            keep_alive = self.prepare_message(
+                Logitech_Keepalive_Payload(timeout=1250)
             )
             answer_release = self.prepare_message(
                 Logitech_Multimedia_Key_Payload(
@@ -223,9 +224,11 @@ class UnifyingApplicativeLayerManager:
                         ),
                         unknown=201,
                         aes_counter=counter
-                    ),
-                    acknowledged=False
+                    )
                 )
+            )
+            keep_alive = self.prepare_message(
+                Logitech_Keepalive_Payload(timeout=1250)
             )
             answer_release = self.prepare_message(
                 self.__crypto_manager.encrypt(
@@ -235,8 +238,7 @@ class UnifyingApplicativeLayerManager:
                         unknown=201,
                         aes_counter=counter+1
                     )
-                ),
-                acknowledged=False
+                )
             )
 
             if force_counter is None:
@@ -249,11 +251,10 @@ class UnifyingApplicativeLayerManager:
 
     def on_synchronized(self):
         print("[i] Synchronized !")
-        self.lock_channel()
 
 
     def on_desynchronized(self):
-        print("[i] Desynchronized, resync...")
+        print("[i] Desynchronized.")
 
     def on_data(self, data):
         pass

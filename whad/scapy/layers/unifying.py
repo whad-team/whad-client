@@ -77,7 +77,7 @@ class Logitech_Set_Keepalive_Payload(Packet):
     fields_desc = [
         ByteField("unused", None),
         ShortField('timeout',1200),
-        IntField("unused_2",0x10000000)
+        IntField("unused_2",None)
     ]
 
 class Logitech_Mouse_Payload(Packet):

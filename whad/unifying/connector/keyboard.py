@@ -69,6 +69,7 @@ class Keyboard(Unifying):
 
     def stop(self):
         self.__started = False
+        self.unlock()
         super().stop()
 
     @property
@@ -89,6 +90,12 @@ class Keyboard(Unifying):
 
     def synchronize(self,timeout=10):
         return self.__stack.ll.synchronize(timeout=10)
+
+    def lock(self):
+        return self.__stack.app.lock_channel()
+
+    def unlock(self):
+        return self.__stack.app.unlock_channel()
 
     def send_text(self, text):
         for key in text:

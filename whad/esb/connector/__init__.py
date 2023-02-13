@@ -81,7 +81,7 @@ class ESB(WhadDeviceConnector):
         except AttributeError:
             return None
 
-    def _build_message_from_scapy_packet(self, packet, channel=None, retransmission_count=15):
+    def _build_message_from_scapy_packet(self, packet, channel=None, retransmission_count=1):
         msg = Message()
 
         self._signal_packet_transmission(packet)
@@ -89,7 +89,6 @@ class ESB(WhadDeviceConnector):
         if ESB_Hdr in packet:
             msg.esb.send_raw.channel = channel if channel is not None else 0xFF
             packet.preamble = 0xAA
-            # print(">", bytes(packet).hex())
             msg.esb.send_raw.pdu = bytes(packet)
             msg.esb.send_raw.retransmission_count = retransmission_count
         elif ESB_Payload_Hdr in packet:
@@ -126,14 +125,14 @@ class ESB(WhadDeviceConnector):
             self.__can_send = ((commands & (1 << Send))>0 or (commands & (1 << SendRaw)))
         return self.__can_send
 
-    def send(self,pdu, address=None, channel=None, retransmission_count=15):
+    def send(self,pdu, address=None, channel=None, retransmission_count=1):
         """
         Send Enhanced ShockBurst packets (on a single channel).
         """
         if self.can_send():
             if self.support_raw_pdu():
                 if ESB_Hdr not in pdu:
-                    packet = ESB_Hdr(address) / pacjet
+                    packet = ESB_Hdr(address) / pdu
                 else:
                     packet = pdu
             elif ESB_Hdr in pdu:

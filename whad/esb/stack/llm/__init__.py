@@ -94,7 +94,7 @@ class EsbLinkLayerManager:
                 return ack
             except LinkLayerTimeoutException:
                 self.__ackmiss += 1
-                if self.__ackmiss > 3:
+                if self.__ackmiss > 10:
                     self.__ackmiss = 0
                     if self.__synchronized:
                         self.__synchronized = False
@@ -106,7 +106,7 @@ class EsbLinkLayerManager:
             self._increment_pid()
             if not acked:
                 self.__ackmiss += 1
-                if self.__ackmiss > 3:
+                if self.__ackmiss > 10:
                     self.__ackmiss = 0
                     if self.__synchronized:
                         self.__synchronized = False

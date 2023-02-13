@@ -29,6 +29,12 @@ class Mouse(Unifying):
         self._enable_role()
 
 
+    def lock(self):
+        return self.__stack.app.lock_channel()
+
+    def unlock(self):
+        return self.__stack.app.unlock_channel()
+
     def _enable_role(self):
         if self.__started:
             super().stop()
@@ -52,6 +58,7 @@ class Mouse(Unifying):
 
     def stop(self):
         self.__started = False
+        self.unlock()
         super().stop()
 
     @property
