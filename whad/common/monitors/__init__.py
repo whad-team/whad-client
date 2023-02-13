@@ -1,4 +1,7 @@
+import logging
 from whad.device import WhadDeviceConnector
+
+logger = logging.getLogger(__name__)
 
 class WhadMonitor:
     """
@@ -28,11 +31,13 @@ class WhadMonitor:
             if self.__monitor_reception:
                 self._connector.attach_callback(self.process_packet, on_reception = True)
                 #print("[i] reception callback attached.")
+                logger.debug("monitor: reception callback attached.")
                 success = True
 
             if self.__monitor_transmission:
                 self._connector.attach_callback(self.process_packet, on_transmission = True)
                 #print("[i] transmission callback attached.")
+                logger.debug("monitor: transmission callback attached.")
                 success = True
         return success
 
@@ -42,6 +47,7 @@ class WhadMonitor:
 
         :returns: boolean indicating the success of detach operation
         """
+        logger.debug("monitor: detaching callbacks.")
         success = False
         if self._connector is not None:
             if self.__monitor_reception:
