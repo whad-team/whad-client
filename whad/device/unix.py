@@ -252,8 +252,14 @@ class UnixSocketConnector(WhadDeviceConnector):
                         raw_message = self.__inpipe[4:4+msg_size]
                         _msg = Message()
                         _msg.ParseFromString(bytes(raw_message))
+                                                
+                        # Send to device
                         logger.debug('WHAD message successfully parsed, forward to underlying device')
                         self.device.send_message(_msg)
+
+                        # Notify message
+                        self.on_msg_sent(_msg)
+
                         # Chomp
                         self.__inpipe = self.__inpipe[msg_size + 4:]
                     else:
@@ -344,6 +350,8 @@ class UnixSocketConnector(WhadDeviceConnector):
         except BrokenPipeError as err:
             logger.debug('Client socket disconnected')
 
+    def on_msg_sent(self, message):
+        pass
 
     def on_generic_msg(self, generic_message):
         """Callback function to process incoming generic messages.
@@ -388,7 +396,7 @@ class UnixSocketProxy(Thread):
     a set of parameters that will be passed to the next (piped) tool.
     """
 
-    def __init__(self, interface, params):
+    def __init__(self, interface, params, connector=UnixSocketConnector):
         """Create a Unix socket proxy.
 
         :param WhadDevice   interface   WHAD interface to proxify
@@ -397,6 +405,19 @@ class UnixSocketProxy(Thread):
         super().__init__()
         self.__interface = interface
         self.__params = params
+
+        # Connected, switch to a unix socket server
+        self.__connector = connector(self.__interface)
+        for param in self.__params:
+            self.__connector.add_parameter(param, self.__params[param])
+
+    @property
+    def interface(self):
+        return self.__interface
+
+    @property
+    def connector(self):
+        return self.__connector
 
     def run(self):
         """Run device proxy thread.
@@ -408,8 +429,4 @@ class UnixSocketProxy(Thread):
 
         This method ends when client disconnects.
         """
-        # Connected, switch to a unix socket server
-        unix_serv = UnixSocketConnector(self.__interface)
-        for param in self.__params:
-            unix_serv.add_parameter(param, self.__params[param])    
-        unix_serv.serve()
+        self.__connector.serve()
