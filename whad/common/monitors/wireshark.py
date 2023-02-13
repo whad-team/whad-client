@@ -42,6 +42,8 @@ class WiresharkMonitor(PcapWriterMonitor):
         )
 
     def attach(self, connector):
+        """Attach to connector
+        """
         if isinstance(connector, ESB) or isinstance(connector, Unifying):
                 self.dissector = WiresharkMonitor.get_dissector("esb")
         return super().attach(connector)
