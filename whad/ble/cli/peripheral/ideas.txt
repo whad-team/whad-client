@@ -5,6 +5,40 @@ Usage:
 
 $ ble-periph -i <interface> [profile json]
 
+
+managing services:
+
+- add a new service: service add <UUID>
+- remove a service: service remove <UUID>
+- edit a service: service edit <UUID> => select service
+- back to normal: back
+
+managing characteristics (in service edit mode):
+
+- add a characteristic: char add <UUID> [perms list]
+- set a characteristic value: char set <value>
+- remove a characteristic: char remove <UUID>
+- list characteristics: char list
+
+list profile:
+
+- display profile: profile
+
+set advertising data:
+
+- ad list
+- ad add <ad type> <ad value>
+
+and some helpers:
+
+- name <device name>
+- bdaddr <bd address>
+
+
+
+
+
+
 Editing services and characteristics
 
 * service add UUID
