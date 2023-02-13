@@ -4,14 +4,7 @@ This utility will configure a compatible whad device to connect to a given
 BLE device, and chain this with another tool.
 
 """
-import os
-import signal
-import sys
-import fcntl
-import select
-import traceback
 from time import sleep
-from threading import Thread
 from whad.cli.app import CommandLineApp
 from whad.ble.connector import Central
 from whad.device.unix import UnixSocketProxy
