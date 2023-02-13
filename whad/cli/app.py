@@ -1,14 +1,11 @@
 """Command-line interface application module
 """
-import pty
 import os
 import sys
-import re
 import select
 import fcntl
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
-from prompt_toolkit.styles import Style
 from urllib.parse import urlparse, parse_qsl
 from signal import signal, SIGPIPE, SIG_DFL  
 
@@ -325,7 +322,6 @@ class CommandLineApp(ArgumentParser):
         """
         # If stdout is piped, foward socket info to next tool
         if isinstance(self.__interface, UnixSocketDevice) and self.is_stdout_piped():
-            logger.error('forward socket info: %s' % self.__interface_path)
             sys.stdout.write('%s\n' % self.__interface_path)
             sys.stdout.flush()
 
