@@ -77,5 +77,15 @@ def generate_ble_metadata(message, msg_type):
         metadata.direction = message.direction
         metadata.decrypted = message.decrypted
 
+    elif msg_type == "send_pdu":
+        message = message.send_pdu
+        metadata.connection_handle = message.conn_handle
+        metadata.direction = message.direction
+
+    elif msg_type == "send_raw_pdu":
+        message = message.send_raw_pdu
+        metadata.direction = message.direction
+        metadata.crc = message.crc
+        metadata.connection_handle = message.conn_handle
 
     return metadata
