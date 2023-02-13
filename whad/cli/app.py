@@ -10,6 +10,7 @@ from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
 from prompt_toolkit.styles import Style
 from urllib.parse import urlparse, parse_qsl
+from signal import signal, SIGPIPE, SIG_DFL  
 
 from whad.device import WhadDevice, UnixSocketDevice
 from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound, \
@@ -17,6 +18,8 @@ from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound, \
 
 import logging
 logger = logging.getLogger(__name__)
+
+signal(SIGPIPE,SIG_DFL)
 
 class command(object):
     """CommandLineApp command decorator.
@@ -281,6 +284,7 @@ class CommandLineApp(ArgumentParser):
                         # parse URL
                         url_info = urlparse(line)
                         if url_info.scheme == 'unix' and url_info.path is not None:
+                            self.__interface_path = line
                             self.__is_interface_piped = True
 
                             # Create a Unix socket device and connect it to the
@@ -296,6 +300,8 @@ class CommandLineApp(ArgumentParser):
 
                             # We're done
                             break
+                        else:
+                            print(line)
         else:           
             # If interface is provided, instantiate it and make it available
             if self.__has_interface:
@@ -317,7 +323,11 @@ class CommandLineApp(ArgumentParser):
     def post_run(self):
         """Implement post-run tasks.
         """
-        pass
+        # If stdout is piped, foward socket info to next tool
+        if isinstance(self.__interface, UnixSocketDevice) and self.is_stdout_piped():
+            logger.error('forward socket info: %s' % self.__interface_path)
+            sys.stdout.write('%s\n' % self.__interface_path)
+            sys.stdout.flush()
 
 
     def run(self, pre=True, post=True):

@@ -106,6 +106,7 @@ class UnixSocketDevice(WhadDevice):
         """
         Close current device.
         """
+        logger.error('socket close')
         # Close underlying device.
         if self.__socket is not None:
             self.__socket.close()
@@ -153,25 +154,27 @@ class UnixSocketDevice(WhadDevice):
         our parsing method through on_data_received() that will handle data reassembling
         and message parsing and dispatch.
         """
+        try:
+            if not self.__opened:
+                raise WhadDeviceNotReady()
 
-        if not self.__opened:
-            raise WhadDeviceNotReady()
+            rlist = [self.__fileno]
+            wlist = []
+            elist = [self.__fileno]
 
-        rlist = [self.__fileno]
-        wlist = []
-        elist = [self.__fileno]
+            readers,writers,errors = select.select(
+                rlist,
+                wlist,
+                elist,
+                1
+            )
 
-        readers,writers,errors = select.select(
-            rlist,
-            wlist,
-            elist,
-            1
-        )
-
-        # Handle incoming messages if any
-        if len(readers) > 0:
-            data = self.__socket.recv(1024)
-            self.on_data_received(data)
+            # Handle incoming messages if any
+            if len(readers) > 0:
+                data = self.__socket.recv(1024)
+                self.on_data_received(data)
+        except ConnectionResetError as err:
+            logger.error('Connection reset by peer')
 
     def change_transport_speed(self, speed):
         """Not supported by Unix socket devices.
@@ -274,34 +277,44 @@ class UnixSocketConnector(WhadDeviceConnector):
         """
         logger.debug('Creating Unix socket server')
         self.__socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.__socket.settimeout(0.5)
         self.__socket.bind(self.__path)
-        self.__socket.listen(1)
+        self.__socket.listen(5)
 
         logger.debug('Publishing unix socket info')
         sys.stdout.write(self.get_url())
         sys.stdout.flush()
 
         try:
-            self.__client,_ = self.__socket.accept()
             while True:
-                rlist = [self.__client.fileno()]
-                readers,writers,errors = select.select(rlist, [], rlist, timeout)
+                self.__client,_ = self.__socket.accept()
+                try:
+                    while True:
+                        rlist = [self.__client.fileno()]
+                        readers,writers,errors = select.select(rlist, [], rlist, timeout)
+                        
+                        # Do we have pending data ?
+                        if len(readers) > 0:
+                            data = self.__client.recv(4096)
+                            # Is socket closed ?
+                            if len(data) == 0:
+                                # Exit serve loop
+                                break
+                            else:
+                                self.on_data_received(data)
+                        elif len(errors) > 0:
+                            logger.debug('Error detected on server socket, exiting.')
+                            break               
+                except ConnectionResetError as err:
+                    pass
                 
-                # Do we have pending data ?
-                if len(readers) > 0:
-                    data = self.__client.recv(4096)
-                    # Is socket closed ?
-                    if len(data) == 0:
-                        # Exit serve loop
-                        break
-                    else:
-                        self.on_data_received(data)
-                elif len(errors) > 0:
-                    logger.debug('Error detected on server socket, exiting.')
-                    break
-        except ConnectionResetError as err:
-            logger.debug('Client closed connection.')
+                self.__client = None
+                
+        except BrokenPipeError as err:
+            logger.error('Broken pipe.')
             self.__client = None
+        except Exception as other_err:
+            pass
 
     # Message callbacks
     def on_any_msg(self, message):

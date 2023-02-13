@@ -11,6 +11,9 @@ from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.central.helpers import show_att_error
 
+import logging
+logger = logging.getLogger(__name__)
+
 from argparse import Namespace
 
 def read_gatt_characteristic(app, command_args, device):
@@ -157,7 +160,7 @@ def read_handler(app, command_args):
         read_gatt_characteristic(app, command_args, device)
 
         # Disconnect
-        device.disconnect()
-        central.stop()
+        #device.disconnect()
+        #central.stop()
     else:
         app.error('You need to specify a target device with option --bdaddr.')
