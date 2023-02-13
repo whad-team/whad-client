@@ -55,6 +55,7 @@ class InteractiveShell(object):
         self.__prompt = default_prompt
         self.__quit = False
         self.__env = {}
+        self.__session = None
 
         # Search specific commands named 'do_$command$'
         for member_name in dir(self):
@@ -83,8 +84,6 @@ class InteractiveShell(object):
                         # No autocomplete found
                         self.__commands_ac[command] = None
 
-        self.__session = PromptSession(completer=DynamicCompleter(self.update_autocomplete))
-
 
     def set_prompt(self, prompt, force_update=False):
         """Set interactive shell prompt.
@@ -92,7 +91,7 @@ class InteractiveShell(object):
         :param str prompt: Prompt
         """
         self.__prompt = prompt
-        if force_update:
+        if force_update and self.__session is not None:
             # We modify the `_message` attribute of our session
             # from the outside
             self.__session.message = self.__prompt
@@ -142,6 +141,7 @@ class InteractiveShell(object):
         """Run the interactive shell.
         """
         try:
+            self.__session = PromptSession(completer=DynamicCompleter(self.update_autocomplete))
             while not self.__quit:
                 input = self.__session.prompt(self.__prompt)
                 res = self.process(input)
