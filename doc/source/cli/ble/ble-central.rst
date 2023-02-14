@@ -420,8 +420,8 @@ shell:
 
 And the following output in Wireshark:
 
-.. image:: ble-central/wireshark-monitor.png
-   :width: 600
+.. image:: ../../_static/ble-central/wireshark-monitor.png
+    :width: 600
 
 Quick tutorial
 --------------

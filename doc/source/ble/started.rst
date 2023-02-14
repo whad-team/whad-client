@@ -75,7 +75,7 @@ and read its value:
         print('Value: %s' % charac.value)
 
 Write to characteristic
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 To write a value into a characteristic, this is as simple as reading one:
 
