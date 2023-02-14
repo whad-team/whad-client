@@ -82,7 +82,7 @@ class Scanner(BLE):
 
             message = self.wait_for_message(filter=message_filter('ble', message_type))
             # Convert message from rebuilt PDU
-            packet = self._build_scapy_packet_from_message(message.ble, message_type)
+            packet = self.translator.from_message(message.ble, message_type)
             # Force TxAdd value to propagate the address type
             if message.ble.adv_pdu.addr_type > 0:
                 packet.getlayer(BTLE_ADV).TxAdd = 1
