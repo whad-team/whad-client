@@ -69,13 +69,13 @@ class ESB(WhadDeviceConnector):
                 packet = ESB_Hdr(bytes(message.raw_pdu.pdu))
                 packet.preamble = 0xAA # force a rebuild
                 packet.metadata = generate_esb_metadata(message, msg_type)
-                self._signal_packet_reception(packet)
+                self.monitor_packet_rx(packet)
                 return packet
 
             elif msg_type == 'pdu':
                 packet = ESB_Payload_Hdr(bytes(message.pdu.pdu))
                 packet.metadata = generate_esb_metadata(message, msg_type)
-                self._signal_packet_reception(packet)
+                self.monitor_packet_rx(packet)
                 return packet
 
         except AttributeError:
@@ -84,7 +84,7 @@ class ESB(WhadDeviceConnector):
     def _build_message_from_scapy_packet(self, packet, channel=None, retransmission_count=15):
         msg = Message()
 
-        self._signal_packet_transmission(packet)
+        self.monitor_packet_tx(packet)
 
         if ESB_Hdr in packet:
             msg.esb.send_raw.channel = channel if channel is not None else 0xFF
@@ -133,7 +133,7 @@ class ESB(WhadDeviceConnector):
         if self.can_send():
             if self.support_raw_pdu():
                 if ESB_Hdr not in pdu:
-                    packet = ESB_Hdr(address) / pacjet
+                    packet = ESB_Hdr(address) / packet
                 else:
                     packet = pdu
             elif ESB_Hdr in pdu:

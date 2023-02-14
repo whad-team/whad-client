@@ -16,6 +16,7 @@ from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.ble.metadata import generate_ble_metadata, BLEMetadata
+from whad.ble.connector.translator import BleMessageTranslator
 from whad.helpers import message_filter, bd_addr_to_bytes
 from whad.ble.profile.advdata import AdvDataFieldList
 from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
@@ -46,23 +47,8 @@ class BLE(WhadDeviceConnector):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
-        formatted_packet = packet
-        if BTLE not in packet:
-            if BTLE_ADV in packet:
-                formatted_packet = BTLE(access_addr=0x8e89bed6)/packet
-            elif BTLE_DATA in packet:
-                # We are forced to use a pseudo access address for connections in this case.
-                formatted_packet = BTLE(access_addr=0x11223344) / packet
+        return self.__translator.format(packet)
 
-        timestamp = None
-        if hasattr(packet, "metadata"):
-            header, timestamp = packet.metadata.convert_to_header()
-            formatted_packet = header / formatted_packet
-        else:
-            header = BTLE_RF()
-            formatted_packet = header / formatted_packet
-
-        return formatted_packet, timestamp
 
     def __init__(self, device=None):
             """
@@ -92,80 +78,13 @@ class BLE(WhadDeviceConnector):
             else:
                 self.__ready = True
 
+            # Initialize translator
+            self.__translator = BleMessageTranslator()
+
+
     def close(self):
         self.device.close()
 
-    def _build_scapy_packet_from_message(self, message, msg_type):
-        try:
-            if msg_type == 'adv_pdu':
-                if message.adv_pdu.adv_type in BLE.SCAPY_CORR_ADV:
-                    data = bytes(message.adv_pdu.adv_data)
-
-                    packet = BTLE_ADV()/BLE.SCAPY_CORR_ADV[message.adv_pdu.adv_type](
-                            bytes(message.adv_pdu.bd_address) + data
-                        )
-                    packet.metadata = generate_ble_metadata(message, msg_type)
-                    self._signal_packet_reception(packet)
-
-                    return packet
-
-            elif msg_type == 'raw_pdu':
-                packet = BTLE(bytes(struct.pack("I", message.raw_pdu.access_address)) + bytes(message.raw_pdu.pdu) + bytes(struct.pack(">I", message.raw_pdu.crc)[1:]))
-                packet.metadata = generate_ble_metadata(message, msg_type)
-
-                self._signal_packet_reception(packet)
-                return packet
-
-            elif msg_type == 'pdu':
-                packet = BTLE_DATA(message.pdu.pdu)
-                packet.metadata = generate_ble_metadata(message, msg_type)
-
-                self._signal_packet_reception(packet)
-                return packet
-
-        except AttributeError as err:
-            print(err)
-            return None
-
-    def _build_message_from_scapy_packet(self, packet, encrypt=False):
-        msg = Message()
-        direction = packet.metadata.direction
-        connection_handle = packet.metadata.connection_handle
-
-        self._signal_packet_transmission(packet)
-
-        if BTLE in packet:
-            msg.ble.send_raw_pdu.direction = direction
-            msg.ble.send_raw_pdu.conn_handle = connection_handle
-            msg.ble.send_raw_pdu.crc = BTLE(raw(packet)).crc # force the CRC to be generated if not provided
-            msg.ble.send_raw_pdu.access_address = BTLE(raw(packet)).access_addr
-
-            msg.ble.send_raw_pdu.encrypt = encrypt
-
-            if BTLE_DATA in packet:
-                msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_DATA:])
-            elif BTLE_CTRL in packet:
-                msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_CTRL:])
-            elif BTLE_ADV in packet:
-                msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_ADV:])
-            else:
-                return None
-
-        else:
-            msg.ble.send_pdu.direction = direction
-            msg.ble.send_pdu.conn_handle = connection_handle
-            msg.ble.send_pdu.encrypt = encrypt
-
-            if BTLE_DATA in packet:
-                msg.ble.send_pdu.pdu = raw(packet[BTLE_DATA:])
-            elif BTLE_CTRL in packet:
-                msg.ble.send_pdu.pdu = raw(packet[BTLE_CTRL:])
-            elif BTLE_ADV in packet:
-                msg.ble.send_pdu.pdu = raw(packet[BTLE_ADV:])
-            else:
-                return None
-
-        return msg
 
     def support_raw_pdu(self):
         """
@@ -712,24 +631,35 @@ class BLE(WhadDeviceConnector):
         if domain == 'ble':
             msg_type = message.WhichOneof('msg')
             if msg_type == 'adv_pdu':
-                packet = self._build_scapy_packet_from_message(message, msg_type)
-                self.on_adv_pdu(packet)
+                packet = self.__translator.from_message(message, msg_type)
+                if packet is not None:
+                    self.monitor_packet_rx(packet)
+                    self.on_adv_pdu(packet)
 
             elif msg_type == 'pdu':
                 if message.pdu.processed:
-                    packet = self._build_scapy_packet_from_message(message, msg_type)
-                    logger.info('[ble PDU log-only]')
+                    packet = self.__translator.from_message(message, msg_type)
+                    if packet is not None:
+                        self.monitor_packet_rx(packet)
+                        logger.info('[ble PDU log-only]')
                 else:
-                    packet = self._build_scapy_packet_from_message(message, msg_type)
-                    self.on_pdu(packet)
+                    packet = self.__translator.from_message(message, msg_type)
+                    if packet is not None:
+                        self.monitor_packet_rx(packet)
+                        self.on_pdu(packet)
 
             elif msg_type == 'raw_pdu':
                 if message.raw_pdu.processed:
-                    logger.info('[ble PDU log-only]')
+                    packet = self.__translator.from_message(message, msg_type)
+                    if packet is not None:
+                        self.monitor_packet_rx(packet)
+                        logger.info('[ble PDU log-only]')
                 else:
                     # Extract scapy packet
-                    packet = self._build_scapy_packet_from_message(message, msg_type)
-                    self.on_raw_pdu(packet)
+                    packet = self.__translator.from_message(message, msg_type)
+                    if packet is not None:
+                        self.monitor_packet_rx(packet)
+                        self.on_raw_pdu(packet)
 
             elif msg_type == 'synchronized':
                 self.on_synchronized(
@@ -840,10 +770,12 @@ class BLE(WhadDeviceConnector):
             # otherwise consider using the internal link-layer encryption status
             if encrypt is not None and isinstance(encrypt, bool):
                 logger.info('[ble connector] encrypt is specified (%s)' % encrypt)
-                msg = self._build_message_from_scapy_packet(packet, encrypt)
+                #msg = self._build_message_from_scapy_packet(packet, encrypt)
+                msg = self.__translator.from_packet(packet, encrypt)
             else:
                 logger.info('[ble connector] link-layer encryption: %s' % self.__encrypted)
-                msg = self._build_message_from_scapy_packet(packet, self.__encrypted)
+                #msg = self._build_message_from_scapy_packet(packet, self.__encrypted)
+                msg = self.__translator.from_packet(packet, self.__encrypted)
 
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)

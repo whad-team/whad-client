@@ -70,13 +70,13 @@ class Zigbee(WhadDeviceConnector):
             if msg_type == 'raw_pdu':
                 packet = Dot15d4FCS(bytes(message.raw_pdu.pdu) + bytes(pack(">H", message.raw_pdu.fcs)))
                 packet.metadata = generate_zigbee_metadata(message, msg_type)
-                self._signal_packet_reception(packet)
+                self.monitor_packet_rx(packet)
                 return packet
 
             elif msg_type == 'pdu':
                 packet = Dot15d4(bytes(message.pdu.pdu))
                 packet.metadata = generate_zigbee_metadata(message, msg_type)
-                self._signal_packet_reception(packet)
+                self.monitor_packet_rx(packet)
                 return packet
 
         except AttributeError:
@@ -85,7 +85,7 @@ class Zigbee(WhadDeviceConnector):
     def _build_message_from_scapy_packet(self, packet, channel=11):
         msg = Message()
 
-        self._signal_packet_transmission(packet)
+        self.monitor_packet_tx(packet)
 
         if Dot15d4FCS in packet:
             msg.zigbee.send_raw.channel = channel

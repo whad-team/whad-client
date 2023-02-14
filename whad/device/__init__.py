@@ -5,7 +5,8 @@ from queue import Queue, Empty
 from binascii import hexlify
 
 # Whad imports
-from whad.exceptions import RequiredImplementation, UnsupportedDomain, WhadDeviceNotReady, WhadDeviceNotFound
+from whad.exceptions import RequiredImplementation, UnsupportedDomain, \
+    WhadDeviceNotReady, WhadDeviceNotFound, WhadDeviceDisconnected
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery
@@ -142,6 +143,7 @@ class WhadDeviceInfo(object):
         """
         return self.__domains.keys()
 
+
 class WhadDeviceConnector(object):
     """
     Device connector.
@@ -245,7 +247,7 @@ class WhadDeviceConnector(object):
         return len(callbacks_dicts) > 0
 
 
-    def _signal_packet_transmission(self, packet):
+    def monitor_packet_tx(self, packet):
         """
         Signals the transmission of a packet and triggers execution of matching transmission callbacks.
 
@@ -262,7 +264,7 @@ class WhadDeviceConnector(object):
         self.__callbacks_lock.release()
 
 
-    def _signal_packet_reception(self, packet):
+    def monitor_packet_rx(self, packet):
         """
         Signals the reception of a packet and triggers execution of matching reception callbacks.
 
@@ -390,7 +392,10 @@ class WhadDeviceInputThread(Thread):
         is canceled.
         """
         while not self.__canceled:
-            self.__device.read()
+            try:
+                self.__device.read()
+            except WhadDeviceDisconnected as err:
+                break
         logger.info('Device IO thread canceled and stopped.')
 
 class WhadDeviceMessageThread(Thread):

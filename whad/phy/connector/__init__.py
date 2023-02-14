@@ -54,13 +54,13 @@ class Phy(WhadDeviceConnector):
             if msg_type == 'raw_packet':
                 packet = Phy_Packet(bytes(message.raw_packet.packet))
                 packet.metadata = generate_phy_metadata(message, msg_type)
-                self._signal_packet_reception(packet)
+                self.monitor_packet_rx(packet)
                 return packet
 
             elif msg_type == 'packet':
                 packet = Phy_Packet(bytes(message.packet.packet))
                 packet.metadata = generate_phy_metadata(message, msg_type)
-                self._signal_packet_reception(packet)
+                self.monitor_packet_rx(packet)
                 return packet
 
         except AttributeError:

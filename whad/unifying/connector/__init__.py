@@ -70,13 +70,13 @@ class Unifying(WhadDeviceConnector):
                 packet = ESB_Hdr(bytes(message.raw_pdu.pdu))
                 packet.preamble = 0xAA # force a rebuild
                 packet.metadata = generate_esb_metadata(message, msg_type)
-                self._signal_packet_reception(packet)
+                self.monitor_packet_rx(packet)
                 return packet
 
             elif msg_type == 'pdu':
                 packet = ESB_Payload_Hdr(bytes(message.pdu.pdu))
                 packet.metadata = generate_esb_metadata(message, msg_type)
-                self._signal_packet_reception(packet)
+                self.monitor_packet_rx(packet)
                 return packet
 
         except AttributeError:
@@ -84,7 +84,7 @@ class Unifying(WhadDeviceConnector):
 
     def _build_message_from_scapy_packet(self, packet, channel=None, retransmission_count=15):
         msg = Message()
-        self._signal_packet_transmission(packet)
+        self.monitor_packet_rx(packet)
 
         if ESB_Hdr in packet:
             msg.unifying.send_raw.channel = channel if channel is not None else 0xFF
