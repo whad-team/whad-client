@@ -1,6 +1,7 @@
 """
 Logitech Unifying applicative layer.
 """
+from whad.esb.stack.llm.constants import ESBRole
 from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Mouse_Payload, Logitech_Set_Keepalive_Payload, \
     Logitech_Keepalive_Payload, Logitech_Unencrypted_Keystroke_Payload, Logitech_Encrypted_Keystroke_Payload, \
     Logitech_Multimedia_Key_Payload
@@ -51,20 +52,19 @@ class UnifyingApplicativeLayerManager:
     def _stop_timeout_thread(self):
         if self.__timeout_thread is not None:
             self.__transmit_timeouts = False
-            print("here")
             self.__timeout_thread.join()
             self.__timeout_thread = None
 
     def _transmit_timeouts_thread(self):
-        while self.__transmit_timeouts:
+        while self.__transmit_timeouts or not self.__packets_queue.empty():
+            self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250))
             try:
-                packet = self.__packets_queue.get(timeout=0.1, block=False)
-                self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250))
+                packet = self.__packets_queue.get(timeout=0.01, block=False)
                 self.send_message(packet)
                 self.send_message(Logitech_Keepalive_Payload(timeout=1250))
             except Empty:
-                self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250))
                 self.send_message(Logitech_Keepalive_Payload(timeout=1250))
+                sleep(0.01)
         print("stopped.")
 
     def send_message(self, message, waiting_ack=False):
@@ -85,6 +85,10 @@ class UnifyingApplicativeLayerManager:
     @role.setter
     def role(self, role):
         self.__role = role
+        if self.__role == UnifyingRole.DONGLE:
+            self.__llm.role = ESBRole.PRX
+        else:
+            self.__role = ESBRole.PTX
 
     @property
     def key(self):
@@ -257,7 +261,7 @@ class UnifyingApplicativeLayerManager:
         print("[i] Desynchronized.")
 
     def on_data(self, data):
-        pass
+        data.show()
 
     def on_acknowledgement(self, ack):
-        print("acked")
+        pass

@@ -418,9 +418,9 @@ class RFStormDevice(VirtualDevice):
         if self.__channel == 0xFF:
             self.__scanning = True
             self.__channel = 0
-
+        else:
+            self.__scanning = False
         success = self._rfstorm_set_channel(self.__channel)
-
         if self.__internal_state == RFStormInternalStates.SNIFFING:
             success = success and self._rfstorm_sniffer_mode(self.__address[::-1])
         elif self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:

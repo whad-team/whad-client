@@ -21,13 +21,14 @@ if __name__ == '__main__':
             connector = Keyboard(dev)
             connector.start()
             #connector.attach_callback(show, on_reception=True, on_transmission=False)
-            connector.channel = 35
             connector.address = "9b:0a:90:42:96"
 
             connector.key = bytes.fromhex("08f59b42d06fd3bdc588cd4d1c244018")
             connector.aes_counter = 0
 
             connector.synchronize()
+            connector.lock()
+
             time.sleep(1)
             connector.volume_up()
             time.sleep(1)
@@ -40,7 +41,7 @@ if __name__ == '__main__':
             connector.send_text("le petit bonhomme en mousse qui s'échappe et puis qui saute le plongeoir")
             time.sleep(1)
             connector.send_key("ENTER")
-
+            connector.unlock()
             connector.stop()
         except (KeyboardInterrupt, SystemExit):
             connector.stop()

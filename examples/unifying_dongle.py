@@ -1,4 +1,4 @@
-from whad.unifying import Keylogger, Mouselogger, Mouse
+from whad.unifying import Dongle
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from whad.scapy.layers.esb import *
@@ -18,25 +18,16 @@ if __name__ == '__main__':
         try:
             dev = WhadDevice.create(interface)
 
-            connector = Mouse(dev)
-            connector.attach_callback(show, on_reception=True, on_transmission=False)
+            connector = Dongle(dev)
             connector.start()
+            #connector.attach_callback(show, on_reception=True, on_transmission=False)
+            connector.address = "9b:0a:90:42:00"
             connector.channel = 5
-            connector.address =  "9b:0a:90:42:96"
-            connector.synchronize()
-            for _ in range(10):
-                connector.move(-100, 0)
+            input()
+            connector.address = "9b:0a:90:42:96"
+
+            while True:
                 time.sleep(1)
-
-            connector.unlock()
-            time.sleep(3)
-            connector.lock()
-
-            for _ in range(10):
-                connector.move(100, 0)
-                time.sleep(1)
-            connector.stop()
-
         except (KeyboardInterrupt, SystemExit):
             connector.stop()
             dev.close()
