@@ -47,7 +47,7 @@ class BLE(WhadDeviceConnector):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
-        return self.__translator.format(packet)
+        return self.translator.format(packet)
 
 
     def __init__(self, device=None):
@@ -79,7 +79,7 @@ class BLE(WhadDeviceConnector):
                 self.__ready = True
 
             # Initialize translator
-            self.__translator = BleMessageTranslator()
+            self.translator = BleMessageTranslator()
 
 
     def close(self):
@@ -631,32 +631,32 @@ class BLE(WhadDeviceConnector):
         if domain == 'ble':
             msg_type = message.WhichOneof('msg')
             if msg_type == 'adv_pdu':
-                packet = self.__translator.from_message(message, msg_type)
+                packet = self.translator.from_message(message, msg_type)
                 if packet is not None:
                     self.monitor_packet_rx(packet)
                     self.on_adv_pdu(packet)
 
             elif msg_type == 'pdu':
                 if message.pdu.processed:
-                    packet = self.__translator.from_message(message, msg_type)
+                    packet = self.translator.from_message(message, msg_type)
                     if packet is not None:
                         self.monitor_packet_rx(packet)
                         logger.info('[ble PDU log-only]')
                 else:
-                    packet = self.__translator.from_message(message, msg_type)
+                    packet = self.translator.from_message(message, msg_type)
                     if packet is not None:
                         self.monitor_packet_rx(packet)
                         self.on_pdu(packet)
 
             elif msg_type == 'raw_pdu':
                 if message.raw_pdu.processed:
-                    packet = self.__translator.from_message(message, msg_type)
+                    packet = self.translator.from_message(message, msg_type)
                     if packet is not None:
                         self.monitor_packet_rx(packet)
                         logger.info('[ble PDU log-only]')
                 else:
                     # Extract scapy packet
-                    packet = self.__translator.from_message(message, msg_type)
+                    packet = self.translator.from_message(message, msg_type)
                     if packet is not None:
                         self.monitor_packet_rx(packet)
                         self.on_raw_pdu(packet)
@@ -707,7 +707,7 @@ class BLE(WhadDeviceConnector):
         logger.info('a connection has been terminated')
         for trigger in self.__triggers:
             self.delete_sequence(trigger)
-            
+
     def on_raw_pdu(self, packet):
 
         if BTLE_ADV in packet:
@@ -771,11 +771,11 @@ class BLE(WhadDeviceConnector):
             if encrypt is not None and isinstance(encrypt, bool):
                 logger.info('[ble connector] encrypt is specified (%s)' % encrypt)
                 #msg = self._build_message_from_scapy_packet(packet, encrypt)
-                msg = self.__translator.from_packet(packet, encrypt)
+                msg = self.translator.from_packet(packet, encrypt)
             else:
                 logger.info('[ble connector] link-layer encryption: %s' % self.__encrypted)
                 #msg = self._build_message_from_scapy_packet(packet, self.__encrypted)
-                msg = self.__translator.from_packet(packet, self.__encrypted)
+                msg = self.translator.from_packet(packet, self.__encrypted)
 
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
