@@ -82,7 +82,7 @@ class Unifying(WhadDeviceConnector):
         except AttributeError:
             return None
 
-    def _build_message_from_scapy_packet(self, packet, channel=None, retransmission_count=15):
+    def _build_message_from_scapy_packet(self, packet, channel=None, retransmission_count=1):
         msg = Message()
         self.monitor_packet_rx(packet)
 
@@ -125,7 +125,7 @@ class Unifying(WhadDeviceConnector):
             self.__can_send = ((commands & (1 << Send))>0 or (commands & (1 << SendRaw)))
         return self.__can_send
 
-    def send(self,pdu, address=None, channel=None, retransmission_count=15):
+    def send(self,pdu, address=None, channel=None, retransmission_count=1):
         """
         Send Logitech Unifying packets (on a single channel).
         """

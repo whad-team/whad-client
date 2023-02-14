@@ -19,16 +19,26 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             connector = Mouse(dev)
-            #connector.attach_callback(show, on_reception=True, on_transmission=False)
+            connector.attach_callback(show, on_reception=True, on_transmission=False)
             connector.start()
             connector.channel = 5
-            connector.address = "ca:e9:06:ec:a4"#"9b:0a:90:42:93"
+            connector.address = "ca:e9:06:ec:a4"
             connector.synchronize()
+            for _ in range(10):
+                connector.move(-100, 0)
+                time.sleep(1)
 
-            while True:
-                print(connector.move(-10, 0))
+            connector.unlock()
+            time.sleep(3)
+            connector.lock()
+
+            for _ in range(10):
+                connector.move(100, 0)
+                time.sleep(1)
+            connector.stop()
 
         except (KeyboardInterrupt, SystemExit):
+            connector.stop()
             dev.close()
 
         except WhadDeviceNotFound:

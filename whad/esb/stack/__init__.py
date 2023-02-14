@@ -55,7 +55,7 @@ class ESBStack:
     def set_address(self, address):
         self.__connector.address = address
 
-    def send(self, packet, channel=None, retransmission_count=15):
+    def send(self, packet, channel=None, retransmission_count=1):
         if channel is None:
             channel = self.__connector.channel
         return self.__connector.send(packet, channel=channel, retransmission_count=retransmission_count)
