@@ -159,8 +159,5 @@ def read_handler(app, command_args):
         # Read GATT characteristic
         read_gatt_characteristic(app, command_args, device)
 
-        # Disconnect
-        #device.disconnect()
-        #central.stop()
     else:
         app.error('You need to specify a target device with option --bdaddr.')

@@ -19,7 +19,7 @@ from random import randint
 from binascii import hexlify
 
 from whad.device import WhadDevice, WhadDeviceConnector
-from whad.exceptions import WhadDeviceNotReady
+from whad.exceptions import WhadDeviceNotReady, WhadDeviceDisconnected
 from whad.protocol.whad_pb2 import Message
 
 import logging
@@ -172,7 +172,11 @@ class UnixSocketDevice(WhadDevice):
             # Handle incoming messages if any
             if len(readers) > 0:
                 data = self.__socket.recv(1024)
-                self.on_data_received(data)
+                if len(data) > 0:
+                    self.on_data_received(data)
+                else:
+                    logger.error('No data received from device')
+                    raise WhadDeviceDisconnected()
         except ConnectionResetError as err:
             logger.error('Connection reset by peer')
 

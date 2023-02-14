@@ -188,9 +188,5 @@ def profile_handler(app, command_args):
             except IOError as ioerr:
                 app.error('An error occured when writing to %s' % command_args[0])
 
-        # Disconnect
-        device.disconnect()
-
-        central.stop()
     else:
         app.error('You need to specify a target device with option --bdaddr.')

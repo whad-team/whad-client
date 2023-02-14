@@ -36,6 +36,10 @@ class UnsupportedCapability(Exception):
 
 # Device communication exceptions
 
+class WhadDeviceDisconnected(Exception):
+    def __init__(self):
+        super().__init__()
+
 class WhadDeviceNotReady(Exception):
     def __init__(self):
         super().__init__()

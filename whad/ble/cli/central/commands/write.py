@@ -61,10 +61,6 @@ def write_handler(app, command_args):
             without_response=False
         )
 
-        # Disconnect
-        device.disconnect()
-        central.stop()
-
     # We need to have an interface specified
     elif app.interface is not None and app.args.bdaddr is not None:
         
@@ -165,10 +161,6 @@ def writecmd_handler(app, command_args):
                 command_args,
                 without_response=True
             )
-        
-        # Disconnect
-        device.disconnect()
-        central.stop()
         
     elif app.interface is None:
         app.error('You need to specify an interface with option --interface.')
