@@ -142,7 +142,6 @@ class EsbLinkLayerManager:
                 if self.__app is not None and len(bytes(pdu)) > 0:
                     self.__app.on_acknowledgement(pdu[ESB_Payload_Hdr:])
         else:
-            print("here")
             if (self.__role == ESBRole.PRX or self.__promiscuous):
                 if self.__populate_queues:
                     self.__data_queue.put(pdu)

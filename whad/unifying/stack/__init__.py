@@ -4,7 +4,7 @@ Logitech Unifying applicative layer.
 from whad.esb.stack.llm.constants import ESBRole
 from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Mouse_Payload, Logitech_Set_Keepalive_Payload, \
     Logitech_Keepalive_Payload, Logitech_Unencrypted_Keystroke_Payload, Logitech_Encrypted_Keystroke_Payload, \
-    Logitech_Multimedia_Key_Payload
+    Logitech_Multimedia_Key_Payload, Logitech_Waked_Up_Payload, Logitech_Wake_Up_Payload
 from whad.unifying.hid import LogitechUnifyingMouseMovementConverter, LogitechUnifyingKeystrokeConverter, InvalidHIDData
 from whad.unifying.stack.constants import UnifyingRole, ClickType, MultimediaKey
 from whad.unifying.crypto import LogitechUnifyingCryptoManager
@@ -65,7 +65,6 @@ class UnifyingApplicativeLayerManager:
             except Empty:
                 self.send_message(Logitech_Keepalive_Payload(timeout=1250))
                 sleep(0.01)
-        print("stopped.")
 
     def send_message(self, message, waiting_ack=False):
         result = self.__llm.send_data(Logitech_Unifying_Hdr()/message)
@@ -88,7 +87,7 @@ class UnifyingApplicativeLayerManager:
         if self.__role == UnifyingRole.DONGLE:
             self.__llm.role = ESBRole.PRX
         else:
-            self.__role = ESBRole.PTX
+            self.__llm.__role = ESBRole.PTX
 
     @property
     def key(self):
@@ -260,8 +259,18 @@ class UnifyingApplicativeLayerManager:
     def on_desynchronized(self):
         print("[i] Desynchronized.")
 
+    def wait_wakeup(self):
+        pass
+
     def on_data(self, data):
         data.show()
+        if Logitech_Wake_Up_Payload in data:
+            # Weird checksum, force it
+            pkt = Logitech_Unifying_Hdr(dev_index = 0,checksum=0xAC)/Logitech_Waked_Up_Payload(wakeup_dev_index=data.dev_index)
+            self.__llm.prepare_acknowledgment(
+                pkt
+            )
+
 
     def on_acknowledgement(self, ack):
         pass

@@ -36,7 +36,7 @@ class Logitech_Unifying_Hdr(Packet):
         return p[:2] + pay + pack('B', cksum)
 
 
-class Logitech_Wake_Up(Packet):
+class Logitech_Wake_Up_Payload(Packet):
     name = "Logitech Wake Up Payload"
     fields_desc = [
         XByteField("dev_index",0x00),
@@ -170,19 +170,29 @@ class Logitech_Pairing_Complete_Payload(Packet):
         StrFixedLenField("padding", b"\x00\x00\x00\x00\x00\x00\x00", length=7)
     ]
 
+
+class Logitech_Waked_Up_Payload(Packet):
+    name = "Logitech Waked_Up Payload"
+    fields_desc = [
+        XByteField("wakeup_dev_index",None),
+        StrFixedLenField("unknown3", b"\x00\x1F\x00\x00\x00\xFF", length=6),
+
+    ]
+
 def guess_payload_class_unifying(self, payload):
     if b"\x0f\x0f\x0f\x0f" == payload[:4]:
         return ESB_Ping_Request
     elif len(payload) == 0:
         return ESB_Ack_Response
-    elif len(payload) >= 2 and payload[1] in (0x51,0xC2,0x40,0x4F,0xD3,0xC1,0xC3,0x5F,0x1F, 0x0F, 0x0E):
+    elif len(payload) >= 2 and payload[1] in (0x51,0xC2,0x40,0x4F,0xD3,0xC1,0xC3,0x5F,0x1F, 0x0F, 0x0E, 0x10):
         return Logitech_Unifying_Hdr
     else:
         return Packet.guess_payload_class(self, payload)
 
 
 # Logitech Unifying protocol
-bind_layers(Logitech_Unifying_Hdr, Logitech_Wake_Up,                frame_type = 0x51)
+bind_layers(Logitech_Unifying_Hdr, Logitech_Waked_Up_Payload,       frame_type = 0x10)
+bind_layers(Logitech_Unifying_Hdr, Logitech_Wake_Up_Payload,                frame_type = 0x51)
 bind_layers(Logitech_Unifying_Hdr, Logitech_Mouse_Payload,            frame_type = 0xC2)
 bind_layers(Logitech_Unifying_Hdr, Logitech_Keepalive_Payload,             frame_type = 0x40)
 bind_layers(Logitech_Unifying_Hdr, Logitech_Set_Keepalive_Payload,         frame_type = 0x4F)

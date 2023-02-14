@@ -21,10 +21,10 @@ if __name__ == '__main__':
             connector = Keyboard(dev)
             connector.start()
             #connector.attach_callback(show, on_reception=True, on_transmission=False)
-            connector.address = "9b:0a:90:42:96"
+            connector.address = "ca:e9:06:ec:a4"#"9b:0a:90:42:96"
 
-            connector.key = bytes.fromhex("08f59b42d06fd3bdc588cd4d1c244018")
-            connector.aes_counter = 0
+            #connector.key = bytes.fromhex("08f59b42d06fd3bdc588cd4d1c244018")
+            #connector.aes_counter = 0
 
             connector.synchronize()
             connector.lock()

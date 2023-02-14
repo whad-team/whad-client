@@ -22,7 +22,7 @@ if __name__ == '__main__':
             connector.attach_callback(show, on_reception=True, on_transmission=False)
             connector.start()
             connector.channel = 5
-            connector.address =  "9b:0a:90:42:96"
+            connector.address =  "ca:e9:06:ec:a4"#"9b:0a:90:42:96"
             connector.synchronize()
             for _ in range(10):
                 connector.move(-100, 0)

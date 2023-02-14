@@ -21,10 +21,10 @@ if __name__ == '__main__':
             connector = Dongle(dev)
             connector.start()
             #connector.attach_callback(show, on_reception=True, on_transmission=False)
-            connector.address = "9b:0a:90:42:00"
+            connector.address = "9b:0a:90:42:00"#"9b:0a:90:42:00"
             connector.channel = 5
             input()
-            connector.address = "9b:0a:90:42:96"
+            connector.address = "9b:0a:90:42:97"#"9b:0a:90:42:96"
 
             while True:
                 time.sleep(1)
