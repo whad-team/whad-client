@@ -1,6 +1,32 @@
+"""
+This module provides a scanner connector :class:`whad.ble.connector.scanner.Scanner`
+for WHAD BLE devices, allowing to discover available BLE devices. 
 
+It implements two different scanning approaches:
+
+* The first one is based on a *normal device scanning* based on WHAD BLE protocol:
+  it puts the hardware adapter in device discovery mode and grab each advertisement
+  received.
+
+* The second one puts the hardware adapter in *sniffing mode* and sniffs advertisements
+  sent on default channels. This mode is only available with WHAD devices that support
+  sniffing.
+
+This connector must be instantiated with a compatible WHAD device, as shown below:
+
+.. code-block:: python
+
+    device = WhadDevice.create('uart0')
+    scanner = Scanner(device)
+
+If the underlying device does not support scanning, this connector will raise
+an :class:`UnsupportedCapability` exception.
+
+"""
+from typing import Iterator
+from whad.ble.bdaddr import BDAddress
 from whad.ble.connector import BLE
-from whad.ble.scanning import AdvertisingDevicesDB
+from whad.ble.scanning import AdvertisingDevicesDB, AdvertisingDevice
 from whad.ble import UnsupportedCapability, message_filter, BleAdvType,\
     BTLE_ADV_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_NONCONN_IND, BTLE_ADV_SCAN_IND,\
     BTLE_SCAN_RSP, BTLE_ADV
@@ -24,9 +50,14 @@ class Scanner(BLE):
         self.__db.reset()
         super().start()
 
-    def discover_devices(self, minimal_rssi=None, filter_address=None):
+    def discover_devices(self, minimal_rssi = None, filter_address = None) -> Iterator[AdvertisingDevice]:
         """
-        Parse incoming advertisements and return new devices.
+        Parse incoming advertisements and yield discovered devices.
+
+        :param  minimal_rssi:       Minimal RSSI level
+        :type   minimal_rssi:       float, optional
+        :param  filter_address:     BD address of a device to discover
+        :type   filter_address:     :class:`whad.ble.bdaddr.BDAddress`, optional
         """
         for advertisement in self.sniff():
             if minimal_rssi is None or advertisement.metadata.rssi > minimal_rssi:
