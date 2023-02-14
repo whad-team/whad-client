@@ -1,3 +1,14 @@
+"""
+Bluetooth Low Energy Peripheral connector
+=========================================
+
+WHAD provides a specific connector to create a BLE device, :class:`Peripheral`.
+This connector implements a GATT server and hosts a GATT profile, allowing remote
+BLE devices to connect to it and query its services, characteristics, and descriptors.
+
+The connector provides some callbacks such as :meth:`Peripheral.on_connected` to
+react on specific events.
+"""
 
 from whad.ble.connector import BLE
 from whad.ble.bdaddr import BDAddress
@@ -24,14 +35,16 @@ class Peripheral(BLE):
     def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None):
         """Create a peripheral device.
 
-        :param WhadDevice device: WHAD device to use as a peripheral
-        :param GattProfile profile: Device profile to use
-        :param AdvDataFieldList adv_data: Advertisement data
+        :param  device:     WHAD device to use as a peripheral
+        :type   device:     :class:`whad.device.WhadDevice`
+        :param  profile:    Device profile to use
+        :type   profile:    :class:`whad.ble.profile.GenericProfile`
+        :param  adv_data:   Advertisement data
+        :type   adv_data:   :class:`whad.ble.profile.advdata.AdvDataFieldList`
         """
         super().__init__(device)
 
         # Initialize stack
-        #self.use_stack(BleStack)
         self.__stack = BleStack(self, GattServer(profile))
         self.__connected = False
 
@@ -62,34 +75,49 @@ class Peripheral(BLE):
                 self.on_connected(existing_connection)
 
 
-    def send_data_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None):
+    def send_data_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None) -> bool:
         """Send a PDU to the central device this peripheral device is connected to.
 
         Sending direction is set to ̀ BleDirection.SLAVE_TO_MASTER` as we need to send PDUs to a central device.
 
-        :param bytes pdu: PDU to send
-        :param int conn_handle: Connection handle
-        :param int direction: Sending direction (to master or slave)
-        :param access_address: Target access address
-        :type access_address: int, optional
+        :param  pdu:            PDU to send
+        :type   pdu:            :class:`scapy.layers.bluetooth4LE.BTLE`
+        :param  conn_handle:    Connection handle
+        :type   conn_handle:    int
+        :param  direction:      Sending direction (to master or slave)
+        :type   direction:      :class:`whad.protocol.ble_pb2.BleDirection`, optional
+        :param  access_address: Target access address
+        :type   access_address: int, optional
+        :return:                PDU transmission result.
+        :rtype: bool
         """
-        super().send_data_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
+        return super().send_data_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
 
-    def send_ctrl_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None):
+
+    def send_ctrl_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None) -> bool:
         """Send a PDU to the central device this peripheral device is connected to.
 
         Sending direction is set to ̀ BleDirection.SLAVE_TO_MASTER` as we need to send PDUs to a central device.
 
-        :param bytes pdu: PDU to send
-        :param int conn_handle: Connection handle
-        :param int direction: Sending direction (to master or slave)
-        :param access_address: Target access address
-        :type access_address: int, optional
+        :param  pdu:            PDU to send
+        :type   pdu:            :class:`scapy.layers.bluetooth4LE.BTLE`
+        :param  conn_handle:    Connection handle
+        :type   conn_handle:    int
+        :param  direction:      Sending direction (to master or slave)
+        :type   direction:      :class:`whad.protocol.ble_pb2.BleDirection`, optional
+        :param  access_address: Target access address
+        :type   access_address: int, optional
+        :return:                PDU transmission result.
+        :rtype: bool
         """
-        super().send_ctrl_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
+        return super().send_ctrl_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
+
 
     def use_stack(self, clazz=BleStack):
         """Specify a stack class to use for BLE. By default, our own stack (BleStack) is used.
+
+        :param  clazz:  BLE stack to use.
+        :type   clazz:  :class:`whad.ble.stack.BleStack`
         """
         self.__stack = clazz(self)
 
@@ -100,6 +128,9 @@ class Peripheral(BLE):
 
     def on_connected(self, connection_data):
         """A device has just connected to this peripheral.
+
+        :param  connection_data:    Connection data
+        :type   connection_data:    :class:`whad.protocol.ble_pb2.Connected`
         """
         logger.info('a device is now connected (connection handle: %d)' % connection_data.conn_handle)
         self.__stack.on_connection(
@@ -116,6 +147,9 @@ class Peripheral(BLE):
 
     def on_disconnected(self, disconnection_data):
         """A device has just disconnected from this peripheral.
+
+        :param  connection_data:    Connection data
+        :type   connection_data:    :class:`whad.protocol.ble_pb2.Disconnected`
         """
         logger.info('a device has just connected (connection handle: %d)' % disconnection_data.conn_handle)
         self.__stack.on_disconnection(
@@ -127,12 +161,16 @@ class Peripheral(BLE):
         if self.__profile is not None:
             self.__profile.on_disconnect(disconnection_data.conn_handle)
 
+
     def on_ctl_pdu(self, pdu):
         """This method is called whenever a control PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
 
         Peripheral devices act as a slave, so we only forward master to slave
         messages to the stack.
+
+        :param  pdu:    BLE PDU
+        :type   pdu:    :class:`scapy.layers.bluetooth4LE.BTLE`
         """
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
             logger.info('Control PDU comes from master, forward to peripheral')
@@ -141,6 +179,9 @@ class Peripheral(BLE):
     def on_data_pdu(self, pdu):
         """This method is called whenever a data PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
+
+        :param  pdu:    BLE PDU
+        :type   pdu:    :class:`scapy.layers.bluetooth4LE.BTLE_DATA`
         """
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
             logger.info('Data PDU comes from master, forward to peripheral')
@@ -148,6 +189,9 @@ class Peripheral(BLE):
 
     def on_new_connection(self, connection):
         """On new connection, discover primary services
+
+        :param  connection:    Connection data
+        :type   connection:    :class:`whad.protocol.ble_pb2.Connected`
         """
         # Use GATT server
         self.connection = connection

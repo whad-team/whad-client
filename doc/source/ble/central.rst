@@ -1,6 +1,19 @@
-BLE Central connector
-=====================
+Central role
+============
 
-.. automodule:: whad.ble.connector.central
+Bluetooth Low Energy central role is used to connect to a BLE peripheral and
+interact with it. WHAD provides a specific connector, :class:`whad.ble.connector.Central`,
+that implements this role.
+
+It also provides a specific wrapper for connected devices in order to mask the
+underlying GATT stack and allow easy access to device services and charactersitics,
+:class:`whad.ble.profile.device.PeripheralDevice`.
+
+Bluetooth Low Energy Central connector
+--------------------------------------
+
+.. autoclass:: whad.ble.connector.Central
     :members:
-    :exclude-members: on_ctl_pdu, on_data_pdu, on_new_connection, on_connected, on_disconnected, send_pdu
+
+.. automodule:: whad.ble.profile.device
+    :members: PeripheralDevice

@@ -1,11 +1,5 @@
-Bluetooth Low Energy
-====================
-
-WHAD supports Bluetooth Low Energy and provides on-the-shelf features and tools
-to interact with any BLE device.
-
 Getting started
----------------
+===============
 
 Scan available devices
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -178,7 +172,7 @@ using this profile:
     periph.start()
 
 It is also possible to trigger specific actions when a characteristic is read or written,
-through the dedicated callbacks provided by :class:`whad.ble.profile.GenericProfile`
+through the dedicated callbacks provided by :class:`whad.ble.profile.GenericProfile`.
 
 Use a link-layer proxy
 ~~~~~~~~~~~~~~~~~~~~~~

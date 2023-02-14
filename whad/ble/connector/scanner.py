@@ -1,4 +1,7 @@
 """
+BLE Scanner connector
+=====================
+
 This module provides a scanner connector :class:`whad.ble.connector.scanner.Scanner`
 for WHAD BLE devices, allowing to discover available BLE devices. 
 
@@ -23,8 +26,8 @@ If the underlying device does not support scanning, this connector will raise
 an :class:`UnsupportedCapability` exception.
 
 """
+from scapy.packet import Packet
 from typing import Iterator
-from whad.ble.bdaddr import BDAddress
 from whad.ble.connector import BLE
 from whad.ble.scanning import AdvertisingDevicesDB, AdvertisingDevice
 from whad.ble import UnsupportedCapability, message_filter, BleAdvType,\
@@ -37,8 +40,14 @@ class Scanner(BLE):
     """
 
     def __init__(self, device):
+        """Instantiate scanner connector over `device`.
+
+        :param  device: BLE WHAD device instance
+        :type   device: :class:`whad.device.WhadDevice`
+        """
         super().__init__(device)
         self.__db = AdvertisingDevicesDB()
+
         # Check device accept scanning mode
         if not self.can_scan():
             raise UnsupportedCapability('Scan')
@@ -47,8 +56,14 @@ class Scanner(BLE):
             self.enable_scan_mode(True)
 
     def start(self):
+        """Start the BLE scanner.
+
+        Calling this method resets the discovered devices database and put
+        the WHAD device into BLE scanning mode.
+        """
         self.__db.reset()
         super().start()
+
 
     def discover_devices(self, minimal_rssi = None, filter_address = None) -> Iterator[AdvertisingDevice]:
         """
@@ -69,9 +84,10 @@ class Scanner(BLE):
                 if device is not None:
                     yield device
 
-    def sniff(self):
+
+    def sniff(self) -> Iterator[Packet]:
         """
-        Listen incoming messages and yield advertisements.
+        Listen and yield incoming advertising PDUs.
         """
 
         while True:

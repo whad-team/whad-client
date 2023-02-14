@@ -129,7 +129,7 @@ write
 
     $ ble-central -i <interface> -b <address> write [UUID | handle] [["hex"] VALUE]
 
-The ``write``command connects to a specified BLE device and writes a given characteristic
+The `write` command connects to a specified BLE device and writes a given characteristic
 with a given value. Characteristic must be identified with its UUID or GATT handle. The
 provided value can be a string or a HEX value.
 
@@ -314,7 +314,7 @@ Reads a characteristic given its *UUID* or *HANDLE*.
 write
 ~~~~~
 
-.. code-bock:: text
+.. code-block:: text
 
     write [UUID | HANDLE] [["hex"] VALUE]
 
@@ -420,7 +420,7 @@ shell:
 
 And the following output in Wireshark:
 
-.. image:: /images/cli/ble-central/wireshark-monitor.png
+.. image:: ble-central/wireshark-monitor.png
    :width: 600
 
 Quick tutorial

@@ -1,4 +1,6 @@
-"""Bluetooth Low Energy Service class
+"""
+BLE GATT Service Model
+======================
 """
 import logging
 

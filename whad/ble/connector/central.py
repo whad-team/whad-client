@@ -1,3 +1,8 @@
+"""
+Bluetooth Low Energy Central connector
+======================================
+"""
+
 from time import time
 
 from whad.ble.connector import BLE
@@ -16,8 +21,8 @@ logger = logging.getLogger(__name__)
 class Central(BLE):
     """This connector provides a BLE Central role.
 
-    To initiate a connection to a device, just call `connect` with the target
-    BD address and it should return an instance of `PeripheralDevice` in return.
+    To initiate a connection to a device, just call :meth:`Central.connect` with the target
+    BD address and it should return an instance of :class:`whad.ble.profile.device.PeripheralDevice` in return.
 
     """
 
@@ -47,24 +52,37 @@ class Central(BLE):
 
 
     @property
-    def local_peer(self):
+    def local_peer(self) -> BDAddress:
+        """Local peer BD address.
+        """
         return self.__local
 
     @property
-    def target_peer(self):
+    def target_peer(self) -> BDAddress:
+        """Remote peer BD address.
+        """
         return self.__target
 
-    def connect(self, bd_address, random=False, timeout=30, access_address=None, channel_map=None, crc_init=None, hop_interval=None, hop_increment=None):
+    def connect(self, bd_address, random=False, timeout=30, access_address=None, channel_map=None, crc_init=None, hop_interval=None, hop_increment=None) -> PeripheralDevice:
         """Connect to a target device
 
-        :param string bd_address: Bluetooth device address (in format 'xx:xx:xx:xx:xx:xx')
-        :param int timeout: Connection timeout
-        :param access_address: Access address to use (optional)
-        :param channel_map: Channel map to use (optional)
-        :param crc_init: CRC Initialization value to use (optional)
-        :param hop_interval: Hop interval to use (optional)
-        :param hop_increment: Hop increment to use (optional)
-        :returns: An instance of `PeripheralDevice` on success, `None` on failure.
+        :param  bd_address:     Bluetooth device address (in format 'xx:xx:xx:xx:xx:xx')
+        :type   bd_address:     str
+        :param  timeout:        Connection timeout
+        :type   timeout:        float
+        :param  access_address: Access address to use (optional)
+        :type   access_address: int
+        :param  channel_map:    Channel map to use (optional)
+        :type   channel_map:    int
+        :param  crc_init:       CRC Initialization value to use (optional)
+        :type   crc_init:       int
+        :param  hop_interval:   Hop interval to use (optional)
+        :type   hop_interval:   int
+        :param  hop_increment:  Hop increment to use (optional)
+        :type   hop_increment:  int
+        
+        :return: An instance of `PeripheralDevice` on success, `None` on failure.
+        :rtype: :class:`whad.ble.profile.device.PeripheralDevice`
         """
         if self.can_connect():
             self.connect_to(
@@ -87,26 +105,48 @@ class Central(BLE):
         else:
             return None
 
-    def peripheral(self):
+    def peripheral(self) -> PeripheralDevice:
+        """Connected BLE peripheral.
+        """
         return self.__peripheral
 
 
-    def send_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
+    def send_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None) -> bool:
+        """Send a PDU to the connected peripheral device or to the central device.
+
+        :param  pdu:            BLE PDU to send.
+        :type   pdu:            :class:`scapy.layers.bluetooth4LE.BTLE`
+        :param  conn_handle:    Connection handle
+        :type   conn_handle:    int
+        :param  direction:      Direction (central to peripheral, peripheral to central)
+        :type   direction:      :class:`whad.protocol.ble.ble_pb2.BleDirection`
+        :param  access_address: Access address to use while sending PDU.
+        :type   access_address: int
+        :param  encrypt:        Enable PDU encryption if set to ``True``.
+        :type   encrypt:        bool
+
+        :return:                PDU transmission result.
+        :rtype:                 bool
+        """
         return super().send_pdu(pdu, conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
 
     ##############################
     # Incoming events
     ##############################
 
-    def is_connected(self):
+    def is_connected(self) -> bool:
         """Determine if the central device is connected to a peripheral.
 
-        :returns: `True` if central is connected to a peripheral device, `False` otherwise.
+        :return:    ``True`` if central is connected to a peripheral device, `False` otherwise.
+        :rtype:     bool
         """
         return self.__connected
 
     def on_connected(self, connection_data):
         """Callback method to handle connection event.
+
+        :param  connection_data: Connection data
+        :type   connection_data: dict
         """
         # Save local and target peer info
         self.__local = BDAddress.from_bytes(
@@ -133,6 +173,9 @@ class Central(BLE):
 
     def on_disconnected(self, disconnection_data):
         """Callback method to handle disconnection event.
+
+        :param  disconnection_data: Disconnection data
+        :type   disconnection_data: :class:`whad.protocol.ble_pb2.Disconnected`
         """
         self.__stack.on_disconnection(
             disconnection_data.conn_handle,
@@ -147,6 +190,7 @@ class Central(BLE):
         if self.__peripheral is not None:
             self.__peripheral.on_disconnect(disconnection_data.conn_handle)
 
+
     def on_ctl_pdu(self, pdu):
         """This callback method is called whenever a control PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
@@ -154,7 +198,8 @@ class Central(BLE):
         Central devices act as master, so we only forward slave to master
         messages to the stack.
 
-        :param pdu: BLE Control PDU
+        :param  pdu: BLE Control PDU
+        :type   pdu: :class:`scapy.layers.bluetooth4LE.BTLE`
         """
         logger.info('received control PDU')
         if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
@@ -167,18 +212,19 @@ class Central(BLE):
         Central devices act as master, so we only forward slave to master
         messages to the stack.
 
-        :param pdu: BLE Control PDU
+        :param  pdu: BLE Data PDU
+        :type   pdu: :class:`scapy.layers.bluetooth4LE.BTLE_DATA`
         """
         logger.info('received data PDU')
-        """This method is called whenever a data PDU is received.
-        This PDU is then forwarded to the BLE stack to handle it.
-        """
         if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
             self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
 
 
     def on_new_connection(self, connection):
         """On new connection, discover primary services.
+
+        :param  connection: New connection Protobuf message
+        :type   connection: :class:`whad.protocol.ble_pb2.Connected`
         """
         logger.info('new connection established')
 
@@ -196,10 +242,11 @@ class Central(BLE):
         # Notify peripheral about this connection
         self.__peripheral.on_connect(self.connection.conn_handle)
 
+
     def export_profile(self):
         """Export GATT profile of the existing connection.
 
-        :rtype: string
         :returns: Profile as a JSON string
+        :rtype: str
         """
         return self.connection.gatt.model.export_json()

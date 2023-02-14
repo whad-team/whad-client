@@ -13,9 +13,25 @@ Welcome to WHAD's documentation!
     intro
     
 .. toctree::
-    :maxdepth: 1
-    :caption: BLE Command-line Tools
+    :maxdepth: 2
+    :caption: Command-line Tools
 
-    cli/ble/ble-central
-    cli/ble/ble-periph
+    cli/index
 
+.. toctree::
+    :maxdepth: 2
+    :caption: Bluetooth Low Energy API
+
+    ble/started
+    ble/scanner
+    ble/central
+    ble/peripheral
+    ble/profile
+
+.. toctree::
+    :maxdepth: 2
+    :caption: Contributing
+
+    device/index
+    device/protocol
+    

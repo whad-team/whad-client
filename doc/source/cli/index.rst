@@ -1,5 +1,5 @@
 Built-in command-line tools
----------------------------
+===========================
 
 WHAD provides two types of command-line tools:
 
@@ -10,14 +10,9 @@ WHAD provides two types of command-line tools:
   be used with any WHAD device that supports a specific domain (**ble-central**
   for instance)
 
+.. toctree::
+    :maxdepth: 1
+    :caption: Bluetooth Low Energy tools
 
-Generic tools
-~~~~~~~~~~~~~
-
-* :doc:`whadup <whadup.rst>`: WHAD device management
-
-Bluetooth Low Energy tools
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* :doc:`ble-central <ble-central>`: Scanner and GATT client
-* :doc:`ble-periph <ble-periph>`: GATT server
+    ble/ble-central
+    ble/ble-periph

@@ -1,6 +1,15 @@
-"""Bluetooth Low Energy device model
+"""This module provides different classes that represent a BLE device and
+allows to interact with it:
+
+* :class:`whad.ble.profile.GenericProfile` is a base class used to register all the ATT attributes, including
+  services, characteristics, characteristic values and descriptors. It is able to
+  inspect any derived class and build the corresponding profile based on properties
+  declared with :class:`whad.ble.profile.service.PrimaryService` and
+  :class:`whad.ble.profile.characteristic.Characteristic`.
+
 """
 import json
+from typing import List, Iterator
 
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,\
@@ -9,7 +18,7 @@ from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,
     CharacteristicDescriptor as BleCharacteristicDescriptor, \
     ReportReferenceDescriptor as BleReportReferenceDescriptor
 from whad.ble.profile.service import PrimaryService as BlePrimaryService, \
-    SecondaryService as BleSecondaryService
+    SecondaryService as BleSecondaryService, Service
 from whad.ble.exceptions import InvalidHandleValueException
 from whad.ble.stack.att.constants import BleAttProperties
 
@@ -149,10 +158,25 @@ class ReportReferenceDescriptor(CharacteristicDescriptor):
 
 
 class Characteristic(object):
-    """Characteristic model
+    """GATT characteristic.
     """
 
     def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False, **kwargs):
+        """Declares a GATT characteristic.
+
+        Other named arguments are used to declare characteristic's descriptors.
+
+        :param  name:           Characteristic name used in GATT model
+        :type   name:           str
+        :param  uuid:           Characteristic UUID
+        :type   uuid:           :class:`whad.ble.profile.attribute.UUID`
+        :param  permissions:    List of permissions for this characteristic (*read*, *write*, *notify*, *indicate*)
+        :type   permissions:    list
+        :param  notify:         Enable notifications
+        :type   notify:         bool
+        :param  indicate:       Enable indications
+        :type   indicate:       bool
+        """
         self.__handle = 0
         self.__name = name
         self.__uuid = uuid
@@ -175,19 +199,27 @@ class Characteristic(object):
                 if not hasattr(self, arg):
                     setattr(self, arg, descriptor)
 
-    def add_descriptor(self, descriptor_model):
+    def add_descriptor(self, descriptor):
         """Add descriptor to our descriptor list
-        """
-        self.__descriptors.append(descriptor_model)
 
-    def descriptors(self):
+        :param  descriptor: Descriptor to add to the characteristic's descriptor list
+        :type   descriptor: :class:`whad.ble.profile.characteristic.CharacteristicDescriptor`
+        """
+        self.__descriptors.append(descriptor)
+
+    def descriptors(self) -> Iterator[CharacteristicDescriptor]:
         """Enumerate descriptors attached to this characteristic
+
+        This method will yield every descriptor attached to the characteristic.
         """
         for descriptor in self.__descriptors:
             yield descriptor
 
-    def get_required_handles(self):
+    def get_required_handles(self) -> int:
         """Compute the number of handles this characteristic will consume
+
+        :return: Number of handles
+        :rtype: int
         """    
         handles = 2
         # A more handle as we may need a ClientCharacteristicConfiguration descriptor
@@ -196,28 +228,47 @@ class Characteristic(object):
         return handles
 
     def attach(self, service):
-        """Attach this characteristic to the corresponding service
+        """Attach this characteristic to the corresponding service.
+
+        :param  service:    Service
+        :type   service:    :class:̀ whad.ble.profile.service.Service`
         """
         self.__service = service
 
     @property
-    def handle(self):
+    def handle(self) -> int:
+        """Characteristic handle
+        """
         return self.__handle
 
     @handle.setter
     def handle(self, value):
+        """Set characteristic handle.
+
+        :param  value:  New handle value
+        :type   value:  int
+        """
         self.__handle = value
 
     @property
-    def end_handle(self):
+    def end_handle(self) -> int:
+        """Characteristic end handle (including characteristic value and descriptors).
+        """
         return self.handle + self.get_required_handles()
 
     @property
-    def name(self):
+    def name(self) -> str:
+        """Name
+        """
         return self.__name
 
     @name.setter
     def name(self, value):
+        """Set characteristic name.
+
+        :param  value:  New name
+        :type   value:  str
+        """
         self.__name = value
 
     @property
@@ -225,23 +276,33 @@ class Characteristic(object):
         return self.__uuid
 
     @property
-    def value(self):
+    def value(self) -> UUID:
+        """Characteristic UUID
+        """
         return self.__value
 
     @property
-    def permissions(self):
+    def permissions(self) -> List[str]:
+        """Characteristics permissions
+        """
         return self.__perms
 
     @property
-    def must_notify(self):
+    def must_notify(self) -> bool:
+        """Check if notification has to be sent on value change.
+        """
         return self.__notify
 
     @property
-    def must_indicate(self):
+    def must_indicate(self) -> bool:
+        """Check if indication has to be sent on value change.
+        """
         return self.__indicate
 
     @property
-    def service(self):
+    def service(self) -> Service:
+        """Related service.
+        """
         return self.__service
 
 
@@ -321,22 +382,53 @@ class ServiceModel(object):
 
 class PrimaryService(ServiceModel):
     def __init__(self, uuid=None, start_handle=0, end_handle=0, name=None, **kwargs):
+        """Declares a GATT primary service.
+
+        Other named arguments are used to add service's characteristics.
+
+        :param  uuid:           Primary service UUID
+        :type   uuid:           :class:`whad.ble.profile.attribute.UUID`
+        :param  start_handle:   Service start handle
+        :type   start_handle:   int, optional
+        :param  end_handle:     Service end handle
+        :type   end_handle:     int, optional
+        :param  name:           Service name
+        :type   name:           str
+        """
         super().__init__(uuid, start_handle, end_handle, service_type=ServiceModel.PRIMARY, name=name, **kwargs)
 
 
 class SecondaryService(ServiceModel):
     def __init__(self, uuid=None, start_handle=0, end_handle=0, name=None, **kwargs):
+        """Declares a GATT secondary service.
+
+        Other named arguments are used to add service's characteristics.
+
+        :param  uuid:           Primary service UUID
+        :type   uuid:           :class:`whad.ble.profile.attribute.UUID`
+        :param  start_handle:   Service start handle
+        :type   start_handle:   int, optional
+        :param  end_handle:     Service end handle
+        :type   end_handle:     int, optional
+        :param  name:           Service name
+        :type   name:           str
+        """
         super().__init__(uuid, start_handle, end_handle, service_type=ServiceModel.SECONDARY, name=name, **kwargs)
 
 
 class GenericProfile(object):
+    """Generic Profile
+    """
 
     def __init__(self, start_handle=0, from_json=None):
         """Parse the device model, instanciate all the services, characteristics
         and descriptors, compute all handle values and registers everything
         inside this instance for further use.
 
-        :param int start_handle: Start handle value to use (default: 1)
+        :param  start_handle:   Start handle value to use (default: 0)
+        :type   start_handle:   int
+        :param  from_json:      JSON data describing a GATT profile
+        :type   from_json:      str
         """
         self.__attr_db = {}
         self.__services = []
@@ -517,8 +609,11 @@ class GenericProfile(object):
     def __alloc_handle(self, number=1):
         """Allocate one or more handle values.
 
-        :param int number: Number of handle values to allocate
+        :param  number: Number of handle values to allocate
+        :type   number: int
+
         :return: Current handle value
+        :rtype: int
         """
         self.__handle += number
         return self.__handle
@@ -559,15 +654,20 @@ class GenericProfile(object):
     def register_attribute(self, attribute):
         """Register a GATT attribute
 
-        :param Attribute attribute: Attribute to register
+        :param  attribute:  Attribute to register
+        :type   attribute:  :class:`whad.ble.profile.attribute.Attribute`
         """
         if isinstance(attribute, Attribute):
             self.__attr_db[attribute.handle] = attribute
 
+
     def add_service(self, service, handles_only=False):
         """Add a service to the current device
 
-        :param service: Service to add to the device
+        :param  service:        Service to add to the device
+        :type   service:        :class:`whad.ble.profile.service.Service`
+        :param  handles_only:   Add only service handles if set to ``True``
+        :type   handles_only:   bool
         """
         logger.debug('add service %s' % service.uuid)
         if service.handle == 0:
@@ -602,7 +702,10 @@ class GenericProfile(object):
     def remove_service(self, service, handles_only=False):
         """Remove service
 
-        @param  service     Service object or UUID
+        :param  service:        Service object or UUID
+        :type   service:        :class:`whad.ble.profile.service.Service`
+        :param  handles_only:   Remove only handles if set to ``True``
+        :type   handles_only:   bool
         """
         if isinstance(service, BlePrimaryService) or isinstance(service, BleSecondaryService):
             service_obj = self.get_service_by_UUID(service.uuid)
@@ -638,11 +741,17 @@ class GenericProfile(object):
             # Not found, raise IndexError
             raise IndexError()
 
-    def update_service(self, service):
+
+    def update_service(self, service) -> bool:
         """Update service in profile.
 
         Keep service in place in the service list,
         but update all the services declared after this one.
+
+        :param  service:    Service object to update.
+        :type   service:    :class:`whad.ble.profile.service.Service`
+        :return: ``True`` if service has been updated, ``False`` otherwise.
+        :rtype: bool
         """
         try:
             service_index = self.__services.index(service)
@@ -660,14 +769,17 @@ class GenericProfile(object):
                 self.update_service(remaining_service)
                 handle = remaining_service.end_handle
             self.__handle = handle
+            return True
         except IndexError as notfound:
             return False
         
-    def find_object_by_handle(self, handle):
+    def find_object_by_handle(self, handle) -> Attribute:
         """Find an object by its handle value
 
-        :param int handle: Object handle
+        :param  handle: Object handle
+        :type   handle: int
         :return: Object if handle is valid, or raise an IndexError exception otherwise
+        :rtype: :class:`whad.ble.profile.attribute.Attribute`
         :raises: IndexError 
         """
         if handle in self.__attr_db:
@@ -675,8 +787,15 @@ class GenericProfile(object):
         else:
             raise IndexError
     
-    def find_objects_by_range(self, start, end):
+    def find_objects_by_range(self, start, end) -> List[Attribute]:
         """Find attributes with handles belonging in the [start, end+1] interval.
+
+        :param  start:  Start handle value
+        :type   start:  int
+        :param  end:    End handle value
+        :type   end:    int
+        :return:        List of objects with handles between start and end values
+        :rtype: list
         """
         handles = []
         for handle in self.__attr_db:
@@ -686,11 +805,13 @@ class GenericProfile(object):
         return [self.find_object_by_handle(handle) for handle in handles]
 
     
-    def find_characteristic_by_value_handle(self, value_handle):
+    def find_characteristic_by_value_handle(self, value_handle) -> BleCharacteristic:
         """Find characteristic object by its value handle.
 
-        :param int value_handle: Characteristic value handle
-        :return Characteristic: Corresponding characteristic object or None if not found.
+        :param  value_handle:   Characteristic value handle
+        :type   value_handle:   int
+        :return: Corresponding characteristic object or ``None`` if not found.
+        :rtype: :class:`whad.ble.profile.characteristic.Characteristic`
         """
         try:
             char_value = self.find_object_by_handle(value_handle)
@@ -701,7 +822,16 @@ class GenericProfile(object):
         except InvalidHandleValueException as bad_handle:
             return None
 
-    def find_characteristic_end_handle(self, handle):
+
+    def find_characteristic_end_handle(self, handle) -> int:
+        """Find characteristic end handle based on its handle.
+
+        :param  handle: Characteristic handle
+        :type   handle: int
+        :rtype: int
+        :return: Characteristic value handle
+        :raises: :class:`whad.ble.exceptions.InvalidHandleValueException`
+        """
         try:
             # Find service owning the characteristic
             service = self.find_service_by_characteristic_handle(handle)
@@ -722,10 +852,17 @@ class GenericProfile(object):
         except InvalidHandleValueException:
             return None
 
-    def find_service_by_characteristic_handle(self, handle):
-        """Find a service object given a characteristic handle
 
-        :param int handle: Characteristic handle
+    def find_service_by_characteristic_handle(self, handle) -> Service:
+        """Find a service object given a characteristic handle that belongs
+        to this service.
+
+        :param  handle: Characteristic handle belonging to the searched service
+        :type   handle: int
+        :rtype: :class:`whad.ble.profile.service.Service`
+        :return: Service object containing the specified characteristic
+        
+        :raises: :class:`whad.ble.exceptions.InvalidHandleValueException`
         """
         try:
             charac = self.find_object_by_handle(handle)
@@ -736,17 +873,25 @@ class GenericProfile(object):
         except IndexError:
             raise InvalidHandleValueException
 
-    def services(self):
+
+    def services(self) -> Iterator[Service]:
+        """Enumerate service objects.
+
+        This method is a generator and will yield service objects registered
+        into the profile.
+        """
         for handle in self.__attr_db:
             object = self.__attr_db[handle]
             if isinstance(object, BlePrimaryService) or isinstance(object, BleSecondaryService):
                 yield object
 
     def get_service_by_UUID(self, service_uuid: UUID):
-        """Get service by its UUID
+        """Get a service by its UUID.
 
-        @param  service_uuid    UUID    Service UUID to look for
-        @retval Service object if found, None otherwise
+        :param      service_uuid:   Service UUID to look for
+        :type       service_uuid:   :class:`whad.ble.profile.attribute.UUID`
+        :return:    Service if found, ``None`` otherwise
+        :rtype:     :class:`whad.ble.profile.service.Service`
         """
         for handle in self.__attr_db:
             object = self.__attr_db[handle]
@@ -758,10 +903,12 @@ class GenericProfile(object):
         return None
 
     def get_characteristic_by_UUID(self, charac_uuid: UUID):
-        """Get characteristic by its UUID
+        """Get characteristic by its UUID.
 
-        @param  charac_uuid     UUID    Characteristic UUID
-        @retval Characteristic object if found, None otherwise
+        :param      charac_uuid:   Characteristic UUID to look for
+        :type       charac_uuid:   :class:`whad.ble.profile.attribute.UUID`
+        :return:    Characteristic if found, ``None`` otherwise
+        :rtype:     :class:`whad.ble.profile.characteristic.Characteristic`
         """
         for handle in self.__attr_db:
             object = self.__attr_db[handle]
@@ -769,7 +916,17 @@ class GenericProfile(object):
                 if object.uuid == charac_uuid:
                     return object        
 
-    def attr_by_type_uuid(self, uuid, start=1, end=0xFFFF):
+
+    def attr_by_type_uuid(self, uuid, start=1, end=0xFFFF) -> Iterator[Attribute]:
+        """Enumerate attributes that have a specific type UUID.
+
+        :param  uuid:   Type UUID
+        :type   uuid:   :class:`whad.ble.profile.attribute.UUID`
+        :param  start:  Start handle
+        :type   start:  int
+        :param  end:    End handle
+        :type   end:    int
+        """
         for handle in self.__attr_db:
             object = self.__attr_db[handle]
             if object.type_uuid == uuid and object.handle >= start and object.handle <= end:
@@ -779,7 +936,8 @@ class GenericProfile(object):
         """Export profile as JSON data, including services, characteristics and descriptors
         definition.
 
-        :return string: JSON data corresponding to this profile
+        :return:    JSON data corresponding to this profile
+        :rtype:     str
         """
         profile_dict = {}
         profile_dict['services'] = []
@@ -812,7 +970,20 @@ class GenericProfile(object):
             profile_dict['services'].append(service_dict)
         return json.dumps(profile_dict)
 
-    def find_hook(self, service, characteristic, operation):
+
+    def find_hook(self, service, characteristic, operation) -> callable:
+        """Find a registered hook for a specific service, characteristic and operation.
+
+        :param  service:        Service object
+        :type   service:        :class:`whad.ble.profile.service.Service`
+        :param  characteristic: Characteristic object
+        :type   characteristic: :class:`whad.ble.profile.characteristic.Characteristic`
+        :param  operation:      GATT operation
+        :type   operation:      str
+
+        :return: Hook callback
+        :rtype: callable
+        """
         hook_key = str(service.uuid) + ':' + str(characteristic.uuid)
         if hook_key in self.__hooks:
             if operation in self.__hooks[hook_key]:
@@ -828,6 +999,9 @@ class GenericProfile(object):
         """Connection hook.
 
         This hook is only used to notify the connection of a device.
+        
+        :param  conn_handle:    Connection handle
+        :type   conn_handle:    int
         """
         pass
 
@@ -835,6 +1009,9 @@ class GenericProfile(object):
         """Disconnection hook.
 
         This hook is only used to notify the disconnection of a device.
+
+        :param  conn_handle:    Connection handle
+        :type   conn_handle:    int
         """
         pass
 
@@ -852,11 +1029,17 @@ class GenericProfile(object):
         error (not allowed to read characteristic value).
         
 
-        :param BlePrimaryService service: Service owning the characteristic
-        :param BleCharacteristic characteristic: Characteristic object
-        :param int offset: Read offset (default: 0)
-        :param int length: Max read length
-        :return: Value to return to the GATT client
+        :param  service:        Service owning the characteristic
+        :type   service:        :class:`whad.ble.profile.service.Service`
+        :param  characteristic: Characteristic object
+        :type   characteristic: :class:`whad.ble.profile.characteristic.Characteristic`
+        :param  offset:         Read offset (default: 0)
+        :type   offset:         int
+        :param  length:         Max read length
+        :type   length:         int
+        
+        :return:    Value to return to the GATT client
+        :rtype:     bytes
         """
         # Check if we have a hook to call
         hook = self.find_hook(service, characteristic, 'read')
@@ -871,6 +1054,17 @@ class GenericProfile(object):
 
         This hook is called whenever a charactertistic is about to be written by a GATT
         client.
+
+        :param  service:            Service owning the characteristic
+        :type   service:            :class:`whad.ble.profile.service.Service`
+        :param  characteristic:     Characteristic object
+        :type   characteristic:     :class:`whad.ble.profile.characteristic.Characteristic`
+        :param  offset:             Read offset (default: 0)
+        :type   offset:             int
+        :param  value:              Value about to be written into the characteristic
+        :type   value:              bytes
+        :param  without_response:   Set to ``True`` if no response is required
+        :type   without_response:   bool
         """
         hook = self.find_hook(service, characteristic, 'write')
         if hook is not None:
@@ -885,6 +1079,17 @@ class GenericProfile(object):
 
         This hook is called whenever a charactertistic has been written by a GATT
         client.
+
+        :param  service:            Service owning the characteristic
+        :type   service:            :class:`whad.ble.profile.service.Service`
+        :param  characteristic:     Characteristic object
+        :type   characteristic:     :class:`whad.ble.profile.characteristic.Characteristic`
+        :param  offset:             Read offset (default: 0)
+        :type   offset:             int
+        :param  value:              Value about to be written into the characteristic
+        :type   value:              bytes
+        :param  without_response:   Set to ``True`` if no response is required
+        :type   without_response:   bool
         """
         # Check if we have a hook to call
         hook = self.find_hook(service, characteristic, 'written')
@@ -897,6 +1102,19 @@ class GenericProfile(object):
             )
 
     def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
+        """Characteristic subscribed hook
+
+        This hook is called whenever a characteristic has been subscribed to.
+
+        :param  service:            Service owning the characteristic
+        :type   service:            :class:`whad.ble.profile.service.Service`
+        :param  characteristic:     Characteristic object
+        :type   characteristic:     :class:`whad.ble.profile.characteristic.Characteristic`
+        :param  notification:       Set to ``True`` if subscribed to notification
+        :type   notification:       bool
+        :param  indication:         Set to ``True`` if subscribed to notification
+        :type   indication:         bool
+        """
         # Check if we have a hook to call
         hook = self.find_hook(service, characteristic, 'sub')
         if hook is not None:
@@ -907,6 +1125,15 @@ class GenericProfile(object):
             )
 
     def on_characteristic_unsubscribed(self, service, characteristic):
+        """Characteristic unsubscribed hook
+
+        This hook is called whenever a characteristic has been unsubscribed.
+
+        :param  service:            Service owning the characteristic
+        :type   service:            :class:`whad.ble.profile.service.Service`
+        :param  characteristic:     Characteristic object
+        :type   characteristic:     :class:`whad.ble.profile.characteristic.Characteristic`
+        """
         # Check if we have a hook to call
         hook = self.find_hook(service, characteristic, 'unsub')
         if hook is not None:
@@ -914,7 +1141,29 @@ class GenericProfile(object):
             return hook()
 
     def on_notification(self, service, characteristic, value):
+        """Characteristic notification hook.
+
+        This hook is called when a notification is sent to a characteristic.
+
+        :param  service:            Service owning the characteristic
+        :type   service:            :class:`whad.ble.profile.service.Service`
+        :param  characteristic:     Characteristic object
+        :type   characteristic:     :class:`whad.ble.profile.characteristic.Characteristic`
+        :param  value:              Characteristic value
+        :type   value:              bytes
+        """
         pass
 
     def on_indication(self, service, characteristic, value):
+        """Characteristic indication hook.
+
+        This hook is called when a indication is sent to a characteristic.
+        
+        :param  service:            Service owning the characteristic
+        :type   service:            :class:`whad.ble.profile.service.Service`
+        :param  characteristic:     Characteristic object
+        :type   characteristic:     :class:`whad.ble.profile.characteristic.Characteristic`
+        :param  value:              Characteristic value
+        :type   value:              bytes
+        """        
         pass

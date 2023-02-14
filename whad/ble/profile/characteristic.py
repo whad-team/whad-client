@@ -1,4 +1,6 @@
-"""Bluetooth Low Energy Characteristic Abstraction
+"""
+BLE GATT Characteristic Model
+=============================
 """
 from whad.ble.stack.att.constants import BleAttProperties
 from whad.ble.stack.gatt.helpers import get_uuid_alias

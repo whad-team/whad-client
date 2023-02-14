@@ -1,3 +1,0 @@
-WHAD Reference API
-==================
-

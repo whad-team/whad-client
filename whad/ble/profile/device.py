@@ -1,4 +1,6 @@
-"""Bluetooth Low Energy device abstraction
+"""
+Bluetooth Low Energy Peripheral abstraction
+===========================================
 
 This module provides the PeripheralDevice class used to wrap all GATT operations
 for a given connected device. This class wraps all the following operations:
@@ -428,10 +430,14 @@ class PeripheralDevice(GenericProfile):
     def __init__(self,  central, gatt_client, conn_handle, from_json=None):
         """Create a peripheral device from a Central and a GATT client.
 
-        :param Central central: Central instance used to connect to a target device.
-        :param GattClient gatt_client: GATT client connected to a target device.
-        :param int conn_handle: Current connection handle.
-        :param str from_json: GATT profile (JSON) to be used when instanciating the underlying GattProfile.
+        :param  central:        Central instance used to connect to a target device.
+        :type   central:        :class:`whad.ble.connector.central.Central`
+        :param  gatt_client:    GATT client connected to a target device.
+        :type   gatt_client:    :class:`whad.ble.stack.gatt.GattClient`
+        :param  conn_handle:    Current connection handle.
+        :type   conn_handle:    int
+        :param  from_json:      GATT profile (JSON) to be used when instanciating the underlying GattProfile.
+        :type   from_json:      str, optional
         """
         self.__gatt = gatt_client
         self.__conn_handle = conn_handle
@@ -441,17 +447,17 @@ class PeripheralDevice(GenericProfile):
 
 
     @property
-    def conn_handle(self):
-        """Return the current connection handle.
-
-        :return int: current connection handle.
+    def conn_handle(self) -> int:
+        """Current connection handle.
         """
         return self.__conn_handle
+
 
     def set_disconnect_cb(self, callback):
         """Set disconnection callback.
 
-        :param callable callback: Callback function to call on disconnection.
+        :param callback:    Callback function to call on disconnection.
+        :type   callback:   callable
         """
         self.__disconnect_cb = callback
 
@@ -459,8 +465,10 @@ class PeripheralDevice(GenericProfile):
     def set_mtu(self, mtu: int):
         """Update connection MTU.
 
-        :param int mtu: ATT MTU to use for this connection.
-        :return int: Remote device MTU.
+        :param  mtu:    ATT MTU to use for this connection.
+        :type   mtu:    int
+        :return:        Remote device MTU.
+        :rtype: int
         """
         return self.__gatt.set_mtu(mtu)
 
@@ -482,11 +490,13 @@ class PeripheralDevice(GenericProfile):
         self.__gatt.discover()
 
 
-    def find_service_by_uuid(self, uuid: UUID):
+    def find_service_by_uuid(self, uuid: UUID) -> PeripheralService:
         """Find service by its UUID
 
-        :param UUID uuid: Service UUID
-        :return PeripheralService: An instance of PeripheralService if service has been found, None otherwise.
+        :param  uuid:   Characteristic UUID
+        :type   uuid:   :class:`whad.ble.profile.attribute.UUID`
+        :return:        PeripheralService: An instance of PeripheralService if service has been found, None otherwise.
+        :rtype: :class:`whad.ble.profile.device.PeripheralService`
         """
         service = self.__gatt.discover_primary_service_by_uuid(uuid)
         if service is not None:
@@ -500,8 +510,10 @@ class PeripheralDevice(GenericProfile):
     def find_characteristic_by_uuid(self, uuid: UUID):
         """Find characteristic by its UUID
 
-        :param UUID uuid: Characteristic UUID
-        :return PeripheralCharacteristic: An instance of PeripheralCharacteristic if characteristic has been found, None otherwise.
+        :param  uuid:   Characteristic UUID
+        :type   uuid:   :class:`whad.ble.profile.attribute.UUID`
+        :return:        PeripheralCharacteristic: An instance of PeripheralCharacteristic if characteristic has been found, None otherwise.
+        :rtype: :class:`whad.ble.profile.device.PeripheralCharacteristic`
         """
         for service in self.services():
             for charac in service.characteristics():
@@ -516,7 +528,10 @@ class PeripheralDevice(GenericProfile):
         """Find an existing object (service, attribute, descriptor) based on its handle,
         it known from the underlying GenericProfile.
 
-        :param int handle: Object handle
+        :param  handle: Object handle
+        :type   handle: int
+        :return:        Characteristic, characteristic value or service
+        :rtype:         :class:`whad.ble.profile.device.PeripheralCharacteristic`, :class:`whad.ble.profile.device.PeripheralCharacteristicValue`, :class:`whad.ble.profile.device.PeripheralService`
         """
         obj = super().find_object_by_handle(handle)
         if isinstance(obj, Characteristic):
@@ -539,20 +554,26 @@ class PeripheralDevice(GenericProfile):
         """Get a PeripheralCharacteristic object representing a characteristic
         defined by the given service UUID and characteristic UUID.
 
-        :param UUID service_uuid: Service UUID
-        :param UUID charac_uuid: Characteristic UUID
-        :return: PeripheralCharacteristic object on success, None if not found.
+        :param  service_uuid:   Service UUID
+        :type   service_uuid:   :class:`whad.ble.profile.attribute.UUID`
+        :param  charac_uuid:    Characteristic UUID
+        :type   charac_uuid:    :class:`whad.ble.profile.attribute.UUID`
+        :return:                PeripheralCharacteristic object on success, None if not found.
+        :rtype: :class:`whad.ble.profile.device.PeripheralCharacteristic`
         """
         service = self.get_service(service_uuid)
         if service is not None:
             return service.get_characteristic(charac_uuid)
         return None
 
+
     def get_service(self, uuid):
         """Retrieve a PeripheralService object given its UUID.
 
-        :param UUID uuid: Service UUID
-        :return PeripheralService: Corresponding PeripheralService object if found, None otherwise.
+        :param  uuid:       Service UUID
+        :type   uuid:       :class:`whad.ble.profile.attribute.UUID`
+        :return:            Corresponding PeripheralService object if found, None otherwise.
+        :rtype: :class:`whad.ble.profile.device.PeripheralService`
         """
 
         for service in self.services():
@@ -574,10 +595,13 @@ class PeripheralDevice(GenericProfile):
         method may raise exceptions due to potential GATT errors the remote device may
         return.
 
-        :param int handle: Characteristic or descriptor handle to write.
-        :param bytes value: Bytes to write into this characteristic.
+        :param  handle: Characteristic or descriptor handle to write.
+        :type   handle: int
+        :param  value:  Bytes to write into this characteristic.
+        :type   value:  bytes
         """
         return self.__gatt.write(handle, value)
+
 
     def write_command(self, handle, value, without_response=False):
         """Perform a write command operation (no write response will be sent) on
@@ -593,8 +617,10 @@ class PeripheralDevice(GenericProfile):
         method may raise exceptions due to potential GATT errors the remote device may
         return.
 
-        :param int handle: Characteristic or descriptor handle to write.
-        :param bytes value: Bytes to write into this characteristic.
+        :param  handle: Characteristic or descriptor handle to write.
+        :type   handle: int
+        :param  value:  Bytes to write into this characteristic.
+        :type   value:  bytes
         """
         return self.__gatt.write_command(handle, value)
 
@@ -611,10 +637,14 @@ class PeripheralDevice(GenericProfile):
         method may raise exceptions due to potential GATT errors the remote device may
         return.
 
-        :param int handle: Characteristic or descriptor handle.
-        :param int offset: Offset applied when reading data from characteristic or descriptor (default: 0).
-        :param bool long: use GATT long read procedure if set to True (default: False)
-        :return bytes: Content of the characteristic or descriptor.
+        :param  handle: Characteristic or descriptor handle.
+        :type   handle: int
+        :param  offset: Offset applied when reading data from characteristic or descriptor (default: 0).
+        :type   offset: int, optional
+        :param  long:   use GATT long read procedure if set to True (default: False)
+        :type   long:   bool, optional
+        :return:        Content of the characteristic or descriptor.
+        :rtype: bytes
         """
         if not long:
             if offset is None:
@@ -627,6 +657,9 @@ class PeripheralDevice(GenericProfile):
     
     def on_disconnect(self, conn_handle):
         """Disconnection callback
+
+        :param  conn_handle:    Connection handle
+        :type   conn_handle:    int
         """
         logger.debug('PeripheralDevice has disconnected')
         if self.__disconnect_cb is not None:

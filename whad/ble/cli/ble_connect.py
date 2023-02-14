@@ -4,7 +4,6 @@ This utility will configure a compatible whad device to connect to a given
 BLE device, and chain this with another tool.
 
 """
-from time import sleep
 from whad.cli.app import CommandLineApp
 from whad.ble.connector import Central
 from whad.device.unix import UnixSocketProxy
@@ -71,7 +70,8 @@ class BleConnectApp(CommandLineApp):
                 'target_addrtype': str(central.target_peer.type)
             })
             proxy.start()
-            proxy.join()        
+            proxy.join()
+            central.stop()
 
 
 def ble_connect_main():
