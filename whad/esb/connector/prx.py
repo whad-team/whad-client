@@ -63,5 +63,12 @@ class PRX(ESB):
         super().stop()
         self.__started = False
 
+    def prepare_acknowledgment(self, ack):
+        self.__stack.ll.prepare_acknowledgment(ack)
+
     def on_pdu(self, pdu):
         self.__stack.on_pdu(pdu)
+
+    def stream(self):
+        for pdu in self.__stack.ll.data_stream():
+            yield pdu

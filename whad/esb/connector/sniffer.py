@@ -60,6 +60,6 @@ class Sniffer(ESB):
                 message_type = "pdu"
 
             message = self.wait_for_message(filter=message_filter('esb', message_type))
-            packet = self._build_scapy_packet_from_message(message.esb, message_type)
+            packet = self.translator.from_message(message.esb, message_type)
 
             yield packet

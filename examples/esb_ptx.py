@@ -1,14 +1,14 @@
-from whad.unifying import Dongle
+from whad.esb import ESB, PRX, PTX
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
-from whad.scapy.layers.esb import *
-from whad.scapy.layers.unifying import *
+from whad.scapy.layers.esb import ESB_Hdr
 from scapy.compat import raw
-import sys,time
-from whad.esb.esbaddr import ESBAddress
+import sys
 
 def show(pkt):
-    print(pkt.metadata, repr(pkt))
+    if hasattr(pkt, "metadata"):
+        print(pkt.metadata)
+    print(bytes(pkt).hex(), repr(pkt))
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -18,19 +18,17 @@ if __name__ == '__main__':
         # Connect to target device and performs discovery
         try:
             dev = WhadDevice.create(interface)
-
-            connector = Dongle(dev)
+            connector = PTX(dev)
+            connector.address = "ca:e9:06:ec:a4"
+            connector.channel = 8
+            connector.attach_callback(show)
             connector.start()
-            #connector.attach_callback(show, on_reception=True, on_transmission=False)
-            connector.address = ESBAddress("9b:0a:90:42:00")#"9b:0a:90:42:00"
-            connector.channel = 5
-            input()
-            connector.address = "9b:0a:90:42:97"#"9b:0a:90:42:96"
 
             while True:
-                time.sleep(1)
+                input()
+                connector.send(ESB_Hdr(bytes.fromhex("cae906eca42a0061010000000000001e5c2980")))
+
         except (KeyboardInterrupt, SystemExit):
-            connector.stop()
             dev.close()
 
         except WhadDeviceNotFound:

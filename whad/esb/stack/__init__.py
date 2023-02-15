@@ -43,16 +43,20 @@ class ESBStack:
     # Interact
     ############################
 
-    def set_channel(self, channel):
-        self.__connector.channel = channel
-
-    def get_channel(self):
+    @property
+    def channel(self):
         return self.__connector.channel
 
-    def get_address(self):
+    @channel.setter
+    def channel(self, channel):
+        self.__connector.channel = channel
+
+    @property
+    def address(self):
         return self.__connector.address
 
-    def set_address(self, address):
+    @address.setter
+    def address(self, address):
         self.__connector.address = address
 
     def send(self, packet, channel=None, retransmission_count=1):

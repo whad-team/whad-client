@@ -112,6 +112,7 @@ class RFStormDevice(VirtualDevice):
 
         self.__opened_stream = False
         self.__opened = True
+
         # Ask parent class to run a background I/O thread
         super().open()
 
