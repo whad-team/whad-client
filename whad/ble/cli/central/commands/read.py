@@ -130,9 +130,6 @@ def read_handler(app, command_args):
 
         # Terminate central
         central.stop()
-
-    elif app.interface is None:
-        app.error('You need to specify an interface with option --interface.')
     
     # Piped interface
     elif app.args.bdaddr is None and app.is_piped_interface():
@@ -152,12 +149,15 @@ def read_handler(app, command_args):
             conn_handle=int(app.args.conn_handle)
         )
    
-        central = Central(app.interface, existing_connection)
+        central = Central(app.input_interface, existing_connection)
 
         device = central.peripheral()
 
         # Read GATT characteristic
         read_gatt_characteristic(app, command_args, device)
+
+    elif app.interface is None:
+        app.error('You need to specify an interface with option --interface.')
 
     else:
         app.error('You need to specify a target device with option --bdaddr.')

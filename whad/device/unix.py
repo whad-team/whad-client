@@ -179,6 +179,8 @@ class UnixSocketDevice(WhadDevice):
                     raise WhadDeviceDisconnected()
         except ConnectionResetError as err:
             logger.error('Connection reset by peer')
+        except Exception as err:
+            raise WhadDeviceDisconnected()
 
     def change_transport_speed(self, speed):
         """Not supported by Unix socket devices.
@@ -198,6 +200,18 @@ class UnixSocketConnector(WhadDeviceConnector):
     def __init__(self, device, path=None):
         """Create a UnixSocketConnector
         """
+        # No client connected
+        self.__client = None
+        
+        # Input pipes
+        self.__inpipe = bytearray()
+
+        # Parameters
+        self.__parameters = {}
+
+        # Shutdown require (to force exit in  ̀`serve()`)
+        self.__shutdown_required = False
+
         # Initialize parent class (device connector)
         super().__init__(device)
 
@@ -223,15 +237,6 @@ class UnixSocketConnector(WhadDeviceConnector):
         except IOError as err:
             logger.debug('Error while cleaning Unix socket path %s' % self.__path)
             raise WhadDeviceNotReady
-
-        # No client connected
-        self.__client = None
-        
-        # Input pipes
-        self.__inpipe = bytearray()
-
-        # Parameters
-        self.__parameters = {}
 
     def add_parameter(self, key: str, value):
         """Add a parameter to this Unix Socket connector.
@@ -278,6 +283,9 @@ class UnixSocketConnector(WhadDeviceConnector):
                     else:
                         break
 
+    def shutdown(self):
+        self.__shutdown_required = True
+
     def serve(self, timeout=None):
         """Serve Unix socket
 
@@ -296,10 +304,10 @@ class UnixSocketConnector(WhadDeviceConnector):
         sys.stdout.flush()
 
         try:
-            while True:
+            while not self.__shutdown_required:
                 self.__client,_ = self.__socket.accept()
                 try:
-                    while True:
+                    while not self.__shutdown_required:
                         rlist = [self.__client.fileno()]
                         readers,writers,errors = select.select(rlist, [], rlist, timeout)
                         
@@ -409,6 +417,7 @@ class UnixSocketProxy(Thread):
         super().__init__()
         self.__interface = interface
         self.__params = params
+        self.__canceled = False
 
         # Connected, switch to a unix socket server
         self.__connector = connector(self.__interface)
@@ -422,6 +431,9 @@ class UnixSocketProxy(Thread):
     @property
     def connector(self):
         return self.__connector
+
+    def stop(self):
+        self.__connector.shutdown()
 
     def run(self):
         """Run device proxy thread.

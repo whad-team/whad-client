@@ -67,6 +67,7 @@ class BleUnixSocketConnector(UnixSocketConnector):
     def on_domain_msg(self, domain, message):
         """Received a domain message, process only BLE messages.
         """
+        packet = None
         if domain == 'ble':
             msg_type = message.WhichOneof('msg')
             if msg_type == 'adv_pdu':
@@ -98,24 +99,31 @@ class BleWiresharkApp(CommandLineApp):
             interface=True,
             commands=False
         )
+        self.proxy = None
 
 
     def run(self):
         """Override App's run() method to handle scripting feature.
         """
-        # Launch pre-run tasks
-        self.pre_run()
+        try:
+            # Launch pre-run tasks
+            self.pre_run()
 
-        # We need to have an interface specified
-        if self.interface is not None:
-            # Make sure we are placed between two piped tools
-            if self.is_stdout_piped() and self.is_stdin_piped():
-                # Start wireshark monitoring
-                self.monitor()
+            # We need to have an interface specified
+            if self.input_interface is not None:
+                # Make sure we are placed between two piped tools
+                if self.is_stdout_piped() and self.is_stdin_piped():
+                    # Start wireshark monitoring
+                    self.monitor()
+                else:
+                    self.error('Tool must be piped to another WHAD tool.')
             else:
-                self.error('Tool must be piped to another WHAD tool.')
-        else:
-            self.error('<i>ble-wireshark</i> must be placed between two WHAD CLI tools to monitor traffic.')
+                self.error('<i>ble-wireshark</i> must be placed between two WHAD CLI tools to monitor traffic.')
+
+        except KeyboardInterrupt as keybd:
+            self.warning('ble-wireshark stopped (CTL-C)')
+            if self.proxy is not None:
+                self.proxy.stop()
 
         # Launch post-run tasks
         self.post_run()
@@ -124,14 +132,14 @@ class BleWiresharkApp(CommandLineApp):
         """Start a new Unix socket server and forward all messages
         """
         # Create our proxy
-        proxy = UnixSocketProxy(self.interface, self.args.__dict__, BleUnixSocketConnector)
+        self.proxy = UnixSocketProxy(self.input_interface, self.args.__dict__, BleUnixSocketConnector)
 
         # Attach a wireshark monitor to our proxy
         monitor = WiresharkMonitor()
-        monitor.attach(proxy.connector)
+        monitor.attach(self.proxy.connector)
         monitor.start()
-        proxy.start()
-        proxy.join()
+        self.proxy.start()
+        self.proxy.join()
         
 
 def ble_wireshark_main():

@@ -7,19 +7,14 @@ Welcome to WHAD's documentation!
 ================================
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
     :caption: General documentation
 
     intro
-    
-.. toctree::
-    :maxdepth: 2
-    :caption: Command-line Tools
-
     cli/index
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
     :caption: Bluetooth Low Energy API
 
     ble/started

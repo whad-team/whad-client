@@ -1,5 +1,7 @@
-Bluetooth Low Energy GATT client
-================================
+.. _whad-ble-central:
+
+ble-central: Bluetooth Low Energy GATT client
+=============================================
 
 ``ble-central`` provides a scanner that can be used to detect surrounding BLE devices
 as well as a GATT client allowing to connect to a remote BLE device and access

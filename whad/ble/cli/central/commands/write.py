@@ -126,7 +126,7 @@ def writecmd_handler(app, command_args):
             conn_handle=int(app.args.conn_handle)
         )
    
-        central = Central(app.interface, existing_connection)
+        central = Central(app.input_interface, existing_connection)
 
         device = central.peripheral()
 

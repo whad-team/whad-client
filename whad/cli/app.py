@@ -185,6 +185,7 @@ class CommandLineApp(ArgumentParser):
         super().__init__(description=description)
 
         self.__interface = None
+        self.__input_iface = None
         self.__args = None
         self.__has_interface = interface
         self.__is_interface_piped = False
@@ -232,6 +233,12 @@ class CommandLineApp(ArgumentParser):
 
 
     @property
+    def input_interface(self):
+        """Input interface
+        """
+        return self.__input_iface
+
+    @property
     def args(self):
         """Return the parsed arguments Namespace.
         """
@@ -250,6 +257,22 @@ class CommandLineApp(ArgumentParser):
         """
         # First we need to parse the main arguments
         self.__args = self.parse_args()
+
+        # If interface is provided, instantiate it and make it available
+        if self.__has_interface:
+            if self.__args.interface is not None:
+                try:
+                    # Create WHAD interface
+                    self.__interface = WhadDevice.create(self.__args.interface)
+                except WhadDeviceNotFound as dev_404:
+                    self.error('WHAD device not found.')
+                    return self.DEV_NOT_FOUND_ERR
+                except WhadDeviceAccessDenied as dev_403:
+                    self.error('Cannot access WHAD device, please check permissions.')
+                    return self.DEV_ACCESS_ERR
+                except WhadDeviceNotReady as dev_500:
+                    self.error('WHAD device is not ready.')
+                    return self.DEV_NOT_READY_ERR
 
         # If no color is enabled, change color depth to 1 (black/white)
         if self.__args.nocolor:
@@ -286,8 +309,8 @@ class CommandLineApp(ArgumentParser):
 
                             # Create a Unix socket device and connect it to the
                             # given Unix socket path
-                            self.__interface = UnixSocketDevice(url_info.path)
-                            self.__interface.open()
+                            self.__input_iface = UnixSocketDevice(url_info.path)
+                            self.__input_iface.open()
 
                             # Copy parameters into our app parameters
                             params = dict(parse_qsl(url_info.query))
@@ -299,29 +322,13 @@ class CommandLineApp(ArgumentParser):
                             break
                         else:
                             print(line)
-        else:           
-            # If interface is provided, instantiate it and make it available
-            if self.__has_interface:
-                if self.__args.interface is not None:
-                    try:
-                        # Create WHAD interface
-                        self.__interface = WhadDevice.create(self.__args.interface)
-                    except WhadDeviceNotFound as dev_404:
-                        self.error('WHAD device not found.')
-                        return self.DEV_NOT_FOUND_ERR
-                    except WhadDeviceAccessDenied as dev_403:
-                        self.error('Cannot access WHAD device, please check permissions.')
-                        return self.DEV_ACCESS_ERR
-                    except WhadDeviceNotReady as dev_500:
-                        self.error('WHAD device is not ready.')
-                        return self.DEV_NOT_READY_ERR
-
+ 
 
     def post_run(self):
         """Implement post-run tasks.
         """
         # If stdout is piped, foward socket info to next tool
-        if isinstance(self.__interface, UnixSocketDevice) and self.is_stdout_piped():
+        if isinstance(self.__input_iface, UnixSocketDevice) and self.is_stdout_piped():
             sys.stdout.write('%s\n' % self.__interface_path)
             sys.stdout.flush()
 

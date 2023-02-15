@@ -105,20 +105,27 @@ class LowLevelPeripheral(Peripheral):
             self.__conn_handle = connection_data.conn_handle
         
         # Notify proxy that a connection has been established
-        self.__proxy.on_connect()
+        if self.__proxy is not None:
+            self.__proxy.on_connect()
         
         # Foward pending PDUs
         if len(self.__pending_control_pdus) > 0:
             for _pdu in self.__pending_control_pdus:
-                pdu = self.__proxy.on_ctl_pdu(pdu)
-                if pdu is not None:
-                    self.send_pdu(_pdu, self.__conn_handle)
+                if self.__proxy is not None:
+                    pdu = self.__proxy.on_ctl_pdu(_pdu)
+                    if pdu is not None:
+                        self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
+                else:
+                    self.send_pdu(reshape_pdu(_pdu), self.__conn_handle)
         
         if len(self.__pending_data_pdus) > 0:
             for _pdu in self.__pending_data_pdus:
-                pdu = self.__proxy.on_data_pdu(pdu)
-                if pdu is not None:
-                    self.send_pdu(_pdu, self.__conn_handle)
+                if self.__proxy is not None:
+                    pdu = self.__proxy.on_data_pdu(_pdu)
+                    if pdu is not None:
+                        self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
+                else:
+                    self.send_pdu(reshape_pdu(_pdu), self.__conn_handle)
 
 
     def on_disconnected(self, connection_data):
@@ -130,7 +137,8 @@ class LowLevelPeripheral(Peripheral):
         self.__conn_handle = None
 
         # Notify proxy the current connection has been terminated
-        self.__proxy.on_disconnect()
+        if self.__proxy is not None:
+            self.__proxy.on_disconnect()
 
 
     def on_ctl_pdu(self, pdu):
@@ -144,8 +152,11 @@ class LowLevelPeripheral(Peripheral):
         """
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
             if self.__other_half is not None and self.__connected:
-                pdu = self.__proxy.on_ctl_pdu(pdu)
-                if pdu is not None:
+                if self.__proxy is not None:
+                    pdu = self.__proxy.on_ctl_pdu(pdu)
+                    if pdu is not None:
+                        self.__other_half.forward_ctrl_pdu(pdu)
+                else:
                     self.__other_half.forward_ctrl_pdu(pdu)
 
 
@@ -157,8 +168,11 @@ class LowLevelPeripheral(Peripheral):
         """
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
             if self.__other_half is not None and self.__connected:
-                pdu = self.__proxy.on_data_pdu(pdu)
-                if pdu is not None:
+                if self.__proxy is not None:
+                    pdu = self.__proxy.on_data_pdu(pdu)
+                    if pdu is not None:
+                        self.__other_half.forward_data_pdu(pdu)
+                else:
                     self.__other_half.forward_data_pdu(pdu)
             else:
                 logger.error('client is not connected to proxy')
@@ -169,8 +183,14 @@ class LowLevelPeripheral(Peripheral):
 
         :param Packet pdu: Control PDU to forward
         """
+        logger.info('Forwarding control PDU to central (%s)' % str(self.__conn_handle))
+        pdu.show()
         if self.__conn_handle is not None:
-            return self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
+            return self.send_pdu(
+                reshape_pdu(pdu),
+                self.__conn_handle,
+                direction=BleDirection.SLAVE_TO_MASTER
+            )
         else:
             self.__pending_control_pdus.append(reshape_pdu(pdu))
 
@@ -180,8 +200,14 @@ class LowLevelPeripheral(Peripheral):
 
         :param Packet pdu: Data PDU to forward
         """
+        logger.info('Forwarding data PDU to central (%s)' % str(self.__conn_handle))
+        pdu.show()
         if self.__conn_handle is not None:
-            return self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
+            return self.send_pdu(
+                reshape_pdu(pdu),
+                self.__conn_handle,
+                direction=BleDirection.SLAVE_TO_MASTER
+            )
         else:
             self.__pending_data_pdus.append(reshape_pdu(pdu))
 
@@ -197,14 +223,12 @@ class LowLevelCentral(Central):
     device or received from the associated peripheral.
     """
 
-    def __init__(self, device):
+    def __init__(self, device, connection_data=None):
         """Instanciate a LowLevelCentral object
 
         :param WhadDevice device: Underlying WHAD device to use.
         """
-        super().__init__(device)
-        self.__connected = False
-        self.__conn_handle = None
+        super().__init__(device, existing_connection=connection_data)
         self.__other_half = None
 
 
@@ -234,6 +258,9 @@ class LowLevelCentral(Central):
 
         :param connection_data: Connection data
         """
+        # Call Central.on_connected()
+        super().on_connected(connection_data)
+
         self.__connected = True
         if connection_data.conn_handle is None:
            self.__conn_handle = 0
@@ -244,6 +271,8 @@ class LowLevelCentral(Central):
     def on_disconnected(self, connection_data):
         """Callback called when our central device has been disconnected from our target device
         """
+        super().on_disconnected(connection_data)
+
         logger.info('target device has disconnected')
         self.__connected = False
         self.__conn_handle = None

@@ -235,6 +235,14 @@ class Characteristic(Attribute):
             ((self.properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE) != 0)
         )
 
+    def can_notify(self) -> bool:
+        """Determine if characteristic sends notifications.
+
+        :return: ``True`` if characteristic sends notification, ``False`` otherwise.
+        :rtype: bool
+        """
+        return ((self.properties & CharacteristicProperties.NOTIFY) != 0)
+
     def must_notify(self):
         """Determine if a notification must be sent for this characteristic.
 
@@ -246,6 +254,14 @@ class Characteristic(Attribute):
             if cccd is not None:
                 return (cccd.config == 0x0001)
         return False
+
+    def can_indicate(self) -> bool:
+        """Determine if characteristic sends indications.
+
+        :return: ``True`` if characteristic sends indication, ``False`` otherwise.
+        :rtype: bool
+        """
+        return ((self.properties & CharacteristicProperties.INDICATE) != 0)
 
     def must_indicate(self):
         """Determine if an indication must be sent for this characteristic.

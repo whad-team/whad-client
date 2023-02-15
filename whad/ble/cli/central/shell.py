@@ -10,6 +10,7 @@ from whad.ble.exceptions import InvalidHandleValueException
 from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Scanner, Central
+from whad.ble.profile.device import PeripheralCharacteristic
 from whad.ble.profile.characteristic import CharacteristicProperties
 from whad.ble.profile.advdata import AdvDataFieldList
 from whad.ble.utils.att import UUID
@@ -732,7 +733,7 @@ class BleCentralShell(InteractiveShell):
         Once subscribed, notifications and indications will be displayed in the
         console.
 
-        > sub 41
+        > sub 0xFFF4
         """
         if self.__target_bd:
             # Figure out what the handle is
@@ -745,7 +746,7 @@ class BleCentralShell(InteractiveShell):
             else:
                 try:
                     handle = int(args[0])
-                except ValueError as badval:
+                except ValueError as err:
                     try:
                         handle = UUID(args[0].replace('-',''))
                     except:
@@ -755,44 +756,51 @@ class BleCentralShell(InteractiveShell):
             # If UUID is provided
             if isinstance(handle, UUID):
                 target_charac = self.__target.find_characteristic_by_uuid(handle)
+            elif isinstance(handle, int):
+                try:
+                    target_charac = self.__target.find_object_by_handle(handle)
+                except IndexError as notfound:
+                    target_charac = None
+                if not isinstance(target_charac, PeripheralCharacteristic) or target_charac is None:
+                    self.error('No characteristic found with handle %d' % handle)
+                    return
 
-                def on_charac_notified(charac, value, indication):
-                    if indication:
-                        print_formatted_text(HTML(
-                            '<ansimagenta>Indication</ansimagenta> received from characteristic with handle %d' % (
-                                charac.handle
-                            )
-                        ))
-                        hexdump(value)
-                    else:
-                        print_formatted_text(HTML(
-                            '<ansimagenta>Notification</ansimagenta> received from characteristic with handle %d' % (
-                                charac.handle
-                            )
-                        ))
-                        hexdump(value)
+            def on_charac_notified(charac, value, indication):
+                if indication:
+                    print_formatted_text(HTML(
+                        '<ansimagenta>Indication</ansimagenta> received from characteristic with handle %d' % (
+                            charac.handle
+                        )
+                    ))
+                    hexdump(value)
+                else:
+                    print_formatted_text(HTML(
+                        '<ansimagenta>Notification</ansimagenta> received from characteristic with handle %d' % (
+                            charac.handle
+                        )
+                    ))
+                    hexdump(value)
 
-                if target_charac is not None:
-                    try:
-                        if not target_charac.must_notify():
-                            if target_charac.must_indicate():
-                                target_charac.subscribe(
-                                    indication=True,
-                                    callback=on_charac_notified
-                                )
-                            else:
-                                self.error('Characteristic does not send notification nor indication.')
-                        else:
+            if target_charac is not None:
+                try:
+                    if not target_charac.can_notify():
+                        if target_charac.can_indicate():
                             target_charac.subscribe(
+                                indication=True,
                                 callback=on_charac_notified
                             )
-                    except AttError as att_err:
-                        self.show_att_error(att_err)
-                    except GattTimeoutException as timeout:
-                        self.error('GATT timeout while writing.')
-                else:
-                    self.error('No characteristic found with UUID %s' % handle)
-
+                        else:
+                            self.error('Characteristic does not send notification nor indication.')
+                    else:
+                        target_charac.subscribe(
+                            callback=on_charac_notified
+                        )
+                except AttError as att_err:
+                    self.show_att_error(att_err)
+                except GattTimeoutException as timeout:
+                    self.error('GATT timeout while writing.')
+            else:
+                self.error('No characteristic found with UUID %s' % handle)
         else:
             self.error('No device connected.')
 
@@ -833,16 +841,24 @@ class BleCentralShell(InteractiveShell):
             # If UUID is provided
             if isinstance(handle, UUID):
                 target_charac = self.__target.find_characteristic_by_uuid(handle)
+            elif isinstance(handle, int):
+                try:
+                    target_charac = self.__target.find_object_by_handle(handle)
+                except IndexError as notfound:
+                    target_charac = None
+                if not isinstance(target_charac, PeripheralCharacteristic) or target_charac is None:
+                    self.error('No characteristic found with handle %d' % handle)
+                    return
 
-                if target_charac is not None:
-                    try:
-                        target_charac.unsubscribe()
-                    except AttError as att_err:
-                        self.show_att_error(att_err)
-                    except GattTimeoutException as timeout:
-                        self.error('GATT timeout.')
-                else:
-                    self.error('No characteristic found with UUID %s' % handle)
+            if target_charac is not None:
+                try:
+                    target_charac.unsubscribe()
+                except AttError as att_err:
+                    self.show_att_error(att_err)
+                except GattTimeoutException as timeout:
+                    self.error('GATT timeout.')
+            else:
+                self.error('No characteristic found with UUID %s' % handle)
 
         else:
             self.error('No device connected.')
