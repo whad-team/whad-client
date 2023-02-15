@@ -1,3 +1,5 @@
+.. _whad-ble-central:
+
 ble-central: Bluetooth Low Energy GATT client
 =============================================
 
