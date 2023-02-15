@@ -45,7 +45,7 @@ class BleConnectApp(CommandLineApp):
                 # Make sure we are piped to another tool
                 if self.is_stdout_piped():
                     # Connect to the target device
-                    self.connect_target(self.args.bdaddr)
+                    self.connect_target(self.args.bdaddr, self.args.random)
                 else:
                     self.error('Tool must be piped to another WHAD tool.')
             else:
