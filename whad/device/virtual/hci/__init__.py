@@ -431,6 +431,11 @@ class HCIDevice(VirtualDevice):
         """
         Configure advertising data to use by HCI device.
         """
+        # pad data if less than 31 bytes
+        if len(data) < 31:
+            data += b'\x00'*(31 - len(data))
+
+        # Send command
         response = self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data))
         return response.status == 0x00
 
