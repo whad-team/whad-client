@@ -42,12 +42,12 @@ def show_adv_record(offset, raw_record):
     nlines = int(len(raw_record)/16)
     if nlines*16 < len(raw_record):
         nlines += 1
-    
+
     print(' AD Record #%d:' % offset)
     for line in range(0, nlines):
         line_str = ' '.join(['%02x' % c for c in raw_record[line*16:(line+1)*16]])
         print('  ' + line_str)
-        
+
 
 
 class BleCentralShell(InteractiveShell):
@@ -116,7 +116,7 @@ class BleCentralShell(InteractiveShell):
         <ansicyan><b>scan</b></ansicyan>
 
         Scan devices and report them in this console in real-time.
-        
+
         The following information is provided:
          - <b>RSSI:</b> represents the strength of the signal in dBm
          - <b>Address type:</b> address is either public or random
@@ -177,7 +177,7 @@ class BleCentralShell(InteractiveShell):
             try:
                 # Retrieve device from cache
                 device = self.__cache[address]
-                
+
                 # Show detailed information about the selected device
                 dev_info = device['info']
 
@@ -227,20 +227,27 @@ class BleCentralShell(InteractiveShell):
     def do_connect(self, args):
         """connect to a device
 
-        <ansicyan><b>connect</b> <i>[ BD address or device name ]</i></ansicyan>
+        <ansicyan><b>connect</b> <i>[ BD address or device name ]</i> <i>[ Connection type ]</i></ansicyan>
 
         Initiate a Bluetooth Low Energy connection to a specific device by its
         Bluetooth Device address or its name. If multiple devices have the same
         name, the first one will be picked for connect.
+
+        By default, the connection is established with a public connection type if
+        the target device is not cached, otherwise it is automatically .
+        You can indicate a specific connection type using a second parameter and
+        indicating "random" or "public".
         """
         if len(args) < 1:
-            self.error('<u>connect</u> requires a single parameter (device name or BD address).\ntype \'help connect\' for more details.')
+            self.error('<u>connect</u> requires at least one parameter (device name or BD address).\ntype \'help connect\' for more details.')
             return
 
         try:
+            target_random_address_type = False
             try:
                 target = self.__cache[args[0]]
-                target_bd_addr = self.__cache[args[0]]['info'].address
+                target_bd_addr = target['info'].address
+                target_random_address_type = (target['info'].address_type == 1)
             except IndexError as notfound:
                 # If target not in cache, we are expecting a BD address
                 if re.match(BDADDR_REGEXP, args[0]):
@@ -248,12 +255,21 @@ class BleCentralShell(InteractiveShell):
                 else:
                     self.error('You must provide a valid BD address.')
                     return
-        
+
+            if len(args) == 2:
+                if args[1].lower() in ("rnd", "random"):
+                    target_random_address_type = True
+                elif args[1].lower() in ("pub", "public"):
+                    target_random_address_type = False
+                else:
+                    self.error('You must indicate a valid connection type ("public" or "random").')
+                    return
+
             # Switch role to Central
             self.switch_role(Central)
 
             # Try to connect to our target device (central role is started here)
-            self.__target = self.__connector.connect(target_bd_addr)
+            self.__target = self.__connector.connect(target_bd_addr, random=target_random_address_type)
             self.__target_bd = target_bd_addr
 
             # Check connection is OK
@@ -262,7 +278,7 @@ class BleCentralShell(InteractiveShell):
 
                 # Attach our disconnection callback
                 self.__target.set_disconnect_cb(self.on_disconnect)
-                
+
                 # Attach our wireshark monitor, if any
                 if self.__wireshark is not None:
                     self.__wireshark.attach(self.__connector)
@@ -286,7 +302,7 @@ class BleCentralShell(InteractiveShell):
                         self.__target_bd,
                         AdvDataFieldList()
                     ))
-                
+
                 # Update prompt
                 self.update_prompt()
             else:
@@ -316,7 +332,7 @@ class BleCentralShell(InteractiveShell):
         self.update_prompt(force=True)
 
         # Show disconnection
-        print_formatted_text(HTML('<ansired>Peripheral has just disconnected</ansired>'))        
+        print_formatted_text(HTML('<ansired>Peripheral has just disconnected</ansired>'))
 
 
     @category('GATT client')
@@ -336,7 +352,7 @@ class BleCentralShell(InteractiveShell):
                 self.__wireshark.detach()
         else:
             self.warning('not connected to a device, aborted.')
-        
+
         # Update prompt
         self.update_prompt()
 
@@ -352,7 +368,7 @@ class BleCentralShell(InteractiveShell):
 
         This <b>cached information</b> is then used by commands <ansicyan>read</ansicyan>, <ansicyan>services</ansicyan>,
         and <ansicyan>characteristics</ansicyan> to speed up the process.
-        
+
         <aaa fg="orange">Sometimes this discovery process may cause an error
         and produces incomplete information, in this case try again and cross
         fingers</aaa>
@@ -449,7 +465,7 @@ class BleCentralShell(InteractiveShell):
                     print_formatted_text(HTML('  | <ansicyan>access rights:</ansicyan> <b>%s</b>' % ', '.join(charac_rights)))
         else:
             self.error('No device connected.')
-    
+
     @category('GATT client')
     def do_read(self, args):
         """read a GATT attribute
@@ -501,7 +517,7 @@ class BleCentralShell(InteractiveShell):
                 except ValueError as badval:
                     self.error('Wrong offset value, will use 0 instead.')
                     offset = None
-                
+
             # Perform characteristic read by handle
             if not isinstance(handle, UUID):
                 try:
@@ -521,7 +537,7 @@ class BleCentralShell(InteractiveShell):
                     self.__cache.mark_as_discovered(self.__target_bd)
 
                 # Search characteristic from its UUID
-                target_charac = self.__target.find_characteristic_by_uuid(handle)                       
+                target_charac = self.__target.find_characteristic_by_uuid(handle)
                 if target_charac is not None:
                     try:
                         # Read data
@@ -532,7 +548,7 @@ class BleCentralShell(InteractiveShell):
 
                         # Display result as hexdump
                         hexdump(value)
-                    
+
                     except AttError as att_err:
                         self.show_att_error(att_err)
                     except GattTimeoutException as timeout:
@@ -585,7 +601,7 @@ class BleCentralShell(InteractiveShell):
 
         if not isinstance(char_value, bytes):
             char_value = bytes(char_value,'utf-8')
-            
+
         # Perform ATT write by handle
         if not isinstance(handle, UUID):
             try:
@@ -604,7 +620,7 @@ class BleCentralShell(InteractiveShell):
                 self.__cache.mark_as_discovered(self.__target_bd)
 
             # Search characteristic from its UUID
-            target_charac = self.__target.find_characteristic_by_uuid(handle)                       
+            target_charac = self.__target.find_characteristic_by_uuid(handle)
             if target_charac is not None:
                 try:
                     if without_response:
@@ -634,7 +650,7 @@ class BleCentralShell(InteractiveShell):
         > writecmd 41 hex 41 42 43
 
         The command above will write 'ABC' to attribute identified by the handle 41.
-        
+
         Data can also be provided as text:
 
         > writecmd 41 ABC
@@ -642,7 +658,7 @@ class BleCentralShell(InteractiveShell):
         if self.__target_bd:
             self.perform_write(args, without_response=True)
         else:
-            self.error('No device connected.')  
+            self.error('No device connected.')
 
 
     @category('GATT client')
@@ -659,7 +675,7 @@ class BleCentralShell(InteractiveShell):
         > write 41 hex 41 42 43
 
         The command above will write 'ABC' to attribute identified by the handle 41.
-        
+
         Data can also be provided as text:
 
         > write 41 ABC
@@ -738,7 +754,7 @@ class BleCentralShell(InteractiveShell):
 
             # If UUID is provided
             if isinstance(handle, UUID):
-                target_charac = self.__target.find_characteristic_by_uuid(handle)      
+                target_charac = self.__target.find_characteristic_by_uuid(handle)
 
                 def on_charac_notified(charac, value, indication):
                     if indication:
@@ -755,7 +771,7 @@ class BleCentralShell(InteractiveShell):
                             )
                         ))
                         hexdump(value)
-            
+
                 if target_charac is not None:
                     try:
                         if not target_charac.must_notify():
@@ -791,7 +807,7 @@ class BleCentralShell(InteractiveShell):
 
         Once unsubscribed, no more notifications and indications will be displayed in the
         console.
-        
+
         Example:
 
         > unsub 41
@@ -816,8 +832,8 @@ class BleCentralShell(InteractiveShell):
 
             # If UUID is provided
             if isinstance(handle, UUID):
-                target_charac = self.__target.find_characteristic_by_uuid(handle)      
-            
+                target_charac = self.__target.find_characteristic_by_uuid(handle)
+
                 if target_charac is not None:
                     try:
                         target_charac.unsubscribe()
@@ -849,7 +865,7 @@ class BleCentralShell(InteractiveShell):
         <ansicyan><b>wireshark</b> <i>["on" | "off"]</i></ansicyan>
 
         This command launches a wireshark that will display all the packets sent
-        and received in the active connection. 
+        and received in the active connection.
         """
         if len(arg) >=1:
             enabled = arg[0].lower()=="on"
