@@ -1,4 +1,4 @@
-from whad.unifying.connector import Unifying, Sniffer, Keylogger, Mouselogger, Mouse, Keyboard
+from whad.unifying.connector import Unifying, Sniffer, Keylogger, Mouselogger, Mouse, Keyboard, Dongle
 from whad.unifying.utils.phy import PHYS
 
 __all__ = [
@@ -8,5 +8,6 @@ __all__ = [
     'Mouselogger',
     'Mouse',
     'Keyboard',
+    'Dongle',
     'PHYS'
 ]

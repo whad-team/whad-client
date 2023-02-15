@@ -1,12 +1,12 @@
 from whad.unifying.connector import Unifying
 from whad.esb.stack import ESBStack
-from whad.unifying.stack import UnifyingApplicativeLayerManager, UnifyingRole, MultimediaKey
+from whad.unifying.stack import UnifyingApplicativeLayerManager, UnifyingRole
 from whad.exceptions import UnsupportedCapability
 
 
-class Keyboard(Unifying):
+class Dongle(Unifying):
     """
-    Logitech Unifying Keyboard interface for compatible WHAD device.
+    Logitech Unifying Dongle interface for compatible WHAD device.
     """
     def __init__(self, device):
         super().__init__(device)
@@ -23,8 +23,8 @@ class Keyboard(Unifying):
             raise UnsupportedCapability("SetNodeAddress")
 
         # Check if device can perform keyboard simulation
-        if not self.can_be_keyboard():
-            raise UnsupportedCapability("KeyboardSimulation")
+        if not self.can_be_dongle():
+            raise UnsupportedCapability("DongleSimulation")
 
         self._enable_role()
 
@@ -33,8 +33,8 @@ class Keyboard(Unifying):
         if self.__started:
             super().stop()
         self.set_node_address(self.__address)
-        self.enable_keyboard_mode(channel=self.__channel)
-        self.__stack.app.role = UnifyingRole.KEYBOARD
+        self.enable_dongle_mode(channel=self.__channel)
+        self.__stack.app.role = UnifyingRole.DONGLE
         if self.__started:
             super().start()
 
@@ -86,31 +86,3 @@ class Keyboard(Unifying):
 
     def on_pdu(self, packet):
         self.__stack.on_pdu(packet)
-
-    def synchronize(self,timeout=10):
-        return self.__stack.ll.synchronize(timeout=10)
-
-    def lock(self):
-        return self.__stack.app.lock_channel()
-
-    def unlock(self):
-        return self.__stack.app.unlock_channel()
-
-    def send_text(self, text):
-        for key in text:
-            self.send_key(key)
-
-    def send_key(self, key, ctrl=False, alt=False, shift=False, gui=False):
-        if self.key is not None:
-            return self.__stack.app.encrypted_keystroke(key, ctrl=ctrl, alt=alt, shift=shift, gui=gui)
-        else:
-            return self.__stack.app.unencrypted_keystroke(key, ctrl=ctrl, alt=alt, shift=shift, gui=gui)
-
-    def volume_up(self):
-        return self.__stack.app.multimedia_keystroke(MultimediaKey.VOLUME_UP)
-
-    def volume_down(self):
-        return self.__stack.app.multimedia_keystroke(MultimediaKey.VOLUME_DOWN)
-
-    def volume_toggle(self):
-        return self.__stack.app.multimedia_keystroke(MultimediaKey.VOLUME_TOGGLE)

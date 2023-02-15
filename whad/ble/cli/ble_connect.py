@@ -22,9 +22,17 @@ class BleConnectApp(CommandLineApp):
             interface=True,
             commands=False
         )
-        
-        self.add_argument('bdaddr', metavar='BDADDR', help='Target device BD address')
 
+        self.add_argument('bdaddr', metavar='BDADDR', help='Target device BD address')
+        # Add an optional random type argument
+        self.add_argument(
+            '-r',
+            '--random',
+            dest='random',
+            action='store_true',
+            default=False,
+            help='Use a random connection type'
+        )
     def run(self):
         """Override App's run() method to handle scripting feature.
         """
@@ -49,14 +57,14 @@ class BleConnectApp(CommandLineApp):
         # Launch post-run tasks
         self.post_run()
 
-    def connect_target(self, bdaddr):
+    def connect_target(self, bdaddr, random_connection_type=False):
         """Connect to our target device
         """
         # Configure our interface
         central = Central(self.interface)
 
         # Connect to our target device
-        periph = central.connect(bdaddr)
+        periph = central.connect(bdaddr, random_connection_type)
         if periph is None:
             # Could not connect
             self.error('Cannot connect to %s' % bdaddr)

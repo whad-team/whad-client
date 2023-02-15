@@ -11,6 +11,7 @@ class Keylogger(Sniffer):
         super().__init__(device)
         self.__locale = "fr"
         self.key = None
+        
     @property
     def locale(self):
         return self.__locale

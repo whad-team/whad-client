@@ -378,3 +378,4 @@ from whad.unifying.connector.keylogger import Keylogger
 from whad.unifying.connector.mouselogger import Mouselogger
 from whad.unifying.connector.mouse import Mouse
 from whad.unifying.connector.keyboard import Keyboard
+from whad.unifying.connector.dongle import Dongle

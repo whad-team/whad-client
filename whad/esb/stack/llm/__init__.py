@@ -47,6 +47,10 @@ class EsbLinkLayerManager:
     def role(self):
         return self.__role
 
+    @role.setter
+    def role(self, role):
+        self.__role = role
+
     def _increment_pid(self):
         self.__pid = (self.__pid + 1) % 4
 
@@ -64,7 +68,6 @@ class EsbLinkLayerManager:
                 queue = self.__ack_queue if queue == self.__data_queue else self.__data_queue
                 msg = queue.get(block=False,timeout=0.05)
                 if hasattr(msg, "metadata") and hasattr(msg.metadata, "channel"):
-                    print(msg.metadata.channel)
                     self.__stack.set_channel(msg.metadata.channel)
                     if not self.__synchronized:
                         self.__synchronized = True
@@ -84,9 +87,9 @@ class EsbLinkLayerManager:
                 no_ack=0
         ) / ESB_Payload_Hdr() / data
 
+        self.__stack.send(packet, channel=self.__stack.get_channel())
+        self._increment_pid()
         if waiting_ack:
-            self.__stack.send(packet, channel=self.__stack.get_channel())
-            self._increment_pid()
             try:
                 ack = self.wait_for_ack()
                 self.__ackmiss = 0
@@ -99,24 +102,7 @@ class EsbLinkLayerManager:
                     if self.__synchronized:
                         self.__synchronized = False
                         self.on_desynchronized()
-
                 return None
-        else:
-            acked = self.__stack.send(packet, channel=self.__stack.get_channel())
-            self._increment_pid()
-            if not acked:
-                self.__ackmiss += 1
-                if self.__ackmiss > 10:
-                    self.__ackmiss = 0
-                    if self.__synchronized:
-                        self.__synchronized = False
-                        self.on_desynchronized()
-            else:
-                self.__ackmiss = 0
-                if not self.__synchronized:
-                    self.__synchronized = True
-                    self.on_synchronized()
-            return acked
 
     def wait_for_ack(self, timeout=0.1):
         self.__populate_queues = True
