@@ -145,9 +145,6 @@ def profile_handler(app, command_args):
 
         # Terminate central
         central.stop()
-
-    elif app.interface is None:
-        app.error('You need to specify an interface with option --interface.')
     
     # Piped interface
     elif app.args.bdaddr is None and app.is_piped_interface():
@@ -167,7 +164,7 @@ def profile_handler(app, command_args):
             conn_handle=int(app.args.conn_handle)
         )
    
-        central = Central(app.interface, existing_connection)
+        central = Central(app.input_interface, existing_connection)
         device = central.peripheral()
 
         # Read GATT characteristic
@@ -187,6 +184,7 @@ def profile_handler(app, command_args):
                 open(command_args[0], 'w').write(json_data)
             except IOError as ioerr:
                 app.error('An error occured when writing to %s' % command_args[0])
-
+    elif app.interface is None:
+        app.error('You need to specify an interface with option --interface.')
     else:
         app.error('You need to specify a target device with option --bdaddr.')
