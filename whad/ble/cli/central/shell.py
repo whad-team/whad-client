@@ -774,8 +774,8 @@ class BleCentralShell(InteractiveShell):
 
                 if target_charac is not None:
                     try:
-                        if not target_charac.must_notify():
-                            if target_charac.must_indicate():
+                        if not target_charac.can_notify():
+                            if target_charac.can_indicate():
                                 target_charac.subscribe(
                                     indication=True,
                                     callback=on_charac_notified

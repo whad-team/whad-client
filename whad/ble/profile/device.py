@@ -196,8 +196,14 @@ class PeripheralCharacteristic:
     def value_handle(self):
         return self.__characteristic.value_handle
 
+    def can_notify(self):
+        return self.__characteristic.can_notify()
+
     def must_notify(self):
         return self.__characteristic.must_notify()
+
+    def can_indicate(self):
+        return self.__characteristic.can_indicate()
 
     def must_indicate(self):
         return self.__characteristic.must_indicate()
