@@ -28,19 +28,23 @@ class BleConnectApp(CommandLineApp):
     def run(self):
         """Override App's run() method to handle scripting feature.
         """
-        # Launch pre-run tasks
-        self.pre_run()
+        try:
+            # Launch pre-run tasks
+            self.pre_run()
 
-        # We need to have an interface specified
-        if self.interface is not None:
-            # Make sure we are piped to another tool
-            if self.is_stdout_piped():
-                # Connect to the target device
-                self.connect_target(self.args.bdaddr)
+            # We need to have an interface specified
+            if self.interface is not None:
+                # Make sure we are piped to another tool
+                if self.is_stdout_piped():
+                    # Connect to the target device
+                    self.connect_target(self.args.bdaddr)
+                else:
+                    self.error('Tool must be piped to another WHAD tool.')
             else:
-                self.error('Tool must be piped to another WHAD tool.')
-        else:
-            self.error('You need to specify an interface with option --interface.')
+                self.error('You need to specify an interface with option --interface.')
+
+        except KeyboardInterrupt as keybd:
+            self.warning('ble-connect stopped (CTL-C)')
 
         # Launch post-run tasks
         self.post_run()
