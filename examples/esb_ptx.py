@@ -24,9 +24,11 @@ if __name__ == '__main__':
             connector.attach_callback(show)
             connector.start()
 
-            while True:
+            for i in range(100):
                 input()
-                connector.send(ESB_Hdr(bytes.fromhex("cae906eca42a0061010000000000001e5c2980")))
+                ack = connector.send_data(b"PTX"+bytes([i]), waiting_ack=True)
+                if ack is not None:
+                    ack.show()
 
         except (KeyboardInterrupt, SystemExit):
             dev.close()
