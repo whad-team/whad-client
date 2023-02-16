@@ -14,17 +14,16 @@ if __name__ == '__main__':
         # Retrieve target interface
         interface = sys.argv[1]
 
-        # Connect to target device and performs discovery
         try:
             dev = WhadDevice.create(interface)
             connector = PRX(dev)
             connector.address = "ca:e9:06:ec:a4"
             connector.channel = 8
-            connector.attach_callback(show)
             connector.start()
             for pkt in connector.stream():
-                #print("Received packet", pkt)
-                connector.prepare_acknowledgment(bytes.fromhex("AABBCCDD"))
+                pkt.show()
+                if ((bytes(pkt)[3] % 5) == 0):
+                    connector.prepare_acknowledgment(b"PRX")
 
             connector.stop()
 

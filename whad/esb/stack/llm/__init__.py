@@ -20,7 +20,6 @@ class EsbLinkLayerManager:
         self.__role = ESBRole.PTX
         self.__synchronized = False
         self.__promiscuous = False
-        self.__populate_queues = False
         self.__ack_queue = Queue()
         self.__data_queue = Queue()
         self.__ackmiss = 0
@@ -70,26 +69,24 @@ class EsbLinkLayerManager:
 
     def synchronize(self, timeout=10):
         self.__role = ESBRole.PTX
-        self.__stack.set_channel(None)
+        self.__stack.channel = None
         start_time = time()
         self.__ack_queue.queue.clear()
         self.__data_queue.queue.clear()
         self.__promiscuous = True
-        self.__populate_queues = True
         queue = self.__ack_queue
         while (time() - start_time) < timeout:
             try:
                 queue = self.__ack_queue if queue == self.__data_queue else self.__data_queue
                 msg = queue.get(block=False,timeout=0.05)
                 if hasattr(msg, "metadata") and hasattr(msg.metadata, "channel"):
-                    self.__stack.set_channel(msg.metadata.channel)
+                    self.__stack.channel.set_channel(msg.metadata.channel)
                     if not self.__synchronized:
                         self.__synchronized = True
                         self.on_synchronized()
                     break
             except Empty:
                 pass
-        self.__populate_queues = False
         self.__promiscuous = False
         return self.__synchronized
 
@@ -119,35 +116,28 @@ class EsbLinkLayerManager:
                 return None
 
     def wait_for_ack(self, timeout=0.1):
-        self.__populate_queues = True
         start_time = time()
         while (time() - start_time) < timeout:
             try:
                 msg = self.__ack_queue.get(block=False,timeout=0.001)
-                self.__populate_queues = False
                 return msg
             except Empty:
                 pass
-        self.__populate_queues = False
         raise LinkLayerTimeoutException
 
     def wait_for_data(self, timeout=0.1):
         self.__role = ESBRole.PRX
-        self.__populate_queues = True
         start_time = time()
         while (time() - start_time) < timeout:
             try:
                 msg = self.__data_queue.get(block=False,timeout=0.001)
-                self.__populate_queues = False
                 return msg
             except Empty:
                 pass
-        self.__populate_queues = False
         raise LinkLayerTimeoutException
 
     def data_stream(self):
         self.__role = ESBRole.PRX
-        self.__populate_queues = True
         while True:
             yield self.__data_queue.get(block=True)
 
@@ -170,8 +160,7 @@ class EsbLinkLayerManager:
 
     def on_prx_pdu(self, pdu):
         if (self.__role == ESBRole.PTX or self.__promiscuous):
-            if self.__populate_queues:
-                self.__ack_queue.put(pdu)
+            self.__ack_queue.put(pdu)
 
             if self.__app is not None and len(bytes(pdu)) > 0:
                 self.__app.on_acknowledgement(pdu[ESB_Payload_Hdr:])
@@ -179,8 +168,7 @@ class EsbLinkLayerManager:
     def on_ptx_pdu(self, pdu):
         if (self.__role == ESBRole.PRX or self.__promiscuous):
 
-            if self.__populate_queues:
-                self.__data_queue.put(pdu)
+            self.__data_queue.put(pdu)
 
             if self.__app is not None:
                 self.__app.on_data(pdu[ESB_Payload_Hdr:])
