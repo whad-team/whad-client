@@ -84,7 +84,7 @@ def profile_export(app, command_args, device, device_metadata):
 def profile_handler(app, command_args):
     """discover services and characteristics
     
-    <ansicyan><b>profile</b> <i>([JSON_PROFILE])</i></ansicyan>
+    <ansicyan><b>profile</b> <i>[JSON_PROFILE]</i></ansicyan>
 
     This command connects to a target device, discover its services and characteristics,
     and optionnaly exports the device's profile into a <i>JSON_PROFILE</i> file. This JSON
@@ -172,18 +172,7 @@ def profile_handler(app, command_args):
 
         # Export profile to JSON file if required
         if len(command_args) >= 1:
-            # Load GATT profile JSON data
-            json_data = device.export_json()
-            profile = loads(json_data)
-
-            # Add specific device info (for emulating)
-            profile['devinfo'] = device_metadata
-            json_data = dumps(profile)
-            try:
-                print('Writing profile JSON data to %s ...' % command_args[0])
-                open(command_args[0], 'w').write(json_data)
-            except IOError as ioerr:
-                app.error('An error occured when writing to %s' % command_args[0])
+            app.warning('Cannot create profile file when chained.')
     elif app.interface is None:
         app.error('You need to specify an interface with option --interface.')
     else:

@@ -34,6 +34,6 @@ will be logged by *Wireshark*.
 
 .. code-block:: text
 
-    # ble-central -i hci0 -b 11:22:33:44:55:66 mydevice.json
+    # ble-central -i hci0 -b 11:22:33:44:55:66 profile mydevice.json
     # ble-connect -i hci0 11:22:33:44:55:66 | ble-wireshark | ble-spawn -i hci1 mydevice.json
 
