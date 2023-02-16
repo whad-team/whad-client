@@ -49,6 +49,14 @@ class BleCentralApp(CommandLineApp):
             help='Specify a script to run'
         )
 
+        self.add_argument(
+            '--profile',
+            '-p',
+            dest='profile',
+            help='Use a saved device profile'
+        )
+
+
     def run(self):
         """Override App's run() method to handle scripting feature.
         """

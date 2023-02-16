@@ -1,6 +1,8 @@
 """BLE characteristic read command handler
 """
 
+import json
+
 from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import command
 from whad.ble import Central
@@ -9,14 +11,14 @@ from whad.ble.bdaddr import BDAddress
 from whad.ble.utils.att import UUID
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
-from whad.ble.cli.central.helpers import show_att_error
+from whad.ble.cli.central.helpers import show_att_error, create_central
 
 import logging
 logger = logging.getLogger(__name__)
 
 from argparse import Namespace
 
-def read_gatt_characteristic(app, command_args, device):
+def read_gatt_characteristic(app, command_args, device, profile_loaded=False):
     # parse target arguments
     if len(command_args) == 0:
         app.error('You must provide at least a characteristic value handle or characteristic UUID.')
@@ -68,8 +70,9 @@ def read_gatt_characteristic(app, command_args, device):
             app.error('GATT timeout while reading.')
 
     else:
-        # Perform discovery if UUID is given
-        device.discover()
+        if not profile_loaded:
+            # Perform discovery if UUID is given
+            device.discover()
 
         # Search characteristic from its UUID
         target_charac = device.find_characteristic_by_uuid(handle)                       
@@ -113,8 +116,14 @@ def read_handler(app, command_args):
     # We need to have an interface specified
     if app.interface is not None and app.args.bdaddr is not None:
         
-        # Switch to central mode
-        central = Central(app.interface)
+        # Create Central connector based on app configuration
+        central, profile_loaded = create_central(app, piped=False)
+
+        # If no connector returned, there was an error, simply exit.
+        if central is None:
+            return
+        
+        # Start central mode
         central.start()
 
         # Connect to target device
@@ -123,7 +132,7 @@ def read_handler(app, command_args):
             app.error('Cannot connect to %s, device does not respond.' % app.args.bdaddr)
         else:
             # Read GATT characteristic
-            read_gatt_characteristic(app, command_args, device)
+            read_gatt_characteristic(app, command_args, device, profile_loaded)
 
             # Disconnect
             device.disconnect()
@@ -139,22 +148,18 @@ def read_handler(app, command_args):
             if not hasattr(app.args, param):
                 app.error('Source interface does not provide a BLE connection')
         
-        initiator = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
-        advertiser = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
-        existing_connection = Namespace(
-            initiator=initiator.value,
-            init_addr_type=int(app.args.initiator_addrtype),
-            advertiser=advertiser.value,
-            adv_addr_type=int(app.args.target_addrtype),
-            conn_handle=int(app.args.conn_handle)
-        )
-   
-        central = Central(app.input_interface, existing_connection)
+        # Create Central connector based on app configuration
+        central, profile_loaded = create_central(app, piped=True)
 
+        # If no connector returned, there was an error, simply exit.
+        if central is None:
+            return
+
+        # Retrieve connected device
         device = central.peripheral()
 
         # Read GATT characteristic
-        read_gatt_characteristic(app, command_args, device)
+        read_gatt_characteristic(app, command_args, device, profile_loaded)
 
     elif app.interface is None:
         app.error('You need to specify an interface with option --interface.')

@@ -1,6 +1,8 @@
 """BLE characteristic write command handler
 """
 
+import json
+
 from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import command
 from whad.ble import Central
@@ -11,7 +13,7 @@ from whad.ble import BDAddress
 from whad.ble.utils.att import UUID
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
-from whad.ble.cli.central.helpers import show_att_error
+from whad.ble.cli.central.helpers import show_att_error, create_central
 
 @command('write')
 def write_handler(app, command_args):
@@ -39,17 +41,12 @@ def write_handler(app, command_args):
             if not hasattr(app.args, param):
                 app.error('Source interface does not provide a BLE connection')
         
-        initiator = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
-        advertiser = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
-        existing_connection = Namespace(
-            initiator=initiator.value,
-            init_addr_type=int(app.args.initiator_addrtype),
-            advertiser=advertiser.value,
-            adv_addr_type=int(app.args.target_addrtype),
-            conn_handle=int(app.args.conn_handle)
-        )
-   
-        central = Central(app.input_interface, existing_connection)
+        # Create Central connector based on app configuration
+        central, profile_loaded = create_central(app, piped=True)
+
+        # If no connector returned, there was an error, simply exit.
+        if central is None:
+            return
 
         device = central.peripheral()
 
@@ -58,14 +55,21 @@ def write_handler(app, command_args):
             app,
             device,
             command_args,
-            without_response=False
+            without_response=False,
+            profile_loaded=profile_loaded
         )
 
     # We need to have an interface specified
     elif app.interface is not None and app.args.bdaddr is not None:
-        
-        # Switch to central mode
-        central = Central(app.interface)
+
+        # Create Central connector based on app configuration
+        central, profile_loaded = create_central(app, piped=False)
+
+        # If no connector returned, there was an error, simply exit.
+        if central is None:
+            return
+
+        # Start central
         central.start()
 
         # Connect to target device
@@ -89,6 +93,7 @@ def write_handler(app, command_args):
         app.error('You need to specify an interface with option --interface.')
     else:
         app.error('You need to specify a target device with option --bdaddr.')
+
 
 @command('writecmd')
 def writecmd_handler(app, command_args):
@@ -116,17 +121,12 @@ def writecmd_handler(app, command_args):
             if not hasattr(app.args, param):
                 app.error('Source interface does not provide a BLE connection')
         
-        initiator = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
-        advertiser = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
-        existing_connection = Namespace(
-            initiator=initiator.value,
-            init_addr_type=int(app.args.initiator_addrtype),
-            advertiser=advertiser.value,
-            adv_addr_type=int(app.args.target_addrtype),
-            conn_handle=int(app.args.conn_handle)
-        )
-   
-        central = Central(app.input_interface, existing_connection)
+        # Create Central connector based on app configuration
+        central, profile_loaded = create_central(app, piped=True)
+
+        # If no connector returned, there was an error, simply exit.
+        if central is None:
+            return
 
         device = central.peripheral()
 
@@ -135,7 +135,8 @@ def writecmd_handler(app, command_args):
             app,
             device,
             command_args,
-            without_response=True
+            without_response=True,
+            profile_loaded=profile_loaded
         )
 
         # Disconnect
@@ -144,9 +145,15 @@ def writecmd_handler(app, command_args):
 
     # We need to have an interface specified
     elif app.interface is not None and app.args.bdaddr is not None:
-        
+
+        # Create Central connector based on app configuration
+        central, profile_loaded = create_central(app, piped=False)
+
+        # If no connector returned, there was an error, simply exit.
+        if central is None:
+            return
+
         # Switch to central mode
-        central = Central(app.interface)
         central.start()
 
         # Connect to target device
@@ -167,7 +174,8 @@ def writecmd_handler(app, command_args):
     else:
         app.error('You need to specify a target device with option --bdaddr.')
 
-def perform_write(app, device, args, without_response=False):
+
+def perform_write(app, device, args, without_response=False, profile_loaded=False):
     """Perform attribute/handle characteristic
     """
     # parse target arguments
@@ -223,8 +231,9 @@ def perform_write(app, device, args, without_response=False):
         except GattTimeoutException as timeout:
             app.error('GATT timeout while writing.')
     else:
-        # Perform discovery if required
-        device.discover()
+        if not profile_loaded:
+            # Perform discovery if required
+            device.discover()
 
         # Search characteristic from its UUID
         target_charac = device.find_characteristic_by_uuid(handle)                       

@@ -1,3 +1,7 @@
+import json
+from argparse import Namespace
+from whad.ble.bdaddr import BDAddress
+from whad.ble import Central
 from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
     InsufficientAuthenticationError, InsufficientAuthorizationError, \
     InsufficientEncryptionKeySize, ReadNotPermittedError, \
@@ -20,3 +24,66 @@ def show_att_error(app, error: AttError):
         app.error('ATT error: attribute not found')
     elif isinstance(error, InsufficientEncryptionKeySize):
         app.error('ATT error: insufficient encryption')
+
+def create_central(app, piped=False):
+    central = None
+    profile_loaded = False
+
+    # Is app stdin piped ?
+    if piped:
+        # Create connection structure
+        initiator = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
+        advertiser = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
+        existing_connection = Namespace(
+            initiator=initiator.value,
+            init_addr_type=int(app.args.initiator_addrtype),
+            advertiser=advertiser.value,
+            adv_addr_type=int(app.args.target_addrtype),
+            conn_handle=int(app.args.conn_handle)
+        )
+
+        # Create central and populate GATT profile if required
+        if app.args.profile is not None:
+            # Load profile
+            try:
+                # Load file content
+                profile_json = open(app.args.profile,'rb').read()
+                profile = json.loads(profile_json)
+
+                # Create central with GATT profile information and current
+                # connection information
+                central = Central(app.input_interface, existing_connection, from_json=profile_json)
+
+                # Profile has been successfully loaded from JSON
+                profile_loaded = True
+            except IOError as err:
+                app.error('Cannot access profile file (%s)' % app.args.profile)
+            except Exception as err:
+                app.error('Cannot parse profile file (%s)' % app.args.profile)
+        else:
+            # No GATT profile, create a classic Central connector with current
+            # connection information
+            central = Central(app.input_interface, existing_connection)
+    else:
+        if app.args.profile is not None:
+            # Load profile
+            try:
+                # Load file content
+                profile_json = open(app.args.profile,'rb').read()
+                profile = json.loads(profile_json)
+
+                # Create Central connector with provided GATT profile
+                central = Central(app.interface, from_json=profile_json)
+
+                # Profile has been successfully loaded from JSON
+                profile_loaded = True
+            except IOError as err:
+                app.error('Cannot access profile file (%s)' % app.args.profile)
+            except Exception as err:
+                print(err)
+                app.error('Cannot parse profile file (%s)' % app.args.profile)
+        else:
+            # Create classic Central connector
+            central = Central(app.interface)
+
+    return (central, profile_loaded)
