@@ -1,6 +1,7 @@
 """
 Bluetooth Low Energy
 """
+import re
 from time import time
 from whad.ble.stack.gatt import GattClient, GattServer
 from whad.helpers import message_filter
@@ -19,6 +20,9 @@ from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvDataFie
     AdvManufacturerSpecificData, AdvShortenedLocalName, AdvTxPowerLevel, AdvDataFieldListOverflow, AdvDataError
 from whad.ble.connector import BLE, Central, Peripheral, Sniffer, Hijacker, Injector, Scanner
 from whad.ble.utils.phy import PHYS
+
+def is_bdaddr_valid(bd_addr):
+    return re.match('^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$',bd_addr)
 
 __all__ = [
     'GattClient',

@@ -4,6 +4,7 @@ This utility will configure a compatible whad device to connect to a given
 BLE device, and chain this with another tool.
 
 """
+from whad.ble import is_bdaddr_valid
 from whad.cli.app import CommandLineApp
 from whad.ble.connector import Central
 from whad.device.unix import UnixSocketProxy
@@ -60,30 +61,34 @@ class BleConnectApp(CommandLineApp):
     def connect_target(self, bdaddr, random_connection_type=False):
         """Connect to our target device
         """
-        # Configure our interface
-        central = Central(self.interface)
+        # Make sure the bd address is valid
+        if is_bdaddr_valid(bdaddr):
+            # Configure our interface
+            central = Central(self.interface)
 
-        # Connect to our target device
-        periph = central.connect(bdaddr, random_connection_type)
-        if periph is None:
-            # Could not connect
-            self.error('Cannot connect to %s' % bdaddr)
+            # Connect to our target device
+            periph = central.connect(bdaddr, random_connection_type)
+            if periph is None:
+                # Could not connect
+                self.error('Cannot connect to %s' % bdaddr)
+            else:
+                # Get peers
+                logger.info('local_peer: %s' % central.local_peer)
+
+                # Connected, starts a Unix socket proxy that will relay the underlying
+                # device WHAD messages to the next tool.
+                proxy = UnixSocketProxy(self.interface, {
+                    'conn_handle':periph.conn_handle,
+                    'initiator_bdaddr':str(central.local_peer),
+                    'initiator_addrtype':str(central.local_peer.type),
+                    'target_bdaddr':str(central.target_peer),
+                    'target_addrtype': str(central.target_peer.type)
+                })
+                proxy.start()
+                proxy.join()
+                central.stop()
         else:
-            # Get peers
-            logger.info('local_peer: %s' % central.local_peer)
-
-            # Connected, starts a Unix socket proxy that will relay the underlying
-            # device WHAD messages to the next tool.
-            proxy = UnixSocketProxy(self.interface, {
-                'conn_handle':periph.conn_handle,
-                'initiator_bdaddr':str(central.local_peer),
-                'initiator_addrtype':str(central.local_peer.type),
-                'target_bdaddr':str(central.target_peer),
-                'target_addrtype': str(central.target_peer.type)
-            })
-            proxy.start()
-            proxy.join()
-            central.stop()
+            self.error('Invalid BD address: %s' % bdaddr)
 
 
 def ble_connect_main():

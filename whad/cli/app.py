@@ -293,9 +293,18 @@ class CommandLineApp(ArgumentParser):
                 # Check if something is available
                 readers, _, errors = select.select([sys.stdin], [], [sys.stdin], .01)
 
+                # Check if an error occurred.
+                if len(errors) > 0:
+                    # We're done
+                    break
+
                 # Read input from stdin
                 if len(readers) > 0:
-                    pending_input += sys.stdin.read(4096)
+                    data_read = sys.stdin.read(4096)
+                    if data_read == '' or data_read is None:
+                        break
+
+                    pending_input += data_read
                     # Check if we have a full line
                     if '\n' in pending_input:
                         idx = pending_input.index('\n')

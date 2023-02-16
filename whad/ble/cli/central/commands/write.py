@@ -1,13 +1,10 @@
 """BLE characteristic write command handler
 """
 
-import json
-
 from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import command
-from whad.ble import Central
+from whad.ble import is_bdaddr_valid
 from binascii import unhexlify, Error as BinasciiError
-from argparse import Namespace
 
 from whad.ble import BDAddress
 from whad.ble.utils.att import UUID
@@ -61,6 +58,11 @@ def write_handler(app, command_args):
 
     # We need to have an interface specified
     elif app.interface is not None and app.args.bdaddr is not None:
+
+        # Make sure BD address is valid
+        if not is_bdaddr_valid(app.args.bdaddr):
+            app.error('Invalid BD address: %s' % app.args.bdaddr)
+            return
 
         # Create Central connector based on app configuration
         central, profile_loaded = create_central(app, piped=False)
@@ -145,6 +147,11 @@ def writecmd_handler(app, command_args):
 
     # We need to have an interface specified
     elif app.interface is not None and app.args.bdaddr is not None:
+
+        # Make sure BD address is valid
+        if not is_bdaddr_valid(app.args.bdaddr):
+            app.error('Invalid BD address: %s' % app.args.bdaddr)
+            return
 
         # Create Central connector based on app configuration
         central, profile_loaded = create_central(app, piped=False)
