@@ -11,8 +11,6 @@ class EsbLinkLayerManager:
     for both roles supported by the Enhanced ShockBurst protocol:
         - Primary Transmitter (PTX): node able to transmit data at any time
         - Primary Receiver (PRX): node able to receive data at any time and acknowledge it
-
-
     """
     def __init__(self, stack, app_class = None):
         self.__stack = stack
@@ -26,6 +24,22 @@ class EsbLinkLayerManager:
         self.__ack_queue = Queue()
         self.__data_queue = Queue()
         self.__ackmiss = 0
+
+    @property
+    def channel(self):
+        return self.__stack.channel
+
+    @channel.setter
+    def channel(self, channel):
+        self.__stack.channel = channel
+
+    @property
+    def address(self):
+        return self.__stack.address
+
+    @address.setter
+    def address(self, address):
+        self.__stack.address = address
 
     @property
     def app(self):
@@ -83,11 +97,11 @@ class EsbLinkLayerManager:
         self.__role = ESBRole.PTX
         packet = ESB_Hdr(
                 pid=self.__pid,
-                address=self.__stack.get_address(),
+                address=self.__stack.address,
                 no_ack=0
         ) / ESB_Payload_Hdr() / data
 
-        self.__stack.send(packet, channel=self.__stack.get_channel())
+        self.__stack.send(packet, channel=self.__stack.channel)
         self._increment_pid()
         if waiting_ack:
             try:
@@ -117,11 +131,31 @@ class EsbLinkLayerManager:
         self.__populate_queues = False
         raise LinkLayerTimeoutException
 
+    def wait_for_data(self, timeout=0.1):
+        self.__role = ESBRole.PRX
+        self.__populate_queues = True
+        start_time = time()
+        while (time() - start_time) < timeout:
+            try:
+                msg = self.__data_queue.get(block=False,timeout=0.001)
+                self.__populate_queues = False
+                return msg
+            except Empty:
+                pass
+        self.__populate_queues = False
+        raise LinkLayerTimeoutException
+
+    def data_stream(self):
+        self.__role = ESBRole.PRX
+        self.__populate_queues = True
+        while True:
+            yield self.__data_queue.get(block=True)
+
     def prepare_acknowledgment(self, data):
         self.__role = ESBRole.PRX
         packet = ESB_Hdr(
                 pid=self.__pid,
-                address=self.__stack.get_address(),
+                address=self.__stack.address,
                 no_ack=True
         ) / ESB_Payload_Hdr() / data
         self.__stack.send(packet)
@@ -134,16 +168,26 @@ class EsbLinkLayerManager:
         if self.__app is not None:
             self.__app.on_desynchronized()
 
+    def on_prx_pdu(self, pdu):
+        if (self.__role == ESBRole.PTX or self.__promiscuous):
+            if self.__populate_queues:
+                self.__ack_queue.put(pdu)
+
+            if self.__app is not None and len(bytes(pdu)) > 0:
+                self.__app.on_acknowledgement(pdu[ESB_Payload_Hdr:])
+
+    def on_ptx_pdu(self, pdu):
+        if (self.__role == ESBRole.PRX or self.__promiscuous):
+
+            if self.__populate_queues:
+                self.__data_queue.put(pdu)
+
+            if self.__app is not None:
+                self.__app.on_data(pdu[ESB_Payload_Hdr:])
+
+
     def on_pdu(self, pdu):
         if ESB_Ack_Response in pdu or len(bytes(pdu)) == 0:
-            if (self.__role == ESBRole.PTX or self.__promiscuous):
-                if self.__populate_queues:
-                    self.__ack_queue.put(pdu)
-                if self.__app is not None and len(bytes(pdu)) > 0:
-                    self.__app.on_acknowledgement(pdu[ESB_Payload_Hdr:])
+            self.on_prx_pdu(pdu)
         else:
-            if (self.__role == ESBRole.PRX or self.__promiscuous):
-                if self.__populate_queues:
-                    self.__data_queue.put(pdu)
-                if self.__app is not None:
-                    self.__app.on_data(pdu[ESB_Payload_Hdr:])
+            self.on_ptx_pdu(pdu)

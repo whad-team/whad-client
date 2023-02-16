@@ -1,10 +1,11 @@
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
+from whad.esb.connector.translator import ESBMessageTranslator
+from whad.esb.esbaddr import ESBAddress
+from whad.esb.metadata import ESBMetadata
+from whad.scapy.layers.esb import ESB_Hdr,ESB_Payload_Hdr,ESB_Ack_Response
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.esb.metadata import ESBMetadata, generate_esb_metadata
-from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
-#from whad.scapy.layers.unifying import *
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.esb.esb_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
@@ -19,6 +20,13 @@ class ESB(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+
+    def format(self, packet):
+        """
+        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
+        the appropriate header and the timestamp in microseconds.
+        """
+        return self.translator.format(packet)
 
     def __init__(self, device=None):
         """
@@ -46,59 +54,8 @@ class ESB(WhadDeviceConnector):
         else:
             self.__ready = True
 
-    def format(self, packet):
-        """
-        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
-        the appropriate header and the timestamp in microseconds.
-        """
-        if ESB_Hdr not in packet:
-            packet = ESB_Hdr(address=self.__cached_address)/packet
-
-        packet.preamble = 0xAA # force a rebuild
-        formatted_packet = ESB_Pseudo_Packet(bytes(packet)[1:])
-
-        timestamp = None
-        if hasattr(packet, "metadata"):
-            timestamp = packet.metadata.timestamp
-
-        return formatted_packet, timestamp
-
-    def _build_scapy_packet_from_message(self, message, msg_type):
-        try:
-            if msg_type == 'raw_pdu':
-                packet = ESB_Hdr(bytes(message.raw_pdu.pdu))
-                packet.preamble = 0xAA # force a rebuild
-                packet.metadata = generate_esb_metadata(message, msg_type)
-                self.monitor_packet_rx(packet)
-                return packet
-
-            elif msg_type == 'pdu':
-                packet = ESB_Payload_Hdr(bytes(message.pdu.pdu))
-                packet.metadata = generate_esb_metadata(message, msg_type)
-                self.monitor_packet_rx(packet)
-                return packet
-
-        except AttributeError:
-            return None
-
-    def _build_message_from_scapy_packet(self, packet, channel=None, retransmission_count=1):
-        msg = Message()
-
-        self.monitor_packet_tx(packet)
-
-        if ESB_Hdr in packet:
-            msg.esb.send_raw.channel = channel if channel is not None else 0xFF
-            packet.preamble = 0xAA
-            msg.esb.send_raw.pdu = bytes(packet)
-            msg.esb.send_raw.retransmission_count = retransmission_count
-        elif ESB_Payload_Hdr in packet:
-            msg.esb.send.channel = channel if channel is not None else 0xFF
-            msg.esb.send.pdu = bytes(packet)
-            msg.esb.send.retransmission_count = retransmission_count
-
-        else:
-            msg = None
-        return msg
+        # Initialize translator
+        self.translator = ESBMessageTranslator()
 
     def close(self):
         self.stop()
@@ -130,26 +87,35 @@ class ESB(WhadDeviceConnector):
         Send Enhanced ShockBurst packets (on a single channel).
         """
         if self.can_send():
+            # If we don't have address or channels, use the cached ones
+            tx_address = address if address is not None else self.__cached_address
+            tx_channel = channel if channel is not None else self.__cached_channel
             if self.support_raw_pdu():
+                # If we support raw PDU but only got a payload, build a packet
                 if ESB_Hdr not in pdu:
-                    packet = ESB_Hdr(address) / pdu
+                    packet = ESB_Hdr(address=tx_address) / pdu
                 else:
                     packet = pdu
+            # if we don't support raw PDU and got a packet, crop to keep only the payload
             elif ESB_Hdr in pdu:
                 packet = pdu[ESB_Payload_Hdr:]
+            # if we don't support raw PDU and got a payload, keep it as it is
             else:
                 packet = pdu
 
+            # Generate TX metadata
             packet.metadata = ESBMetadata()
-            packet.metadata.channel = self.__cached_channel if channel is None else channel
-            packet.metadata.address = self.__cached_address if address is None else address
+            packet.metadata.channel = tx_channel
+            packet.metadata.address = tx_address
 
-            msg = self._build_message_from_scapy_packet(packet, channel, retransmission_count)
+            self.monitor_packet_tx(packet)
+            msg = self.translator.from_packet(packet, channel, retransmission_count)
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
         else:
             return False
+
     def support_raw_pdu(self):
         """
         Determine if the device supports raw PDU.
@@ -176,15 +142,19 @@ class ESB(WhadDeviceConnector):
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
 
-        msg = Message()
-        msg.esb.sniff.channel = channel if channel is not None else 0xFF
+        self.__cached_address = ESBAddress(address)
         self.__cached_channel = channel
-        self.__cached_address = address
 
-        try:
-            msg.esb.sniff.address = bytes.fromhex(address.replace(":", ""))
-        except ValueError:
-            return False
+        msg = Message()
+
+        if channel is None:
+            # Enable scanning mode
+            msg.esb.sniff.channel = 0xFF
+        else:
+            self.__cached_channel = channel
+            msg.esb.sniff.channel = self.__cached_channel
+
+        msg.esb.sniff.address = self.__cached_address.value
         msg.esb.sniff.show_acknowledgements = show_acknowledgements
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
@@ -208,10 +178,13 @@ class ESB(WhadDeviceConnector):
         if not self.can_be_prx():
             raise UnsupportedCapability("PrimaryReceiverMode")
 
+        # Check that we got a channel provided
         if channel is None:
             return False
 
+        # Keep provided channel in cache
         self.__cached_channel = channel
+
         msg = Message()
         msg.esb.prx.channel = channel
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
@@ -233,13 +206,17 @@ class ESB(WhadDeviceConnector):
         """
         Enable Enhanced ShockBurst primary transmitter (PTX) mode.
         """
-        if not self.can_be_prx():
+        if not self.can_be_ptx():
             raise UnsupportedCapability("PrimaryTransmitterMode")
 
-        self.__cached_channel = channel
-
         msg = Message()
-        msg.esb.ptx.channel = channel if channel is not None else 0xFF
+        if channel is None:
+            # Enable scanning mode
+            msg.esb.ptx.channel = 0xFF
+        else:
+            # Keep channel in cache
+            self.__cached_channel = channel
+            msg.esb.ptx.channel = self.__cached_channel
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -260,9 +237,12 @@ class ESB(WhadDeviceConnector):
         if not self.can_set_node_address():
             raise UnsupportedCapability("SetNodeAddress")
 
+        node_address = ESBAddress(address)
+        # Keep address in cache
+        self.__cached_address = node_address
+
         msg = Message()
-        self.__cached_address = address
-        msg.esb.set_node_addr.address = bytes.fromhex(address.replace(":", ""))
+        msg.esb.set_node_addr.address = node_address.value
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -296,21 +276,24 @@ class ESB(WhadDeviceConnector):
 
         if domain == 'esb':
             msg_type = message.WhichOneof('msg')
+
             if msg_type == 'pdu':
-                packet = self._build_scapy_packet_from_message(message, msg_type)
+                packet = self.translator.from_message(message, msg_type)
+                self.monitor_packet_rx(packet)
                 self.on_pdu(packet)
 
             elif msg_type == 'raw_pdu':
-                packet = self._build_scapy_packet_from_message(message, msg_type)
+                packet = self.translator.from_message(message, msg_type)
+                self.monitor_packet_rx(packet)
                 self.on_raw_pdu(packet)
 
 
     def on_raw_pdu(self, packet):
-
+        # Extract the PDU from raw packet
         if ESB_Payload_Hdr in packet:
             pdu = packet[ESB_Payload_Hdr:]
-        else:
-            pdu = ESB_Payload_Hdr()/ESB_Ack_Response()
+
+        # Propagate metadata to PDU
         pdu.metadata = packet.metadata
         self.on_pdu(pdu)
 

@@ -64,3 +64,6 @@ class PTX(ESB):
 
     def on_pdu(self, pdu):
         self.__stack.on_pdu(pdu)
+
+    def synchronize(self, timeout=10):
+        return self.__stack.ll.synchronize(timeout=10)

@@ -87,7 +87,7 @@ class UnifyingApplicativeLayerManager:
         if self.__role == UnifyingRole.DONGLE:
             self.__llm.role = ESBRole.PRX
         else:
-            self.__llm.__role = ESBRole.PTX
+            self.__llm.role = ESBRole.PTX
 
     @property
     def key(self):
