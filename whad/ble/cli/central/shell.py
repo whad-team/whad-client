@@ -1,4 +1,5 @@
 import re
+import json
 
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
@@ -10,7 +11,7 @@ from whad.ble.exceptions import InvalidHandleValueException
 from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Scanner, Central
-from whad.ble.profile.device import PeripheralCharacteristic
+from whad.ble.profile.device import PeripheralCharacteristic, PeripheralDevice
 from whad.ble.profile.characteristic import CharacteristicProperties
 from whad.ble.profile.advdata import AdvDataFieldList
 from whad.ble.utils.att import UUID
@@ -362,50 +363,72 @@ class BleCentralShell(InteractiveShell):
     def do_profile(self, args):
         """discover device services and characteristics
 
-        <ansicyan><b>profile</b></ansicyan>
+        <ansicyan><b>profile</b> <i>[PROFILE]</i></ansicyan>
 
         This command performs a GATT services and characteristics discovery,
         collecting all this information and keeping it in a dedicated <b>cache</b>.
 
+        If <ansicyan>PROFILE</ansicyan> is provided, <i>ble-central</i> will load this file JSON content
+        as current device GATT profile instead of discovering GATT services and
+        characteristics. If not, it will discover the device services and
+        characteristics, this operation may take some time to complete.
+
         This <b>cached information</b> is then used by commands <ansicyan>read</ansicyan>, <ansicyan>services</ansicyan>,
         and <ansicyan>characteristics</ansicyan> to speed up the process.
 
-        <aaa fg="orange">Sometimes this discovery process may cause an error
-        and produces incomplete information, in this case try again and cross
-        fingers</aaa>
+        <aaa fg="orange">Sometimes this discovery process may cause an error and produces
+        incomplete information, in this case try again and cross fingers.</aaa>
         """
         if self.__target is not None:
-            try:
-                self.__target.discover()
+            # If PROFILE is provided, parse json and load device info.
+            if len(args) > 0:
+                try:
+                    # Load file content
+                    profile_json = open(args[0],'rb').read()
+                    profile = json.loads(profile_json)
 
-                # Cache our target with its discovered services/characteristics
-                self.__cache.add_profile(self.__target_bd, self.__target)
-                self.__cache.mark_as_discovered(self.__target_bd)
+                    # Recreate a PeripheralDevice based on this profile
+                    self.__target = PeripheralDevice(
+                        central=self.__connector,
+                        gatt_client=self.__connector.connection.gatt,
+                        conn_handle=self.__connector.connection.conn_handle,
+                        from_json=profile_json
+                    )
+                    
+                except IOError as err:
+                    self.error('Cannot load profile json file `%s`' % args[1])
 
-                # Show services and characteristics
-                for service in self.__target.services():
-                    print_formatted_text(HTML('<ansigreen><b>Service %s</b></ansigreen>\n' % service.uuid))
-                    for charac in service.characteristics():
-                        properties = charac.properties
-                        charac_rights = []
-                        if properties & CharacteristicProperties.READ != 0:
-                            charac_rights.append('read')
-                        if properties & CharacteristicProperties.WRITE != 0:
-                            charac_rights.append('write')
-                        if properties & CharacteristicProperties.INDICATE != 0:
-                            charac_rights.append('indicate')
-                        if properties & CharacteristicProperties.NOTIFY != 0:
-                            charac_rights.append('notify')
-                        print_formatted_text(HTML(' <b>%s</b> handle: <b>%d</b>, value handle: <b>%d</b>' % (
-                            charac.uuid, charac.handle, charac.value_handle
-                        )))
-                        print_formatted_text(HTML('  | <ansicyan>access rights:</ansicyan> <b>%s</b>' % ', '.join(charac_rights)))
-                    print('')
+            # If not provided, discover services and characteristics
+            else:
+                try:
+                    self.__target.discover()
+                except GattTimeoutException as timeout:
+                    self.error('GATT timeout occured')
+                    return
 
+            # Cache our target with its discovered services/characteristics
+            self.__cache.add_profile(self.__target_bd, self.__target)
+            self.__cache.mark_as_discovered(self.__target_bd)
 
-
-            except GattTimeoutException as timeout:
-                print('GATT timeout occured')
+            # Show services and characteristics
+            for service in self.__target.services():
+                print_formatted_text(HTML('<ansigreen><b>Service %s</b></ansigreen>\n' % service.uuid))
+                for charac in service.characteristics():
+                    properties = charac.properties
+                    charac_rights = []
+                    if properties & CharacteristicProperties.READ != 0:
+                        charac_rights.append('read')
+                    if properties & CharacteristicProperties.WRITE != 0:
+                        charac_rights.append('write')
+                    if properties & CharacteristicProperties.INDICATE != 0:
+                        charac_rights.append('indicate')
+                    if properties & CharacteristicProperties.NOTIFY != 0:
+                        charac_rights.append('notify')
+                    print_formatted_text(HTML(' <b>%s</b> handle: <b>%d</b>, value handle: <b>%d</b>' % (
+                        charac.uuid, charac.handle, charac.value_handle
+                    )))
+                    print_formatted_text(HTML('  | <ansicyan>access rights:</ansicyan> <b>%s</b>' % ', '.join(charac_rights)))
+                print('')
 
 
     @category('GATT client')

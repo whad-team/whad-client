@@ -29,7 +29,6 @@ class Central(BLE):
     def __init__(self, device, existing_connection = None, from_json=None):
         super().__init__(device)
 
-        #self.use_stack(BleStack)
         self.__gatt_client = GattClient()
         self.__stack = BleStack(self, self.__gatt_client)
         self.__connected = False
