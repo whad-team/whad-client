@@ -64,8 +64,31 @@ class BleCentralApp(CommandLineApp):
         self.pre_run()
         
         if self.args.script is not None:
+            if self.is_piped_interface():
+                # Make sure we have all the required parameters
+                failed = False
+                for param in ['initiator_bdaddr', 'initiator_addrtype', 'target_bdaddr', 'target_addrtype', 'conn_handle']:
+                    if not hasattr(self.args, param):
+                        self.error('Source interface does not provide a BLE connection')
+                        failed = True
+                        break
+                
+                if not failed:
+                    # Create central device
+                    central, _ = create_central(self, piped=True)
+
+                    if central is not None:
+                        myshell = BleCentralShell(
+                            self.input_interface,
+                            connector=central,
+                            bd_address=self.args.target_bdaddr
+                        )
+                        myshell.run_script(self.args.script)
+                    else:
+                        self.error('Failed to open piped interface.')
+
             # We need to have an interface specified
-            if self.interface is not None:
+            elif self.interface is not None:
                 # Launch an interactive shell (well, driven by our script)
                 myshell = BleCentralShell(self.interface)
                 myshell.run_script(self.args.script)

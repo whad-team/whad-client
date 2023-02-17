@@ -56,17 +56,48 @@ class BleCentralShell(InteractiveShell):
     """Bluetooth Low Energy interactive shell
     """
 
-    def __init__(self, interface: WhadDevice = None):
+    def __init__(self, interface: WhadDevice = None, connector=None, bd_address=None):
         super().__init__(HTML('<b>ble-central></b> '))
 
         # If interface is None, pick the first matching our needs
         self.__interface = interface
-        self.__connector: WhadDeviceConnector = None
         self.__cache = BleDevicesCache()
-
-        self.__target = None
-        self.__target_bd = None
         self.__wireshark = None
+
+        # If connector is not provided
+        if connector is None:
+            # Reset target info and connector.
+            self.__target = None
+            self.__target_bd = None
+            self.__connector: WhadDeviceConnector = None
+        else:
+            # If connector provided, consider the central already connected
+            self.__connector = connector
+            self.__target = connector.peripheral()
+            self.__target_bd = bd_address
+
+            # Attach our disconnection callback
+            self.__target.set_disconnect_cb(self.on_disconnect)
+
+            # Detach any previous callback
+            self.__connector.detach_callback(self.on_disconnect, on_reception=True, on_transmission=False)
+
+            # Attach our packet monitor callback (to detect disconnection)
+            self.__connector.attach_callback(
+                self.on_disconnect,
+                on_transmission=False,
+                on_reception=True,
+                filter=lambda pkt: pkt.haslayer(LL_TERMINATE_IND)
+            )
+
+            # Create our cached device if non-existing
+            if self.__target_bd not in self.__cache:
+                self.__cache.add(AdvertisingDevice(
+                    -50,
+                    0,
+                    self.__target_bd,
+                    AdvDataFieldList()
+                ))
 
         self.intro = INTRO
 
