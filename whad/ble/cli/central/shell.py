@@ -5,6 +5,7 @@ from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
 from binascii import unhexlify, Error as BinasciiError
 
+from scapy.layers.bluetooth import *
 from scapy.layers.bluetooth4LE import *
 
 from whad.ble.exceptions import InvalidHandleValueException
@@ -771,6 +772,101 @@ class BleCentralShell(InteractiveShell):
                     self.error('Invalid hex value.')
             except BinasciiError as err:
                 self.error('Invalid hex value.')
+        else:
+            self.error('No device connected.')
+
+    @category('GATT client')
+    def do_spdu(self, args):
+        """Send a raw PDU built with scapy to a connected device
+
+        <ansicyan><b>spdu</b> <i>[Scapy packet definition]</i></ansicyan>
+
+        Send a raw link-layer PDU built with scapy, in Python.
+
+        > spdu BTLE_CTRL()/LL_TERMINATE_IND(code=3)
+
+        The command above will send a <i>LL_TERMINATE_IND</i> control PDU to
+        the device.
+        """
+        if self.__target_bd:
+            try:
+                python_code = ' '.join(args)
+
+                # Create a limited scapy global environment
+                scapy_env = {
+                    # Headers
+                    'BTLE_CTRL': BTLE_CTRL,
+                    'L2CAP_Hdr': L2CAP_Hdr,
+                    'ATT_Hdr': ATT_Hdr,
+
+                    # ATT
+                    'ATT_Error_Response': ATT_Error_Response,
+                    'ATT_Exchange_MTU_Request': ATT_Exchange_MTU_Request,
+                    'ATT_Exchange_MTU_Response': ATT_Exchange_MTU_Response,
+                    'ATT_Execute_Write_Request': ATT_Execute_Write_Request,
+                    'ATT_Execute_Write_Response':  ATT_Execute_Write_Response,
+                    'ATT_Find_By_Type_Value_Request': ATT_Find_By_Type_Value_Request,
+                    'ATT_Find_By_Type_Value_Response': ATT_Find_By_Type_Value_Response,
+                    'ATT_Find_Information_Request': ATT_Find_Information_Request,
+                    'ATT_Find_Information_Response': ATT_Find_Information_Response,
+                    'ATT_Handle_Value_Indication': ATT_Handle_Value_Indication,
+                    'ATT_Handle_Value_Notification': ATT_Handle_Value_Notification,
+                    'ATT_Prepare_Write_Request': ATT_Prepare_Write_Request,
+                    'ATT_Prepare_Write_Response': ATT_Prepare_Write_Response,
+                    'ATT_Read_Blob_Request': ATT_Read_Blob_Request,
+                    'ATT_Read_Blob_Response': ATT_Read_Blob_Response,
+                    'ATT_Read_By_Group_Type_Request': ATT_Read_By_Group_Type_Request,
+                    'ATT_Read_By_Group_Type_Response': ATT_Read_By_Group_Type_Response,
+                    'ATT_Read_By_Type_Request_128bit': ATT_Read_By_Type_Request_128bit,
+                    'ATT_Read_By_Type_Request': ATT_Read_By_Type_Request,
+                    'ATT_Read_By_Type_Response': ATT_Read_By_Type_Response,
+                    'ATT_Read_Multiple_Request': ATT_Read_Multiple_Request,
+                    'ATT_Read_Multiple_Response': ATT_Read_Multiple_Response,
+                    'ATT_Read_Request': ATT_Read_Request,
+                    'ATT_Read_Response': ATT_Read_Response,
+                    'ATT_Write_Command': ATT_Write_Command,
+                    'ATT_Write_Request': ATT_Write_Request,
+                    'ATT_Write_Response': ATT_Write_Response,
+
+                    # BTLE control PDU
+                    'LL_TERMINATE_IND': LL_TERMINATE_IND,
+                    'LL_PAUSE_ENC_REQ': LL_PAUSE_ENC_REQ,
+                    'LL_CHANNEL_MAP_IND': LL_CHANNEL_MAP_IND,
+                    'LL_CONNECTION_PARAM_REQ': LL_CONNECTION_PARAM_REQ,
+                    'LL_CONNECTION_UPDATE_IND': LL_CONNECTION_UPDATE_IND,
+                    'LL_CONNECTION_PARAM_RSP': LL_CONNECTION_PARAM_RSP,
+                    'LL_ENC_REQ': LL_ENC_REQ,
+                    'LL_ENC_RSP': LL_ENC_RSP,
+                    'LL_FEATURE_REQ': LL_FEATURE_REQ,
+                    'LL_FEATURE_RSP': LL_FEATURE_RSP,
+                    'LL_LENGTH_REQ': LL_LENGTH_REQ,
+                    'LL_LENGTH_RSP': LL_LENGTH_RSP,
+                    'LL_MIN_USED_CHANNELS_IND': LL_MIN_USED_CHANNELS_IND,
+                    'LL_VERSION_IND': LL_VERSION_IND,
+                    'LL_PHY_REQ': LL_PHY_REQ,
+                    'LL_PHY_RSP': LL_PHY_RSP,
+                    'LL_PING_REQ': LL_PING_REQ,
+                    'LL_PING_RSP': LL_PING_RSP,
+                    'LL_REJECT_IND': LL_REJECT_IND,
+                    'LL_REJECT_EXT_IND': LL_REJECT_EXT_IND,
+                    'LL_SLAVE_FEATURE_REQ': LL_SLAVE_FEATURE_REQ,
+                    'LL_START_ENC_REQ': LL_START_ENC_REQ,
+                    'LL_START_ENC_RSP': LL_START_ENC_RSP,
+                    'LL_UNKNOWN_RSP': LL_UNKNOWN_RSP,
+                }
+                raw_pdu = eval(python_code, scapy_env, {})
+                if isinstance(raw_pdu, BTLE_CTRL) or isinstance(raw_pdu, L2CAP_Hdr):               
+                    res = self.__connector.send_pdu(
+                        BTLE_DATA()/raw_pdu,
+                        conn_handle=self.__target.conn_handle
+                    )
+                    if not res:
+                        self.error('An error occured while sending PDU.')
+                else:
+                    self.error('Invalid hex value.')
+            except Exception as err:
+                print(err)
+                self.error('An error occured while assembling packet')
         else:
             self.error('No device connected.')
 
