@@ -3,7 +3,7 @@
 
 from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import command
-from whad.ble import is_bdaddr_valid
+from whad.ble.bdaddr import BDAddress
 from binascii import unhexlify, Error as BinasciiError
 
 from whad.ble import BDAddress
@@ -60,7 +60,7 @@ def write_handler(app, command_args):
     elif app.interface is not None and app.args.bdaddr is not None:
 
         # Make sure BD address is valid
-        if not is_bdaddr_valid(app.args.bdaddr):
+        if not BDAddress.check(app.args.bdaddr):
             app.error('Invalid BD address: %s' % app.args.bdaddr)
             return
 
@@ -149,7 +149,7 @@ def writecmd_handler(app, command_args):
     elif app.interface is not None and app.args.bdaddr is not None:
 
         # Make sure BD address is valid
-        if not is_bdaddr_valid(app.args.bdaddr):
+        if not BDAddress.check(app.args.bdaddr):
             app.error('Invalid BD address: %s' % app.args.bdaddr)
             return
 

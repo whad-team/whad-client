@@ -4,7 +4,7 @@ This utility will configure a compatible whad device to connect to a given
 BLE device, and chain this with another tool.
 
 """
-from whad.ble import is_bdaddr_valid
+from whad.ble.bdaddr import BDAddress
 from whad.cli.app import CommandLineApp
 from whad.ble.connector import Central
 from whad.device.unix import UnixSocketProxy
@@ -62,7 +62,7 @@ class BleConnectApp(CommandLineApp):
         """Connect to our target device
         """
         # Make sure the bd address is valid
-        if is_bdaddr_valid(bdaddr):
+        if BDAddress.check(bdaddr):
             # Configure our interface
             central = Central(self.interface)
 

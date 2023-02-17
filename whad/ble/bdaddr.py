@@ -84,3 +84,15 @@ class BDAddress(object):
             return BDAddress(address.decode('utf-8'), addr_type=addr_type)
         else:
             raise InvalidBDAddressException
+
+    @staticmethod
+
+    def check(bd_addr: str) -> bool:
+        """Check if a BD address is valid
+
+        :param      bd_addr: BD address to test
+        :type       bd_addr: str
+        :return:    ``True`` if BD address is valid, ``False`` otherwise
+        :rtype:     bool
+        """
+        return re.match('^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$',bd_addr)
