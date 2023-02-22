@@ -765,6 +765,7 @@ class BLE(WhadDeviceConnector):
             packet.metadata = BLEMetadata()
             packet.metadata.direction = direction
             packet.metadata.connection_handle = conn_handle
+            self.monitor_packet_tx(packet)
 
             # If encrypt is provided, take it into account
             # otherwise consider using the internal link-layer encryption status
