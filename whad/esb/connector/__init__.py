@@ -8,7 +8,7 @@ from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.esb.esb_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
+from whad.protocol.esb.esb_pb2 import Sniff, SniffPromiscuous, Start, Stop, StartCmd, StopCmd, \
     Send, SendCmd, SendRawCmd, SendRaw, PrimaryReceiverMode, PrimaryTransmitterMode, \
     SetNodeAddress
 
@@ -73,6 +73,17 @@ class ESB(WhadDeviceConnector):
             (commands & (1 << Stop))>0
         )
 
+    def can_sniff_promiscuous(self):
+        """
+        Determine if the device implements a promiscous mode.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Esb)
+        return (
+            (commands & (1 << SniffPromiscuous)) > 0 and
+            (commands & (1 << Start))>0 and
+            (commands & (1 << Stop))>0
+        )
+
     def can_send(self):
         """
         Determine if the device can transmit packets.
@@ -86,35 +97,33 @@ class ESB(WhadDeviceConnector):
         """
         Send Enhanced ShockBurst packets (on a single channel).
         """
-        if self.can_send():
-            # If we don't have address or channels, use the cached ones
-            tx_address = address if address is not None else self.__cached_address
-            tx_channel = channel if channel is not None else self.__cached_channel
-            if self.support_raw_pdu():
-                # If we support raw PDU but only got a payload, build a packet
-                if ESB_Hdr not in pdu:
-                    packet = ESB_Hdr(address=tx_address) / pdu
-                else:
-                    packet = pdu
-            # if we don't support raw PDU and got a packet, crop to keep only the payload
-            elif ESB_Hdr in pdu:
-                packet = pdu[ESB_Payload_Hdr:]
-            # if we don't support raw PDU and got a payload, keep it as it is
+        if not self.can_send():
+            raise UnsupportedCapability("Send")
+        # If we don't have address or channels, use the cached ones
+        tx_address = address if address is not None else self.__cached_address
+        tx_channel = channel if channel is not None else self.__cached_channel
+        if self.support_raw_pdu():
+            # If we support raw PDU but only got a payload, build a packet
+            if ESB_Hdr not in pdu:
+                packet = ESB_Hdr(address=tx_address) / pdu
             else:
                 packet = pdu
-
-            # Generate TX metadata
-            packet.metadata = ESBMetadata()
-            packet.metadata.channel = tx_channel
-            packet.metadata.address = tx_address
-
-            self.monitor_packet_tx(packet)
-            msg = self.translator.from_packet(packet, channel, retransmission_count)
-            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
+        # if we don't support raw PDU and got a packet, crop to keep only the payload
+        elif ESB_Hdr in pdu:
+            packet = pdu[ESB_Payload_Hdr:]
+        # if we don't support raw PDU and got a payload, keep it as it is
         else:
-            return False
+            packet = pdu
+
+        # Generate TX metadata
+        packet.metadata = ESBMetadata()
+        packet.metadata.channel = tx_channel
+        packet.metadata.address = tx_address
+
+        self.monitor_packet_tx(packet)
+        msg = self.translator.from_packet(packet, channel, retransmission_count)
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def support_raw_pdu(self):
         """
@@ -135,9 +144,9 @@ class ESB(WhadDeviceConnector):
             (commands & (1 << SetNodeAddress)) > 0
         )
 
-    def sniff_esb(self, channel=None, address="FF:FF:FF:FF:FF", show_acknowledgements=False):
+    def sniff(self, address, channel, show_acknowledgements=False):
         """
-        Sniff Enhanced ShockBurst packets.
+        Sniff Enhanced ShockBurst packets sent on a given channel with a given address.
         """
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
@@ -146,16 +155,25 @@ class ESB(WhadDeviceConnector):
         self.__cached_channel = channel
 
         msg = Message()
-
-        if channel is None:
-            # Enable scanning mode
-            msg.esb.sniff.channel = 0xFF
-        else:
-            self.__cached_channel = channel
-            msg.esb.sniff.channel = self.__cached_channel
-
+        msg.esb.sniff.channel = self.__cached_channel
         msg.esb.sniff.address = self.__cached_address.value
         msg.esb.sniff.show_acknowledgements = show_acknowledgements
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+
+    def sniff_promiscuous(self, channel):
+        """
+        Sniff any Enhanced ShockBurst packets sent on a given channel.
+        """
+        if not self.can_sniff_promiscuous():
+            raise UnsupportedCapability("SniffPromiscous")
+
+        self.__cached_channel = channel
+
+        msg = Message()
+        msg.esb.sniff_promiscuous.channel = self.__cached_channel
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -210,13 +228,8 @@ class ESB(WhadDeviceConnector):
             raise UnsupportedCapability("PrimaryTransmitterMode")
 
         msg = Message()
-        if channel is None:
-            # Enable scanning mode
-            msg.esb.ptx.channel = 0xFF
-        else:
-            # Keep channel in cache
-            self.__cached_channel = channel
-            msg.esb.ptx.channel = self.__cached_channel
+        self.__cached_channel = channel
+        msg.esb.ptx.channel = channel
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
