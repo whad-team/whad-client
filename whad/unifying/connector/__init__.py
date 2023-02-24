@@ -3,6 +3,8 @@ from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.esb.metadata import ESBMetadata, generate_esb_metadata
+from whad.esb.connector.translator import ESBMessageTranslator
+from whad.esb.esbaddr import ESBAddress
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
@@ -19,6 +21,13 @@ class Unifying(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+
+    def format(self, packet):
+        """
+        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
+        the appropriate header and the timestamp in microseconds.
+        """
+        return self.translator.format(packet)
 
     def __init__(self, device=None):
         """
@@ -47,58 +56,8 @@ class Unifying(WhadDeviceConnector):
             self.__ready = True
             bind()
 
-    def format(self, packet):
-        """
-        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
-        the appropriate header and the timestamp in microseconds.
-        """
-        if ESB_Hdr not in packet:
-            packet = ESB_Hdr(address=self.__cached_address)/packet
-
-        packet.preamble = 0xAA # force a rebuild
-        formatted_packet = ESB_Pseudo_Packet(bytes(packet)[1:])
-
-        timestamp = None
-        if hasattr(packet, "metadata"):
-            timestamp = packet.metadata.timestamp
-
-        return formatted_packet, timestamp
-
-    def _build_scapy_packet_from_message(self, message, msg_type):
-        try:
-            if msg_type == 'raw_pdu':
-                packet = ESB_Hdr(bytes(message.raw_pdu.pdu))
-                packet.preamble = 0xAA # force a rebuild
-                packet.metadata = generate_esb_metadata(message, msg_type)
-                self.monitor_packet_rx(packet)
-                return packet
-
-            elif msg_type == 'pdu':
-                packet = ESB_Payload_Hdr(bytes(message.pdu.pdu))
-                packet.metadata = generate_esb_metadata(message, msg_type)
-                self.monitor_packet_rx(packet)
-                return packet
-
-        except AttributeError:
-            return None
-
-    def _build_message_from_scapy_packet(self, packet, channel=None, retransmission_count=1):
-        msg = Message()
-        self.monitor_packet_rx(packet)
-
-        if ESB_Hdr in packet:
-            msg.unifying.send_raw.channel = channel if channel is not None else 0xFF
-            packet.preamble = 0xAA
-            # print(">", bytes(packet).hex())
-            msg.unifying.send_raw.pdu = bytes(packet)
-            msg.unifying.send_raw.retransmission_count = retransmission_count
-        elif ESB_Payload_Hdr in packet:
-            msg.unifying.send.channel = channel if channel is not None else 0xFF
-            msg.unifying.send.pdu = bytes(packet)
-            msg.unifying.send.retransmission_count = retransmission_count
-        else:
-            msg = None
-        return msg
+        # Initialize translator
+        self.translator = ESBMessageTranslator("unifying")
 
     def close(self):
         self.stop()
@@ -129,28 +88,33 @@ class Unifying(WhadDeviceConnector):
         """
         Send Logitech Unifying packets (on a single channel).
         """
-        if self.can_send():
-            if self.support_raw_pdu():
-                if ESB_Hdr not in pdu:
-                    packet = ESB_Hdr(address) / pdu
-                else:
-                    packet = pdu
-            elif ESB_Hdr in pdu:
-                packet = pdu[ESB_Payload_Hdr:]
+        if not self.can_send():
+            raise UnsupportedCapability("Send")
+        # If we don't have address or channels, use the cached ones
+        tx_address = address if address is not None else self.__cached_address
+        tx_channel = channel if channel is not None else self.__cached_channel
+        if self.support_raw_pdu():
+            # If we support raw PDU but only got a payload, build a packet
+            if ESB_Hdr not in pdu:
+                packet = ESB_Hdr(address=tx_address) / pdu
             else:
                 packet = pdu
-
-            packet.metadata = ESBMetadata()
-            packet.metadata.channel = self.__cached_channel if channel is None else channel
-            packet.metadata.address = self.__cached_address if address is None else address
-
-            msg = self._build_message_from_scapy_packet(packet, channel, retransmission_count)
-            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
+        # if we don't support raw PDU and got a packet, crop to keep only the payload
+        elif ESB_Hdr in pdu:
+            packet = pdu[ESB_Payload_Hdr:]
+        # if we don't support raw PDU and got a payload, keep it as it is
         else:
-            return False
+            packet = pdu
 
+        # Generate TX metadata
+        packet.metadata = ESBMetadata()
+        packet.metadata.channel = tx_channel
+        packet.metadata.address = tx_address
+
+        self.monitor_packet_tx(packet)
+        msg = self.translator.from_packet(packet, channel, retransmission_count)
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def support_raw_pdu(self):
         """
@@ -171,7 +135,7 @@ class Unifying(WhadDeviceConnector):
             (commands & (1 << SetNodeAddress)) > 0
         )
 
-    def sniff_unifying(self, channel=None, address="FF:FF:FF:FF:FF", show_acknowledgements=False):
+    def sniff(self, channel=None, address="FF:FF:FF:FF:FF", show_acknowledgements=False):
         """
         Sniff Logitech Unifying packets.
         """
@@ -179,13 +143,15 @@ class Unifying(WhadDeviceConnector):
             raise UnsupportedCapability("Sniff")
 
         msg = Message()
-        msg.unifying.sniff.channel = channel if channel is not None else 0xFF
-        self.__cached_channel = channel
-        self.__cached_address = address
-        try:
-            msg.unifying.sniff.address = bytes.fromhex(address.replace(":", ""))
-        except ValueError:
-            return False
+        self.__cached_address = ESBAddress(address)
+        if channel is None:
+            # Enable scanning mode
+            msg.unifying.sniff.channel = 0xFF
+        else:
+            self.__cached_channel = channel
+            msg.unifying.sniff.channel = self.__cached_channel
+
+        msg.unifying.sniff.address = self.__cached_address.value
         msg.unifying.sniff.show_acknowledgements = show_acknowledgements
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
@@ -238,8 +204,13 @@ class Unifying(WhadDeviceConnector):
             raise UnsupportedCapability("LogitechKeyboardMode")
 
         msg = Message()
-        self.__cached_channel = channel
-        msg.unifying.keyboard.channel = channel if channel is not None else 0xFF
+        if channel is None:
+            # Enable scanning mode
+            msg.unifying.keyboard.channel = 0xFF
+        else:
+            # Keep channel in cache
+            self.__cached_channel = channel
+            msg.unifying.keyboard.channel = self.__cached_channel
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -262,8 +233,13 @@ class Unifying(WhadDeviceConnector):
             raise UnsupportedCapability("LogitechMouseMode")
 
         msg = Message()
-        self.__cached_channel = channel
-        msg.unifying.mouse.channel = channel if channel is not None else 0xFF
+        if channel is None:
+            # Enable scanning mode
+            msg.unifying.mouse.channel = 0xFF
+        else:
+            # Keep channel in cache
+            self.__cached_channel = channel
+            msg.unifying.mouse.channel = self.__cached_channel
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -284,12 +260,12 @@ class Unifying(WhadDeviceConnector):
         if not self.can_set_node_address():
             raise UnsupportedCapability("SetNodeAddress")
 
-        self.__cached_address = address
+        node_address = ESBAddress(address)
+        # Keep address in cache
+        self.__cached_address = node_address
+
         msg = Message()
-        try:
-            msg.unifying.set_node_addr.address = bytes.fromhex(address.replace(":", ""))
-        except ValueError:
-            return False
+        msg.esb.set_node_addr.address = node_address.value
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -348,26 +324,27 @@ class Unifying(WhadDeviceConnector):
         if domain == 'unifying':
             msg_type = message.WhichOneof('msg')
             if msg_type == 'pdu':
-                packet = self._build_scapy_packet_from_message(message, msg_type)
-                self.__cached_address = packet.metadata.address
-                self.__cached_channel = packet.metadata.channel
+                packet = self.translator.from_message(message, msg_type)
+                self.monitor_packet_rx(packet)
                 self.on_pdu(packet)
 
             elif msg_type == 'raw_pdu':
-                packet = self._build_scapy_packet_from_message(message, msg_type)
-                self.__cached_address = packet.metadata.address
-                self.__cached_channel = packet.metadata.channel
+                packet = self.translator.from_message(message, msg_type)
+                self.monitor_packet_rx(packet)
                 self.on_raw_pdu(packet)
 
 
     def on_raw_pdu(self, packet):
-
+        # Extract the PDU from raw packet
         if ESB_Payload_Hdr in packet:
             pdu = packet[ESB_Payload_Hdr:]
         else:
             pdu = ESB_Payload_Hdr()/ESB_Ack_Response()
+
+        # Propagate metadata to PDU
         pdu.metadata = packet.metadata
         self.on_pdu(pdu)
+
 
     def on_pdu(self, packet):
         pass

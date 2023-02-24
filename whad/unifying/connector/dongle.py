@@ -84,5 +84,15 @@ class Dongle(Unifying):
         self.__address = address
         self._enable_role()
 
+    def wait_synchronization(self):
+        return self.__stack.app.wait_synchronization()
+
+    def wait_wakeup(self):
+        return self.__stack.app.wait_wakeup()
+
     def on_pdu(self, packet):
         self.__stack.on_pdu(packet)
+
+    def stream(self):
+        for pdu in self.__stack.ll.data_stream():
+            yield pdu

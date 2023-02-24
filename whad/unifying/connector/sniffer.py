@@ -37,7 +37,7 @@ class Sniffer(Unifying):
         if self.__configuration.pairing:
             self.sniff_pairing()
         else:
-            self.sniff_unifying(channel=channel, show_acknowledgements=ack, address=address)
+            super().sniff(channel=channel, show_acknowledgements=ack, address=address)
 
     @property
     def configuration(self):
@@ -111,7 +111,7 @@ class Sniffer(Unifying):
                 message_type = "pdu"
 
             message = self.wait_for_message(filter=message_filter('unifying', message_type))
-            packet = self._build_scapy_packet_from_message(message.unifying, message_type)
+            packet = self.translator.from_message(message.unifying, message_type)
 
             if self.__configuration.pairing:
                 self.__key_derivation.process_packet(packet)

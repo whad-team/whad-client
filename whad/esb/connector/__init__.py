@@ -135,18 +135,16 @@ class ESB(WhadDeviceConnector):
             (commands & (1 << SetNodeAddress)) > 0
         )
 
-    def sniff_esb(self, channel=None, address="FF:FF:FF:FF:FF", show_acknowledgements=False):
+    def sniff(self, channel=None, address="FF:FF:FF:FF:FF", show_acknowledgements=False):
         """
         Sniff Enhanced ShockBurst packets.
         """
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
 
-        self.__cached_address = ESBAddress(address)
-        self.__cached_channel = channel
 
         msg = Message()
-
+        self.__cached_address = ESBAddress(address)
         if channel is None:
             # Enable scanning mode
             msg.esb.sniff.channel = 0xFF
@@ -292,6 +290,8 @@ class ESB(WhadDeviceConnector):
         # Extract the PDU from raw packet
         if ESB_Payload_Hdr in packet:
             pdu = packet[ESB_Payload_Hdr:]
+        else:
+            pdu = ESB_Payload_Hdr()/ESB_Ack_Response()
 
         # Propagate metadata to PDU
         pdu.metadata = packet.metadata

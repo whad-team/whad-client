@@ -23,7 +23,7 @@ if __name__ == '__main__':
             #connector.add_key(bytes.fromhex("08f59b42d06fd3bdc588cd4d1c244018"))
             connector.start()
             out = ""
-            for i in connector.sniff():
+            for i in connector.stream():
                 print(i)
                 #key_stream():
                 #out += i

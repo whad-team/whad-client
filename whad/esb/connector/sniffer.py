@@ -25,7 +25,7 @@ class Sniffer(ESB):
         ack = self.__configuration.acknowledgements
         address = self.__configuration.address
 
-        self.sniff_esb(channel=channel, show_acknowledgements=ack, address=address)
+        super().sniff(channel=channel, show_acknowledgements=ack, address=address)
 
     @property
     def configuration(self):

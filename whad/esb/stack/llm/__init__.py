@@ -69,7 +69,7 @@ class EsbLinkLayerManager:
 
     def synchronize(self, timeout=10):
         self.__role = ESBRole.PTX
-        self.__stack.channel = None
+        self.channel = None
         start_time = time()
         self.__ack_queue.queue.clear()
         self.__data_queue.queue.clear()
@@ -80,7 +80,7 @@ class EsbLinkLayerManager:
                 queue = self.__ack_queue if queue == self.__data_queue else self.__data_queue
                 msg = queue.get(block=False,timeout=0.05)
                 if hasattr(msg, "metadata") and hasattr(msg.metadata, "channel"):
-                    self.__stack.channel.set_channel(msg.metadata.channel)
+                    self.channel = msg.metadata.channel
                     if not self.__synchronized:
                         self.__synchronized = True
                         self.on_synchronized()

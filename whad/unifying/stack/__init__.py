@@ -11,6 +11,7 @@ from whad.unifying.crypto import LogitechUnifyingCryptoManager
 from time import sleep, time
 from threading import Thread, Lock
 from queue import Queue, Empty
+from whad.esb.esbaddr import ESBAddress
 
 class UnifyingApplicativeLayerManager:
     """
@@ -25,6 +26,8 @@ class UnifyingApplicativeLayerManager:
         self.__timeout_thread = None
         self.__crypto_manager = None
         self.__aes_counter = 0
+        self.__wait_wakeup = False
+        self.__synchronized = False
         self.__packets_queue = Queue(10)
 
     @property
@@ -254,23 +257,49 @@ class UnifyingApplicativeLayerManager:
 
     def on_synchronized(self):
         print("[i] Synchronized !")
-
+        self.__synchronized = True
 
     def on_desynchronized(self):
         print("[i] Desynchronized.")
+        self.__synchronized = False
+
+    def wait_synchronization(self):
+        while not self.__synchronized:
+            sleep(0.01)
+        return True
 
     def wait_wakeup(self):
-        pass
+        self.__llm.address = ESBAddress(self.__llm.address).base + ":00"
+        self.__wait_wakeup = True
+        while not self.__wait_wakeup:
+            sleep(0.01)
+        return True
 
     def on_data(self, data):
-        data.show()
-        if Logitech_Wake_Up_Payload in data:
-            # Weird checksum, force it
-            pkt = Logitech_Unifying_Hdr(dev_index = 0,checksum=0xAC)/Logitech_Waked_Up_Payload(wakeup_dev_index=data.dev_index)
-            self.__llm.prepare_acknowledgment(
-                pkt
-            )
+        if self.__role == UnifyingRole.DONGLE:
+            if not self.__synchronized:
+                self.on_synchronized()
 
+            if self.__wait_wakeup:
+                if Logitech_Wake_Up_Payload in data:
+                    # Weird checksum, force it
+                    pkt = Logitech_Unifying_Hdr(dev_index = 0,checksum=0xAC)/Logitech_Waked_Up_Payload(wakeup_dev_index=data.dev_index)
+                    self.__llm.prepare_acknowledgment(
+                        pkt
+                    )
+                elif hasattr(data,"dev_index"):
+                    self.__llm.address = ESBAddress(self.__llm.address).base + ":{:02x}".format(data.dev_index)
+                    self.__wait_wakeup = False
+                    self.on_wakeup(data.dev_index)
+
+            if Logitech_Set_Keepalive_Payload in data:
+                self.on_set_keepalive(data.timeout)
+
+    def on_wakeup(self, dev_index):
+        print("Waked up by device {:02x}".format(dev_index))
+
+    def on_set_keepalive(self, timeout):
+        print("[i] Set keep alive: ",timeout)
 
     def on_acknowledgement(self, ack):
         pass
