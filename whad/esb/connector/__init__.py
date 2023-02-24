@@ -123,6 +123,7 @@ class ESB(WhadDeviceConnector):
         self.monitor_packet_tx(packet)
         msg = self.translator.from_packet(packet, channel, retransmission_count)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        print(resp.generic.cmd_result.result == ResultCode.SUCCESS)
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def support_raw_pdu(self):

@@ -109,7 +109,7 @@ class RFStormDevice(VirtualDevice):
 
         self.__acking = False
         self.__ack_payload = None
-
+        self.__last_ack_timestamp = self._get_timestamp()
         self.__opened_stream = False
         self.__opened = True
 
@@ -250,7 +250,6 @@ class RFStormDevice(VirtualDevice):
         """
         Transmit an Acknowledgement ESB payload on RFStorm device.
         """
-        print(len(payload))
         data = bytes([len(payload)]) + payload
         return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_TRANSMIT_ACK, data, no_response=True)
 
@@ -288,11 +287,6 @@ class RFStormDevice(VirtualDevice):
             raise WhadDeviceNotReady()
 
         if self.__opened_stream:
-            if self.__acking:
-                if self.__ack_payload is not None:
-                    self._rfstorm_transmit_ack_payload(self.__ack_payload)
-                else:
-                    self._rfstorm_transmit_ack_payload(b"")
             # Read an RFStorm packet
             try:
                 data = self._rfstorm_read_packet()
@@ -305,9 +299,14 @@ class RFStormDevice(VirtualDevice):
                     len(data) >= 1 and
                     data != b"\xFF"
                 ):
-                if self.__acking and self.__ack_payload is not None:
-                    self.__ack_payload = None
+
                 self._process_packet(data)
+                if self.__acking:
+                    if self.__ack_payload is not None:
+                        self._rfstorm_transmit_ack_payload(self.__ack_payload)
+                        self.__ack_payload = None
+                    else:
+                        self._rfstorm_transmit_ack_payload(b"")
         else:
             sleep(0.01)
 

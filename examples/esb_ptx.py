@@ -23,10 +23,13 @@ if __name__ == '__main__':
             connector.channel = 8
             connector.attach_callback(show)
             connector.start()
+            connector.synchronize()
+            print("Synchronized on channel:", connector.channel)
 
             for i in range(100):
                 input()
-                ack = connector.send_data(b"PTX"+bytes([i]), waiting_ack=True)
+                connector.send_data(b"PTX"+bytes([i]))
+                ack = connector.wait_for_ack()
                 print(ack)
                 if ack is not None:
                     ack.show()

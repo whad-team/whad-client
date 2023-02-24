@@ -1,5 +1,6 @@
 from whad.esb.connector import ESB
 from whad.esb.stack import ESBStack
+from whad.esb.stack.llm.exceptions import LinkLayerTimeoutException
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 
@@ -65,8 +66,15 @@ class PTX(ESB):
     def on_pdu(self, pdu):
         self.__stack.on_pdu(pdu)
 
-    def send_data(self, data, waiting_ack=False):
-        return self.__stack.ll.send_data(data, waiting_ack=waiting_ack)
+    def wait_for_ack(self, timeout=1):
+        try:
+            ack = self.__stack.ll.wait_for_ack(timeout=timeout)
+            return ack
+        except LinkLayerTimeoutException:
+            return None
+
+    def send_data(self, data):
+        return self.__stack.ll.send_data(data)
 
     def synchronize(self, timeout=10):
         return self.__stack.ll.synchronize(timeout=10)
