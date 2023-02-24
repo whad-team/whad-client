@@ -34,6 +34,7 @@ class Dongle(Unifying):
             super().stop()
         self.set_node_address(self.__address)
         self.enable_dongle_mode(channel=self.__channel)
+        print(self.__channel)
         self.__stack.app.role = UnifyingRole.DONGLE
         if self.__started:
             super().start()

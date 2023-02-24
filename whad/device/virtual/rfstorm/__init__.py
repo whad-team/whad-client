@@ -214,7 +214,6 @@ class RFStormDevice(VirtualDevice):
         )
 
     def _rfstorm_transmit_ack_payload(self, payload):
-        print(len(payload))
         data = bytes([len(payload)]) + payload
         return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_TRANSMIT_ACK, data, no_response=True)
 

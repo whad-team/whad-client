@@ -181,6 +181,7 @@ class Unifying(WhadDeviceConnector):
         msg = Message()
         self.__cached_channel = channel
         msg.unifying.dongle.channel = channel
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -265,7 +266,7 @@ class Unifying(WhadDeviceConnector):
         self.__cached_address = node_address
 
         msg = Message()
-        msg.esb.set_node_addr.address = node_address.value
+        msg.unifying.set_node_addr.address = node_address.value
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 

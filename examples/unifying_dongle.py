@@ -19,13 +19,15 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             connector = Dongle(dev)
-            connector.start()
             #connector.attach_callback(show, on_reception=True, on_transmission=False)
 
-            connector.address = "9b:0a:90:42:98"
-            connector.channel = 75
+            connector.address = "ca:e9:06:ec:a4"#"9b:0a:90:42:98"
+            #connector.address = "ca:e9:06:ec:a4"
+            connector.channel = 8
+            connector.start()
             #connector.wait_wakeup()
             connector.wait_synchronization()
+            input()
             for i in connector.stream():
                 print(i)
             while True:

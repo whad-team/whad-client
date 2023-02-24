@@ -5,7 +5,8 @@ from whad.esb.stack.llm.constants import ESBRole
 from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Mouse_Payload, Logitech_Set_Keepalive_Payload, \
     Logitech_Keepalive_Payload, Logitech_Unencrypted_Keystroke_Payload, Logitech_Encrypted_Keystroke_Payload, \
     Logitech_Multimedia_Key_Payload, Logitech_Waked_Up_Payload, Logitech_Wake_Up_Payload
-from whad.unifying.hid import LogitechUnifyingMouseMovementConverter, LogitechUnifyingKeystrokeConverter, InvalidHIDData
+from whad.unifying.hid import LogitechUnifyingMouseMovementConverter, LogitechUnifyingKeystrokeConverter, \
+    HIDCodeNotFound, InvalidHIDData
 from whad.unifying.stack.constants import UnifyingRole, ClickType, MultimediaKey
 from whad.unifying.crypto import LogitechUnifyingCryptoManager
 from time import sleep, time
@@ -295,11 +296,61 @@ class UnifyingApplicativeLayerManager:
             if Logitech_Set_Keepalive_Payload in data:
                 self.on_set_keepalive(data.timeout)
 
+            if Logitech_Keepalive_Payload in data:
+                self.on_keepalive(data.timeout)
+
+            if Logitech_Mouse_Payload in data:
+                self.on_mouse_payload(data)
+
+            if Logitech_Multimedia_Key_Payload in data and data.hid_key_scan_code != b"\x00"*4:
+                self.on_multimedia_keystroke(MultimediaKey(data.hid_key_scan_code[1]))
+
+            if Logitech_Unencrypted_Keystroke_Payload in data:
+                self.on_unencrypted_keystroke_payload(data)
+
+    def on_unencrypted_keystroke_payload(self, data):
+        print("[i] Unencrypted Keystroke Payload (payload="+bytes(data).hex()+")")
+        if data.hid_data != b"\x00"*7:
+            try:
+                key = LogitechUnifyingKeystrokeConverter.get_key_from_hid_data(data.hid_data, locale=self.__locale)
+                self.on_unencrypted_keystroke(key)
+            except (InvalidHIDData, HIDCodeNotFound):
+                pass
+
+    def on_unencrypted_keystroke(self, key):
+        print("[i] Unencrypted keystroke (key="+str(key)+")")
+
     def on_wakeup(self, dev_index):
-        print("Waked up by device {:02x}".format(dev_index))
+        print("[i] Waked up by device (dev_index=0x{:02x})".format(dev_index))
 
     def on_set_keepalive(self, timeout):
-        print("[i] Set keep alive: ",timeout)
+        print("[i] Set keep alive (timeout="+str(timeout)+")")
+
+    def on_keepalive(self, timeout):
+        print("[i] Keep alive (timeout="+str(timeout)+")")
+
+    def on_mouse_payload(self, data):
+        print("[i] Mouse payload (payload="+bytes(data).hex()+")")
+        converter = LogitechUnifyingMouseMovementConverter()
+        x, y = converter.get_coordinates_from_hid_data(data.movement)
+        if x != 0 or y != 0:
+            self.on_move_mouse(x, y)
+
+        button = ClickType(data.button_mask)
+        if button != ClickType.NONE:
+            self.on_click_mouse(button)
+
+        if data.wheel_x != 0 or data.wheel_y != 0:
+            self.on_wheel_mouse(data.wheel_x, data.wheel_y)
+
+    def on_wheel_mouse(self, x, y):
+        print("[i] Mouse wheel (x="+str(x)+", y="+str(y)+")")
+
+    def on_move_mouse(self, x, y):
+        print("[i] Mouse move (x="+str(x)+", y="+str(y)+")")
+
+    def on_click_mouse(self, type):
+        print("[i] Mouse click (click="+str(type.name)+")")
 
     def on_acknowledgement(self, ack):
         pass
