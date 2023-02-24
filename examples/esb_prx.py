@@ -22,8 +22,8 @@ if __name__ == '__main__':
             connector.start()
             for pkt in connector.stream():
                 pkt.show()
-                #if ((bytes(pkt)[3] % 5) == 0):
-                #    connector.prepare_acknowledgment(b"PRX")
+                if ((bytes(pkt)[3] % 5) == 0):
+                    connector.prepare_acknowledgment(b"PRX")
 
             connector.stop()
 

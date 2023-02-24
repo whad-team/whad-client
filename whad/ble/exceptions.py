@@ -44,7 +44,7 @@ class HookReturnValue(Exception):
     """Raise this exception in a hook to return a specific value to the
     caller.
     """
-    
+
     def __init__(self, value):
         super().__init__()
         self.__value = value

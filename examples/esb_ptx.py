@@ -27,6 +27,7 @@ if __name__ == '__main__':
             for i in range(100):
                 input()
                 ack = connector.send_data(b"PTX"+bytes([i]), waiting_ack=True)
+                print(ack)
                 if ack is not None:
                     ack.show()
 
