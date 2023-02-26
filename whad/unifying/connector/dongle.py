@@ -8,7 +8,7 @@ class Dongle(Unifying):
     """
     Logitech Unifying Dongle interface for compatible WHAD device.
     """
-    def __init__(self, device):
+    def __init__(self, device, **kwargs):
         super().__init__(device)
 
         self.__channel = 5
@@ -18,11 +18,16 @@ class Dongle(Unifying):
             self,
             app_class = UnifyingApplicativeLayerManager
         )
+
+        for name, callback in kwargs.items():
+            if name.startswith("on_"):
+                self.__stack.app.callbacks[name] = callback
+
         # Check if device can choose its own address
         if not self.can_set_node_address():
             raise UnsupportedCapability("SetNodeAddress")
 
-        # Check if device can perform keyboard simulation
+        # Check if device can perform dongle simulation
         if not self.can_be_dongle():
             raise UnsupportedCapability("DongleSimulation")
 
@@ -34,7 +39,6 @@ class Dongle(Unifying):
             super().stop()
         self.set_node_address(self.__address)
         self.enable_dongle_mode(channel=self.__channel)
-        print(self.__channel)
         self.__stack.app.role = UnifyingRole.DONGLE
         if self.__started:
             super().start()

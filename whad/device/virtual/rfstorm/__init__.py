@@ -222,16 +222,13 @@ class RFStormDevice(VirtualDevice):
             return False
 
         data = bytes([channel])
-        response = self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_SET_CHANNEL, data)
-        return response is not None and len(response) > 0 and response[0] == channel
+        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_SET_CHANNEL, data)
 
     def _rfstorm_get_channel(self, channel):
         return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_GET_CHANNEL)[0]
 
     def _rfstorm_enable_lna(self):
-        return self._rfstorm_check_success(
-            self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_ENABLE_LNA)
-        )
+        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_ENABLE_LNA)
 
     def write(self, data):
         if not self.__opened:
