@@ -300,6 +300,7 @@ class ESB(WhadDeviceConnector):
     def on_pdu(self, packet):
         pass
 
+from whad.esb.connector.scanner import Scanner
 from whad.esb.connector.sniffer import Sniffer
 from whad.esb.connector.prx import PRX
 from whad.esb.connector.ptx import PTX
