@@ -84,8 +84,6 @@ class Scanner(ESB):
         :type   filter_address:     :class:`whad.esb.bdaddr.ESBAddress`, optional
         """
         for packet in self.sniff():
-            #print(packet)
-            #print(packet.metadata)
             if minimal_rssi is None or packet.metadata.rssi > minimal_rssi:
                 device = self.__db.on_device_found(
                     packet.metadata.rssi,

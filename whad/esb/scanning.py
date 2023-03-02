@@ -95,15 +95,21 @@ class CommunicatingDevice(object):
                 self.last_channel
             )
         )
-        # Generate device summary
-        return '[%4d dBm] %s %s %s %s' % (
-            self.__rssi,
-            role,
-            self.__address,
-            channels,
-            applicative_layer
-        )
-
+        if self.__rssi is not None:
+            return '[%4d dBm] %s %s %s %s' % (
+                self.__rssi,
+                role,
+                self.__address,
+                channels,
+                applicative_layer
+            )
+        else:
+           return '%s %s %s %s' % (
+                role,
+                self.__address,
+                channels,
+                applicative_layer
+            )
 
     def update_rssi(self, rssi=0):
         """Update device RSSI.
@@ -214,7 +220,6 @@ class CommunicatingDevicesDB(object):
             existing_device.update_channel(channel)
             if applicative_layer is not None:
                 existing_device.set_applicative_layer(applicative_layer)
-
         '''
         addr_type = adv_packet.getlayer(BTLE_ADV).TxAdd
 
