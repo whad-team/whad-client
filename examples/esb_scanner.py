@@ -1,10 +1,14 @@
-from whad.unifying import Keylogger, Mouselogger
+from whad.esb import Scanner
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
-import sys,time
+from whad.scapy.layers.esb import ESB_Hdr
+from scapy.compat import raw
+import sys
 
 def show(pkt):
-    print(repr(pkt))
+    if hasattr(pkt, "metadata"):
+        print(pkt.metadata)
+    print(bytes(pkt).hex(), repr(pkt))
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -14,18 +18,10 @@ if __name__ == '__main__':
         # Connect to target device and performs discovery
         try:
             dev = WhadDevice.create(interface)
-
-            connector = Keylogger(dev)
-            connector.address = "9b:0a:90:42:99"
-            connector.scanning = True
-            connector.decrypt = True
-
-            connector.add_key(bytes.fromhex("08f59b42156fa86c4288b64d02ca4006"))
+            connector = Scanner(dev)
             connector.start()
-            out = ""
-            for i in connector.stream():
-                out += i
-                print(out)
+            for d in connector.discover_devices():
+                print(">", d)
 
         except (KeyboardInterrupt, SystemExit):
             dev.close()

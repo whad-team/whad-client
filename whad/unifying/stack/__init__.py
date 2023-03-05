@@ -5,12 +5,17 @@ from whad.esb.stack.llm.constants import ESBRole
 from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Mouse_Payload, Logitech_Set_Keepalive_Payload, \
     Logitech_Keepalive_Payload, Logitech_Unencrypted_Keystroke_Payload, Logitech_Encrypted_Keystroke_Payload, \
     Logitech_Multimedia_Key_Payload, Logitech_Waked_Up_Payload, Logitech_Wake_Up_Payload
-from whad.unifying.hid import LogitechUnifyingMouseMovementConverter, LogitechUnifyingKeystrokeConverter, InvalidHIDData
+from whad.unifying.hid import LogitechUnifyingMouseMovementConverter, LogitechUnifyingKeystrokeConverter, \
+    HIDCodeNotFound, InvalidHIDData
 from whad.unifying.stack.constants import UnifyingRole, ClickType, MultimediaKey
 from whad.unifying.crypto import LogitechUnifyingCryptoManager
+from whad.unifying.exceptions import MissingEncryptedKeystrokePayload
 from time import sleep, time
 from threading import Thread, Lock
 from queue import Queue, Empty
+from whad.esb.esbaddr import ESBAddress
+from sys import _getframe as getframe
+
 
 class UnifyingApplicativeLayerManager:
     """
@@ -25,7 +30,21 @@ class UnifyingApplicativeLayerManager:
         self.__timeout_thread = None
         self.__crypto_manager = None
         self.__aes_counter = 0
+        self.__wait_wakeup = False
+        self.__synchronized = False
+        self.callbacks = {}
         self.__packets_queue = Queue(10)
+
+
+    def dongle_callback(func):
+        def run_callback(*args, **kwargs):
+            callbacks = getattr(args[0], "callbacks")
+            execute = True
+            if func.__name__ in callbacks and callable(callbacks[func.__name__]):
+                execute = callbacks[func.__name__](*args[1:], **kwargs)
+            if execute is None or execute:
+                func(*args, **kwargs)
+        return run_callback
 
     @property
     def aes_counter(self):
@@ -251,26 +270,145 @@ class UnifyingApplicativeLayerManager:
         except InvalidHIDData:
             return False
 
-
+    @dongle_callback
     def on_synchronized(self):
         print("[i] Synchronized !")
+        self.__synchronized = True
 
-
+    @dongle_callback
     def on_desynchronized(self):
         print("[i] Desynchronized.")
+        self.__synchronized = False
+
+    def wait_synchronization(self):
+        while not self.__synchronized:
+            sleep(0.01)
+        return True
 
     def wait_wakeup(self):
-        pass
+        self.__llm.address = ESBAddress(self.__llm.address).base + ":00"
+        self.__wait_wakeup = True
+        while not self.__wait_wakeup:
+            sleep(0.01)
+        return True
 
+    @dongle_callback
     def on_data(self, data):
-        data.show()
-        if Logitech_Wake_Up_Payload in data:
-            # Weird checksum, force it
-            pkt = Logitech_Unifying_Hdr(dev_index = 0,checksum=0xAC)/Logitech_Waked_Up_Payload(wakeup_dev_index=data.dev_index)
-            self.__llm.prepare_acknowledgment(
-                pkt
-            )
+        if self.__role == UnifyingRole.DONGLE:
+            if not self.__synchronized:
+                self.on_synchronized()
 
+            if self.__wait_wakeup:
+                if Logitech_Wake_Up_Payload in data:
+                    # Weird checksum, force it
+                    pkt = Logitech_Unifying_Hdr(dev_index = 0,checksum=0xAC)/Logitech_Waked_Up_Payload(wakeup_dev_index=data.dev_index)
+                    self.__llm.prepare_acknowledgment(
+                        pkt
+                    )
+                elif hasattr(data,"dev_index"):
+                    self.__llm.address = ESBAddress(self.__llm.address).base + ":{:02x}".format(data.dev_index)
+                    self.__wait_wakeup = False
+                    self.on_wakeup(data.dev_index)
+
+            if Logitech_Set_Keepalive_Payload in data:
+                self.on_set_keepalive(data.timeout)
+
+            if Logitech_Keepalive_Payload in data:
+                self.on_keepalive(data.timeout)
+
+            if Logitech_Mouse_Payload in data:
+                self.on_mouse_payload(data)
+
+            if Logitech_Multimedia_Key_Payload in data and data.hid_key_scan_code != b"\x00"*4:
+                try:
+                    self.on_multimedia_keystroke(MultimediaKey(data.hid_key_scan_code[0]))
+                except ValueError:
+                    pass
+            if Logitech_Unencrypted_Keystroke_Payload in data:
+                self.on_unencrypted_keystroke_payload(data)
+
+            if Logitech_Encrypted_Keystroke_Payload in data:
+                self.on_encrypted_keystroke_payload(data)
+
+    @dongle_callback
+    def on_multimedia_keystroke(self, key):
+        print("[i] Multimedia keystroke (key="+str(key.name)+")")
+
+    @dongle_callback
+    def on_unencrypted_keystroke_payload(self, data):
+        print("[i] Unencrypted Keystroke Payload (payload="+bytes(data).hex()+")")
+        if data.hid_data != b"\x00"*7:
+            try:
+                key = LogitechUnifyingKeystrokeConverter.get_key_from_hid_data(data.hid_data, locale=self.__locale)
+                self.on_unencrypted_keystroke(key)
+            except (InvalidHIDData, HIDCodeNotFound):
+                pass
+
+    @dongle_callback
+    def on_encrypted_keystroke_payload(self, data):
+        print("[i] Encrypted Keystroke Payload (payload="+bytes(data).hex()+")")
+        if self.__crypto_manager is not None:
+            try:
+                decrypted = self.__crypto_manager.decrypt(data)
+                print("\t-> Decrypted payload: ", bytes(decrypted).hex())
+                if decrypted.hid_data != b"\x00"*7:
+                    key = LogitechUnifyingKeystrokeConverter.get_key_from_hid_data(decrypted.hid_data, locale=self.__locale)
+                    self.on_encrypted_keystroke(key)
+            except (MissingEncryptedKeystrokePayload, InvalidHIDData, HIDCodeNotFound):
+                pass
+
+    @dongle_callback
+    def on_encrypted_keystroke(self, key):
+        print("[i] Encrypted keystroke (key="+str(key)+")")
+        self.on_keystroke(key)
+
+    @dongle_callback
+    def on_unencrypted_keystroke(self, key):
+        print("[i] Unencrypted keystroke (key="+str(key)+")")
+        self.on_keystroke(key)
+
+    @dongle_callback
+    def on_keystroke(self, key):
+        print("[i] Keystroke ("+str(key)+")")
+
+    @dongle_callback
+    def on_wakeup(self, dev_index):
+        print("[i] Waked up by device (dev_index=0x{:02x})".format(dev_index))
+
+    @dongle_callback
+    def on_set_keepalive(self, timeout):
+        print("[i] Set keep alive (timeout="+str(timeout)+")")
+
+    @dongle_callback
+    def on_keepalive(self, timeout):
+        print("[i] Keep alive (timeout="+str(timeout)+")")
+
+    @dongle_callback
+    def on_mouse_payload(self, data):
+        print("[i] Mouse payload (payload="+bytes(data).hex()+")")
+        converter = LogitechUnifyingMouseMovementConverter()
+        x, y = converter.get_coordinates_from_hid_data(data.movement)
+        if x != 0 or y != 0:
+            self.on_move_mouse(x, y)
+
+        button = ClickType(data.button_mask)
+        if button != ClickType.NONE:
+            self.on_click_mouse(button)
+
+        if data.wheel_x != 0 or data.wheel_y != 0:
+            self.on_wheel_mouse(data.wheel_x, data.wheel_y)
+
+    @dongle_callback
+    def on_wheel_mouse(self, x, y):
+        print("[i] Mouse wheel (x="+str(x)+", y="+str(y)+")")
+
+    @dongle_callback
+    def on_move_mouse(self, x, y):
+        print("[i] Mouse move (x="+str(x)+", y="+str(y)+")")
+
+    @dongle_callback
+    def on_click_mouse(self, type):
+        print("[i] Mouse click (click="+str(type.name)+")")
 
     def on_acknowledgement(self, ack):
         pass

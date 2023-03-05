@@ -19,7 +19,6 @@ class Mouselogger(Sniffer):
 
                 converter = LogitechUnifyingMouseMovementConverter()
                 x, y = converter.get_coordinates_from_hid_data(movement)
-
                 button = ClickType(packet.button_mask)
 
                 yield ((x,y), button)

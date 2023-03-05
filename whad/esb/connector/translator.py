@@ -15,9 +15,10 @@ class ESBMessageTranslator(object):
     (if it makes sense) and scapy packets into WHAD ESB messages.
     """
 
-    def __init__(self):
+    def __init__(self, domain="esb"):
         self.__cached_address = None
         self.__cached_channel = None
+        self.__domain = domain
 
     def format(self, packet):
         """
@@ -59,14 +60,14 @@ class ESBMessageTranslator(object):
     def from_packet(self, packet, channel=None, retransmission_count=1):
         msg = Message()
         if ESB_Hdr in packet:
-            msg.esb.send_raw.channel = channel if channel is not None else 0xFF
+            getattr(msg, self.__domain).send_raw.channel = channel if channel is not None else 0xFF
             packet.preamble = 0xAA
-            msg.esb.send_raw.pdu = bytes(packet)
-            msg.esb.send_raw.retransmission_count = retransmission_count
+            getattr(msg, self.__domain).send_raw.pdu = bytes(packet)
+            getattr(msg, self.__domain).send_raw.retransmission_count = retransmission_count
         elif ESB_Payload_Hdr in packet:
-            msg.esb.send.channel = channel if channel is not None else 0xFF
-            msg.esb.send.pdu = bytes(packet)
-            msg.esb.send.retransmission_count = retransmission_count
+            getattr(msg, self.__domain).send.channel = channel if channel is not None else 0xFF
+            getattr(msg, self.__domain).send.pdu = bytes(packet)
+            getattr(msg, self.__domain).send.retransmission_count = retransmission_count
 
         else:
             msg = None

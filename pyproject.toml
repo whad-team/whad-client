@@ -7,3 +7,48 @@ addopts = "--verbose"
 testpaths = [
   "tests",
 ]
+
+[project]
+name = "whad"
+version = "0.0.1"
+authors = [
+    { name="Damien CAUQUIL" },
+    { name="Romain CAYRE" },
+]
+
+license = { text="MIT" }
+requires-python = ">=3.7, <4"
+description = "Scapy: interactive packet manipulation tool"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10"
+]
+
+[project.scripts]
+whadup = "whad.tools.whadup:main"
+whadsniff = "whad.tools.whadsniff:main"
+ble-central = "whad.ble.cli.central:ble_central_main"
+ble-interpret = "whad.ble.cli.interpret:ble_interpret_main"
+ble-clone = "whad.ble.cli.clone:ble_clone_main"
+ble-periph = "whad.ble.cli.peripheral:ble_periph_main"
+ble-connect = "whad.ble.cli.ble_connect:ble_connect_main"
+ble-wireshark = "whad.ble.cli.ble_wireshark:ble_wireshark_main"
+ble-spawn = "whad.ble.cli.ble_spawn:ble_spawn_main"
+
+# setuptools specific
+[tool.setuptools]
+zip-safe = false
+
+[tool.setuptools.packages.find]
+include = [
+    "whad*",
+]
+exclude = [
+    "test*",
+    "ressource*",
+    "doc*",
+]
