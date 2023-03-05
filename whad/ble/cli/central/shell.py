@@ -452,6 +452,8 @@ class BleCentralShell(InteractiveShell):
                         charac_rights.append('read')
                     if properties & CharacteristicProperties.WRITE != 0:
                         charac_rights.append('write')
+                    if properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE != 0:
+                        charac_rights.append('write_without_response')
                     if properties & CharacteristicProperties.INDICATE != 0:
                         charac_rights.append('indicate')
                     if properties & CharacteristicProperties.NOTIFY != 0:
@@ -511,6 +513,8 @@ class BleCentralShell(InteractiveShell):
                         charac_rights.append('read')
                     if properties & CharacteristicProperties.WRITE != 0:
                         charac_rights.append('write')
+                    if properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE != 0:
+                        charac_rights.append('write_without_response')
                     if properties & CharacteristicProperties.INDICATE != 0:
                         charac_rights.append('indicate')
                     if properties & CharacteristicProperties.NOTIFY != 0:

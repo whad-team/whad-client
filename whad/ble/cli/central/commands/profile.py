@@ -43,6 +43,8 @@ def profile_discover(app, device):
                 rights += '<ansigreen>R</ansigreen>'
             if properties & CharacteristicProperties.WRITE != 0:
                 rights += '<ansired>W</ansired>'
+            if properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE != 0:
+                rights += '<ansimagenta>W</ansimagenta>'
             if properties & CharacteristicProperties.INDICATE != 0:
                 rights += '<ansicyan>I</ansicyan>'
             if properties & CharacteristicProperties.NOTIFY != 0:
