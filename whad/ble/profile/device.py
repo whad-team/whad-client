@@ -223,7 +223,17 @@ class PeripheralCharacteristic:
 
     def write(self, value, without_response=False):
         """Set characteristic value
+
+        If characteristic is only writeable without response, use a write command
+        rather than a write request. Otherwise, use a write request. If a characteristic
+        has both write and write without response properties, `without_response` must be
+        set to True to use a write command.
         """
+        # If characteristic is only writeable without response, force without_response to True.
+        access_mask = CharacteristicProperties.WRITE_WITHOUT_RESPONSE | CharacteristicProperties.WRITE
+        if (self.__characteristic.properties & access_mask) == CharacteristicProperties.WRITE_WITHOUT_RESPONSE:
+            without_response = True
+        
         if isinstance(value, bytes):
             if without_response:
                 return self.__gatt.write_command(
