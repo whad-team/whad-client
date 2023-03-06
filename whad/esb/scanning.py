@@ -80,7 +80,7 @@ class CommunicatingDevice(object):
         if self.__applicative_layer is None:
             applicative_layer = ""
         else:
-            applicative_layer = "(%s)"  % (self.__applicative_protocol)
+            applicative_layer = "(%s)"  % (self.__applicative_layer)
 
         # Display device role
         if self.__role == ESBRole.PRX:
@@ -200,6 +200,16 @@ class CommunicatingDevicesDB(object):
             role = ESBRole.PTX
 
         applicative_layer = None
+
+        payload = bytes(pdu)
+        # Check if the payload is unifying
+        if len(payload) >= 2 and payload[1] in (0x51,0xC2,0x40,0x4F,0xD3,0xC1,0xC3,0x5F,0x1F,0x0F,0x0E,0x10):
+            checksum = 0x00
+            for i in payload[:-1]:
+                checksum = (checksum  - i) & 0xFF
+            if checksum == payload[-1]:
+                applicative_layer = "unifying"
+
         # If bd address does not match, don't report it
         if filter_addr is not None and filter_addr.lower() != str(address).lower():
             return
@@ -220,70 +230,3 @@ class CommunicatingDevicesDB(object):
             existing_device.update_channel(channel)
             if applicative_layer is not None:
                 existing_device.set_applicative_layer(applicative_layer)
-        '''
-        addr_type = adv_packet.getlayer(BTLE_ADV).TxAdd
-
-        if adv_packet.haslayer(BTLE_ADV_IND):
-            bd_address = BDAddress(adv_packet[BTLE_ADV_IND].AdvA)
-            try:
-                adv_data = b''.join([ bytes(record) for record in adv_packet[BTLE_ADV_IND].data])
-                adv_list = AdvDataFieldList.from_bytes(adv_data)
-                device = AdvertisingDevice(
-                    rssi,
-                    addr_type,
-                    bd_address,
-                    adv_list
-                )
-
-                # If bd address does not match, don't report it
-                if filter_addr is not None and filter_addr.lower() != str(bd_address).lower():
-                    return
-
-                if str(bd_address) not in self.__db:
-                    self.__db[str(bd_address)] = device
-                    return device
-            except AdvDataError as ad_error:
-                pass
-            except AdvDataFieldListOverflow as ad_ovf:
-                pass
-
-        elif adv_packet.haslayer(BTLE_ADV_NONCONN_IND):
-            try:
-                bd_address = BDAddress(adv_packet[BTLE_ADV_NONCONN_IND].AdvA)
-                adv_data = b''.join([ bytes(record) for record in adv_packet[BTLE_ADV_NONCONN_IND].data])
-                adv_list = AdvDataFieldList.from_bytes(adv_data)
-                device = AdvertisingDevice(
-                    rssi,
-                    addr_type,
-                    bd_address,
-                    adv_list,
-                    connectable=False
-                )
-
-                # If bd address does not match, don't report it
-                if filter_addr is not None and filter_addr.lower() != str(bd_address).lower():
-                    return
-
-                if str(bd_address) not in self.__db:
-                    self.__db[str(bd_address)] = device
-                    return device
-            except AdvDataError as ad_error:
-                pass
-            except AdvDataFieldListOverflow as ad_ovf:
-                pass
-
-        elif adv_packet.haslayer(BTLE_SCAN_RSP):
-            try:
-                bd_address = BDAddress(adv_packet[BTLE_SCAN_RSP].AdvA)
-                adv_data = b''.join([ bytes(record) for record in adv_packet[BTLE_SCAN_RSP].data])
-                adv_list = AdvDataFieldList.from_bytes(adv_data)
-                if str(bd_address) in self.__db:
-                    device = self.__db[str(bd_address)]
-                    if not device.got_scan_rsp:
-                        device.set_scan_rsp(adv_list)
-                        return device
-            except AdvDataError as ad_error:
-                pass
-            except AdvDataFieldListOverflow as ad_ovf:
-                pass
-        '''
