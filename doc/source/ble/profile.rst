@@ -93,13 +93,13 @@ a characteristic event handler:
         )
 
         @read(generic_access.device_name)
-        def on_device_name_read(self, service, charac, offset, mtu):
+        def on_device_name_read(self, offset, mtu):
             """Return the content of the device name characteristic prefixed with 'FOO'
             """
             raise HookReturnValue(b'FOO'+ self.generic_access.device_name.value)
 
         @written(generic_access.device_name)
-        def on_device_name_changed(self, service, charac, offset, value, without_response):
+        def on_device_name_changed(self, value, without_response):
             """Called every time the device name characteristic has been changed by client.
             """
             print('Device name has been changed to: %s' % value)
