@@ -5,7 +5,7 @@ from whad.ble.profile.attribute import UUID
 from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
 from whad.device import WhadDevice
 from random import randint
-from whad.ble.exceptions import HookReturnAuthRequired, HookReturnValue
+from whad.ble.exceptions import HookReturnAuthentRequired, HookReturnValue
 from whad.ble.profile import read, written, subscribed
 from struct import pack, unpack
 
@@ -74,7 +74,7 @@ class MyPeripheral(GenericProfile):
             raise HookReturnValue(self.custom.number.value)
         else:
             # no cheating! you can't read this!
-            raise HookReturnAuthRequired()
+            raise HookReturnAuthentRequired()
 
     @subscribed(custom.number)
     def on_number_subscribed(self, notification, indication):
