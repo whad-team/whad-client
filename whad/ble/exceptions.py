@@ -98,9 +98,19 @@ class HookReturnAccessDenied(Exception):
         super().__init__()
 
 
-class HookReturnAuthRequired(Exception):
+class HookReturnAuthentRequired(Exception):
     """Raise this exception in a hook to ask for authentication.
     """
 
     def __init__(self):
         super().__init__()
+
+
+class HookReturnAuthorRequired(Exception):
+    """Raise this exception in a hook to notify an Authorization is required
+    to access an attribute.
+    """
+
+    def __init__(self):
+        super().__init__()
+

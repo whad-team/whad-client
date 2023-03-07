@@ -720,9 +720,9 @@ class GattProxy(object):
         Raise a :class:`HookReturnValue` exception to override the value that will be written
         in the target characteristic.
 
-        Raise any other hook exception (:class:`HookReturnAccessDenied`, :class:`HookReturnNotFound`, or
-        :class:`HookReturnAuthRequired`) to force the proxy to return a specific error to the
-        initiator device.
+        Raise any other hook exception (:class:`HookReturnAccessDenied`, :class:`HookReturnNotFound`, 
+        :class:`HookReturnAuthentRequired` or :class:`HookReturnAuthorRequired`) to force the proxy
+        to return a specific error to the initiator device.
 
         :param Service service: Service object the target characteristic belongs to.
         :param Characteristic characteristic: Target characteristic object.

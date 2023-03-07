@@ -6,8 +6,9 @@ from time import time
 from queue import Queue, Empty
 from struct import unpack, pack
 
-from whad.ble.exceptions import HookReturnValue, HookReturnAuthRequired,\
-    HookReturnAccessDenied, HookReturnGattError, HookReturnNotFound
+from whad.ble.exceptions import HookReturnValue, HookReturnAuthentRequired,\
+    HookReturnAuthorRequired, HookReturnAccessDenied, HookReturnGattError, \
+    HookReturnNotFound
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
 from whad.ble.stack.att.exceptions import InvalidHandleValueError, error_response_to_exc, InsufficientAuthenticationError,\
     InsufficientAuthorizationError, InsufficientEncryptionKeySize, ReadNotPermittedError, AttErrorCode
@@ -994,11 +995,17 @@ class GattServer(Gatt):
                         self.att.read_response(
                             value
                         )
-                    except HookReturnAuthRequired as auth_error:
+                    except HookReturnAuthentRequired as authent_error:
                         self.error(
                             BleAttOpcode.READ_REQUEST,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                    except HookReturnAuthorRequired as author_error:
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHOR
                         )
                     except HookReturnAccessDenied as access_denied:
                         self.error(
@@ -1094,11 +1101,17 @@ class GattServer(Gatt):
                         self.att.read_blob_response(
                             value
                         )
-                    except HookReturnAuthRequired as auth_error:
+                    except HookReturnAuthentRequired as authent_error:
                         self.error(
                             BleAttOpcode.READ_BLOB_REQUEST,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                    except HookReturnAuthorRequired as author_error:
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHOR
                         )
                     except HookReturnAccessDenied as access_denied:
                         self.error(
@@ -1192,11 +1205,17 @@ class GattServer(Gatt):
                             True
                         )
 
-                    except HookReturnAuthRequired as auth_error:
+                    except HookReturnAuthentRequired as authent_error:
                         self.error(
                             BleAttOpcode.WRITE_REQUEST,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                    except HookReturnAuthorRequired as author_error:
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHOR
                         )
                     except HookReturnAccessDenied as access_denied:
                         self.error(
@@ -1328,11 +1347,17 @@ class GattServer(Gatt):
                             True
                         )
 
-                    except HookReturnAuthRequired as auth_error:
+                    except HookReturnAuthentRequired as authent_error:
                         self.error(
                             BleAttOpcode.WRITE_COMMAND,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                    except HookReturnAuthorRequired as author_error:
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHOR
                         )
                     except HookReturnAccessDenied as access_denied:
                         self.error(
