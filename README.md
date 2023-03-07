@@ -66,9 +66,9 @@ You can install the package easily using:
 pip install .
 ```
 
-Then, connect a compatible WHAD-enabled device and run whadup utility.
+Then, list compatible WHAD-enabled devices: `python3 whad/tools/whadup.py` and connect a compatible WHAD-enabled device and run whadup utility.
 ```
-python3 whadup.py /dev/ttyACM0
+python3 what/tools/whadup.py /dev/ttyACM0
 ```
 
 You should get an output similar to the following one:
