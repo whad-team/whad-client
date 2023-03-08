@@ -13,7 +13,8 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Cmd_Connect_Accept_Timeout, HCI_Cmd_Set_Event_Mask, HCI_Cmd_LE_Host_Supported, \
     HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
     HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect, \
-    HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, HCI_Cmd_LE_Set_Scan_Response_Data
+    HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, HCI_Event_Disconnection_Complete, \
+    HCI_Cmd_LE_Set_Scan_Response_Data
 from whad.device.virtual.hci.converter import HCIConverter
 from whad.device.virtual.hci.hciconfig import HCIConfig
 from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState
@@ -90,6 +91,8 @@ class HCIDevice(VirtualDevice):
         self._fw_author = None
         self._dev_id = None
         self._manufacturer = None
+        self._cached_scan_data = None
+        self._cached_scan_response_data = None
 
     @property
     def identifier(self):
@@ -163,6 +166,25 @@ class HCIDevice(VirtualDevice):
                     if messages is not None:
                         for message in messages:
                             self._send_whad_message(message)
+                    # If the connection is stopped and peripheral mode is started,
+                    # automatically re-enable advertising based on cached data
+                    if HCI_Event_Disconnection_Complete in event and self.__internal_state == HCIInternalState.PERIPHERAL:
+                        # If advertising was not enabled, skip
+                        if not self._advertising:
+                            return
+
+                        # if data are cached, configure them
+                        if self._cached_scan_data is not None:
+                            # We can't wait for response because we are in the reception loop context
+                            success = self._set_advertising_data(self._cached_scan_data, wait_response=False)
+
+                        if self._cached_scan_response_data is not None:
+                            success = self._set_scan_response_data(self._cached_scan_response_data, wait_response=False)
+
+                        # We need to artificially disable advertising indicator to prevent cached operation
+                        self._advertising = False
+                        self._set_advertising_mode(True, wait_response=False)
+
 
         except (BrokenPipeError, OSError) as err:
             print(err)
@@ -427,7 +449,7 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_Disconnect(handle=handle))
         return response.status == 0x00
 
-    def _set_advertising_data(self, data):
+    def _set_advertising_data(self, data, wait_response=True):
         """
         Configure advertising data to use by HCI device.
         """
@@ -436,17 +458,25 @@ class HCIDevice(VirtualDevice):
             data += b'\x00'*(31 - len(data))
 
         # Send command
-        response = self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data))
-        return response.status == 0x00
+        if wait_response:
+            response = self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data))
+            return response.status == 0x00
+        else:
+            self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data), wait_response=False)
+            return True
 
-    def _set_scan_response_data(self, data):
+    def _set_scan_response_data(self, data, wait_response=True):
         """
         Configure scan response data to use by HCI device.
         """
-        response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(data=data))
-        return response.status == 0x00
+        if wait_response:
+            response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(data=data))
+            return response.status == 0x00
+        else:
+            response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(data=data), wait_response=False)
+            return True
 
-    def _set_advertising_mode(self, enable=True):
+    def _set_advertising_mode(self, enable=True, wait_response=True):
         """
         Enable or disable advertising mode for HCI device.
         """
@@ -454,8 +484,12 @@ class HCIDevice(VirtualDevice):
             return True
         else:
             logger.debug('Enable advertising: %s' % enable)
-            response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))
-            success = response.status == 0x00
+            if wait_response:
+                response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))
+                success = response.status == 0x00
+            else:
+                self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)), wait_response=False)
+                success = True
             if success:
                 self._advertising = enable
             return success
@@ -465,8 +499,10 @@ class HCIDevice(VirtualDevice):
             success = True
             if len(message.scan_data) > 0:
                 success = success and self._set_advertising_data(message.scan_data)
+                self._cached_scan_data = message.scan_data
             if len(message.scanrsp_data) > 0:
                 success = success and self._set_scan_response_data(message.scanrsp_data)
+                self._cached_scan_response_data = message.scanrsp_data
             success = success and self._set_advertising_mode(True)
             if success:
                 self.__internal_state = HCIInternalState.PERIPHERAL
