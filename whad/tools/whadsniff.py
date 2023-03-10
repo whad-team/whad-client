@@ -1,149 +1,116 @@
-from pkgutil import iter_modules
-from importlib import import_module
+"""WHAD general sniffing tool
+
+This utility implements a generic sniffer module, automatically adapted to every domain.
+"""
+import logging
 from argparse import ArgumentParser
-from dataclasses import fields, is_dataclass
-from inspect import getdoc
-import sys
-
-import whad
-from whad.device import WhadDevice
-from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
+from prompt_toolkit import print_formatted_text, HTML
+from whad.cli.app import CommandLineApp
+from importlib import import_module
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
+from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
+from dataclasses import fields, is_dataclass
+from pkgutil import iter_modules
+from inspect import getdoc
+from scapy.config import conf
+from html import escape
+from hexdump import hexdump
+from scapy.all import BrightTheme, Packet
+import whad
 
-def list_implemented_environment():
+logger = logging.getLogger(__name__)
+
+def list_implemented_sniffers():
+    """Build a dictionnary of sniffers connector and configuration, by domain.
+    """
     environment = {}
 
+    # Iterate over modules
     for _, candidate_protocol,_ in iter_modules(whad.__path__):
+        # If the module contains a sniffer connector and a sniffing module,
+        # store the associated classes in the environment dictionary
         try:
             module = import_module("whad.{}.connector.sniffer".format(candidate_protocol))
             configuration_module = import_module("whad.{}.sniffing".format(candidate_protocol))
-            environment[candidate_protocol] = {"sniffer_class":module.Sniffer, "configuration_class":configuration_module.SnifferConfiguration}
+            environment[candidate_protocol] = {
+                "sniffer_class":module.Sniffer,
+                "configuration_class":configuration_module.SnifferConfiguration
+            }
         except ModuleNotFoundError:
             pass
+    # return the environment dictionary
     return environment
 
 def get_sniffer_parameters(configuration_class):
+    """
+    Extract all parameters from a sniffer configuration class, with their name and associated documentation.
+
+    :param configuration_class: sniffer configuration class
+    :return: dict containing parameters for a given configuration class
+    """
     parameters = {}
-    configuration_documentation = {
-                i.replace(":param ","").split(":")[0] : i.replace(":param ","").split(":")[1]
-                for i in getdoc(configuration_class).split("\n")
-                if i.startswith(":param ")
+    # Extract documentation of every field in the configuration class
+    fields_configuration_documentation = {
+        i.replace(":param ","").split(":")[0] : i.replace(":param ","").split(":")[1]
+        for i in getdoc(configuration_class).split("\n")
+        if i.startswith(":param ")
     }
 
+    # Iterate over the fields of the configuration class
     for field in fields(configuration_class):
+
+        # If the field is a dataclass, process subfields
         if is_dataclass(field.type):
-            subfield_configuration_documentation = {
-                        i.replace(":param ","").split(":")[0] : i.replace(":param ","").split(":")[1]
-                        for i in getdoc(field.type).split("\n")
-                        if i.startswith(":param ")
+            # Extract documentation of every subfields
+            subfields_configuration_documentation = {
+                i.replace(":param ","").split(":")[0] : i.replace(":param ","").split(":")[1]
+                for i in getdoc(field.type).split("\n")
+                if i.startswith(":param ")
             }
+
+            # Populate parameters dict with subfields configuration
             for subfield in fields(field.type):
-                parameters["{}.{}".format(field.name,subfield.name)] = (subfield.type, subfield.default, field.type, subfield_configuration_documentation[subfield.name] if subfield.name in subfield_configuration_documentation else None)
+                parameters["{}.{}".format(field.name,subfield.name)] = (
+                    subfield.type,
+                    subfield.default,
+                    field.type,
+                    (
+                        subfields_configuration_documentation[subfield.name]
+                        if subfield.name in subfields_configuration_documentation
+                        else None
+                    )
+                )
+        # if the field is not a dataclass, process it
         else:
-            parameters[field.name] = (field.type, field.default, None, configuration_documentation[field.name] if field.name in configuration_documentation else None)
+            # Populate parameters dict with field configuration
+            parameters[field.name] = (
+                field.type,
+                field.default,
+                None,
+                (
+                    fields_configuration_documentation[field.name]
+                    if field.name in fields_configuration_documentation
+                    else None
+                )
+            )
     return parameters
 
-def build_arguments(environment):
-    parser = ArgumentParser()
-    parser.add_argument(
-        'device',
-        metavar='DEVICE',
-        type=str,
-        help='WHAD device'
-    )
-    parser.add_argument(
-        '--show',
-        dest='show',
-        action="store_true",
-        help='Display packets using scapy show method'
-    )
-    parser.add_argument(
-        '-o',
-        '--output',
-        dest='output',
-        default=None,
-        type=str,
-        help='Output PCAP file'
-    )
-
-    parser.add_argument(
-        '-w',
-        '--wireshark',
-        dest='wireshark',
-        action='store_true',
-        help='Enable wireshark monitoring'
-    )
-
-    parser.add_argument(
-        '--raw',
-        dest='raw',
-        action="store_true",
-        help='Display raw packets (hexadecimal)'
-    )
-
-    parser.add_argument(
-        '--hide_metadata',
-        dest='metadata',
-        action="store_false",
-        help='Hide packets metadata'
-    )
-
-    subparsers = parser.add_subparsers(
-        required=True,
-        dest="protocol",
-        help='Protocol in use'
-    )
-
-    for protocol_name in environment:
-        environment[protocol_name]["subparser"] = subparsers.add_parser(protocol_name)
-        for parameter_name, (parameter_type, parameter_default, parameter_base_class, parameter_help) in environment[protocol_name]["parameters"].items():
-
-            dest = parameter_name
-            if parameter_base_class is not None:
-                parameter_base, parameter_name = parameter_name.split(".")
-            if parameter_help is not None and "(" in parameter_help:
-                parameter_shortnames = ["-{}".format(i) for i in parameter_help.split("(")[1].replace(")","").split(",")]
-                parameter_help = parameter_help.split("(")[0]
-            else:
-                parameter_shortnames = []
-            if parameter_type != bool:
-                if parameter_type == int:
-                    def auto_int(x):
-                        return int(x, 0)
-                    parameter_type = auto_int # allow to provide hex arguments
-
-                if parameter_type == list:
-                    parameter_default=[]
-                    parameter_type=str
-                    action = "append"
-                else:
-                    action = "store"
-                environment[protocol_name]["subparser"].add_argument(
-                    "--"+parameter_name,
-                    *parameter_shortnames,
-                    default=parameter_default,
-                    action=action,
-                    type=parameter_type,
-                    dest=dest,
-                    help=parameter_help
-                )
-            else:
-                environment[protocol_name]["subparser"].add_argument(
-                    "--"+parameter_name,
-                    *parameter_shortnames,
-                    action='store_true',
-                    dest=dest,
-                    help=parameter_help
-                )
-    return parser
 
 def build_configuration_from_args(environment, args):
-    configuration = environment[args.protocol]["configuration_class"]()
+    """
+    Build sniffer configuration from arguments provided via argparse.
+
+    :param environment: environment
+    :type environment: dict
+    :param args: arguments provided by user
+    :type args: :class:`argparse.ArgumentParser`
+    """
+    configuration = environment[args.domain]["configuration_class"]()
     subfields = {}
-    for parameter in environment[args.protocol]["parameters"]:
+    for parameter in environment[args.domain]["parameters"]:
         base_class = None
 
-        base_class = environment[args.protocol]["parameters"][parameter][2]
+        base_class = environment[args.domain]["parameters"][parameter][2]
 
         if base_class is None:
             setattr(configuration,parameter,getattr(args,parameter))
@@ -166,91 +133,334 @@ def build_configuration_from_args(environment, args):
             setattr(configuration, subfield, None)
     return configuration
 
-def display(pkt, args):
-    metadata = ""
-    if hasattr(pkt, "metadata") and args.metadata:
-        metadata = repr(pkt.metadata)
-    if args.show:
-        print(metadata)
-        pkt.show()
-        if hasattr(pkt, "decrypted"):
-            print("[i] Decrypted payload:")
-            pkt.decrypted.show()
-    elif args.raw:
-        print(metadata, bytes(pkt).hex())
-        if hasattr(pkt, "decrypted"):
-            print("[i] Decrypted payload:", bytes(pkt.decrypted).hex())
-    else:
-        print(metadata, repr(pkt))
-        if hasattr(pkt, "decrypted"):
-            print("[i] Decrypted payload:", repr(pkt.decrypted))
-    print()
+class WhadDomainSubParser(ArgumentParser):
+    """
+    Implements a Whad Domain subparser.
+    """
+    def warning(self, message):
+        """Display a warning message in orange (if color is enabled)
+        """
+        print_formatted_text(
+            HTML('<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % message)
+        )
 
-def main():
-    environment = list_implemented_environment()
-    for protocol_name in environment:
-        environment[protocol_name]["parameters"] = get_sniffer_parameters(environment[protocol_name]["configuration_class"])
+    def error(self, message):
+        """Display an error message in red (if color is enabled)
+        """
+        print_formatted_text(
+            HTML('<ansired>[!] <b>%s</b></ansired>' % message)
+        )
 
-    parser = build_arguments(environment)
-    args = parser.parse_args()
-    configuration = build_configuration_from_args(environment, args)
-    sniffer = None
+class WhadSniffApp(CommandLineApp):
 
-    monitors = []
+    def __init__(self):
+        """Application uses an interface and has commands.
+        """
+        super().__init__(
+            description='WHAD generic sniffing tool',
+            interface=True,
+            commands=False
+        )
 
-    try:
-        dev = WhadDevice.create(args.device)
-        sniffer = environment[args.protocol]["sniffer_class"](dev)
+        self.add_argument(
+            '--hide_metadata',
+            dest='metadata',
+            action="store_false",
+            help='Hide packets metadata'
+        )
+        self.add_argument(
+            '--format',
+            dest='format',
+            action="store",
+            default='repr',
+            choices=['repr', 'show', 'raw', 'hexdump'],
+            help='Indicate format to display packet'
+        )
 
-        if args.output is not None:
-            monitor_pcap = PcapWriterMonitor(args.output)
-            monitor_pcap.attach(sniffer)
-            monitor_pcap.start()
-            monitors.append(monitor_pcap)
+        self.add_argument(
+            '-o',
+            '--output',
+            dest='output',
+            default=None,
+            type=str,
+            help='Output PCAP file'
+        )
 
-        if args.wireshark:
-            monitor_wireshark = WiresharkMonitor()
-            monitor_wireshark.attach(sniffer)
-            monitor_wireshark.start()
-            monitors.append(monitor_wireshark)
+        self.add_argument(
+            '-w',
+            '--wireshark',
+            dest='wireshark',
+            action='store_true',
+            help='Enable wireshark monitoring'
+        )
+
+        subparsers = self.add_subparsers(
+            required=True,
+            dest="domain",
+            parser_class=WhadDomainSubParser,
+            help='Domain in use'
+        )
+
+        self.build_subparsers(subparsers)
 
 
-        sniffer.configuration = configuration
-        sniffer.start()
+    def display(self, pkt):
+        """
+        Display an packet according to the selected format.
 
-        for pkt in sniffer.sniff():
-            display(pkt, args)
+        Four main types of formats can be used:
+            * repr: scapy packet repr method (default)
+            * show: scapy show method, "field" representation
+            * hexdump: hexdump representation of the packet content
+            * raw: raw received bytes
 
-    except WhadDeviceNotFound as dev_error:
-        # Device not found, display error and return -1
-        print('[!] WHAD device not found (are you sure `%s` is a valid device identifier ?)' % (
-            args.device
-        ))
-        sys.exit(-1)
+        :param  pkt:        Received Signal Strength Indicator
+        :type   pkt:        :class:`scapy.packet.packet`
+        """
+        if isinstance(pkt, Packet):
 
-    except WhadDeviceNotReady as dev_busy:
-        # Device not ready, display error and return -1
-        print('[!] WHAD device seems busy, make sure no other program is using it.')
-        sys.exit(-1)
+            metadata = ""
+            if hasattr(pkt, "metadata") and self.args.metadata:
+                metadata = repr(pkt.metadata)
 
-    except UnsupportedDomain as unsupported_domain:
-        print('[!] WHAD device doesn\'t support selected protocol ({})'.format(args.protocol))
-        sys.exit(-1)
+            # Process scapy show method format
+            if self.args.format == "show":
+                print_formatted_text(
+                    HTML(
+                        '<b><ansipurple>%s</ansipurple></b>' % (
+                            metadata
+                        )
+                    )
+                )
+                pkt.show()
 
-    except UnsupportedCapability as unsupported_capability:
-        print('[!] WHAD device doesn\'t support selected capability ({})'.format(unsupported_capability.capability))
-        sys.exit(-1)
+                if hasattr(pkt, "decrypted"):
+                    print_formatted_text(
+                        HTML(
+                            "<ansicyan>[i] Decrypted payload:</ansicyan>"
+                        )
+                    )
+                    pkt.decrypted.show()
 
-    except KeyboardInterrupt as keybd_evt:
-        if sniffer is not None:
-            sys.stdout.write('Stopping sniffer ...')
-            sys.stdout.flush()
+            # Process raw bytes format
+            elif self.args.format == "raw":
+                print_formatted_text(
+                    HTML(
+                        '<b><ansipurple>%s</ansipurple></b> %s' % (
+                            metadata,
+                            bytes(pkt).hex()
+                        )
+                    )
+                )
+
+                if hasattr(pkt, "decrypted"):
+                    print_formatted_text(
+                        HTML(
+                            "<ansicyan>[i] Decrypted payload:</ansicyan> %s" %
+                            bytes(pkt.decrypted).hex()
+                        )
+                    )
+
+            # Process hexdump format
+            elif self.args.format == "hexdump":
+                print_formatted_text(
+                    HTML(
+                        '<b><ansipurple>%s</ansipurple></b>' % (
+                            metadata
+                        )
+                    )
+                )
+                print_formatted_text(
+                    HTML("<i>%s</i>" %
+                        escape(hexdump(bytes(pkt), result="return"))
+                    )
+                )
+                if hasattr(pkt, "decrypted"):
+                    print_formatted_text(
+                        HTML(
+                            "<ansicyan>[i] Decrypted payload:</ansicyan>"
+                        )
+                    )
+                    print_formatted_text(
+                            HTML("<i>%s</i>" %
+                                escape(hexdump(bytes(pkt.decrypted), result="return")
+                            )
+                        )
+                    )
+            # Process scapy repr format
+            else:
+                print_formatted_text(
+                    HTML(
+                        '<b><ansipurple>%s</ansipurple></b>' % (
+                            metadata
+                        )
+                    )
+                )
+                print(repr(pkt))
+                if hasattr(pkt, "decrypted"):
+                    print_formatted_text(
+                        HTML("<ansicyan>[i] Decrypted payload:</ansicyan>")
+                    )
+                    print(repr(pkt.decrypted))
+            print()
+        # If it is not a packet, use repr method
+        else:
+            print(repr(pkt))
+
+    def display_event(self, event):
+        """Display an event generated from a sniffer.
+        """
+        print_formatted_text(
+            HTML(
+                "<ansicyan>[i] event: <b>%s</b></ansicyan> %s" % (
+                    event.name,
+                    "("+event.message +")" if event.message is not None else ""
+                )
+            )
+        )
+
+    def pre_run(self):
+        """Pre-run operations: configure scapy theme.
+        """
+        super().pre_run()
+        # If no color is not selected, configure scapy color theme
+        if not self.args.nocolor:
+            conf.color_theme = BrightTheme()
+
+    def run(self):
+        monitors = []
+        sniffer = None
+        # Launch pre-run tasks
+        self.pre_run()
+        try:
+
+            # We need to have an interface specified
+            if self.interface is not None:
+                # We need to have a domain specified
+                if self.args.domain is not None:
+                    # Parse the arguments to populate a sniffer configuration
+                    configuration = build_configuration_from_args(self.environment, self.args)
+
+                    # Generate a sniffer based on the selected domain
+                    sniffer = self.environment[self.args.domain]["sniffer_class"](self.interface)
+
+                    # Add an event listener to display incoming events
+                    sniffer.add_event_listener(self.display_event)
+                    sniffer.configuration = configuration
+
+                    # If output parameter is selected, add a PCAP Writer monitor
+                    if self.args.output is not None:
+                        monitor_pcap = PcapWriterMonitor(args.output)
+                        monitor_pcap.attach(sniffer)
+                        monitor_pcap.start()
+                        monitors.append(monitor_pcap)
+
+                    # If wireshark parameter is selected, add a WiresharkMonitor
+                    if self.args.wireshark:
+                        monitor_wireshark = WiresharkMonitor()
+                        monitor_wireshark.attach(sniffer)
+                        monitor_wireshark.start()
+                        monitors.append(monitor_wireshark)
+
+                    # Start the sniffer
+                    sniffer.start()
+                    # Iterates over the packet stream and display packets
+                    for pkt in sniffer.sniff():
+                        self.display(pkt)
+                else:
+                    self.error("You need to specify a domain.")
+            else:
+                self.error('You need to specify an interface with option --interface.')
+
+
+        except UnsupportedDomain as unsupported_domain:
+            self.error('WHAD device doesn\'t support selected domain ({})'.format(self.args.domain))
+
+        except UnsupportedCapability as unsupported_capability:
+            self.error('WHAD device doesn\'t support selected capability ({})'.format(unsupported_capability.capability))
+
+        except KeyboardInterrupt as keybd:
+            self.warning('sniffer stopped (CTRL-C)')
             sniffer.stop()
             sniffer.close()
-            sys.stdout.write(' done\n')
-            sys.stdout.flush()
-        for monitor in monitors:
-            monitor.close()
+            for monitor in monitors:
+                monitor.close()
 
-if __name__ == '__main__':
-    main()
+    def build_subparsers(self, subparsers):
+        """
+        Generate the subparsers argument according to the environment.
+        """
+
+        # List every domain implementing a sniffer
+        self.environment = list_implemented_sniffers()
+
+        # Iterate over domain, and get the associated sniffer parameters
+        for domain_name in self.environment:
+            self.environment[domain_name]["parameters"] = get_sniffer_parameters(
+                self.environment[domain_name]["configuration_class"]
+            )
+
+
+            self.environment[domain_name]["subparser"] = subparsers.add_parser(
+                domain_name,
+                description="WHAD {} Sniffing tool".format(domain_name.capitalize())
+            )
+            # Iterate over every parameters, and add arguments to subparsers
+            for (
+                    parameter_name,
+                    (parameter_type, parameter_default, parameter_base_class, parameter_help)
+                ) in self.environment[domain_name]["parameters"].items():
+
+                dest = parameter_name
+                # If parameter is based on a dataclass, process a subparameter
+                if parameter_base_class is not None:
+                    parameter_base, parameter_name = parameter_name.split(".")
+
+                # Process parameter help and shortname
+                if parameter_help is not None and "(" in parameter_help:
+                    parameter_shortnames = [
+                        "-{}".format(i) for i in
+                        parameter_help.split("(")[1].replace(")","").split(",")
+                    ]
+                    parameter_help = parameter_help.split("(")[0]
+                else:
+                    parameter_shortnames = []
+
+                # Process parameter type
+                if parameter_type != bool:
+                    # If we got an int
+                    if parameter_type == int:
+                        # allow to provide hex arguments
+                        parameter_type = lambda x: int(x,0)
+
+                    # If we got a list, it is a list of string
+                    if parameter_type == list:
+                        parameter_default=[]
+                        parameter_type=str
+                        action = "append"
+                    else:
+                        action = "store"
+                    # Add non-boolean argument to corresponding subparser
+                    self.environment[domain_name]["subparser"].add_argument(
+                        "--"+parameter_name,
+                        *parameter_shortnames,
+                        default=parameter_default,
+                        action=action,
+                        type=parameter_type,
+                        dest=dest,
+                        help=parameter_help
+                    )
+                else:
+                    # Add boolean argument to corresponding subparser
+                    self.environment[domain_name]["subparser"].add_argument(
+                        "--"+parameter_name,
+                        *parameter_shortnames,
+                        action='store_true',
+                        dest=dest,
+                        help=parameter_help
+                    )
+
+
+def whadsniff_main():
+    app = WhadSniffApp()
+    app.run()

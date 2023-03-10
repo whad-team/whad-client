@@ -415,6 +415,7 @@ class BLE(WhadDeviceConnector):
             msg.ble.sniff_conn.hop_increment = hop_increment
 
         msg.ble.sniff_conn.monitored_channels = b"\xFF\xFF\xFF\xFF\x1F"
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 

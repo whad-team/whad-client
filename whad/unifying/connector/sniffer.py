@@ -1,18 +1,21 @@
 from whad.unifying.connector import Unifying
-from whad.unifying.sniffing import SnifferConfiguration
+from whad.unifying.sniffing import SnifferConfiguration, KeyExtractedEvent
 from whad.unifying.crypto import LogitechUnifyingDecryptor, LogitechUnifyingKeyDerivation
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
-
+from whad.common.sniffing import EventsManager
 from whad.scapy.layers.unifying import Logitech_Encrypted_Keystroke_Payload
+import logging
 
+logger = logging.getLogger(__name__)
 
-class Sniffer(Unifying):
+class Sniffer(Unifying, EventsManager):
     """
     Logitech Unifying Sniffer interface for compatible WHAD device.
     """
     def __init__(self, device):
-        super().__init__(device)
+        Unifying.__init__(self, device)
+        EventsManager.__init__(self)
 
         self.__configuration = SnifferConfiguration()
         self.__decryptor = LogitechUnifyingDecryptor()
@@ -116,12 +119,14 @@ class Sniffer(Unifying):
             if self.__configuration.pairing:
                 self.__key_derivation.process_packet(packet)
                 if self.__key_derivation.key is not None:
-                    print("[i] New key extracted: ", self.__key_derivation.key.hex())
+                    logger.info("[i] New key extracted: ", self.__key_derivation.key.hex())
+                    self.trigger_event(KeyExtractedEvent(self.__key_derivation.key))
                     self.__key_derivation.reset()
 
             if Logitech_Encrypted_Keystroke_Payload in packet and self.__configuration.decrypt:
                 decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
+
                 if success:
                     packet.decrypted = decrypted
-
+            self.monitor_packet_rx(packet)
             yield packet

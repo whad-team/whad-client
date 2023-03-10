@@ -7,7 +7,7 @@ import fcntl
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
 from urllib.parse import urlparse, parse_qsl
-from signal import signal, SIGPIPE, SIG_DFL  
+from signal import signal, SIGPIPE, SIG_DFL
 
 from whad.device import WhadDevice, UnixSocketDevice
 from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound, \
@@ -74,7 +74,7 @@ class CommandsRegistry:
             CommandsRegistry.CMDS_SHORT_DESC[command] = short_desc
         if desc is not None:
             CommandsRegistry.CMDS_DESC[command] = desc
-    
+
     @staticmethod
     def get_handler(command):
         if command in CommandsRegistry.COMMANDS:
@@ -153,7 +153,7 @@ class CommandLineApp(ArgumentParser):
 
     """This class provides a wrap-up for WHAD CLI applications, adding
     a common default options:
-    
+
      --interface/-i: specifies the WHAD interface to use
      --no-color: tells the application not to use colors in terminal
 
@@ -173,7 +173,7 @@ class CommandLineApp(ArgumentParser):
     DEV_NOT_READY_ERR = -2
     DEV_ACCESS_ERR = -3
 
-    def __init__(self, description: str = None, commands: bool=True, interface: bool=True):
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
         """Instanciate a CommandLineApp
 
         :param str program_name: program (app) name
@@ -182,7 +182,7 @@ class CommandLineApp(ArgumentParser):
         :param bool commands: if enabled, the application will consider first positional argument as a command
         :param bool interface: if enabled, the application will resolve a WHAD interface
         """
-        super().__init__(description=description)
+        super().__init__(description=description, **kwargs)
 
         self.__interface = None
         self.__input_iface = None
@@ -284,7 +284,7 @@ class CommandLineApp(ArgumentParser):
 
             # Set stdin non-blocking
             orig_fl = fcntl.fcntl(sys.stdin, fcntl.F_GETFL)
-            fcntl.fcntl(sys.stdin, fcntl.F_SETFL, orig_fl | os.O_NONBLOCK)            
+            fcntl.fcntl(sys.stdin, fcntl.F_SETFL, orig_fl | os.O_NONBLOCK)
 
             # Wait an url on stdin to continue
             logger.debug('Stdin is piped, wait for a valid URL describing our interface.')
@@ -331,7 +331,7 @@ class CommandLineApp(ArgumentParser):
                             break
                         else:
                             print(line)
- 
+
 
     def post_run(self):
         """Implement post-run tasks.
@@ -402,4 +402,3 @@ if __name__ == '__main__':
 
     app = CommandLineApp('cli-demo',description='Whad CLI demo')
     app.run()
-
