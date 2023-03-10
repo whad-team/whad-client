@@ -5,9 +5,12 @@ from whad.ble.profile.attribute import UUID
 from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
 from whad.device import WhadDevice
 from random import randint
-from whad.ble.exceptions import HookReturnAuthentRequired, HookReturnValue
+from whad.ble.exceptions import HookReturnAuthorRequired, HookReturnValue
 from whad.ble.profile import read, written, subscribed
 from struct import pack, unpack
+
+import logging
+logging.basicConfig(level=logging.INFO)
 
 NAME = 'WHAT BLE Peripheral Guess Demo'
 
@@ -74,7 +77,7 @@ class MyPeripheral(GenericProfile):
             raise HookReturnValue(self.custom.number.value)
         else:
             # no cheating! you can't read this!
-            raise HookReturnAuthentRequired()
+            raise HookReturnAuthorRequired()
 
     @subscribed(custom.number)
     def on_number_subscribed(self, notification, indication):
@@ -94,7 +97,7 @@ def update_number():
 if __name__ == '__main__':
     print(f'======== {NAME} ===========')
     my_profile = MyPeripheral()
-    periph = Peripheral(WhadDevice.create('hci0'), profile=my_profile)
+    periph = Peripheral(WhadDevice.create('hci1'), profile=my_profile)
     periph.attach_callback(callback=show)
     periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
         AdvCompleteLocalName(b'Guess Me!'),
