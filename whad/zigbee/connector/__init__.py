@@ -1,10 +1,8 @@
 from scapy.compat import raw
 from scapy.config import conf
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
-from struct import pack
-
+from whad.zigbee.connector.translator import ZigbeeMessageTranslator
 from whad import WhadDomain, WhadCapability
-from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr, Dot15d4TAP_FCS_Type
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
@@ -46,61 +44,14 @@ class Zigbee(WhadDeviceConnector):
         else:
             self.__ready = True
             conf.dot15d4_protocol = 'zigbee'
+            self.translator = ZigbeeMessageTranslator()
 
     def close(self):
         self.stop()
         self.device.close()
 
     def format(self, packet):
-        if hasattr(packet, "metadata"):
-            header, timestamp = packet.metadata.convert_to_header()
-        else:
-            header = Dot15d4TAP_Hdr()
-            timestamp = None
-
-        header.data.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_FCS_Type(
-            fcs_type=int(Dot15d4FCS in packet)
-            )
-        )
-        formatted_packet = header/packet
-        return formatted_packet, timestamp
-
-    def _build_scapy_packet_from_message(self, message, msg_type):
-        try:
-            if msg_type == 'raw_pdu':
-                packet = Dot15d4FCS(bytes(message.raw_pdu.pdu) + bytes(pack(">H", message.raw_pdu.fcs)))
-                packet.metadata = generate_zigbee_metadata(message, msg_type)
-                self.monitor_packet_rx(packet)
-                return packet
-
-            elif msg_type == 'pdu':
-                packet = Dot15d4(bytes(message.pdu.pdu))
-                packet.metadata = generate_zigbee_metadata(message, msg_type)
-                self.monitor_packet_rx(packet)
-                return packet
-
-        except AttributeError:
-            return None
-
-    def _build_message_from_scapy_packet(self, packet, channel=11):
-        msg = Message()
-
-        self.monitor_packet_tx(packet)
-
-        if Dot15d4FCS in packet:
-            msg.zigbee.send_raw.channel = channel
-            pdu = raw(packet)[:-2]
-            msg.zigbee.send_raw.pdu = pdu
-            msg.zigbee.send_raw.fcs = packet.fcs
-
-        elif Dot15d4 in packet:
-            msg.zigbee.send.channel = channel
-            pdu = raw(packet)
-            msg.zigbee.send.pdu = pdu
-        else:
-            msg = None
-
-        return msg
+        return self.translator.format(packet)
 
     def can_sniff(self):
         """
@@ -218,7 +169,10 @@ class Zigbee(WhadDeviceConnector):
                 pdu = Dot15d4(raw(pdu)[:-2])
             else:
                 packet = pdu
-            msg = self._build_message_from_scapy_packet(packet, channel)
+
+            self.monitor_packet_tx(packet)
+
+            msg = self.translator.from_packet(packet, channel)
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -269,11 +223,13 @@ class Zigbee(WhadDeviceConnector):
 
             msg_type = message.WhichOneof('msg')
             if msg_type == 'pdu':
-                packet = self._build_scapy_packet_from_message(message, msg_type)
+                packet = self.translator.from_message(message, msg_type)
+                self.monitor_packet_rx(packet)
                 self.on_pdu(packet)
 
             elif msg_type == 'raw_pdu':
-                packet = self._build_scapy_packet_from_message(message, msg_type)
+                packet = self.translator.from_message(message, msg_type)
+                self.monitor_packet_rx(packet)
                 self.on_raw_pdu(packet)
             elif msg_type == "ed_sample":
                 self.on_ed_sample(message.ed_sample.timestamp, message.ed_sample.sample)
