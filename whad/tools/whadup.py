@@ -2,7 +2,7 @@
 Whad up ?
 """
 import sys
-from whad.exceptions import WhadDeviceNotFound
+from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.device import WhadDevice
 from whad.protocol.ble.ble_pb2 import BleCommand
 from whad.protocol.zigbee.zigbee_pb2 import ZigbeeCommand
@@ -171,35 +171,38 @@ def main():
                 print(' - URL    : %s' % dev.info.fw_url)
             print(' - Version: %s' % dev.info.version_str)
             print('')
-            print('[i] Discovering domains ...')
-            domains = {}
-            for domain in dev.get_domains():
-                if domain in DOMAINS:
-                    caps_val = dev.get_domain_capability(domain)
-                    domains[domain] = get_readable_capabilities(caps_val)
-            print('[i] Domains discovered.')
-            print('')
+            try:
+                print('[i] Discovering domains ...')
+                domains = {}
+                for domain in dev.get_domains():
+                    if domain in DOMAINS:
+                        caps_val = dev.get_domain_capability(domain)
+                        domains[domain] = get_readable_capabilities(caps_val)
+                print('[i] Domains discovered.')
+                print('')
 
-            for domain in domains:
-                print('This device supports %s:' % DOMAINS[domain])
-                for cap in domains[domain]:
-                    print(' - %s' % cap)
-                print('')
-                print(' List of supported commands:')
-                for cmd in get_domain_supported_commands(domain, dev.get_domain_commands(domain)):
-                    print('  - %s' % cmd)
-                print('')
+                for domain in domains:
+                    print('This device supports %s:' % DOMAINS[domain])
+                    for cap in domains[domain]:
+                        print(' - %s' % cap)
+                    print('')
+                    print(' List of supported commands:')
+                    for cmd in get_domain_supported_commands(domain, dev.get_domain_commands(domain)):
+                        print('  - %s' % cmd)
+                    print('')
+            except Exception as err:
+                print('[e] An error occured while requesting this device.' +
+                      'We were not able to retrieve the supported domains.')
 
             dev.close()
         except WhadDeviceNotFound:
             print('[e] Device not found')
             exit(1)
-
-        #except Exception as err:
-        #    print(err)
-        #    print('oops')
-        #    print(type(err))
-
+        except WhadDeviceNotReady:
+            print('[e] Cannot communicate with the device. Make sure it is a ' +
+                  'WHAD compatible device and reset it.')
+        except PermissionError:
+            print('[e] Cannot access the requested device (permission error).')
     else:
         print("[i] Available devices")
         for device in WhadDevice.list(): #print('Usage: %s [device]' % sys.argv[0])
