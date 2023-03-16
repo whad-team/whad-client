@@ -3,7 +3,7 @@ BLE Scanner connector
 =====================
 
 This module provides a scanner connector :class:`whad.ble.connector.scanner.Scanner`
-for WHAD BLE devices, allowing to discover available BLE devices. 
+for WHAD BLE devices, allowing to discover available BLE devices.
 
 It implements two different scanning approaches:
 
@@ -99,6 +99,7 @@ class Scanner(BLE):
             message = self.wait_for_message(filter=message_filter('ble', message_type))
             # Convert message from rebuilt PDU
             packet = self.translator.from_message(message.ble, message_type)
+            self.monitor_packet_rx(packet)
             # Force TxAdd value to propagate the address type
             if message.ble.adv_pdu.addr_type > 0:
                 packet.getlayer(BTLE_ADV).TxAdd = 1

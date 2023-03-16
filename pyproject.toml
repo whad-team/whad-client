@@ -30,7 +30,7 @@ classifiers = [
 
 [project.scripts]
 whadup = "whad.tools.whadup:main"
-whadsniff = "whad.tools.whadsniff:main"
+whadsniff = "whad.tools.whadsniff:whadsniff_main"
 ble-central = "whad.ble.cli.central:ble_central_main"
 ble-interpret = "whad.ble.cli.interpret:ble_interpret_main"
 ble-clone = "whad.ble.cli.clone:ble_clone_main"

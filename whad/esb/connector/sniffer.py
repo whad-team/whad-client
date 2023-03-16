@@ -2,13 +2,15 @@ from whad.esb.connector import ESB
 from whad.esb.sniffing import SnifferConfiguration
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
+from whad.common.sniffing import EventsManager
 
-class Sniffer(ESB):
+class Sniffer(ESB, EventsManager):
     """
     Enhanced ShockBurst Sniffer interface for compatible WHAD device.
     """
     def __init__(self, device):
-        super().__init__(device)
+        ESB.__init__(self, device)
+        EventsManager.__init__(self)
 
         self.__configuration = SnifferConfiguration()
 
@@ -61,5 +63,5 @@ class Sniffer(ESB):
 
             message = self.wait_for_message(filter=message_filter('esb', message_type))
             packet = self.translator.from_message(message.esb, message_type)
-
+            self.monitor_packet_rx(packet)
             yield packet

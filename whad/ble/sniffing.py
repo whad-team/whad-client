@@ -1,13 +1,14 @@
 from whad.ble.exceptions import InvalidAccessAddressException
 from dataclasses import dataclass
-
+from whad.ble.utils.phy import is_access_address_valid
+from whad.common.sniffing import SniffingEvent
 @dataclass
 class SynchronizedConnection:
     access_address : int = None
     crc_init : int = None
     hop_interval : int = None
     hop_increment : int = None
-    channel_map : int = None
+    channel_map : bytes = None
 
 class ConnectionConfiguration(SynchronizedConnection):
     """
@@ -20,6 +21,26 @@ class ConnectionConfiguration(SynchronizedConnection):
     :param channel_map: indicate Channel Map of the targeted connection (chm)
     """
     pass
+
+class SynchronizationEvent(SniffingEvent):
+    def __init__(self, connection):
+        super().__init__("Connection synchronized")
+        self.synchronized_connection = connection
+
+    @property
+    def message(self):
+        return "access_address={}, crc_init={}, hop_interval={} ({} us), hop_increment={}, channel_map={}".format(
+                    "0x{:08x}".format(self.synchronized_connection.access_address),
+                    "0x{:06x}".format(self.synchronized_connection.crc_init),
+                    str(self.synchronized_connection.hop_interval), str(self.synchronized_connection.hop_interval*1250),
+                    str(self.synchronized_connection.hop_increment),
+                    "0x"+self.synchronized_connection.channel_map.hex()
+        )
+
+
+class DesynchronizationEvent(SniffingEvent):
+    def __init__(self):
+        super().__init__("Connection desynchronized")
 
 @dataclass
 class SnifferConfiguration:

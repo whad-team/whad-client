@@ -1,17 +1,19 @@
 from scapy.layers.zigbee import ZigbeeSecurityHeader
-
 from whad.zigbee.connector import Zigbee
 from whad.zigbee.sniffing import SnifferConfiguration
 from whad.zigbee.crypto import ZigbeeDecryptor
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
+from whad.common.sniffing import EventsManager
 
-class Sniffer(Zigbee):
+class Sniffer(Zigbee, EventsManager):
     """
     Zigbee Sniffer interface for compatible WHAD device.
     """
     def __init__(self, device):
-        super().__init__(device)
+        Zigbee.__init__(self, device)
+        EventsManager.__init__(self)
+
 
         self.__configuration = SnifferConfiguration()
         self.__decryptor = ZigbeeDecryptor()
@@ -72,7 +74,8 @@ class Sniffer(Zigbee):
                 message_type = "pdu"
 
             message = self.wait_for_message(filter=message_filter('zigbee', message_type))
-            packet = self._build_scapy_packet_from_message(message.zigbee, message_type)
+            packet = self.translator.from_message(message.zigbee, message_type)
+            self.monitor_packet_rx(packet)
 
             if ZigbeeSecurityHeader in packet and self.__configuration.decrypt:
                 decrypted, success = self.__decryptor.attempt_to_decrypt(packet)

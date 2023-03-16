@@ -1,14 +1,19 @@
 from whad.ble.connector import BLE, Injector, Hijacker
 from whad.ble.utils.phy import is_access_address_valid
-from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress
+from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress, SynchronizationEvent, DesynchronizationEvent
 from whad.ble import UnsupportedCapability, message_filter
+from whad.common.sniffing import EventsManager
+from struct import pack
+import logging
+logger = logging.getLogger(__name__)
 
-class Sniffer(BLE):
+class Sniffer(BLE, EventsManager):
     """
     BLE Sniffer interface for compatible WHAD device.
     """
     def __init__(self, device):
-        super().__init__(device)
+        BLE.__init__(self, device)
+        EventsManager.__init__(self)
         self.__synchronized = False
         self.__connection = None
         self.__access_addresses = {}
@@ -65,7 +70,8 @@ class Sniffer(BLE):
             hop_interval = hop_interval,
             channel_map = channel_map
         )
-        print("[sniffer] Connection synchronized -> access_address={}, crc_init={}, hop_interval={} ({} us), hop_increment={}, channel_map={}.".format(
+        self.trigger_event(SynchronizationEvent(self.__connection))
+        logger.info("Connection synchronized -> access_address={}, crc_init={}, hop_interval={} ({} us), hop_increment={}, channel_map={}.".format(
                     "0x{:08x}".format(self.__connection.access_address),
                     "0x{:06x}".format(self.__connection.crc_init),
                     str(self.__connection.hop_interval), str(self.__connection.hop_interval*1250),
@@ -76,7 +82,8 @@ class Sniffer(BLE):
     def on_desynchronized(self, access_address=None):
         self.__synchronized = False
         self.__connection = None
-        print("[sniffer] Connection lost.")
+        self.trigger_event(DesynchronizationEvent())
+        logger.info("Connection lost.")
 
     def _enable_sniffing(self):
         if self.__configuration.access_addresses_discovery:
@@ -88,7 +95,6 @@ class Sniffer(BLE):
             channel_map = self.__configuration.active_connection.channel_map
             hop_interval = self.__configuration.active_connection.hop_interval
             hop_increment = self.__configuration.active_connection.hop_increment
-
             self.sniff_active_connection(access_address, crc_init, channel_map, hop_interval, hop_increment)
 
         elif self.__configuration.follow_connection:
@@ -182,7 +188,7 @@ class Sniffer(BLE):
 
             elif self.__configuration.active_connection is not None:
                 message = self.wait_for_message(filter=message_filter('ble', "synchronized"))
-                print(message)
+
                 # TODO : improve the switch
                 if message.ble.synchronized.hop_increment > 0:
                     if self.support_raw_pdu():
@@ -193,7 +199,9 @@ class Sniffer(BLE):
                         message_type = "adv_pdu"
 
                     message = self.wait_for_message(filter=message_filter('ble', message_type))
-                    yield self.translator.from_message(message.ble, message_type)
+                    packet = self.translator.from_message(message.ble, message_type)
+                    self.monitor_packet_rx(packet)
+                    yield packet
 
             else:
                 if self.support_raw_pdu():
@@ -204,4 +212,6 @@ class Sniffer(BLE):
                     message_type = "adv_pdu"
 
                 message = self.wait_for_message(filter=message_filter('ble', message_type))
-                yield self.translator.from_message(message.ble, message_type)
+                packet = self.translator.from_message(message.ble, message_type)
+                self.monitor_packet_rx(packet)
+                yield packet
