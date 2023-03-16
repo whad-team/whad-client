@@ -618,6 +618,9 @@ class WhadDevice(object):
         # Device IO thread
         self.__io_thread = None
 
+        # Default timeout for messages (5 seconds)
+        self.__timeout = 5.0
+
         # Message queues
         self.__messages = Queue()
         self.__msg_queue = Queue()
@@ -662,9 +665,18 @@ class WhadDevice(object):
         self.__io_thread.start()
 
         # Ask firmware for a reset
-        logger.info('resetting device (if possible)')
-        self.reset()
-        self.__opened = True
+        try:
+            logger.info('resetting device (if possible)')
+            self.reset()
+            self.__opened = True
+        except Empty as err:
+            # Device is unresponsive, does not seem compatible
+            # Shutdown IO thread
+            self.__io_thread.cancel()
+            self.__io_thread.join()
+
+            # Notify device not found
+            raise WhadDeviceNotReady()
 
     def close(self):
         """
@@ -807,7 +819,7 @@ class WhadDevice(object):
             self.send_message(command, keep)
 
         # Retrieve the first message matching our filter.
-        return self.wait_for_message()
+        return self.wait_for_message(self.__timeout)
 
 
     def on_data_received(self, data):
