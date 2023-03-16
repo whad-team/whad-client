@@ -6,7 +6,8 @@ This module provides a database that keeps track of discovered devices,
 :class:`whad.ble.scanning.AdvertisingDevicesDB`. Discovered devices information
 are handled in :class:`whad.ble.scanning.AdvertisingDevice`.
 """
-
+from time import time
+from threading import Lock
 from whad.ble import BDAddress, AdvDataFieldList, \
     AdvCompleteLocalName, AdvDataError, AdvDataFieldListOverflow, \
     AdvShortenedLocalName
@@ -24,6 +25,8 @@ class AdvertisingDevice(object):
     * Type of advertising PDU
     * Connectable information
     """
+
+    SCAN_RSP_TIMEOUT = 0.5
 
     def __init__(self, rssi, address_type, bd_address, adv_data, rsp_data=None, undirected=True, connectable=True):
         """Instantiate an AdvertisingDevice.
@@ -51,6 +54,9 @@ class AdvertisingDevice(object):
         self.__got_scan_rsp = False
         self.__undirected = undirected
         self.__connectable = connectable
+        self.__scanned = False
+        self.__timestamp = time()
+        self.__last_seen = self.__timestamp
 
     @property
     def address(self) -> str:
@@ -120,6 +126,31 @@ class AdvertisingDevice(object):
             return short_name
         else:
             return None
+        
+    @property
+    def scanned(self) -> bool:
+        """Device scanned status
+        """
+        return self.__scanned
+    
+    @property
+    def timestamp(self) -> float:
+        """Device discovery timestamp.
+        """
+        return self.__timestamp
+    
+    @property
+    def last_seen(self) -> float:
+        """Device last seen timestamp.
+        """
+        return self.__last_seen
+    
+
+    @property
+    def connectable(self) -> bool:
+        """Connectable status.
+        """
+        return self.__connectable
 
 
     def __repr__(self):
@@ -157,13 +188,32 @@ class AdvertisingDevice(object):
         )
 
 
-    def update_rssi(self, rssi=0):
-        """Update device RSSI.
+    def seen(self):
+        """Mark device as seen (update last_seen value with current time).
+        """
+        self.__last_seen = time()
+
+
+    def update(self, rssi : float = None, adv_data : bytes = None):
+        """Update device RSSI and advertising data and check for scan response
+        timeout.
 
         :param  rssi: New RSSI value.
         :type   rssi: float
+        :param  adv_data: New advertising data
+        :type   adv_data: bytes
         """
-        self.__rssi = rssi
+        if rssi is not None:
+            self.__rssi = rssi
+        
+        if adv_data is not None:
+            self.__adv_data = adv_data
+
+        # Update scanned status if required
+        if not self.__scanned:
+            if (time() - self.__timestamp) > self.SCAN_RSP_TIMEOUT:
+                self.__scanned = True
+
 
     def set_scan_rsp(self, scan_rsp):
         """Update device advertisement data.
@@ -174,6 +224,7 @@ class AdvertisingDevice(object):
         if not self.__got_scan_rsp:
             self.__rsp_data = scan_rsp
             self.__got_scan_rsp = True
+            self.__scanned = True
 
 
 class AdvertisingDevicesDB(object):
@@ -200,11 +251,10 @@ class AdvertisingDevicesDB(object):
         :return:    Device if found, `None` otherwise.
         :rtype:     :class:`whad.ble.scanning.AdvertisingDevice`
         """
+        device = None
         if address in self.__db:
-            return self.__db[address]
-        else:
-            return None
-
+            device = self.__db[address]
+        return device
 
     def register_device(self, device):
         """Register or update a device.
@@ -213,6 +263,17 @@ class AdvertisingDevicesDB(object):
         :type   device: :class:`whad.ble.scanning.AdvertisingDevice`
         """
         self.__db[device.address] = device
+
+
+    def __apply_scan_rsp_timeout(self):
+        """Check every device to determine if our scan request has timed out.
+        """
+        for address in self.__db:
+            device = self.__db[address]
+            if not device.scanned:
+                device.update()
+                if self.__db[address].scanned:
+                    yield device
 
 
     def on_device_found(self, rssi, adv_packet, filter_addr=None):
@@ -227,6 +288,7 @@ class AdvertisingDevicesDB(object):
         :param  filter_addr:    BD address to filter
         :type   filter_addr:    str
         """
+        devices = []
         addr_type = adv_packet.getlayer(BTLE_ADV).TxAdd
 
         if adv_packet.haslayer(BTLE_ADV_IND):
@@ -247,7 +309,9 @@ class AdvertisingDevicesDB(object):
 
                 if str(bd_address) not in self.__db:
                     self.__db[str(bd_address)] = device
-                    return device
+                else:
+                    self.__db[str(bd_address)].seen()
+                
             except AdvDataError as ad_error:
                 pass
             except AdvDataFieldListOverflow as ad_ovf:
@@ -272,7 +336,9 @@ class AdvertisingDevicesDB(object):
 
                 if str(bd_address) not in self.__db:
                     self.__db[str(bd_address)] = device
-                    return device
+                else:
+                    self.__db[str(bd_address)].seen()
+
             except AdvDataError as ad_error:
                 pass
             except AdvDataFieldListOverflow as ad_ovf:
@@ -287,8 +353,14 @@ class AdvertisingDevicesDB(object):
                     device = self.__db[str(bd_address)]
                     if not device.got_scan_rsp:
                         device.set_scan_rsp(adv_list)
-                        return device
+                        devices.append(device)
             except AdvDataError as ad_error:
                 pass
             except AdvDataFieldListOverflow as ad_ovf:
                 pass
+
+        # Check if some devices scan response timeout is reached
+        for device in self.__apply_scan_rsp_timeout():
+            devices.append(device)
+
+        return devices

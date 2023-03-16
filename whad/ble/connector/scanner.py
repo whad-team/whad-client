@@ -76,13 +76,14 @@ class Scanner(BLE):
         """
         for advertisement in self.sniff():
             if minimal_rssi is None or advertisement.metadata.rssi > minimal_rssi:
-                device = self.__db.on_device_found(
+                devices = self.__db.on_device_found(
                     advertisement.metadata.rssi,
                     advertisement,
                     filter_addr=filter_address
                 )
-                if device is not None:
-                    yield device
+                for device in devices:
+                    if device is not None and device.scanned:
+                        yield device
 
 
     def sniff(self) -> Iterator[Packet]:
