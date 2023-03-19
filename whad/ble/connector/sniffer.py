@@ -4,7 +4,9 @@ from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, Acce
 from whad.ble import UnsupportedCapability, message_filter
 from whad.common.sniffing import EventsManager
 from struct import pack
+from time import sleep
 import logging
+
 logger = logging.getLogger(__name__)
 
 class Sniffer(BLE, EventsManager):
@@ -23,8 +25,17 @@ class Sniffer(BLE, EventsManager):
         if not self.can_sniff_advertisements() and not self.can_sniff_new_connection():
             raise UnsupportedCapability("Sniff")
 
-    def is_synchronized(self):
+    @property
+    def synchronized(self):
         return self.__synchronized
+
+    def wait_new_connection(self, address="FF:FF:FF:FF:FF:FF"):
+        self.filter = address
+        self.configure(advertisements=False, connection=True)
+        self.start()
+        while not self.synchronized:
+            sleep(0.01)
+        return self.__connection
 
     @property
     def access_address(self):
@@ -141,7 +152,7 @@ class Sniffer(BLE, EventsManager):
         return self.__configuration.filter.upper()
 
     @filter.setter
-    def set_filter(self, address="FF:FF:FF:FF:FF:FF"):
+    def filter(self, address="FF:FF:FF:FF:FF:FF"):
         self.stop()
         self.__configuration.filter = address.upper()
         self._enable_sniffing()

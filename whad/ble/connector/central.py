@@ -4,7 +4,7 @@ Bluetooth Low Energy Central connector
 """
 
 from time import time
-
+from whad.ble import Message, Connected
 from whad.ble.connector import BLE
 from whad.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
@@ -38,17 +38,27 @@ class Central(BLE):
         self.__target = None
         self.__local = None
 
-        # If no connection, check if 
+        # If no connection, check if
         if not self.can_be_central():
             raise UnsupportedCapability('Central')
 
         # If a connection already exists, just feed the stack with the parameters
         if existing_connection is not None:
-            self.on_connected(existing_connection)
+            self.on_connected(self._create_pseudo_connection())
         else:
             # self.stop() # ButteRFly doesn't support calling stop when spawning central
             self.enable_central_mode()
 
+
+    def _create_pseudo_connection(self):
+        pseudo_connection = Message()
+        pseudo_connection.ble.connected.CopyFrom(Connected())
+        pseudo_connection.ble.connected.conn_handle = 0
+        pseudo_connection.ble.connected.initiator = b"\x00\x00\x00\x00\x00\x00"
+        pseudo_connection.ble.connected.init_addr_type = 0
+        pseudo_connection.ble.connected.advertiser = b"\x00\x00\x00\x00\x00\x00"
+        pseudo_connection.ble.connected.adv_addr_type = 0
+        return pseudo_connection
 
     @property
     def local_peer(self) -> BDAddress:
@@ -79,7 +89,7 @@ class Central(BLE):
         :type   hop_interval:   int
         :param  hop_increment:  Hop increment to use (optional)
         :type   hop_increment:  int
-        
+
         :return: An instance of `PeripheralDevice` on success, `None` on failure.
         :rtype: :class:`whad.ble.profile.device.PeripheralDevice`
         """

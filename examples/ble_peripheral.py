@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 
 NAME = 'WHAT BLE Peripheral Guess Demo'
 
-
+'''
 class MyPeripheral(GenericProfile):
 
     device = PrimaryService(
@@ -92,11 +92,11 @@ def update_number():
     print('Press a key to modify the number to guess')
     input()
     my_profile.custom.number.value = pack('B', 15)
-
+'''
 
 if __name__ == '__main__':
     print(f'======== {NAME} ===========')
-    my_profile = MyPeripheral()
+    my_profile = GenericProfile(from_json="lightbulb2.json")
     periph = Peripheral(WhadDevice.create('hci1'), profile=my_profile)
     periph.attach_callback(callback=show)
     periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
