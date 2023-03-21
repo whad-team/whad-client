@@ -23,11 +23,8 @@ if __name__ == '__main__':
             for i in sniffer.sniff():
                 print(i.metadata, repr(i))
                 analyzer.process_packet(i)
-                if analyzer.triggered:
-                    print("triggered")
-
-                if analyzer.completed:
-                    print("completed")
+                if analyzer.triggered and analyzer.completed:
+                    print(analyzer.profile)
 
 
         except (KeyboardInterrupt, SystemExit):
