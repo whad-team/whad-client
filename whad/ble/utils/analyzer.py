@@ -265,6 +265,7 @@ class GATTServerDiscovery(TrafficAnalyzer):
 
         self.services = []
         self.characteristics = []
+        self.descriptors = []
 
     def complete(self):
         super().complete()
@@ -277,6 +278,7 @@ class GATTServerDiscovery(TrafficAnalyzer):
         self.secondary_service_analyzer.process_packet(pkt)
         self.characteristics_analyzer.process_packet(pkt)
         self.descriptors_discovery.process_packet(pkt)
+
 
         if self.primary_service_analyzer.triggered:
             self.trigger()
@@ -300,6 +302,7 @@ class GATTServerDiscovery(TrafficAnalyzer):
 
         if self.descriptors_discovery.completed:
             for descriptor in self.descriptors_discovery.descriptors:
+                self.descriptors += self.descriptors_discovery.descriptors
                 selected_service = None
                 for service in self.services:
                     if service.handle < descriptor.handle and descriptor.handle <= service.end_handle:
@@ -331,8 +334,30 @@ class GATTServerDiscovery(TrafficAnalyzer):
 
             self.descriptors_discovery.reset()
 
-        if self.characteristics_completed and self.services_completed:
+
+        if (self.triggered and
+            self.characteristics_completed and
+            not self.characteristics_analyzer.triggered and
+            self.services_completed and
+            not self.primary_service_analyzer.triggered and
+            not self.descriptors_discovery.triggered
+        ):
+            handles = []
+            for service in self.services:
+                handles.append(service.handle)
+                for characteristic in service.characteristics():
+                    handles.append(characteristic.handle)
+                    handles.append(characteristic.value_handle)
+
+                    for descriptor in characteristic.descriptors():
+                        handles.append(descriptor.handle)
+
+                    if characteristic.can_notify() or characteristic.can_indicate():
+                        if len(list(characteristic.descriptors())) == 0:
+                            return
+
             if (
-                    all([len(list(service.characteristics())) > 0 for service in self.services])
+                    all([len(list(service.characteristics())) > 0 for service in self.services]) and
+                    list(range(min(*handles), max(*handles)+1)) == handles
                 ):
                 self.complete()
