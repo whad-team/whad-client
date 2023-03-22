@@ -1,9 +1,14 @@
 from scapy.layers.bluetooth import  ATT_Read_By_Group_Type_Request, ATT_Read_By_Group_Type_Response, \
-                                    ATT_Read_By_Type_Request, ATT_Read_By_Type_Response, ATT_Error_Response
-from whad.ble.stack.gatt.message import GattReadByGroupTypeResponse, GattReadByTypeResponse
-from whad.ble.profile import PrimaryService, SecondaryService, Characteristic, GenericProfile
+                                    ATT_Read_By_Type_Request, ATT_Read_By_Type_Response, ATT_Error_Response, \
+                                    ATT_Find_Information_Request, ATT_Find_Information_Response
+from whad.ble.stack.gatt.message import GattReadByGroupTypeResponse, GattReadByTypeResponse, GattFindInfoResponse
 from whad.ble.profile.attribute import UUID
+from whad.ble.profile import GenericProfile
+from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
+from whad.ble.profile.service import PrimaryService, SecondaryService
 from struct import unpack
+
+
 
 class TrafficAnalyzer:
     def __init__(self):
@@ -110,6 +115,40 @@ class ReadByTypeDiscovery(TrafficAnalyzer):
         else:
             pass
 
+class FindInformationDiscovery(TrafficAnalyzer):
+
+    def reset(self):
+        super().reset()
+        self.start_handle = None
+        self.end_handle = None
+        self.items = []
+
+    def process_packet(self, packet):
+        if ATT_Find_Information_Request in packet:
+            if not self.triggered:
+                self.start_handle = packet.start
+                self.end_handle = packet.end
+                self.trigger()
+            else:
+                if packet.end != self.end_handle:
+                    self.reset()
+                    self.start_handle = packet.start
+                    self.end_handle = packet.end
+                    self.trigger()
+
+        elif ATT_Find_Information_Response in packet and self.triggered:
+            response = GattFindInfoResponse.from_bytes(
+                format = packet[ATT_Find_Information_Response].format,
+                data = bytes(packet[ATT_Find_Information_Response:])[1:]
+            )
+            for item in response:
+                self.items.append(item)
+            self.complete()
+
+        elif ATT_Error_Response in packet and packet.request == 0x04 and self.triggered:
+            self.complete()
+
+
 class PrimaryServicesDiscovery(ReadByGroupTypeDiscovery):
     def reset(self):
         super().reset()
@@ -117,8 +156,6 @@ class PrimaryServicesDiscovery(ReadByGroupTypeDiscovery):
 
     def complete(self):
         if self.uuid == 0x2800:
-            for item in self.items:
-                print("ITEM:", item.handle, item.end, item.value)
             self.primary_services = [
                 PrimaryService(
                     uuid=UUID(item.value),
@@ -151,7 +188,6 @@ class CharacteristicsDiscovery(ReadByTypeDiscovery):
                 charac.handle = charac_handle
                 charac.value_handle = charac_value_handle
                 self.characteristics.append(charac)
-            print("CHARAC:", self.characteristics)
             super().complete()
         else:
             self.reset()
@@ -185,7 +221,6 @@ class ServicesDiscovery(TrafficAnalyzer):
 
     def complete(self):
         super().complete()
-        print(self.services)
 
     def process_packet(self, pkt):
         self.primary_service_analyzer.process_packet(pkt)
@@ -202,6 +237,19 @@ class ServicesDiscovery(TrafficAnalyzer):
             self.services += self.secondary_service_analyzer.secondary_services
             self.complete()
 
+class DescriptorsDiscovery(FindInformationDiscovery):
+    def reset(self):
+        super().reset()
+        self.descriptors = []
+
+    def complete(self):
+        for item in self.items:
+            if item.uuid  == UUID(0x2901) or item.uuid == UUID(0x2902):
+                self.descriptors.append(item)
+
+        if len(self.descriptors) > 0:
+            super().complete()
+
 
 class GATTServerDiscovery(TrafficAnalyzer):
 
@@ -210,6 +258,7 @@ class GATTServerDiscovery(TrafficAnalyzer):
         self.primary_service_analyzer = PrimaryServicesDiscovery()
         self.secondary_service_analyzer = SecondaryServicesDiscovery()
         self.characteristics_analyzer = CharacteristicsDiscovery()
+        self.descriptors_discovery = DescriptorsDiscovery()
 
         self.services_completed = False
         self.characteristics_completed = False
@@ -221,16 +270,13 @@ class GATTServerDiscovery(TrafficAnalyzer):
         super().complete()
         self.profile = GenericProfile()
         for service in self.services:
-            print(service)
-            for characteristic in service.characteristics():
-                print("\t", characteristic)
             self.profile.add_service(service)
-
 
     def process_packet(self, pkt):
         self.primary_service_analyzer.process_packet(pkt)
         self.secondary_service_analyzer.process_packet(pkt)
         self.characteristics_analyzer.process_packet(pkt)
+        self.descriptors_discovery.process_packet(pkt)
 
         if self.primary_service_analyzer.triggered:
             self.trigger()
@@ -245,23 +291,48 @@ class GATTServerDiscovery(TrafficAnalyzer):
             self.secondary_service_analyzer.reset()
 
         if self.characteristics_analyzer.completed:
-            print(self.characteristics_analyzer.completed)
-            self.characteristics += self.characteristics_analyzer.characteristics
+            for characteristic in self.characteristics_analyzer.characteristics:
+                for service in self.services:
+                    if service.handle < characteristic.handle and characteristic.handle <= service.end_handle:
+                        service.add_characteristic(characteristic)
             self.characteristics_completed = True
             self.characteristics_analyzer.reset()
 
-        if self.characteristics_completed and self.services_completed:
-            for characteristic in self.characteristics:
-                if characteristic.service is None:
-                    for service in self.services:
-                        print(service.handle, service.end)
-                        if service.handle < characteristic.handle and characteristic.handle < service.end:
-                            service.add_characteristic(characteristic)
-                            characteristic.attach(service)
-                            break
+        if self.descriptors_discovery.completed:
+            for descriptor in self.descriptors_discovery.descriptors:
+                selected_service = None
+                for service in self.services:
+                    if service.handle < descriptor.handle and descriptor.handle <= service.end_handle:
+                        selected_service = service
+                        break
 
+                characteristics = list(selected_service.characteristics())
+                selected_characteristic = None
+                for characteristic in characteristics:
+                    if characteristic.handle <= descriptor.handle:
+                        selected_characteristic = characteristic
+                    else:
+                        break
+                if selected_characteristic is not None:
+                    descriptor_obj = None
+                    if descriptor.uuid  == UUID(0x2901):
+                        descriptor_obj = CharacteristicDescriptor(
+                                selected_characteristic,
+                                handle=descriptor.handle,
+                                uuid=descriptor.uuid
+                        )
+                    elif descriptor.uuid == UUID(0x2902):
+                        descriptor_obj = ClientCharacteristicConfig(
+                                selected_characteristic,
+                                handle=descriptor.handle
+                        )
+                    if descriptor_obj is not None:
+                        selected_characteristic.add_descriptor(descriptor_obj)
+
+            self.descriptors_discovery.reset()
+
+        if self.characteristics_completed and self.services_completed:
             if (
-                    all([charac.service is not None for charac in self.characteristics]) and
                     all([len(list(service.characteristics())) > 0 for service in self.services])
                 ):
                 self.complete()

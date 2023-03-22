@@ -1,5 +1,5 @@
 from whad.ble import Sniffer
-from whad.ble.utils.analyzer import GATTServerDiscovery
+from whad.ble.utils.analyzer import GATTServerDiscovery, FindInformationDiscovery
 from scapy.all import BTLE_DATA, L2CAP_Hdr, ATT_Hdr, ATT_Write_Request
 import sys
 from whad.device import WhadDevice
@@ -23,7 +23,11 @@ if __name__ == '__main__':
             for i in sniffer.sniff():
                 print(i.metadata, repr(i))
                 analyzer.process_packet(i)
-                if analyzer.triggered and analyzer.completed:
+
+                if analyzer.triggered:
+                    print("triggered")
+                if analyzer.completed:
+                    print("completed")
                     print(analyzer.profile)
 
 

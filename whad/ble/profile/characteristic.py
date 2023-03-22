@@ -141,7 +141,7 @@ class Characteristic(Attribute):
     @Attribute.handle.setter
     def handle(self, new_handle):
         if isinstance(new_handle, int):
-            
+
             # Set attribute handle
             Attribute.handle.fset(self, new_handle)
 
@@ -176,7 +176,7 @@ class Characteristic(Attribute):
     def value_handle(self, value):
         self.__value_handle = value
         self.__value.handle = value
-    
+
     @value.setter
     def value(self, new_value):
         """Set characteristic value
@@ -231,7 +231,7 @@ class Characteristic(Attribute):
 
     def writeable(self):
         return (
-            ((self.properties & CharacteristicProperties.WRITE) != 0) or 
+            ((self.properties & CharacteristicProperties.WRITE) != 0) or
             ((self.properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE) != 0)
         )
 
@@ -274,7 +274,7 @@ class Characteristic(Attribute):
             if cccd is not None:
                 return (cccd.config == 0x0002)
         return False
-            
+
 
 
     def add_descriptor(self, descriptor):
@@ -282,7 +282,7 @@ class Characteristic(Attribute):
 
         :param CharacteristicDescriptor descriptor: Descriptor instance to add to this characteristic.
         """
-        if isinstance(descriptor, ClientCharacteristicConfig):
+        if isinstance(descriptor, CharacteristicDescriptor):
             self.__descriptors.append(descriptor)
             if descriptor.handle > self.__end_handle:
                 self.__end_handle = descriptor.handle
@@ -300,8 +300,3 @@ class Characteristic(Attribute):
             if isinstance(desc, ClientCharacteristicConfig):
                 return desc
         return None
-
-
-    
-
-    
