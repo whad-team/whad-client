@@ -103,7 +103,7 @@ def profile_handler(app, command_args):
         start_time = time()
         for device in scanner.discover_devices():
             if device.address.lower() == app.args.bdaddr.lower():
-                if device.got_scan_rsp or (time() - start_time) >= 10.0:
+                if device.scanned or (time() - start_time) >= 10.0:
                     break
 
         # Generate device advertising information
@@ -120,7 +120,7 @@ def profile_handler(app, command_args):
         central.start()
 
         # Connect to target device
-        device = central.connect(app.args.bdaddr)
+        device = central.connect(app.args.bdaddr, random=(device.address_type==BDAddress.RANDOM))
         if device is None:
             app.error('Cannot connect to %s, device does not respond.' % app.args.bdaddr)
         else:

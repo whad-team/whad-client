@@ -592,3 +592,5 @@ class HCIDevice(VirtualDevice):
                         self._send_whad_command_result(ResultCode.ERROR)
             except WhadDeviceUnsupportedOperation as err:
                 self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+        else:
+            logger.debug('on_whad_ble_send_pdu(): internal state error')
