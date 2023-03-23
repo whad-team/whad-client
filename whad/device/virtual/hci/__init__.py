@@ -155,6 +155,7 @@ class HCIDevice(VirtualDevice):
         """
 
         if not self.__opened:
+            logger.debug('read(): HCI device is not ready')
             raise WhadDeviceNotReady()
         try:
             if self.__socket is not None and self.__socket.readable(0.1):
@@ -169,6 +170,7 @@ class HCIDevice(VirtualDevice):
                     # If the connection is stopped and peripheral mode is started,
                     # automatically re-enable advertising based on cached data
                     if HCI_Event_Disconnection_Complete in event and self.__internal_state == HCIInternalState.PERIPHERAL:
+                        logger.debug('read(): received HCI Disconnection Complete event')
                         # If advertising was not enabled, skip
                         if not self._advertising:
                             return
@@ -176,14 +178,18 @@ class HCIDevice(VirtualDevice):
                         # if data are cached, configure them
                         if self._cached_scan_data is not None:
                             # We can't wait for response because we are in the reception loop context
+                            logger.debug('read(): setting cached advertising data')
                             success = self._set_advertising_data(self._cached_scan_data, wait_response=False)
 
                         if self._cached_scan_response_data is not None:
+                            logger.debug('read(): setting cached scan response data')
                             success = self._set_scan_response_data(self._cached_scan_response_data, wait_response=False)
 
                         # We need to artificially disable advertising indicator to prevent cached operation
                         self._advertising = False
+                        logger.debug('read(): switches back to advertising mode')
                         self._set_advertising_mode(True, wait_response=False)
+                        logger.debug('read(): advertising mode enabled')
 
 
         except (BrokenPipeError, OSError) as err:
@@ -508,6 +514,8 @@ class HCIDevice(VirtualDevice):
                 self.__internal_state = HCIInternalState.PERIPHERAL
                 self._send_whad_command_result(ResultCode.SUCCESS)
                 return
+            else:
+                logger.debug('cannot set advertising mode (%d)' % success)
         self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_ble_disconnect(self, message):
@@ -569,6 +577,7 @@ class HCIDevice(VirtualDevice):
 
     def _on_whad_ble_send_pdu(self, message):
         logger.debug('Recevied WHAD BLE send_pdu message')
+        print(message)
         if ((self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE) or
            (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
             try:

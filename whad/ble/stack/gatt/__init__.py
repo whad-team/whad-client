@@ -1606,6 +1606,7 @@ class GattServer(Gatt):
 
         List attribute with given type UUID from `start` handle to ̀`end` handle.
         """
+        logger.debug('received a read_by_group_type request')
         # List attributes by type UUID, sorted by handles
         attrs = {}
         attrs_handles = []
@@ -1643,13 +1644,17 @@ class GattServer(Gatt):
 
             # Once datalist created, send answer
             datalist_raw = datalist.to_bytes()
+            logger.debug('sending read_by_group_type_response ...')
             self.att.read_by_group_type_response(item_size, datalist_raw)
+            logger.debug('read_by_group_type_response sent')
         else:
+            logger.debug('no attribute, send a GATT error')
             self.error(
                BleAttOpcode.READ_BY_GROUP_TYPE_REQUEST,
                start,
                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
+            logger.debug('GATT error sent')
 
     def on_terminated(self):
         """Connection has been terminated, remove characteristics subscriptions.

@@ -123,6 +123,8 @@ class HCIConverter:
             return [msg]
 
     def process_disconnection_complete(self, event):
+        logger.debug('received HCI disconnection complete event (status: %d)' % event.status)
+        logger.debug('send a WHAD BLE disconnected message')
         if event.status == 0x00:
             msg = Message()
             handle = event.handle
