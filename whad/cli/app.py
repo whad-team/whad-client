@@ -141,7 +141,8 @@ def show_default_help(app, args):
         max_cmd_size = max([len(cmd) for cmd,doc in commands])
         cmd_fmt = "<ansicyan>{0:<%d}</ansicyan>\t\t{1}" % max_cmd_size
         for cmd, doc in commands:
-            print_formatted_text(HTML(cmd_fmt.format(cmd, doc)))
+            if cmd != 'interactive':
+                print_formatted_text(HTML(cmd_fmt.format(cmd, doc)))
         print('')
     else:
         cmd = args[0]
@@ -356,6 +357,12 @@ class CommandLineApp(ArgumentParser):
                 handler = CommandsRegistry.get_handler(command)
                 if handler is not None:
                     return handler(self, self.__args.command_args)
+            elif CommandsRegistry.get_handler('interactive'):
+                # If no command is passed to the CLI tool and an interactive
+                # command handler has been defined, call it.
+                handler = CommandsRegistry.get_handler('interactive')
+                if handler is not None:
+                    return handler(self, self.__args.command_args)                
 
             # By default, print help if no script is specified
             self.print_help()
