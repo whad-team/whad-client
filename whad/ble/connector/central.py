@@ -3,11 +3,12 @@ Bluetooth Low Energy Central connector
 ======================================
 """
 
-from time import time
+from time import time, sleep
 
 from whad.ble.connector import BLE
 from whad.ble.bdaddr import BDAddress
-from whad.ble.stack import BleStack
+from whad.ble.stack import BleStack, BtVersion
+from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
 from whad.ble.stack.gatt import GattClient
 from whad.ble.profile.device import PeripheralDevice
 from whad.protocol.ble.ble_pb2 import BleDirection
@@ -241,6 +242,36 @@ class Central(BLE):
         # Notify peripheral about this connection
         self.__peripheral.on_connect(self.connection.conn_handle)
 
+
+    def version(self, synchronous=True):
+        """Query BLE version of remote peer.
+        """
+        if self.connection is not None:
+            # Send an LL_VERSION_IND PDU
+            self.connection.send_version()
+
+            # Wait for an answer (mandatory)
+            if synchronous:
+                while not self.connection.remote_version:
+                    sleep(0.01)
+                result = self.connection.remote_version
+
+                # Identify BT version
+                if result.version in BT_VERSIONS:
+                    version = BT_VERSIONS[result.version]
+                else:
+                    version = result.version
+
+                # Identify BT company
+                if result.company in BT_MANUFACTURERS:
+                    company = BT_MANUFACTURERS[result.company]
+                else:
+                    company = result.company
+
+                # Return information
+                return (version, result.subversion, company)
+            else:
+                return None
 
     def export_profile(self):
         """Export GATT profile of the existing connection.

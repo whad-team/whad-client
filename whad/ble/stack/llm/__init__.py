@@ -48,6 +48,8 @@ class BleConnection(object):
         self.__l2cap = BleL2CAP(self)
         self.__encrypted = False
         self.__llcm = None
+        self.__version_sent = False
+        self.__version_remote = None
 
         self.__handlers = {
             CONNECTION_UPDATE_REQ: self.on_connection_update_req,
@@ -122,6 +124,10 @@ class BleConnection(object):
     @property
     def conn_handle(self):
         return self.__conn_handle
+    
+    @property
+    def remote_version(self):
+        return self.__version_remote
 
     def set_stk(self, stk):
         self.__encrypted = True
@@ -304,13 +310,15 @@ class BleConnection(object):
     def on_version_ind(self, version):
         """Send back our version info
         """
-        self.send_control(
-            BTLE_CTRL() / LL_VERSION_IND(
-                version=self.__llm.stack.bt_version,
-                company=self.__llm.stack.manufacturer_id,
-                subversion=self.__llm.stack.bt_sub_version
+        if not self.__version_sent:
+            self.send_control(
+                BTLE_CTRL() / LL_VERSION_IND(
+                    version=self.__llm.stack.bt_version,
+                    company=self.__llm.stack.manufacturer_id,
+                    subversion=self.__llm.stack.bt_sub_version
+                )
             )
-        )
+        self.__version_remote = version
 
     def on_reject_ind(self, reject):
         pass
@@ -339,10 +347,26 @@ class BleConnection(object):
     def on_length_rsp(self, length_rsp):
         pass
 
+    ##################################
+    # LLM control procedures
+    ##################################
 
-    ##################################
-    # Control PDU callbacks
-    ##################################
+    def send_version(self):
+        """Send LL_VERSION_IND PDU.
+        """
+        if not self.__version_sent:
+            # Mark version as sent
+            self.__version_sent = True
+
+            # Send LL_VERSION_IND PDU
+            self.send_control(
+                BTLE_CTRL() / LL_VERSION_IND(
+                    version=self.__llm.stack.bt_version,
+                    company=self.__llm.stack.manufacturer_id,
+                    subversion=self.__llm.stack.bt_sub_version
+                )
+            )
+
 
 class BleLinkLayerManager(object):
 
