@@ -28,6 +28,14 @@ class InvalidAccessAddressException(Exception):
     def __init__(self):
         super().__init__()
 
+#######################
+# Sniffing exception
+#######################
+
+class ConnectionLostException(Exception):
+    def __init__(self, connection):
+        super().__init__()
+        self.connection = connection
 
 #######################
 # Hook Exceptions
@@ -44,7 +52,7 @@ class HookReturnValue(Exception):
     """Raise this exception in a hook to return a specific value to the
     caller.
     """
-    
+
     def __init__(self, value):
         super().__init__()
         self.__value = value
@@ -113,4 +121,3 @@ class HookReturnAuthorRequired(Exception):
 
     def __init__(self):
         super().__init__()
-

