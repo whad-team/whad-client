@@ -70,8 +70,9 @@ class MACDataService(MACService):
             data.src_addr = self.database.get("macShortAddress")
         elif source_address_mode == MACAddressMode.EXTENDED:
             data.src_addr = self.database.get("macExtendedAddress")
-
         data = data/msdu
+
+
         ack = self.manager.send_data(data, wait_for_ack=wait_for_ack, source_address_mode=source_address_mode)
         return ack
 
@@ -489,6 +490,7 @@ class MACManager(Dot15d4Manager):
         sequence_number = self.database.get("macDataSequenceNumber")
         packet.seqnum = sequence_number
         self.database.set("macDataSequenceNumber", sequence_number + 1)
+        #packet.show()
         self.stack.send(packet)
         if wait_for_ack:
             try:

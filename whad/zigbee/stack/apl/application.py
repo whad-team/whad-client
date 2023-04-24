@@ -50,7 +50,7 @@ class ApplicationObject:
         return self.manager.send_interpan_data(asdu, asdu_handle=asdu_handle, source_address_mode=source_address_mode, destination_pan_id=destination_pan_id, destination_address=destination_address, profile_id=self.profile_id, cluster_id=cluster_id)
 
     def on_interpan_data(self, asdu, cluster_id=0, destination_pan_id=0xFFFF, destination_address=0xFFFF, source_pan_id=0xFFFF, source_address=0xFFFF, link_quality=255):
-        for cluster in self.input_clusters:
+        for cluster in self.input_clusters + self.output_clusters:
             if cluster.cluster_id == cluster_id:
                 cluster.on_interpan_data(asdu,  destination_pan_id=destination_pan_id, destination_address=destination_address, source_pan_id=source_pan_id, source_address=source_address, link_quality=link_quality)
                 return True

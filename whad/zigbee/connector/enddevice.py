@@ -28,6 +28,7 @@ class EndDevice(Zigbee):
             # If no application provided, attach a default ZCL application on endpoint 1
             app = ApplicationObject("zcl_app", 0x0104, 0x0100, device_version=0, input_clusters=[], output_clusters=[])
             self.stack.apl.attach_application(app, endpoint=1)
+
         else:
             for app in applications:
                 endpoint = 1

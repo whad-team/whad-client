@@ -3,8 +3,9 @@ from whad.zigbee.stack.apl.zcl.attributes import ZCLAttributes
 from whad.zigbee.stack.apl.zcl.commands import ZCLCommands
 from whad.zigbee.stack.apl.zcl.exceptions import ZCLCommandNotFound
 from whad.zigbee.stack.aps.constants import APSDestinationAddressMode
+from whad.zigbee.stack.mac.constants import MACAddressMode
 from scapy.layers.zigbee import ZigbeeClusterLibrary, ZCLGeneralReadAttributes
-from whad.scapy.layers.zll import ZCLGeneralDiscoverAttributes, ZCLGeneralDiscoverAttributesResponse
+from whad.scapy.layers.zll import ZCLGeneralDiscoverAttributes, ZCLGeneralDiscoverAttributesResponse, ZigbeeZLLCommissioningCluster
 from inspect import stack,signature
 from enum import IntEnum
 import logging
@@ -67,7 +68,11 @@ class ZCLClusterConfiguration:
                     acknowledged_transmission=False,
                     fragmentation_permitted=False,
                     include_extended_nonce=False,
-                    disable_default_response=False
+                    disable_default_response=False,
+                    interpan=False,
+                    asdu_handle=0,
+                    source_address_mode=MACAddressMode.EXTENDED,
+                    destination_pan_id=0xFFFF
     ):
         self.destination_address_mode = destination_address_mode
         self.destination_address = destination_address
@@ -82,6 +87,11 @@ class ZCLClusterConfiguration:
         self.fragmentation_permitted = fragmentation_permitted
         self.include_extended_nonce = include_extended_nonce
         self.disable_default_response = disable_default_response
+        self.interpan = interpan
+        self.asdu_handle=asdu_handle
+        self.source_address_mode=source_address_mode
+        self.destination_pan_id=destination_pan_id
+
 
 class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
     _transaction_counter = 0
@@ -182,7 +192,11 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                     acknowledged_transmission=False,
                     fragmentation_permitted=False,
                     include_extended_nonce=False,
-                    disable_default_response=False
+                    disable_default_response=False,
+                    interpan=False,
+                    asdu_handle=0,
+                    source_address_mode=MACAddressMode.EXTENDED,
+                    destination_pan_id=0xFFFF
     ):
         self.active_configuration = ZCLClusterConfiguration(
             destination_address_mode = destination_address_mode,
@@ -197,7 +211,11 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
             acknowledged_transmission = acknowledged_transmission,
             fragmentation_permitted = fragmentation_permitted,
             include_extended_nonce = include_extended_nonce,
-            disable_default_response = disable_default_response
+            disable_default_response = disable_default_response,
+            interpan=interpan,
+            asdu_handle=asdu_handle,
+            source_address_mode=source_address_mode,
+            destination_pan_id=destination_pan_id
         )
 
     def send_command(self, command):
@@ -249,28 +267,28 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                 disable_default_response=current_configuration.disable_default_response
         ) / command
 
-        if current_configuration.destination_address is not None:
-            return self.send_data(
+        if current_configuration.interpan:
+            asdu = ZigbeeZLLCommissioningCluster(
+                zcl_frametype=1 if cluster_specific else 0,
+                direction=0 if self.type == ZCLClusterType.CLIENT else 1,
+                command_identifier=command_id,
+                transaction_sequence=transaction,
+                disable_default_response=int(current_configuration.disable_default_response)
+            ) / command
+            return self.send_interpan_data(
                 asdu,
-                current_configuration.destination_address_mode,
-                current_configuration.destination_address,
-                current_configuration.destination_endpoint,
-                alias_address=current_configuration.alias_address,
-                alias_sequence_number=current_configuration.alias_sequence_number,
-                radius=current_configuration.radius,
-                security_enabled_transmission=current_configuration.security_enabled_transmission,
-                use_network_key=current_configuration.use_network_key,
-                acknowledged_transmission=current_configuration.acknowledged_transmission,
-                fragmentation_permitted=current_configuration.fragmentation_permitted,
-                include_extended_nonce=current_configuration.include_extended_nonce
+                asdu_handle=current_configuration.asdu_handle,
+                source_address_mode=current_configuration.source_address_mode,
+                destination_pan_id=current_configuration.destination_pan_id,
+                destination_address=current_configuration.destination_address
             )
         else:
-            for destination in self.destinations:
-                self.send_data(
+            if current_configuration.destination_address is not None:
+                return self.send_data(
                     asdu,
-                    APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT,
-                    destination["address"],
-                    destination["endpoint"],
+                    current_configuration.destination_address_mode,
+                    current_configuration.destination_address,
+                    current_configuration.destination_endpoint,
                     alias_address=current_configuration.alias_address,
                     alias_sequence_number=current_configuration.alias_sequence_number,
                     radius=current_configuration.radius,
@@ -280,7 +298,70 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                     fragmentation_permitted=current_configuration.fragmentation_permitted,
                     include_extended_nonce=current_configuration.include_extended_nonce
                 )
+            else:
+                for destination in self.destinations:
+                    self.send_data(
+                        asdu,
+                        APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT,
+                        destination["address"],
+                        destination["endpoint"],
+                        alias_address=current_configuration.alias_address,
+                        alias_sequence_number=current_configuration.alias_sequence_number,
+                        radius=current_configuration.radius,
+                        security_enabled_transmission=current_configuration.security_enabled_transmission,
+                        use_network_key=current_configuration.use_network_key,
+                        acknowledged_transmission=current_configuration.acknowledged_transmission,
+                        fragmentation_permitted=current_configuration.fragmentation_permitted,
+                        include_extended_nonce=current_configuration.include_extended_nonce
+                    )
 
+
+    def on_interpan_data(self, asdu,destination_pan_id, destination_address, source_pan_id, source_address, link_quality):
+        command_identifier = asdu.command_identifier
+        commands = self.cluster_specific_commands if asdu.zcl_frametype == 1 else self.profile_wide_commands
+        try:
+            command = commands.get_command_by_id(command_identifier)
+            if command.receive_callback is None:
+                raise ZCLCommandNotFound
+            # Adapt informations to callbacks parameters
+            parameters = []
+            callback_parameters = signature(command.receive_callback).parameters
+            if ZigbeeClusterLibrary in asdu:
+                base_class = ZigbeeClusterLibrary
+            elif ZigbeeZLLCommissioningCluster in asdu:
+                base_class = ZigbeeZLLCommissioningCluster
+            for name, parameter in callback_parameters.items():
+                if int(parameter.kind) == 1:
+                    if name in ("payload","command"):
+                        parameters += [asdu[base_class].payload]
+                    elif name in ("source","src", "source_address"):
+                        parameters += [source_address]
+                    elif name in ("source_pan_id", "src_panid","source_panid"):
+                        parameters += [source_pan_id]
+                    elif name in ("destination","dest", "dest_address","destination_address"):
+                        parameters += [destination_address]
+                    elif name in ("destination_pan_id","dest_panid", "destination_panid"):
+                        parameters += [destination_pan_id]
+                    elif name in ("link_quality", "lqi"):
+                        parameters += [link_quality]
+                    elif name in ("transaction", "transaction_sequence"):
+                        parameters += [asdu[base_class].transaction_sequence]
+                    elif name in ("no_response", "disable_default_response"):
+                        parameters += [asdu[base_class].disable_default_response]
+
+            logger.info("[zcl] Cluster {} (cluster_id={}) Receiving {} interpan command '{}' (command_id={})".format(
+                self.__class__.__name__,
+                hex(self.cluster_id),
+                "cluster specific" if asdu.zcl_frametype == 1 else "profile wide",
+                command.name,
+                hex(command_identifier))
+            )
+            return_value = command.receive_callback(*parameters)
+            if asdu.transaction_sequence in self.pending_responses:
+                self.pending_responses[asdu.transaction_sequence] = return_value
+
+        except ZCLCommandNotFound:
+            logger.info("[zcl] command not found (command_identifier = 0x{:02x})".format(command_identifier))
 
     def on_data(self, asdu, source_address, source_address_mode, security_status, link_quality):
         command_identifier = asdu.command_identifier
@@ -398,8 +479,8 @@ class ZCLClientCluster(ZCLCluster):
         return subclasses
 
     def __init__(self, cluster_id, default_configuration=ZCLClusterConfiguration()):
-        super().__init__(cluster_id, ZCLClusterType.CLIENT)
+        super().__init__(cluster_id, ZCLClusterType.CLIENT, default_configuration=default_configuration)
 
 class ZCLServerCluster(ZCLCluster):
     def __init__(self, cluster_id, default_configuration=ZCLClusterConfiguration()):
-        super().__init__(cluster_id, ZCLClusterType.SERVER)
+        super().__init__(cluster_id, ZCLClusterType.SERVER, default_configuration=default_configuration)

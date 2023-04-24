@@ -3,6 +3,7 @@ from whad.zigbee.stack.aps.constants import APSDestinationAddressMode
 from whad.zigbee.stack.mac.constants import MACScanType
 from whad.device import WhadDevice
 from whad.zigbee.crypto import NetworkLayerCryptoManager
+from whad.zigbee.stack.apl.zcl.clusters import ZCLTouchLinkClient
 from whad.exceptions import WhadDeviceNotFound
 from whad.zigbee.stack.apl.application import ApplicationObject
 from time import time,sleep
@@ -14,11 +15,11 @@ import sys
 
 import logging
 logging.basicConfig(level=logging.WARNING)
-#logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
-#logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
-#logging.getLogger('whad.zigbee.stack.aps').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.aps').setLevel(logging.INFO)
 logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
-#logging.getLogger('whad.zigbee.stack.apl.zcl').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.apl.zcl').setLevel(logging.INFO)
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -29,10 +30,24 @@ if __name__ == '__main__':
             #monitor = PcapWriterMonitor("/tmp/decrypt.pcap")
 
             dev = WhadDevice.create(interface)
-            endDevice = EndDevice(dev)
+            touchlink = ZCLTouchLinkClient()
+            zll = ApplicationObject("zll_app", 0xc05e, 0x0100, device_version=0, input_clusters=[], output_clusters=[])
+            zll.add_output_cluster(touchlink)
+            endDevice = EndDevice(dev, [zll])
+
             endDevice.start()
             selected_network = None
+            #endDevice.stack.apl.get_service("zdo").network_manager.configure_extended_address(0x000b57fffe209d2f)
 
+            channel = 16
+
+            while True:
+                endDevice.set_channel(channel)
+                touchlink.scan_request(address_assignment=True, factory_new=False, link_initiator=True)
+                sleep(0.2)
+                channel = channel + 1 if channel != 26 else 11
+
+            exit()
             print("[i] Discovering networks.")
             for network in endDevice.discover_networks():
                 print("[i] Network detected: ", network)

@@ -1,7 +1,7 @@
 from scapy.layers.zigbee import ZigBeeBeacon, ZigbeeNWKStub, ZigbeeNWK, \
     ZigbeeSecurityHeader, ZigbeeNWKCommandPayload, ZigbeeAppDataPayload, \
     ZigbeeAppDataPayloadStub, LinkStatusEntry
-from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster
+from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster, NewZigbeeAppDataPayloadStub
 from scapy.fields import FlagValueIter
 from whad.zigbee.crypto import NetworkLayerCryptoManager
 from .exceptions import NWKTimeoutException
@@ -461,7 +461,7 @@ class NWKInterpanService(NWKService):
         super().__init__(manager, name="nwk_interpan")
 
     @Dot15d4Service.request("INTRP-DATA")
-    def interpan_data(self,asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, profile_id=0, cluster_id=0):
+    def interpan_data(self,asdu, asdu_handle=0, source_address_mode=MACAddressMode.EXTENDED, destination_pan_id=0xFFFF, destination_address=0xFFFF, profile_id=0, cluster_id=0):
         if destination_address == 0xFFFF:
             delivery_mode = 2
         else:
@@ -472,6 +472,7 @@ class NWKInterpanService(NWKService):
             delivery_mode=delivery_mode,
             data=asdu
         )
+
         self.manager.mac.get_service("data").data(
             data,
             source_address_mode=source_address_mode,
@@ -483,7 +484,10 @@ class NWKInterpanService(NWKService):
     def on_interpan_npdu(self, pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality):
         profile_id = pdu.profile
         cluster_id = pdu.cluster
-        asdu = pdu[ZigbeeAppDataPayloadStub].data
+        if NewZigbeeAppDataPayloadStub in pdu:
+            asdu = bytes(pdu[NewZigbeeAppDataPayloadStub].payload)
+        elif ZigbeeAppDataPayloadStub in pdu:
+            asdu = pdu[ZigbeeAppDataPayloadStub].data
 
         if profile_id == 0xc05e and cluster_id == 0x1000:
             asdu = ZigbeeZLLCommissioningCluster(asdu)
@@ -597,7 +601,7 @@ class NWKManager(Dot15d4Manager):
             return pdu, False
 
     def on_mcps_data(self, pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality):
-        if ZigbeeNWKStub in pdu and ZigbeeAppDataPayloadStub in pdu:
+        if ZigbeeNWKStub in pdu and (ZigbeeAppDataPayloadStub in pdu or NewZigbeeAppDataPayloadStub in pdu):
             self.get_service("interpan").on_interpan_npdu(pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality)
         elif ZigbeeNWK in pdu:
             if ZigbeeSecurityHeader not in pdu and self.database.get("nwkSecureAllFrames"):

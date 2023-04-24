@@ -1,9 +1,39 @@
-from whad.zigbee.stack.apl.zcl import ZCLCluster
+from whad.zigbee.stack.apl.zcl import ZCLCluster, ZCLClientCluster, ZCLServerCluster, ZCLClusterConfiguration
 from whad.zigbee.stack.mac.constants import MACAddressMode
 from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster, ZLLScanRequest
 from random import randint
-# TODO: old version, refactoring needed
 
+
+class ZCLTouchLinkClient(ZCLClientCluster):
+
+    def __init__(self):
+        super().__init__(cluster_id=0x1000, default_configuration=ZCLClusterConfiguration(destination_address=0xFFFF,destination_pan_id =0xFFFF, interpan=True, disable_default_response=True))
+
+    @ZCLCluster.command_generate(0x00, "ScanRequest")
+    def scan_request(self, transaction_id=None, link_initiator=True, address_assignment=True, factory_new=True):
+        if transaction_id is None:
+            transaction_id = randint(0, 0xFFFFFFFF)
+        node_descriptor = self.application.manager.get_application_by_name("zdo").configuration.get("configNodeDescriptor")
+        command = ZLLScanRequest(
+            inter_pan_transaction_id=transaction_id,
+            rx_on_when_idle=int(node_descriptor.receiver_on_when_idle),
+            logical_type=int(node_descriptor.logical_type),
+            link_initiator=link_initiator,
+            address_assignment=address_assignment,
+            factory_new=factory_new
+        )
+
+        self.send_command(command)
+
+
+    @ZCLCluster.command_receive(0x01, "ScanResponse")
+    def on_scan_response(self, command):
+        command.show()
+
+        #status = self.wait_response()
+        #return status == 0
+
+# TODO: old version, refactoring needed
 '''
 class ZCLTouchLink(ZCLCluster):
     def __init__(self):
