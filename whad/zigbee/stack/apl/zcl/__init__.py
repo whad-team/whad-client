@@ -267,6 +267,7 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                 disable_default_response=current_configuration.disable_default_response
         ) / command
 
+
         if current_configuration.interpan:
             asdu = ZigbeeZLLCommissioningCluster(
                 zcl_frametype=1 if cluster_specific else 0,
@@ -280,7 +281,10 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                 asdu_handle=current_configuration.asdu_handle,
                 source_address_mode=current_configuration.source_address_mode,
                 destination_pan_id=current_configuration.destination_pan_id,
-                destination_address=current_configuration.destination_address
+                destination_address=current_configuration.destination_address,
+                destination_address_mode=current_configuration.destination_address_mode,
+                acknowledged_transmission=current_configuration.acknowledged_transmission
+
             )
         else:
             if current_configuration.destination_address is not None:

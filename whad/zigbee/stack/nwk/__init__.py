@@ -461,7 +461,7 @@ class NWKInterpanService(NWKService):
         super().__init__(manager, name="nwk_interpan")
 
     @Dot15d4Service.request("INTRP-DATA")
-    def interpan_data(self,asdu, asdu_handle=0, source_address_mode=MACAddressMode.EXTENDED, destination_pan_id=0xFFFF, destination_address=0xFFFF, profile_id=0, cluster_id=0):
+    def interpan_data(self,asdu, asdu_handle=0, source_address_mode=MACAddressMode.EXTENDED,destination_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, profile_id=0, cluster_id=0, acknowledged_transmission=False):
         if destination_address == 0xFFFF:
             delivery_mode = 2
         else:
@@ -478,7 +478,8 @@ class NWKInterpanService(NWKService):
             source_address_mode=source_address_mode,
             destination_pan_id=destination_pan_id,
             destination_address=destination_address,
-            wait_for_ack=False
+            destination_address_mode=destination_address_mode,
+            wait_for_ack=acknowledged_transmission
         )
 
     def on_interpan_npdu(self, pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality):

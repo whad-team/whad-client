@@ -46,8 +46,9 @@ class ApplicationObject:
             application=self
         )
 
-    def send_interpan_data(self, asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, cluster_id=0):
-        return self.manager.send_interpan_data(asdu, asdu_handle=asdu_handle, source_address_mode=source_address_mode, destination_pan_id=destination_pan_id, destination_address=destination_address, profile_id=self.profile_id, cluster_id=cluster_id)
+    def send_interpan_data(self, asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF,destination_address_mode=MACAddressMode.SHORT, cluster_id=0, acknowledged_transmission=False):
+        print(acknowledged_transmission)
+        return self.manager.send_interpan_data(asdu, asdu_handle=asdu_handle, source_address_mode=source_address_mode, destination_pan_id=destination_pan_id, destination_address=destination_address, destination_address_mode=destination_address_mode, profile_id=self.profile_id, cluster_id=cluster_id, acknowledged_transmission=acknowledged_transmission)
 
     def on_interpan_data(self, asdu, cluster_id=0, destination_pan_id=0xFFFF, destination_address=0xFFFF, source_pan_id=0xFFFF, source_address=0xFFFF, link_quality=255):
         for cluster in self.input_clusters + self.output_clusters:

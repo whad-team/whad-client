@@ -22,13 +22,17 @@ class Cluster:
             cluster_id=self.cluster_id
         )
 
-    def send_interpan_data(self, asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF):
+    def send_interpan_data(self, asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, destination_address_mode=MACAddressMode.SHORT, acknowledged_transmission=False):
+        
+
         return self.application.send_interpan_data(
             asdu,
             asdu_handle=asdu_handle,
             source_address_mode=source_address_mode,
             destination_pan_id=destination_pan_id,
             destination_address=destination_address,
+            destination_address_mode=destination_address_mode,
+            acknowledged_transmission=acknowledged_transmission,
             cluster_id=self.cluster_id
         )
 

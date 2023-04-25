@@ -56,7 +56,7 @@ class MACDataService(MACService):
         super().__init__(manager, name="mac_data")
 
     @Dot15d4Service.request("MCPS-DATA")
-    def data(self, msdu, msdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, pan_id_suppressed=False, sequence_number_suppressed=False, wait_for_ack=False):
+    def data(self, msdu, msdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, destination_address_mode=MACAddressMode.SHORT, pan_id_suppressed=False, sequence_number_suppressed=False, wait_for_ack=False):
 
         data = Dot15d4Data()
         if destination_pan_id is not None:
@@ -73,7 +73,7 @@ class MACDataService(MACService):
         data = data/msdu
 
 
-        ack = self.manager.send_data(data, wait_for_ack=wait_for_ack, source_address_mode=source_address_mode)
+        ack = self.manager.send_data(data, wait_for_ack=wait_for_ack, source_address_mode=source_address_mode, destination_address_mode=destination_address_mode)
         return ack
 
     def on_data_pdu(self, pdu):
@@ -474,7 +474,7 @@ class MACManager(Dot15d4Manager):
         self.stack.send(ack)
     """
 
-    def send_data(self, packet, wait_for_ack=False, return_ack=False, source_address_mode=None):
+    def send_data(self, packet, wait_for_ack=False, return_ack=False, source_address_mode=None, destination_address_mode=None):
         if source_address_mode is not None:
             if source_address_mode == MACAddressMode.NONE:
                 fcf_srcaddrmode = 0
@@ -482,15 +482,28 @@ class MACManager(Dot15d4Manager):
                 fcf_srcaddrmode = 2
             else:
                 fcf_srcaddrmode = 3
-            packet = Dot15d4(fcf_srcaddrmode=fcf_srcaddrmode)/packet
         else:
-            packet = Dot15d4()/packet
+            fcf_srcaddrmode = 2
+
+        if destination_address_mode is not None:
+            if destination_address_mode == MACAddressMode.NONE:
+                fcf_destaddrmode = 0
+            elif destination_address_mode == MACAddressMode.SHORT:
+                fcf_destaddrmode = 2
+            else:
+                fcf_destaddrmode = 3
+        else:
+            fcf_destaddrmode = 2
+
+
+        packet = Dot15d4(fcf_srcaddrmode=fcf_srcaddrmode, fcf_destaddrmode=fcf_destaddrmode)/packet
+        packet.show()
         if wait_for_ack:
             packet.fcf_ackreq = 1
         sequence_number = self.database.get("macDataSequenceNumber")
         packet.seqnum = sequence_number
         self.database.set("macDataSequenceNumber", sequence_number + 1)
-        #packet.show()
+        packet.show()
         self.stack.send(packet)
         if wait_for_ack:
             try:

@@ -61,8 +61,8 @@ class APLManager(Dot15d4Manager):
         for application in self.endpoints.values():
             yield application
 
-    def send_interpan_data(self, asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, profile_id=0, cluster_id=0):
-        return self.aps.get_service("interpan").interpan_data(asdu, asdu_handle=asdu_handle, source_address_mode=source_address_mode, destination_pan_id=destination_pan_id, destination_address=destination_address, profile_id=profile_id, cluster_id=cluster_id)
+    def send_interpan_data(self, asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, destination_address_mode=MACAddressMode.SHORT, profile_id=0, cluster_id=0, acknowledged_transmission=False):
+        return self.aps.get_service("interpan").interpan_data(asdu, asdu_handle=asdu_handle, source_address_mode=source_address_mode, destination_pan_id=destination_pan_id, destination_address=destination_address,destination_address_mode=destination_address_mode, profile_id=profile_id, cluster_id=cluster_id, acknowledged_transmission=acknowledged_transmission)
 
     def send_data(self, asdu, destination_address_mode, destination_address, destination_endpoint, alias_address=None, alias_sequence_number=0, radius=30, security_enabled_transmission=False, use_network_key=False, acknowledged_transmission=False, fragmentation_permitted=False, include_extended_nonce=False, cluster_id=None, profile_id=None, application=None):
         selected_endpoint = None

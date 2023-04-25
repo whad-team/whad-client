@@ -353,8 +353,8 @@ class APSInterpanPseudoService(APSService):
     APS pseudo service forwarding interpan operations.
     """
     @Dot15d4Service.request("INTRP-DATA")
-    def interpan_data(self,asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, profile_id=0, cluster_id=0):
-        return self.manager.nwk.get_service("interpan").interpan_data(asdu, asdu_handle=asdu_handle, source_address_mode=source_address_mode, destination_pan_id=destination_pan_id, destination_address=destination_address, profile_id=profile_id, cluster_id=cluster_id)
+    def interpan_data(self,asdu, asdu_handle=0, source_address_mode=MACAddressMode.SHORT, destination_address_mode=MACAddressMode.SHORT, destination_pan_id=0xFFFF, destination_address=0xFFFF, profile_id=0, cluster_id=0, acknowledged_transmission=False):
+        return self.manager.nwk.get_service("interpan").interpan_data(asdu, asdu_handle=asdu_handle, source_address_mode=source_address_mode, destination_pan_id=destination_pan_id, destination_address=destination_address,destination_address_mode=destination_address_mode, profile_id=profile_id, cluster_id=cluster_id, acknowledged_transmission=acknowledged_transmission)
 
     @Dot15d4Service.indication("INTRP-DATA")
     def indicate_interpan_data(self, asdu, profile_id=0, cluster_id=0, destination_pan_id=0xFFFF, destination_address=0xFFFF, source_pan_id=0xFFFF, source_address=0xFFFF, link_quality=255):
