@@ -1,6 +1,7 @@
 from whad.zigbee.stack.apl.zcl import ZCLCluster, ZCLClientCluster, ZCLServerCluster, ZCLClusterConfiguration
 from whad.zigbee.stack.mac.constants import MACAddressMode
-from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster, ZLLScanRequest, ZLLIdentifyRequest, ZLLResetToFactoryNewRequest
+from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster, ZLLScanRequest, ZLLIdentifyRequest, \
+    ZLLDeviceInformationRequest, ZLLResetToFactoryNewRequest
 from random import randint
 
 
@@ -33,12 +34,33 @@ class ZCLTouchLinkClient(ZCLClientCluster):
         if command.inter_pan_transaction_id == self.transaction_id:
             command.show()
             #self.identify_request(transaction_id=self.transaction_id, identify_duration=5, destination_address=source_address)
+
+            '''
             self.reset_to_factory_new(
             transaction_id=self.transaction_id,
             destination_address=source_address
             )
+            '''
+            self.device_information_request(transaction_id=self.transaction_id, start_index=0, destination_address=source_address)
         #status = self.wait_response()
         #return status == 0
+
+    @ZCLCluster.command_generate(0x02, "DeviceInformationRequest")
+    def device_information_request(self,transaction_id=None, start_index=0, destination_address=None):
+        if transaction_id is None:
+            transaction_id = randint(0, 0xFFFFFFFF)
+            self.transaction_id = transaction_id
+
+        self.configure(
+            destination_address=destination_address,
+            destination_address_mode=MACAddressMode.EXTENDED,
+            interpan=True,
+            acknowledged_transmission=True,
+            disable_default_response=True
+        )
+
+        command = ZLLDeviceInformationRequest(inter_pan_transaction_id=transaction_id, start_index=start_index)
+        self.send_command(command)
 
     @ZCLCluster.command_generate(0x06, "IdentifyRequest")
     def identify_request(self,transaction_id=None, identify_duration=1, destination_address=None):

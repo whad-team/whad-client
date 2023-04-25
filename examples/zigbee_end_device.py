@@ -44,7 +44,7 @@ if __name__ == '__main__':
             while True:
                 endDevice.set_channel(channel)
                 touchlink.scan_request(address_assignment=True, factory_new=False, link_initiator=True)
-                sleep(0.2)
+                sleep(0.1)
                 channel = channel + 1 if channel != 26 else 11
 
             exit()

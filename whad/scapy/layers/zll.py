@@ -127,9 +127,45 @@ class ZLLDeviceInformationRequest(Packet):
     fields_desc = [
         # Inter-PAN transaction identifier (4 octets)
         XLEIntField("inter_pan_transaction_id", 0x66666666),
-	# Start index of device table (1 octet)
+       # Start index of device table (1 octet)
         ByteField("start_index", 0),
     ]
+
+class ZLLDeviceInformationRecord(Packet):
+    name = "ZLL: Device Information Record"
+    fields_desc = [
+        # Extended PAN identifier (8 octets)
+        dot15d4AddressField("ieee_address", 0, adjust=lambda pkt,x: 8),
+        # Endpoint identifier (1 octet)
+        ByteField("endpoint_id", 0x00),
+        # Profile identifier (2 octets)
+        XLEShortField("profile_id", 0x0000),
+        # Device identifier (2 octets)
+        XLEShortField("device_id", 0x0000),
+        # Version (1 octet)
+        ByteField("version", 0),
+        # Group identifier count (1 octet)
+        ByteField("group_identifier_count", 0),
+        # Sort (1 octet)
+        ByteField("sort", 0),
+
+    ]
+
+class ZLLDeviceInformationResponse(Packet):
+    name = "ZLL: Device Information Response"
+    fields_desc = [
+        # Inter-PAN transaction identifier (4 octets)
+        XLEIntField("inter_pan_transaction_id", 0x66666666),
+        # Number of sub devices (1 octet)
+        ByteField("number_of_sub_devices", 0),
+        # Start index of device table (1 octet)
+        ByteField("start_index", 0),
+        # Device information record count (1 octet)
+        ByteField("device_information_record_count", 0),
+        # Device Information record (variable)
+        PacketListField("device_information_record", [], ZLLDeviceInformationRecord)
+    ]
+
 
 class ZLLIdentifyRequest(Packet):
     name = "ZLL: Identify Request"
@@ -439,7 +475,7 @@ class ZCLGeneralDiscoverAttributesResponse(Packet):
 class ZCLGeneralDefaultResponse(Packet):
     name = "General Domain: Command Frame Payload: default_response"
     fields_desc = [
-        ByteField("response_to_command", None), 
+        ByteField("response_to_command", None),
         ByteEnumField("status", 0, _zcl_enumerated_status_values),
     ]
 
@@ -458,6 +494,8 @@ bind_layers( ZigbeeZLLCommissioningCluster, ZLLScanResponse,
         command_identifier=0x01, direction=1)
 bind_layers( ZigbeeZLLCommissioningCluster, ZLLDeviceInformationRequest,
         command_identifier=0x03, direction=0)
+bind_layers( ZigbeeZLLCommissioningCluster, ZLLDeviceInformationResponse,
+        command_identifier=0x03, direction=1)
 bind_layers( ZigbeeZLLCommissioningCluster, ZLLIdentifyRequest,
         command_identifier=0x06, direction=0)
 bind_layers( ZigbeeZLLCommissioningCluster, ZLLResetToFactoryNewRequest,
