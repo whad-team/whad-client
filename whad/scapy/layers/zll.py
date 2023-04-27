@@ -2,7 +2,8 @@ from scapy.layers.zigbee import ZigbeeDeviceProfile, ZigbeeAppDataPayloadStub, Z
     _zcl_profile_identifier, _zcl_attribute_data_types, _zcl_enumerated_status_values, _DiscreteString, \
     _zcl_cluster_identifier, ZigbeeNWKStub
 from scapy.fields import BitEnumField, BitField, ByteEnumField, ByteField, ConditionalField, \
-    FlagsField, XBitField, XLEIntField, XLEShortField, EnumField, XShortField, PacketListField
+    FlagsField, XBitField, XLEIntField, XLEShortField, EnumField, XShortField, PacketListField, \
+    StrFixedLenField
 from scapy.layers.dot15d4 import dot15d4AddressField
 from scapy.packet import Packet, bind_layers
 
@@ -255,7 +256,7 @@ class ZLLNetworkJoinRouterRequest(Packet):
         # Key index (1 octets)
         ByteField("key_index", 4),  # default: Master key
         # Encrypted network key (16 octets)
-        XBitField("encrypted_network_key", 0, 128),
+        StrFixedLenField("encrypted_network_key", None, length=16),#XBitField("encrypted_network_key", 0, 128),
         # Network update identifier (1 octet)
         ByteField("network_update_id", 0x00),
         # Logical channel (1 octet)

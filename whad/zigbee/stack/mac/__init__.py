@@ -377,7 +377,6 @@ class MACManager(Dot15d4Manager):
         return self.database
 
     def on_pdu(self, pdu):
-        pdu.show()
         if self.match_filter(pdu):
             if pdu.fcf_frametype == 0x01 or Dot15d4Data in pdu:
                 self.get_service("data").on_data_pdu(pdu)
@@ -484,7 +483,7 @@ class MACManager(Dot15d4Manager):
             else:
                 fcf_srcaddrmode = 3
         else:
-            fcf_srcaddrmode = 2
+            fcf_srcaddrmode = 0
 
         if destination_address_mode is not None:
             if destination_address_mode == MACAddressMode.NONE:
@@ -496,7 +495,6 @@ class MACManager(Dot15d4Manager):
         else:
             fcf_destaddrmode = 2
 
-
         packet = Dot15d4(fcf_srcaddrmode=fcf_srcaddrmode, fcf_destaddrmode=fcf_destaddrmode)/packet
 
         if wait_for_ack:
@@ -504,7 +502,6 @@ class MACManager(Dot15d4Manager):
         sequence_number = self.database.get("macDataSequenceNumber")
         packet.seqnum = sequence_number
         self.database.set("macDataSequenceNumber", sequence_number + 1)
-
         self.stack.send(packet)
         if wait_for_ack:
             try:

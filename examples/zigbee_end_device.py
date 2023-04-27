@@ -15,10 +15,10 @@ import sys
 
 import logging
 logging.basicConfig(level=logging.WARNING)
-logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
-logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
-logging.getLogger('whad.zigbee.stack.aps').setLevel(logging.INFO)
-logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
+#logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
+#logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
+#logging.getLogger('whad.zigbee.stack.aps').setLevel(logging.INFO)
+#logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
 logging.getLogger('whad.zigbee.stack.apl.zcl').setLevel(logging.INFO)
 
 if __name__ == '__main__':
@@ -30,30 +30,18 @@ if __name__ == '__main__':
             #monitor = PcapWriterMonitor("/tmp/decrypt.pcap")
 
             dev = WhadDevice.create(interface)
-            touchlink = ZCLTouchLinkClient()
-            zll = ApplicationObject("zll_app", 0xc05e, 0x0100, device_version=0, input_clusters=[], output_clusters=[])
-            zll.add_output_cluster(touchlink)
-            endDevice = EndDevice(dev, [zll])
-
+            endDevice = EndDevice(dev)
             endDevice.start()
+
+            """
             selected_network = None
-            #endDevice.stack.apl.get_service("zdo").network_manager.configure_extended_address(0x000b57fffe209d2f)
-
-            channel = 16
-
-            while True:
-                endDevice.set_channel(channel)
-                touchlink.scan_request(address_assignment=True, factory_new=False, link_initiator=True)
-                sleep(0.1)
-                channel = channel + 1 if channel != 26 else 11
-
-            exit()
             print("[i] Discovering networks.")
             for network in endDevice.discover_networks():
                 print("[i] Network detected: ", network)
                 if network.extended_pan_id == 0xf4ce3673877b2d89:
                     selected_network = network
 
+            print(endDevice.stack.apl.get_application_by_name("zdo").device_and_service_discovery.discover_devices())
             print("[i] Joining network: ", selected_network)
             selected_network.join()
             try:
@@ -73,6 +61,7 @@ if __name__ == '__main__':
                                 onoff.toggle()
             except KeyboardInterrupt:
                 selected_network.leave()
+            
             #discover()
             #print(selected_network.devices)
 
@@ -141,3 +130,27 @@ if __name__ == '__main__':
             exit(1)
     else:
         print('Usage: %s [device]' % sys.argv[0])
+
+
+'''
+touchlink = ZCLTouchLinkClient()
+zll = ApplicationObject("zll_app", 0xc05e, 0x0100, device_version=0, input_clusters=[], output_clusters=[])
+zll.add_output_cluster(touchlink)
+endDevice = EndDevice(dev, [zll])
+
+
+endDevice.start()
+selected_network = None
+#endDevice.stack.apl.get_service("zdo").network_manager.configure_extended_address(0x000b57fffe209d2f)
+
+touchlink_channels = [11, 15, 20, 25]
+channel=25
+
+endDevice.set_channel(channel)
+touchlink.scan_request(address_assignment=True, factory_new=False, link_initiator=True)
+sleep(5)
+endDevice.stack.apl.get_service("zdo").network_manager.configure_short_address(0x0024)
+endDevice.stack.apl.get_service("zdo").network_manager.configure_extended_pan_id(0x1122334455667788)
+endDevice.stack.apl.get_service("zdo").security_manager.provision_network_key("11223344556677881122334455667788")
+endDevice.stack.nwk.get_service("management").join(0x1122334455667788)
+'''

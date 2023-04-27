@@ -1,7 +1,8 @@
 from whad.zigbee.stack.apl.zcl import ZCLCluster, ZCLClientCluster, ZCLServerCluster, ZCLClusterConfiguration
 from whad.zigbee.stack.mac.constants import MACAddressMode
 from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster, ZLLScanRequest, ZLLIdentifyRequest, \
-    ZLLDeviceInformationRequest, ZLLResetToFactoryNewRequest
+    ZLLDeviceInformationRequest, ZLLResetToFactoryNewRequest, ZLLNetworkJoinRouterRequest
+from whad.zigbee.crypto import TouchlinkKeyManager
 from random import randint
 
 
@@ -33,6 +34,14 @@ class ZCLTouchLinkClient(ZCLClientCluster):
     def on_scan_response(self, command, source_address):
         if command.inter_pan_transaction_id == self.transaction_id:
             command.show()
+            self.network_join_router_request(
+                transaction_id=self.transaction_id,
+                response_id=command.response_id,
+                destination_address=source_address,
+                extended_pan_id=0x1122334455667788,
+                network_address=0x0024,
+                key_index=4,
+            )
             #self.identify_request(transaction_id=self.transaction_id, identify_duration=5, destination_address=source_address)
 
             '''
@@ -41,9 +50,11 @@ class ZCLTouchLinkClient(ZCLClientCluster):
             destination_address=source_address
             )
             '''
-            self.device_information_request(transaction_id=self.transaction_id, start_index=0, destination_address=source_address)
+            #self.device_information_request(transaction_id=self.transaction_id, start_index=0, destination_address=source_address)
         #status = self.wait_response()
         #return status == 0
+
+
 
     @ZCLCluster.command_generate(0x02, "DeviceInformationRequest")
     def device_information_request(self,transaction_id=None, start_index=0, destination_address=None):
@@ -94,6 +105,48 @@ class ZCLTouchLinkClient(ZCLClientCluster):
         )
         command = ZLLResetToFactoryNewRequest(inter_pan_transaction_id=transaction_id)
         self.send_command(command)
+
+    @ZCLCluster.command_generate(0x12, "NetworkJoinRouterRequest")
+    def network_join_router_request(self,transaction_id=None, response_id=None, destination_address=None, key_index=4, network_update_id=0, key=bytes.fromhex("11223344556677881122334455667788"), logical_channel=25, pan_id=0x1234, extended_pan_id=0x0102030405060708, network_address=0x0001):
+        if transaction_id is None:
+            transaction_id = randint(0, 0xFFFFFFFF)
+            self.transaction_id = transaction_id
+
+        self.configure(
+            destination_address=destination_address,
+            destination_address_mode=MACAddressMode.EXTENDED,
+            interpan=True,
+            acknowledged_transmission=True,
+            disable_default_response=True
+        )
+
+        encrypted_key = TouchlinkKeyManager(
+            unencrypted_key=key,
+            response_id=response_id,
+            transaction_id=transaction_id,
+            key_index=key_index
+        ).encrypted_key
+
+        command = ZLLNetworkJoinRouterRequest(
+            inter_pan_transaction_id=transaction_id,
+            pan_id_ext=extended_pan_id,
+            key_index=key_index,
+            encrypted_network_key=encrypted_key,
+            network_update_id=network_update_id,
+            channel=logical_channel,
+            pan_id=pan_id,
+            network_address=network_address
+        )
+        command.show()
+        self.send_command(command)
+
+
+    @ZCLCluster.command_receive(0x13, "NetworkJoinRouterResponse")
+    def on_network_join_router_response(self, command, source_address):
+        command.show()
+        if command.inter_pan_transaction_id == self.transaction_id:
+            print("Touchlink provisionning OK !")
+            exit()
 
 # TODO: old version, refactoring needed
 '''
