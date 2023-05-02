@@ -2,7 +2,9 @@ from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAc
 from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
 from whad.device.virtual.yard.constants import YardStickOneId, YardStickOneEndPoints, \
-    YardApplications, YardSystemCommands, YardRadioStructure, YardRFStates, YardMemoryRegisters
+    YardApplications, YardSystemCommands, YardRadioStructure, YardRFStates, \
+    YardMemoryRegisters, YardMARCStates, YardCCA, YardFrequencyTransitionPoints, \
+    YardNICCommands, YardVCOType
 from whad.helpers import message_filter,is_message_type
 from whad import WhadDomain, WhadCapability
 from whad.protocol.generic_pb2 import ResultCode
@@ -81,14 +83,23 @@ class YardStickOneDevice(VirtualDevice):
         self._fw_version = self._get_firmware_version()
         self._dev_capabilities = self._get_capabilities()
 
-        self.__opened_stream = True
         self.__opened = True
 
         self.radio_structure = YardRadioStructure(self._poke, self._peek)
         print(self.radio_structure)
+
         self._set_idle_mode()
+        self.set_test_config()
+        self._set_rx_mode()
+        self._strobe_rx_mode()
+
+
         # Ask parent class to run a background I/O thread
         super().open()
+        self.__opened_stream = True
+
+        while True:
+            sleep(1)
 
     def write(self, data):
         if not self.__opened:
@@ -98,20 +109,17 @@ class YardStickOneDevice(VirtualDevice):
         if not self.__opened:
             raise WhadDeviceNotReady()
 
-        if False:
+        if self.__opened_stream:
             try:
-                data = self._yard_read_response()
-                self.__in_buffer += data
-                print(self.__in_buffer)
-                if self.__in_buffer.startswith(b"@"):
-                    if len(self.__in_buffer) >= 3:
-                        size = unpack("<H", self.__in_buffer[3:5])[0]
-                        if len(self.__in_buffer) >= 5 + size:
-                            app = self.__in_buffer[1]
-                            verb = self.__in_buffer[2]
-                            data = self.__in_buffer[5:5+size]
-                            self.__queue.put((app, verb, data))
-                            self.__in_buffer = self.__in_buffer[5+size:]
+                self._yard_send_command(YardApplications.NIC, YardNICCommands.SET_RECV_LARGE, pack("<H", 200))
+                data = self._yard_send_command(YardApplications.NIC,YardNICCommands.RECV)
+                while True:
+                    data = self._yard_read_response()
+                    print("recv:", data)
+                    self.radio_structure.update()
+                    print(self.radio_structure.get("MARCSTATE"))
+                    print(self.radio_structure)
+
 
             except USBTimeoutError:
                 pass
@@ -182,7 +190,6 @@ class YardStickOneDevice(VirtualDevice):
         return (revision, 0, 0)
 
     def _get_url(self):
-        #print(self._peek(0xdf00, 0x3e).hex())
         return "https://github.com/atlas0fd00m/rfcat".encode('utf-8')
 
     def _peek(self, address, size):
@@ -233,3 +240,95 @@ class YardStickOneDevice(VirtualDevice):
 
     def _strobe_return_mode(self):
         self._poke(YardMemoryRegisters.RFST, bytes([self._rf_mode]))
+
+    def _set_rf_register(self, register, value):
+        # Update the radio structure
+        self.radio_structure.update()
+        # Check Main Radio Control State
+        old_marc_state = self.radio_structure.get("MARCSTATE")
+
+        # Go back to idle state
+        if old_marc_state != YardMARCStates.MARC_STATE_IDLE:
+            self._strobe_idle_mode()
+
+        self.radio_structure.set(register, value)
+
+        # Go back to configured mode
+        self._strobe_return_mode()
+
+
+    def _set_clear_channel_assessment(self, mode=YardCCA.CCA_PACKET, absolute_threshold=0, relative_threshold=1, magnitude=3):
+        mcsm1 = self.radio_structure.get("MCSM1") & 0x0F
+        mcsm1 |= (mode << 4)
+
+        agcctrl2 = self.radio_structure.get("AGCCTRL2") & 0xF8
+        agcctrl2 |= magnitude
+
+        agcctrl1 = self.radio_structure.get("AGCCTRL1")& 0xc0
+        agcctrl1 |= (absolute_threshold & 0x0f)
+        agcctrl1 |= ((relative_threshold << 4) & 0x03)
+
+        self._set_rf_register("MCSM1", mcsm1)
+        self._set_rf_register("AGCCTRL1", agcctrl1)
+        self._set_rf_register("AGCCTRL2", agcctrl2)
+
+    def _set_frequency(self, frequency=433920000):
+        freq_multiplier = (0x10000 / 1000000.0) / 24
+        computed_value = int(frequency * freq_multiplier)
+
+        self._set_rf_register("FREQ2", (computed_value >> 16))
+        self._set_rf_register("FREQ1", (computed_value >> 8) & 0xFF)
+        self._set_rf_register("FREQ0", (computed_value & 0xFF))
+
+        if (
+            (frequency > YardFrequencyTransitionPoints.FREQ_EDGE_900 and
+            frequency < YardFrequencyTransitionPoints.FREQ_MID_900) or
+            (frequency > YardFrequencyTransitionPoints.FREQ_EDGE_400 and
+            frequency < YardFrequencyTransitionPoints.FREQ_MID_400) or
+            (frequency < YardFrequencyTransitionPoints.FREQ_MID_300)
+        ):
+            self._set_rf_register("FSCAL2", YardVCOType.LOW_VCO)
+        elif (
+            frequency < 1e9 and (
+                (frequency > YardFrequencyTransitionPoints.FREQ_MID_900) or
+                (frequency > YardFrequencyTransitionPoints.FREQ_MID_400) or
+                (frequency > YardFrequencyTransitionPoints.FREQ_MID_300))
+            ):
+            self._set_rf_register("FSCAL2", YardVCOType.HIGH_VCO)
+
+    def set_test_config(self):
+        self._set_rf_register("IOCFG0",0x06)
+        self._set_rf_register("SYNC1",0xaa)
+        self._set_rf_register("SYNC0",0xaa)
+        self._set_rf_register("PKTLEN",0xff)
+        self._set_rf_register("PKTCTRL1",0x00)
+        self._set_rf_register("PKTCTRL0",0x08)
+        self._set_rf_register("FSCTRL1",0x0b)
+        self._set_rf_register("FSCTRL0",0x00)
+        self._set_rf_register("ADDR",0x00)
+        self._set_rf_register("CHANNR",0x00)
+        self._set_rf_register("MDMCFG4",0x68)
+        self._set_rf_register("MDMCFG3",0xb5)
+        self._set_rf_register("MDMCFG2",0x80)
+        self._set_rf_register("MDMCFG1",0x23)
+        self._set_rf_register("MDMCFG0",0x11)
+        self._set_rf_register("MCSM2",0x07)
+        self._set_rf_register("MCSM1",0x3f)
+        self._set_rf_register("MCSM0",0x14)
+        self._set_rf_register("DEVIATN",0x45)
+        self._set_rf_register("FOCCFG",0x16)
+        self._set_rf_register("BSCFG",0x6c)
+        self._set_rf_register("AGCCTRL2",0x43)
+        self._set_rf_register("AGCCTRL1",0x40)
+        self._set_rf_register("AGCCTRL0",0x91)
+        self._set_rf_register("FREND1",0x56)
+        self._set_rf_register("FREND0",0x10)
+        self._set_rf_register("FSCAL3",0xad)
+        self._set_rf_register("FSCAL2",0x0A)
+        self._set_rf_register("FSCAL1",0x00)
+        self._set_rf_register("FSCAL0",0x11)
+        self._set_rf_register("TEST2",0x88)
+        self._set_rf_register("TEST1",0x31)
+        self._set_rf_register("TEST0",0x09)
+        self._set_rf_register("PA_TABLE0",0xc0)
+        self._set_frequency(433920000)
