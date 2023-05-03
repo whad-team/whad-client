@@ -78,6 +78,15 @@ class APIMoteRegisters(IntEnum):
 
 class APIMoteRegistersMasks:
 
+    class MCSM0:
+        CLOSE_IN_RX = RegisterMask(mask=0b11, offset=0)
+        FS_AUTOCAL = RegisterMask(mask=0b11, offset=4)
+
+    class MCSM1:
+        TX_OFF_MODE = RegisterMask(mask=0b11, offset=0)
+        RX_OFF_MODE = RegisterMask(mask=0b11, offset=2)
+        CCA_MODE = RegisterMask(mask=0b11, offset=4)
+
     class MDMCTRL0:
         PREAMBLE_LENGTH = RegisterMask(mask=0b1111, offset=0)
         AUTO_ACK = RegisterMask(mask=0b1, offset=4)

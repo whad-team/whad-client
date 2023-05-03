@@ -2,6 +2,12 @@
 This module provides some constants used by WHAD to communicate with the Yard Stick One.
 """
 from enum import IntEnum
+from dataclasses import dataclass
+
+@dataclass
+class RegisterMask:
+    mask : int = 0
+    offset : int = 0
 
 # USB identifiers
 class YardStickOneId(IntEnum):
@@ -214,3 +220,89 @@ class YardFrequencyTransitionPoints:
 class YardVCOType:
     LOW_VCO = 0x0A
     HIGH_VCO = 0x2A
+
+# Yard Supported modulations
+class YardModulations:
+    MODULATION_2FSK                        = 0b000
+    MODULATION_GFSK                        = 0b001
+    MODULATION_ASK                         = 0b011
+    MODULATION_4FSK                        = 0b100
+    MODULATION_MSK                         = 0b111
+
+# Yard Registers Masks
+class YardRegistersMasks:
+
+    class MDMCFG1:
+        CHANSPC_E = RegisterMask(mask=0b11, offset=0)
+        NUM_PREAMBLE = RegisterMask(mask=0b111, offset=4)
+        FEC_EN = RegisterMask(mask=0b1, offset=7)
+
+
+    class MDMCFG2:
+        SYNC_MODE = RegisterMask(mask=0b111, offset=0)
+        MANCHESTER_EN = RegisterMask(mask=0b1, offset=3)
+        MOD_FORMAT = RegisterMask(mask=0b111, offset=4)
+        DEM_DCFILT_OFF = RegisterMask(mask=0b1, offset=7)
+
+
+    class MDMCFG3:
+        DRATE_M = RegisterMask(mask=0b11111111, offset=0)
+
+    class MDMCFG4:
+        DRATE_E = RegisterMask(mask=0b1111, offset=0)
+        CHANBW_M = RegisterMask(mask=0b11, offset=4)
+        CHANBW_E = RegisterMask(mask=0b11, offset=7)
+
+    class PKTCTRL0:
+        LENGTH_CONFIG = RegisterMask(mask=0b11, offset=0)
+        CRC_EN = RegisterMask(mask=0b1, offset=2)
+        PKT_FORMAT = RegisterMask(mask=0b11, offset=4)
+        WHITE_DATA = RegisterMask(mask=0b1, offset=6)
+
+
+    class PKTCTRL1:
+        ADR_CHK = RegisterMask(mask=0b11, offset=0)
+        APPEND_STATUS = RegisterMask(mask=0b1, offset=2)
+        PQT = RegisterMask(mask=0b111, offset=5)
+
+    class MCSM1:
+        TXOFF_MODE = RegisterMask(mask=0b11, offset=0)
+        RXOFF_MODE = RegisterMask(mask=0b11, offset=2)
+        CCA_MODE = RegisterMask(mask=0b11, offset=4)
+
+
+    class MCSM2:
+        RX_TIME = RegisterMask(mask=0b111, offset=0)
+        RX_TIME_QUAL = RegisterMask(mask=0b1, offset=3)
+        RX_TIME_RSSI = RegisterMask(mask=0b1, offset=4)
+
+    class AGCCTRL1:
+        CARRIER_SENSE_ABS_THR = RegisterMask(mask=0b1111, offset=0)
+        CARRIER_SENSE_REL_THR = RegisterMask(mask=0b11, offset=4)
+        AGC_LNA_PRIORITY = RegisterMask(mask=0b1, offset=6)
+
+
+    class AGCCTRL2:
+        MAGN_TARGET  = RegisterMask(mask=0b111, offset=0)
+        MAX_LNA_GAIN  = RegisterMask(mask=0b111, offset=3)
+        MAX_DVGA_GAIN  = RegisterMask(mask=0b11, offset=6)
+
+    class DEVIATN:
+        DEVIATION_M = RegisterMask(mask=0b111, offset=0)
+        DEVIATION_E = RegisterMask(mask=0b111, offset=4)
+
+    class FSCTRL0:
+        FREQ_OFFSET = RegisterMask(mask=0b11111111, offset=0)
+
+    class FSCTRL1:
+        FREQ_IF = RegisterMask(mask=0b11111, offset=0)
+
+    class FREND0:
+        LODIV_BUF_CURRENT_TX = RegisterMask(mask=0b111, offset=0)
+        PA_POWER = RegisterMask(mask=0b11, offset=4)
+
+    class FREND1:
+        MIX_CURRENT = RegisterMask(mask=0b11, offset=0)
+        LODIV_BUF_CURRENT_RX = RegisterMask(mask=0b11, offset=2)
+        LNA2MIX_CURRENT = RegisterMask(mask=0b11, offset=4)
+        LNA_CURRENT = RegisterMask(mask=0b11, offset=6)
