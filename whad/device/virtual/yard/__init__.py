@@ -93,9 +93,27 @@ class YardStickOneDevice(VirtualDevice):
 
         self._set_idle_mode()
         self.set_test_config()
-        self._set_rx_mode()
-        self._strobe_rx_mode()
+        self._set_sync_word(b"", carrier_sense=True)
+        #self._set_rx_mode()
+        #self._strobe_rx_mode()
+        self._set_power(0xC0, invert=True)
 
+        self._set_frequency(433920000)
+        self._set_modulation(YardModulations.MODULATION_ASK)
+        self._set_packet_length(100, variable=False)
+        self._set_data_rate(2000)
+        self._set_sync_word(b"")
+        print("length:", self._get_packet_length())
+        print("datarate:", self._get_data_rate())
+
+        self._set_tx_mode()
+        self._strobe_tx_mode()
+        #frame = b"\xff\xff\xff\xf8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xe8\x8e\x8e\xe7wGGGtGDw@\x00tDGDtGGwwGGGtGDw@\x00tDGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4D"
+        frame = b"\xFF\x00\xFF\x00\xFF\x00\xFF\x00\xFF\x00\xFF\x00"
+        self._send_packet(frame, repeat=1, offset=1)
+        self._strobe_idle_mode()
+
+        #self._set_idle_mode()
 
         # Ask parent class to run a background I/O thread
         super().open()
@@ -146,9 +164,9 @@ class YardStickOneDevice(VirtualDevice):
 
     # Yard Stick One low level communication primitives
 
-    def _yard_read_response(self, timeout=500):
+    def _yard_read_response(self, timeout=1000):
         try:
-            response = bytes(self.__yard.read(YardStickOneEndPoints.IN_ENDPOINT, 500, timeout=timeout))
+            response = bytes(self.__yard.read(YardStickOneEndPoints.IN_ENDPOINT, 512, timeout=timeout))
             if len(response) >= 3:
                 size = unpack("<H", response[3:5])[0]
                 if len(response) >= 5 + size:
@@ -160,8 +178,10 @@ class YardStickOneDevice(VirtualDevice):
             response = (None, None, None)
         return response
 
-    def _yard_send_command(self, app, command, data=b"", timeout=500):
+    def _yard_send_command(self, app, command, data=b"", timeout=1000, no_response=False):
         message = bytes([app, command]) + pack("<H", len(data)) + data
+        if no_response:
+            return
         recv_app, recv_verb, recv_data = None, None, None
         while recv_app != app and recv_verb != command:
             print(">", message.hex())
@@ -202,6 +222,15 @@ class YardStickOneDevice(VirtualDevice):
     def _get_url(self):
         return "https://github.com/atlas0fd00m/rfcat".encode('utf-8')
 
+    def _send_packet(self, packet, repeat=0, offset=0):
+        data = bytes(packet)
+        self._yard_send_command(
+            YardApplications.NIC,
+            YardNICCommands.XMIT,
+            pack("<HHH", len(data), repeat, offset) + data,
+            no_response=True
+        )
+        
     def _peek(self, address, size):
         return self._yard_send_command(
             YardApplications.SYSTEM,
@@ -596,12 +625,12 @@ class YardStickOneDevice(VirtualDevice):
         self.radio_structure.update()
 
         for exponent in range(4):
-            mantissa = int((((24*1000000.0)/(bandwidth*(2**e)*8.0)) - 4) + 0.5)
+            mantissa = int((((24*1000000.0)/(bandwidth*(2**exponent)*8.0)) - 4) + 0.5)
             if mantissa < 4:
                 mdmcfg4_mask = YardRegistersMasks.MDMCFG4
                 mdmcfg4 = self.radio_structure.get("MDMCFG4") & ~(
-                    (mdmcfg4_mask.CHANBW_E.mask << mdmcfg4_mask.CHANGW_E.offset ) |
-                    (mdmcfg4_mask.CHANBW_M.mask << mdmcfg4_mask.CHANGW_M.offset )
+                    (mdmcfg4_mask.CHANBW_E.mask << mdmcfg4_mask.CHANBW_E.offset ) |
+                    (mdmcfg4_mask.CHANBW_M.mask << mdmcfg4_mask.CHANBW_M.offset )
                 )
                 mdmcfg4 |= (
                     ((exponent & mdmcfg4_mask.CHANBW_E.mask) << mdmcfg4_mask.CHANBW_E.offset) |
@@ -718,10 +747,11 @@ class YardStickOneDevice(VirtualDevice):
         mdmcfg2 = self.radio_structure.get("MDMCFG2")
         mdmcfg2_mask = YardRegistersMasks.MDMCFG2
 
-        mdmcfg2 &= ~(mdmcfg2_mask.SYNC_MODE.mask << msmcfg2_mask.SYNC_MODE.offset)
-        mdmcfg2 |= ((sync_mode & mdmcfg2_mask.SYNC_MODE.mask) <<  msmcfg2_mask.SYNC_MODE.offset)
-        self._set_rf_register("SYNC1",sync_word[1])
-        self._set_rf_register("SYNC0",sync_word[0])
+        mdmcfg2 &= ~(mdmcfg2_mask.SYNC_MODE.mask << mdmcfg2_mask.SYNC_MODE.offset)
+        mdmcfg2 |= ((sync_mode & mdmcfg2_mask.SYNC_MODE.mask) <<  mdmcfg2_mask.SYNC_MODE.offset)
+        if len(sync_word) > 0:
+            self._set_rf_register("SYNC1",sync_word[1])
+            self._set_rf_register("SYNC0",sync_word[0])
         self._set_rf_register("MDMCFG2", mdmcfg2)
 
         return True
@@ -790,7 +820,7 @@ class YardStickOneDevice(VirtualDevice):
                 break
         return best_bandwidth
 
-    def _configure_power_amplifier_mode(self, mode=0):
+    def _set_power_amplifier_mode(self, mode=0):
         return self._yard_send_command(
             YardApplications.NIC,
             YardNICCommands.SET_AMP_MODE,
@@ -803,10 +833,11 @@ class YardStickOneDevice(VirtualDevice):
         )[0]
 
     def set_test_config(self):
+        '''
         self._set_rf_register("IOCFG0",0x06)
         self._set_rf_register("SYNC1",0xaa)
         self._set_rf_register("SYNC0",0xaa)
-        self._set_rf_register("PKTLEN",30)
+        self._set_rf_register("PKTLEN",255)
         self._set_rf_register("PKTCTRL1",0x00)
         self._set_rf_register("PKTCTRL0",0x08)
         self._set_rf_register("FSCTRL1",0x0b)
@@ -836,12 +867,18 @@ class YardStickOneDevice(VirtualDevice):
         self._set_rf_register("TEST2",0x88)
         self._set_rf_register("TEST1",0x31)
         self._set_rf_register("TEST0",0x09)
-        self._set_rf_register("PA_TABLE0",0x00)
-        self._set_rf_register("PA_TABLE1",0x01)
-        self._set_frequency(433920000)
-        self._set_modulation(YardModulations.MODULATION_ASK)
-        self._set_packet_length(30)
-        self._set_data_rate(200000)
-        print("length:", self._get_packet_length())
-        print("datarate:", self._get_data_rate())
-        print("PA mode:", self._get_power_amplifier_mode())
+        self._set_rf_register("PA_TABLE0",0x05)
+        self._set_rf_register("PA_TABLE1",0x00)
+        '''
+
+        self._set_rf_register("MDMCFG4",0x68)
+        self._set_rf_register("MDMCFG3",0xb5)
+        self._set_rf_register("MDMCFG2",0x80)
+        self._set_rf_register("MDMCFG1",0x23)
+        self._set_rf_register("MDMCFG0",0x11)
+        self._set_rf_register("PA_TABLE0",0x20)
+        self._set_rf_register("PA_TABLE1",0x00)
+
+        #self._set_channel_bandwidth(self.compute_best_channel_bandwidth())
+        #self._set_deviation(self.compute_best_deviation())
+        #self._set_channel(0)

@@ -10,6 +10,10 @@ class RegisterMask:
     mask : int = 0
     offset : int = 0
 
+class USB_PROPERTIES:
+    USB_RX_WAIT = 1000
+    USB_TX_WAIT = 10000
+
 # USB identifiers
 class YardStickOneId(IntEnum):
     YARD_ID_VENDOR    = 0x1d50
@@ -257,7 +261,7 @@ class YardRegistersMasks:
     class MDMCFG4:
         DRATE_E = RegisterMask(mask=0b1111, offset=0)
         CHANBW_M = RegisterMask(mask=0b11, offset=4)
-        CHANBW_E = RegisterMask(mask=0b11, offset=7)
+        CHANBW_E = RegisterMask(mask=0b11, offset=6)
 
     class PKTCTRL0:
         LENGTH_CONFIG = RegisterMask(mask=0b11, offset=0)
