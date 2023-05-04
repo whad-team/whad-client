@@ -4,6 +4,7 @@ This module provides some constants used by WHAD to communicate with the Yard St
 from enum import IntEnum
 from dataclasses import dataclass
 
+
 @dataclass
 class RegisterMask:
     mask : int = 0
@@ -229,6 +230,11 @@ class YardModulations:
     MODULATION_4FSK                        = 0b100
     MODULATION_MSK                         = 0b111
 
+# Yard Supported Encoding
+class YardEncodings:
+    NON_RETURN_TO_ZERO  = 0
+    MANCHESTER          = 1
+
 # Yard Registers Masks
 class YardRegistersMasks:
 
@@ -306,3 +312,36 @@ class YardRegistersMasks:
         LODIV_BUF_CURRENT_RX = RegisterMask(mask=0b11, offset=2)
         LNA2MIX_CURRENT = RegisterMask(mask=0b11, offset=4)
         LNA_CURRENT = RegisterMask(mask=0b11, offset=6)
+
+
+# Number of preamble bytes lookup table
+NUM_PREAMBLE_LOOKUP_TABLE = [
+    2,
+    3,
+    4,
+    6,
+    8,
+    12,
+    16,
+    24
+]
+
+# Possible bandwidth list
+POSSIBLE_CHANNEL_BANDWIDTHS = [
+    53e3,
+    63e3,
+    75e3,
+    93e3,
+    107e3,
+    125e3,
+    150e3,
+    188e3,
+    214e3,
+    250e3,
+    300e3,
+    375e3,
+    428e3,
+    500e3,
+    600e3,
+    750e3,
+]

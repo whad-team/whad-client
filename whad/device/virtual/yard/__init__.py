@@ -4,7 +4,8 @@ from whad.protocol.whad_pb2 import Message
 from whad.device.virtual.yard.constants import YardStickOneId, YardStickOneEndPoints, \
     YardApplications, YardSystemCommands, YardRadioStructure, YardRFStates, \
     YardMemoryRegisters, YardMARCStates, YardCCA, YardFrequencyTransitionPoints, \
-    YardNICCommands, YardVCOType, YardRegistersMasks,YardModulations
+    YardNICCommands, YardVCOType, YardRegistersMasks, YardModulations, YardEncodings, \
+    POSSIBLE_CHANNEL_BANDWIDTHS, NUM_PREAMBLE_LOOKUP_TABLE
 from whad.helpers import message_filter,is_message_type
 from whad import WhadDomain, WhadCapability
 from whad.protocol.generic_pb2 import ResultCode
@@ -418,17 +419,394 @@ class YardStickOneDevice(VirtualDevice):
         self.radio_structure.update()
         mask_pktctrl0 = YardRegistersMasks.PKTCTRL0
         pktctrl0 = self.radio_structure.get("PKTCTRL0") & ~(mask_pktctrl0.LENGTH_CONFIG.mask << mask_pktctrl0.LENGTH_CONFIG.offset)
-        pktctrl0 |= (int(variable) << mask_pktctrl0.LENGTH_CONFIG.offset)
+        pktctrl0 |= ((int(variable) & mask_pktctrl0.LENGTH_CONFIG.mask) << mask_pktctrl0.LENGTH_CONFIG.offset)
         self._set_rf_register("PKTCTRL0", pktctrl0)
         self._set_rf_register("PKTLEN", length if length <= 255 else 0)
 
+    def _is_packet_length_variable(self):
+        self.radio_structure.update()
+        mask_pktctrl0 = YardRegistersMasks.PKTCTRL0
+        length_config = (
+                        (
+                            self.radio_structure.get("PKTCTRL0") &
+                            (mask_pktctrl0.LENGTH_CONFIG.mask << mask_pktctrl0.LENGTH_CONFIG.offset)
+                        ) >> mask_pktctrl0.LENGTH_CONFIG.offset
+        )
+        return bool(length_config)
 
+    def _get_packet_length(self):
+        self.radio_structure.update()
+        return self.radio_structure.get("PKTLEN")
+
+    def _set_crc(self, enable=False):
+        self.radio_structure.update()
+        mask_pktctrl0 = YardRegistersMasks.PKTCTRL0
+        pktctrl0 = self.radio_structure.get("PKTCTRL0") & ~(mask_pktctrl0.CRC_EN.mask << mask_pktctrl0.CRC_EN.offset)
+        pktctrl0 |= int(enable) << mask_pktctrl0.CRC_EN.offset
+        self._set_rf_register("PKTCTRL0", pktctrl0)
+
+
+    def _is_crc_enabled(self):
+        self.radio_structure.update()
+        mask_pktctrl0 = YardRegistersMasks.PKTCTRL0
+        crc_enabled = bool(
+            (
+                self.radio_structure.get("PKTCTRL0") &
+                (mask_pktctrl0.CRC_EN.mask << mask_pktctrl0.CRC_EN.offset)
+            ) >> mask_pktctrl0.CRC_EN.offset
+        )
+        return crc_enabled
+
+    def _set_whitening(self, enable=False):
+        self.radio_structure.update()
+        mask_pktctrl0 = YardRegistersMasks.PKTCTRL0
+        pktctrl0 = self.radio_structure.get("PKTCTRL0") & ~(mask_pktctrl0.WHITE_DATA.mask << mask_pktctrl0.WHITE_DATA.offset)
+        pktctrl0 |= int(enable) << mask_pktctrl0.WHITE_DATA.offset
+        self._set_rf_register("PKTCTRL0", pktctrl0)
+
+
+    def _is_whitening_enabled(self):
+        self.radio_structure.update()
+        mask_pktctrl0 = YardRegistersMasks.PKTCTRL0
+        whitening_enabled = bool(
+            (
+                self.radio_structure.get("PKTCTRL0") &
+                (mask_pktctrl0.WHITE_DATA.mask << mask_pktctrl0.WHITE_DATA.offset)
+            ) >> mask_pktctrl0.WHITE_DATA.offset
+        )
+        return crc_enabled
+
+
+    def _set_preamble_quality_threshold(self, threshold=3):
+        self.radio_structure.update()
+        mask_pktctrl1 = YardRegistersMasks.PKTCTRL1
+        pktctrl1 = self.radio_structure.get("PKTCTRL1") & ~(mask_pktctrl1.PQT.mask << mask_pktctrl1.PQT.offset)
+        pktctrl1 |= (num & mask_pktctrl1.PQT) << mask_pktctrl1.PQT.offset
+        self._set_rf_register("PKTCTRL1", pktctrl1)
+
+
+    def _get_preamble_quality_threshold(self):
+        self.radio_structure.update()
+        mask_pktctrl1 = YardRegistersMasks.PKTCTRL1
+        pqt = int(
+            (
+                self.radio_structure.get("PKTCTRL1") &
+                (mask_pktctrl1.PQT.mask << mask_pktctrl1.PQT.offset)
+            ) >> mask_pktctrl1.PQT.offset
+        )
+        return pqt
+
+    def _set_append_packet_status(self, enable=False):
+        self.radio_structure.update()
+        mask_pktctrl1 = YardRegistersMasks.PKTCTRL1
+        pktctrl1 = self.radio_structure.get("PKTCTRL1") & ~(mask_pktctrl1.APPEND_STATUS.mask << mask_pktctrl1.APPEND_STATUS.offset)
+        pktctrl1 |= int(enable) << mask_pktctrl1.APPEND_STATUS.offset
+        self._set_rf_register("PKTCTRL1", pktctrl1)
+
+
+    def _is_append_packet_status_enabled(self):
+        self.radio_structure.update()
+        mask_pktctrl1 = YardRegistersMasks.PKTCTRL1
+        append_packet_status_enabled = bool(
+            (
+                self.radio_structure.get("PKTCTRL1") &
+                (mask_pktctrl1.APPEND_STATUS.mask << mask_pktctrl1.APPEND_STATUS.offset)
+            ) >> mask_pktctrl1.APPEND_STATUS.offset
+        )
+        return append_packet_status_enabled
+
+    def _set_append_packet_status(self, enable=False):
+        self.radio_structure.update()
+        mask_pktctrl1 = YardRegistersMasks.PKTCTRL1
+        pktctrl1 = self.radio_structure.get("PKTCTRL1") & ~(mask_pktctrl1.APPEND_STATUS.mask << mask_pktctrl1.APPEND_STATUS.offset)
+        pktctrl1 |= int(enable) << mask_pktctrl1.APPEND_STATUS.offset
+        self._set_rf_register("PKTCTRL1", pktctrl1)
+
+
+    def _set_encoding(self, encoding=YardEncodings.NON_RETURN_TO_ZERO):
+        self.radio_structure.update()
+        mask_mdmcfg2 = YardRegistersMasks.MDMCFG2
+        mdmcfg2 = self.radio_structure.get("MDMCFG2") & ~(mask_mdmcfg2.MANCHESTER_EN.mask << mask_mdmcfg2.MANCHESTER_EN.offset)
+        mdmcfg2 |= int(enable) << mask_mdmcfg2.MANCHESTER_EN.offset
+        self._set_rf_register("MDMCFG2", mdmcfg2)
+
+
+    def _get_encoding(self):
+        self.radio_structure.update()
+        mask_mdmcfg2 = YardRegistersMasks.MDMCFG2
+        encoding = int(
+            (
+                self.radio_structure.get("MDMCFG2") &
+                (mask_mdmcfg2.MANCHESTER_EN.mask << mask_mdmcfg2.MANCHESTER_EN.offset)
+            ) >> mask_mdmcfg2.MANCHESTER_EN.offset
+        )
+        return YardEncodings.MANCHESTER if encoding else YardEncodings.NON_RETURN_TO_ZERO
+
+
+    def _set_forward_error_correction(self, enable=False):
+        self.radio_structure.update()
+        mask_mdmcfg1 = YardRegistersMasks.MDMCFG1
+        mdmcfg1 = self.radio_structure.get("MDMCFG1") & ~(mask_mdmcfg1.FEC_EN.mask << mask_mdmcfg1.FEC_EN.offset)
+        mdmcfg1 |= int(enable) << mask_mdmcfg1.FEC_EN.offset
+        self._set_rf_register("MDMCFG1", mdmcfg1)
+
+
+    def _get_forward_error_correction(self):
+        self.radio_structure.update()
+        mask_mdmcfg1 = YardRegistersMasks.MDMCFG1
+        forward_error_correction = bool(
+            (
+                self.radio_structure.get("MDMCFG1") &
+                (mask_mdmcfg1.FEC_EN.mask << mask_mdmcfg1.FEC_EN.offset)
+            ) >> mask_mdmcfg1.FEC_EN.offset
+        )
+        return forward_error_correction
+
+
+    def _set_intermediate_frequency(self, intermediate_frequency):
+        self.radio_structure.update()
+        mask_fsctrl1 = YardRegistersMasks.FSCTRL1
+        computed_value = int(0.5 + (intermediate_frequency * (2**10)) / (1000000.0 * 24))
+        fsctrl1 = self.radio_structure.get("FSCTRL1") & ~(mask_fsctrl1.FREQ_IF.mask << mask_fsctrl1.FREQ_IF.offset)
+        fsctrl1 |= int(computed_value) << mask_fsctrl1.FEC_EN.offset
+        self._set_rf_register("FSCTRL1", fsctrl1)
+
+
+    def _get_intermediate_frequency(self):
+        self.radio_structure.update()
+        mask_fsctrl1 = YardRegistersMasks.FSCTRL1
+        if_value = int(
+            (
+                self.radio_structure.get("MDMCFG1") &
+                (mask_fsctrl1.FREQ_IF.mask << mask_fsctrl1.FREQ_IF.offset)
+            ) >> mask_fsctrl1.FREQ_IF.offset
+        )
+        intermediate_frequency = (if_value * ((1000000.0 * 24) / (2**10)))
+        return intermediate_frequency
+
+    def _set_channel(self, channel):
+        self.radio_structure.set("CHANNR", channel)
+
+    def _get_channel(self, channel):
+        self.radio_structure.update()
+        return self.radio_structure.get("CHANNR")
+
+
+    def _set_channel_bandwidth(self, bandwidth):
+        self.radio_structure.update()
+
+        for exponent in range(4):
+            mantissa = int((((24*1000000.0)/(bandwidth*(2**e)*8.0)) - 4) + 0.5)
+            if mantissa < 4:
+                mdmcfg4_mask = YardRegistersMasks.MDMCFG4
+                mdmcfg4 = self.radio_structure.get("MDMCFG4") & ~(
+                    (mdmcfg4_mask.CHANBW_E.mask << mdmcfg4_mask.CHANGW_E.offset ) |
+                    (mdmcfg4_mask.CHANBW_M.mask << mdmcfg4_mask.CHANGW_M.offset )
+                )
+                mdmcfg4 |= (
+                    ((exponent & mdmcfg4_mask.CHANBW_E.mask) << mdmcfg4_mask.CHANBW_E.offset) |
+                    ((mantissa & mdmcfg4_mask.CHANBW_M.mask) << mdmcfg4_mask.CHANBW_M.offset)
+                )
+                self._set_rf_register("MDMCFG4", mdmcfg4)
+                bw = 1000.0*24 / (8.0*(4+mantissa) * (2**exponent))
+                if bw > 102e3:
+                    self._set_rf_register("FREND1", 0xb6)
+                else:
+                    self._set_rf_register("FREND1", 0x56)
+
+                if bw > 325e3:
+                    self._set_rf_register("TEST2", 0x88)
+                    self._set_rf_register("TEST1", 0x31)
+                else:
+                    self._set_rf_register("TEST2", 0x81)
+                    self._set_rf_register("TEST1", 0x35)
+                return True
+        return False
+
+    def _get_channel_bandwidth(self):
+        self.radio_structure.update()
+
+        mdmcfg4_mask = YardRegistersMasks.MDMCFG4
+        mdmcfg4 = self.radio_structure.get("MDMCFG4")
+        exponent = (
+            mdmcfg4 & (mdmcfg4_mask.CHANBW_E.mask << mdmcfg4_mask.CHANGW_E.offset )
+            ) >> mdmcfg4.CHANGW_E.offset
+        mantissa = (
+            mdmcfg4 & (mdmcfg4_mask.CHANBW_M.mask << mdmcfg4_mask.CHANGW_M.offset )
+            ) >> mdmcfg4.CHANGW_M.offset
+
+        return (1000000.0*24) / (8.0*(4+mantissa) * (2**exponent))
+
+    def _set_data_rate(self, data_rate):
+        self.radio_structure.update()
+        mdmcfg4 = self.radio_structure.get("MDMCFG4")
+        mdmcfg4_mask = YardRegistersMasks.MDMCFG4
+
+        for exponent in range(16):
+            mantissa = int(((data_rate * (2**28)) / ((2**exponent) * (24*1000000.0)) - 256) + 0.5)
+            if mantissa < 256:
+                self._set_rf_register("MDMCFG3", mantissa)
+                mdmcfg4 = mdmcfg4 & ~(mdmcfg4_mask.DRATE_E.mask << mdmcfg4_mask.DRATE_E.offset)
+                mdmcfg4 |= ((exponent & mdmcfg4_mask.DRATE_E.mask) << mdmcfg4_mask.DRATE_E.offset)
+                self._set_rf_register("MDMCFG4", mdmcfg4)
+                return True
+        return False
+
+    def _get_data_rate(self):
+        self.radio_structure.update()
+        mdmcfg4_mask = YardRegistersMasks.MDMCFG4
+        exponent = int(
+            (
+                self.radio_structure.get("MDMCFG4") &
+                (mdmcfg4_mask.DRATE_E.mask << mdmcfg4_mask.DRATE_E.offset)
+            ) >> mdmcfg4_mask.DRATE_E.offset
+        )
+        mantissa = self.radio_structure.get("MDMCFG3")
+        data_rate = 1000000.0 * 24 * (256+mantissa) * (2**exponent) / (2**28)
+        return data_rate
+
+
+    def _set_deviation(self, deviation):
+        deviatn_mask = YardRegistersMasks.DEVIATN
+
+        for exponent in range(8):
+            mantissa = int(((deviation * (2**17)) / ((2**exponent) * (24*1000000.0)) - 8) + 0.5)
+            if mantissa < 8:
+                deviatn = (
+                    ((mantissa & deviatn_mask.DEVIATION_M.mask) << deviatn_mask.DEVIATION_M.offset) |
+                    ((exponent & deviatn_mask.DEVIATION_E.mask) << deviatn_mask.DEVIATION_E.offset)
+                )
+                self._set_rf_register("DEVIATN", deviatn)
+                return True
+        return False
+
+    def _get_deviation(self):
+        self.radio_structure.update()
+        deviatn_mask = YardRegistersMasks.DEVIATN
+        deviatn = self.radio_structure.get("DEVIATN")
+        exponent = int(
+            (
+                deviatn &
+                (deviatn_mask.DEVIATION_E.mask << deviatn_mask.DEVIATION_E.offset)
+            ) >> deviatn_mask.DEVIATION_E.offset
+        )
+        mantissa = int(
+            (
+                deviatn &
+                (deviatn_mask.DEVIATION_E.mask << deviatn_mask.DEVIATION_E.offset)
+            ) >> deviatn_mask.DEVIATION_E.offset
+        )
+
+        deviation = 1000000.0 * 24 * (8+mantissa) * (2**exponent) / (2**17)
+        return deviation
+
+    def _set_sync_word(self, sync_word, carrier_sense=False, bitflip_tolerance=False):
+        sync_mode = 0
+        if len(sync_word) == 0:
+            sync_mode = int(carrier_sense) << 2 | 0
+        elif len(sync_word) == 2:
+            sync_mode = (int(carrier_sense) << 2) | (1 << int(bitflip_tolerance))
+        elif len(sync_word) == 4:
+            if sync_word[:2] == sync_word[2:]:
+                sync_mode = (int(carrier_sense) << 2) | 0b11
+            else:
+                return False
+        else:
+            return False
+
+        self.radio_structure.update()
+        mdmcfg2 = self.radio_structure.get("MDMCFG2")
+        mdmcfg2_mask = YardRegistersMasks.MDMCFG2
+
+        mdmcfg2 &= ~(mdmcfg2_mask.SYNC_MODE.mask << msmcfg2_mask.SYNC_MODE.offset)
+        mdmcfg2 |= ((sync_mode & mdmcfg2_mask.SYNC_MODE.mask) <<  msmcfg2_mask.SYNC_MODE.offset)
+        self._set_rf_register("SYNC1",sync_word[1])
+        self._set_rf_register("SYNC0",sync_word[0])
+        self._set_rf_register("MDMCFG2", mdmcfg2)
+
+        return True
+
+    def _get_sync_word(self):
+        self.radio_structure.update()
+        mdmcfg2 = self.radio_structure.get("MDMCFG2")
+        mdmcfg2_mask = YardRegistersMasks.MDMCFG2
+        sync_mode = int(
+            (mdmcfg2 & (mdmcfg2_mask.SYNC_MODE.mask << mdmcfg2_mask.SYNC_MODE.offset))
+            >>  mdmcfg2_mask.SYNC_MODE.offset
+        )
+        if sync_mode & 0b11 == 0b11:
+            multiplier = 2
+        elif sync_mode & 0b11 == 0:
+            multiplier = 0
+        else:
+            multiplier = 1
+        return multiplier * bytes([self.radio_structure.get("SYNC0"), self.radio_structure.get("SYNC1")])
+
+    def _get_number_of_preamble_bytes(self):
+        self.radio_structure.update()
+        mdmcfg1 = self.radio_structure.get("MDMCFG1")
+        mdmcfg1_mask = YardRegistersMasks.MDMCFG1
+        num_preamble_flag = int((
+            mdmcfg1 &
+            (mdmcfg1.NUM_PREAMBLE.mask << mdmcfg1.NUM_PREAMBLE.offset)
+        ) >> mdmcfg1.NUM_PREAMBLE.offset)
+        return NUM_PREAMBLE_LOOKUP_TABLE[num_preamble_flag]
+
+    def _set_number_of_preamble_bytes(self, number):
+        try:
+            num_preamble_flag = NUM_PREAMBLE_LOOKUP_TABLE[number]
+        except IndexError:
+            return False
+
+        self.radio_structure.update()
+        mdmcfg1 = self.radio_structure.get("MDMCFG1")
+        mdmcfg1_mask = YardRegistersMasks.MDMCFG1
+        mdmcfg1 &= ~(mdmcfg1.NUM_PREAMBLE.mask << mdmcfg1.NUM_PREAMBLE.offset)
+
+        mdmcfg1 |= ((num_preamble_flag & mdmcfg1.NUM_PREAMBLE.mask) << mdmcfg1.NUM_PREAMBLE.offset)
+        self._set_rf_register("MDMCFG1", mdmcfg1)
+        return True
+
+    def compute_best_deviation(self):
+        data_rate = self._get_data_rate()
+        if data_rate <= 2400:
+            deviation = 5100
+        elif data_rate <= 38400:
+            deviation = 20000 * ((data_rate - 2400) / 36000)
+        else:
+            deviation = 129000 * ((data_rate - 38400) / 211600)
+        return deviation
+
+    def compute_best_channel_bandwidth(self):
+        frequency = self._get_frequency()
+        data_rate = self._get_data_rate()
+        center_frequency = frequency + 14000000
+        frequency_uncertainty = 2 * (20e-6 * frequency)
+        min_bandwidth = frequency_uncertainty + data_rate
+        best_bandwidth = None
+        for possible in POSSIBLE_CHANNEL_BANDWIDTHS:
+            if min_bandwidth < possible:
+                best_bandwidth = possible
+                break
+        return best_bandwidth
+
+    def _configure_power_amplifier_mode(self, mode=0):
+        return self._yard_send_command(
+            YardApplications.NIC,
+            YardNICCommands.SET_AMP_MODE,
+            pack("B", mode)
+        )
+    def _get_power_amplifier_mode(self):
+        return self._yard_send_command(
+            YardApplications.NIC,
+            YardNICCommands.GET_AMP_MODE
+        )[0]
 
     def set_test_config(self):
         self._set_rf_register("IOCFG0",0x06)
         self._set_rf_register("SYNC1",0xaa)
         self._set_rf_register("SYNC0",0xaa)
-        self._set_rf_register("PKTLEN",0xff)
+        self._set_rf_register("PKTLEN",30)
         self._set_rf_register("PKTCTRL1",0x00)
         self._set_rf_register("PKTCTRL0",0x08)
         self._set_rf_register("FSCTRL1",0x0b)
@@ -463,3 +841,7 @@ class YardStickOneDevice(VirtualDevice):
         self._set_frequency(433920000)
         self._set_modulation(YardModulations.MODULATION_ASK)
         self._set_packet_length(30)
+        self._set_data_rate(200000)
+        print("length:", self._get_packet_length())
+        print("datarate:", self._get_data_rate())
+        print("PA mode:", self._get_power_amplifier_mode())

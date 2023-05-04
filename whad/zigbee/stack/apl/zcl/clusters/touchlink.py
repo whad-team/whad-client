@@ -42,6 +42,7 @@ class ZCLTouchLinkClient(ZCLClientCluster):
                 network_address=0x0024,
                 key_index=4,
             )
+            self.network_join_router_request(transaction_id=self.transaction_id, destination_address=source_address)
             #self.identify_request(transaction_id=self.transaction_id, identify_duration=5, destination_address=source_address)
 
             '''
