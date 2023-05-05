@@ -92,26 +92,38 @@ class YardStickOneDevice(VirtualDevice):
         print(self.radio_structure)
 
         self._set_idle_mode()
-        self.set_test_config()
-        self._set_sync_word(b"", carrier_sense=True)
+        #self._strobe_idle_mode()
+
+        #self.set_test_config()
         #self._set_rx_mode()
         #self._strobe_rx_mode()
-        self._set_power(0xC0, invert=True)
 
-        self._set_frequency(433920000)
+        #self._set_rf_register("MDMCFG4",0x68)
+        #self._set_rf_register("MDMCFG3",0xb5)
+        #self._set_rf_register("MDMCFG2",0x80)
+        #self._set_rf_register("MDMCFG1",0x23)
+        #self._set_rf_register("MDMCFG0",0x11)
         self._set_modulation(YardModulations.MODULATION_ASK)
-        self._set_packet_length(100, variable=False)
+        #self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
+        self._set_frequency(433920000)
         self._set_data_rate(2000)
-        self._set_sync_word(b"")
+
+        self._set_channel_spacing(24000)#self.compute_best_channel_bandwidth())
+        self._set_channel(0)
+
+        self._set_sync_word(b"", carrier_sense=True)
+        self._set_preamble_quality_threshold(0)
+        self._set_packet_length(250, variable=False)
+
         print("length:", self._get_packet_length())
         print("datarate:", self._get_data_rate())
 
-        self._set_tx_mode()
-        self._strobe_tx_mode()
-        #frame = b"\xff\xff\xff\xf8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xe8\x8e\x8e\xe7wGGGtGDw@\x00tDGDtGGwwGGGtGDw@\x00tDGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4D"
-        frame = b"\xFF\x00\xFF\x00\xFF\x00\xFF\x00\xFF\x00\xFF\x00"
-        self._send_packet(frame, repeat=1, offset=1)
-        self._strobe_idle_mode()
+        self._set_rx_mode()
+        self._strobe_rx_mode()
+        # frame = b"\xff\xff\xff\xf8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xe8\x8e\x8e\xe7wGGGtGDw@\x00tDGDtGGwwGGGtGDw@\x00tDGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4D"
+        # frame = b"\xFF\x00\xFF\x00\xFF\x00\xFF\x00\xFF\x00\xFF\x00"
+        # self._send_packet(frame, repeat=1, offset=1)
+        #self._strobe_idle_mode()
 
         #self._set_idle_mode()
 
@@ -230,7 +242,7 @@ class YardStickOneDevice(VirtualDevice):
             pack("<HHH", len(data), repeat, offset) + data,
             no_response=True
         )
-        
+
     def _peek(self, address, size):
         return self._yard_send_command(
             YardApplications.SYSTEM,
@@ -510,7 +522,7 @@ class YardStickOneDevice(VirtualDevice):
         self.radio_structure.update()
         mask_pktctrl1 = YardRegistersMasks.PKTCTRL1
         pktctrl1 = self.radio_structure.get("PKTCTRL1") & ~(mask_pktctrl1.PQT.mask << mask_pktctrl1.PQT.offset)
-        pktctrl1 |= (num & mask_pktctrl1.PQT) << mask_pktctrl1.PQT.offset
+        pktctrl1 |= (threshold & mask_pktctrl1.PQT.mask) << mask_pktctrl1.PQT.offset
         self._set_rf_register("PKTCTRL1", pktctrl1)
 
 
@@ -556,7 +568,7 @@ class YardStickOneDevice(VirtualDevice):
         self.radio_structure.update()
         mask_mdmcfg2 = YardRegistersMasks.MDMCFG2
         mdmcfg2 = self.radio_structure.get("MDMCFG2") & ~(mask_mdmcfg2.MANCHESTER_EN.mask << mask_mdmcfg2.MANCHESTER_EN.offset)
-        mdmcfg2 |= int(enable) << mask_mdmcfg2.MANCHESTER_EN.offset
+        mdmcfg2 |= int(encoding) << mask_mdmcfg2.MANCHESTER_EN.offset
         self._set_rf_register("MDMCFG2", mdmcfg2)
 
 
@@ -871,13 +883,6 @@ class YardStickOneDevice(VirtualDevice):
         self._set_rf_register("PA_TABLE1",0x00)
         '''
 
-        self._set_rf_register("MDMCFG4",0x68)
-        self._set_rf_register("MDMCFG3",0xb5)
-        self._set_rf_register("MDMCFG2",0x80)
-        self._set_rf_register("MDMCFG1",0x23)
-        self._set_rf_register("MDMCFG0",0x11)
-        self._set_rf_register("PA_TABLE0",0x20)
-        self._set_rf_register("PA_TABLE1",0x00)
 
         #self._set_channel_bandwidth(self.compute_best_channel_bandwidth())
         #self._set_deviation(self.compute_best_deviation())
