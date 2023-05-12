@@ -5,14 +5,14 @@ from whad.device.virtual.yard.constants import YardStickOneId, YardStickOneEndPo
     YardApplications, YardSystemCommands, YardRadioStructure, YardRFStates, \
     YardMemoryRegisters, YardMARCStates, YardCCA, YardFrequencyTransitionPoints, \
     YardNICCommands, YardVCOType, YardRegistersMasks, YardModulations, YardEncodings, \
-    POSSIBLE_CHANNEL_BANDWIDTHS, NUM_PREAMBLE_LOOKUP_TABLE
+    POSSIBLE_CHANNEL_BANDWIDTHS, NUM_PREAMBLE_LOOKUP_TABLE, YardUSBProperties
 from whad.helpers import message_filter,is_message_type
 from whad import WhadDomain, WhadCapability
 from whad.protocol.generic_pb2 import ResultCode
 from usb.core import find, USBError, USBTimeoutError
 from usb.util import get_string
 from struct import unpack, pack
-from time import sleep
+from time import sleep,time
 from queue import Queue, Empty
 
 # Helpers functions
@@ -104,28 +104,42 @@ class YardStickOneDevice(VirtualDevice):
         #self._set_rf_register("MDMCFG1",0x23)
         #self._set_rf_register("MDMCFG0",0x11)
         self._set_modulation(YardModulations.MODULATION_ASK)
-        #self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
+        self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
+        self._set_crc(enable=False)
+        self._set_whitening(enable=False)
+        self._set_packet_format(0)
+        self._set_forward_error_correction(enable=False)
+        self._set_clear_channel_assessment(mode=YardCCA.NO_CCA)
         self._set_frequency(433920000)
-        self._set_data_rate(2000)
-
-        self._set_channel_spacing(24000)#self.compute_best_channel_bandwidth())
+        self._set_data_rate(4800)
+        self._set_channel_spacing(self.compute_best_channel_bandwidth())
         self._set_channel(0)
 
-        self._set_sync_word(b"", carrier_sense=True)
+        #self._set_intermediate_frequency(44444)
+        self._set_sync_word(b"")
         self._set_preamble_quality_threshold(0)
         self._set_packet_length(250, variable=False)
 
         print("length:", self._get_packet_length())
         print("datarate:", self._get_data_rate())
 
+        #self._set_rx_mode()
+        #self._strobe_rx_mode()
+        #frame = bytes.fromhex("")
+        #self._set_packet_length(len(frame), variable=False)
+        self._set_power(0x60)
+        frame = bytes([i for i in range(250)])
+        self._set_packet_length(len(frame), variable=False)
+
+        self._set_tx_mode()
+        self._send_packet(frame)
+        sleep(2)
+
+        self._set_idle_mode()
+
+
         self._set_rx_mode()
         self._strobe_rx_mode()
-        # frame = b"\xff\xff\xff\xf8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xe8\x8e\x8e\xe7wGGGtGDw@\x00tDGDtGGwwGGGtGDw@\x00tDGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4DGDtGGwwGGGtGDw@\x00\xf4D"
-        # frame = b"\xFF\x00\xFF\x00\xFF\x00\xFF\x00\xFF\x00\xFF\x00"
-        # self._send_packet(frame, repeat=1, offset=1)
-        #self._strobe_idle_mode()
-
-        #self._set_idle_mode()
 
         # Ask parent class to run a background I/O thread
         super().open()
@@ -236,10 +250,13 @@ class YardStickOneDevice(VirtualDevice):
 
     def _send_packet(self, packet, repeat=0, offset=0):
         data = bytes(packet)
+        waitlen = len(data) + repeat * (len(data) - offset)
+        wait = YardUSBProperties.USB_TX_WAIT * ((waitlen / 255) + 1)
+
         self._yard_send_command(
             YardApplications.NIC,
-            YardNICCommands.XMIT,
-            pack("<HHH", len(data), repeat, offset) + data,
+            YardNICCommands.LONG_XMIT,
+            pack("<H", len(data)) + data,
             no_response=True
         )
 
@@ -312,11 +329,11 @@ class YardStickOneDevice(VirtualDevice):
 
         masks_mcsm1 = YardRegistersMasks.MCSM1
         mcsm1 = self.radio_structure.get("MCSM1") & ~(masks_mcsm1.CCA_MODE.mask << masks_mcsm1.CCA_MODE.offset)
-        mcsm1 |= (mode << masks_mcsm1.offset)
+        mcsm1 |= (mode << masks_mcsm1.CCA_MODE.offset)
 
-        mask_magn_target = YardRegistersMasks.AGCCTRL2.MAGN_TARGET
-        agcctrl2 = self.radio_structure.get("AGCCTRL2") & ~(mask_magn_target.mask << mask_magn_target.offset)
-        agcctrl2 |= (magnitude << magn_target.offset)
+        mask_agcctrl2 = YardRegistersMasks.AGCCTRL2
+        agcctrl2 = self.radio_structure.get("AGCCTRL2") & ~(mask_agcctrl2.MAGN_TARGET.mask << mask_agcctrl2.MAGN_TARGET.offset)
+        agcctrl2 |= (magnitude << mask_agcctrl2.MAGN_TARGET.offset)
 
         mask_agcctrl1 = YardRegistersMasks.AGCCTRL1
         agcctrl1 = self.radio_structure.get("AGCCTRL1") & ~(
@@ -399,7 +416,7 @@ class YardStickOneDevice(VirtualDevice):
             if self.radio_structure.get("PA_TABLE0") == 0 and self.radio_structure.get("PA_TABLE1") != 0:
                 power = self.radio_structure.get("PA_TABLE1")
                 self._set_power(power, invert=invert)
-
+        print(mdmcfg2)
         self._set_rf_register("MDMCFG2", mdmcfg2)
 
     def _get_modulation(self):
@@ -416,14 +433,28 @@ class YardStickOneDevice(VirtualDevice):
         if modulation == YardModulations.MODULATION_ASK and not invert:
             self.radio_structure.set("PA_TABLE0", 0)
             self.radio_structure.set("PA_TABLE1", power)
+            self.radio_structure.set("PA_TABLE2", 0)
+            self.radio_structure.set("PA_TABLE3", 0)
+            self.radio_structure.set("PA_TABLE4", 0)
+            self.radio_structure.set("PA_TABLE5", 0)
+            self.radio_structure.set("PA_TABLE6", 0)
+            self.radio_structure.set("PA_TABLE7", 0)
+
+
         else:
             self.radio_structure.set("PA_TABLE0", power)
             self.radio_structure.set("PA_TABLE1", 0)
+            self.radio_structure.set("PA_TABLE2", 0)
+            self.radio_structure.set("PA_TABLE3", 0)
+            self.radio_structure.set("PA_TABLE4", 0)
+            self.radio_structure.set("PA_TABLE5", 0)
+            self.radio_structure.set("PA_TABLE6", 0)
+            self.radio_structure.set("PA_TABLE7", 0)
 
         mask_frend0 = YardRegistersMasks.FREND0
         frend0 = self.radio_structure.get("FREND0") & ~(mask_frend0.PA_POWER.mask << mask_frend0.PA_POWER.offset)
         if modulation == YardModulations.MODULATION_ASK:
-            frend0 |= 1
+            frend0 |= (1 << mask_frend0.PA_POWER.offset)
         self._set_rf_register("FREND0", frend0)
 
     def _get_channel_spacing(self):
@@ -461,7 +492,7 @@ class YardStickOneDevice(VirtualDevice):
         mask_pktctrl0 = YardRegistersMasks.PKTCTRL0
         pktctrl0 = self.radio_structure.get("PKTCTRL0") & ~(mask_pktctrl0.LENGTH_CONFIG.mask << mask_pktctrl0.LENGTH_CONFIG.offset)
         pktctrl0 |= ((int(variable) & mask_pktctrl0.LENGTH_CONFIG.mask) << mask_pktctrl0.LENGTH_CONFIG.offset)
-        self._set_rf_register("PKTCTRL0", pktctrl0)
+
         self._set_rf_register("PKTLEN", length if length <= 255 else 0)
 
     def _is_packet_length_variable(self):
@@ -568,7 +599,7 @@ class YardStickOneDevice(VirtualDevice):
         self.radio_structure.update()
         mask_mdmcfg2 = YardRegistersMasks.MDMCFG2
         mdmcfg2 = self.radio_structure.get("MDMCFG2") & ~(mask_mdmcfg2.MANCHESTER_EN.mask << mask_mdmcfg2.MANCHESTER_EN.offset)
-        mdmcfg2 |= int(encoding) << mask_mdmcfg2.MANCHESTER_EN.offset
+        mdmcfg2 |= (int(encoding) << mask_mdmcfg2.MANCHESTER_EN.offset)
         self._set_rf_register("MDMCFG2", mdmcfg2)
 
 
@@ -609,7 +640,7 @@ class YardStickOneDevice(VirtualDevice):
         mask_fsctrl1 = YardRegistersMasks.FSCTRL1
         computed_value = int(0.5 + (intermediate_frequency * (2**10)) / (1000000.0 * 24))
         fsctrl1 = self.radio_structure.get("FSCTRL1") & ~(mask_fsctrl1.FREQ_IF.mask << mask_fsctrl1.FREQ_IF.offset)
-        fsctrl1 |= int(computed_value) << mask_fsctrl1.FEC_EN.offset
+        fsctrl1 |= int(computed_value) << mask_fsctrl1.FREQ_IF.offset
         self._set_rf_register("FSCTRL1", fsctrl1)
 
 
@@ -843,6 +874,15 @@ class YardStickOneDevice(VirtualDevice):
             YardApplications.NIC,
             YardNICCommands.GET_AMP_MODE
         )[0]
+
+    def _set_packet_format(self, format=0):
+        self.radio_structure.update()
+        mask_pktctrl0 = YardRegistersMasks.PKTCTRL0
+
+        pktctrl0 = self.radio_structure.get("PKTCTRL0") & ~(mask_pktctrl0.PKT_FORMAT.mask << mask_pktctrl0.PKT_FORMAT.offset)
+        pktctrl0 |= ((int(format) & mask_pktctrl0.PKT_FORMAT.mask) << mask_pktctrl0.PKT_FORMAT.offset)
+
+        self._set_rf_register("PKTCTRL0", pktctrl0)
 
     def set_test_config(self):
         '''

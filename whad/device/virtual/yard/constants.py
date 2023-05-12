@@ -10,7 +10,7 @@ class RegisterMask:
     mask : int = 0
     offset : int = 0
 
-class USB_PROPERTIES:
+class YardUSBProperties:
     USB_RX_WAIT = 1000
     USB_TX_WAIT = 10000
 
@@ -308,8 +308,8 @@ class YardRegistersMasks:
         FREQ_IF = RegisterMask(mask=0b11111, offset=0)
 
     class FREND0:
-        LODIV_BUF_CURRENT_TX = RegisterMask(mask=0b111, offset=0)
-        PA_POWER = RegisterMask(mask=0b11, offset=4)
+        PA_POWER = RegisterMask(mask=0b111, offset=0)
+        LODIV_BUF_CURRENT_TX = RegisterMask(mask=0b11, offset=4)
 
     class FREND1:
         MIX_CURRENT = RegisterMask(mask=0b11, offset=0)
