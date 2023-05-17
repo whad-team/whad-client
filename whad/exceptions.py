@@ -57,14 +57,22 @@ class WhadDeviceAccessDenied(Exception):
         return 'WhadDeviceAccessDenied(%s) - missing udev rules' % self.__device_name
 
 class WhadDeviceUnsupportedOperation(Exception):
+    def __init__(self, operation, message):
+        self.__operation = operation
+        self.__message = message
+
+    def __str__(self):
+        return "WhadDeviceUnsupportedOperation(%s) - %s" % (self.__operation, self.__message)
+
+    def __repr__(self):
+        return str(self)
+    
+class WhadDeviceTimeout(Exception):
     def __init__(self, message):
         self.__message = message
 
     def __str__(self):
-        return "WhadDeviceUnsupportedOperation(%s) - %s" % self.__message
-
-    def __repr__(self):
-        return str(self)
+        return "WhadDeviceTimeout(%s)" % self.__message
 
 # External tools exceptions
 

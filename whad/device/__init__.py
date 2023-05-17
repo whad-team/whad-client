@@ -3,10 +3,11 @@ import traceback
 from threading import Thread, Lock
 from queue import Queue, Empty
 from binascii import hexlify
+from time import time
 
 # Whad imports
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, \
-    WhadDeviceNotReady, WhadDeviceNotFound, WhadDeviceDisconnected
+    WhadDeviceNotReady, WhadDeviceNotFound, WhadDeviceDisconnected, WhadDeviceTimeout
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery
@@ -754,16 +755,25 @@ class WhadDevice(object):
         if filter is not None:
             self.set_queue_filter(filter)
 
+        start_time = time()
+
         while True:
+            try:
+                # Wait for a matching message to be caught (blocking)
+                msg = self.__msg_queue.get(block=True, timeout=timeout)
 
-            # Wait for a matching message to be caught (blocking)
-            msg = self.__msg_queue.get(block=True, timeout=timeout)
-
-            # If message does not match, dispatch.
-            if not self.__mq_filter(msg):
-                self.dispatch_message(msg)
-            else:
-                return msg
+                # If message does not match, dispatch.
+                if not self.__mq_filter(msg):
+                    self.dispatch_message(msg)
+                else:
+                    return msg
+            except Empty as err:
+                """
+                Queue is empty, wait for a message to show up.
+                """
+                if timeout is not None:
+                    if time() - start_time > timeout:
+                        raise WhadDeviceTimeout(None)
 
 
     def send_message(self, message, keep=None):
