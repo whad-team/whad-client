@@ -11,6 +11,7 @@ from argparse import Namespace
 from whad.ble.profile.characteristic import CharacteristicProperties
 from whad.cli.app import command
 from whad.ble import Central, Scanner
+from whad.ble.exceptions import ConnectionLostException
 from whad.ble.bdaddr import BDAddress
 from whad.ble.utils.att import UUID
 from whad.ble.stack.att.exceptions import AttError
@@ -124,26 +125,29 @@ def profile_handler(app, command_args):
         if device is None:
             app.error('Cannot connect to %s, device does not respond.' % app.args.bdaddr)
         else:
-            # Perform profile discovery
-            profile_discover(app, device)
+            try:
+                # Perform profile discovery
+                profile_discover(app, device)
 
-            # Export profile to JSON file if required
-            if len(command_args) >= 1:
-                # Load GATT profile JSON data
-                json_data = device.export_json()
-                profile = loads(json_data)
+                # Export profile to JSON file if required
+                if len(command_args) >= 1:
+                    # Load GATT profile JSON data
+                    json_data = device.export_json()
+                    profile = loads(json_data)
 
-                # Add specific device info (for emulating)
-                profile['devinfo'] = device_metadata
-                json_data = dumps(profile)
-                try:
-                    print('Writing profile JSON data to %s ...' % command_args[0])
-                    open(command_args[0], 'w').write(json_data)
-                except IOError as ioerr:
-                    app.error('An error occured when writing to %s' % command_args[0])
+                    # Add specific device info (for emulating)
+                    profile['devinfo'] = device_metadata
+                    json_data = dumps(profile)
+                    try:
+                        print('Writing profile JSON data to %s ...' % command_args[0])
+                        open(command_args[0], 'w').write(json_data)
+                    except IOError as ioerr:
+                        app.error('An error occured when writing to %s' % command_args[0])
 
-            # Disconnect
-            device.disconnect()
+                # Disconnect
+                device.disconnect()
+            except ConnectionLostException as conn_lost:
+                app.error('BLE device disconnected during discovery.')
 
         # Terminate central
         central.stop()
@@ -165,16 +169,23 @@ def profile_handler(app, command_args):
             adv_addr_type=int(app.args.target_addrtype),
             conn_handle=int(app.args.conn_handle)
         )
-   
+
         central = Central(app.input_interface, existing_connection)
         device = central.peripheral()
 
-        # Read GATT characteristic
-        profile_discover(app, device)
+        try:
+            # Read GATT characteristic
+            profile_discover(app, device)
 
-        # Export profile to JSON file if required
-        if len(command_args) >= 1:
-            app.warning('Cannot create profile file when chained.')
+            # Export profile to JSON file if required
+            if len(command_args) >= 1:
+                app.warning('Cannot create profile file when chained.')
+
+        except ConnectionLostException as conn_lost:
+            app.error('BLE device disconnected during discovery.')
+
+        central.stop()
+
     elif app.interface is None:
         app.error('You need to specify an interface with option --interface.')
     else:

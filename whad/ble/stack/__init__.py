@@ -73,7 +73,7 @@ class BleStack:
         self.__llm.on_data_pdu(conn_handle, data)
 
     def send_data(self, conn_handle, data, encrypt=None):
-        self.__connector.send_data_pdu(data, conn_handle=conn_handle, encrypt=encrypt)
+        return self.__connector.send_data_pdu(data, conn_handle=conn_handle, encrypt=encrypt)
 
     def send_control(self, conn_handle, pdu, encrypt=None):
         self.__connector.send_ctrl_pdu(pdu, conn_handle, encrypt=encrypt)

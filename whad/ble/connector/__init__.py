@@ -20,6 +20,7 @@ from whad.ble.connector.translator import BleMessageTranslator
 from whad.helpers import message_filter, bd_addr_to_bytes
 from whad.ble.profile.advdata import AdvDataFieldList
 from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
+from whad.ble.exceptions import ConnectionLostException
 
 # Logging
 import logging
@@ -780,7 +781,11 @@ class BLE(WhadDeviceConnector):
                 msg = self.translator.from_packet(packet, self.__encrypted)
 
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+            logger.info('[ble connector] Commant sent, result: %s' % resp)
+            if resp is None:
+                raise ConnectionLostException(None)
+            else:
+                return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         else:
             return False
 

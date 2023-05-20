@@ -15,6 +15,7 @@ from whad.ble.stack.att.exceptions import InvalidHandleValueError, error_respons
 from whad.ble.stack.gatt.helpers import get_uuid_alias
 from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
+from whad.ble.exceptions import ConnectionLostException
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
 from whad.ble.profile.service import PrimaryService, SecondaryService
@@ -34,6 +35,7 @@ class Gatt(object):
         """
         self.__att = att
         self.__queue = Queue()
+        self.__terminated = False
 
     def attach(self, att):
         """Attach this GATT instance to the underlying ATT layer
@@ -69,6 +71,10 @@ class Gatt(object):
         """
         start_time = time()
         while (time() - start_time) < timeout:
+            # Check if connection has been terminated.
+            if self.__terminated:
+                logger.debug('Connection lost')
+                raise ConnectionLostException(None)
             try:
                 msg = self.__queue.get(block=False,timeout=0.5)
                 if isinstance(msg, message_clazz) or isinstance(msg, GattErrorResponse):
@@ -308,7 +314,8 @@ class Gatt(object):
     def on_terminated(self):
         """Called when the underlying connection has been terminated.
         """
-        pass
+        # Mark connection as terminated.
+        self.__terminated = True
 
 class GattClient(Gatt):
     """GATT client
@@ -318,6 +325,7 @@ class GattClient(Gatt):
         super().__init__()
         self.__model = GenericProfile()
         self.__notification_callbacks = {}
+        self.__terminated = False
 
     @property
     def model(self):
@@ -818,6 +826,9 @@ class GattClient(Gatt):
         return self.__model.services()
 
     def on_terminated(self):
+        # Process termination.
+        super().on_terminated()
+
         # Remove all notification/indication callbacks
         self.clear_notification_callbacks()
 

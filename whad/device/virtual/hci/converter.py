@@ -101,6 +101,11 @@ class HCIConverter:
 
     def process_connection_complete(self, event):
         if event.status == 0x00:
+
+            # Mark device as connected.
+            self.__device._connected = True
+
+            # Send BLE connected message to consumer.
             msg = Message()
             handle = event.handle
             if event.role == 0: # master role
@@ -124,6 +129,10 @@ class HCIConverter:
 
     def process_disconnection_complete(self, event):
         if event.status == 0x00:
+            # Mark device as disconnected
+            self.__device._connected = False
+
+            # Send disconnection message to consumer.
             msg = Message()
             handle = event.handle
             reason = event.reason

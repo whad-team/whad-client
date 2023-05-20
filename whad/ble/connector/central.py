@@ -10,6 +10,7 @@ from whad.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack, BtVersion
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
 from whad.ble.stack.gatt import GattClient
+from whad.ble.exceptions import ConnectionLostException
 from whad.ble.profile.device import PeripheralDevice
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
@@ -127,7 +128,10 @@ class Central(BLE):
         :return:                PDU transmission result.
         :rtype:                 bool
         """
-        return super().send_pdu(pdu, conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
+        if self.__connected:
+            return super().send_pdu(pdu, conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
+        else:
+            raise ConnectionLostException(None)
 
     ##############################
     # Incoming events

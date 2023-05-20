@@ -12,6 +12,7 @@ from whad.device.unix import UnixSocketProxy
 import logging
 logger = logging.getLogger(__name__)
 
+#logging.basicConfig(level=logging.DEBUG)
 
 class BleConnectApp(CommandLineApp):
 

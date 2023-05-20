@@ -3,7 +3,7 @@ import traceback
 from threading import Thread, Lock
 from queue import Queue, Empty
 from binascii import hexlify
-from time import time
+from time import time, sleep
 
 # Whad imports
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, \
@@ -318,14 +318,14 @@ class WhadDeviceConnector(object):
         """
         return self.__device.send_command(message, filter)
 
-    def wait_for_message(self, timeout=None, filter=None):
+    def wait_for_message(self, timeout=None, filter=None, command=False):
         """Waits for a specific message to be received.
 
         This method reads the message queue and return the first message that matches the
         provided filter. A timeout can be specified and will cause this method to return
         None if this timeout is reached.
         """
-        return self.__device.wait_for_message(timeout=timeout, filter=filter)
+        return self.__device.wait_for_message(timeout=timeout, filter=filter, command=command)
 
     # Message callbacks
     def on_any_msg(self, message):
@@ -741,7 +741,7 @@ class WhadDevice(object):
         return self.__msg_queue.get(block=True, timeout=timeout)
 
 
-    def wait_for_message(self, timeout=None, filter=None):
+    def wait_for_message(self, timeout=None, filter=None, command=False):
         """
         Configures the device message queue filter to automatically move messages
         that matches the filter into the queue, and then waits for the first message
@@ -771,9 +771,13 @@ class WhadDevice(object):
                 """
                 Queue is empty, wait for a message to show up.
                 """
-                if timeout is not None:
-                    if time() - start_time > timeout:
-                        raise WhadDeviceTimeout(None)
+                if timeout is not None and (time() - start_time > timeout):
+                    if command:
+                        raise WhadDeviceTimeout('WHAD device did not answer to a command')
+                    else:
+                        return None
+
+                sleep(0.001)
 
 
     def send_message(self, message, keep=None):
@@ -819,6 +823,8 @@ class WhadDevice(object):
         :returns: Response message from the device
         :rtype: Message
         """
+        self.__tx_lock.acquire()
+
         # If a queue filter is not provided, expect a default CmdResult
         if keep is None:
             self.send_message(command, message_filter(
@@ -829,7 +835,13 @@ class WhadDevice(object):
             self.send_message(command, keep)
 
         # Retrieve the first message matching our filter.
-        return self.wait_for_message(self.__timeout)
+        result = self.wait_for_message(self.__timeout, command=True)
+        self.__tx_lock.release()
+
+        # Log message
+        logger.debug('Command result: %s' % result)
+
+        return result
 
 
     def on_data_received(self, data):

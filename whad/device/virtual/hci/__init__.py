@@ -27,7 +27,7 @@ from whad.scapy.layers.hci import HCI_Cmd_Read_Local_Version_Information, \
 from select import select
 from os import read, write
 from time import sleep
-from queue import Queue
+from queue import Queue, Empty
 from struct import unpack
 
 import logging
@@ -93,6 +93,8 @@ class HCIDevice(VirtualDevice):
         self._manufacturer = None
         self._cached_scan_data = None
         self._cached_scan_response_data = None
+        self.__timeout = 1.0
+        self._connected = False
 
     @property
     def identifier(self):
@@ -192,17 +194,33 @@ class HCIDevice(VirtualDevice):
             sleep(1)
 
     def _wait_response(self, timeout=None):
-        response = self.__hci_responses.get(block=True, timeout=timeout)
+        response = None
+        try:
+            response = self.__hci_responses.get(block=True, timeout=timeout)
+        except Empty as err:
+            logger.debug('[hci] device did not respond')
         return response
 
     def _write_packet(self, packet):
         """
         Writes an HCI packet.
         """
+        logger.debug('[hci] sending packet ...')
         self.__socket.send(packet)
-        response = self._wait_response()
-        while response.code != 0x13:
-            response = self._wait_response()
+        
+        # Wait for response
+        logger.debug('[hci] waiting for response (timeout: %s)...' % self.__timeout)
+        response = self._wait_response(timeout=self.__timeout)
+        if response is None:
+            return False
+        else:
+            logger.debug('[hci] response code: 0x%04x' % response.code)
+            while response.code != 0x13:
+                logger.debug('[hci] waiting for response ...')
+                response = self._wait_response(timeout=self.__timeout)
+                if response is None:
+                    return False
+                logger.debug('[hci] response code: 0x%04x' % response.code)
         return response.number == 1
 
     def _write_command(self, command, wait_response=True):
@@ -574,12 +592,17 @@ class HCIDevice(VirtualDevice):
             try:
                 hci_packets = self.__converter.process_message(message)
                 if hci_packets is not None:
+                    logger.debug('sending HCI packets ...')
                     success = True
                     for hci_packet in hci_packets:
                         success = success and self._write_packet(hci_packet)
+                    logger.debug('HCI packet sending result: %s' % success)
                     if success:
+                        logger.debug('send_pdu command succeeded.')
                         self._send_whad_command_result(ResultCode.SUCCESS)
                     else:
+                        logger.debug('send_pdu command failed.')
                         self._send_whad_command_result(ResultCode.ERROR)
             except WhadDeviceUnsupportedOperation as err:
+                logger.debug('Parameter error')
                 self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
