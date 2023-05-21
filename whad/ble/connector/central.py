@@ -10,7 +10,7 @@ from whad.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack, BtVersion
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
 from whad.ble.stack.gatt import GattClient
-from whad.ble.exceptions import ConnectionLostException
+from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
 from whad.ble.profile.device import PeripheralDevice
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
@@ -99,11 +99,13 @@ class Central(BLE):
             start_time=time()
             while not self.is_connected():
                 if time()-start_time >= timeout:
-                    return None
+                    raise PeripheralNotFound
+                sleep(0.1)
             self.__random_addr = random
             return self.peripheral()
         else:
-            return None
+            # TODO: raise cannot connect
+            raise PeripheralNotFound()
 
     def peripheral(self) -> PeripheralDevice:
         """Connected BLE peripheral.
