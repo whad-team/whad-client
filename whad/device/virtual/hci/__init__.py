@@ -38,22 +38,22 @@ def get_hci(index):
     Returns an HCI socket based on adapter index.
     '''
     try:
-        logging.debug('Creating bluetooth socket ...')
+        logger.debug('Creating bluetooth socket ...')
         socket = BluetoothUserSocketFixed(index)
-        logging.debug('Bluetooth socket successfully created.')
+        logger.debug('Bluetooth socket successfully created.')
         return socket
     except BluetoothSocketError as err:
-        logging.debug('An error occured while creating bluetooth socket')
+        logger.debug('An error occured while creating bluetooth socket')
         try:
-            logging.debug('Shutting down HCI interface #%d' % index)
+            logger.debug('Shutting down HCI interface #%d' % index)
             HCIConfig.down(index)
-            logging.debug('HCI interface %d shut down, creating Bluetooth socket ...' % index)
+            logger.debug('HCI interface %d shut down, creating Bluetooth socket ...' % index)
             socket = BluetoothUserSocketFixed(index)
-            logging.debug('Bluetooth socket successfully created.')
+            logger.debug('Bluetooth socket successfully created.')
             return socket
         except BluetoothSocketError as err:
-            logger.error(err)
-            logging.error('Cannot create Bluetooth socket !')
+            logger.debug(err)
+            logger.error('Cannot create Bluetooth socket !')
             return None
 
 
