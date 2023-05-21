@@ -8,14 +8,12 @@ from struct import unpack, pack
 
 from whad.ble.exceptions import HookReturnValue, HookReturnAuthentRequired,\
     HookReturnAuthorRequired, HookReturnAccessDenied, HookReturnGattError, \
-    HookReturnNotFound
+    HookReturnNotFound, ConnectionLostException
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
-from whad.ble.stack.att.exceptions import InvalidHandleValueError, error_response_to_exc, InsufficientAuthenticationError,\
-    InsufficientAuthorizationError, InsufficientEncryptionKeySize, ReadNotPermittedError, AttErrorCode
+from whad.ble.stack.att.exceptions import error_response_to_exc, AttErrorCode
 from whad.ble.stack.gatt.helpers import get_uuid_alias
 from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
-from whad.ble.exceptions import ConnectionLostException
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
 from whad.ble.profile.service import PrimaryService, SecondaryService

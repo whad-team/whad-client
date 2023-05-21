@@ -28,14 +28,32 @@ class InvalidAccessAddressException(Exception):
     def __init__(self):
         super().__init__()
 
-#######################
-# Sniffing exception
-#######################
+
+################################
+# Connection related exceptions
+################################
+
+class PeripheralNotFound(Exception):
+    """This exception is raised when a targeted peripheral cannot be found.
+    """
+    def __init__(self, peripheral=None):
+        super().__init__()
+        self.peripheral = peripheral
+
+class NotConnected(Exception):
+    """This exception is raised when a peripheral is used while not connected.
+    """
+    def __init__(self, peripheral=None):
+        super().__init__()
+        self.peripheral = peripheral
 
 class ConnectionLostException(Exception):
-    def __init__(self, connection):
+    """This exception is raised when a connection is unexpectedly terminated.
+    """
+    def __init__(self, connection=None):
         super().__init__()
         self.connection = connection
+
 
 #######################
 # Hook Exceptions

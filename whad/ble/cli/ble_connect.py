@@ -8,6 +8,7 @@ from whad.ble.bdaddr import BDAddress
 from whad.cli.app import CommandLineApp
 from whad.ble.connector import Central
 from whad.device.unix import UnixSocketProxy
+from whad.ble.exceptions import PeripheralNotFound
 
 import logging
 logger = logging.getLogger(__name__)
@@ -68,11 +69,9 @@ class BleConnectApp(CommandLineApp):
             central = Central(self.interface)
 
             # Connect to our target device
-            periph = central.connect(bdaddr, random_connection_type)
-            if periph is None:
-                # Could not connect
-                self.error('Cannot connect to %s' % bdaddr)
-            else:
+            try:
+                periph = central.connect(bdaddr, random_connection_type)
+                
                 # Get peers
                 logger.info('local_peer: %s' % central.local_peer)
 
@@ -87,6 +86,10 @@ class BleConnectApp(CommandLineApp):
                 })
                 proxy.start()
                 proxy.join()
+            except PeripheralNotFound as not_found:
+                # Could not connect
+                self.error('Cannot connect to %s' % bdaddr)
+            finally:
                 central.stop()
         else:
             self.error('Invalid BD address: %s' % bdaddr)

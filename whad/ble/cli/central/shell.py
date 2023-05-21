@@ -8,7 +8,7 @@ from binascii import unhexlify, Error as BinasciiError
 from scapy.layers.bluetooth import *
 from scapy.layers.bluetooth4LE import *
 
-from whad.ble.exceptions import InvalidHandleValueException
+from whad.ble.exceptions import InvalidHandleValueException, ConnectionLostException
 from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Scanner, Central
@@ -436,6 +436,9 @@ class BleCentralShell(InteractiveShell):
                     self.__target.discover()
                 except GattTimeoutException as timeout:
                     self.error('GATT timeout occured')
+                    return
+                except ConnectionLostException as disconnected:
+                    self.error('Services discovery failed (peripheral disconnected)')
                     return
 
             # Cache our target with its discovered services/characteristics
