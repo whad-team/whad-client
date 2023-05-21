@@ -164,7 +164,10 @@ def read_handler(app, command_args):
         read_gatt_characteristic(app, command_args, device, profile_loaded)
 
     elif app.interface is None:
-        app.error('You need to specify an interface with option --interface.')
-
+        # If stdin is piped, that means previous program has failed.
+        # We display this warning only if the tool has been launched in
+        # standalone mode
+        if not app.is_stdin_piped():
+            app.error('You need to specify an interface with option --interface.')
     else:
         app.error('You need to specify a target device with option --bdaddr.')

@@ -24,4 +24,8 @@ def interactive_handler(app, command_args):
         myshell = BleCentralShell(app.interface)
         myshell.run()
     else:
-        app.error('You need to specify an interface with option --interface.')
+        # If stdin is piped, that means previous program has failed.
+        # We display this warning only if the tool has been launched in
+        # standalone mode
+        if not app.is_stdin_piped():
+            app.error('You need to specify an interface with option --interface.')
