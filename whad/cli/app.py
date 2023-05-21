@@ -6,6 +6,9 @@ import select
 import fcntl
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
+from prompt_toolkit.output import create_output
+from prompt_toolkit.application.current import get_app_session
+
 from urllib.parse import urlparse, parse_qsl
 from signal import signal, SIGPIPE, SIG_DFL
 
@@ -279,6 +282,11 @@ class CommandLineApp(ArgumentParser):
         if self.__args.nocolor:
             os.environ['PROMPT_TOOLKIT_COLOR_DEPTH']='DEPTH_1_BIT'
 
+        # If stdout is piped, then tell prompt-toolkit to fallback to another
+        # TTY (normally, stderr).
+        if self.is_stdout_piped():
+            get_app_session()._output = create_output(always_prefer_tty=True)
+
         # If stdin is piped, we must wait for a specific URL sent in a single
         # line that describes the interface to use.
         if self.is_stdin_piped():
@@ -337,7 +345,7 @@ class CommandLineApp(ArgumentParser):
     def post_run(self):
         """Implement post-run tasks.
         """
-        # If stdout is piped, foward socket info to next tool
+        # If stdout is piped, forward socket info to next tool
         if isinstance(self.__input_iface, UnixSocketDevice) and self.is_stdout_piped():
             sys.stdout.write('%s\n' % self.__interface_path)
             sys.stdout.flush()
