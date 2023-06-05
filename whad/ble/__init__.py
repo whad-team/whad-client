@@ -21,6 +21,11 @@ from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvDataFie
 from whad.ble.connector import BLE, Central, Peripheral, Sniffer, Hijacker, Injector, Scanner
 from whad.ble.utils.phy import PHYS
 
+# Bluetooth Mesh scapy layers: TODO move to a specific domain ?
+from whad.scapy.layers.bt_mesh import bind, unbind
+bind()
+
+
 def is_bdaddr_valid(bd_addr):
     return re.match('^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$',bd_addr)
 
