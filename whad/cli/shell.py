@@ -134,8 +134,11 @@ class InteractiveShell(object):
             command = tokens[0]
             if command in self.__commands:
                 resolved_args = [self.resolve(arg) for arg in tokens[1:]]
-                # Command is supported, follow to method
-                return self.__commands[command](resolved_args)
+                try:
+                    # Command is supported, follow to method
+                    return self.__commands[command](resolved_args)
+                except KeyboardInterrupt as kbd_int:
+                    print('\rInterrupted by user.')
 
     def run(self):
         """Run the interactive shell.
