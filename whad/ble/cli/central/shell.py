@@ -8,7 +8,8 @@ from binascii import unhexlify, Error as BinasciiError
 from scapy.layers.bluetooth import *
 from scapy.layers.bluetooth4LE import *
 
-from whad.ble.exceptions import InvalidHandleValueException, ConnectionLostException
+from whad.ble.exceptions import InvalidHandleValueException, ConnectionLostException, \
+    PeripheralNotFound
 from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Scanner, Central
@@ -301,48 +302,50 @@ class BleCentralShell(InteractiveShell):
 
             # Switch role to Central
             self.switch_role(Central)
+            try:
+                # Try to connect to our target device (central role is started here)
+                self.__target = self.__connector.connect(target_bd_addr, random=target_random_address_type)
+                self.__target_bd = target_bd_addr
 
-            # Try to connect to our target device (central role is started here)
-            self.__target = self.__connector.connect(target_bd_addr, random=target_random_address_type)
-            self.__target_bd = target_bd_addr
+                # Check connection is OK
+                if self.__target is not None:
+                    print('Successfully connected to target %s' % target_bd_addr)
 
-            # Check connection is OK
-            if self.__target is not None:
-                print('Successfully connected to target %s' % target_bd_addr)
+                    # Attach our disconnection callback
+                    self.__target.set_disconnect_cb(self.on_disconnect)
 
-                # Attach our disconnection callback
-                self.__target.set_disconnect_cb(self.on_disconnect)
+                    # Attach our wireshark monitor, if any
+                    if self.__wireshark is not None:
+                        self.__wireshark.attach(self.__connector)
 
-                # Attach our wireshark monitor, if any
-                if self.__wireshark is not None:
-                    self.__wireshark.attach(self.__connector)
+                    # Detach any previous callback
+                    self.__connector.detach_callback(self.on_disconnect, on_reception=True, on_transmission=False)
 
-                # Detach any previous callback
-                self.__connector.detach_callback(self.on_disconnect, on_reception=True, on_transmission=False)
+                    # Attach our packet monitor callback (to detect disconnection)
+                    self.__connector.attach_callback(
+                        self.on_disconnect,
+                        on_transmission=False,
+                        on_reception=True,
+                        filter=lambda pkt: pkt.haslayer(LL_TERMINATE_IND)
+                    )
 
-                # Attach our packet monitor callback (to detect disconnection)
-                self.__connector.attach_callback(
-                    self.on_disconnect,
-                    on_transmission=False,
-                    on_reception=True,
-                    filter=lambda pkt: pkt.haslayer(LL_TERMINATE_IND)
-                )
+                    # Create our cached device if non-existing
+                    if self.__target_bd not in self.__cache:
+                        self.__cache.add(AdvertisingDevice(
+                            -50,
+                            0,
+                            self.__target_bd,
+                            AdvDataFieldList()
+                        ))
 
-                # Create our cached device if non-existing
-                if self.__target_bd not in self.__cache:
-                    self.__cache.add(AdvertisingDevice(
-                        -50,
-                        0,
-                        self.__target_bd,
-                        AdvDataFieldList()
-                    ))
-
-                # Update prompt
-                self.update_prompt()
-            else:
+                    # Update prompt
+                    self.update_prompt()
+                else:
+                    print('Unable to connect to device %s' % target_bd_addr)
+                    self.__target_bd = None
+            except PeripheralNotFound as not_found:
                 print('Unable to connect to device %s' % target_bd_addr)
                 self.__target_bd = None
-
         except IndexError as notfound:
             print('Device %s not found' % args[0])
 
@@ -481,8 +484,15 @@ class BleCentralShell(InteractiveShell):
 
             # Do we need to discover the services ?
             if len(list(self.__target.services())) == 0:
-                self.__target.discover()
-                self.__cache.mark_as_discovered(self.__target_bd)
+                try:
+                    self.__target.discover()
+                    self.__cache.mark_as_discovered(self.__target_bd)
+                except GattTimeoutException as timeout:
+                    self.error('GATT timeout occured')
+                    return
+                except ConnectionLostException as disconnected:
+                    self.error('Services/characteristics discovery failed (peripheral disconnected)')
+                    return
 
             # We are connected to a device, list cached services
             for service in self.__target.services():
@@ -504,8 +514,16 @@ class BleCentralShell(InteractiveShell):
 
             # Do we need to discover the services ?
             if len(list(self.__target.services())) == 0:
-                self.__target.discover()
-                self.__cache.mark_as_discovered(self.__target_bd)
+                try:
+                    self.__target.discover()
+                    self.__cache.mark_as_discovered(self.__target_bd)
+                except GattTimeoutException as timeout:
+                    self.error('GATT timeout occured')
+                    return
+                except ConnectionLostException as disconnected:
+                    self.error('Services/characteristics discovery failed (peripheral disconnected)')
+                    return
+
 
             # We are connected to a device, list cached services
             for service in self.__target.services():
@@ -592,6 +610,8 @@ class BleCentralShell(InteractiveShell):
                     self.show_att_error(att_err)
                 except GattTimeoutException as timeout:
                     self.error('GATT timeout while reading.')
+                except ConnectionLostException as conn_lost:
+                    self.error('Characteristic read failed (peripheral disconnected)')
 
             else:
                 # Perform discovery if required
@@ -616,6 +636,8 @@ class BleCentralShell(InteractiveShell):
                         self.show_att_error(att_err)
                     except GattTimeoutException as timeout:
                         self.error('GATT timeout while reading.')
+                    except ConnectionLostException as conn_lost:
+                        self.error('Characteristic read failed (peripheral disconnected)')
                 else:
                     self.error('No characteristic found with UUID %s' % handle)
         else:
@@ -676,6 +698,9 @@ class BleCentralShell(InteractiveShell):
                 self.show_att_error(att_err)
             except GattTimeoutException as timeout:
                 self.error('GATT timeout while writing.')
+            except ConnectionLostException as conn_lost:
+                self.error('Characteristic write failed (peripheral disconnected)')
+
         else:
             # Perform discovery if required
             if not self.__cache.is_discovered(self.__target_bd):
@@ -694,6 +719,8 @@ class BleCentralShell(InteractiveShell):
                     self.show_att_error(att_err)
                 except GattTimeoutException as timeout:
                     self.error('GATT timeout while writing.')
+                except ConnectionLostException as conn_lost:
+                    self.error('Characteristic write failed (peripheral disconnected)')
             else:
                 self.error('No characteristic found with UUID %s' % handle)
 
@@ -779,6 +806,9 @@ class BleCentralShell(InteractiveShell):
                     self.error('Invalid hex value.')
             except BinasciiError as err:
                 self.error('Invalid hex value.')
+            except ConnectionLostException as conn_lost:
+                self.error('Sending PDU failed (peripheral disconnected)')
+
         else:
             self.error('No device connected.')
 
@@ -871,6 +901,10 @@ class BleCentralShell(InteractiveShell):
                         self.error('An error occured while sending PDU.')
                 else:
                     self.error('Invalid hex value.')
+
+            except ConnectionLostException as conn_lost:
+                self.error('Sending PDU failed (peripheral disconnected)')
+
             except Exception as err:
                 print(err)
                 self.error('An error occured while assembling packet')
@@ -956,6 +990,8 @@ class BleCentralShell(InteractiveShell):
                     self.show_att_error(att_err)
                 except GattTimeoutException as timeout:
                     self.error('GATT timeout while writing.')
+                except ConnectionLostException as conn_lost:
+                    self.error('Characteristic subscribe failed (peripheral disconnected)')
             else:
                 self.error('No characteristic found with UUID %s' % handle)
         else:
@@ -1014,6 +1050,8 @@ class BleCentralShell(InteractiveShell):
                     self.show_att_error(att_err)
                 except GattTimeoutException as timeout:
                     self.error('GATT timeout.')
+                except ConnectionLostException as conn_lost:
+                    self.error('Characteristic unscribe failed (peripheral disconnected)')
             else:
                 self.error('No characteristic found with UUID %s' % handle)
 
