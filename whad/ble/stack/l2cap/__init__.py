@@ -115,9 +115,11 @@ class BleL2CAP(object):
             logger.debug('[l2cap] Received a L2CAP Connection Parameter Update Request, rejecting')
             
             # Reject this request
+            self.__connection.lock()
             self.__connection.send_l2cap_data(
                 L2CAP_Hdr()/L2CAP_CmdHdr(id=packet[L2CAP_CmdHdr].id)/L2CAP_Connection_Parameter_Update_Response(move_result=1)
             )
+            self.__connection.unlock()
 
     def send(self, data, channel='attribute'):
         """Send data

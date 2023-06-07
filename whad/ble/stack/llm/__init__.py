@@ -5,7 +5,7 @@ from binascii import hexlify
 from struct import pack
 from random import randint
 
-from time import sleep
+from threading import Lock
 
 from scapy.layers.bluetooth4LE import *
 
@@ -50,6 +50,7 @@ class BleConnection(object):
         self.__llcm = None
         self.__version_sent = False
         self.__version_remote = None
+        self.__lock = Lock()
 
         self.__handlers = {
             CONNECTION_UPDATE_REQ: self.on_connection_update_req,
@@ -83,6 +84,16 @@ class BleConnection(object):
     @property
     def local_peer(self):
         return self.__local_peer
+
+    def lock(self):
+        """Lock connection
+        """
+        self.__lock.acquire()
+
+    def unlock(self):
+        """Unlock connection
+        """
+        self.__lock.release()
 
     def on_disconnect(self):
         """Connection has been closed.
@@ -290,7 +301,14 @@ class BleConnection(object):
     def on_feature_req(self, feature_req):
         """Features not supported yet
         """
-        self.on_unsupported_opcode(FEATURE_REQ)
+        #self.on_unsupported_opcode(FEATURE_REQ)
+        # Reply with our basic feature set
+        self.send_control(
+            BTLE_CTRL() / LL_FEATURE_RSP(feature_set=[
+                'le_encryption',
+                'le_ping'                
+            ])
+        )
 
     def on_feature_rsp(self, feature_rsp):
         """Features not supported yet
@@ -342,6 +360,8 @@ class BleConnection(object):
         pass
 
     def on_length_req(self, length_req):
+        """Received a length request PDU
+        """
         pass
 
     def on_length_rsp(self, length_rsp):
