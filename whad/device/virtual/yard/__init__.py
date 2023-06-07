@@ -110,27 +110,28 @@ class YardStickOneDevice(VirtualDevice):
         self._set_packet_format(0)
         self._set_forward_error_correction(enable=False)
         self._set_clear_channel_assessment(mode=YardCCA.NO_CCA)
-        self._set_frequency(433920000)
-        self._set_data_rate(4800)
-        self._set_channel_spacing(self.compute_best_channel_bandwidth())
+        self._set_frequency(433870000)
+        self._set_data_rate(10000)
+        #self._set_channel_spacing(self.compute_best_channel_bandwidth())
         self._set_channel(0)
 
         #self._set_intermediate_frequency(44444)
-        self._set_sync_word(b"")
+        self._set_sync_word(b"\x00\x00\x00\x00")
         self._set_preamble_quality_threshold(0)
         self._set_packet_length(250, variable=False)
 
         print("length:", self._get_packet_length())
         print("datarate:", self._get_data_rate())
 
+        frame =b"\x00\x00\x00\x00\x00\x7f\xff\x83\xe0\x00\x1f\xff\xc0\xff\xfe\x0f\x80\x00|\x00\x03\xff\xf8?\x00\x01\xf0\x00\x0f\x80\x00\xfc\x00\x07\xff\xf8?\xff\x81\xf0\x00\x1f\xff\xe0\xff\xff\x07\xff\xf0>\x00\x03\xe0\x00\x1f\x00\x00\xf8\x00\x0f\xff\xf0|\x00\x03\xff\xf8?\xff\xc1\xff\xfe\x0f\x80\x00\x7f\xff\x07\xe0\x00>\x00\x01\xff\xfc\x1f\xff\xe0\xf8\x00\x00\x00\x00\x00\x00\x00\x00\x03\xff\xf8\x1f\x00\x01\xff\xfe\x0f\xff\xf0|\x00\x07\xe0\x00?\xff\xc1\xf0\x00\x0f\x80\x00\xf8\x00\x07\xc0\x00?\xff\x83\xff\xfc\x1f\x00\x00\xff\xfe\x0f\xff\xf0\x7f\xff\x83\xe0\x00\x1f\x00\x01\xf8\x00\x0f\x80\x00\x7f\xff\x07\xe0\x00?\xff\xc1\xff\xfc\x0f\xff\xe0\xfc\x00\x07\xff\xf8>\x00\x01\xf0\x00\x1f\xff\xe0\xff\xff\x07\xc0\x00\x00\x00\x00\x00\x00\x00\x00?\xff\xc1\xf0\x00\x0f\xff\xe0\xff\xff"
         #self._set_rx_mode()
         #self._strobe_rx_mode()
         #frame = bytes.fromhex("")
         #self._set_packet_length(len(frame), variable=False)
-        self._set_power(0x60)
-        frame = bytes([i for i in range(250)])
+        self._set_power(0x80)
+        #frame = bytes([i for i in range(250)])
         self._set_packet_length(len(frame), variable=False)
-
+#
         self._set_tx_mode()
         self._send_packet(frame)
         sleep(2)
@@ -248,17 +249,28 @@ class YardStickOneDevice(VirtualDevice):
     def _get_url(self):
         return "https://github.com/atlas0fd00m/rfcat".encode('utf-8')
 
-    def _send_packet(self, packet, repeat=0, offset=0):
+    def _send_packet(self, packet, repeat=10, offset=0):
         data = bytes(packet)
-        waitlen = len(data) + repeat * (len(data) - offset)
-        wait = YardUSBProperties.USB_TX_WAIT * ((waitlen / 255) + 1)
-
+        #waitlen = len(data) + repeat * (len(data) - offset)
+        #wait = YardUSBProperties.USB_TX_WAIT * ((waitlen / 255) + 1)
+        '''
         self._yard_send_command(
             YardApplications.NIC,
             YardNICCommands.LONG_XMIT,
             pack("<H", len(data)) + data,
-            no_response=True
+            no_response=False
         )
+        '''
+        #self._strobe_tx_mode()
+        self._yard_send_command(
+            YardApplications.NIC,
+            YardNICCommands.XMIT,
+            pack("<HHH", len(data), repeat, offset) + data,
+            no_response=False
+        )
+        #sleep(1)
+        self._strobe_idle_mode()
+
 
     def _peek(self, address, size):
         return self._yard_send_command(
