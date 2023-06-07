@@ -513,6 +513,7 @@ class HCIDevice(VirtualDevice):
             return success
 
     def _on_whad_ble_periph_mode(self, message):
+        logger.debug('whad ble periph mode message')
         if PeripheralMode in self._dev_capabilities[WhadDomain.BtLE][1]:
             success = True
             if len(message.scan_data) > 0:
@@ -567,6 +568,15 @@ class HCIDevice(VirtualDevice):
         if self.__internal_state == HCIInternalState.SCANNING:
             self._set_scan_mode(True)
             self._send_whad_command_result(ResultCode.SUCCESS)
+        elif self.__internal_state == HCIInternalState.PERIPHERAL:
+            if not self._advertising:
+                if self._set_advertising_mode(True):
+                    self._advertising = True
+                    self._send_whad_command_result(ResultCode.SUCCESS)
+                else:
+                    self._send_whad_command_result(ResultCode.ERROR)
+            else:
+                self._send_whad_command_result(ResultCode.SUCCESS)
         else:
             self._send_whad_command_result(ResultCode.ERROR)
 
