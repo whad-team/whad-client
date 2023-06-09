@@ -35,7 +35,7 @@ def k2(n, p):
     t1 = aes_cmac(t, t0 + p + b"\x01")
     t2 = aes_cmac(t, t1 + p + b"\x02")
     t3 = aes_cmac(t, t2 + p + b"\x03")
-    return (int.from_bytes(t1 + t2 + t3) % (2 ** 263)).to_bytes(33)
+    return (int.from_bytes((t1 + t2 + t3),byteorder='big')  % (2 ** 263)).to_bytes(33,byteorder='big')
 
 
 def k3(n):
@@ -44,7 +44,7 @@ def k3(n):
     """
     salt = s1(b"smk3")
     t = aes_cmac(salt, n)
-    return (int.from_bytes(aes_cmac(t, b"id64" + b"\x01"))).to_bytes(16)
+    return (int.from_bytes(aes_cmac(t, b"id64" + b"\x01"), byteorder='big')).to_bytes(16,byteorder='big')
 
 
 def k4(n):
@@ -53,4 +53,4 @@ def k4(n):
     """
     salt = s1(b"smk4")
     t = aes_cmac(salt, n)
-    return (int.from_bytes(aes_cmac(t, b"id6" + b"\x01"))).to_bytes(16)
+    return (int.from_bytes(aes_cmac(t, b"id6" + b"\x01"),byteorder='big')).to_bytes(16,byteorder='big')

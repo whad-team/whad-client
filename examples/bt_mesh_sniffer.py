@@ -6,7 +6,6 @@ from scapy.layers.bluetooth import EIR_Hdr
 from scapy.layers.bluetooth4LE import BTLE_ADV
 import sys
 
-
 def bt_mesh_filter(packet, ignore_regular_adv):
     if BTLE_ADV in packet:
         if hasattr(packet, "data"):
@@ -39,6 +38,7 @@ if __name__ == '__main__':
             for i in sniffer.sniff():
                 if bt_mesh_filter(i, ignore_regular_adv):
                     i.show()
+                    print(bytes(i).hex())
 
 
 
