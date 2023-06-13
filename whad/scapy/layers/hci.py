@@ -1,7 +1,7 @@
 from whad.ble.stack.constants import BT_MANUFACTURERS
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteEnumField, ByteField, LEShortEnumField, LEShortField, \
-    StrField, StrNullField, LELongField
+    StrField, StrNullField, LELongField, XByteField
 from scapy.layers.bluetooth import HCI_Command_Hdr, HCI_Event_Command_Complete, \
     HCI_Event_LE_Meta, LEMACField
 from scapy.layers.bluetooth4LE import BTLEChanMapField
