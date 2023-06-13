@@ -2,7 +2,8 @@ from whad.ble.stack.constants import BT_MANUFACTURERS
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteEnumField, ByteField, LEShortEnumField, LEShortField, \
     StrField, StrNullField, LELongField
-from scapy.layers.bluetooth import HCI_Command_Hdr, HCI_Event_Command_Complete, LEMACField
+from scapy.layers.bluetooth import HCI_Command_Hdr, HCI_Event_Command_Complete, \
+    HCI_Event_LE_Meta, LEMACField
 from scapy.layers.bluetooth4LE import BTLEChanMapField
 
 HCI_VERSIONS = LMP_VERSIONS = {
@@ -58,6 +59,22 @@ class HCI_Cmd_Complete_LE_Read_Supported_States(Packet):
     name = "LE Read Supported States Command Complete"
     fields_desc = [
         LELongField("supported_states", None)
+    ]
+
+class HCI_LE_Meta_Enhanced_Connection_Complete(Packet):
+    name = "Enhanced Connection Complete"
+    fields_desc = [
+        ByteEnumField("status", 0, {0: "success"}),
+        LEShortField("handle", 0),
+        ByteEnumField("role", 0, {0: "master"}),
+        ByteEnumField("patype", 0, {0: "public", 1: "random"}),
+        LEMACField("paddr", None),
+        LEMACField("localresolvprivaddr", None),
+        LEMACField("peerresolvprivaddr", None),
+        LEShortField("interval", 54),
+        LEShortField("latency", 0),
+        LEShortField("supervision", 42),
+        XByteField("clock_latency", 5),
     ]
 
 
@@ -142,6 +159,9 @@ bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Local_Name,       
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Supported_States,                              opcode=0x201c)
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_LE_Read_Supported_States,          opcode=0x201c)
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Host_Channel_Classification,                    opcode=0x2014)
+
+bind_layers(HCI_Event_LE_Meta, HCI_LE_Meta_Enhanced_Connection_Complete,                    event=0xa)
+
 
 bind_layers(HCI_Command_Hdr, HCI_Cmd_ST_Write_BD_Address,                                   opcode=0xfc22)
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Zeevo_Write_BD_Address,                                opcode=0xfc01)

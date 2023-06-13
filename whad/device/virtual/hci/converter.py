@@ -1,6 +1,7 @@
 from scapy.layers.bluetooth import HCI_Event_LE_Meta, HCI_LE_Meta_Advertising_Reports, \
     HCI_LE_Meta_Connection_Complete, L2CAP_Hdr, HCI_Hdr, HCI_ACL_Hdr, HCI_Event_Disconnection_Complete
 from scapy.layers.bluetooth4LE import BTLE_DATA
+from whad.scapy.layers.hci import HCI_LE_Meta_Enhanced_Connection_Complete
 from scapy.compat import raw
 from whad.exceptions import WhadDeviceUnsupportedOperation
 from whad.protocol.whad_pb2 import Message
@@ -48,6 +49,9 @@ class HCIConverter:
                 return self.process_advertising_reports(event[HCI_LE_Meta_Advertising_Reports:])
             elif HCI_LE_Meta_Connection_Complete in event:
                 return self.process_connection_complete(event[HCI_LE_Meta_Connection_Complete:])
+            elif HCI_LE_Meta_Enhanced_Connection_Complete in event:
+                return self.process_connection_complete(event[HCI_LE_Meta_Enhanced_Connection_Complete:])
+                
         elif HCI_ACL_Hdr in event:
             return self.process_acl_data(event[HCI_ACL_Hdr:])
         elif HCI_Event_Disconnection_Complete in event:
@@ -76,7 +80,7 @@ class HCIConverter:
             msg.ble.pdu.pdu = raw(pdu)
             msg.ble.pdu.processed = processed
             return [msg]
-            
+
         elif event.PB == 1:
             msg = Message()
             pdu = BTLE_DATA()/event[HCI_ACL_Hdr:].payload
