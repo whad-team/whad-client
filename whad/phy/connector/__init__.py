@@ -5,9 +5,10 @@ from whad.phy.metadata import generate_phy_metadata, PhyMetadata
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.protocol.phy.phy_pb2 import SetASKModulation, SetFSKModulation, \
     SetGFSKModulation, SetBPSKModulation, SetQPSKModulation, Start, Stop, \
-    SetBPSKModulationCmd, SetQPSKModulationCmd, SetSubGhzFrequency, \
-    SetTwoDotFourGhzFrequency, SetFiveGhzFrequency, SetDataRate, SetEndianness, \
-    Endianness, SetTXPower, TXPower, SetPacketSize, SetSyncWord, StartCmd, StopCmd
+    SetBPSKModulationCmd, SetQPSKModulationCmd, GetSupportedFrequenciesCmd, \
+    GetSupportedFrequencies, SetFrequency, SetDataRate, SetEndianness, \
+    Endianness, SetTXPower, TXPower, SetPacketSize, SetSyncWord, StartCmd, \
+    StopCmd
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.exceptions import RequiredImplementation, UnsupportedCapability, UnsupportedDomain
@@ -81,6 +82,20 @@ class Phy(WhadDeviceConnector):
         commands = self.device.get_domain_commands(WhadDomain.Phy)
         return (commands & (1 << SetFSKModulation)) > 0
 
+
+    def can_get_supported_frequencies(self):
+        """
+        Determine if the device can get a list of supported frequencies.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        return (commands & (1 << GetSupportedFrequencies)) > 0
+
+    def can_set_frequency(self):
+        """
+        Determine if the device can select a specific frequency.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        return (commands & (1 << SetFrequency)) > 0
 
     def can_use_gfsk(self):
         """
@@ -177,79 +192,31 @@ class Phy(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-    def can_use_subghz_band(self):
-        """
-        Checks if the device supports SubGHz frequency bands.
-        """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetSubGhzFrequency)) > 0
 
-    def can_use_2_4_ghz_band(self):
+    def get_supported_frequencies(self):
         """
-        Checks if the device supports 2.4GHz ISM frequency band.
+        Get list of supported frequency ranges (in Hz).
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetTwoDotFourGhzFrequency)) > 0
-
-    def can_use_5_ghz_band(self):
-        """
-        Checks if the device supports 5GHz frequency band.
-        """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetFiveGhzFrequency)) > 0
-
-    def set_subghz_frequency(self, frequency):
-        """
-        Configure frequency in the SubGHz band (in MHz).
-        """
-        if not self.can_use_subghz_band():
-            raise UnsupportedCapability("SubGHzBand")
+        if not self.can_get_supported_frequencies():
+            raise UnsupportedCapability("GetSupportedFrequencies")
 
         msg = Message()
-        msg.phy.freq_subghz.frequency_offset = frequency
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        msg.phy.get_supported_freq.CopyFrom(GetSupportedFrequenciesCmd())
+        resp = self.send_command(msg, message_filter('phy', 'supported_freq'))
+        return (resp.phy.supported_freq.frequency_ranges)
 
-    def set_2_4_ghz_frequency(self, frequency):
-        """
-        Configure frequency in the 2.4GHz band (in MHz).
-        """
-        if not self.can_use_2_4_ghz_band():
-            raise UnsupportedCapability("TwoDotFourGHzBand")
-
-        msg = Message()
-        msg.phy.freq_twodotfourghz.frequency_offset = (frequency - 2400)
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
-
-    def set_5_ghz_frequency(self, frequency):
-        """
-        Configure frequency in the 5GHz band (in MHz).
-        """
-        if not self.can_use_5_ghz_band():
-            raise UnsupportedCapability("FiveGHzBand")
-
-        msg = Message()
-        msg.phy.freq_fiveghz.frequency_offset = (5000 - frequency)
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def set_frequency(self, frequency):
         """
-        Configure frequency (in MHz).
+        Configure frequency (in Hz).
         """
-        if frequency >= 0 and frequency <= 1000:
-            return self.set_subghz_frequency(frequency)
+        if not self.can_set_frequency():
+            raise UnsupportedCapability("SetFrequency")
 
-        elif frequency >= 2400 and frequency <= 2500:
-            return self.set_2_4_ghz_frequency(frequency)
-
-        elif frequency >= 5000 and frequency <= 6000:
-            return self.set_5_ghz_frequency(frequency)
-
-        else:
-            raise RequiredImplementation()
+        msg = Message()
+        msg.phy.set_freq.frequency = frequency
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
     def can_set_datarate(self):
         """

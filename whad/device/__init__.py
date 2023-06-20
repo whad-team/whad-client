@@ -190,7 +190,7 @@ class WhadDeviceConnector(object):
         )
         for callback_dict in callbacks_dicts:
             callback_dict[callback] = filter
-        
+
         # Leave critical section
         self.__callbacks_lock.release()
 
@@ -684,7 +684,7 @@ class WhadDevice(object):
         Close device.
 
         This method MUST be overriden by inherited classes.
-        """       
+        """
         logger.info('closing WHAD device')
         self.__closing = True
 
@@ -868,6 +868,7 @@ class WhadDevice(object):
                         _msg.ParseFromString(bytes(raw_message))
                         logger.debug('WHAD message successfully parsed')
                         self.on_message_received(_msg)
+                        print(_msg)
                         # Chomp
                         self.__inpipe = self.__inpipe[msg_size + 4:]
                     else:
@@ -890,7 +891,7 @@ class WhadDevice(object):
         :param Message message: Message to dispatch
         """
         logger.info('dispatching WHAD message ...')
-        
+
         # Allows a connector to catch any message
         self.on_any_msg(message)
 
@@ -916,7 +917,7 @@ class WhadDevice(object):
         """
         if self.__closing:
             return
-        
+
         logger.debug(message)
         logger.debug(self.__mq_filter)
         # If message queue filter is defined and message matches this filter,
@@ -935,7 +936,7 @@ class WhadDevice(object):
         """
         if self.__closing:
             return
-            
+
         try:
             message = self.__messages.get(block=True, timeout=timeout)
             if message is not None:

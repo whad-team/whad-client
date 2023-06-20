@@ -13,6 +13,7 @@ if __name__ == '__main__':
         dev = WhadDevice.create("uart0")
         sniffer1 = Phy(dev)
         sniffer1.attach_callback(show_packet)
+        print(sniffer1.get_supported_frequencies())
         sniffer1.set_frequency(2426)
         sniffer1.set_datarate(1000000)
         sniffer1.configure_gfsk(deviation=250000)

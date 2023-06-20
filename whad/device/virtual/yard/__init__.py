@@ -92,6 +92,7 @@ class YardStickOneDevice(VirtualDevice):
         print(self.radio_structure)
 
         self._set_idle_mode()
+        '''
         #self._strobe_idle_mode()
 
         #self.set_test_config()
@@ -138,19 +139,14 @@ class YardStickOneDevice(VirtualDevice):
 
         self._set_idle_mode()
 
-
         self._set_rx_mode()
         self._strobe_rx_mode()
+        '''
+        self._set_idle_mode()
 
         # Ask parent class to run a background I/O thread
         super().open()
         self.__opened_stream = True
-
-        try:
-            while True:
-                sleep(1)
-        except:
-            self.close()
 
     def write(self, data):
         if not self.__opened:
