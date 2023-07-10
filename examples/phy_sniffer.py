@@ -1,6 +1,7 @@
 from whad.phy import Phy, Endianness
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
+from whad.esb.utils.phy import PHYS
 from time import time,sleep
 import sys
 
@@ -12,7 +13,9 @@ if __name__ == '__main__':
 
         dev = WhadDevice.create("uart0")
         sniffer1 = Phy(dev)
+
         sniffer1.attach_callback(show_packet)
+        '''
         print(sniffer1.get_supported_frequencies())
         sniffer1.set_frequency(2402000000)
         sniffer1.set_packet_size(252)
@@ -20,6 +23,10 @@ if __name__ == '__main__':
         sniffer1.configure_gfsk(deviation=250000)
         sniffer1.set_endianness(Endianness.LITTLE)
         sniffer1.set_sync_word(bytes.fromhex("8e89bed6"))
+        '''
+        sniffer1.set_physical_layer(PHYS["ESB-2M"])
+        sniffer1.set_frequency(2417000000)
+
         sniffer1.sniff_phy()
         sniffer1.start()
 

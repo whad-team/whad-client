@@ -2,6 +2,9 @@ from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.phy.metadata import generate_phy_metadata, PhyMetadata
+from whad.phy.utils.definitions import OOKModulationScheme, ASKModulationScheme, \
+    OQPSKModulationScheme, QPSKModulationScheme, BPSKModulationScheme, \
+    FSKModulationScheme, GFSKModulationScheme
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.protocol.phy.phy_pb2 import SetASKModulation, SetFSKModulation, \
     SetGFSKModulation, SetBPSKModulation, SetQPSKModulation, Start, Stop, \
@@ -418,8 +421,24 @@ class Phy(WhadDeviceConnector):
         if not success:
             return False
 
-        # ...
+        success = self.set_packet_size(physical_layer.maximum_packet_size)
+        if not success:
+            return False
+
+        supported_frequencies = self.get_supported_frequencies()
+        start, end = physical_layer.frequency_range[0], physical_layer.frequency_range[1]
+        success = False
+        for i in supported_frequencies:
+            if start >= i[0] and end <= i[1]:
+                success = True
+                break
+
+        if not success:
+            return False
+
+        print(physical_layer.endianness)
         self.__physical_layer = physical_layer
+        return True
 
     def on_discovery_msg(self, message):
         pass

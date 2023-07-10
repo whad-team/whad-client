@@ -20,6 +20,7 @@ from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvDataFie
     AdvManufacturerSpecificData, AdvShortenedLocalName, AdvTxPowerLevel, AdvDataFieldListOverflow, AdvDataError
 from whad.ble.connector import BLE, Central, Peripheral, Sniffer, Hijacker, Injector, Scanner
 from whad.ble.utils.phy import PHYS
+from whad.scapy.layers.bt_mesh import BTMesh_Unprovisioned_Device_Beacon, EIR_BTMesh_Beacon
 
 def is_bdaddr_valid(bd_addr):
     return re.match('^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$',bd_addr)
