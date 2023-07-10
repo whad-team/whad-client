@@ -34,6 +34,12 @@ class Phy(WhadDeviceConnector):
         self.__can_send = None
         self.__can_send_raw = None
 
+        # Frequency cache
+        self.__cached_supported_frequencies = None
+
+        # Physical layer
+        self.__physical_layer = None
+
         # Open device and make sure it is compatible
         self.device.open()
         self.device.discover()
@@ -203,7 +209,7 @@ class Phy(WhadDeviceConnector):
         msg = Message()
         msg.phy.get_supported_freq.CopyFrom(GetSupportedFrequenciesCmd())
         resp = self.send_command(msg, message_filter('phy', 'supported_freq'))
-        return (resp.phy.supported_freq.frequency_ranges)
+        return [(i.start, i.end) for i in resp.phy.supported_freq.frequency_ranges]
 
 
     def set_frequency(self, frequency):
@@ -213,6 +219,10 @@ class Phy(WhadDeviceConnector):
         if not self.can_set_frequency():
             raise UnsupportedCapability("SetFrequency")
 
+        if self.__cached_supported_frequencies is None:
+            self.__cached_supported_frequencies = self.get_supported_frequencies()
+        if all([frequency <= freq_range[0] or frequency >= freq_range[1] for freq_range in self.__cached_supported_frequencies]):
+            print("not in range")
         msg = Message()
         msg.phy.set_freq.frequency = frequency
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
@@ -296,7 +306,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("PacketSize")
 
         msg = Message()
-        msg.phy.packet_size.size = size
+        msg.phy.packet_size.packet_size = size
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -373,6 +383,43 @@ class Phy(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
+
+    def set_physical_layer(self, physical_layer):
+        """
+        Sets a specific physical layer.
+        """
+        if isinstance(physical_layer.modulation, OOKModulationScheme):
+            success = self.configure_ask(on_off_keying=True)
+        elif isinstance(physical_layer.modulation, ASKModulationScheme):
+            success = self.configure_ask(on_off_keying=False)
+        elif isinstance(physical_layer.modulation, GFSKModulationScheme):
+            success = self.configure_gfsk(deviation=physical_layer.modulation.deviation)
+        elif isinstance(physical_layer.modulation, FSKModulationScheme):
+            success = self.configure_fsk(deviation=physical_layer.modulation.deviation)
+        elif isinstance(physical_layer.modulation, QPSKModulationScheme):
+            success = self.configure_qpsk()
+        elif isinstance(physical_layer.modulation, BPSKModulationScheme):
+            success = self.configure_bpsk()
+        else:
+            return False
+
+        if not success:
+            return False
+
+        success = self.set_endianness(physical_layer.endianness)
+        if not success:
+            return False
+
+        success = self.set_datarate(physical_layer.datarate)
+        if not success:
+            return False
+
+        success = self.set_sync_word(physical_layer.synchronization_word)
+        if not success:
+            return False
+
+        # ...
+        self.__physical_layer = physical_layer
 
     def on_discovery_msg(self, message):
         pass

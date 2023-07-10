@@ -16,10 +16,12 @@ class FieldsSize(IntEnum):
 
 def frequency_to_channel(frequency):
     '''
-    Converts a frequency (in MHz) to the corresponding BLE channel.
+    Converts a frequency (in Hz) to the corresponding BLE channel.
     '''
-    if not isinstance(frequency,int) or frequency < 2402 or frequency > 2480:
+    if not isinstance(frequency,int) or frequency < 2402000000 or frequency > 2480000000:
         return None
+
+    frequency = int(frequency / 1000000)
 
     freq_offset = frequency - 2400
     if freq_offset == 2:
@@ -37,7 +39,7 @@ def frequency_to_channel(frequency):
 
 def channel_to_frequency(channel):
     '''
-    Converts a BLE channel to the corresponding frequency (in MHz).
+    Converts a BLE channel to the corresponding frequency (in Hz).
     '''
     if not isinstance(channel,int) or channel < 0 or channel > 39:
         return None
@@ -52,7 +54,7 @@ def channel_to_frequency(channel):
     else:
         freq_offset = 2 * (channel + 3)
 
-    return 2400 + freq_offset
+    return (2400 + freq_offset) * 1000000
 
 def dewhitening(data, channel):
   '''
@@ -146,7 +148,7 @@ PHYS = {
                 modulation=GFSKModulationScheme(deviation=250000),
                 datarate=1000000,
                 endianness=Endianness.LITTLE,
-                frequency_range=(2402, 2480),
+                frequency_range=(2402000000, 2480000000),
                 maximum_packet_size=255,
                 synchronization_word=b"\xAA",
                 frequency_to_channel_function=frequency_to_channel,
@@ -160,7 +162,7 @@ PHYS = {
                 modulation=GFSKModulationScheme(deviation=500000),
                 datarate=2000000,
                 endianness=Endianness.LITTLE,
-                frequency_range=(2402, 2480), 
+                frequency_range=(2402000000, 2480000000),
                 maximum_packet_size=255,
                 synchronization_word=b"\xAA\xAA",
                 frequency_to_channel_function=frequency_to_channel,
