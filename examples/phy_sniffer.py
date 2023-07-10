@@ -24,7 +24,7 @@ if __name__ == '__main__':
         sniffer1.set_endianness(Endianness.LITTLE)
         sniffer1.set_sync_word(bytes.fromhex("8e89bed6"))
         '''
-        sniffer1.set_physical_layer(PHYS["ESB-2M"])
+        sniffer1.set_physical_layer(PHYS["BLE-1M"])
         sniffer1.set_frequency(2417000000)
 
         sniffer1.sniff_phy()
