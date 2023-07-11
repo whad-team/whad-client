@@ -12,7 +12,6 @@ def channel_to_frequency(channel):
   """
   return (2400 + channel) * 1000000
 
-&
 PHYS = {
     "ESB-1M": PhysicalLayer(
                 modulation=GFSKModulationScheme(deviation=170000),
