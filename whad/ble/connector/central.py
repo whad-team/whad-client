@@ -28,11 +28,11 @@ class Central(BLE):
 
     """
 
-    def __init__(self, device, existing_connection = None, from_json=None):
+    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack):
         super().__init__(device)
 
         self.__gatt_client = GattClient()
-        self.__stack = BleStack(self, self.__gatt_client)
+        self.__stack = stack(self, self.__gatt_client)
         self.__connected = False
         self.__peripheral = None
         self.__random_addr = False
