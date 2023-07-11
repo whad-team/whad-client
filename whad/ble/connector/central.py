@@ -211,7 +211,7 @@ class Central(BLE):
             self.__stack.on_ctl_pdu(pdu.metadata.connection_handle, pdu)
 
     def on_data_pdu(self, pdu):
-        """This callback methid is called whenever a data PDU is received.
+        """This callback method is called whenever a data PDU is received.
         This PDU is then forwarded to the BLE stack to handle it.
 
         Central devices act as master, so we only forward slave to master
