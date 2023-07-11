@@ -50,13 +50,8 @@ class PhysicalLayer:
         self.synchronization_word = synchronization_word
         self.frequency_range = frequency_range
         self.maximum_packet_size = maximum_packet_size
-        if channel_to_frequency_function is not None:
-            self.channel_to_frequency = channel_to_frequency_function
-        if frequency_to_channel_function is not None:
-            self.frequency_to_channel = frequency_to_channel_function
-        if integrity_function is not None:
-            self.integrity = integrity_function
-        if decoding_function is not None:
-            self.decoding = decoding_function
-        if encoding_function is not None:
-            self.encoding = encoding_function
+        self.channel_to_frequency = channel_to_frequency_function
+        self.frequency_to_channel = frequency_to_channel_function
+        self.integrity = integrity_function
+        self.decoding = decoding_function
+        self.encoding = encoding_function
