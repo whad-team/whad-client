@@ -39,6 +39,7 @@ class Phy(WhadDeviceConnector):
 
         # Frequency cache
         self.__cached_supported_frequencies = None
+        self.__cached_frequency = None
 
         # Physical layer
         self.__physical_layer = None
@@ -127,7 +128,7 @@ class Phy(WhadDeviceConnector):
         commands = self.device.get_domain_commands(WhadDomain.Phy)
         return (commands & (1 << SetQPSKModulation)) > 0
 
-    def configure_ask(self, on_off_keying=True):
+    def set_ask(self, on_off_keying=True):
         """
         Enable Amplitude Shift Keying modulation scheme.
         """
@@ -139,7 +140,7 @@ class Phy(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-    def configure_fsk(self, deviation=250000):
+    def set_fsk(self, deviation=250000):
         """
         Enable Frequency Shift Keying modulation scheme.
 
@@ -157,7 +158,7 @@ class Phy(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-    def configure_gfsk(self, deviation=250000):
+    def set_gfsk(self, deviation=250000):
         """
         Enable Gaussian Frequency Shift Keying modulation scheme.
 
@@ -176,7 +177,7 @@ class Phy(WhadDeviceConnector):
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
 
-    def configure_bpsk(self):
+    def set_bpsk(self):
         """
         Enable Binary Phase Shift Keying modulation scheme.
         """
@@ -189,7 +190,7 @@ class Phy(WhadDeviceConnector):
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
 
-    def configure_qpsk(self):
+    def set_qpsk(self):
         """
         Enable Quadrature Phase Shift Keying modulation scheme.
         """
@@ -225,11 +226,13 @@ class Phy(WhadDeviceConnector):
         if self.__cached_supported_frequencies is None:
             self.__cached_supported_frequencies = self.get_supported_frequencies()
         if all([frequency <= freq_range[0] or frequency >= freq_range[1] for freq_range in self.__cached_supported_frequencies]):
-            print("not in range")
+            raise UnsupportedFrequency(frequency)
         msg = Message()
         msg.phy.set_freq.frequency = frequency
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        self.__cached_frequency = frequency
+        return success
 
     def can_set_datarate(self):
         """
@@ -386,23 +389,44 @@ class Phy(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
+    def set_channel(self, channel):
+        if self.__physical_layer is None:
+            raise UnknownPhysicalLayer()
+
+        if self.__physical_layer.channel_to_frequency is None:
+            raise UnknownPhysicalLayerFunction("channel_to_frequency")
+
+        return self.set_frequency(self.__physical_layer.channel_to_frequency(channel))
+
+
+    def get_channel(self, channel):
+        if self.__physical_layer is None:
+            raise UnknownPhysicalLayer()
+
+        if self.__physical_layer.frequency_to_channel is None:
+            raise UnknownPhysicalLayerFunction("frequency_to_channel")
+
+        if self.__cached_frequency is None:
+            return None
+
+        return self.__physical_layer.frequency_to_channel(self.__cached_frequency)
 
     def set_physical_layer(self, physical_layer):
         """
         Sets a specific physical layer.
         """
         if isinstance(physical_layer.modulation, OOKModulationScheme):
-            success = self.configure_ask(on_off_keying=True)
+            success = self.set_ask(on_off_keying=True)
         elif isinstance(physical_layer.modulation, ASKModulationScheme):
-            success = self.configure_ask(on_off_keying=False)
+            success = self.set_ask(on_off_keying=False)
         elif isinstance(physical_layer.modulation, GFSKModulationScheme):
-            success = self.configure_gfsk(deviation=physical_layer.modulation.deviation)
+            success = self.set_gfsk(deviation=physical_layer.modulation.deviation)
         elif isinstance(physical_layer.modulation, FSKModulationScheme):
-            success = self.configure_fsk(deviation=physical_layer.modulation.deviation)
+            success = self.set_fsk(deviation=physical_layer.modulation.deviation)
         elif isinstance(physical_layer.modulation, QPSKModulationScheme):
-            success = self.configure_qpsk()
+            success = self.set_qpsk()
         elif isinstance(physical_layer.modulation, BPSKModulationScheme):
-            success = self.configure_bpsk()
+            success = self.set_bpsk()
         else:
             return False
 
@@ -436,7 +460,6 @@ class Phy(WhadDeviceConnector):
         if not success:
             return False
 
-        print(physical_layer.endianness)
         self.__physical_layer = physical_layer
         return True
 
