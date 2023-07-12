@@ -16,6 +16,7 @@ from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.exceptions import RequiredImplementation, UnsupportedCapability, UnsupportedDomain
 from whad.scapy.layers.phy import Phy_Packet
+
 class Phy(WhadDeviceConnector):
     """
     Physical layer connector.
@@ -41,6 +42,11 @@ class Phy(WhadDeviceConnector):
         self.__cached_supported_frequencies = None
         self.__cached_frequency = None
 
+        # Address cache
+        self.__address = None
+        self.__pattern_cropped_bytes = 0
+        self.__pattern = None
+
         # Physical layer
         self.__physical_layer = None
 
@@ -63,14 +69,27 @@ class Phy(WhadDeviceConnector):
     def _build_scapy_packet_from_message(self, message, msg_type):
         try:
             if msg_type == 'raw_packet':
-                packet = Phy_Packet(bytes(message.raw_packet.packet))
+                bytes_packet = bytes(message.raw_packet.packet)
+                if self.__pattern_cropped_bytes > 0:
+                    bytes_packet = self.__pattern[:self.__pattern_cropped_bytes] + bytes_packet
+                if self.__physical_layer is not None and self.__physical_layer.decoding is not None:
+                    bytes_packet = self.__physical_layer.decoding(bytes_packet, self.__physical_layer.configuration)
+
+                packet = Phy_Packet(bytes_packet) if self.__physical_layer.scapy_layer is None else self.__physical_layer.scapy_layer(bytes_packet)
                 packet.metadata = generate_phy_metadata(message, msg_type)
                 self.monitor_packet_rx(packet)
                 return packet
 
             elif msg_type == 'packet':
-                packet = Phy_Packet(bytes(message.packet.packet))
+                bytes_packet = bytes(message.packet.packet)
+                if self.__pattern_cropped_bytes > 0:
+                    bytes_packet = self.__pattern[:self.__pattern_cropped_bytes] + bytes_packet
+                if self.__physical_layer is not None and self.__physical_layer.decoding is not None:
+                    bytes_packet = self.__physical_layer.decoding(bytes_packet, self.__physical_layer.configuration)
+
+                packet = Phy_Packet(bytes_packet) if self.__physical_layer.scapy_layer is None else self.__physical_layer.scapy_layer(bytes_packet)
                 packet.metadata = generate_phy_metadata(message, msg_type)
+
                 self.monitor_packet_rx(packet)
                 return packet
 
@@ -222,6 +241,9 @@ class Phy(WhadDeviceConnector):
         """
         if not self.can_set_frequency():
             raise UnsupportedCapability("SetFrequency")
+
+        if frequency is None:
+            return False
 
         if self.__cached_supported_frequencies is None:
             self.__cached_supported_frequencies = self.get_supported_frequencies()
@@ -396,6 +418,9 @@ class Phy(WhadDeviceConnector):
         if self.__physical_layer.channel_to_frequency is None:
             raise UnknownPhysicalLayerFunction("channel_to_frequency")
 
+        if hasattr(self.__physical_layer.configuration, "channel"):
+            self.__physical_layer.configuration.channel = channel
+
         return self.set_frequency(self.__physical_layer.channel_to_frequency(channel))
 
 
@@ -410,6 +435,43 @@ class Phy(WhadDeviceConnector):
             return None
 
         return self.__physical_layer.frequency_to_channel(self.__cached_frequency)
+
+
+    def set_address(self, address):
+        if self.__physical_layer is None:
+            raise UnknownPhysicalLayer()
+
+        if self.__physical_layer.format_address is None:
+            raise UnknownPhysicalLayerFunction("format_address")
+
+        self.__address = address
+        if hasattr(self.__physical_layer.configuration, "address"):
+            self.__physical_layer.configuration.address = address
+
+        bytes_address = self.__physical_layer.format_address(self.__address)
+        pattern = (self.__physical_layer.synchronization_word + bytes_address)
+        self.__pattern_cropped_bytes = len(pattern) - 4
+        self.__pattern = pattern
+        self.set_sync_word(self.__pattern[-4:])
+
+
+    def get_address(self, address):
+        if self.__physical_layer is None:
+            raise UnknownPhysicalLayer()
+
+        return self.__address
+
+    def set_configuration(self, configuration):
+        if self.__physical_layer is None:
+            raise UnknownPhysicalLayer()
+
+        if hasattr(configuration, "channel"):
+            self.set_channel(configuration.channel)
+
+        if hasattr(configuration, "address"):
+            self.set_address(configuration.address)
+
+        self.__physical_layer.configuration = configuration
 
     def set_physical_layer(self, physical_layer):
         """

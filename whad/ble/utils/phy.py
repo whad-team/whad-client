@@ -3,7 +3,10 @@ This module provides some helpers functions and constants related to Bluetooth L
 '''
 from whad.helpers import swap_bits
 from whad.phy import Endianness, GFSKModulationScheme, PhysicalLayer
+from scapy.layers.bluetooth4LE import BTLE
 from enum import IntEnum
+from dataclasses import dataclass
+from struct import pack
 
 class FieldsSize(IntEnum):
     '''
@@ -143,6 +146,28 @@ def is_access_address_valid(aa):
             return False
     return True
 
+
+@dataclass
+class BLEPhysicalLayerConfiguration:
+    address : int = 0x8e89bed6
+    channel : int = 37
+    crc_init : int = 0x555555
+
+
+def check_crc(pkt, configuration):
+    return crc(pkt[FieldsSize.ACCESS_ADDRESS_SIZE:-FieldsSize.CRC_SIZE], configuration.crc_init) == pkt[-FieldsSize.CRC_SIZE:]
+
+def decoding(pkt, configuration):
+    # Remove preamble
+    while pkt.startswith(b"\xAA"):
+        pkt = pkt[1:]
+
+    dewhitened = dewhitening(pkt[FieldsSize.ACCESS_ADDRESS_SIZE:], configuration.channel)
+    size = dewhitened[1]
+    packet = pkt[:FieldsSize.ACCESS_ADDRESS_SIZE] + dewhitened[:size+ FieldsSize.CRC_SIZE + FieldsSize.HEADER_SIZE]
+    return packet
+
+
 PHYS = {
     "LE-1M": PhysicalLayer(
                 modulation=GFSKModulationScheme(deviation=250000),
@@ -151,12 +176,15 @@ PHYS = {
                 frequency_range=(2402000000, 2480000000),
                 maximum_packet_size=250,
                 synchronization_word=b"\xAA",
+                configuration=BLEPhysicalLayerConfiguration(),
+                scapy_layer=BTLE,
                 frequency_to_channel_function=frequency_to_channel,
                 channel_to_frequency_function=channel_to_frequency,
-                integrity_function=crc,
-                encoding_function=whitening,
-                decoding_function=dewhitening
-            ),
+                format_address_function=lambda access_address:pack(">I", access_address),
+                integrity_function=check_crc,
+                encoding_function=None,
+                decoding_function=decoding,
+    ),
 
     "LE-2M": PhysicalLayer(
                 modulation=GFSKModulationScheme(deviation=500000),
@@ -165,8 +193,11 @@ PHYS = {
                 frequency_range=(2402000000, 2480000000),
                 maximum_packet_size=250,
                 synchronization_word=b"\xAA\xAA",
+                configuration=BLEPhysicalLayerConfiguration(),
+                scapy_layer=BTLE, 
                 frequency_to_channel_function=frequency_to_channel,
                 channel_to_frequency_function=channel_to_frequency,
+                format_address_function=lambda access_address:pack(">I", access_address),
                 integrity_function=crc,
                 encoding_function=whitening,
                 decoding_function=dewhitening
