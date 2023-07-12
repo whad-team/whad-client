@@ -72,10 +72,15 @@ class Phy(WhadDeviceConnector):
                 bytes_packet = bytes(message.raw_packet.packet)
                 if self.__pattern_cropped_bytes > 0:
                     bytes_packet = self.__pattern[:self.__pattern_cropped_bytes] + bytes_packet
+
                 if self.__physical_layer is not None and self.__physical_layer.decoding is not None:
                     bytes_packet = self.__physical_layer.decoding(bytes_packet, self.__physical_layer.configuration)
 
-                packet = Phy_Packet(bytes_packet) if self.__physical_layer.scapy_layer is None else self.__physical_layer.scapy_layer(bytes_packet)
+                if self.__physical_layer is not None and self.__physical_layer.decoding is not None:
+                    packet = self.__physical_layer.scapy_layer(bytes_packet)
+                else:
+                    packet = Phy_Packet(bytes_packet)
+
                 packet.metadata = generate_phy_metadata(message, msg_type)
                 self.monitor_packet_rx(packet)
                 return packet
@@ -83,11 +88,15 @@ class Phy(WhadDeviceConnector):
             elif msg_type == 'packet':
                 bytes_packet = bytes(message.packet.packet)
                 if self.__pattern_cropped_bytes > 0:
+
                     bytes_packet = self.__pattern[:self.__pattern_cropped_bytes] + bytes_packet
                 if self.__physical_layer is not None and self.__physical_layer.decoding is not None:
                     bytes_packet = self.__physical_layer.decoding(bytes_packet, self.__physical_layer.configuration)
+                if self.__physical_layer is not None and self.__physical_layer.decoding is not None:
+                    packet = self.__physical_layer.scapy_layer(bytes_packet)
+                else:
+                    packet = Phy_Packet(bytes_packet)
 
-                packet = Phy_Packet(bytes_packet) if self.__physical_layer.scapy_layer is None else self.__physical_layer.scapy_layer(bytes_packet)
                 packet.metadata = generate_phy_metadata(message, msg_type)
 
                 self.monitor_packet_rx(packet)
