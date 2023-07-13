@@ -300,13 +300,10 @@ class RFStormDevice(VirtualDevice):
                 except USBTimeoutError:
                     data = b""
                 if data is not None and isinstance(data, bytes) and len(data) >= 1 and data != b"\xFF":
-                    print("here")
-
                     self.__last_packet_timestamp = time()
                     if len(data[:5]) >= 3:
                         if self.__phy_endianness == Endianness.LITTLE:
                             data = bytes([swap_bits(i) for i in data])
-                        print(data)
                         self._send_whad_pdu(data[5:], data[:5], int(self.__last_packet_timestamp))
 
             else:
@@ -439,23 +436,39 @@ class RFStormDevice(VirtualDevice):
         self._send_whad_command_result(ResultCode.SUCCESS)
 
 
+    def _on_whad_phy_send(self, message):
+        self._on_whad_send(message)
 
     def _on_whad_send(self, message):
-        channel = message.channel if message.channel != 0xFF else self.__channel
-        pdu = message.pdu
-        retransmission_count = message.retransmission_count
-        if self.__acking:
-            self.__ack_payload = pdu
-        else:
-            ack = self._rfstorm_transmit_payload(pdu, retransmits=retransmission_count)
-            if self.__check_ack:
-                if ack:
-                    self._send_whad_pdu(b"", address=self.__address)
-                    self._send_whad_command_result(ResultCode.SUCCESS)
-                else:
-                    self._send_whad_command_result(ResultCode.SUCCESS)
+        if self.__domain == RFStormDomains.RFSTORM_PHY:
+            if self.__phy_endianness == Endianness.LITTLE:
+                sync = bytes([swap_bits(i) for i in self.__phy_sync])[::-1]
+                data =  bytes([swap_bits(i) for i in message.packet])
+            else:
+                sync = self.__phy_sync
+                data = message.packet
+            success = self._rfstorm_transmit_payload_generic(sync + data, address=b"")
+            if success:
+                self._send_whad_command_result(ResultCode.SUCCESS)
+            else:
+                self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
 
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            channel = message.channel if message.channel != 0xFF else self.__channel
+            pdu = message.pdu
+            retransmission_count = message.retransmission_count
+            if self.__acking:
+                self.__ack_payload = pdu
+            else:
+                ack = self._rfstorm_transmit_payload(pdu, retransmits=retransmission_count)
+                if self.__check_ack:
+                    if ack:
+                        self._send_whad_pdu(b"", address=self.__address)
+                        self._send_whad_command_result(ResultCode.SUCCESS)
+                    else:
+                        self._send_whad_command_result(ResultCode.SUCCESS)
+
+            self._send_whad_command_result(ResultCode.SUCCESS)
 
     def _on_whad_esb_send(self, message):
         self.__domain = RFStormDomains.RFSTORM_RAW_ESB
