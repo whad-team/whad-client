@@ -46,3 +46,4 @@ class RFStormDataRate(IntEnum):
 class RFStormDomains(IntEnum):
     RFSTORM_RAW_ESB = 0
     RFSTORM_UNIFYING = 1
+    RFSTORM_PHY = 2

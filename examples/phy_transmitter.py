@@ -12,7 +12,7 @@ if __name__ == '__main__':
             print(repr(pkt.metadata))
             pkt.show()
 
-        dev = WhadDevice.create("rfstorm0")
+        dev = WhadDevice.create("uart0")
         sniffer1 = Phy(dev)
 
         sniffer1.attach_callback(show_packet)
@@ -25,16 +25,11 @@ if __name__ == '__main__':
         sniffer1.set_gfsk(deviation=500000)
         sniffer1.set_endianness(Endianness.LITTLE)
         sniffer1.set_sync_word(bytes.fromhex("aabbccdd"))
-        '''
-        print(sniffer1.set_physical_layer(get_physical_layers_by_domain("ble")["LE-1M"]))
-        sniffer1.set_address(0x8e89bed6)
-        sniffer1.set_channel(37)
-        '''
-        sniffer1.sniff_phy()
         sniffer1.start()
 
 
         while True:
+            sniffer1.send(bytes.fromhex("01020304050607080910"))
             input()
 
 

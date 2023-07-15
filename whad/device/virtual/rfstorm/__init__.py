@@ -4,6 +4,7 @@ from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
 from whad.device.virtual.rfstorm.constants import RFStormId, RFStormCommands, \
     RFStormDataRate, RFStormEndPoints, RFStormInternalStates, RFStormDomains
+from whad.protocol.phy.phy_pb2 import SupportedFrequencyRanges
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.esb.esb_pb2 import \
     Sniff as EsbSniff, \
@@ -22,11 +23,24 @@ from whad.protocol.unifying.unifying_pb2 import \
     LogitechDongleMode as UnifyingLogitechDongleMode, \
     LogitechMouseMode as UnifyingLogitechMouseMode, \
     LogitechKeyboardMode as UnifyingLogitechKeyboardMode
-
+from whad.protocol.phy.phy_pb2 import \
+    SetGFSKModulation as PhySetGFSKModulation, \
+    GetSupportedFrequencies as PhyGetSupportedFrequencies, \
+    SetFrequency as PhySetFrequency, \
+    SetDataRate as PhySetDataRate, \
+    SetEndianness as PhySetEndianness, \
+    SetTXPower as PhySetTXPower, \
+    SetPacketSize as PhySetPacketSize, \
+    SetSyncWord as PhySetSyncWord, \
+    Sniff as PhySniff, \
+    Send as PhySend, \
+    Start as PhyStart, \
+    Stop as PhyStop
 from whad import WhadCapability, WhadDomain
-
+from whad.phy import Endianness
 from threading import Thread, Lock
 from time import sleep, time
+from whad.helpers import swap_bits
 
 # Helpers functions
 def get_rfstorm(id=0,bus=None, address=None):
@@ -85,10 +99,18 @@ class RFStormDevice(VirtualDevice):
         self.__acking = False
         self.__ack_payload = None
         self.__check_ack = False
+
+        self.__phy_sync = None
+        self.__phy_rate = RFStormDataRate.RF_2MBPS
+        self.__phy_size = 32
+        self.__phy_endianness = Endianness.BIG
+
         self.__internal_state = RFStormInternalStates.NONE
         self.__domain = RFStormDomains.RFSTORM_RAW_ESB
         self.__index, self.__rfstorm = device
         self.__last_packet_timestamp = 0
+
+        self.__supported_frequency_range = (2400000000, 2500000000)
         self.__lock = Lock()
         super().__init__()
 
@@ -132,11 +154,45 @@ class RFStormDevice(VirtualDevice):
         capabilities = {
             WhadDomain.Esb : (
                                 (WhadCapability.Sniff | WhadCapability.Inject | WhadCapability.SimulateRole | WhadCapability.NoRawData),
-                                [EsbSniff, EsbSend, EsbStart, EsbStop, EsbSetNodeAddress, EsbPrimaryReceiverMode, EsbPrimaryTransmitterMode]
+                                [
+                                    EsbSniff,
+                                    EsbSend,
+                                    EsbStart,
+                                    EsbStop,
+                                    EsbSetNodeAddress,
+                                    EsbPrimaryReceiverMode,
+                                    EsbPrimaryTransmitterMode
+                                ]
             ),
             WhadDomain.LogitechUnifying : (
                                 (WhadCapability.Sniff | WhadCapability.Inject | WhadCapability.SimulateRole | WhadCapability.NoRawData),
-                                [UnifyingSniff, UnifyingSend, UnifyingStart, UnifyingStop, UnifyingSetNodeAddress, UnifyingLogitechMouseMode, UnifyingLogitechKeyboardMode, UnifyingLogitechDongleMode]
+                                [
+                                    UnifyingSniff,
+                                    UnifyingSend,
+                                    UnifyingStart,
+                                    UnifyingStop,
+                                    UnifyingSetNodeAddress,
+                                    UnifyingLogitechMouseMode,
+                                    UnifyingLogitechKeyboardMode,
+                                    UnifyingLogitechDongleMode
+                                ]
+            ),
+            WhadDomain.Phy: (
+                                (WhadCapability.Sniff | WhadCapability.Inject | WhadCapability.NoRawData),
+                                [
+                                    PhySetGFSKModulation,
+                                    PhyGetSupportedFrequencies,
+                                    PhySetFrequency,
+                                    PhySetDataRate,
+                                    PhySetEndianness,
+                                    PhySetTXPower,
+                                    PhySetPacketSize,
+                                    PhySetSyncWord,
+                                    PhySniff,
+                                    PhySend,
+                                    PhyStart,
+                                    PhyStop
+                                ]
             ),
 
         }
@@ -238,42 +294,55 @@ class RFStormDevice(VirtualDevice):
         if not self.__opened:
             raise WhadDeviceNotReady()
         if self.__opened_stream:
-            if self.__scanning:
-                if time() - self.__last_packet_timestamp > 1:
-                    if self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
-                        self.__channel = (self.__channel + 1) % 100
-                        self._rfstorm_set_channel(self.__channel)
-                        sleep(0.05)
-                    elif self.__internal_state == RFStormInternalStates.SNIFFING:
-                        for i in range(0,100):
-                            self._rfstorm_set_channel(i)
-                            if self._rfstorm_transmit_payload(b"\x0f\x0f\x0f\x0f",1,1):
-                                self.__last_packet_timestamp = time()
-                                self.__channel = i
-                                self._send_whad_pdu(b"", address=self.__address)
-                                break
-
-            if not self.__ptx:
+            if self.__domain == RFStormDomains.RFSTORM_PHY:
                 try:
                     data = self._rfstorm_read_packet()
                 except USBTimeoutError:
                     data = b""
-
                 if data is not None and isinstance(data, bytes) and len(data) >= 1 and data != b"\xFF":
-                    if self.__acking:
-                        if self.__ack_payload is not None:
-                            self._rfstorm_transmit_ack_payload(self.__ack_payload)
-                            self.__ack_payload = None
-                        else:
-                            self._rfstorm_transmit_ack_payload(b"")
                     self.__last_packet_timestamp = time()
-                    if self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
-                        if len(data[:5]) >= 3:
-                            self._send_whad_pdu(data[5:], data[:5])
-                    elif self.__internal_state == RFStormInternalStates.SNIFFING:
-                        self._send_whad_pdu(data[1:], self.__address)
+                    if len(data[:5]) >= 3:
+                        if self.__phy_endianness == Endianness.LITTLE:
+                            data = bytes([swap_bits(i) for i in data])
+                        self._send_whad_pdu(data[5:], data[:5], int(self.__last_packet_timestamp))
+
             else:
-                sleep(0.1)
+                if self.__scanning:
+                    if time() - self.__last_packet_timestamp > 1:
+                        if self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
+                            self.__channel = (self.__channel + 1) % 100
+                            self._rfstorm_set_channel(self.__channel)
+                            sleep(0.05)
+                        elif self.__internal_state == RFStormInternalStates.SNIFFING:
+                            for i in range(0,100):
+                                self._rfstorm_set_channel(i)
+                                if self._rfstorm_transmit_payload(b"\x0f\x0f\x0f\x0f",1,1):
+                                    self.__last_packet_timestamp = time()
+                                    self.__channel = i
+                                    self._send_whad_pdu(b"", address=self.__address)
+                                    break
+
+                if not self.__ptx:
+                    try:
+                        data = self._rfstorm_read_packet()
+                    except USBTimeoutError:
+                        data = b""
+
+                    if data is not None and isinstance(data, bytes) and len(data) >= 1 and data != b"\xFF":
+                        if self.__acking:
+                            if self.__ack_payload is not None:
+                                self._rfstorm_transmit_ack_payload(self.__ack_payload)
+                                self.__ack_payload = None
+                            else:
+                                self._rfstorm_transmit_ack_payload(b"")
+                        self.__last_packet_timestamp = time()
+                        if self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
+                            if len(data[:5]) >= 3:
+                                self._send_whad_pdu(data[5:], data[:5])
+                        elif self.__internal_state == RFStormInternalStates.SNIFFING:
+                            self._send_whad_pdu(data[1:], self.__address)
+                else:
+                    sleep(0.1)
 
 
     # Virtual device whad message builder
@@ -283,6 +352,8 @@ class RFStormDevice(VirtualDevice):
             self._send_whad_esb_pdu(pdu, address, timestamp)
         elif self.__domain == RFStormDomains.RFSTORM_UNIFYING:
             self._send_whad_unifying_pdu(pdu, address, timestamp)
+        elif self.__domain == RFStormDomains.RFSTORM_PHY:
+            self._send_whad_phy_pdu(address + pdu, timestamp)
 
     def _send_whad_esb_pdu(self, pdu, address, timestamp=None):
         msg = Message()
@@ -302,23 +373,102 @@ class RFStormDevice(VirtualDevice):
         msg.unifying.pdu.pdu = pdu
         self._send_whad_message(msg)
 
+    def _send_whad_phy_pdu(self, packet, timestamp=None):
+        msg = Message()
+        msg.phy.packet.frequency = (self.__channel + 2400) * 1000000
+        if timestamp is not None:
+            msg.phy.packet.timestamp = timestamp
+        msg.phy.packet.packet = packet
+        self._send_whad_message(msg)
+
+    def _on_whad_phy_sync_word(self, message):
+        if len(message.sync_word) > 0 and len(message.sync_word) < 5:
+            self.__phy_sync = message.sync_word
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+    def _on_whad_phy_get_supported_freq(self, message):
+        msg = Message()
+        range = SupportedFrequencyRanges.FrequencyRange()
+        range.start, range.end = self.__supported_frequency_range[0], self.__supported_frequency_range[1]
+        msg.phy.supported_freq.frequency_ranges.extend([range])
+        self._send_whad_message(msg)
+
+    def _on_whad_phy_set_freq(self, message):
+        range_start, range_end = self.__supported_frequency_range[0], self.__supported_frequency_range[1]
+
+        if message.frequency >= range_start and message.frequency <= range_end:
+            self.__channel = int(message.frequency / 1000000) - 2400
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+
+    def _on_whad_phy_datarate(self, message):
+        rates = {
+            250000 : RFStormDataRate.RF_250KBPS,
+            1000000 : RFStormDataRate.RF_1MBPS,
+            2000000 : RFStormDataRate.RF_2MBPS,
+        }
+        if message.rate in list(rates.keys()):
+            self.__phy_rate = rates[message.rate]
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+
+    def _on_whad_phy_packet_size(self, message):
+        if message.packet_size >= 5 and message.packet_size <= 31:
+            self.__phy_size = message.packet_size
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+    def _on_whad_phy_endianness(self, message):
+        if message.endianness in (Endianness.BIG, Endianness.LITTLE):
+            self.__phy_endianness = message.endianness
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+    def _on_whad_phy_mod_gfsk(self, message):
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+
+    def _on_whad_phy_send(self, message):
+        self._on_whad_send(message)
 
     def _on_whad_send(self, message):
-        channel = message.channel if message.channel != 0xFF else self.__channel
-        pdu = message.pdu
-        retransmission_count = message.retransmission_count
-        if self.__acking:
-            self.__ack_payload = pdu
-        else:
-            ack = self._rfstorm_transmit_payload(pdu, retransmits=retransmission_count)
-            if self.__check_ack:
-                if ack:
-                    self._send_whad_pdu(b"", address=self.__address)
-                    self._send_whad_command_result(ResultCode.SUCCESS)
-                else:
-                    self._send_whad_command_result(ResultCode.SUCCESS)
+        if self.__domain == RFStormDomains.RFSTORM_PHY:
+            if self.__phy_endianness == Endianness.LITTLE:
+                sync = bytes([swap_bits(i) for i in self.__phy_sync])[::-1]
+                data =  bytes([swap_bits(i) for i in message.packet])
+            else:
+                sync = self.__phy_sync
+                data = message.packet
+            success = self._rfstorm_transmit_payload_generic(sync + data, address=b"")
+            if success:
+                self._send_whad_command_result(ResultCode.SUCCESS)
+            else:
+                self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
 
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            channel = message.channel if message.channel != 0xFF else self.__channel
+            pdu = message.pdu
+            retransmission_count = message.retransmission_count
+            if self.__acking:
+                self.__ack_payload = pdu
+            else:
+                ack = self._rfstorm_transmit_payload(pdu, retransmits=retransmission_count)
+                if self.__check_ack:
+                    if ack:
+                        self._send_whad_pdu(b"", address=self.__address)
+                        self._send_whad_command_result(ResultCode.SUCCESS)
+                    else:
+                        self._send_whad_command_result(ResultCode.SUCCESS)
+
+            self._send_whad_command_result(ResultCode.SUCCESS)
 
     def _on_whad_esb_send(self, message):
         self.__domain = RFStormDomains.RFSTORM_RAW_ESB
@@ -377,19 +527,24 @@ class RFStormDevice(VirtualDevice):
         self._on_whad_prx(message)
 
     def _on_whad_sniff(self, message):
-        channel = message.channel
-        show_acknowledgements = message.show_acknowledgements
-        address = message.address
-        self.__ptx = False
-        self.__channel = channel
-
-        self.__acking = False
-        if address == b"\xFF\xFF\xFF\xFF\xFF":
-            self.__internal_state = RFStormInternalStates.PROMISCUOUS_SNIFFING
-        else:
+        if self.__domain == RFStormDomains.RFSTORM_PHY:
             self.__internal_state = RFStormInternalStates.SNIFFING
-            self.__address = address
-        self._send_whad_command_result(ResultCode.SUCCESS)
+
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            channel = message.channel
+            show_acknowledgements = message.show_acknowledgements
+            address = message.address
+            self.__ptx = False
+            self.__channel = channel
+
+            self.__acking = False
+            if address == b"\xFF\xFF\xFF\xFF\xFF":
+                self.__internal_state = RFStormInternalStates.PROMISCUOUS_SNIFFING
+            else:
+                self.__internal_state = RFStormInternalStates.SNIFFING
+                self.__address = address
+            self._send_whad_command_result(ResultCode.SUCCESS)
 
     def _on_whad_esb_sniff(self, message):
         self.__domain = RFStormDomains.RFSTORM_RAW_ESB
@@ -397,6 +552,10 @@ class RFStormDevice(VirtualDevice):
 
     def _on_whad_unifying_sniff(self, message):
         self.__domain = RFStormDomains.RFSTORM_UNIFYING
+        self._on_whad_sniff(message)
+
+    def _on_whad_phy_sniff(self, message):
+        self.__domain = RFStormDomains.RFSTORM_PHY
         self._on_whad_sniff(message)
 
     def _on_whad_stop(self, message):
@@ -411,24 +570,41 @@ class RFStormDevice(VirtualDevice):
         self.__domain = RFStormDomains.RFSTORM_UNIFYING
         self._on_whad_stop(message)
 
+    def _on_whad_phy_stop(self, message):
+        self.__domain = RFStormDomains.RFSTORM_PHY
+        self._on_whad_stop(message)
+
     def _on_whad_start(self, message):
         self._rfstorm_enable_lna()
-        if self.__channel == 0xFF:
-            self.__scanning = True
-            self.__channel = 0
-        else:
-            self.__scanning = False
-        success = self._rfstorm_set_channel(self.__channel)
-        if self.__internal_state == RFStormInternalStates.SNIFFING:
-            success = success and self._rfstorm_sniffer_mode(self.__address[::-1])
-        elif self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
-            success = success and self._rfstorm_promiscuous_mode()
+        if self.__domain == RFStormDomains.RFSTORM_PHY:
+            if self.__phy_endianness == Endianness.LITTLE:
+                sync = bytes([swap_bits(i) for i in self.__phy_sync])[::-1]
+            else:
+                sync = self.__phy_sync
+            success = self._rfstorm_generic_promiscuous_mode(prefix=sync, rate=self.__phy_rate, payload_length=self.__phy_size)
+            if success:
+                self.__opened_stream = True
+                self._send_whad_command_result(ResultCode.SUCCESS)
+            else:
+                self._send_whad_command_result(ResultCode.ERROR)
 
-        if success:
-            self.__opened_stream = True
-            self._send_whad_command_result(ResultCode.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.ERROR)
+            if self.__channel == 0xFF:
+                self.__scanning = True
+                self.__channel = 0
+            else:
+                self.__scanning = False
+            success = self._rfstorm_set_channel(self.__channel)
+            if self.__internal_state == RFStormInternalStates.SNIFFING:
+                success = success and self._rfstorm_sniffer_mode(self.__address[::-1])
+            elif self.__internal_state == RFStormInternalStates.PROMISCUOUS_SNIFFING:
+                success = success and self._rfstorm_promiscuous_mode()
+
+            if success:
+                self.__opened_stream = True
+                self._send_whad_command_result(ResultCode.SUCCESS)
+            else:
+                self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_esb_start(self, message):
         self.__domain = RFStormDomains.RFSTORM_RAW_ESB
@@ -436,4 +612,8 @@ class RFStormDevice(VirtualDevice):
 
     def _on_whad_unifying_start(self, message):
         self.__domain = RFStormDomains.RFSTORM_UNIFYING
+        self._on_whad_start(message)
+
+    def _on_whad_phy_start(self, message):
+        self.__domain = RFStormDomains.RFSTORM_PHY
         self._on_whad_start(message)

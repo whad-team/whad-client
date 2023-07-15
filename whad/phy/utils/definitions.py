@@ -43,15 +43,18 @@ class OQPSKModulationScheme(QPSKModulationScheme):
         super().__init__(offset_mode=True)
 
 class PhysicalLayer:
-    def __init__(self, modulation, datarate, endianness, synchronization_word, frequency_range, maximum_packet_size, channel_to_frequency_function=None, frequency_to_channel_function=None, integrity_function=None, decoding_function=None, encoding_function=None):
+    def __init__(self, modulation, datarate, endianness, synchronization_word, frequency_range, maximum_packet_size, configuration=None, scapy_layer=None, channel_to_frequency_function=None, frequency_to_channel_function=None, format_address_function=None, integrity_function=None, decoding_function=None, encoding_function=None):
         self.modulation = modulation
         self.datarate = datarate
         self.endianness = endianness
         self.synchronization_word = synchronization_word
         self.frequency_range = frequency_range
         self.maximum_packet_size = maximum_packet_size
+        self.configuration = configuration
+        self.scapy_layer = scapy_layer
         self.channel_to_frequency = channel_to_frequency_function
         self.frequency_to_channel = frequency_to_channel_function
+        self.format_address = format_address_function
         self.integrity = integrity_function
         self.decoding = decoding_function
         self.encoding = encoding_function

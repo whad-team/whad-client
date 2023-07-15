@@ -11,11 +11,13 @@ from whad.protocol.phy.phy_pb2 import SetASKModulation, SetFSKModulation, \
     SetBPSKModulationCmd, SetQPSKModulationCmd, GetSupportedFrequenciesCmd, \
     GetSupportedFrequencies, SetFrequency, SetDataRate, SetEndianness, \
     Endianness, SetTXPower, TXPower, SetPacketSize, SetSyncWord, StartCmd, \
-    StopCmd
+    StopCmd, Send, SendRaw
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
-from whad.exceptions import RequiredImplementation, UnsupportedCapability, UnsupportedDomain
 from whad.scapy.layers.phy import Phy_Packet
+from whad.exceptions import RequiredImplementation, UnsupportedCapability, UnsupportedDomain
+from whad.phy.connector.translator import PhyMessageTranslator
+
 class Phy(WhadDeviceConnector):
     """
     Physical layer connector.
@@ -41,12 +43,18 @@ class Phy(WhadDeviceConnector):
         self.__cached_supported_frequencies = None
         self.__cached_frequency = None
 
+        # Address cache
+        self.__address = None
+
         # Physical layer
         self.__physical_layer = None
 
         # Open device and make sure it is compatible
         self.device.open()
         self.device.discover()
+
+        # Initialize translator
+        self.translator = PhyMessageTranslator()
 
         # Check if device supports Logitech Unifying
         if not self.device.has_domain(WhadDomain.Phy):
@@ -58,24 +66,6 @@ class Phy(WhadDeviceConnector):
     def close(self):
         self.stop()
         self.device.close()
-
-
-    def _build_scapy_packet_from_message(self, message, msg_type):
-        try:
-            if msg_type == 'raw_packet':
-                packet = Phy_Packet(bytes(message.raw_packet.packet))
-                packet.metadata = generate_phy_metadata(message, msg_type)
-                self.monitor_packet_rx(packet)
-                return packet
-
-            elif msg_type == 'packet':
-                packet = Phy_Packet(bytes(message.packet.packet))
-                packet.metadata = generate_phy_metadata(message, msg_type)
-                self.monitor_packet_rx(packet)
-                return packet
-
-        except AttributeError:
-            return None
 
     def can_use_ask(self):
         """
@@ -223,6 +213,9 @@ class Phy(WhadDeviceConnector):
         if not self.can_set_frequency():
             raise UnsupportedCapability("SetFrequency")
 
+        if frequency is None:
+            return False
+
         if self.__cached_supported_frequencies is None:
             self.__cached_supported_frequencies = self.get_supported_frequencies()
         if all([frequency <= freq_range[0] or frequency >= freq_range[1] for freq_range in self.__cached_supported_frequencies]):
@@ -274,6 +267,15 @@ class Phy(WhadDeviceConnector):
         msg.phy.endianness.endianness = endianness
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+    def can_send(self):
+        """
+        Determine if the device can transmit packets.
+        """
+        if self.__can_send is None:
+            commands = self.device.get_domain_commands(WhadDomain.Phy)
+            self.__can_send = ((commands & (1 << Send))>0 or (commands & (1 << SendRaw)))
+        return self.__can_send
 
     def can_set_tx_power(self):
         """
@@ -396,6 +398,9 @@ class Phy(WhadDeviceConnector):
         if self.__physical_layer.channel_to_frequency is None:
             raise UnknownPhysicalLayerFunction("channel_to_frequency")
 
+        if hasattr(self.__physical_layer.configuration, "channel"):
+            self.__physical_layer.configuration.channel = channel
+
         return self.set_frequency(self.__physical_layer.channel_to_frequency(channel))
 
 
@@ -410,6 +415,45 @@ class Phy(WhadDeviceConnector):
             return None
 
         return self.__physical_layer.frequency_to_channel(self.__cached_frequency)
+
+
+    def set_address(self, address):
+        if self.__physical_layer is None:
+            raise UnknownPhysicalLayer()
+
+        if self.__physical_layer.format_address is None:
+            raise UnknownPhysicalLayerFunction("format_address")
+
+        self.__address = address
+        self.translator.address = address
+
+        if hasattr(self.__physical_layer.configuration, "address"):
+            self.__physical_layer.configuration.address = address
+
+        bytes_address = self.__physical_layer.format_address(self.__address)
+        pattern = (self.__physical_layer.synchronization_word + bytes_address)
+        self.translator.pattern_cropped_bytes = len(pattern) - 4
+        self.translator.pattern = pattern
+        self.set_sync_word(self.translator.pattern[-4:])
+
+
+    def get_address(self, address):
+        if self.__physical_layer is None:
+            raise UnknownPhysicalLayer()
+
+        return self.__address
+
+    def set_configuration(self, configuration):
+        if self.__physical_layer is None:
+            raise UnknownPhysicalLayer()
+
+        if hasattr(configuration, "channel"):
+            self.set_channel(configuration.channel)
+
+        if hasattr(configuration, "address"):
+            self.set_address(configuration.address)
+
+        self.__physical_layer.configuration = configuration
 
     def set_physical_layer(self, physical_layer):
         """
@@ -461,7 +505,27 @@ class Phy(WhadDeviceConnector):
             return False
 
         self.__physical_layer = physical_layer
+        self.translator.physical_layer = self.__physical_layer
         return True
+
+    def send(self, packet):
+        """
+        Send Phy packets .
+        """
+        if self.can_send():
+            if isinstance(packet, bytes):
+                packet = Phy_Packet(packet)
+            # Generate TX metadata
+            packet.metadata = PhyMetadata()
+            packet.metadata.frequency = self.__cached_frequency
+
+            self.monitor_packet_tx(packet)
+            msg = self.translator.from_packet(packet)
+            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+        else:
+            return False
 
     def on_discovery_msg(self, message):
         pass
@@ -476,11 +540,13 @@ class Phy(WhadDeviceConnector):
         if domain == 'phy':
             msg_type = message.WhichOneof('msg')
             if msg_type == 'packet':
-                packet = self._build_scapy_packet_from_message(message, msg_type)
+                packet = self.translator.from_message(message, msg_type)
+                self.monitor_packet_rx(packet)
                 self.on_packet(packet)
 
             elif msg_type == 'raw_pdu':
-                packet = self._build_scapy_packet_from_message(message, msg_type)
+                packet = self.translator.from_message(message, msg_type)
+                self.monitor_packet_rx(packet)
                 self.on_raw_packet(packet)
 
 
