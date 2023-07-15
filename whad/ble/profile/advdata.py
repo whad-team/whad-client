@@ -306,7 +306,7 @@ class AdvManufacturerSpecificData(AdvDataField):
             raise AdvDataError
 
 
-class AdvIncServiceUuid16List(AdvDataField):
+class AdvIncServiceUuid16List(AdvUuid16List):
     """Incomplete list of 16-bit Service UUIDs
     """
 
