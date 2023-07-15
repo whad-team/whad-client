@@ -66,6 +66,100 @@ class LayerRegistry(object):
             else:
                 cls.LAYERS[clazz.alias] = clazz
 
+    def populate(self, options={}):
+        """Stack instanciation.
+
+        We instanciate each layer and register these instances into our object.
+        """
+        self.options = options
+
+        # Define layers and default context.
+        print('initialize layer registry')
+        self.__layers = {}
+        for layer in self.LAYERS.keys():
+            self.create_layer(self.LAYERS[layer], layer)
+
+    def create_layer(self, layer_class, inst_name, context=None):
+        """Create a layer and registers it into our list of layers.
+        """
+        layer_options = self.options[layer_class.alias] if layer_class.alias in self.options else {}
+        if issubclass(layer_class, ContextLayer):
+            self.__layers[inst_name] = layer_class(self, inst_name, options=layer_options, context=context)
+        else:    
+            self.__layers[inst_name] = layer_class(self, layer_class.alias, options=layer_options)
+
+    def get_layer(self, name):
+        """Retrieve a specific layer based on its name.
+        """
+        if name in self.__layers:
+            return self.__layers[name]
+        else:
+            raise IndexError
+
+    def get_entry_layer(self):
+        """Find our entry layer.
+        """
+        for clazz in self.__layers.values():
+            if isinstance(clazz, StackEntryLayer):
+                return clazz
+        return None
+    
+    @property
+    def layers(self):
+        return self.__layers
+
+    @classmethod
+    def get_layer_sources(cls, layer):
+        sources = []
+        layer = cls.LAYERS[layer]
+
+        methods = [getattr(layer, prop) for prop in dir(layer) if callable(getattr(layer, prop))]
+        for method in methods:
+            if hasattr(method, 'match_sources') and isinstance(getattr(method, 'match_sources'), dict):
+                match_sources = getattr(method, 'match_sources')
+                for _source in match_sources:
+                    if _source not in sources:
+                        sources.append(_source)
+        return sources
+
+    @classmethod
+    def export(cls, gv_file):
+        """Export our stack model to a grahpviz graph file
+        """
+        # Build nodes
+        nodes = list(cls.LAYERS.keys())
+
+        # First we need to collect all the interactions
+        links = []
+        for node_name in nodes:
+            sources = LayerRegistry.get_layer_sources(node_name)
+            for source in sources:
+                links.append((source, node_name))
+        
+        # Then we create our ghrapviz file
+        output = 'digraph finite_state_machine {\n'
+        output += 'rankdir=LR;\n'
+
+        # We add our nodes
+        for node_name in nodes:
+            if issubclass(cls.LAYERS[node_name], StackEntryLayer):
+                shape = 'doublecircle'
+            else:
+                shape = 'circle'    
+            output += 'node [shape = %s, label="%s", fontsize=12] %s;\n' % (
+                shape,
+                node_name,
+                node_name
+            )
+
+        # We then add our links
+        for src,dst in links:
+            output += '%s -> %s;\n' % (src, dst)
+        
+        output += '}'
+
+        open(gv_file,'w').write(output)
+
 class StackLayerState(object):
     """Stack layer state database
 
@@ -184,15 +278,13 @@ class ContextLayer(StackLayer, LayerRegistry):
 
         # Create this layer and its sub-layers
         instance = cls(stack, inst_name, options=options, context=context)
-        
-        # Register this instance into our stack
-
 
     def __init__(self, stack=None, layer_name='', options={}, context={}):
         super().__init__(stack=stack, layer_name=layer_name, options=options)
+
+        # Create all contained layers
+        self.populate(options=options)
         
-        # Save shared context
-        self.context = context
 
 
 
