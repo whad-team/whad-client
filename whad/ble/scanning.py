@@ -161,9 +161,15 @@ class AdvertisingDevice(object):
         short_name = None
         for record in self.ad_records:
             if isinstance(record, AdvShortenedLocalName):
-                short_name = record.name.decode('utf-8')
+                try:
+                    short_name = record.name.decode('utf-8')
+                except UnicodeDecodeError:
+                    short_name = record.name.decode('latin1')
             elif isinstance(record, AdvCompleteLocalName):
-                complete_name = record.name.decode('utf-8')
+                try:
+                    complete_name = record.name.decode('utf-8')
+                except UnicodeDecodeError:
+                    complete_name = record.name.decode('latin1')
 
         # Pick the best name
         if complete_name:
