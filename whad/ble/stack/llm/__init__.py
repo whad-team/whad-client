@@ -9,6 +9,7 @@ from threading import Lock
 
 from scapy.layers.bluetooth4LE import *
 
+from whad.common.stack import StackEntryLayer, layer_alias, match_source, layer_state, StackLayerState
 from whad.ble.stack.l2cap import BleL2CAP
 from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, e
 
@@ -386,6 +387,313 @@ class BleConnection(object):
                     subversion=self.__llm.stack.bt_sub_version
                 )
             )
+
+class NewBleConnection(object):
+
+    def __init__(self, ll, conn_handle, local_peer_addr, remote_peer_addr):
+        self.__ll = ll
+        self.__conn_handle = conn_handle
+        self.__remote_peer = remote_peer_addr
+        self.__local_peer = local_peer_addr
+        self.__version_sent = False
+        self.__lock = Lock()
+
+    @property
+    def remote_peer(self):
+        return self.__remote_peer
+
+    @property
+    def local_peer(self):
+        return self.__local_peer
+    
+    @property
+    def conn_handle(self):
+        return self.__conn_handle
+
+    @property
+    def gatt(self):
+        return None
+    
+    def lock(self):
+        """Lock connection
+        """
+        self.__lock.acquire()
+
+    def unlock(self):
+        """Unlock connection
+        """
+        self.__lock.release()
+
+    def on_disconnect(self):
+        """Connection has been closed.
+        """
+        pass
+
+    def send_version(self):
+        """Send LL_VERSION_IND PDU.
+        """
+        if not self.__ll.get_connection(self.__conn_handle)['version_sent']:
+            # Mark version as sent
+            self.__ll.get_connection(self.__conn_handle)['version_sent'] = True
+
+            # Send LL_VERSION_IND PDU
+            self.__ll.stack.send_control(
+                self.__conn_handle,
+                BTLE_CTRL() / LL_VERSION_IND(
+                    version=self.__llm.stack.bt_version,
+                    company=self.__llm.stack.manufacturer_id,
+                    subversion=self.__llm.stack.bt_sub_version
+                )
+            )
+
+class LinkLayerState(StackLayerState):
+    FIELDS = ['connections']
+
+    def __init__(self):
+        super().__init__()
+        self.connections = {}
+
+    def get_connection(self, conn_handle):
+        if conn_handle in self.connections:
+            return self.connections[conn_handle]
+        else:
+            raise IndexError
+        
+    def register_connection(self, conn_handle):
+        self.connections[conn_handle] = {
+            'version_sent': False,  # version exchanged
+            'version_remote': None,
+            'nb_pdu_recvd': 0       # number of packets received
+        }
+
+    def unregister_connection(self, conn_handle):
+        if conn_handle in self.connections:
+            del self.connections[conn_handle]
+
+    def mark_version_sent(self, conn_handle):
+        if conn_handle in self.connections:
+            self.connections[conn_handle]['version_sent'] = True
+
+    def is_version_sent(self, conn_handle):
+        if conn_handle in self.connections:
+            self.connections[conn_handle]['version_sent']
+        return False
+    
+    def set_version_remote(self, conn_handle, version):
+        if conn_handle in self.connections:
+            self.connections[conn_handle]['version_remote'] = version
+
+@layer_alias('ll')
+@layer_state(LinkLayerState)
+class NewLinkLayer(StackEntryLayer):
+
+    def configure(self, options={}):
+        # Control PDU dispatch
+        self.__handlers = {
+            CONNECTION_UPDATE_REQ: self.on_connection_update_req,
+            CHANNEL_MAP_REQ: self.on_channel_map_req,
+            TERMINATE_IND: self.on_terminate_ind,
+            ENC_REQ: self.on_enc_req,
+            ENC_RSP: self.on_enc_rsp,
+            START_ENC_REQ: self.on_start_enc_req,
+            START_ENC_RSP: self.on_start_enc_rsp,
+            UNKNOWN_RSP: self.on_unknown_rsp,
+            FEATURE_REQ: self.on_feature_req,
+            FEATURE_RSP: self.on_feature_rsp,
+            PAUSE_ENC_REQ: self.on_pause_enc_req,
+            PAUSE_ENC_RSP: self.on_pause_enc_rsp,
+            VERSION_IND: self.on_version_ind,
+            REJECT_IND: self.on_reject_ind,
+            SLAVE_FEATURE_REQ: self.on_slave_feature_req,
+            CONNECTION_PARAM_REQ: self.on_connection_param_req,
+            CONNECTION_PARAM_RSP: self.on_connection_param_rsp,
+            REJECT_IND_EXT: self.on_reject_ind_ext,
+            PING_REQ: self.on_ping_req,
+            PING_RSP: self.on_ping_rsp,
+            LENGTH_REQ: self.on_length_req,
+            LENGTH_RSP: self.on_length_rsp
+        }
+
+    def on_connect(self, conn_handle, local_peer_addr, remote_peer_addr):
+        """Handles BLE connection
+        """
+        if conn_handle not in self.state.connections:
+            logger.info('[llm] registers new connection %d with %s' % (conn_handle, remote_peer_addr))
+
+            # Update state with new connection
+            self.state.register_connection(conn_handle)
+
+            # Return connection object
+            return NewBleConnection(
+                self,
+                conn_handle,
+                local_peer_addr,
+                remote_peer_addr
+            )
+        else:
+            logger.error('[!] Connection already exists')
+
+            # Return connection object
+            return NewBleConnection(
+                self,
+                conn_handle,
+                local_peer_addr,
+                remote_peer_addr
+            )
+
+    def on_disconnect(self, conn_handle):
+        self.state.unregister_connection(conn_handle)
+
+    def on_phy(self, pdu, tag=None, conn_handle=None):
+        """We are fed with BLE PDU.
+        """
+        # Count PDU
+        if conn_handle in self.state.connections:
+            conn_metadata = self.state.get_connection(conn_handle)
+            conn_metadata['nb_pdu_recvd'] += 1
+
+        if tag == 'control':
+            # We received a control PDU
+            self.on_ctrl_pdu(pdu, conn_handle)
+        elif tag == 'data':
+            # We received a data PDU
+            self.on_data_pdu(pdu, conn_handle)
+
+    def on_ctrl_pdu(self, pdu, conn_handle):
+        if conn_handle in self.state.connections:
+            ctrl = pdu.getlayer(BTLE_CTRL)
+            if ctrl.opcode in self.__handlers:
+                self.__handlers[int(ctrl.opcode)](conn_handle, ctrl.getlayer(1))
+        else:
+            logger.error('[!] Unknown connection handle: %d', conn_handle)
+
+    def on_data_pdu(self, pdu, conn_handle):
+        """Forward data PDU to upper layer (L2CAP)
+        """
+        if conn_handle in self.state.connections:
+            self.send('l2cap', bytes(pdu.payload), fragment=(pdu.LLID == 0x1), conn_handle=conn_handle)
+
+    """Control PDU handlers
+    """
+
+    ### Link-layer control PDU callbacks
+
+    def on_unsupported_opcode(self, conn_handle, opcode):
+        self.stack.send_control(
+            conn_handle,
+            BTLE_CTRL() / LL_UNKNOWN_RSP(code=opcode)
+        )
+
+    def on_connection_update_req(self, conn_handle, conn_update):
+        """Connection update is not supported yet
+        """
+        self.on_unsupported_opcode(conn_handle, CONNECTION_UPDATE_REQ)
+
+    def on_channel_map_req(self, conn_handle, channel_map):
+        """Channel map update is not supported yet
+        """
+        self.on_unsupported_opcode(conn_handle, CHANNEL_MAP_REQ)
+
+    def on_terminate_ind(self, conn_handle, terminate):
+        """Terminate this connection
+        """
+        # Connection has been terminated
+        conn = self.get_connection(conn_handle)
+
+    def on_enc_req(self, conn_handle, enc_req):
+        """Encryption request handler
+        """
+        self.on_unsupported_opcode(conn_handle, ENC_REQ)
+
+    def on_enc_rsp(self, conn_handle, enc_rsp):
+        """Encryption not supported yet
+        """
+        self.on_unsupported_opcode(conn_handle, ENC_RSP)
+
+    def on_start_enc_req(self, conn_handle, start_enc_req):
+        """Encryption not supported yet
+        """
+        self.on_unsupported_opcode(conn_handle, START_ENC_REQ)
+
+    def on_start_enc_rsp(self, conn_handle, start_enc_rsp):
+        """Encryption start response handler
+        """
+        self.on_unsupported_opcode(conn_handle, START_ENC_RSP)
+
+    def on_unknown_rsp(self, conn_handle, unk_rsp):
+        pass
+
+    def on_feature_req(self, conn_handle, feature_req):
+        """Features not supported yet
+        """
+        #self.on_unsupported_opcode(FEATURE_REQ)
+        # Reply with our basic feature set
+        self.stack.send_control(
+            conn_handle,
+            BTLE_CTRL() / LL_FEATURE_RSP(feature_set=[
+                'le_encryption',
+                'le_ping'                
+            ])
+        )
+
+    def on_feature_rsp(self, conn_handle, feature_rsp):
+        """Features not supported yet
+        """
+        self.on_unsupported_opcode(conn_handle, FEATURE_RSP)
+
+    def on_pause_enc_req(self, conn_handle, pause_enc_req):
+        """Encryption not supported yet
+        """
+        self.on_unsupported_opcode(conn_handle, PAUSE_ENC_REQ)
+
+    def on_pause_enc_rsp(self, conn_handle, pause_enc_rsp):
+        """Encryption not supported yet
+        """
+        self.on_unsupported_opcode(conn_handle, PAUSE_ENC_RSP)
+
+    def on_version_ind(self, conn_handle, version):
+        """Send back our version info
+        """
+        if not self.state.is_version_sent(conn_handle):
+            self.stack.send_control(
+                conn_handle,
+                BTLE_CTRL() / LL_VERSION_IND(
+                    version=self.stack.bt_version,
+                    company=self.stack.manufacturer_id,
+                    subversion=self.stack.bt_sub_version
+                )
+            )
+        self.state.set_version_remote(conn_handle, version)
+        self.state.mark_version_sent(conn_handle)
+
+    def on_reject_ind(self, conn_handle, reject):
+        pass
+
+    def on_slave_feature_req(self, conn_handle, feature_req):
+        self.on_unsupported_opcode(conn_handle, FEATURE_REQ)
+
+    def on_connection_param_req(self, conn_handle, conn_param_req):
+        self.on_unsupported_opcode(conn_handle, CONNECTION_PARAM_REQ)
+
+    def on_connection_param_rsp(self, conn_handle, conn_param_rsp):
+        pass
+
+    def on_reject_ind_ext(self, conn_handle, reject_ext):
+        pass
+
+    def on_ping_req(self, conn_handle, ping_req):
+        pass
+
+    def on_ping_rsp(self, conn_handle, ping_rsp):
+        pass
+
+    def on_length_req(self, conn_handle, length_req):
+        """Received a length request PDU
+        """
+        pass
+
+    def on_length_rsp(self, conn_handle, length_rsp):
+        pass
 
 
 class BleLinkLayerManager(object):

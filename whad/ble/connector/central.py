@@ -7,7 +7,7 @@ from time import time, sleep
 from whad.ble import Message, Connected
 from whad.ble.connector import BLE
 from whad.ble.bdaddr import BDAddress
-from whad.ble.stack import BleStack, BtVersion
+from whad.ble.stack import BleStack, BtVersion, NewBleStack
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
 from whad.ble.stack.gatt import GattClient
 from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
@@ -28,7 +28,7 @@ class Central(BLE):
 
     """
 
-    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack):
+    def __init__(self, device, existing_connection = None, from_json=None, stack=NewBleStack):
         super().__init__(device)
 
         self.__gatt_client = GattClient()

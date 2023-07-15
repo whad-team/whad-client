@@ -1,7 +1,9 @@
 import json
-from layer import StackEntryLayer, StackLayer
+from .layer import StackEntryLayer, StackLayer, match_source, layer_alias, layer_state, StackLayerState, LayerRegistry,\
+    ContextLayer
 
-class Stack(object):
+
+class Stack(LayerRegistry):
     """Basic protocol stack class.
 
     A class contains layers that are declared using the `Stack.layer` decorator
@@ -9,27 +11,30 @@ class Stack(object):
     data to dedicated callbacks.
     """
 
-    LAYERS = {}
-
-    @staticmethod
-    def layer(clazz):
-        """Add a layer class into the stack layer registry.
-        """
-        if hasattr(clazz, 'alias'):
-            if clazz.alias in Stack.LAYERS:
-                Stack.LAYERS[clazz.alias] = clazz
-            else:
-                Stack.LAYERS[clazz.alias] = clazz
-
     def __init__(self, options={}):
         """Stack instanciation.
 
         We instanciate each layer and register these instances into our object.
         """
+        self.options = options
+
+        # Default context is None
+        context = None
+
+        # Define layers and default context.
         self.__layers = {}
-        for layer in Stack.LAYERS.keys():
-            layer_options = options[layer] if layer in options else {}
-            self.__layers[layer] = Stack.LAYERS[layer](self, layer, layer_options)
+        for layer in self.LAYERS.keys():
+            self.create_layer(self.LAYERS[layer], layer)
+
+    def create_layer(self, layer_class, inst_name, context=None):
+        """Create a layer and registers it into our list of layers.
+        """
+        layer_options = self.options[layer_class.alias] if layer_class.alias in self.options else {}
+        if issubclass(layer_class, ContextLayer):
+            self.__layers[inst_name] = layer_class(self, inst_name, options=layer_options, context=context)
+        else:    
+            self.__layers[inst_name] = layer_class(self, layer_class.alias, options=layer_options)
+
 
     def __get_layer_method_by_source(self, layer, source, tag='default'):
         """Find the method associated with a source for a given layer.
@@ -52,10 +57,10 @@ class Stack(object):
                         return method
         return None
     
-    @staticmethod
-    def get_layer_sources(layer):
+    @classmethod
+    def get_layer_sources(cls, layer):
         sources = []
-        layer = Stack.LAYERS[layer]
+        layer = cls.LAYERS[layer]
 
         methods = [getattr(layer, prop) for prop in dir(layer) if callable(getattr(layer, prop))]
         for method in methods:
@@ -70,6 +75,7 @@ class Stack(object):
         """Dispatch data from source to destination, with an optional tag
         and arguments.
         """
+        # If no context defined, pick up destination layer in our default layers.
         if destination in self.__layers:
             # Look for the layer method associated with the specified source
             method = self.__get_layer_method_by_source(destination, source, tag)
@@ -80,12 +86,12 @@ class Stack(object):
                     destination, source, tag
                 ))
 
-    def feed(self, data):
+    def feed(self, data, **kwargs):
         """Dispatch data to entry layer.
         """
         entry_layer = self.get_entry_layer()
         if entry_layer is not None:
-            entry_layer.on_phy(data)
+            entry_layer.on_phy(data, **kwargs)
 
     def __getitem__(self, name):
         """Array-like behavior to get a specific layer.
@@ -99,7 +105,7 @@ class Stack(object):
             return self.__layers[name]
         else:
             raise IndexError
-        
+    
     def get_entry_layer(self):
         """Find our entry layer.
         """
@@ -127,12 +133,12 @@ class Stack(object):
         for name in nodes:
             self.__layers[name].load(state[name])
 
-    @staticmethod
-    def export(gv_file):
+    @classmethod
+    def export(cls, gv_file):
         """Export our stack model to a grahpviz graph file
         """
         # Build nodes
-        nodes = list(Stack.LAYERS.keys())
+        nodes = list(cls.LAYERS.keys())
 
         # First we need to collect all the interactions
         links = []
@@ -147,7 +153,7 @@ class Stack(object):
 
         # We add our nodes
         for node_name in nodes:
-            if issubclass(Stack.LAYERS[node_name], StackEntryLayer):
+            if issubclass(cls.LAYERS[node_name], StackEntryLayer):
                 shape = 'doublecircle'
             else:
                 shape = 'circle'    
@@ -168,5 +174,9 @@ class Stack(object):
 __all__ = [
     'Stack',
     'StackLayer',
-    'StackEntryLayer'
+    'StackEntryLayer',
+    'match_source',
+    'layer_name',
+    'layer_state',
+    'StackLayerState'
 ]

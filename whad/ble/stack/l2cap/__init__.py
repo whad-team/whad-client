@@ -7,8 +7,156 @@ from scapy.layers.bluetooth import L2CAP_Hdr, ATT_Hdr, SM_Hdr, L2CAP_CmdHdr, \
 from whad.ble.stack.att import BleATT
 from whad.ble.stack.smp import BleSMP
 
+from whad.common.stack import StackLayer, layer_alias, match_source, layer_state, StackLayerState
+
 import logging
 logger = logging.getLogger(__name__)
+
+
+class L2CAPState(StackLayerState):
+
+    FIELDS = ['flows']
+
+    def __init__(self):
+        super().__init__()
+        self.flows = {}
+
+    def register_flow(self, conn_handle):
+        self.flows[conn_handle] = {
+            'local_mtu': 23,    # Local MTU
+            'remote_mtu': 23,   # Remote MTU
+            'fifo': None,    # Incoming data (may be incomplete)
+            'expected_len': 0
+        }
+        return self.flows[conn_handle]
+
+    def get_flow(self, conn_handle):
+        if conn_handle in self.flows:
+            return self.flows[conn_handle]
+        return None
+    
+    def get_remote_mtu(self, conn_handle):
+        flow = self.get_flow(conn_handle)
+        if flow is not None:
+            return flow['remote_mtu']
+        else:
+            return None
+    
+    def set_remote_mtu(self, conn_handle, mtu):
+        flow = self.get_flow(conn_handle)
+        if flow is not None:
+            flow['remote_mtu'] = mtu
+
+    def get_local_mtu(self, conn_handle):
+        flow = self.get_flow(conn_handle)
+        if flow is not None:
+            return flow['local_mtu']
+        else:
+            return None
+
+    def set_local_mtu(self, conn_handle, mtu):
+        flow = self.get_flow(conn_handle)
+        if flow is not None:
+            flow['local_mtu'] = mtu
+
+    def reset_fifo(self, conn_handle):
+        flow = self.get_flow(conn_handle)
+        if flow is not None:
+            flow['fifo'] = None
+
+    def get_fifo(self, conn_handle):
+        flow = self.get_flow(conn_handle)
+        if flow is not None:
+            return flow['fifo']
+        return b''
+    
+    def get_data_size(self, conn_handle):
+        flow = self.get_flow(conn_handle)
+        if flow is not None:
+            if flow['fifo'] is None:
+                return 0
+            else:
+                return len(flow['fifo'])
+
+    def append_data(self, conn_handle, data):
+        flow = self.get_flow(conn_handle)
+        if flow is not None:
+            if flow['fifo'] is None:
+                flow['fifo'] = data
+            else:
+                flow['fifo'] += data
+
+@layer_alias('l2cap')
+class NewL2CAPLayer(StackLayer):
+
+    def configure(self, options={}):
+        pass
+
+    def set_remote_mtu(self, conn_handle, mtu):
+        self.state.set_remote_mtu(conn_handle, mtu)
+        
+    @match_source('ll')
+    def on_data_received(self, l2cap_data, fragment=False, conn_handle=None):
+        flow = self.state.get_flow(conn_handle)
+        if flow is None:
+            flow = self.state.register_flow(conn_handle)
+           
+        """Handles incoming L2CAP data"""
+        if fragment and flow['fifo'] is not None:
+            logger.debug('[l2cap] Received a L2CAP fragment of %d bytes' % len(l2cap_data))
+            self.state.append_data(conn_handle, l2cap_data)
+            logger.debug('[l2cap] L2CAP packet size so far: %d' % len(flow['fifo']))
+
+            if len(flow['fifo']) >= flow['expected_len']:
+                # We have received a complete L2CAP packet, process it
+                logger.debug('[l2cap] Received a complete L2CAP packet, process it')
+                self.on_l2cap_packet(L2CAP_Hdr(flow['fifo'][:flow['expected_len']]))
+                flow['fifo'] = None
+
+        elif len(l2cap_data) >= 2:
+            # Start of L2CAP or complete L2CAP message
+            flow['fifo'] = l2cap_data
+            logger.debug('[l2cap] received start of fragmented or complete message')
+            
+            # Check if we have a complete L2CAP message
+            flow['expected_len'] = unpack('<H', flow['fifo'][:2])[0] + 4
+            logger.debug('[l2cap] expected l2cap length: %d' % flow['expected_len'])
+            logger.debug('[l2cap] actual l2cap length: %d' % len(flow['fifo']))
+            
+            if len(flow['fifo']) >= flow['expected_len']:
+                # We have received a complete L2CAP packet, process it
+                logger.debug('[l2cap] Received a complete L2CAP packet, process it')
+                self.on_l2cap_packet(L2CAP_Hdr(flow['fifo'][:flow['expected_len']]))
+                flow['fifo'] = None
+
+
+    def on_l2cap_packet(self, packet):
+        """Process incoming L2CAP packets.
+        """
+        """
+        if ATT_Hdr in packet:
+            self.__att.on_packet(packet.getlayer(ATT_Hdr))
+        elif SM_Hdr in packet:
+            self.__smp.on_smp_packet(packet.getlayer(SM_Hdr))
+        elif L2CAP_CmdHdr in packet:
+            self.on_cmd_packet(packet.getlayer(L2CAP_CmdHdr))
+        """
+
+    def on_cmd_packet(self, packet):
+        """Handle L2CAP Connection Parameter Update Requests.
+
+        This command is rejected by default.
+        """
+        if L2CAP_Connection_Parameter_Update_Request in packet:
+            logger.debug('[l2cap] Received a L2CAP Connection Parameter Update Request, rejecting')
+            
+            # Reject this request
+            self.__connection.lock()
+            self.__connection.send_l2cap_data(
+                L2CAP_Hdr()/L2CAP_CmdHdr(id=packet[L2CAP_CmdHdr].id)/L2CAP_Connection_Parameter_Update_Response(move_result=1)
+            )
+            self.__connection.unlock()
+
 
 class BleL2CAP(object):
 
