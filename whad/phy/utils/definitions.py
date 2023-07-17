@@ -20,6 +20,11 @@ class FSKModulationScheme(ModulationScheme):
         self.gaussian_filter = gaussian_filter
         super().__init__(symbols)
 
+class QFSKModulationScheme(FSKModulationScheme):
+    def __init__(self, deviation):
+        super().__init__(("00", "01", "11", "10"), deviation=deviation)
+
+
 class GFSKModulationScheme(FSKModulationScheme):
     def __init__(self, deviation):
         super().__init__(("0", "1"), deviation, gaussian_filter=True)

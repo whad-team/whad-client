@@ -5,6 +5,11 @@ from enum import IntEnum
 from dataclasses import dataclass
 
 
+class YardInternalStates(IntEnum):
+    YardModeIdle = 0
+    YardModeRx = 1
+    YardModeTx = 2
+
 @dataclass
 class RegisterMask:
     mask : int = 0

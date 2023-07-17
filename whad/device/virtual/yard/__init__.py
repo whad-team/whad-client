@@ -1,19 +1,28 @@
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
+from whad.protocol.phy.phy_pb2 import SupportedFrequencyRanges
 from whad.device.virtual.yard.constants import YardStickOneId, YardStickOneEndPoints, \
     YardApplications, YardSystemCommands, YardRadioStructure, YardRFStates, \
     YardMemoryRegisters, YardMARCStates, YardCCA, YardFrequencyTransitionPoints, \
     YardNICCommands, YardVCOType, YardRegistersMasks, YardModulations, YardEncodings, \
-    POSSIBLE_CHANNEL_BANDWIDTHS, NUM_PREAMBLE_LOOKUP_TABLE, YardUSBProperties
+    POSSIBLE_CHANNEL_BANDWIDTHS, NUM_PREAMBLE_LOOKUP_TABLE, YardUSBProperties, \
+    YardInternalStates
 from whad.helpers import message_filter,is_message_type
 from whad import WhadDomain, WhadCapability
 from whad.protocol.generic_pb2 import ResultCode
 from usb.core import find, USBError, USBTimeoutError
 from usb.util import get_string
+from whad.phy import Endianness
 from struct import unpack, pack
 from time import sleep,time
+from whad.helpers import swap_bits
 from queue import Queue, Empty
+from whad.protocol.phy.phy_pb2 import GetSupportedFrequencies, SetFrequency, \
+    SetDataRate, SetPacketSize, SetEndianness, SetTXPower, TXPower, SetSyncWord, \
+    SetASKModulation, Sniff, Start, Stop, Set4FSKModulation, SetFSKModulation, \
+    SetGFSKModulation
+
 
 # Helpers functions
 def get_yardstickone(id=0,bus=None, address=None):
@@ -63,11 +72,192 @@ class YardStickOneDevice(VirtualDevice):
         if device is None:
             raise WhadDeviceNotFound
         self.__opened_stream = False
+
+        self.__supported_frequency_range = [
+            (281000000, 361000000),
+            (378000000, 481000000),
+            (749000000, 962000000),
+        ]
+        self.__internal_state = YardInternalStates.YardModeIdle
+        self.__frequency = None
+        self.__endianness = Endianness.BIG
+
         self.__in_buffer = b""
         self.__queue = Queue()
         self.__opened = False
         self.__index, self.__yard = device
         super().__init__()
+
+    def _enter_configuration_mode(self):
+        self._set_idle_mode()
+        self._strobe_idle_mode()
+
+    def _restore_previous_mode(self):
+        if self.__internal_state == YardInternalStates.YardModeRx:
+            self._set_rx_mode()
+            self._strobe_rx_mode()
+
+        elif self.__internal_state == YardInternalStates.YardModeTx:
+            self._set_tx_mode()
+            self._strobe_tx_mode()
+
+    def _on_whad_phy_get_supported_freq(self, message):
+        msg = Message()
+        for supported_range in self.__supported_frequency_range:
+            range = SupportedFrequencyRanges.FrequencyRange()
+            range.start, range.end = supported_range[0], supported_range[1]
+            msg.phy.supported_freq.frequency_ranges.extend([range])
+        self._send_whad_message(msg)
+
+
+    def _on_whad_phy_set_freq(self, message):
+        found = False
+        for supported_range in self.__supported_frequency_range:
+            range_start, range_end = supported_range[0], supported_range[1]
+            if message.frequency >= range_start and message.frequency <= range_end:
+                found = True
+                break
+
+        if found:
+            self._enter_configuration_mode()
+            self._set_frequency(message.frequency)
+            self.__frequency = message.frequency
+            self._restore_previous_mode()
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+    def _on_whad_phy_datarate(self, message):
+        self._enter_configuration_mode()
+        self._set_data_rate(message.rate)
+        self._restore_previous_mode()
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+    def _on_whad_phy_packet_size(self, message):
+        if message.packet_size < 255:
+            self._enter_configuration_mode()
+            self._set_packet_length(message.packet_size)
+            self._restore_previous_mode()
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+    def _on_whad_phy_endianness(self, message):
+        if message.endianness in (Endianness.BIG, Endianness.LITTLE):
+            self.__endianness = message.endianness
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+    def _on_whad_phy_tx_power(self, message):
+        tx_powers = {
+            TXPower.LOW : 0x20,
+            TXPower.MEDIUM : 0x80,
+            TXPower.HIGH : 0xC0
+        }
+        if message.tx_power in list(tx_powers.keys()):
+            self._enter_configuration_mode()
+            self._set_power(
+                tx_powers[message.tx_power]
+            )
+            self._restore_previous_mode()
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+    def _on_whad_phy_mod_ask(self, message):
+        self._enter_configuration_mode()
+        self._set_modulation(YardModulations.MODULATION_ASK)
+        self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
+        self._restore_previous_mode()
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+    def _on_whad_phy_mod_4fsk(self, message):
+        self._enter_configuration_mode()
+        self._set_modulation(YardModulations.MODULATION_4FSK)
+        self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
+        self._set_deviation(message.deviation)
+        self._restore_previous_mode()
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+
+    def _on_whad_phy_mod_fsk(self, message):
+        self._enter_configuration_mode()
+        self._set_modulation(YardModulations.MODULATION_2FSK)
+        self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
+        self._set_deviation(message.deviation)
+        self._restore_previous_mode()
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+    def _on_whad_phy_mod_gfsk(self, message):
+        self._enter_configuration_mode()
+        self._set_modulation(YardModulations.MODULATION_GFSK)
+        self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
+        self._set_deviation(message.deviation)
+        # message.gaussian_filter can't be processed
+        self._restore_previous_mode()
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+    def _on_whad_phy_sync_word(self, message):
+        if len(message.sync_word) == 0:
+            self._enter_configuration_mode()
+            self._set_crc(enable=False)
+            self._set_whitening(enable=False)
+            self._set_packet_format(0)
+            self._set_forward_error_correction(enable=False)
+            self._set_clear_channel_assessment(mode=YardCCA.NO_CCA)
+            self._set_sync_word(b"")
+            self._set_preamble_quality_threshold(0)
+            self._restore_previous_mode()
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        elif len(message.sync_word) <= 2:
+            self._enter_configuration_mode()
+            self._set_crc(enable=False)
+            self._set_whitening(enable=False)
+            self._set_packet_format(0)
+            self._set_forward_error_correction(enable=False)
+            self._set_clear_channel_assessment(mode=YardCCA.NO_CCA)
+            if self.__endianness == Endianness.LITTLE:
+                sync = bytes([swap_bits(i) for i in message.sync_word])[::-1]
+            else:
+                sync = message.sync_word
+            self._set_sync_word(sync)
+            self._set_preamble_quality_threshold(0)
+            self._restore_previous_mode()
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+
+    def _on_whad_phy_sniff(self, message):
+        self.__internal_state = YardInternalStates.YardModeRx
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+    def _on_whad_phy_start(self, message):
+        if self.__internal_state == YardInternalStates.YardModeRx:
+            self._set_rx_mode()
+            self._strobe_rx_mode()
+            self.__opened_stream = True
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+    def _on_whad_phy_stop(self, message):
+        self._set_mode_idle()
+        self._strobe_rx_mode()
+        self.__opened_stream = False
+        self._send_whad_command_result(ResultCode.SUCCESS)
+
+
+    def _send_whad_phy_pdu(self, packet, timestamp=None):
+        msg = Message()
+        try:
+            msg.phy.packet.frequency = self._get_frequency()
+        except:
+            pass
+        if timestamp is not None:
+            msg.phy.packet.timestamp = timestamp
+        msg.phy.packet.packet = packet
+        self._send_whad_message(msg)
+
 
     def open(self):
         try:
@@ -89,21 +279,14 @@ class YardStickOneDevice(VirtualDevice):
         self.radio_structure = YardRadioStructure(self._poke, self._peek)
 
         self._frequency_offset_accumulator = 0
-        print(self.radio_structure)
+        #print(self.radio_structure)
 
         self._set_idle_mode()
-        '''
-        #self._strobe_idle_mode()
-
-        #self.set_test_config()
-        #self._set_rx_mode()
-        #self._strobe_rx_mode()
-
-        #self._set_rf_register("MDMCFG4",0x68)
-        #self._set_rf_register("MDMCFG3",0xb5)
-        #self._set_rf_register("MDMCFG2",0x80)
-        #self._set_rf_register("MDMCFG1",0x23)
-        #self._set_rf_register("MDMCFG0",0x11)
+        self._set_rf_register("MDMCFG4",0x68)
+        self._set_rf_register("MDMCFG3",0xb5)
+        self._set_rf_register("MDMCFG2",0x80)
+        self._set_rf_register("MDMCFG1",0x23)
+        self._set_rf_register("MDMCFG0",0x11)
         self._set_modulation(YardModulations.MODULATION_ASK)
         self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
         self._set_crc(enable=False)
@@ -115,8 +298,16 @@ class YardStickOneDevice(VirtualDevice):
         self._set_data_rate(10000)
         #self._set_channel_spacing(self.compute_best_channel_bandwidth())
         self._set_channel(0)
+        self._set_intermediate_frequency(44444)
+        #self._strobe_idle_mode()
 
-        #self._set_intermediate_frequency(44444)
+        #self.set_test_config()
+        #self._set_rx_mode()
+        #self._strobe_rx_mode()
+
+        '''
+
+
         self._set_sync_word(b"\x00\x00\x00\x00")
         self._set_preamble_quality_threshold(0)
         self._set_packet_length(250, variable=False)
@@ -146,7 +337,7 @@ class YardStickOneDevice(VirtualDevice):
 
         # Ask parent class to run a background I/O thread
         super().open()
-        self.__opened_stream = True
+        self.__opened_stream = False
 
     def write(self, data):
         if not self.__opened:
@@ -160,10 +351,15 @@ class YardStickOneDevice(VirtualDevice):
             try:
                 self._yard_send_command(YardApplications.NIC, YardNICCommands.SET_RECV_LARGE, pack("<H", 200))
                 data = self._yard_send_command(YardApplications.NIC,YardNICCommands.RECV)
-                while self.__opened_stream:
+                while self.__opened_stream and self.__internal_state == YardInternalStates.YardModeRx:
                     data = self._yard_read_response()
-                    print("recv:", data)
-                    print(self._get_frequency(), self._get_frequency_offset_estimate())
+                    if data[0] is not None:
+                        if self.__endianness == Endianness.LITTLE:
+                            formatted_data = bytes([swap_bits(i) for i in data[2]])
+                        else:
+                            formatted_data = data[2]
+
+                        self._send_whad_phy_pdu(formatted_data, int(time()))
                     #self.radio_structure.update()
                     #print(self.radio_structure.get("MARCSTATE"))
                     #print(self.radio_structure)
@@ -207,7 +403,7 @@ class YardStickOneDevice(VirtualDevice):
             return
         recv_app, recv_verb, recv_data = None, None, None
         while recv_app != app and recv_verb != command:
-            print(">", message.hex())
+            #print(">", message.hex())
             self.__yard.write(YardStickOneEndPoints.OUT_ENDPOINT, message, timeout=timeout)
             recv_app, recv_verb, recv_data = self._yard_read_response()
         return recv_data
@@ -217,7 +413,24 @@ class YardStickOneDevice(VirtualDevice):
         capabilities = {
             WhadDomain.Phy : (
                                 (WhadCapability.Sniff),
-                                []
+                                [
+                                    GetSupportedFrequencies,
+                                    SetASKModulation,
+                                    SetFSKModulation,
+                                    Set4FSKModulation,
+                                    GetSupportedFrequencies,
+                                    SetFrequency,
+                                    SetDataRate,
+                                    SetEndianness,
+                                    SetTXPower,
+                                    SetPacketSize,
+                                    SetSyncWord,
+                                    Sniff,
+                                    #Send,
+                                    Start,
+                                    Stop,
+                                    Set4FSKModulation
+                                ]
             )
         }
 
@@ -424,7 +637,7 @@ class YardStickOneDevice(VirtualDevice):
             if self.radio_structure.get("PA_TABLE0") == 0 and self.radio_structure.get("PA_TABLE1") != 0:
                 power = self.radio_structure.get("PA_TABLE1")
                 self._set_power(power, invert=invert)
-        print(mdmcfg2)
+        #print(mdmcfg2)
         self._set_rf_register("MDMCFG2", mdmcfg2)
 
     def _get_modulation(self):

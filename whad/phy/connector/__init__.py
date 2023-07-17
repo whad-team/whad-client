@@ -11,7 +11,7 @@ from whad.protocol.phy.phy_pb2 import SetASKModulation, SetFSKModulation, \
     SetBPSKModulationCmd, SetQPSKModulationCmd, GetSupportedFrequenciesCmd, \
     GetSupportedFrequencies, SetFrequency, SetDataRate, SetEndianness, \
     Endianness, SetTXPower, TXPower, SetPacketSize, SetSyncWord, StartCmd, \
-    StopCmd, Send, SendRaw
+    StopCmd, Send, SendRaw, Set4FSKModulation, Set4FSKModulationCmd
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.phy import Phy_Packet
@@ -104,6 +104,13 @@ class Phy(WhadDeviceConnector):
         commands = self.device.get_domain_commands(WhadDomain.Phy)
         return (commands & (1 << SetGFSKModulation)) > 0
 
+    def can_use_4fsk(self):
+        """
+        Determine if the device can be configured to use 4-Frequency Shift Keying modulation scheme.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        return (commands & (1 << Set4FSKModulation)) > 0
+
     def can_use_bpsk(self):
         """
         Determine if the device can be configured to use Binary Phase Shift Keying modulation scheme.
@@ -126,7 +133,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("ASKModulation")
 
         msg = Message()
-        msg.phy.mod_ask.ook = ook
+        msg.phy.mod_ask.ook = on_off_keying
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -147,6 +154,19 @@ class Phy(WhadDeviceConnector):
         msg.phy.mod_fsk.deviation = deviation
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+    def set_4fsk(self, deviation=250000):
+        """
+        Enable 4-Frequency Shift Keying modulation scheme.
+        """
+        if not self.can_use_4fsk():
+            raise UnsupportedCapability("4FSKModulation")
+
+        msg = Message()
+        msg.phy.mod_4fsk.deviation = deviation
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
 
     def set_gfsk(self, deviation=250000):
         """
@@ -463,6 +483,8 @@ class Phy(WhadDeviceConnector):
             success = self.set_ask(on_off_keying=True)
         elif isinstance(physical_layer.modulation, ASKModulationScheme):
             success = self.set_ask(on_off_keying=False)
+        elif isinstance(physical_layer.modulation, QFSKModulationScheme):
+            success = self.set_4fsk(deviation=physical_layer.modulation.deviation)
         elif isinstance(physical_layer.modulation, GFSKModulationScheme):
             success = self.set_gfsk(deviation=physical_layer.modulation.deviation)
         elif isinstance(physical_layer.modulation, FSKModulationScheme):
