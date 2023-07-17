@@ -534,20 +534,19 @@ class Phy(WhadDeviceConnector):
         """
         Send Phy packets .
         """
-        if self.can_send():
-            if isinstance(packet, bytes):
-                packet = Phy_Packet(packet)
-            # Generate TX metadata
-            packet.metadata = PhyMetadata()
-            packet.metadata.frequency = self.__cached_frequency
+        if not self.can_send():
+            raise UnsupportedCapability("Send")
+        if isinstance(packet, bytes):
+            packet = Phy_Packet(packet)
+        # Generate TX metadata
+        packet.metadata = PhyMetadata()
+        packet.metadata.frequency = self.__cached_frequency
 
-            self.monitor_packet_tx(packet)
-            msg = self.translator.from_packet(packet)
-            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        self.monitor_packet_tx(packet)
+        msg = self.translator.from_packet(packet)
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-        else:
-            return False
 
     def on_discovery_msg(self, message):
         pass

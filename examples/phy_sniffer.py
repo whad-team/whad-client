@@ -1,4 +1,4 @@
-from whad.phy import Phy, Endianness, OOKModulationScheme, PhysicalLayer
+from whad.phy import Phy, Endianness, OOKModulationScheme, PhysicalLayer, TXPower
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from whad.phy.utils.helpers import get_physical_layers_by_domain
@@ -117,25 +117,26 @@ if __name__ == '__main__':
         sniffer1.set_endianness(Endianness.BIG)
         sniffer1.set_sync_word(bytes.fromhex("aa"))
         '''
-        
+
         # https://fsec404.github.io/blog/Shanon-entropy/
         sniffer1.set_frequency(433920000)
         sniffer1.set_packet_size(250)
-        sniffer1.set_datarate(4800)
-        #sniffer1.set_ask()
-        sniffer1.set_4fsk(1950)
+        sniffer1.set_datarate(10000)
+        sniffer1.set_ask()
+        #sniffer1.set_4fsk(1950)
         sniffer1.set_endianness(Endianness.BIG)
         sniffer1.set_sync_word(b"")
-
+        sniffer1.set_tx_power(TXPower.HIGH)
         '''
         sniffer1.set_physical_layer(somfy)
         sniffer1.set_channel(0)
         '''
         sniffer1.sniff_phy()
         sniffer1.start()
-
         while True:
             input()
+            sniffer1.send(bytes.fromhex("f0007fff07fff83e000000000000000001fffe0f80007fff07fff83e0001f0001fffe0f80007c0007c0003e0003fffc1fffe0f8000ffff07fff83fffc3f0001f0000f8000fc0007fff83e0003fffc1fffe0fffe07c0007fff83e0001f0001fffe0ffff07c000000000000000003fffc1f0000fffe0ffff07c0003e0003fffc1f0000f8000f80007c0007fff83fffc1f0001fffe0ffff07fff87e0003e0001f0001f0000fffe0fc0007fff07fff83fffc1f0001fffe0f80007c0007fff83fffc1f000000000000000"))
+
 
 
 

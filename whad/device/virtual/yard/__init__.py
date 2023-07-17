@@ -21,7 +21,7 @@ from queue import Queue, Empty
 from whad.protocol.phy.phy_pb2 import GetSupportedFrequencies, SetFrequency, \
     SetDataRate, SetPacketSize, SetEndianness, SetTXPower, TXPower, SetSyncWord, \
     SetASKModulation, Sniff, Start, Stop, Set4FSKModulation, SetFSKModulation, \
-    SetGFSKModulation
+    SetGFSKModulation, Send
 
 
 # Helpers functions
@@ -78,6 +78,7 @@ class YardStickOneDevice(VirtualDevice):
             (378000000, 481000000),
             (749000000, 962000000),
         ]
+
         self.__internal_state = YardInternalStates.YardModeIdle
         self.__frequency = None
         self.__endianness = Endianness.BIG
@@ -108,6 +109,12 @@ class YardStickOneDevice(VirtualDevice):
             range.start, range.end = supported_range[0], supported_range[1]
             msg.phy.supported_freq.frequency_ranges.extend([range])
         self._send_whad_message(msg)
+
+
+
+    def _on_whad_phy_send(self, message):
+        self._send_packet(message.packet)
+        self._send_whad_command_result(ResultCode.SUCCESS)
 
 
     def _on_whad_phy_set_freq(self, message):
@@ -418,9 +425,10 @@ class YardStickOneDevice(VirtualDevice):
         if no_response:
             return
         recv_app, recv_verb, recv_data = None, None, None
-        while recv_app != app and recv_verb != command:
+        while (recv_app != app and recv_verb != command):
             #print(">", message.hex())
             self.__yard.write(YardStickOneEndPoints.OUT_ENDPOINT, message, timeout=timeout)
+
             recv_app, recv_verb, recv_data = self._yard_read_response()
         return recv_data
 
@@ -442,7 +450,7 @@ class YardStickOneDevice(VirtualDevice):
                                     SetPacketSize,
                                     SetSyncWord,
                                     Sniff,
-                                    #Send,
+                                    Send,
                                     Start,
                                     Stop,
                                     Set4FSKModulation
@@ -474,27 +482,24 @@ class YardStickOneDevice(VirtualDevice):
     def _get_url(self):
         return "https://github.com/atlas0fd00m/rfcat".encode('utf-8')
 
-    def _send_packet(self, packet, repeat=10, offset=0):
+    def _send_packet(self, packet, repeat=3, offset=0):
         data = bytes(packet)
-        #waitlen = len(data) + repeat * (len(data) - offset)
-        #wait = YardUSBProperties.USB_TX_WAIT * ((waitlen / 255) + 1)
-        '''
-        self._yard_send_command(
-            YardApplications.NIC,
-            YardNICCommands.LONG_XMIT,
-            pack("<H", len(data)) + data,
-            no_response=False
-        )
-        '''
-        #self._strobe_tx_mode()
-        self._yard_send_command(
-            YardApplications.NIC,
-            YardNICCommands.XMIT,
-            pack("<HHH", len(data), repeat, offset) + data,
-            no_response=False
-        )
-        #sleep(1)
-        self._strobe_idle_mode()
+
+        # It is the only solution we found to allow transmitting data without breaking the sniffer mode.
+        # TBI: to be improved
+        old_state = self.__internal_state
+        self.__internal_state = YardInternalStates.YardModeTx
+        opened_stream = self.__opened_stream
+        self.__opened_stream = False
+        self._set_tx_mode()
+        self._strobe_tx_mode()
+
+        message = bytes([YardApplications.NIC, YardNICCommands.LONG_XMIT]) + pack("<H", len(data)) + data
+        self.__yard.write(YardStickOneEndPoints.OUT_ENDPOINT, message, timeout=1000)
+
+        self.__internal_state = old_state
+        self._restore_previous_mode()
+        self.__opened_stream = opened_stream
 
 
     def _peek(self, address, size):
