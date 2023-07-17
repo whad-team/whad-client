@@ -225,6 +225,22 @@ class YardStickOneDevice(VirtualDevice):
             self._set_preamble_quality_threshold(0)
             self._restore_previous_mode()
             self._send_whad_command_result(ResultCode.SUCCESS)
+        elif len(message.sync_word) == 4 and message.sync_word[:2] == message.sync_word[2:]:
+            self._enter_configuration_mode()
+            self._set_crc(enable=False)
+            self._set_whitening(enable=False)
+            self._set_packet_format(0)
+            self._set_forward_error_correction(enable=False)
+            self._set_clear_channel_assessment(mode=YardCCA.NO_CCA)
+            if self.__endianness == Endianness.LITTLE:
+                sync = bytes([swap_bits(i) for i in message.sync_word])[::-1]
+            else:
+                sync = message.sync_word
+            self._set_sync_word(sync)
+            self._set_preamble_quality_threshold(0)
+            self._restore_previous_mode()
+            self._send_whad_command_result(ResultCode.SUCCESS)
+
         else:
             self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
 

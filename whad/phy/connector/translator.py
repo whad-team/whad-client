@@ -28,17 +28,7 @@ class PhyMessageTranslator(object):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
-        if ESB_Hdr not in packet:
-            packet = ESB_Hdr(address=self.__cached_address)/packet
-
-        packet.preamble = 0xAA # force a rebuild
-        formatted_packet = ESB_Pseudo_Packet(bytes(packet)[1:])
-
-        timestamp = None
-        if hasattr(packet, "metadata"):
-            timestamp = packet.metadata.timestamp
-
-        return formatted_packet, timestamp
+        return packet, 0
 
 
     def from_message(self, message, msg_type):
@@ -49,15 +39,14 @@ class PhyMessageTranslator(object):
 
             if self.physical_layer is not None and self.physical_layer.decoding is not None:
                 bytes_packet = self.physical_layer.decoding(bytes_packet, self.physical_layer.configuration)
+            if bytes_packet is not None and len(bytes_packet) > 0:
+                if self.physical_layer is not None and self.physical_layer.scapy_layer is not None:
+                    packet = self.physical_layer.scapy_layer(bytes_packet)
+                else:
+                    packet = Phy_Packet(bytes_packet)
+                    packet.metadata = generate_phy_metadata(message, msg_type)
 
-            if self.physical_layer is not None and self.physical_layer.decoding is not None:
-                packet = self.physical_layer.scapy_layer(bytes_packet)
-            else:
-                packet = Phy_Packet(bytes_packet)
-
-            packet.metadata = generate_phy_metadata(message, msg_type)
-
-            return packet
+                return packet
 
         elif msg_type == 'packet':
             bytes_packet = bytes(message.packet.packet)
@@ -66,15 +55,15 @@ class PhyMessageTranslator(object):
                 bytes_packet = self.pattern[:self.pattern_cropped_bytes] + bytes_packet
             if self.physical_layer is not None and self.physical_layer.decoding is not None:
                 bytes_packet = self.physical_layer.decoding(bytes_packet, self.physical_layer.configuration)
-            if self.physical_layer is not None and self.physical_layer.decoding is not None:
-                packet = self.physical_layer.scapy_layer(bytes_packet)
-            else:
-                packet = Phy_Packet(bytes_packet)
+            if bytes_packet is not None and len(bytes_packet) > 0:
+                if self.physical_layer is not None and self.physical_layer.scapy_layer is not None:
+                    packet = self.physical_layer.scapy_layer(bytes_packet)
+                else:
+                    packet = Phy_Packet(bytes_packet)
+                    packet.metadata = generate_phy_metadata(message, msg_type)
 
-            packet.metadata = generate_phy_metadata(message, msg_type)
 
-
-            return packet
+                return packet
 
 
     def from_packet(self, packet):

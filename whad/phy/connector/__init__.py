@@ -563,13 +563,16 @@ class Phy(WhadDeviceConnector):
             msg_type = message.WhichOneof('msg')
             if msg_type == 'packet':
                 packet = self.translator.from_message(message, msg_type)
-                self.monitor_packet_rx(packet)
-                self.on_packet(packet)
+                if packet is not None:
+                    self.monitor_packet_rx(packet)
+                    self.on_packet(packet)
 
             elif msg_type == 'raw_pdu':
                 packet = self.translator.from_message(message, msg_type)
-                self.monitor_packet_rx(packet)
-                self.on_raw_packet(packet)
+
+                if packet is not None:
+                    self.monitor_packet_rx(packet)
+                    self.on_raw_packet(packet)
 
 
     def on_raw_packet(self, packet):
