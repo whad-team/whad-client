@@ -85,6 +85,7 @@ class YardStickOneDevice(VirtualDevice):
 
         self.__in_buffer = b""
         self.__queue = Queue()
+
         self.__opened = False
         self.__index, self.__yard = device
         super().__init__()
@@ -264,8 +265,8 @@ class YardStickOneDevice(VirtualDevice):
         self._send_whad_command_result(ResultCode.SUCCESS)
 
     def _on_whad_phy_stop(self, message):
-        self._set_mode_idle()
-        self._strobe_rx_mode()
+        #self._set_idle_mode()
+        #self._strobe_idle_mode()
         self.__opened_stream = False
         self._send_whad_command_result(ResultCode.SUCCESS)
 
@@ -375,8 +376,10 @@ class YardStickOneDevice(VirtualDevice):
                 self._yard_send_command(YardApplications.NIC, YardNICCommands.SET_RECV_LARGE, pack("<H", 200))
                 data = self._yard_send_command(YardApplications.NIC,YardNICCommands.RECV)
                 while self.__opened_stream and self.__internal_state == YardInternalStates.YardModeRx:
+
                     data = self._yard_read_response()
-                    if data[0] is not None:
+
+                    if data[0] is not None and data[0] != 0xFF and not (len(data[2]) == 1 and data[2] == b"\xC8"):
                         if self.__endianness == Endianness.LITTLE:
                             formatted_data = bytes([swap_bits(i) for i in data[2]])
                         else:
@@ -426,7 +429,6 @@ class YardStickOneDevice(VirtualDevice):
             return
         recv_app, recv_verb, recv_data = None, None, None
         while (recv_app != app and recv_verb != command):
-            #print(">", message.hex())
             self.__yard.write(YardStickOneEndPoints.OUT_ENDPOINT, message, timeout=timeout)
 
             recv_app, recv_verb, recv_data = self._yard_read_response()
@@ -436,7 +438,7 @@ class YardStickOneDevice(VirtualDevice):
     def _get_capabilities(self):
         capabilities = {
             WhadDomain.Phy : (
-                                (WhadCapability.Sniff),
+                                (WhadCapability.Sniff | WhadCapability.NoRawData),
                                 [
                                     GetSupportedFrequencies,
                                     SetASKModulation,
@@ -486,11 +488,11 @@ class YardStickOneDevice(VirtualDevice):
         data = bytes(packet)
 
         # It is the only solution we found to allow transmitting data without breaking the sniffer mode.
-        # TBI: to be improved
         old_state = self.__internal_state
         self.__internal_state = YardInternalStates.YardModeTx
         opened_stream = self.__opened_stream
         self.__opened_stream = False
+
         self._set_tx_mode()
         self._strobe_tx_mode()
 
@@ -499,6 +501,7 @@ class YardStickOneDevice(VirtualDevice):
 
         self.__internal_state = old_state
         self._restore_previous_mode()
+
         self.__opened_stream = opened_stream
 
 

@@ -121,6 +121,7 @@ if __name__ == '__main__':
         # https://fsec404.github.io/blog/Shanon-entropy/
         sniffer1.set_frequency(433920000)
         sniffer1.set_packet_size(250)
+        #sniffer1.set_datarate(10000)
         sniffer1.set_datarate(10000)
         sniffer1.set_ask()
         #sniffer1.set_4fsk(1950)
@@ -135,7 +136,7 @@ if __name__ == '__main__':
         sniffer1.start()
         while True:
             input()
-            sniffer1.send(bytes.fromhex("f0007fff07fff83e000000000000000001fffe0f80007fff07fff83e0001f0001fffe0f80007c0007c0003e0003fffc1fffe0f8000ffff07fff83fffc3f0001f0000f8000fc0007fff83e0003fffc1fffe0fffe07c0007fff83e0001f0001fffe0ffff07c000000000000000003fffc1f0000fffe0ffff07c0003e0003fffc1f0000f8000f80007c0007fff83fffc1f0001fffe0ffff07fff87e0003e0001f0001f0000fffe0fc0007fff07fff83fffc1f0001fffe0f80007c0007fff83fffc1f000000000000000"))
+            sniffer1.send(bytes.fromhex("fc300800017ffc1f0000fffe0fffe07c0007c0003fff83e0001f0001fffe0fffe0fc000000000000000003fff81f0001f0000f8000fc0007fff07e0003e0001fffc1f0000f8000fffe0f80007fff07fff83fffc1fffc1fffc1f8000ffff07c0003fff83e0001fffc1fffe0f80007c0003fff83e0001f0001fffe0ffff07c000000000000000003f3f40f0000f80007c0007c0003fff83e0001f0000fffe07c0007e0003fffc1f0001fffe0ffff07fff83fff81fffc1f8000fffe07c0007fff83e0001fffc1fffe0f"))
 
 
 

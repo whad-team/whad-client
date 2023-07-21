@@ -13,3 +13,7 @@ class UnknownPhysicalLayerFunction(Exception):
 class UnsupportedFrequency(Exception):
     def __init__(self, frequency):
         super().__init__(self, frequency)
+
+class NoModulation(Exception):
+    def __init__(self):
+        super().__init__()

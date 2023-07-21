@@ -11,11 +11,12 @@ from whad.protocol.phy.phy_pb2 import SetASKModulation, SetFSKModulation, \
     SetBPSKModulationCmd, SetQPSKModulationCmd, GetSupportedFrequenciesCmd, \
     GetSupportedFrequencies, SetFrequency, SetDataRate, SetEndianness, \
     Endianness, SetTXPower, TXPower, SetPacketSize, SetSyncWord, StartCmd, \
-    StopCmd, Send, SendRaw, Set4FSKModulation, Set4FSKModulationCmd
+    StopCmd, Send, Sniff, SendRaw, Set4FSKModulation, Set4FSKModulationCmd
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.phy import Phy_Packet
 from whad.exceptions import RequiredImplementation, UnsupportedCapability, UnsupportedDomain
+from whad.phy.exceptions import UnsupportedFrequency
 from whad.phy.connector.translator import PhyMessageTranslator
 
 class Phy(WhadDeviceConnector):
@@ -566,7 +567,7 @@ class Phy(WhadDeviceConnector):
                     self.monitor_packet_rx(packet)
                     self.on_packet(packet)
 
-            elif msg_type == 'raw_pdu':
+            elif msg_type == 'raw_packet':
                 packet = self.translator.from_message(message, msg_type)
 
                 if packet is not None:
