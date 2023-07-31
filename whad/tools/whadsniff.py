@@ -349,7 +349,7 @@ class WhadSniffApp(CommandLineApp):
                     try:
                         sniffer.configuration = configuration
                     except Exception as e:
-                        self.error("Error during configuration: " +str(e))
+                        self.error("Error during configuration: " +repr(e))
                         raise KeyboardInterrupt
                     # If output parameter is selected, add a PCAP Writer monitor
                     if self.args.output is not None:

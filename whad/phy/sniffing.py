@@ -30,7 +30,7 @@ class SnifferConfiguration:
     """
     frequency : int = 2402000000
     little_endian : bool = False
-    datarate : int = 10000
+    datarate : int = 100000
     packet_size : int = 31
     sync_word : bytes = b"\xAA"
     ask: bool = False

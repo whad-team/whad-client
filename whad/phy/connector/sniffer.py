@@ -38,8 +38,7 @@ class Sniffer(Phy, EventsManager):
             self.set_bpsk()
         elif self.__configuration.qpsk:
             self.set_qpsk()
-        else:
-            raise NoModulation()
+
 
         self.set_endianness(
             Endianness.LITTLE if

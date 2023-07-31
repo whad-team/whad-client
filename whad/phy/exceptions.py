@@ -17,3 +17,41 @@ class UnsupportedFrequency(Exception):
 class NoModulation(Exception):
     def __init__(self):
         super().__init__()
+
+    def __repr__(self):
+        return "NoModulation: No modulation provided"
+
+class NoDatarate(Exception):
+    def __init__(self):
+        super().__init__()
+
+    def __repr__(self):
+        return "NoDatarate: No datarate provided"
+
+class NoFrequency(Exception):
+    def __init__(self):
+        super().__init__()
+
+    def __repr__(self):
+        return "NoFrequency: No frequency provided"
+
+class NoSyncWord(Exception):
+    def __init__(self):
+        super().__init__()
+
+    def __repr__(self):
+        return "NoSyncWord: No synchronization word provided"
+
+class NoEndianess(Exception):
+    def __init__(self):
+        super().__init__()
+
+    def __repr__(self):
+        return "NoEndianness: No endianness provided"
+
+class NoPacketSize(Exception):
+    def __init__(self):
+        super().__init__()
+
+    def __repr__(self):
+        return "NoPacketSize: No packet size provided"

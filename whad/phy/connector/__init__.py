@@ -16,7 +16,8 @@ from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.phy import Phy_Packet
 from whad.exceptions import RequiredImplementation, UnsupportedCapability, UnsupportedDomain
-from whad.phy.exceptions import UnsupportedFrequency
+from whad.phy.exceptions import UnsupportedFrequency, NoModulation, NoDatarate, NoFrequency, \
+    NoSyncWord, NoEndianess, NoPacketSize
 from whad.phy.connector.translator import PhyMessageTranslator
 
 class Phy(WhadDeviceConnector):
@@ -49,6 +50,14 @@ class Phy(WhadDeviceConnector):
 
         # Physical layer
         self.__physical_layer = None
+
+        # Configurations
+        self.__configured_datarate = False
+        self.__configured_endianness = False
+        self.__configured_frequency = False
+        self.__configured_syncword = False
+        self.__configured_packetsize = False
+        self.__configured_modulation = False
 
         # Open device and make sure it is compatible
         self.device.open()
@@ -136,9 +145,12 @@ class Phy(WhadDeviceConnector):
         msg = Message()
         msg.phy.mod_ask.ook = on_off_keying
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if success:
+            self.__configured_modulation = True
+        return success
 
-    def set_fsk(self, deviation=250000):
+    def set_bfsk(self, deviation=250000):
         """
         Enable Frequency Shift Keying modulation scheme.
 
@@ -154,7 +166,10 @@ class Phy(WhadDeviceConnector):
         msg = Message()
         msg.phy.mod_fsk.deviation = deviation
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if success:
+            self.__configured_modulation = True
+        return success
 
     def set_4fsk(self, deviation=250000):
         """
@@ -166,7 +181,10 @@ class Phy(WhadDeviceConnector):
         msg = Message()
         msg.phy.mod_4fsk.deviation = deviation
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if success:
+            self.__configured_modulation = True
+        return success
 
 
     def set_gfsk(self, deviation=250000):
@@ -185,7 +203,10 @@ class Phy(WhadDeviceConnector):
         msg = Message()
         msg.phy.mod_gfsk.deviation = deviation
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if success:
+            self.__configured_modulation = True
+        return success
 
 
     def set_bpsk(self):
@@ -198,7 +219,10 @@ class Phy(WhadDeviceConnector):
         msg = Message()
         msg.phy.mod_bpsk.CopyFrom(SetBPSKModulationCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if success:
+            self.__configured_modulation = True
+        return success
 
 
     def set_qpsk(self):
@@ -211,7 +235,10 @@ class Phy(WhadDeviceConnector):
         msg = Message()
         msg.phy.mod_qpsk.CopyFrom(SetQPSKModulationCmd())
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if success:
+            self.__configured_modulation = True
+        return success
 
 
     def get_supported_frequencies(self):
@@ -245,7 +272,9 @@ class Phy(WhadDeviceConnector):
         msg.phy.set_freq.frequency = frequency
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-        self.__cached_frequency = frequency
+        if success:
+            self.__cached_frequency = frequency
+            self.__configured_frequency = True
         return success
 
     def can_set_datarate(self):
@@ -267,8 +296,10 @@ class Phy(WhadDeviceConnector):
         msg = Message()
         msg.phy.datarate.rate = rate
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if success:
+            self.__configured_datarate = True
+        return success
 
     def can_set_endianness(self):
         """
@@ -287,7 +318,10 @@ class Phy(WhadDeviceConnector):
         msg = Message()
         msg.phy.endianness.endianness = endianness
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if success:
+            self.__configured_endianness = True
+        return success
 
     def can_send(self):
         """
@@ -337,8 +371,10 @@ class Phy(WhadDeviceConnector):
         msg = Message()
         msg.phy.packet_size.packet_size = size
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if success:
+            self.__configured_packetsize = True
+        return success
 
     def can_set_sync_word(self):
         """
@@ -358,8 +394,10 @@ class Phy(WhadDeviceConnector):
         msg = Message()
         msg.phy.sync_word.sync_word = sync_word
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if success:
+            self.__configured_syncword = True
+        return success
 
     def can_sniff(self):
         """
@@ -388,6 +426,19 @@ class Phy(WhadDeviceConnector):
         """
         if iq_stream and not self.support_raw_iq_stream():
             raise UnsupportedCapability("RawIQStream")
+
+        if not self.__configured_modulation:
+            raise NoModulation()
+        if not self.__configured_datarate:
+            raise NoDatarate()
+        if not self.__configured_packetsize:
+            raise NoPacketSize()
+        if not self.__configured_frequency:
+            raise NoFrequency()
+        if not self.__configured_syncword:
+            raise NoSyncWord()
+        if not self.__configured_endianness:
+            raise NoEndianess()
 
         msg = Message()
         msg.phy.sniff.iq_stream = iq_stream
