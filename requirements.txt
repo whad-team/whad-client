@@ -4,3 +4,4 @@ elementpath==2.4.0
 pyserial==3.5.0
 pycryptodomex==3.11.0
 pyusb==1.2.1
+cryptography==36.0.0
