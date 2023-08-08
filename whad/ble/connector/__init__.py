@@ -475,7 +475,7 @@ class BLE(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-    def set_bd_address(self, bd_address):
+    def set_bd_address(self, bd_address, public=True):
         """
         Set Bluetooth Low Energy BD address.
         """
@@ -484,6 +484,7 @@ class BLE(WhadDeviceConnector):
         if (commands & (1 << SetBdAddress))>0:
             msg = Message()
             msg.ble.set_bd_addr.bd_address = bd_addr_to_bytes(bd_address)
+            msg.ble.set_bd_addr.addr_type = BleAddrType.PUBLIC if public else BleAddrType.RANDOM
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         else:
