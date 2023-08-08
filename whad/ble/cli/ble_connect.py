@@ -27,6 +27,15 @@ class BleConnectApp(CommandLineApp):
         )
 
         self.add_argument('bdaddr', metavar='BDADDR', help='Target device BD address')
+        self.add_argument(
+            '-s',
+            '--spoof-addr',
+            metavar='SPOOFED_BD_ADDR',
+            dest='bdaddr_src',
+            default=None,
+            help='Spoofed BD address'
+        )
+
         # Add an optional random type argument
         self.add_argument(
             '-r',
@@ -36,6 +45,8 @@ class BleConnectApp(CommandLineApp):
             default=False,
             help='Use a random connection type'
         )
+
+
     def run(self):
         """Override App's run() method to handle scripting feature.
         """
@@ -60,6 +71,18 @@ class BleConnectApp(CommandLineApp):
         # Launch post-run tasks
         self.post_run()
 
+    def set_bd_address(self, central: Central, bdaddr: str):
+        """Set central BLE address
+        """
+        # If a spoofed address has been provided, then try to set it
+        if bdaddr is not None:
+            # Make sure it is a valid BD address
+            if BDAddress.check(bdaddr):
+                # Set the BD address
+                if not central.set_bd_address(bdaddr):
+                    self.warning('Cannot spoof BD address, please make sure your WHAD interface supports this feature.')
+
+
     def connect_target(self, bdaddr, random_connection_type=False):
         """Connect to our target device
         """
@@ -67,6 +90,10 @@ class BleConnectApp(CommandLineApp):
         if BDAddress.check(bdaddr):
             # Configure our interface
             central = Central(self.interface)
+
+            # Spoof source BD address if required
+            if self.args.bdaddr_src is not None:
+                self.set_bd_address(central, self.args.bdaddr_src)
 
             # Connect to our target device
             try:
