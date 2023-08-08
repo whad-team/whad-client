@@ -1,5 +1,6 @@
 import json
 from argparse import Namespace
+from prompt_toolkit import print_formatted_text, HTML
 from whad.ble.bdaddr import BDAddress
 from whad.ble import Central
 from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
@@ -24,6 +25,21 @@ def show_att_error(app, error: AttError):
         app.error('ATT error: attribute not found')
     elif isinstance(error, InsufficientEncryptionKeySize):
         app.error('ATT error: insufficient encryption')
+
+
+def set_bd_address(app, central: Central):
+    """Set central BLE address
+    """
+    # If a spoofed address has been provided, then try to set it
+    if app.args.bdaddr_src is not None:
+        # Make sure it is a valid BD address
+        if BDAddress.check(app.args.bdaddr_src):
+            # Set the BD address
+            if central.set_bd_address(app.args.bdaddr_src):
+                print_formatted_text(HTML('BLE source address set to <b>%s</b>' % app.args.bdaddr_src.lower()))
+            else:
+                app.error('Cannot spoof BD address, please make sure your WHAD interface supports this feature.')
+
 
 def create_central(app, piped=False):
     central = None
@@ -75,6 +91,10 @@ def create_central(app, piped=False):
                 # Create Central connector with provided GATT profile
                 central = Central(app.interface, from_json=profile_json)
 
+                # Set source BD address if required
+                if app.args.bdaddr_src is not None:
+                    set_bd_address(app, central)
+
                 # Profile has been successfully loaded from JSON
                 profile_loaded = True
             except IOError as err:
@@ -85,5 +105,10 @@ def create_central(app, piped=False):
         else:
             # Create classic Central connector
             central = Central(app.interface)
+
+            # Set source BD address if required
+            if app.args.bdaddr_src is not None:
+                set_bd_address(app, central)
+
 
     return (central, profile_loaded)
