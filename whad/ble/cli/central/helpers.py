@@ -38,7 +38,7 @@ def set_bd_address(app, central: Central):
             if central.set_bd_address(app.args.bdaddr_src):
                 print_formatted_text(HTML('BLE source address set to <b>%s</b>' % app.args.bdaddr_src.lower()))
             else:
-                app.error('Cannot spoof BD address, please make sure your WHAD interface supports this feature.')
+                app.warning('Cannot spoof BD address, please make sure your WHAD interface supports this feature.')
 
 
 def create_central(app, piped=False):
