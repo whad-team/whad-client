@@ -425,7 +425,7 @@ class HCIDevice(VirtualDevice):
                 return self._bd_address == bd_address
 
             else:
-                logger.error("[i] Address modification not supported.")
+                logger.debug("Address modification not supported.")
                 return False
         else:
             self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
