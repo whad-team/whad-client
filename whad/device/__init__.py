@@ -14,6 +14,12 @@ from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceTyp
 from whad.helpers import message_filter, asciiz
 # Logging
 import logging
+
+# Remove scapy deprecation warnings
+import warnings
+from cryptography.utils import CryptographyDeprecationWarning
+warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
+
 logger = logging.getLogger(__name__)
 
 class WhadDeviceInfo(object):

@@ -29,7 +29,6 @@ from whad.protocol.phy.phy_pb2 import \
     SetFrequency as PhySetFrequency, \
     SetDataRate as PhySetDataRate, \
     SetEndianness as PhySetEndianness, \
-    SetTXPower as PhySetTXPower, \
     SetPacketSize as PhySetPacketSize, \
     SetSyncWord as PhySetSyncWord, \
     Sniff as PhySniff, \
@@ -185,7 +184,6 @@ class RFStormDevice(VirtualDevice):
                                     PhySetFrequency,
                                     PhySetDataRate,
                                     PhySetEndianness,
-                                    PhySetTXPower,
                                     PhySetPacketSize,
                                     PhySetSyncWord,
                                     PhySniff,

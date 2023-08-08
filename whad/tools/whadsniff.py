@@ -346,8 +346,11 @@ class WhadSniffApp(CommandLineApp):
 
                     # Add an event listener to display incoming events
                     sniffer.add_event_listener(self.display_event)
-                    sniffer.configuration = configuration
-
+                    try:
+                        sniffer.configuration = configuration
+                    except Exception as e:
+                        self.error("Error during configuration: " +repr(e))
+                        raise KeyboardInterrupt
                     # If output parameter is selected, add a PCAP Writer monitor
                     if self.args.output is not None:
                         monitor_pcap = PcapWriterMonitor(args.output)
@@ -426,18 +429,22 @@ class WhadSniffApp(CommandLineApp):
                 else:
                     parameter_shortnames = []
 
+
                 # Process parameter type
                 if parameter_type != bool:
+                    choices = []
                     # If we got an int
                     if parameter_type == int:
                         # allow to provide hex arguments
                         parameter_type = lambda x: int(x,0)
-
                     # If we got a list, it is a list of string
                     if parameter_type == list:
                         parameter_default=[]
                         parameter_type=str
                         action = "append"
+                    elif parameter_type == bytes:
+                        parameter_type = bytes.fromhex
+                        action = "store"
                     else:
                         action = "store"
                     # Add non-boolean argument to corresponding subparser
