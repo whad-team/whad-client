@@ -43,10 +43,16 @@ class BleCentralApp(CommandLineApp):
         )
 
         self.add_argument(
-            '--spoof-addr',
+            '--spoof-public',
             '-s',
-            dest='bdaddr_src',
-            help='Specify spoofed BD address (spoofed whenever it is possible)'
+            dest='bdaddr_pub_src',
+            help='Specify a public BD address to spoof'
+        )
+
+        self.add_argument(
+            '--spoof-random',
+            dest='bdaddr_rand_src',
+            help='Specify a random BD address to spoof'
         )
 
         self.add_argument(
@@ -69,8 +75,6 @@ class BleCentralApp(CommandLineApp):
         """
         # Launch pre-run tasks
         self.pre_run()
-        
-        # If 
 
         if self.args.script is not None:
             if self.is_piped_interface():

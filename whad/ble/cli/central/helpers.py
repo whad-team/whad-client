@@ -30,15 +30,26 @@ def show_att_error(app, error: AttError):
 def set_bd_address(app, central: Central):
     """Set central BLE address
     """
+    bd_addr = None
+    is_public = False
+
     # If a spoofed address has been provided, then try to set it
-    if app.args.bdaddr_src is not None:
+    if app.args.bdaddr_pub_src is not None:
         # Make sure it is a valid BD address
-        if BDAddress.check(app.args.bdaddr_src):
-            # Set the BD address
-            if central.set_bd_address(app.args.bdaddr_src):
-                print_formatted_text(HTML('BLE source address set to <b>%s</b>' % app.args.bdaddr_src.lower()))
-            else:
-                app.warning('Cannot spoof BD address, please make sure your WHAD interface supports this feature.')
+        if BDAddress.check(app.args.bdaddr_pub_src):
+            bd_addr = app.args.bdaddr_pub_src
+            is_public = True
+    elif app.args.bdaddr_rand_src is not None:
+        # Make sure it is a valid BD address
+        if BDAddress.check(app.args.bdaddr_rand_src):
+            bd_addr = app.args.bdaddr_rand_src
+            is_public = False
+            
+    # Set the BD address
+    if central.set_bd_address(bd_addr, public=is_public):
+        print_formatted_text(HTML('BLE source address set to <b>%s</b>' % app.args.bdaddr_src.lower()))
+    else:
+        app.warning('Cannot spoof BD address, please make sure your WHAD interface supports this feature.')
 
 
 def create_central(app, piped=False):
@@ -92,7 +103,7 @@ def create_central(app, piped=False):
                 central = Central(app.interface, from_json=profile_json)
 
                 # Set source BD address if required
-                if app.args.bdaddr_src is not None:
+                if app.args.bdaddr_pub_src is not None or app.args.bdaddr_rand_src is not None:
                     set_bd_address(app, central)
 
                 # Profile has been successfully loaded from JSON
@@ -107,7 +118,7 @@ def create_central(app, piped=False):
             central = Central(app.interface)
 
             # Set source BD address if required
-            if app.args.bdaddr_src is not None:
+            if app.args.bdaddr_pub_src is not None or app.args.bdaddr_rand_src is not None:
                 set_bd_address(app, central)
 
 

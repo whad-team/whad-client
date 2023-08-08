@@ -28,12 +28,19 @@ class BleConnectApp(CommandLineApp):
 
         self.add_argument('bdaddr', metavar='BDADDR', help='Target device BD address')
         self.add_argument(
-            '-s',
-            '--spoof-addr',
-            metavar='SPOOFED_BD_ADDR',
-            dest='bdaddr_src',
+            '--spoof-public',
+            metavar='PUB_BD_ADDR',
+            dest='bdaddr_pub_src',
             default=None,
-            help='Spoofed BD address'
+            help='Spoof a public BD address'
+        )
+
+        self.add_argument(
+            '--spoof-random',
+            metavar='RAND_BD_ADDR',
+            dest='bdaddr_rand_src',
+            default=None,
+            help='Spoof a random BD address'
         )
 
         # Add an optional random type argument
@@ -71,16 +78,17 @@ class BleConnectApp(CommandLineApp):
         # Launch post-run tasks
         self.post_run()
 
-    def set_bd_address(self, central: Central, bdaddr: str):
+    def set_bd_address(self, central: Central, bdaddr: str, public=True):
         """Set central BLE address
         """
-        # If a spoofed address has been provided, then try to set it
-        if bdaddr is not None:
-            # Make sure it is a valid BD address
-            if BDAddress.check(bdaddr):
-                # Set the BD address
-                if not central.set_bd_address(bdaddr):
-                    self.warning('Cannot spoof BD address, please make sure your WHAD interface supports this feature.')
+        # Make sure it is a valid BD address
+        if BDAddress.check(bdaddr):
+            # Set the BD address
+            if not central.set_bd_address(bdaddr, public=public):
+                self.warning('Cannot spoof BD address, please make sure your WHAD interface supports this feature.')
+        else:
+            self.error('Invalid spoofed BD address: %s' % bdaddr)
+
 
 
     def connect_target(self, bdaddr, random_connection_type=False):
@@ -92,8 +100,10 @@ class BleConnectApp(CommandLineApp):
             central = Central(self.interface)
 
             # Spoof source BD address if required
-            if self.args.bdaddr_src is not None:
-                self.set_bd_address(central, self.args.bdaddr_src)
+            if self.args.bdaddr_pub_src is not None:
+                self.set_bd_address(central, self.args.bdaddr_pub_src, public=True)
+            elif self.args.bdaddr_rand_src is not None:
+                self.set_bd_address(central, self.args.bdaddr_rand_src, public=False)
 
             # Connect to our target device
             try:
