@@ -494,6 +494,7 @@ class HCIDevice(VirtualDevice):
             response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(data=data), wait_response=False)
             return True
 
+
     def _set_advertising_mode(self, enable=True, wait_response=True):
         """
         Enable or disable advertising mode for HCI device.
@@ -616,3 +617,12 @@ class HCIDevice(VirtualDevice):
             except WhadDeviceUnsupportedOperation as err:
                 logger.debug('Parameter error')
                 self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+
+    def _on_whad_ble_set_bd_addr(self, message):
+        logger.debug('Received WHAD BLE set_bd_addr message')
+        if self._set_BD_address(message.bd_address):
+            logger.debug('HCI adapter BD address set to %s' % str(message.bd_address))
+            self._send_whad_command_result(ResultCode.SUCCESS)
+        else:
+            logger.debug('HCI adapter does not support BD address spoofing')
+            self._send_whad_command_result(ResultCode.ERROR)
