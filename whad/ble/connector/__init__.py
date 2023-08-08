@@ -485,7 +485,7 @@ class BLE(WhadDeviceConnector):
             msg = Message()
             msg.ble.set_bd_addr.bd_address = bd_addr_to_bytes(bd_address)
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-            return True
+            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         else:
             return False
 
