@@ -323,6 +323,7 @@ class WhadDeviceConnector(object):
         :param filter: Filtering function used to match the expected response from the device.
         """
         return self.__device.send_command(message, filter)
+     
 
     def wait_for_message(self, timeout=None, filter=None, command=False):
         """Waits for a specific message to be received.
@@ -840,8 +841,17 @@ class WhadDevice(object):
         else:
             self.send_message(command, keep)
 
-        # Retrieve the first message matching our filter.
-        result = self.wait_for_message(self.__timeout, command=True)
+        try:
+            # Retrieve the first message matching our filter.
+            result = self.wait_for_message(self.__timeout, command=True)
+        except WhadDeviceTimeout as timedout:
+            # Ensure tx lock is properly released
+            self.__tx_lock.release()
+
+            # Forward exception
+            raise timedout
+        
+        # Ensure tx lock is properly released
         self.__tx_lock.release()
 
         # Log message
