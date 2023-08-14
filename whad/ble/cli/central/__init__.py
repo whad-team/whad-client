@@ -22,7 +22,7 @@ from .shell import BleCentralShell
 from .commands import *
 
 import logging
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 class BleCentralApp(CommandLineApp):
 
