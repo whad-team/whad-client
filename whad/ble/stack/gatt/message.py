@@ -94,6 +94,16 @@ class GattReadByTypeRequest(GattDataHolder):
             type=attr_type
         )
 
+class GattReadByTypeRequest128(GattDataHolder):
+    def __init__(self, start: int, end: int, attr_type1: UUID, attr_type2: UUID):
+        super().__init__(
+            start=start,
+            end=end,
+            type1=attr_type1,
+            type2=attr_type2
+        )
+
+
 class GattReadByTypeResponse(GattAttributeDataList):
     def __init__(self, item_size):
         super().__init__(item_size)

@@ -9,8 +9,8 @@ from threading import Lock
 
 from scapy.layers.bluetooth4LE import *
 
-from whad.common.stack import StackEntryLayer, layer_alias, match_source, layer_state, StackLayerState
-from whad.ble.stack.l2cap import BleL2CAP
+from whad.common.stack import Layer, alias, source, state, LayerState, instance
+from whad.ble.stack.l2cap import L2CAPLayer
 from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, e
 
 import logging
@@ -38,6 +38,9 @@ PING_REQ = 0x12
 PING_RSP = 0x13
 LENGTH_REQ = 0x14
 LENGTH_RSP = 0x15
+
+
+''' Kept BleConnection because of pairing stuff in it.
 
 class BleConnection(object):
 
@@ -387,11 +390,12 @@ class BleConnection(object):
                     subversion=self.__llm.stack.bt_sub_version
                 )
             )
+'''
+            
+class BleConnection(object):
 
-class NewBleConnection(object):
-
-    def __init__(self, ll, conn_handle, local_peer_addr, remote_peer_addr):
-        self.__ll = ll
+    def __init__(self, l2cap_instance, conn_handle, local_peer_addr, remote_peer_addr):
+        self.__l2cap = l2cap_instance
         self.__conn_handle = conn_handle
         self.__remote_peer = remote_peer_addr
         self.__local_peer = local_peer_addr
@@ -412,7 +416,7 @@ class NewBleConnection(object):
 
     @property
     def gatt(self):
-        return None
+        return self.__l2cap.get_layer('gatt')
     
     def lock(self):
         """Lock connection
@@ -429,6 +433,7 @@ class NewBleConnection(object):
         """
         pass
 
+    '''
     def send_version(self):
         """Send LL_VERSION_IND PDU.
         """
@@ -445,9 +450,9 @@ class NewBleConnection(object):
                     subversion=self.__llm.stack.bt_sub_version
                 )
             )
+    '''
 
-class LinkLayerState(StackLayerState):
-    FIELDS = ['connections']
+class LinkLayerState(LayerState):
 
     def __init__(self):
         super().__init__()
@@ -459,8 +464,9 @@ class LinkLayerState(StackLayerState):
         else:
             raise IndexError
         
-    def register_connection(self, conn_handle):
+    def register_connection(self, conn_handle, l2cap_instance):
         self.connections[conn_handle] = {
+            'l2cap': l2cap_instance,
             'version_sent': False,  # version exchanged
             'version_remote': None,
             'nb_pdu_recvd': 0       # number of packets received
@@ -469,6 +475,17 @@ class LinkLayerState(StackLayerState):
     def unregister_connection(self, conn_handle):
         if conn_handle in self.connections:
             del self.connections[conn_handle]
+
+    def get_connection_l2cap(self, conn_handle):
+        if conn_handle in self.connections:
+            return self.connections[conn_handle]['l2cap']
+        return None
+
+    def get_connection_handle(self, l2cap_instance):
+        for conn_handle in self.connections:
+            if self.connections[conn_handle]['l2cap'] == l2cap_instance:
+                return conn_handle
+        return
 
     def mark_version_sent(self, conn_handle):
         if conn_handle in self.connections:
@@ -483,9 +500,9 @@ class LinkLayerState(StackLayerState):
         if conn_handle in self.connections:
             self.connections[conn_handle]['version_remote'] = version
 
-@layer_alias('ll')
-@layer_state(LinkLayerState)
-class NewLinkLayer(StackEntryLayer):
+@alias('ll')
+@state(LinkLayerState)
+class LinkLayer(Layer):
 
     def configure(self, options={}):
         # Control PDU dispatch
@@ -520,12 +537,16 @@ class NewLinkLayer(StackEntryLayer):
         if conn_handle not in self.state.connections:
             logger.info('[llm] registers new connection %d with %s' % (conn_handle, remote_peer_addr))
 
+            # Instantiate a L2CAP layer (contextual) to handle the connection
+            conn_l2cap = self.instantiate(L2CAPLayer)
+            conn_l2cap.set_conn_handle(conn_handle)
+
             # Update state with new connection
-            self.state.register_connection(conn_handle)
+            self.state.register_connection(conn_handle, conn_l2cap.name)
 
             # Return connection object
-            return NewBleConnection(
-                self,
+            return BleConnection(
+                conn_l2cap,
                 conn_handle,
                 local_peer_addr,
                 remote_peer_addr
@@ -534,7 +555,7 @@ class NewLinkLayer(StackEntryLayer):
             logger.error('[!] Connection already exists')
 
             # Return connection object
-            return NewBleConnection(
+            return BleConnection(
                 self,
                 conn_handle,
                 local_peer_addr,
@@ -542,22 +563,37 @@ class NewLinkLayer(StackEntryLayer):
             )
 
     def on_disconnect(self, conn_handle):
+        # Free the previously instantiated L2CAP layer
+        conn_layer = self.state.get_connection_l2cap(conn_handle)
+        if conn_layer is not None:
+            self.destroy(self.get_layer(conn_layer))
+
+        # Remove connection from our registered connections
         self.state.unregister_connection(conn_handle)
 
-    def on_phy(self, pdu, tag=None, conn_handle=None):
-        """We are fed with BLE PDU.
+    @source('phy', 'data')
+    def on_data_pdu_recv(self, pdu, conn_handle=None):
+        """We received a DATA PDU.
+        """
+        # Count PDU
+        if conn_handle in self.state.connections:
+            conn_metadata = self.state.get_connection(conn_handle)
+            conn_metadata['nb_pdu_recvd'] += 1
+        
+        # We received a data PDU
+        self.on_data_pdu(pdu, conn_handle)
+
+    @source('phy', 'control')
+    def on_ctrl_pdu_recv(self, pdu, tag=None, conn_handle=None):
+        """We received a CTRL PDU.
         """
         # Count PDU
         if conn_handle in self.state.connections:
             conn_metadata = self.state.get_connection(conn_handle)
             conn_metadata['nb_pdu_recvd'] += 1
 
-        if tag == 'control':
-            # We received a control PDU
-            self.on_ctrl_pdu(pdu, conn_handle)
-        elif tag == 'data':
-            # We received a data PDU
-            self.on_data_pdu(pdu, conn_handle)
+        # We received a control PDU
+        self.on_ctrl_pdu(pdu, conn_handle)
 
     def on_ctrl_pdu(self, pdu, conn_handle):
         if conn_handle in self.state.connections:
@@ -567,11 +603,45 @@ class NewLinkLayer(StackEntryLayer):
         else:
             logger.error('[!] Unknown connection handle: %d', conn_handle)
 
+
     def on_data_pdu(self, pdu, conn_handle):
         """Forward data PDU to upper layer (L2CAP)
         """
-        if conn_handle in self.state.connections:
-            self.send('l2cap', bytes(pdu.payload), fragment=(pdu.LLID == 0x1), conn_handle=conn_handle)
+        # We look for the corresponding L2CAP layer instance
+        l2cap_layer = self.state.get_connection_l2cap(conn_handle)
+        if l2cap_layer is not None:
+            self.send(l2cap_layer, bytes(pdu.payload), fragment=(pdu.LLID == 0x1))
+
+    @instance('l2cap')
+    def on_l2cap_send_data(self, instance, data, fragment=False, encrypt=None):
+        '''L2CAP data encapsulation
+
+        This method retrieves the connection handle corresponding to the instance
+        that wants to send data and build a BTLE_DATA packet to send to the PHY
+        layer.
+        '''
+        # Retrieve connection handle corresponding to the instance
+        conn_handle = self.state.get_connection_handle(instance)
+        if conn_handle is not None:
+            logger.debug('sending l2cap data PDU for conn_handle %d' % conn_handle)
+            llid = 0x01 if fragment else 0x02
+            self.send(
+                'phy',
+                BTLE_DATA(
+                    LLID=llid,
+                    len=len(data)
+                )/data,
+                tag='data',
+                conn_handle=conn_handle,
+                encrypt=encrypt
+            )
+        else:
+            logger.error('no connection handle found for L2CAP instance %s' % instance)
+
+    def send_ctrl_pdu(self, conn_handle, pdu, encrypt=None):
+        """Send a control PDU to the underlying PHY layer.
+        """
+        self.send('phy', pdu, tag='control', encrypt=encrypt)
 
     """Control PDU handlers
     """
@@ -579,7 +649,7 @@ class NewLinkLayer(StackEntryLayer):
     ### Link-layer control PDU callbacks
 
     def on_unsupported_opcode(self, conn_handle, opcode):
-        self.stack.send_control(
+        self.send_ctrl_pdu(
             conn_handle,
             BTLE_CTRL() / LL_UNKNOWN_RSP(code=opcode)
         )
@@ -628,7 +698,7 @@ class NewLinkLayer(StackEntryLayer):
         """
         #self.on_unsupported_opcode(FEATURE_REQ)
         # Reply with our basic feature set
-        self.stack.send_control(
+        self.send_ctrl_pdu(
             conn_handle,
             BTLE_CTRL() / LL_FEATURE_RSP(feature_set=[
                 'le_encryption',
@@ -654,8 +724,11 @@ class NewLinkLayer(StackEntryLayer):
     def on_version_ind(self, conn_handle, version):
         """Send back our version info
         """
+        logger.debug('received a VERSION_IND PDU')
         if not self.state.is_version_sent(conn_handle):
-            self.stack.send_control(
+            logger.debug('sending back our VERSION_IND PDU')
+            """
+            self.get_layer('phy').send_control(
                 conn_handle,
                 BTLE_CTRL() / LL_VERSION_IND(
                     version=self.stack.bt_version,
@@ -663,6 +736,18 @@ class NewLinkLayer(StackEntryLayer):
                     subversion=self.stack.bt_sub_version
                 )
             )
+            """
+            # send control PDU
+            self.send_ctrl_pdu(
+                conn_handle,
+                BTLE_CTRL() / LL_VERSION_IND(
+                    version=self.stack.bt_version,
+                    company=self.stack.manufacturer_id,
+                    subversion=self.stack.bt_sub_version
+                )
+            )
+        else:
+            logger.debug('VERSION_IND PDU already sent, skip.')
         self.state.set_version_remote(conn_handle, version)
         self.state.mark_version_sent(conn_handle)
 
@@ -695,97 +780,4 @@ class NewLinkLayer(StackEntryLayer):
     def on_length_rsp(self, conn_handle, length_rsp):
         pass
 
-
-class BleLinkLayerManager(object):
-
-    def __init__(self, stack, gatt_class):
-        self.__stack = stack
-        self.__connections = {}
-        self.__gatt_class = gatt_class
-
-    @property
-    def gatt_class(self):
-        return self.__gatt_class
-
-    @property
-    def stack(self):
-        return self.__stack
-
-    def on_connect(self, conn_handle, local_peer_addr, remote_peer_addr):
-        """Handles BLE connection
-        """
-        if conn_handle not in self.__connections:
-            logger.info('[llm] registers new connection %d with %s' % (conn_handle, remote_peer_addr))
-            self.__connections[conn_handle] = BleConnection(
-                self,
-                conn_handle,
-                local_peer_addr,
-                remote_peer_addr
-            )
-            return self.__connections[conn_handle]
-        else:
-            logger.error('[!] Connection already exists')
-            self.__connections[conn_handle] = BleConnection(
-                self,
-                conn_handle,
-                local_peer_addr,
-                remote_peer_addr
-            )
-            return self.__connections[conn_handle]
-
-    def on_disconnect(self, conn_handle):
-        if conn_handle in self.__connections:
-            logger.info('[llm] connection %d has just terminated' % conn_handle)
-            self.__connections[conn_handle].on_disconnect()
-            del self.__connections[conn_handle]
-
-    def on_ctl_pdu(self, conn_handle, control):
-        """Handles Control PDU
-        """
-        if conn_handle in self.__connections:
-            conn = self.__connections[conn_handle]
-            conn.on_ctrl_pdu(control)
-        else:
-            logger.error('[!] Wrong connection handle: %d', conn_handle)
-
-    def on_data_pdu(self, conn_handle, data):
-        """Manages Data PDU.
-        """
-        if conn_handle in self.__connections:
-            conn = self.__connections[conn_handle]
-            conn.on_l2cap_data(bytes(data.payload), data.LLID == 0x1)
-
-    def send_data(self, conn_handle, data, fragment=False, encrypt=None):
-        """Pack data into a Data PDU and transfer it to the device.
-        """
-        llid = 0x01 if fragment else 0x02
-        self.__stack.send_data(
-            conn_handle,
-            BTLE_DATA(
-                LLID=llid,
-                len=len(data)
-            )/data,
-            encrypt=encrypt
-        )
-
-    def send_control(self, conn_handle, control_pdu, encrypt=None):
-        """Send a control PDU
-        """
-        self.__stack.send_control(
-            conn_handle,
-            BTLE_DATA(
-                LLID=0x03,
-                len=len(control_pdu)
-            )/control_pdu,
-            encrypt=encrypt
-        )
-
-    def set_encryption(self, conn_handle, enabled=False, key=None, iv=None):
-        """Notify connector encryption has been enabled or disabled.
-        """
-        return self.__stack.set_encryption(
-            conn_handle,
-            enabled,
-            key,
-            iv
-        )
+LinkLayer.add(L2CAPLayer)

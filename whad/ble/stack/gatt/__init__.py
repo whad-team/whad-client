@@ -18,31 +18,74 @@ from whad.ble.profile import GenericProfile
 from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
 from whad.ble.profile.service import PrimaryService, SecondaryService
 
+from whad.common.stack import Layer, source, alias
+
 logger = logging.getLogger(__name__)
 
-class Gatt(object):
+@alias('gatt')
+class GattLayer(Layer):
+    '''Gatt client/server base class
+    '''
 
-    """Gatt client/server base class
-
-    This class provides a default interface for GATT client and server, handling all possible incoming
-    request and sending default responses whenever it is possible.
-    """
-
-    def __init__(self, att=None):
-        """Gatt constructor
-        """
-        self.__att = att
+    def configure(self, options):
+        '''Configure the GATT layer
+        '''
         self.__queue = Queue()
-        self.__terminated = False
+        self.state.terminated = False
 
-    def attach(self, att):
-        """Attach this GATT instance to the underlying ATT layer
-        """
-        self.__att = att
+        # Dispatch rules
+        self.__handlers = {
+            GattErrorResponse: self.on_error_response,
+
+            GattFindInfoRequest: self.on_find_info_request,
+            GattFindInfoResponse: self.on_find_info_response,
+            
+            GattFindByTypeValueRequest: self.on_find_by_type_value_request,
+            GattFindByTypeValueResponse: self.on_find_by_type_value_response,
+            
+            GattReadByTypeRequest: self.on_read_by_type_request,
+            GattReadByTypeResponse: self.on_read_by_type_response,
+            
+            GattReadByGroupTypeRequest: self.on_read_by_group_type_request,
+            GattReadByGroupTypeResponse: self.on_read_by_group_type_response,
+            
+            GattReadRequest: self.on_read_request,
+            GattReadResponse: self.on_read_response,
+
+            GattReadBlobRequest: self.on_read_blob_request,
+            GattReadBlobResponse: self.on_read_blob_response,
+
+            GattReadMultipleRequest: self.on_read_multiple_request,
+            GattReadMultipleResponse: self.on_read_multiple_response,
+
+            GattWriteRequest: self.on_write_request,
+            GattWriteResponse: self.on_write_response,
+
+            GattHandleValueNotification: self.on_handle_value_notification,
+            GattHandleValueIndication: self.on_handle_value_indication,
+
+            GattPrepareWriteRequest: self.on_prepare_write_request,
+            GattPrepareWriteResponse: self.on_prepare_write_response,
+
+            GattExecuteWriteRequest: self.on_execute_write_request,
+            GattExecuteWriteResponse: self.on_execute_write_response,
+
+        }
 
     @property
     def att(self):
-        return self.__att
+        return self.get_layer('att')
+
+    @source('att')
+    def on_att_packet(self, packet):
+        '''Process ATT packets
+        '''
+        # Dispatch on the correct handler
+        packet_type = type(packet)
+        if packet_type in self.__handlers:
+            self.__handlers[packet_type](packet)
+        else:
+            logger.error('no GATT handler for packet type %s' % packet_type.__name__)
 
     def indicate(self, characteristic):
         """Send an indication to a GATT client. Not implemented by default.
@@ -70,7 +113,7 @@ class Gatt(object):
         start_time = time()
         while (time() - start_time) < timeout:
             # Check if connection has been terminated.
-            if self.__terminated:
+            if self.state.terminated:
                 logger.debug('Connection lost')
                 raise ConnectionLostException(None)
             try:
@@ -91,46 +134,52 @@ class Gatt(object):
             reason
         )
 
-    def on_error_response(self, error):
+    def on_error_response(self, error: GattErrorResponse):
         self.on_gatt_message(error)
 
-    def on_find_info_request(self, start, end):
-        """ATT Find Information Request callback
+
+    def on_find_info_request(self, packet: GattFindInfoRequest):
+        '''ATT Find Information Request callback
 
         By default, this method generates an ATT Error Response with ATTRIBUTE_NOT_FOUND error.
 
         :param int start: Start handle value
         :param int end: End handle value
-        """
+        '''
+        logger.debug('[gatt] find_info_request, start:%d, end:%d' %(
+            packet.start, packet.end
+        ))
         self.error(
-            BleAttOpcode.FIND_INFO_REQUEST, start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            BleAttOpcode.FIND_INFO_REQUEST, packet.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
-
-    def on_find_info_response(self, response):
-        """ATT Find Information Response callback
+        
+    def on_find_info_response(self, packet: GattFindInfoResponse):
+        '''ATT Find Information Response callback
 
         :param format: Information data format
         :param handles: List of handles
-        """
+        '''
         pass
 
-    def on_find_by_type_value_request(self, request):
+    def on_find_by_type_value_request(self, request: GattFindByTypeValueRequest):
         """ATT Find By Type Value Request callback
 
         :param GattFindByTypeValueRequest request: Request
         """
+        logger.debug('[gatt] FindByTypeValueRequest, start: %d, type: %s' % (request.start, request.type))
         self.error(
             BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST, request.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
 
-    def on_find_by_type_value_response(self, response):
+    def on_find_by_type_value_response(self, response: GattFindByTypeValueResponse):
         """ATT Find By Type Value Response callback
 
         :param GattFindByTypeValueResponse response: Response message
         """
         pass
 
-    def on_read_by_type_request(self, start, end, uuid):
+
+    def on_read_by_type_request(self, request: GattReadByTypeRequest):
         """ATT Read By Type Request callback
 
         :param int start: Start handle value
@@ -138,19 +187,7 @@ class Gatt(object):
         :param uuid: Type UUID
         """
         self.error(
-            BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST, start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
-        )
-
-    def on_read_by_type_request_128bit(self, start, end, uuid1, uuid2):
-        """ATT Read By Type Request with 128-bit UUID callback
-
-        :param int start: Start handle value
-        :param int end: End handle value
-        :param uuid1: 128-bit part 1
-        :param uuid2: 128-bit part 2
-        """
-        self.error(
-            BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST, start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST, request.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
 
     def on_read_by_type_response(self, response):
@@ -160,56 +197,7 @@ class Gatt(object):
         """
         pass
 
-    def on_read_request(self, handle):
-        """ATT Read Request callback
-
-        :param int handle: Attribute handle
-        """
-        self.error(
-            BleAttOpcode.READ_REQUEST, handle, BleAttErrorCode.INVALID_HANDLE
-        )
-
-    def on_read_response(self, value):
-        """ATT Read Response callback
-
-        :param value: Attribute value
-        """
-        pass
-
-    def on_read_blob_request(self, handle, offset):
-        """ATT Read Blob Request callback
-
-        :param int handle: Attribute handle
-        :param int offset: Offset of the first byte of data to read
-        """
-        self.error(
-            BleAttOpcode.READ_BLOB_REQUEST, handle, BleAttErrorCode.INVALID_HANDLE
-        )
-
-    def on_read_blob_response(self, value):
-        """ATT Read Blob Response callback
-
-        :param value: Attribute value
-        """
-        pass
-
-    def on_read_multiple_request(self, handles):
-        """ATT Read Multiple Request callback
-
-        :param handles: List of handles
-        """
-        self.error(
-            BleAttOpcode.READ_BLOB_REQUEST, handles[0], BleAttErrorCode.INVALID_HANDLE
-        )
-
-    def on_read_multiple_response(self, values):
-        """ATT Read Multiple Response callback
-
-        :param values: Multiple Attribute values
-        """
-        pass
-
-    def on_read_by_group_type_request(self, start, end, uuid):
+    def on_read_by_group_type_request(self, request: GattReadByGroupTypeRequest):
         """ATT Read By Group Type Request callback
 
         :param int start: Start handle value
@@ -217,7 +205,7 @@ class Gatt(object):
         :param uuid: Type UUID
         """
         self.error(
-            BleAttOpcode.READ_BY_GROUP_TYPE_REQUEST, start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            BleAttOpcode.READ_BY_GROUP_TYPE_REQUEST, request.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
 
 
@@ -229,14 +217,63 @@ class Gatt(object):
         """
         pass
 
-    def on_write_request(self, handle, data):
+    def on_read_request(self, request: GattReadRequest):
+        """ATT Read Request callback
+
+        :param int handle: Attribute handle
+        """
+        self.error(
+            BleAttOpcode.READ_REQUEST, request.handle, BleAttErrorCode.INVALID_HANDLE
+        )
+
+    def on_read_response(self, response: GattReadResponse):
+        """ATT Read Response callback
+
+        :param value: Attribute value
+        """
+        pass
+
+    def on_read_blob_request(self, request: GattReadBlobRequest):
+        """ATT Read Blob Request callback
+
+        :param int handle: Attribute handle
+        :param int offset: Offset of the first byte of data to read
+        """
+        self.error(
+            BleAttOpcode.READ_BLOB_REQUEST, request.handle, BleAttErrorCode.INVALID_HANDLE
+        )
+
+    def on_read_blob_response(self, response: GattReadBlobResponse):
+        """ATT Read Blob Response callback
+
+        :param value: Attribute value
+        """
+        pass
+
+    def on_read_multiple_request(self, request: GattReadMultipleRequest):
+        """ATT Read Multiple Request callback
+
+        :param handles: List of handles
+        """
+        self.error(
+            BleAttOpcode.READ_BLOB_REQUEST, request.handles[0], BleAttErrorCode.INVALID_HANDLE
+        )
+
+    def on_read_multiple_response(self, response: GattReadMultipleResponse):
+        """ATT Read Multiple Response callback
+
+        :param values: Multiple Attribute values
+        """
+        pass
+
+    def on_write_request(self, request: GattWriteRequest):
         """ATT Write Request callback
 
         :param int handle: Attribute handle
         :param data: Attribute value
         """
         self.error(
-            BleAttOpcode.WRITE_REQUEST, handle, BleAttErrorCode.INVALID_HANDLE
+            BleAttOpcode.WRITE_REQUEST, request.handle, BleAttErrorCode.INVALID_HANDLE
         )
 
     def on_write_response(self, response):
@@ -244,17 +281,33 @@ class Gatt(object):
         """
         pass
 
-    def on_write_command(self, handle, data):
+    def on_write_command(self, request: GattWriteCommand):
         """ATT Write Command callback
 
         :param int handle: Attribute handle
         :param data: Attribute data
         """
         self.error(
-            BleAttOpcode.WRITE_REQUEST, handle, BleAttErrorCode.INVALID_HANDLE
+            BleAttOpcode.WRITE_REQUEST, request.handle, BleAttErrorCode.INVALID_HANDLE
         )
 
-    def on_prepare_write_request(self, handle, offset, data):
+    def on_handle_value_notification(self, notification: GattHandleValueNotification):
+        """ATT Handle Value Notification
+
+        :param int handle: Attribute handle
+        :param value: Attribute value
+        """
+        pass
+
+    def on_handle_value_indication(self, indication: GattHandleValueIndication):
+        """ATT Handle Value Indication
+
+        :param int handle: Attribute handle
+        :param value: Attribute value
+        """
+        pass
+
+    def on_prepare_write_request(self, request: GattPrepareWriteRequest):
         """ATT Prepare Write request callback
 
         :param int handle: Attribute handle
@@ -262,10 +315,10 @@ class Gatt(object):
         :param data: Attribute data
         """
         self.error(
-            BleAttOpcode.PREPARE_WRITE_REQUEST, handle, BleAttErrorCode.INVALID_HANDLE
+            BleAttOpcode.PREPARE_WRITE_REQUEST, request.handle, BleAttErrorCode.INVALID_HANDLE
         )
 
-    def on_prepare_write_response(self, handle, offset, data):
+    def on_prepare_write_response(self, response: GattPrepareWriteResponse):
         """ATT Prepare Write Response Callback
 
         :param int handle: Attribute handle
@@ -274,56 +327,32 @@ class Gatt(object):
         """
         pass
 
-    def on_execute_write_request(self, flags):
+    def on_execute_write_request(self, request: GattExecuteWriteRequest):
         """ATT Execute Write Request callback
 
         :param int flags: Flags
         """
         pass
 
-    def on_execute_write_response(self):
+    def on_execute_write_response(self, response: GattExecuteWriteResponse):
         """ATT Execute Write Response callback
         """
         pass
 
-    def on_handle_value_notification(self, notification):
-        """ATT Handle Value Notification
 
-        :param int handle: Attribute handle
-        :param value: Attribute value
-        """
-        pass
 
-    def on_handle_value_indication(self, handle, value):
-        """ATT Handle Value Indication
+class GattClient(GattLayer):
 
-        :param int handle: Attribute handle
-        :param value: Attribute value
-        """
-        pass
-
-    def on_exch_mtu_response(self, response):
-        """ATT MTU exchange response
-
-        :param GattExchangeMtuResponse response: response from remote device
-        """
-        pass
-
-    def on_terminated(self):
-        """Called when the underlying connection has been terminated.
-        """
-        # Mark connection as terminated.
-        self.__terminated = True
-
-class GattClient(Gatt):
-    """GATT client
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.__model = GenericProfile()
+    def __init__(self, parent=None, layer_name=None, options={}):
+        super().__init__(parent=parent, layer_name=layer_name, options=options)
+        self.__model = None
         self.__notification_callbacks = {}
-        self.__terminated = False
+
+    def configure(self, options):
+        '''Configure GATT client.
+        '''
+        super().configure(options)
+
 
     @property
     def model(self):
@@ -333,24 +362,16 @@ class GattClient(Gatt):
         if isinstance(model, GenericProfile):
             self.__model = model
 
+
     ###################################
     # Supported response handlers
     ###################################
 
-    def on_read_by_group_type_response(self, response):
+    def on_read_by_group_type_response(self, response: GattReadByGroupTypeResponse):
         """ATT Read By Group Type Response callback
 
         """
         self.on_gatt_message(response)
-
-
-    def on_read_by_type_response(self, response):
-        """ATT Read By Type Response callback
-
-        :param GattReadByTypeResponse response: Response
-        """
-        self.on_gatt_message(response)
-
 
     def on_find_info_response(self, response):
         """ATT Find Information Response callback
@@ -369,7 +390,7 @@ class GattClient(Gatt):
         self.on_gatt_message(response)
 
 
-    def on_read_by_type_response(self, response):
+    def on_read_by_type_response(self, response: GattReadByTypeResponse):
         """ATT Read By Type Response callback
 
         :param GattReadByTypeResponse response: Response
@@ -377,7 +398,7 @@ class GattClient(Gatt):
         self.on_gatt_message(response)
 
 
-    def on_read_blob_response(self, response):
+    def on_read_blob_response(self, response: GattReadBlobResponse):
         """ATT Read Blob Response callback
 
         :param value: Attribute value
@@ -405,7 +426,7 @@ class GattClient(Gatt):
         """
         self.on_gatt_message(response)
 
-    def on_find_by_type_value_response(self, response):
+    def on_find_by_type_value_response(self, response: GattFindByTypeValueResponse):
         """ATT Find By Type Value Response callback
 
         :param GattFindByTypeValueResponse response: Response message
@@ -709,8 +730,10 @@ class GattClient(Gatt):
         :param int handle: Target characteristic or descriptor handle
         :param bytes value: Data to write
         """
+        local_mtu = self.get_layer('l2cap').get_local_mtu()
+
         # Check if data to write is longer than MTU
-        if len(value) > (self.att.local_mtu - 3):
+        if len(value) > (local_mtu - 3):
             return self.write_long(handle, value)
         else:
             # If data can be sent in a single write request, just send it :)
@@ -752,10 +775,12 @@ class GattClient(Gatt):
         # We need to determine how many prepared write requests we should issue
         # to the target device
         data_len = len(value)
-        nb_chunks = int(data_len / (self.att.local_mtu - 5))
-        if nb_chunks % (self.att.local_mtu - 5) > 0:
+        local_mtu = self.get_layer('l2cap').get_local_mtu()
+
+        nb_chunks = int(data_len / (local_mtu - 5))
+        if nb_chunks % (local_mtu - 5) > 0:
             nb_chunks += 1
-        chunk_size = self.att.local_mtu - 5
+        chunk_size = local_mtu - 5
 
         # Send prepared write requests
         offset = 0
@@ -825,30 +850,35 @@ class GattClient(Gatt):
 
     def on_terminated(self):
         # Process termination.
-        super().on_terminated()
+        #super().on_terminated()
 
         # Remove all notification/indication callbacks
         self.clear_notification_callbacks()
 
 
-class GattServer(Gatt):
+class GattServer(GattLayer):
     """
     BLE GATT server
     """
 
-    def __init__(self, model):
-        """Instanciate our GATT server and use the provided device model
-
-        :param DeviceModel model: Device model object
-        """
-        super().__init__()
-        self.__model = model
+    def __init__(self, parent=None, layer_name=None, options={}):
+        super().__init__(parent=parent, layer_name=layer_name, options=options)
+        self.__model = None
 
         # Prepared write queues
         self.__write_queues = {}
 
         # Subscribed characteristics
         self.__subscribed_characs = []
+
+    def set_model(self, model):
+        self.__model = model
+
+    def configure(self, options):
+        '''Configure GATT client.
+        '''
+        super().configure(options)
+
 
     ###################################
     # Supported response handlers
@@ -865,24 +895,26 @@ class GattServer(Gatt):
         :param Characteristic characteristic: Characteristic to notify the GATT client about.
         """
         try:
+            local_mtu = self.get_layer('l2cap').get_local_mtu()
+
             # Call model callback
             service = self.__model.find_service_by_characteristic_handle(characteristic.handle)
             self.__model.on_notification(
                 service,
                 characteristic,
-                characteristic.value[:self.att.local_mtu-3]
+                characteristic.value[:local_mtu-3]
             )
 
             # Send notification
             self.att.handle_value_notification(
                 characteristic.value_handle,
-                characteristic.value[:self.att.local_mtu-3]
+                characteristic.value[:local_mtu-3]
             )
         except HookReturnValue as value_override:
             # Return overriden value
             self.att.handle_value_notification(
                 characteristic.value_handle,
-                value_override.value[:self.att.local_mtu-3]
+                value_override.value[:local_mtu-3]
             )
 
     def indicate(self, characteristic):
@@ -891,24 +923,26 @@ class GattServer(Gatt):
         :param Characteristic characteristic: Characteristic to notify the GATT client about.
         """
         try:
+            local_mtu = self.get_layer('l2cap').get_local_mtu()
+
             # Call model callback
             service = self.__model.find_service_by_characteristic_handle(characteristic.handle)
             self.__model.on_indication(
                 service,
                 characteristic,
-                characteristic.value[:self.att.local_mtu-3]
+                characteristic.value[:local_mtu-3]
             )
 
             # Send notification
             self.att.handle_value_indication(
                 characteristic.value_handle,
-                characteristic.value[:self.att.local_mtu-3]
+                characteristic.value[:local_mtu-3]
             )
         except HookReturnValue as value_override:
             # Return overriden value
             self.att.handle_value_indication(
                 characteristic.value_handle,
-                value_override.value[:self.att.local_mtu-3]
+                value_override.value[:local_mtu-3]
             )
 
     def on_find_info_request(self, request):
@@ -926,7 +960,7 @@ class GattServer(Gatt):
         if len(attrs_handles) > 0:
 
             # Get MTU
-            mtu = self.att.local_mtu
+            mtu = self.get_layer('l2cap').get_local_mtu()
 
             # Get item size (UUID size + 2)
             uuid_size = len(attrs[attrs_handles[0]].type_uuid.packed)
@@ -972,6 +1006,8 @@ class GattServer(Gatt):
         :param int handle: Characteristic or descriptor handle
         """
         try:
+            local_mtu = self.get_layer('l2cap').get_local_mtu()
+
             # Search attribute by handle and send respons
             attr = self.__model.find_object_by_handle(request.handle)
 
@@ -988,18 +1024,18 @@ class GattServer(Gatt):
                             service,
                             charac,
                             0,
-                            self.att.local_mtu - 1
+                            local_mtu - 1
                         )
 
                         # Make sure the returned value matches the boundaries
-                        value = charac.value[:self.att.local_mtu - 1]
+                        value = charac.value[:local_mtu - 1]
 
                         self.att.read_response(
                             value
                         )
                     except HookReturnValue as force_value:
                         # Make sure the returned value matches the boundaries
-                        value = force_value.value[:self.att.local_mtu - 1]
+                        value = force_value.value[:local_mtu - 1]
 
                         self.att.read_response(
                             value
@@ -1054,7 +1090,7 @@ class GattServer(Gatt):
             elif isinstance(attr, CharacteristicDescriptor):
                 # Make sure the returned value matches the boundaries
                 self.att.read_response(
-                    attr.value[:self.att.local_mtu - 1]
+                    attr.value[:local_mtu - 1]
                 )
 
         except IndexError as e:
@@ -1069,6 +1105,8 @@ class GattServer(Gatt):
         """Read blob request
         """
         try:
+            local_mtu = self.get_layer('l2cap').get_local_mtu()
+
             # Search attribute by handle and send response
             attr = self.__model.find_object_by_handle(request.handle)
 
@@ -1093,11 +1131,11 @@ class GattServer(Gatt):
                             service,
                             charac,
                             request.offset,
-                            self.att.local_mtu - 1
+                            local_mtu - 1
                         )
 
                         # Make sure the returned value matches the boundaries
-                        value = charac.value[request.offset:request.offset + self.att.local_mtu - 1]
+                        value = charac.value[request.offset:request.offset + local_mtu - 1]
 
                         self.att.read_blob_response(
                             value
@@ -1105,7 +1143,7 @@ class GattServer(Gatt):
 
                     except HookReturnValue as force_value:
                         # Make sure the returned value matches the boundaries
-                        value = force_value.value[:self.att.local_mtu - 1]
+                        value = force_value.value[:local_mtu - 1]
 
                         self.att.read_blob_response(
                             value
@@ -1143,7 +1181,7 @@ class GattServer(Gatt):
                 elif isinstance(attr, CharacteristicDescriptor):
                     # Valid offset, return data[offset:offset + MTU - 1]
                     self.att.read_blob_response(
-                        attr.value[request.offset:request.offset + self.att.local_mtu - 1]
+                        attr.value[request.offset:request.offset + local_mtu - 1]
                     )
             elif request.offset == len(attr.value):
                 # Special case: when offset == attribute length then return empty data
@@ -1545,13 +1583,13 @@ class GattServer(Gatt):
             # Unknown flag !
             pass
 
-    def on_read_by_type_request(self, start, end, uuid):
+    def on_read_by_type_request(self, request: GattReadByTypeRequest):
         """Read attribute by type request
         """
         # List attributes by type UUID, sorted by handles
         attrs = {}
         attrs_handles = []
-        for attribute in self.__model.attr_by_type_uuid(UUID(uuid), start, end):
+        for attribute in self.__model.attr_by_type_uuid(UUID(request.type), request.start, request.end):
             attrs[attribute.handle] = attribute
             attrs_handles.append(attribute.handle)
         attrs_handles.sort()
@@ -1560,8 +1598,8 @@ class GattServer(Gatt):
         if len(attrs_handles) > 0:
 
             # Get MTU
-            mtu = self.att.local_mtu
-
+            mtu = self.get_layer('l2cap').get_local_mtu()
+            
             # Get item size (UUID size + 2)
             uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
             item_size = uuid_size + 5
@@ -1599,18 +1637,18 @@ class GattServer(Gatt):
                 # If not, send an error.
                 self.error(
                     BleAttOpcode.READ_BY_TYPE_REQUEST,
-                    start,
+                    request.start,
                     BleAttErrorCode.ATTRIBUTE_NOT_FOUND
                 )
         else:
             self.error(
                BleAttOpcode.READ_BY_TYPE_REQUEST,
-               start,
+               request.start,
                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
 
 
-    def on_read_by_group_type_request(self, start, end, uuid):
+    def on_read_by_group_type_request(self, request: GattReadByGroupTypeRequest):
         """Read by group type request
 
         List attribute with given type UUID from `start` handle to ̀`end` handle.
@@ -1618,7 +1656,7 @@ class GattServer(Gatt):
         # List attributes by type UUID, sorted by handles
         attrs = {}
         attrs_handles = []
-        for attribute in self.__model.attr_by_type_uuid(UUID(uuid), start, end):
+        for attribute in self.__model.attr_by_type_uuid(UUID(request.type), request.start, request.end):
             attrs[attribute.handle] = attribute
             attrs_handles.append(attribute.handle)
         attrs_handles.sort()
@@ -1627,7 +1665,7 @@ class GattServer(Gatt):
         if len(attrs_handles) > 0:
 
             # Get MTU
-            mtu = self.att.local_mtu
+            mtu = self.get_layer('l2cap').get_local_mtu()
 
             # Get item size (UUID size + 4)
             uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
@@ -1656,7 +1694,7 @@ class GattServer(Gatt):
         else:
             self.error(
                BleAttOpcode.READ_BY_GROUP_TYPE_REQUEST,
-               start,
+               request.start,
                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
 
