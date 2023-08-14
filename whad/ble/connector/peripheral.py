@@ -14,6 +14,7 @@ from whad.ble.connector import BLE
 from whad.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
 from whad.ble.stack.gatt import GattServer
+from whad.ble.stack.att import ATTLayer
 from whad.ble.profile import GenericProfile
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
@@ -32,7 +33,7 @@ class Peripheral(BLE):
     defined by a specific profile.
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, stack=BleStack):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -44,8 +45,11 @@ class Peripheral(BLE):
         """
         super().__init__(device)
 
+        # Attach a GATT server to our stack ATT layer
+        ATTLayer.add(GattServer)
+
         # Initialize stack
-        self.__stack = BleStack(self, GattServer(profile))
+        self.__stack = stack(self)
         self.__connected = False
 
         # Initialize profile
@@ -132,6 +136,7 @@ class Peripheral(BLE):
         :param  connection_data:    Connection data
         :type   connection_data:    :class:`whad.protocol.ble_pb2.Connected`
         """
+        # Retrieve the GATT server instance and set its profile
         logger.info('a device is now connected (connection handle: %d)' % connection_data.conn_handle)
         self.__stack.on_connection(
             connection_data.conn_handle,
@@ -195,6 +200,11 @@ class Peripheral(BLE):
         """
         # Use GATT server
         self.connection = connection
+        self.__connected = True
+
+        # Retrieve GATT server
+        self.__gatt_server = connection.gatt
+        self.__gatt_server.set_model(self.__profile)
         self.__connected = True
 
         # Notify our profile about this connection

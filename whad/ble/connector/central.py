@@ -7,9 +7,10 @@ from time import time, sleep
 from whad.ble import Message, Connected
 from whad.ble.connector import BLE
 from whad.ble.bdaddr import BDAddress
-from whad.ble.stack import BleStack, BtVersion, NewBleStack
+from whad.ble.stack import BleStack, BtVersion
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
 from whad.ble.stack.gatt import GattClient
+from whad.ble.stack.att import ATTLayer
 from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
 from whad.ble.profile.device import PeripheralDevice
 from whad.protocol.ble.ble_pb2 import BleDirection
@@ -28,11 +29,14 @@ class Central(BLE):
 
     """
 
-    def __init__(self, device, existing_connection = None, from_json=None, stack=NewBleStack):
+    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack):
         super().__init__(device)
+        
+        # Attach a GATT client to our stack ATT layer
+        ATTLayer.add(GattClient)
 
-        self.__gatt_client = GattClient()
-        self.__stack = stack(self, self.__gatt_client)
+        self.__gatt_client = None
+        self.__stack = stack(self)
         self.__connected = False
         self.__peripheral = None
         self.__random_addr = False
@@ -241,6 +245,9 @@ class Central(BLE):
             connection.conn_handle,
             from_json=self.__profile_json
         )
+
+        # Retrieve GATT client
+        self.__gatt_client = connection.gatt
         self.__gatt_client.set_model(self.__peripheral)
         self.__connected = True
 
