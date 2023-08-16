@@ -35,7 +35,7 @@ class BLEMetadata(Metadata):
             crc_checked = 1
             crc_valid = self.is_crc_valid
         if self.channel is not None:
-            rf_channel = channel_to_frequency(self.channel) - 2402
+            rf_channel = self.channel
 
         header = BTLE_RF(
             rf_channel = rf_channel,

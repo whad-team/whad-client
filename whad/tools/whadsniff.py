@@ -353,7 +353,7 @@ class WhadSniffApp(CommandLineApp):
                         raise KeyboardInterrupt
                     # If output parameter is selected, add a PCAP Writer monitor
                     if self.args.output is not None:
-                        monitor_pcap = PcapWriterMonitor(args.output)
+                        monitor_pcap = PcapWriterMonitor(self.args.output)
                         monitor_pcap.attach(sniffer)
                         monitor_pcap.start()
                         monitors.append(monitor_pcap)
