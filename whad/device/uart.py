@@ -15,7 +15,7 @@ from time import sleep
 from queue import Empty
 
 from whad.device import WhadDevice
-from whad.exceptions import WhadDeviceNotReady
+from whad.exceptions import WhadDeviceNotReady, WhadDeviceError
 from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter
 from whad.protocol.device_pb2 import DeviceResetQuery
@@ -187,21 +187,24 @@ class UartDevice(WhadDevice):
         :param bytes data: Data to write
         :returns: number of bytes written to the device
         """
-        if not self.__opened:
-            raise WhadDeviceNotReady()
+        try:
+            if not self.__opened:
+                raise WhadDeviceNotReady()
 
-        nb_bytes_written = 0
-        wlist = [self.__fileno]
-        elist = [self.__fileno]
-        readers,writers,errors = select.select(
-            [],
-            wlist,
-            elist
-        )
+            nb_bytes_written = 0
+            wlist = [self.__fileno]
+            elist = [self.__fileno]
+            readers,writers,errors = select.select(
+                [],
+                wlist,
+                elist
+            )
 
-        if len(writers) > 0:
-            nb_bytes_written = os.write(self.__fileno, data)
-        return nb_bytes_written
+            if len(writers) > 0:
+                nb_bytes_written = os.write(self.__fileno, data)
+            return nb_bytes_written
+        except OSError as os_error:
+            raise WhadDeviceError("Sending data to WHAD device failed.")
 
     def read(self):
         """Fetches data from the device, if there is any data to read. We call select()
