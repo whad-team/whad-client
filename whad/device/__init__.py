@@ -7,7 +7,7 @@ from time import time, sleep
 
 # Whad imports
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, \
-    WhadDeviceNotReady, WhadDeviceNotFound, WhadDeviceDisconnected, WhadDeviceTimeout
+    WhadDeviceNotReady, WhadDeviceNotFound, WhadDeviceDisconnected, WhadDeviceTimeout, WhadDeviceError
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery
@@ -175,6 +175,37 @@ class WhadDeviceConnector(object):
         self.__callbacks_lock = Lock()
         self.__reception_callbacks = {}
         self.__transmission_callbacks = {}
+        self.__error_callbacks = []
+
+
+    def attach_error_callback(self, callback, context=None):
+        '''Attach an error callback to this connector.
+
+        :param callback: function handling errors.
+        :param context:  context object to pass to the error handling function.
+        :returns: Boolean indicating if the callback has been successfully attached.
+        '''
+        # Enter critical section
+        self.__callbacks.lock()
+        self.__error_callbacks.append(
+            (callback, context)
+        )
+
+        # Leave critical section
+        self.__callbacks_lock.release()
+
+    def on_error(self, error):
+        '''Triggers a call to the device connector error handling registered callback(s).
+        '''
+        if len(self.__error_callbacks) > 0:
+            # Duplicate error callbacks list
+            self.__callbacks_lock.lock()
+            callbacks = list(self.__error_callbacks)
+            self.__callbacks_lock.releaser()
+
+            # Call each error callback
+            for callback, context in callbacks:
+                callback(error, context=context)
 
 
     def attach_callback(self, callback, on_reception=True, on_transmission=True, filter=lambda pkt:True):
@@ -308,9 +339,12 @@ class WhadDeviceConnector(object):
         :param Message message: WHAD message to send to the device.
         :param filter: optional filter function for incoming message queue.
         """
-        logger.debug('sending WHAD message to device: %s' % message)
-        return self.__device.send_message(message, filter)
-
+        try:
+            logger.debug('sending WHAD message to device: %s' % message)
+            return self.__device.send_message(message, filter)
+        except WhadDeviceError as device_error:
+            logger.debug('an error occured while communicating with the WHAD device !')
+            self.on_error(device_error)
 
     def send_command(self, message, filter=None):
         """Sends a command message to the underlying device and waits for an answer.
@@ -833,13 +867,19 @@ class WhadDevice(object):
         self.__tx_lock.acquire()
 
         # If a queue filter is not provided, expect a default CmdResult
-        if keep is None:
-            self.send_message(command, message_filter(
-                'generic',
-                'cmd_result'
-            ))
-        else:
-            self.send_message(command, keep)
+        try:
+            if keep is None:
+                self.send_message(command, message_filter(
+                    'generic',
+                    'cmd_result'
+                ))
+            else:
+                self.send_message(command, keep)
+        except WhadDeviceError as error:
+            # Device error has been triggered, it looks like our device is in
+            # an unspecified state, notify user.
+            logger.debug('WHAD device in error while sending message: ' % error)
+            raise error
 
         try:
             # Retrieve the first message matching our filter.
