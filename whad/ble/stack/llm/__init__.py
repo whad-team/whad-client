@@ -668,7 +668,9 @@ class LinkLayer(Layer):
         """Terminate this connection
         """
         # Connection has been terminated
-        conn = self.get_connection(conn_handle)
+        conn = self.state.get_connection(conn_handle)
+        if conn is not None:
+            self.on_disconnect(conn_handle)
 
     def on_enc_req(self, conn_handle, enc_req):
         """Encryption request handler
@@ -727,23 +729,14 @@ class LinkLayer(Layer):
         logger.debug('received a VERSION_IND PDU')
         if not self.state.is_version_sent(conn_handle):
             logger.debug('sending back our VERSION_IND PDU')
-            """
-            self.get_layer('phy').send_control(
-                conn_handle,
-                BTLE_CTRL() / LL_VERSION_IND(
-                    version=self.stack.bt_version,
-                    company=self.stack.manufacturer_id,
-                    subversion=self.stack.bt_sub_version
-                )
-            )
-            """
+
             # send control PDU
             self.send_ctrl_pdu(
                 conn_handle,
                 BTLE_CTRL() / LL_VERSION_IND(
-                    version=self.stack.bt_version,
-                    company=self.stack.manufacturer_id,
-                    subversion=self.stack.bt_sub_version
+                    version=self.get_layer('phy').bt_version.value,
+                    company=self.get_layer('phy').manufacturer_id,
+                    subversion=self.get_layer('phy').bt_sub_version
                 )
             )
         else:
@@ -755,7 +748,7 @@ class LinkLayer(Layer):
         pass
 
     def on_slave_feature_req(self, conn_handle, feature_req):
-        self.on_unsupported_opcode(conn_handle, FEATURE_REQ)
+        self.on_unsupported_opcode(conn_handle, SLAVE_FEATURE_REQ)
 
     def on_connection_param_req(self, conn_handle, conn_param_req):
         self.on_unsupported_opcode(conn_handle, CONNECTION_PARAM_REQ)
@@ -767,7 +760,7 @@ class LinkLayer(Layer):
         pass
 
     def on_ping_req(self, conn_handle, ping_req):
-        pass
+        self.on_unsupported_opcode(conn_handle, PING_REQ)
 
     def on_ping_rsp(self, conn_handle, ping_rsp):
         pass
@@ -775,7 +768,7 @@ class LinkLayer(Layer):
     def on_length_req(self, conn_handle, length_req):
         """Received a length request PDU
         """
-        pass
+        self.on_unsupported_opcode(conn_handle, LENGTH_REQ)
 
     def on_length_rsp(self, conn_handle, length_rsp):
         pass
