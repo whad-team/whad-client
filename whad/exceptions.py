@@ -74,6 +74,13 @@ class WhadDeviceTimeout(Exception):
     def __str__(self):
         return "WhadDeviceTimeout(%s)" % self.__message
 
+class WhadDeviceError(Exception):
+    def __init__(self, message):
+        self.__message
+
+    def __str__(self):
+        return "WhadDeviceError(%s)" % self.__message
+
 # External tools exceptions
 
 class ExternalToolNotFound(Exception):
