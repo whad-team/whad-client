@@ -186,7 +186,7 @@ class WhadDeviceConnector(object):
         :returns: Boolean indicating if the callback has been successfully attached.
         '''
         # Enter critical section
-        self.__callbacks.lock()
+        self.__callbacks_lock.lock()
         self.__error_callbacks.append(
             (callback, context)
         )
