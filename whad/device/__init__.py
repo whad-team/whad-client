@@ -201,7 +201,7 @@ class WhadDeviceConnector(object):
             # Duplicate error callbacks list
             self.__callbacks_lock.acquire()
             callbacks = list(self.__error_callbacks)
-            self.__callbacks_lock.releaser()
+            self.__callbacks_lock.release()
 
             # Call each error callback
             for callback, context in callbacks:
