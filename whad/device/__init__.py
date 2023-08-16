@@ -186,7 +186,7 @@ class WhadDeviceConnector(object):
         :returns: Boolean indicating if the callback has been successfully attached.
         '''
         # Enter critical section
-        self.__callbacks_lock.lock()
+        self.__callbacks_lock.acquire()
         self.__error_callbacks.append(
             (callback, context)
         )
@@ -199,7 +199,7 @@ class WhadDeviceConnector(object):
         '''
         if len(self.__error_callbacks) > 0:
             # Duplicate error callbacks list
-            self.__callbacks_lock.lock()
+            self.__callbacks_lock.acquire()
             callbacks = list(self.__error_callbacks)
             self.__callbacks_lock.releaser()
 
