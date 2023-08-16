@@ -356,7 +356,11 @@ class WhadDeviceConnector(object):
         :param Message message: WHAD message to send to the device
         :param filter: Filtering function used to match the expected response from the device.
         """
-        return self.__device.send_command(message, filter)
+        try:
+            return self.__device.send_command(message, filter)
+        except WhadDeviceError as device_error:
+            logger.debug('an error occured while communicating with the WHAD device !')
+            self.on_error(device_error)
      
 
     def wait_for_message(self, timeout=None, filter=None, command=False):
