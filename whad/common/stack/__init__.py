@@ -1,4 +1,3 @@
-import json
 from .layer import source, alias, state, instance, LayerState,  Layer, ContextualLayer
 
 
