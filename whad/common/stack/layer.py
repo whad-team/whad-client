@@ -133,6 +133,20 @@ Of course, it is possible for a layer to send data to any layer, the dataflow is
 totally flexible. 
 
 
+Contextual layers
+-----------------
+
+Often, a layer is in charge of decapsulating and encapsulating data based on a
+specific context. In our stack model, this type of layer is called a contextual
+layer.
+
+In our stack model, a contextual layer must inherit from `ContextualLayer` and
+be instantiated to hold its own context. The lower layer must then instantiate
+a dedicated contextual layer corresponding to a specific context, and dispatch
+the incoming packets/messages to the correct contextual layer, thus performing
+the mux/demux operation.
+
+
 """
 
 def convert_layer_structure(structure):
@@ -303,6 +317,16 @@ class Layer(object):
                 cls.LAYERS[clazz.alias] = clazz
             else:
                 cls.LAYERS[clazz.alias] = clazz
+
+    @classmethod
+    def remove(cls, clazz):
+        """Remove a sub-layer class.
+        """
+        layers_prop_name = 'LAYERS'
+        if hasattr(cls, layers_prop_name):
+            class_layers = getattr(cls, layers_prop_name)
+            if clazz.alias in class_layers:
+                del class_layers[clazz.alias]
 
     def __init__(self, parent=None, layer_name=None, options={}):
         self.__parent = parent
@@ -548,7 +572,7 @@ class Layer(object):
         # Find the target layer object
         target_layer = self.get_layer(destination)
         if target_layer is not None:
-            # Then we search the corresponding handler for our source
+# Then we search the corresponding handler for our source
             handler = target_layer.get_handler(source_layer, tag)
             if handler is not None:
                 if handler.is_contextual:
@@ -632,29 +656,6 @@ class Layer(object):
         }
 
         return structure
-        
-        """
-        sublayers = {
-            'name': cls.alias,
-            'instanciable': cls.instantiable(),
-            'emitters': cls.list_emitters(),
-            'sublayers':[],
-        }
-
-        if hasattr(cls, 'LAYERS'):
-            # Loop on all sublayers
-            print('%s sublayers: %s' % (cls.alias, cls.LAYERS))
-            for sublayer in cls.LAYERS:
-                sublayers['sublayers'].append({
-                    'name': sublayer,
-                    'instanciable': cls.LAYERS[sublayer].instantiable(),
-                    'emitters': cls.LAYERS[sublayer].list_emitters(),
-                    'sublayers': cls.LAYERS[sublayer].get_structure(first_call=False)
-                })
-            return [sublayers]
-        else:
-            return []
-        """
 
     @classmethod
     def export(cls, output_file):
@@ -677,43 +678,6 @@ class Layer(object):
         output += '}'
 
         return output
-    """
-    @classmethod
-    def export(cls, gv_file):
-        # Build nodes
-        nodes = list(cls.LAYERS.keys())
-
-        # First we need to collect all the interactions
-        links = []
-        for node_name in nodes:
-            sources = Layer.get_layer_sources(node_name)
-            for source in sources:
-                links.append((source, node_name))
-        
-        # Then we create our ghrapviz file
-        output = 'digraph finite_state_machine {\n'
-        output += 'rankdir=LR;\n'
-
-        # We add our nodes
-        for node_name in nodes:
-            if issubclass(cls.LAYERS[node_name], Layer):
-                shape = 'doublecircle'
-            else:
-                shape = 'circle'    
-            output += 'node [shape = %s, label="%s", fontsize=12] %s;\n' % (
-                shape,
-                node_name,
-                node_name
-            )
-
-        # We then add our links
-        for src,dst in links:
-            output += '%s -> %s;\n' % (src, dst)
-        
-        output += '}'
-
-        open(gv_file,'w').write(output)
-    """
 
 
 class ContextualLayer(Layer):
