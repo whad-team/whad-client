@@ -42,7 +42,7 @@ class L2CAPLayer(ContextualLayer):
         """Handles incoming L2CAP data"""
         if fragment and self.state.fifo is not None:
             logger.debug('[l2cap] Received a L2CAP fragment of %d bytes' % len(l2cap_data))
-            self.state.append_data(self.state.conn_handle , l2cap_data)
+            self.state.fifo += l2cap_data
             logger.debug('[l2cap] L2CAP packet size so far: %d' % len(self.state.fifo))
 
             if len(self.state.fifo) >= self.state.expected_len:
@@ -60,7 +60,6 @@ class L2CAPLayer(ContextualLayer):
             self.state.expected_len = unpack('<H', self.state.fifo[:2])[0] + 4
             logger.debug('[l2cap] expected l2cap length: %d' % self.state.expected_len)
             logger.debug('[l2cap] actual l2cap length: %d' % len(self.state.fifo))
-            
             if len(self.state.fifo) >= self.state.expected_len:
                 # We have received a complete L2CAP packet, process it
                 logger.debug('[l2cap] Received a complete L2CAP packet, process it')
