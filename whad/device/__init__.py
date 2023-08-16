@@ -878,7 +878,7 @@ class WhadDevice(object):
         except WhadDeviceError as error:
             # Device error has been triggered, it looks like our device is in
             # an unspecified state, notify user.
-            logger.debug('WHAD device in error while sending message: ' % error)
+            logger.debug('WHAD device in error while sending message: %s' % error)
             raise error
 
         try:
