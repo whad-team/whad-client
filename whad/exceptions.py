@@ -76,7 +76,7 @@ class WhadDeviceTimeout(Exception):
 
 class WhadDeviceError(Exception):
     def __init__(self, message):
-        self.__message
+        self.__message = message
 
     def __str__(self):
         return "WhadDeviceError(%s)" % self.__message
