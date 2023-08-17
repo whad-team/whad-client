@@ -162,7 +162,6 @@ class ATTLayer(Layer):
 
         :param ATT_Find_Information_Request request: Request
         """
-        
         self.send('gatt', GattFindInfoRequest(
                 request.start,
                 request.end
@@ -273,16 +272,12 @@ class ATTLayer(Layer):
     def on_read_multiple_request(self, request):
         """Handle ATT Read Multiple Request
         """
-        self.__gatt.on_read_multiple_request(
-            GattReadMultipleRequest(request.handles)
-        )
+        self.send('gatt',GattReadMultipleRequest(request.handles))
 
     def on_read_multiple_response(self, response):
         """Handle ATT Read Multiple Response
         """
-        self.__gatt.on_read_multiple_response(
-            GattReadMultipleResponse(response.values)
-        )
+        self.send('gatt', GattReadMultipleResponse(response.values))
 
     def on_read_by_group_type_request(self, request):
         """Handle ATT Read By Group Type Request
