@@ -335,6 +335,7 @@ class Layer(object):
         self.__layers = {}
         self.__layer_cache = {}
         self.__options = options
+        self.__monitor_callbacks = []
 
         # Cache our message handlers
         self.__handlers = {}
@@ -406,6 +407,22 @@ class Layer(object):
         '''
         if layer_instance.name in self.__layers:
             del self.__layers[layer_instance.name]
+
+    def register_monitor_callback(self, callback):
+        '''Register a callback to monitor messages sent between layers.
+        '''
+        if callback not in self.__monitor_callbacks:
+            self.__monitor_callbacks.append(callback)
+
+    def unregister_monitor_callback(self, callback):
+        '''Unregister a previously registered callback.
+        '''
+        if callback in self.__monitor_callbacks:
+            self.__monitor_callbacks.remove(callback)
+
+    def monitor_message(self, source, destination, data, tag='default', **kwargs):
+        for monitor in self.__monitor_callbacks:
+            monitor(source, destination, data, tag=tag, **kwargs)
 
     def has_layer(self, name):
         """Check if layer has a specific sublayer.
@@ -568,7 +585,12 @@ class Layer(object):
             source_layer = source[:idx]
         else:
             source_layer = source
- 
+
+        print(source_layer, destination)
+
+        # notify monitors
+        self.monitor_message(source, destination, data, tag=tag, **kwargs)
+
         # Find the target layer object
         target_layer = self.get_layer(destination)
         if target_layer is not None:
