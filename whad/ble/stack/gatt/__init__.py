@@ -59,6 +59,7 @@ class GattLayer(Layer):
             GattReadMultipleResponse: self.on_read_multiple_response,
 
             GattWriteRequest: self.on_write_request,
+            GattWriteCommand: self.on_write_command,
             GattWriteResponse: self.on_write_response,
 
             GattHandleValueNotification: self.on_handle_value_notification,
@@ -118,6 +119,7 @@ class GattLayer(Layer):
                 raise ConnectionLostException(None)
             try:
                 msg = self.__queue.get(block=False,timeout=0.5)
+                print(msg)
                 if isinstance(msg, message_clazz) or isinstance(msg, GattErrorResponse):
                     return msg
             except Empty:
@@ -187,7 +189,7 @@ class GattLayer(Layer):
         :param uuid: Type UUID
         """
         self.error(
-            BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST, request.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            BleAttOpcode.READ_BY_TYPE_REQUEST, request.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
 
     def on_read_by_type_response(self, response):
@@ -256,7 +258,7 @@ class GattLayer(Layer):
         :param handles: List of handles
         """
         self.error(
-            BleAttOpcode.READ_BLOB_REQUEST, request.handles[0], BleAttErrorCode.INVALID_HANDLE
+            BleAttOpcode.READ_MULTIPLE_REQUEST, request.handles[0], BleAttErrorCode.INVALID_HANDLE
         )
 
     def on_read_multiple_response(self, response: GattReadMultipleResponse):
@@ -288,7 +290,7 @@ class GattLayer(Layer):
         :param data: Attribute data
         """
         self.error(
-            BleAttOpcode.WRITE_REQUEST, request.handle, BleAttErrorCode.INVALID_HANDLE
+            BleAttOpcode.WRITE_COMMAND, request.handle, BleAttErrorCode.INVALID_HANDLE
         )
 
     def on_handle_value_notification(self, notification: GattHandleValueNotification):
@@ -371,6 +373,7 @@ class GattClient(GattLayer):
         """ATT Read By Group Type Response callback
 
         """
+        print('received gatt group type response: %s' % response)
         self.on_gatt_message(response)
 
     def on_find_info_response(self, response):
@@ -708,13 +711,15 @@ class GattClient(GattLayer):
 
         :param int handle: Handle of the attribute to read (descriptor or characteristic)
         """
+        local_mtu = self.get_layer('l2cap').get_local_mtu()
+
         value=b''
         offset=0
         while True:
             self.att.read_blob_request(handle, offset)
             msg = self.wait_for_message(GattReadBlobResponse)
             if isinstance(msg, GattReadBlobResponse):
-                if len(msg.value) < (self.att.local_mtu - 1):
+                if len(msg.value) < (local_mtu - 1):
                     value += msg.value
                     break
                 else:
