@@ -67,15 +67,16 @@ class TestBleStackLinkLayerSupportedPDUs(BleLLTest):
     def test_feature_req(self, phy_instance):
         '''Processing of LL_FEATURE_REQ
         '''
-        phy_instance.send('ll', BTLE_CTRL()/LL_FEATURE_REQ(), tag='control', conn_handle=42)
+        phy_instance.send('ll', BTLE_CTRL() / LL_FEATURE_REQ(), tag='control', conn_handle=42)
         assert phy_instance.expect(LayerMessage(
             'll',
             'phy',
-            BTLE_CTRL() / LL_FEATURE_RSP(feature_set=[
+            BTLE_DATA() / BTLE_CTRL() / LL_FEATURE_RSP(feature_set=[
                 'le_encryption',
                 'le_ping'                
             ]),
             tag='control',
+            conn_handle=42,
             encrypt=None
         ))
 
@@ -86,12 +87,13 @@ class TestBleStackLinkLayerSupportedPDUs(BleLLTest):
         assert phy_instance.expect(LayerMessage(
         'll',
         'phy',
-        BTLE_CTRL() / LL_VERSION_IND(
+        BTLE_DATA() / BTLE_CTRL() / LL_VERSION_IND(
             version=0x06,
             company=0x0002,
             subversion=0x0100
         ),
         tag='control',
+        conn_handle=42,
         encrypt=None
         ))
 
@@ -126,12 +128,13 @@ class TestBleStackUnsupportedPDUs(BleLLTest):
 
     @pytest.mark.parametrize("phy_instance,pdu,expected", unsupported_pdus, indirect=["phy_instance"])
     def test_unsupported_op(self, phy_instance, pdu, expected):
-        phy_instance.send('ll', BTLE_CTRL() / pdu, tag='control', conn_handle=42)
+        phy_instance.send('ll', BTLE_DATA() / BTLE_CTRL() / pdu, tag='control', conn_handle=42)
         assert phy_instance.expect(LayerMessage(
             'll',
             'phy',
-            BTLE_CTRL() / expected,
+            BTLE_DATA() / BTLE_CTRL() / expected,
             tag='control',
+            conn_handle=42,
             encrypt=None
         ))
 

@@ -678,7 +678,7 @@ class LinkLayer(Layer):
     def on_unsupported_opcode(self, conn_handle, opcode):
         self.send_ctrl_pdu(
             conn_handle,
-            BTLE_CTRL() / LL_UNKNOWN_RSP(code=opcode)
+            LL_UNKNOWN_RSP(code=opcode)
         )
 
     def on_connection_update_req(self, conn_handle, conn_update):
@@ -729,7 +729,7 @@ class LinkLayer(Layer):
         # Reply with our basic feature set
         self.send_ctrl_pdu(
             conn_handle,
-            BTLE_CTRL() / LL_FEATURE_RSP(feature_set=[
+            LL_FEATURE_RSP(feature_set=[
                 'le_encryption',
                 'le_ping'                
             ])
@@ -760,7 +760,7 @@ class LinkLayer(Layer):
             # send control PDU
             self.send_ctrl_pdu(
                 conn_handle,
-                BTLE_CTRL() / LL_VERSION_IND(
+                LL_VERSION_IND(
                     version=self.get_layer('phy').bt_version.value,
                     company=self.get_layer('phy').manufacturer_id,
                     subversion=self.get_layer('phy').bt_sub_version
