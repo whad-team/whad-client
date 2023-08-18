@@ -1,33 +1,21 @@
 """
 Pythonic Bluetooth LE stack
 """
-from whad.ble.stack.gatt import GattClient
-from .llm import BleLinkLayerManager
+from .llm import LinkLayer
 from .constants import BtVersion
 
-class BleStack:
-    """
-    This class holds the main components of a (hackable) BLE stack:
+from whad.common.stack import Layer, alias, source
 
-    - the Link Layer Manager (LLM)
-    - the L2CAP manager
-    - the Generic Access Profile controller (GAP)
-    - the Generic Attribute Profile controller (GATT)
-    - the Attribute Protocol (ATT)
-    - the Security Manager (SMP)
+import logging
+logger = logging.getLogger(__name__)
 
-    The Link-layer manager handles all the low-level operations:
-    - BLE connection control (handles Control PDUs)
-    - BLE connection data (forward to upper layer, i.e. L2CAP)
-    """
+@alias('phy')
+class BleStack(Layer):
 
-    def __init__(self, connector, gatt_class=None, bt_version=BtVersion(4, 0), manufacturer=0x0002, sub_version=0x0100):
-        """
-        Create an instance of BleStack associated with a specific connector. This
-        connector provides the transport layer.
+    def __init__(self, connector, bt_version=BtVersion(4, 0), manufacturer=0x0002, sub_version=0x0100, options={}):
+        super().__init__(options=options)
 
-        :param WhadDeviceConnector connector: Connector to use with this stack.
-        """
+        # Save connector (used as PHY layer)
         self.__connector = connector
 
         # Store BT supported version, manufacturer and sub version
@@ -35,58 +23,72 @@ class BleStack:
         self.__manufacturer = manufacturer
         self.__sub_version = sub_version
 
-        # Instanciate all the required controllers
-        self.__llm = BleLinkLayerManager(self, gatt_class)
-
+    @property
+    def bt_version(self):
+        return self.__version
+    
     @property
     def manufacturer_id(self):
         return self.__manufacturer
-
-    @property
-    def bt_version(self):
-        return self.__version.value
-
+    
     @property
     def bt_sub_version(self):
         return self.__sub_version
 
-
-    #############################
-    # Incoming messages
-    #############################
-
     def on_connection(self, conn_handle, local_peer_addr, remote_peer_addr):
-        connection = self.__llm.on_connect(
+        '''BLE connection callback.
+        '''
+        # Call the LL layer object's `on_connect()` method to give it all the
+        # required information
+        connection = self.get_layer('ll').on_connect(
             conn_handle,
             local_peer_addr,
             remote_peer_addr
         )
+
+        # Tell the WHAD connector we have a new connection.
         self.__connector.on_new_connection(connection)
 
     def on_disconnection(self, conn_handle, reason):
-        self.__llm.on_disconnect(conn_handle)
+        '''BLE disconnection callback.
+        '''
+        # Notify link layer that a connection has been terminated.
+        self.get_layer('ll').on_disconnect(conn_handle)
 
-    def on_ctl_pdu(self, conn_handle, control):
-        self.__llm.on_ctl_pdu(conn_handle, control)
+    def on_ctl_pdu(self, conn_handle, pdu):
+        '''Control PDU callback.
 
-    def on_data_pdu(self, conn_handle, data):
-        self.__llm.on_data_pdu(conn_handle, data)
+        This callback handles a control PDU received from a connection
+        identified by its connection handle `conn_handle`.
+        '''
+        logger.debug('received a control PDU (%d bytes) for connection handle %d' % (len(pdu), conn_handle))
+        # Notify link layer we received a control PDU for a given `conn_handle`.
+        self.send('ll', pdu, tag='control', conn_handle=conn_handle)
 
-    def send_data(self, conn_handle, data, encrypt=None):
+
+    def on_data_pdu(self, conn_handle, pdu):
+        '''Data PDU callback.
+
+        This callback hanles a data PDU received from a connection identitied
+        by its connection handle `conn_handle`.
+        '''
+        logger.debug('received a data PDU (%d bytes) for conn_handle %d' % (len(pdu), conn_handle))
+        # Notify link layer we received a data PDU for a given `conn_handle`.
+        self.send('ll', pdu, tag='data', conn_handle=conn_handle)
+
+    @source('ll', 'data')
+    def send_data(self, data, conn_handle=None, encrypt=None):
+        '''Send data to the underlying WHAD connector.
+        '''
+        logger.debug('sending a data PDU (%d bytes) to conn_handle %d' % (len(data), conn_handle))
         return self.__connector.send_data_pdu(data, conn_handle=conn_handle, encrypt=encrypt)
 
-    def send_control(self, conn_handle, pdu, encrypt=None):
+    @source('ll', 'control')
+    def send_control(self, pdu, conn_handle=None, encrypt=None):
+        '''Send control PDU to the underlying WHAD connector.
+        '''
+        logger.debug('sending a control PDU (%d bytes) to conn_handle %d' % (len(pdu), conn_handle))
         self.__connector.send_ctrl_pdu(pdu, conn_handle, encrypt=encrypt)
 
-    def set_encryption(self, conn_handle, enabled, key, iv):
-        """Notify encryption status directly
+BleStack.add(LinkLayer)
 
-        Call connector's `notify_encryption_status()` method usually implemented
-        in BLE in order to notify the underlying WHAD device that encryption has
-        been enabled or not.
-        """
-        return self.__connector.set_encryption(enabled=enabled, key=key, iv=iv)
-
-    ############################
-    # Interact
-    ############################

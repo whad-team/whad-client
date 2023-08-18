@@ -38,7 +38,7 @@ class HCIConverter:
             return [hci_packet]
         elif ll_packet.LLID == 3:
             logger.warning("HCI devices cannot send control PDU.")
-            raise WhadDeviceUnsupportedOperation("Device cannot send control PDU, only data PDU.")
+            raise WhadDeviceUnsupportedOperation("send_pdu", "Device cannot send control PDU, only data PDU.")
 
     def process_event(self, event):
         """

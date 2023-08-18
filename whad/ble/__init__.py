@@ -18,7 +18,7 @@ from whad.ble.profile.device import PeripheralDevice
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvDataField, AdvCompleteLocalName, \
     AdvManufacturerSpecificData, AdvShortenedLocalName, AdvTxPowerLevel, AdvDataFieldListOverflow, AdvDataError
-from whad.ble.connector import BLE, Central, Peripheral, Sniffer, Hijacker, Injector, Scanner
+from whad.ble.connector import BLE, Central, Peripheral, Sniffer, Hijacker, Injector, Scanner, PeripheralClient
 from whad.ble.utils.phy import PHYS
 from whad.scapy.layers.bt_mesh import BTMesh_Unprovisioned_Device_Beacon, EIR_BTMesh_Beacon
 
@@ -41,6 +41,7 @@ __all__ = [
     'AdvDataError',
     'Central',
     'Peripheral',
+    'PeripheralClient',
     'Sniffer',
     'Hijacker',
     'Injector',
