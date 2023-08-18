@@ -361,7 +361,7 @@ class WhadDeviceConnector(object):
         except WhadDeviceError as device_error:
             logger.debug('an error occured while communicating with the WHAD device !')
             self.on_error(device_error)
-     
+
 
     def wait_for_message(self, timeout=None, filter=None, command=False):
         """Waits for a specific message to be received.
@@ -557,18 +557,31 @@ class WhadDevice(object):
                     index = None
 
             available_devices = cls.list()
-            if index is not None:
-                try:
-                    return available_devices[index]
-                except IndexError:
+            # If the list of device is built statically, check before instantiation
+            if available_devices is not None:
+                if index is not None:
+                    try:
+                        return available_devices[index]
+                    except IndexError:
+                        raise WhadDeviceNotFound
+                elif identifier is not None:
+                    for dev in available_devices:
+                        if dev.identifier == identifier:
+                            return dev
                     raise WhadDeviceNotFound
-            elif identifier is not None:
-                for dev in available_devices:
-                    if dev.identifier == identifier:
-                        return dev
-                raise WhadDeviceNotFound
+                else:
+                    raise WhadDeviceNotFound
+            # Otherwise, check dynamically using check_interface
             else:
+                formatted_interface_string = interface_string.replace(
+                    cls.INTERFACE_NAME + ":",
+                    ""
+                )
+                if cls.check_interface(formatted_interface_string):
+
+                    return cls(formatted_interface_string)
                 raise WhadDeviceNotFound
+
         else:
             raise WhadDeviceNotFound
 
@@ -621,6 +634,13 @@ class WhadDevice(object):
             for device in device_class.list():
                 available_devices.append(device)
         return available_devices
+
+    @classmethod
+    def check_interface(cls, interface):
+        '''
+        Checks dynamically if the device can be instantiated.
+        '''
+        return False
 
     @property
     def index(self):
@@ -894,7 +914,7 @@ class WhadDevice(object):
 
             # Forward exception
             raise timedout
-        
+
         # Ensure tx lock is properly released
         self.__tx_lock.release()
 
@@ -1213,6 +1233,7 @@ class WhadDevice(object):
 
 # Defines every supported low-level device
 from whad.device.uart import UartDevice
+from whad.device.tcp import TCPSocketDevice
 from whad.device.virtual import VirtualDevice
 from whad.device.unix import UnixSocketDevice
 
