@@ -248,7 +248,7 @@ class Central(BLE):
 
         # Retrieve GATT client
         self.__gatt_client = connection.gatt
-        self.__gatt_client.set_model(self.__peripheral)
+        self.__gatt_client.set_client_model(self.__peripheral)
         self.__connected = True
 
         # Notify peripheral about this connection
