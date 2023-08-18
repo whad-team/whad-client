@@ -40,7 +40,7 @@ def is_valid_hostname(hostname):
     allowed = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
     return all(allowed.match(label) for label in labels)
 
-class UnixSocketDevice(WhadDevice):
+class TCPSocketDevice(WhadDevice):
     """
     UnixSocketDevice device class.
     """
@@ -59,8 +59,7 @@ class UnixSocketDevice(WhadDevice):
         '''
         This method checks dynamically if the provided interface can be instantiated.
         '''
-        print("Checking...", str(interface))
-
+        logger.info("Checking interface: %s" % str(interface))
         if ":" in interface:
             host, port = interface.split(":")
             try:
@@ -68,6 +67,7 @@ class UnixSocketDevice(WhadDevice):
             except ValueError:
                 return False
         else:
+            host = interface
             port = 12345
 
         try:
@@ -151,7 +151,6 @@ class UnixSocketDevice(WhadDevice):
         """
         Close current device.
         """
-        logger.error('socket close')
         # Close underlying device.
         if self.__socket is not None:
             self.__socket.close()
@@ -314,11 +313,12 @@ class TCPSocketConnector(WhadDeviceConnector):
         self.__socket.bind((self.__address, self.__port))
         self.__socket.listen()
 
-        logger.debug('Waiting for TCP socket connection on %s' % self.get_url())
+        logger.debug('Waiting for TCP socket connection on %s (%s)' % (self.__address, self.__port))
 
         try:
             while not self.__shutdown_required:
                 self.__client,_ = self.__socket.accept()
+                self.device.open()
                 try:
                     while not self.__shutdown_required:
                         rlist = [self.__client.fileno()]
@@ -399,11 +399,3 @@ class TCPSocketConnector(WhadDeviceConnector):
         :param message: Domain message
         """
         pass
-
-    def get_url(self):
-        """Return socket URL
-        """
-        return 'tcp://%s:%s' % (
-            self.__address,
-            self.__port
-        )

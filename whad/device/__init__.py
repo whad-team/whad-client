@@ -540,19 +540,11 @@ class WhadDevice(object):
                     ""
                 )
                 if cls.check_interface(formatted_interface_string):
-                    
+
                     return cls(formatted_interface_string)
                 raise WhadDeviceNotFound
 
         else:
-            formatted_interface_string = interface_string.replace(
-                cls.INTERFACE_NAME + ":",
-                ""
-            )
-
-            if cls.check_interface(formatted_interface_string):
-                print("here")
-                return cls(formatted_interface_string)
             raise WhadDeviceNotFound
 
     @classmethod
@@ -1197,6 +1189,7 @@ class WhadDevice(object):
 
 # Defines every supported low-level device
 from whad.device.uart import UartDevice
+from whad.device.tcp import TCPSocketDevice
 from whad.device.virtual import VirtualDevice
 from whad.device.unix import UnixSocketDevice
 
