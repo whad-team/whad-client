@@ -1,4 +1,65 @@
 """Generic stack testing features
+
+This module provides a generic stack sandbox implemented in `Sandbox`. This
+sandbox is a specific container for layers that is able to monitor any message
+sent between each layer contained in it as well as impersonate missing layers
+(providing a way to mock tem).
+
+One can create a sandbox by simply adding the required layers into it:
+
+```
+class MySandbox(Sandbox)
+    pass
+MySandbox.add(ATTLayer)
+MySandbox.add(GattClient)
+```
+
+Using Pytest, it is then quite easy to use this sandbox and access the different
+instantiated layers:
+
+```
+@pytest.fixture
+def sandbox(self):
+    return MySandbox()
+
+@pytest.fixture
+def att(self, sandbox):
+    return sandbox.get_layer('att')
+
+@pytest.fixture
+def gatt(self, sandbox):
+    return sandbox.get_layer('gatt')
+
+def test_something(sandbox, att, gatt):
+    pass
+``` 
+
+If `get_layer()` is called to retrieve a layer that does not belong to the
+sandbox sub-layers, then the sandbox returns its own instance to impersonate
+this layer. It can then be used to mock a specific layer and provide some
+methods that are supposed to be provided by this layer.
+
+Since this sandbox does work as a normal layer, it can send messages to its
+inner layers:
+
+```
+def test_something(sandbox, att, gatt):
+    sandbox.send('att', ATT_Hdr() / ATT_Write_Request(
+        gatt_handle=1,
+        data=b'Something'
+    ))
+
+    assert sandbox.expect(LayerMessage(
+        'att',
+        'l2cap',
+        ATT_Hdr()/ATT_Write_Response()
+    ))
+```
+
+The `expect()` method provided by the sandbox checks if a specific message has
+been observed between two layers, and returns True if such a message has been
+seen and False otherwise.
+
 """
 
 from whad.common.stack import Layer, alias
@@ -13,6 +74,9 @@ class contextual(object):
         return func
 
 class LayerMessage(object):
+    '''This class is used by `Sandbox` to represent a message between two layers,
+    keeping track of the source, destination, data, tag and named arguments.
+    '''
 
     def __init__(self, source, destination, data, tag='default', **kwargs):
         self.__source = source
@@ -53,16 +117,6 @@ class LayerMessage(object):
         # check main properties
         if (self.source != other.source) or (self.destination != other.destination) \
             or (self.data != other.data) or (self.tag != other.tag):
-            '''
-            print('LayerMessage - comparison failed: difference in core data')
-            print('source: %s' % (self.source == other.source))
-            print('destination: %s' % (self.destination == other.destination))
-            print('tag: %s' % (self.tag == other.tag))
-            print('data types: %s, %s'% (type(self.data), type(other.data)))
-            print('data: %s (%s, %s)'%(self.data == other.data, self.data, other.data))
-            self.data.show()
-            other.data.show()
-            '''
             return False
         
         # check arguments
@@ -109,7 +163,10 @@ class Sandbox(Layer):
         layer.register_monitor_callback(self.log_message)
         return layer
 
-    def get_layer(self, name):
+    def get_layer(self, name: str):
+        '''Retrieve a specific layer if one of ours, or this instance if layer
+        cannot be found.
+        '''
         layer = super().get_layer(name)
         if layer is None:
             self.destination = self
@@ -118,9 +175,14 @@ class Sandbox(Layer):
             return layer
     
     def get_handler(self, source, tag):
+        '''This method is called by our stack message handler search code, and is
+        required here to return our dummy message handler.
+        '''
         return self.dummy_message_handler
 
     def log_message(self, source, destination, data, tag='default', **kwargs):
+        '''Layer message monitoring.
+        '''
         self.messages.append(LayerMessage(
             source,
             destination,
@@ -131,12 +193,13 @@ class Sandbox(Layer):
 
     @contextual(True)
     def dummy_message_handler(self, source, data, **kwargs):
-        """Override the original `send_from` method to catch any message sent by
-        our layer under test.
+        """Dummy message handler, does nothing.
         """
         pass
 
     def expect(self, messages, strict=False):
+        '''Checks if one or more messages have been captured.
+        '''
         if isinstance(messages, list):
             if strict and len(self.messages) != len(messages):
                 return False

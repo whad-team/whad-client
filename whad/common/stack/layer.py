@@ -145,8 +145,6 @@ be instantiated to hold its own context. The lower layer must then instantiate
 a dedicated contextual layer corresponding to a specific context, and dispatch
 the incoming packets/messages to the correct contextual layer, thus performing
 the mux/demux operation.
-
-
 """
 
 def convert_layer_structure(structure):
