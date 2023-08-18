@@ -13,11 +13,13 @@ react on specific events.
 from whad.ble.connector import BLE
 from whad.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
-from whad.ble.stack.gatt import GattServer
+from whad.ble.stack.gatt import GattServer, GattClientServer
 from whad.ble.stack.att import ATTLayer
 from whad.ble.profile import GenericProfile
+from whad.ble.profile.device import PeripheralDevice
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
+
 
 from binascii import hexlify
 
@@ -125,6 +127,9 @@ class Peripheral(BLE):
         """
         self.__stack = clazz(self)
 
+    @property
+    def gatt(self):
+        return self.__gatt_server
 
     ##############################
     # Incoming events
@@ -204,8 +209,52 @@ class Peripheral(BLE):
 
         # Retrieve GATT server
         self.__gatt_server = connection.gatt
-        self.__gatt_server.set_model(self.__profile)
+        self.__gatt_server.set_server_model(self.__profile)
         self.__connected = True
 
         # Notify our profile about this connection
         self.__profile.on_connect(self.connection.conn_handle)
+
+
+class PeripheralClient(Peripheral):
+    '''This BLE connector provides a way to create a peripheral device with
+    both GATT server and client roles.
+    '''
+
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, stack=BleStack):
+        super().__init__(
+            device,
+            existing_connection=existing_connection,
+            profile=profile,
+            adv_data=adv_data,
+            scan_data=scan_data,
+            bd_address=bd_address,
+            stack=stack
+        )
+
+        # Change ATTLayer to use GattClientServer and reinstantiate our stack
+        ATTLayer.add(GattClientServer)
+        self.use_stack(BleStack)
+
+
+    def on_new_connection(self, connection):
+        super().on_new_connection(connection)
+        
+        # Create a new peripheral device to represent the central device
+        # that has just connected
+        print(connection.gatt)
+        print(connection.conn_handle)
+        self.__peripheral = PeripheralDevice(
+            self,
+            connection.gatt,
+            connection.conn_handle
+        )
+
+        # Retrieve GATT client
+        self.__central = connection.gatt
+        self.__central.set_client_model(self.__peripheral)
+        #self.__connected = True
+
+    @property
+    def central_device(self):
+        return self.__peripheral
