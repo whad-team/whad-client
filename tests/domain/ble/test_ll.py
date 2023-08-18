@@ -1,3 +1,12 @@
+'''BLE stack Link-layer unit tests
+
+This module provides 3 sets of tests:
+
+- TestBleStackLinkLayerSupportedPDUs: checks all the supported PDUs are correctly handled
+- TestBleStackUnsupportedPDUs: checks all unsupported PDUs generate errors
+- TestBleStackL2CAPForwarding: check that data PDU are forwarded to L2CAP layer
+
+'''
 import pytest
 
 from scapy.layers.bluetooth4LE import *
@@ -14,29 +23,33 @@ from whad.ble.stack.llm import LinkLayer, CONNECTION_UPDATE_REQ, \
 
 # Create our sandboxed link-layer (mock phy layer)
 @alias('phy')
-class PhyMock(Sandbox):
+class LLSandbox(Sandbox):
 
     @property
     def bt_version(self):
         return BtVersion(4, 0)
-    
+
     @property
     def manufacturer_id(self):
         return 0x0002
-    
+
     @property
     def bt_sub_version(self):
         return 0x0100
 
-PhyMock.add(LinkLayer)
+LLSandbox.add(LinkLayer)
 
 
 class BleLLTest(object):
 
     @pytest.fixture
-    def phy_layer(self):
-        return PhyMock(target=LinkLayer)
+    def sandbox(self):
+        return LLSandbox()
 
+    @pytest.fixture
+    def phy_layer(self, sandbox):
+        return sandbox.get_layer('phy')
+    
     @pytest.fixture
     def phy_instance(self, phy_layer):
         phy_layer.get_layer('ll').state.connections[42] = {
@@ -126,7 +139,7 @@ class TestBleStackL2CAPForwarding:
 
     @pytest.fixture
     def phy_layer(self):
-        return PhyMock(target=LinkLayer)
+        return LLSandbox()
 
     @pytest.fixture
     def phy_instance(self, phy_layer):

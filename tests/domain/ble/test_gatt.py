@@ -1,558 +1,30 @@
-'''BLE stack ATT/GATT layers unit tests.
+'''BLE stack GATT layer unit tests
+
+This module provides two sets of tests to ensure the GATT layer
+behaves as expected:
+
+- TestGattClientProcedures: checks GATT client procedures implementation
+- TestGattServerProcedures: checks GATT server procedures implementation
+
 '''
+
 import pytest
 
 from scapy.layers.bluetooth import *
 
-from whad.common.stack import alias
 from whad.common.stack.tests import Sandbox, LayerMessage
 
-from whad.ble.stack.att import ATTLayer, ATT_Handle_Value_Confirmation
+from whad.ble.stack.att import ATTLayer
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
 from whad.ble.utils.att import UUID
 from whad.ble.stack.att.exceptions import *
 
-from whad.ble.stack.gatt import GattLayer, GattClient, GattServer
+from whad.ble.stack.gatt import GattClient, GattServer
 from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 
 from whad.ble.profile import GenericProfile, Characteristic, PrimaryService as BlePrimaryService
 from whad.ble.profile.service import PrimaryService
-
-############################
-# L2CAP and ATT mocks
-############################
-
-@alias('l2cap')
-class L2capMock(Sandbox):
-    pass
-L2capMock.add(ATTLayer)
-
-@alias('att')
-class AttMock(Sandbox):
-    
-    def read_by_group_type_request(self, start, end, uuid):
-        pass
-
-    def read_request(self, gatt_handle=None):
-        pass
-
-    def read_blob_request(self, handle, offset):
-        pass
-
-    def read_by_type_request(self, start, end, uuid):
-        pass
-
-    def get_local_mtu(self):
-        return 23
-    
-    def write_request(self, handle, value):
-        pass
-
-    def prepare_write_request(self, handle, offset, value):
-        pass
-
-    def execute_write_request(self, flags):
-        pass
-
-    def exch_mtu_request(self, mtu):
-        pass
-
-    def find_info_request(self, handle, end_handle):
-        pass
-
-
-######################
-# GATT features tests
-######################
-
-class GattTest(object):
-
-    @pytest.fixture
-    def l2cap_instance(self):
-        return L2capMock(target=ATTLayer)
-    
-    @pytest.fixture
-    def att(self, l2cap_instance):
-        return l2cap_instance.get_layer('att')
-    
-    @pytest.fixture
-    def gatt(self, l2cap_instance):
-        return l2cap_instance.get_layer('gatt')
-    
-
-class TestGatt(GattTest):
-    '''Test GATT internal mechanics (message queue)
-    '''
-    
-    @pytest.fixture
-    def att(self):
-        AttMock.add(GattClient)
-        return AttMock(target=GattClient)
-    
-    @pytest.fixture
-    def gatt(self, att):
-        return att.get_layer('gatt')
-    
-    def test_wait_for_message(self, gatt, att):
-        # Send a write request to Gatt
-        att.send('gatt', GattWriteResponse())
-        assert isinstance(
-            gatt.wait_for_message(GattWriteResponse),
-            GattWriteResponse
-        )
-
-
-#######################
-# GATT/L2CAP tests
-#######################
-
-
-class TestAttToL2CAP(GattTest):
-    '''Test ATT features.
-    '''
-
-    def test_find_info_req(self, l2cap_instance, att):
-        '''Test ATTLayer `find_info_request()` function
-        '''
-        att.find_info_request(0, 1)
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Find_Information_Request(
-                start=0,
-                end=1
-            )
-        ))
-
-    def test_find_info_resp(self, l2cap_instance, att):
-        att.find_info_response(format=1, handles=b'test')
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Find_Information_Response(
-                format=1,
-                handles=b'test'
-            )
-        ))
-
-    def test_find_by_type_value_req(self, l2cap_instance, att):
-        att.find_by_type_value_request(0, 1, UUID(0x2800), b'test')
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Find_By_Type_Value_Request(
-                start=0,
-                end=1,
-                uuid=UUID(0x2800),
-                data=b'test'
-            )
-        ))
-    
-    def test_read_by_type_request(self, l2cap_instance, att):
-        att.read_by_type_request(0, 1, UUID(0x2800))
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Read_By_Type_Request(
-                start=0,
-                end=1,
-                uuid=UUID(0x2800)
-            )
-        ))
-
-    def test_read_by_type_response(self, l2cap_instance, att):
-        att.read_by_type_response(2, [b'aa',b'bb'])
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Read_By_Type_Response(
-                len=2,
-                handles=[b'aa', b'bb']
-            )
-        ))
-
-    def test_read_request(self, l2cap_instance, att):
-        att.read_request(10)
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Read_Request(gatt_handle=10)
-        ))
-
-    def test_read_response(self, l2cap_instance, att):
-        att.read_response(b'testvalue')
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Read_Response(value=b'testvalue')
-        ))
-
-    def test_read_blob_request(self, l2cap_instance, att):
-        att.read_blob_request(42, 10)
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Read_Blob_Request(
-                gatt_handle=42,
-                offset=10
-            )
-        ))
-
-    def test_read_blob_response(self, l2cap_instance, att):
-        att.read_blob_response(b'response')
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Read_Blob_Response(
-                value=b'response'
-            )
-        ))
-
-    def test_read_multiple_request(self, l2cap_instance, att):
-        att.read_multiple_request([1,2,3])
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Read_Multiple_Request(
-                handles=[1,2,3]
-            )
-        ))
-
-    def test_read_multiple_response(self, l2cap_instance, att):
-        att.read_multiple_response([b'aaa', b'bbb', b'ccc'])
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Read_Multiple_Response(
-                values=[b'aaa',b'bbb', b'ccc']
-            )
-        ))
-
-    def test_read_by_group_type_request(self, l2cap_instance, att):
-        att.read_by_group_type_request(0, 1, UUID(0x2900))
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Read_By_Group_Type_Request(
-                start=0,
-                end=1,
-                uuid=UUID(0x2900)
-            )
-        ))
-
-    def test_read_by_group_type_response(self, l2cap_instance, att):
-        att.read_by_group_type_response(2, [b'aa', b'bb', b'cc', b'dd'])
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Read_By_Group_Type_Response(
-                length=2,
-                data=[b'aa', b'bb', b'cc', b'dd']
-            )
-        ))
-
-    def test_write_request(self, l2cap_instance, att):
-        att.write_request(33, b'toto')
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Write_Request(
-                gatt_handle = 33,
-                data=b'toto'
-            )
-        ))
-
-    def test_write_response(self, l2cap_instance, att):
-        att.write_response()
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Write_Response()
-        ))
-    
-    def test_write_command(self, l2cap_instance, att):
-        att.write_command(22, b'foobar')
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Write_Command(
-                gatt_handle=22,
-                data=b'foobar'
-            )
-        ))
-
-    def test_prepare_write_request(self, l2cap_instance, att):
-        att.prepare_write_request(12, 55, b'bar')
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Prepare_Write_Request(
-                gatt_handle=12,
-                offset=55,
-                data=b'bar'
-            )
-        ))
-
-    def test_prepare_write_response(self, l2cap_instance, att):
-        att.prepare_write_response(5, 10, b'something')
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Prepare_Write_Response(
-                gatt_handle=5,
-                offset=10,
-                data=b'something'
-            )
-        ))
-
-    def test_execute_write_request(self, l2cap_instance, att):
-        att.execute_write_request(0x42)
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Execute_Write_Request(
-                flags=0x42
-            )
-        ))
-
-    def test_execute_write_response(self, l2cap_instance, att):
-        att.execute_write_response()
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Execute_Write_Response()
-        ))
-
-    def test_value_notification(self, l2cap_instance, att):
-        att.handle_value_notification(93, b'nothinghere')
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Handle_Value_Notification(
-                gatt_handle=93,
-                value=b'nothinghere'
-            )
-        ))
-
-    def test_value_indication(self, l2cap_instance, att):
-        att.handle_value_indication(93, b'nothinghere')
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Handle_Value_Indication(
-                gatt_handle=93,
-                value=b'nothinghere'
-            )
-        ))
-
-    def test_value_confirmation(self, l2cap_instance, att):
-        att.handle_value_confirmation()
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Handle_Value_Confirmation()
-        ))
-
-
-#####################
-# ATT/GATT tests
-#####################
-
-
-class TestAttToGatt(GattTest):
-    '''Test ATT -> GATT communication
-    '''
-
-    @pytest.fixture
-    def l2cap_instance(self):
-        ATTLayer.add(GattLayer)
-        return L2capMock(target=ATTLayer)
-    
-    @pytest.fixture
-    def att(self, l2cap_instance):
-        return l2cap_instance.get_layer('att')
-
-    def test_find_info_request(self, l2cap_instance, att):
-        l2cap_instance.send('att', ATT_Hdr() / ATT_Find_Information_Request(
-            start=12,
-            end=42
-        ))
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Error_Response(
-                request=BleAttOpcode.FIND_INFO_REQUEST,
-                handle=12,
-                ecode=BleAttErrorCode.ATTRIBUTE_NOT_FOUND
-            )
-        ))
-
-    def test_find_by_type_value_request(self, l2cap_instance, att):
-        l2cap_instance.send(
-            'att',
-            ATT_Hdr() / ATT_Find_By_Type_Value_Request(
-                start=0,
-                end=0x42,
-                uuid=UUID(0x2800),
-                data=b'foobar'
-            )
-        )
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Error_Response(
-                request=BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST,
-                handle=0,
-                ecode=BleAttErrorCode.ATTRIBUTE_NOT_FOUND
-            )
-        ))
-
-    def test_read_by_type_request(self, l2cap_instance, att):
-        l2cap_instance.send(
-            'att',
-            ATT_Hdr() / ATT_Read_By_Type_Request(
-                start=13,
-                end=45,
-                uuid=UUID(0x1234)
-            )
-        )
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Error_Response(
-                request=BleAttOpcode.READ_BY_TYPE_REQUEST,
-                handle=13,
-                ecode=BleAttErrorCode.ATTRIBUTE_NOT_FOUND
-            )
-        ))
-
-    def test_read_by_group_type_request(self, l2cap_instance, att):
-        l2cap_instance.send(
-            'att',
-            ATT_Hdr() / ATT_Read_By_Group_Type_Request(
-                start=27,
-                end=45,
-                uuid=UUID(0x1234)
-            )
-        )
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Error_Response(
-                request=BleAttOpcode.READ_BY_GROUP_TYPE_REQUEST,
-                handle=27,
-                ecode=BleAttErrorCode.ATTRIBUTE_NOT_FOUND
-            )
-        ))
-
-    def test_read_request(self, l2cap_instance, att):
-        l2cap_instance.send(
-            'att',
-            ATT_Hdr() / ATT_Read_Request(
-                gatt_handle=21
-           )
-        )
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Error_Response(
-                request=BleAttOpcode.READ_REQUEST,
-                handle=21,
-                ecode=BleAttErrorCode.INVALID_HANDLE
-            )
-        ))
-
-    def test_read_blob_request(self, l2cap_instance, att):
-        l2cap_instance.send(
-            'att',
-            ATT_Hdr() / ATT_Read_Blob_Request(
-                gatt_handle=7,
-                offset=8
-           )
-        )
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Error_Response(
-                request=BleAttOpcode.READ_BLOB_REQUEST,
-                handle=7,
-                ecode=BleAttErrorCode.INVALID_HANDLE
-            )
-        ))
-
-    def test_read_multiple_request(self, l2cap_instance, att):
-        l2cap_instance.send(
-            'att',
-            ATT_Hdr() / ATT_Read_Multiple_Request(
-                handles=[1,2,3]
-            )
-        )
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Error_Response(
-                request=BleAttOpcode.READ_MULTIPLE_REQUEST,
-                handle=1,
-                ecode=BleAttErrorCode.INVALID_HANDLE
-            )
-        ))
-
-    def test_write_request(self, l2cap_instance, att):
-        l2cap_instance.send(
-            'att',
-            ATT_Hdr() / ATT_Write_Request(
-                gatt_handle=44,
-                data=b'somethinguseful'
-            )
-        )
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Error_Response(
-                request=BleAttOpcode.WRITE_REQUEST,
-                handle=44,
-                ecode=BleAttErrorCode.INVALID_HANDLE
-            )
-        ))
-
-    def test_write_command(self, l2cap_instance, att):
-        l2cap_instance.send(
-            'att',
-            ATT_Hdr() / ATT_Write_Command(
-                gatt_handle=88,
-                data=b'somethinguseful'
-            )
-        )
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Error_Response(
-                request=BleAttOpcode.WRITE_COMMAND,
-                handle=88,
-                ecode=BleAttErrorCode.INVALID_HANDLE
-            )
-        ))
-
-    def test_prepare_write_request(self, l2cap_instance, att):
-        l2cap_instance.send(
-            'att',
-            ATT_Hdr() / ATT_Prepare_Write_Request(
-                gatt_handle=27,
-                offset=3,
-                data=b'somethinguseful'
-            )
-        )
-        assert l2cap_instance.expect(LayerMessage(
-            'att',
-            'l2cap',
-            ATT_Hdr() / ATT_Error_Response(
-                request=BleAttOpcode.PREPARE_WRITE_REQUEST,
-                handle=27,
-                ecode=BleAttErrorCode.INVALID_HANDLE
-            )
-        ))
-
 
 #############################################
 # GATT Client procedures Tests
@@ -571,16 +43,27 @@ class GattDeviceModel(GenericProfile):
     )
 
 
-class TestGattClientProcedures(GattTest):
+class GattClientSandbox(Sandbox):
+    def get_local_mtu(self):
+        return 23
+    def set_local_mtu(self, mtu):
+        pass
+GattClientSandbox.add(ATTLayer)
+GattClientSandbox.add(GattClient)
+
+class TestGattClientProcedures(object):
 
     @pytest.fixture
-    def att(self):
-        AttMock.add(GattClient)
-        return AttMock(target=GattClient)
-       
+    def sandbox(self):
+        return GattClientSandbox()
+    
     @pytest.fixture
-    def gatt(self, att):
-        return att.get_layer('gatt')
+    def att(self, sandbox):
+        return sandbox.get_layer('att')
+
+    @pytest.fixture
+    def gatt(self, sandbox):
+        return sandbox.get_layer('gatt')
     
     def test_discover_primary_services_endhandle(self, att, gatt):
         # Build primary service discovery response
@@ -886,3 +369,254 @@ class TestGattClientProcedures(GattTest):
         ))
         with pytest.raises(UnsupportedRequestError):
             gatt.set_mtu(100)
+
+
+class GattServerSandbox(Sandbox):
+    def get_local_mtu(self):
+        return 23
+GattServerSandbox.add(ATTLayer)
+GattServerSandbox.add(GattServer)
+
+class TestGattServerProcedures(object):
+
+    @pytest.fixture
+    def sandbox(self):
+        return GattServerSandbox()
+    
+    @pytest.fixture
+    def att(self, sandbox):
+        return sandbox.get_layer('att')
+
+    @pytest.fixture
+    def gatt(self, sandbox):
+        return sandbox.get_layer('gatt')
+    
+    def test_characteristic_notification(self, sandbox, gatt):
+        model = GattDeviceModel()
+        gatt.set_model(model)
+        gatt.notify(model.device.device_name)
+        sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Handle_Value_Notification(
+                gatt_handle=model.device.device_name.handle,
+                value=model.device.device_name.value
+            )
+        ))
+
+    def test_characteristic_indication(self, sandbox, gatt):
+        model = GattDeviceModel()
+        gatt.set_model(model)
+        gatt.indicate(model.device.device_name)
+        sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Handle_Value_Indication(
+                gatt_handle=model.device.device_name.handle,
+                value=model.device.device_name.value
+            )
+        ))
+
+    def test_find_info_request(self, sandbox, gatt):
+        model = GattDeviceModel()
+        gatt.set_model(model)
+        gatt.on_find_info_request(GattFindInfoRequest(
+            1,
+            1
+        ))
+
+        assert sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Find_Information_Response(
+                format=1,
+                handles=b'\x01\x00\x00\x28'
+            )
+        ))
+        
+    def test_characteristic_read(self, sandbox, gatt):
+        model = GattDeviceModel()
+        model.device.device_name.value = b'something'
+        gatt.set_model(model)
+        gatt.on_read_request(GattReadRequest(
+            handle=3
+        ))
+        sandbox.messages[0].data.show()
+        assert sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Read_Response(
+                value=b'something'
+            )
+        ))
+
+    def test_characteristic_read_blob(self, sandbox, gatt):
+        model = GattDeviceModel()
+        model.device.device_name.value = b'something'
+        gatt.set_model(model)
+        gatt.on_read_blob_request(GattReadBlobRequest(
+            3, 1
+        ))
+        
+        assert sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Read_Blob_Response(
+                value=b'omething'
+            )
+        ))
+
+    def test_characteristic_write(self, sandbox, gatt):
+        model = GattDeviceModel()
+        model.device.device_name.value = b'something'
+        gatt.set_model(model)
+        gatt.on_write_request(GattWriteRequest(
+            handle=3,
+            value=b'Foobar'
+        ))
+        assert model.device.device_name.value == b'Foobar'
+        assert sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Write_Response()
+        ))
+
+    def test_characteristic_write_command(self, sandbox, gatt):
+        model = GattDeviceModel()
+        model.device.device_name.value = b'something'
+        gatt.set_model(model)
+        gatt.on_write_request(GattWriteRequest(
+            handle=3,
+            value=b'Foobar'
+        ))
+        assert model.device.device_name.value == b'Foobar'
+    
+
+    def test_prepare_write(self, sandbox, gatt):
+        '''Test GATT server prepare write request handling
+        '''
+        # Initialize our model
+        model = GattDeviceModel()
+        model.device.device_name.value = b'something'
+        gatt.set_model(model)
+
+        gatt.on_prepare_write_request(GattPrepareWriteRequest(
+            3, 0, b'part1'
+        ));
+
+        assert sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Prepare_Write_Response(
+                gatt_handle=3,
+                offset=0,
+                data=b'part1'
+            )
+        ))
+
+    def test_prepare_write_fail(self, sandbox, gatt):
+        '''Test GATT server prepare write request handling
+        when fed with an invalid handle
+        '''
+        # Initialize our model
+        model = GattDeviceModel()
+        model.device.device_name.value = b'something'
+        gatt.set_model(model)
+
+        gatt.on_prepare_write_request(GattPrepareWriteRequest(
+            9, 0, b'part1'
+        ));
+
+        assert sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Error_Response(
+                request=BleAttOpcode.PREPARE_WRITE_REQUEST,
+                handle=9,
+                ecode=BleAttErrorCode.INVALID_HANDLE
+            )
+        ))
+
+    def test_execute_write(self, sandbox, gatt):
+        '''Test GATT server prepared request execution
+        '''
+        # Initialize our model
+        model = GattDeviceModel()
+        model.device.device_name.value = b'something'
+        gatt.set_model(model)
+
+        # We send two prepared write requests
+        gatt.on_prepare_write_request(GattPrepareWriteRequest(
+            3, 0, b'part1'
+        ));
+        gatt.on_prepare_write_request(GattPrepareWriteRequest(
+            3, 5, b'part2'
+        ));
+
+        # And we execute the write requests
+        gatt.on_execute_write_request(GattExecuteWriteRequest(
+            flags=1
+        ))
+
+        # Check characteristic value
+        assert model.device.device_name.value == b'part1part2'
+
+        # Make sure we got a response
+        assert sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Execute_Write_Response()
+        ))
+
+    def test_read_by_type_request(self, sandbox, gatt):
+        '''Test GATT server read by type handling
+        '''
+        # Initialize our model
+        model = GattDeviceModel()
+        model.device.device_name.value = b'something'
+        gatt.set_model(model)
+
+        # Ask server to enumerate characteristics
+        gatt.on_read_by_type_request(GattReadByTypeRequest(
+            start=0,
+            end=5,
+            attr_type=UUID(0x2803)
+        ))
+
+        # Return a list of 1 characteristic (device_name)
+        # with handle 3, UUID of 0x2A00, UUID len of 2
+        # and properties of 0x1A (read, write, notify)
+        assert sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Read_By_Type_Response(
+                len=7,
+                handles=b'\x02\x00\x1a\x03\x00\x00\x2a'
+            )
+        ))
+
+    def test_read_by_group_type_request(self, sandbox, gatt):
+        '''Test GATT server read by group type handling
+        '''
+        # Initialize our model
+        model = GattDeviceModel()
+        model.device.device_name.value = b'something'
+        gatt.set_model(model)
+
+        # Ask server to enumerate characteristics
+        gatt.on_read_by_group_type_request(GattReadByGroupTypeRequest(
+            start=0,
+            end=5,
+            group_type=UUID(0x2803)
+        ))
+
+        # Return a list of 1 item
+        # with start handle 2, end handle 4 and UUID 0x2A00
+        assert sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Read_By_Group_Type_Response(
+                length=6,
+                data=b'\x02\x00\x04\x00\x00\x2A'
+            )
+        ))      

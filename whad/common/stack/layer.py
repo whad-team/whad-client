@@ -586,8 +586,6 @@ class Layer(object):
         else:
             source_layer = source
 
-        print(source_layer, destination)
-
         # notify monitors
         self.monitor_message(source, destination, data, tag=tag, **kwargs)
 

@@ -1,4 +1,9 @@
 '''BLE L2CAP protocol layer unit tests.
+
+This module provides a single set of tests:
+
+- TestL2CAPLayer: checks L2CAP encapsulation works as expected
+
 '''
 import pytest
 
@@ -21,17 +26,15 @@ L2CAPLayer.remove(GattLayer)
 class LinkLayerMock(Sandbox):
 
     def __init__(self, parent=None, layer_name=None, options={}):
-        super().__init__(parent=parent, layer_name=layer_name, options=options, target=L2CAPLayer)
+        super().__init__(parent=parent, layer_name=layer_name, options=options)
         
         # Instanciate a L2CAP layer and configure target
         self.__l2cap = self.instantiate(L2CAPLayer)
         self.target = self.__l2cap.name
-        self.target_class = L2CAPLayer
 
     @property
     def l2cap(self):
         return self.__l2cap
-
 LinkLayerMock.add(L2CAPLayer)
     
 class L2CAPTest(object):
