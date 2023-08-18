@@ -1,5 +1,6 @@
 import re
 import json
+import traceback
 
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
@@ -906,7 +907,6 @@ class BleCentralShell(InteractiveShell):
                 self.error('Sending PDU failed (peripheral disconnected)')
 
             except Exception as err:
-                print(err)
                 self.error('An error occured while assembling packet')
         else:
             self.error('No device connected.')

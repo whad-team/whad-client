@@ -418,6 +418,18 @@ class BleConnection(object):
     def gatt(self):
         return self.__l2cap.get_layer('gatt')
     
+    @property
+    def phy(self):
+        return self.__l2cap.get_layer('phy')
+    
+    @property
+    def ll(self):
+        return self.__l2cap.get_layer('ll')
+
+    @property
+    def remote_version(self):
+        return self.ll.state.get_version_remote(self.__conn_handle)
+
     def lock(self):
         """Lock connection
         """
@@ -433,24 +445,35 @@ class BleConnection(object):
         """
         pass
 
-    '''
     def send_version(self):
         """Send LL_VERSION_IND PDU.
         """
-        if not self.__ll.get_connection(self.__conn_handle)['version_sent']:
+        if not self.ll.state.get_connection(self.__conn_handle)['version_sent']:
             # Mark version as sent
-            self.__ll.get_connection(self.__conn_handle)['version_sent'] = True
+            self.ll.state.get_connection(self.__conn_handle)['version_sent'] = True
 
             # Send LL_VERSION_IND PDU
-            self.__ll.stack.send_control(
+            self.ll.send_ctrl_pdu(
                 self.__conn_handle,
+                LL_VERSION_IND(
+                    version=self.phy.bt_version.value,
+                    company=self.phy.manufacturer_id,
+                    subversion=self.phy.bt_sub_version
+                )
+            )
+
+    def on_version_ind(self, version):
+        """Send back our version info
+        """
+        if not self.__version_sent:
+            self.send_control(
                 BTLE_CTRL() / LL_VERSION_IND(
                     version=self.__llm.stack.bt_version,
                     company=self.__llm.stack.manufacturer_id,
                     subversion=self.__llm.stack.bt_sub_version
                 )
             )
-    '''
+        self.__version_remote = version
 
 class LinkLayerState(LayerState):
 
@@ -499,6 +522,10 @@ class LinkLayerState(LayerState):
     def set_version_remote(self, conn_handle, version):
         if conn_handle in self.connections:
             self.connections[conn_handle]['version_remote'] = version
+
+    def get_version_remote(self, conn_handle):
+        if conn_handle in self.connections:
+            return self.connections[conn_handle]['version_remote']
 
 @alias('ll')
 @state(LinkLayerState)
@@ -641,7 +668,7 @@ class LinkLayer(Layer):
     def send_ctrl_pdu(self, conn_handle, pdu, encrypt=None):
         """Send a control PDU to the underlying PHY layer.
         """
-        self.send('phy', pdu, tag='control', encrypt=encrypt)
+        self.send('phy', BTLE_DATA()/BTLE_CTRL()/pdu, tag='control', conn_handle=conn_handle, encrypt=encrypt)
 
     """Control PDU handlers
     """

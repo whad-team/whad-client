@@ -84,7 +84,7 @@ class BleStack(Layer):
         return self.__connector.send_data_pdu(data, conn_handle=conn_handle, encrypt=encrypt)
 
     @source('ll', 'control')
-    def send_control(self, conn_handle, pdu, encrypt=None):
+    def send_control(self, pdu, conn_handle=None, encrypt=None):
         '''Send control PDU to the underlying WHAD connector.
         '''
         logger.debug('sending a control PDU (%d bytes) to conn_handle %d' % (len(pdu), conn_handle))
