@@ -789,7 +789,7 @@ class BLE(WhadDeviceConnector):
         else:
             return False
 
-from whad.ble.connector.peripheral import Peripheral
+from whad.ble.connector.peripheral import Peripheral, PeripheralClient
 from whad.ble.connector.central import Central
 from whad.ble.connector.injector import Injector
 from whad.ble.connector.hijacker import Hijacker
