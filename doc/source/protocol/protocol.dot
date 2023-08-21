@@ -1,0 +1,21 @@
+digraph foo {
+    center=true;
+
+    root [label="Phy", peripheries=2];
+    ether [label="Ether"];
+    icmp [label="ICMP"];
+    ip [label="IP"];
+    udp [label="UDP"];
+    tcp [label="TCP"];
+
+    root -> ether;
+    ether -> ip;
+    ether -> icmp;
+    ip -> udp;
+    ip -> tcp;
+    tcp -> ip;
+    udp -> ip;
+    ip -> ether;
+    ether -> root;
+    icmp -> ether;
+   }

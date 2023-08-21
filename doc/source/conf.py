@@ -44,6 +44,7 @@ extensions = [
     #'sphinx.ext.autosummary',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
+    'sphinx.ext.graphviz',
     'sphinxcontrib.mermaid'
 ]
 
