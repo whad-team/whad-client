@@ -5,7 +5,7 @@ __all__ = [
     'Layer',
     'source',
     'instance',
-    'name',
+    'alias',
     'state',
     'LayerState',
     'ContextualLayer'
