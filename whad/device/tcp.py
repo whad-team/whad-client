@@ -52,7 +52,7 @@ class TCPSocketDevice(WhadDevice):
         '''
         Returns a list of available TCP socket devices.
         '''
-        return None
+        return []
 
     @classmethod
     def check_interface(cls, interface):
