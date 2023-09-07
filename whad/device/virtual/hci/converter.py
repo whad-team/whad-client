@@ -51,7 +51,7 @@ class HCIConverter:
                 return self.process_connection_complete(event[HCI_LE_Meta_Connection_Complete:])
             elif HCI_LE_Meta_Enhanced_Connection_Complete in event:
                 return self.process_connection_complete(event[HCI_LE_Meta_Enhanced_Connection_Complete:])
-                
+
         elif HCI_ACL_Hdr in event:
             return self.process_acl_data(event[HCI_ACL_Hdr:])
         elif HCI_Event_Disconnection_Complete in event:
@@ -106,9 +106,9 @@ class HCIConverter:
     def process_connection_complete(self, event):
         if event.status == 0x00:
 
-            # Mark device as connected.
+            # Mark device as connected and register handle.
             self.__device._connected = True
-
+            self.__device._active_handles.append(event.handle)
             # Send BLE connected message to consumer.
             msg = Message()
             handle = event.handle
@@ -133,8 +133,9 @@ class HCIConverter:
 
     def process_disconnection_complete(self, event):
         if event.status == 0x00:
-            # Mark device as disconnected
+            # Mark device as disconnected and remove handle
             self.__device._connected = False
+            self.__device._active_handles.remove(event.handle)
 
             # Send disconnection message to consumer.
             msg = Message()
