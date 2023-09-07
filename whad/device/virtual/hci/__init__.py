@@ -493,10 +493,17 @@ class HCIDevice(VirtualDevice):
         Configure scan response data to use by HCI device.
         """
         if wait_response:
-            response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(data=data))
+            response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(
+                    data=data + (31 - len(data)) * b"\x00", len=len(data)
+                )
+            )
             return response.status == 0x00
         else:
-            response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(data=data), wait_response=False)
+            response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(
+                    data=data + (31 - len(data)) * b"\x00", len=len(data)
+                ),
+                wait_response=False
+            )
             return True
 
 
