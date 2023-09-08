@@ -20,7 +20,8 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
             connector = PTX(dev)
             connector.address = "ca:e9:06:ec:a4"
-            connector.channel = 8
+            connector.channel = 5
+            #connector.synchronize()
             connector.attach_callback(show)
             connector.start()
 
