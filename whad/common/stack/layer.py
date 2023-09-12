@@ -372,7 +372,9 @@ class Layer(object):
         # Define layers and default context.
         for layer in self.LAYERS.keys():
             if not self.LAYERS[layer].instantiable():
-                self.create_layer(self.LAYERS[layer], layer)
+                layer_inst = self.create_layer(self.LAYERS[layer], layer)
+                if layer in options:
+                    layer_inst.configure(options[layer])
 
     def instantiate(self, contextual_clazz):
         """Instantiate a contextual layer.
@@ -694,6 +696,10 @@ class Layer(object):
             output += '%s -> %s;\n' % (source, destination)
 
         output += '}'
+
+        # Write to file
+        with open(output_file, 'w') as f:
+            f.write(output)
 
         return output
 

@@ -13,6 +13,7 @@ from whad.ble.stack.gatt import GattClient
 from whad.ble.stack.att import ATTLayer
 from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
 from whad.ble.profile.device import PeripheralDevice
+from whad.common.stack import Layer
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
 
@@ -29,11 +30,17 @@ class Central(BLE):
 
     """
 
-    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack):
+    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack, client=GattClient):
         super().__init__(device)
         
-        # Attach a GATT client to our stack ATT layer
-        ATTLayer.add(GattClient)
+        """Attach a GATT client if specified in parameter
+
+        If `client` is set to None, the default GATT layer is used, which does
+        not provide any client feature at all.
+        """
+        if client is not None:
+            if issubclass(client, Layer) and client.alias == 'gatt':
+                ATTLayer.add(client)
 
         self.__gatt_client = None
         self.__stack = stack(self)
@@ -66,6 +73,12 @@ class Central(BLE):
         """Remote peer BD address.
         """
         return self.__target
+
+    @property
+    def stack(self):
+        '''Return the current stack instance
+        '''
+        return self.__stack
 
     def connect(self, bd_address, random=False, timeout=30, access_address=None, channel_map=None, crc_init=None, hop_interval=None, hop_increment=None) -> PeripheralDevice:
         """Connect to a target device

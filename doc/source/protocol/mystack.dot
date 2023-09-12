@@ -1,0 +1,14 @@
+digraph T {
+rankdir=LR;
+node [label="phy", fontsize=12] phy;
+node [label="ether", fontsize=12] ether;
+subgraph cluster_ip {
+style=filled;
+color=lightgrey;
+node [label="ip", fontsize=12] ip;
+}
+ether -> phy;
+ip -> ether;
+phy -> ether;
+ether -> ip;
+}

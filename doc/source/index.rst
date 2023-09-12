@@ -29,4 +29,6 @@ Welcome to WHAD's documentation!
 
     device/index
     device/protocol
+    protocol/index
+    protocol/reference
     

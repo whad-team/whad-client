@@ -1,0 +1,49 @@
+digraph foo {
+    center=true;
+    rankdir="TB";
+
+
+    root [label="Phy", peripheries=2];
+
+    subgraph cluster_ether {
+        label="Ethernet";
+
+        subgraph cluster_ip {
+            rankdir="BT";
+            label="IP";
+            
+            subgraph cluster_tcp {
+                label="TCP";
+                tcp [label="TCP"];
+            }
+
+            subgraph cluster_udp {
+                label="UDP";
+                udp [label="UDP"];            
+            }
+
+            ip [label="IP"];
+
+            ip -> tcp;
+            ip -> udp;
+            tcp -> ip;
+            udp -> ip;
+        }
+
+        subgraph cluster_icmp {
+            label="ICMP";
+
+            icmp [label="ICMP"];
+        }
+
+        ether [label="Ether"];
+        ether -> ip;
+        ip -> ether;
+        ether -> icmp;
+        icmp -> ether;  
+    }
+
+    root -> ether;
+    ether -> root;
+
+   }
