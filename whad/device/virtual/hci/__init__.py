@@ -95,6 +95,7 @@ class HCIDevice(VirtualDevice):
         self._cached_scan_response_data = None
         self.__timeout = 1.0
         self._connected = False
+        self._active_handles = []
 
     @property
     def identifier(self):
@@ -124,6 +125,9 @@ class HCIDevice(VirtualDevice):
         """
         Close current device.
         """
+        # Disconnect if necessary
+        for handle in self._active_handles:
+            self._disconnect(handle)
         # Ask parent class to stop I/O thread
         logger.debug('Stopping background IO threads ...')
         super().close()
@@ -207,7 +211,7 @@ class HCIDevice(VirtualDevice):
         """
         logger.debug('[hci] sending packet ...')
         self.__socket.send(packet)
-        
+
         # Wait for response
         logger.debug('[hci] waiting for response (timeout: %s)...' % self.__timeout)
         response = self._wait_response(timeout=self.__timeout)
@@ -382,6 +386,7 @@ class HCIDevice(VirtualDevice):
                     # Write BD address and reset with vendor specific commands
                     self._write_command(HCI_Cmd_CSR_Write_BD_Address(addr=bd_address), wait_response=False)
                     self._write_command(HCI_Cmd_CSR_Reset(), wait_response=False)
+
                     # We are forced to close the socket and reopen it here...
                     self.__socket.close()
                     # Add a delay to prevent error
@@ -488,10 +493,17 @@ class HCIDevice(VirtualDevice):
         Configure scan response data to use by HCI device.
         """
         if wait_response:
-            response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(data=data))
+            response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(
+                    data=data + (31 - len(data)) * b"\x00", len=len(data)
+                )
+            )
             return response.status == 0x00
         else:
-            response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(data=data), wait_response=False)
+            response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(
+                    data=data + (31 - len(data)) * b"\x00", len=len(data)
+                ),
+                wait_response=False
+            )
             return True
 
 
@@ -578,6 +590,9 @@ class HCIDevice(VirtualDevice):
                     self._send_whad_command_result(ResultCode.ERROR)
             else:
                 self._send_whad_command_result(ResultCode.SUCCESS)
+
+        elif self.__internal_state == HCIInternalState.CENTRAL:
+            self._send_whad_command_result(ResultCode.SUCCESS)
         else:
             self._send_whad_command_result(ResultCode.ERROR)
 

@@ -56,7 +56,7 @@ class ATTLayer(Layer):
             self.on_exch_mtu_request(att_pkt.getlayer(ATT_Exchange_MTU_Request))
         elif ATT_Exchange_MTU_Response in att_pkt:
             self.on_exch_mtu_response(att_pkt.getlayer(ATT_Exchange_MTU_Response))
-        
+
         elif ATT_Find_Information_Request in att_pkt:
             self.on_find_info_request(att_pkt.getlayer(ATT_Find_Information_Request))
         elif ATT_Find_Information_Response in att_pkt:
@@ -139,7 +139,7 @@ class ATTLayer(Layer):
         """
         # Update L2CAP Client MTU
         self.get_layer('l2cap').set_remote_mtu(mtu_req.mtu)
-        
+
         # Send back our MTU.
         self.send(ATT_Exchange_MTU_Response(
             mtu=self.get_layer('l2cap').get_local_mtu()
@@ -151,7 +151,7 @@ class ATTLayer(Layer):
         :param mtu_resp ATT_Exchange_MTU_Response: MTU response
         """
         self.get_layer('l2cap').set_remote_mtu(mtu_resp.mtu)
-        
+
         # Forward to GATT
         #self.send('gatt', GattExchangeMtuResponse(mtu=mtu_resp.mtu),
         #          tag='XCHG_MTU_RESP')
@@ -190,7 +190,7 @@ class ATTLayer(Layer):
     def on_find_by_type_value_response(self, response):
         handles = b''.join([item.build() for item in response.handles])
         self.send('gatt', GattFindByTypeValueResponse.from_bytes(handles))
-    
+
     def on_read_by_type_request(self, request):
         """Handle read by type request
         """
@@ -203,7 +203,7 @@ class ATTLayer(Layer):
     def on_read_by_type_request_128bit(self, request):
         """Handle ATT Read By Type Request 128-bit UUID
         """
-        self.send('gatt', 
+        self.send('gatt',
             request.start,
             request.end,
             request.uuid1,
@@ -238,8 +238,7 @@ class ATTLayer(Layer):
                 )
             )
         else:
-            self.__gatt.on_read_response(
-                GattReadResponse(
+            self.send('gatt', GattReadResponse(
                     b''
                 )
             )
@@ -311,7 +310,7 @@ class ATTLayer(Layer):
         """Handle ATT Write Response
         """
         self.send('gatt', GattWriteResponse())
-    
+
     def on_write_command(self, command):
         """Handle ATT Write Command
         """
@@ -353,7 +352,7 @@ class ATTLayer(Layer):
         """Handle ATT Execute Write Response
         """
         self.send('gatt', GattExecuteWriteResponse())
-        
+
     def on_handle_value_notification(self, notif):
         """Handle ATT Handle Value Notification
         """
@@ -413,7 +412,7 @@ class ATTLayer(Layer):
             mtu=mtu
         ))
 
-    
+
     def find_info_request(self, start, end):
         """Sends an ATT Find Information Request
         """
@@ -425,12 +424,12 @@ class ATTLayer(Layer):
     def  find_info_response(self, format, handles):
         """Sends an ATT Find Information Response
         """
-        
+
         self.send_data(ATT_Find_Information_Response(
             format=format,
             handles=handles
         ))
-    
+
     def find_by_type_value_request(self, start, end, type_uuid, value):
         """Sends an ATT Find By Type Value Request
         """
@@ -476,7 +475,7 @@ class ATTLayer(Layer):
             handles=handles
         ))
 
-    
+
     def read_request(self, gatt_handle):
         """Sends an ATT Read Request
         """
@@ -529,7 +528,7 @@ class ATTLayer(Layer):
         self.send_data(ATT_Read_Multiple_Response(
             values=values
         ))
-    
+
 
     def read_by_group_type_request(self, start, end, uuid):
         """Sends an ATT Read By Group Type Request
@@ -604,7 +603,7 @@ class ATTLayer(Layer):
             gatt_handle=handle,
             offset=offset,
             data=data
-        ))   
+        ))
 
     def execute_write_request(self, flags):
         """Sends an ATT Execute Write Request
@@ -645,8 +644,7 @@ class ATTLayer(Layer):
 
     def handle_value_confirmation(self):
         """Sends an ATT Handle Value Confirmation
-        
+
         Not supported yet
         """
         self.send_data(ATT_Handle_Value_Confirmation())
-

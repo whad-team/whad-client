@@ -8,9 +8,13 @@ from scapy.data import MTU
 from scapy.consts import WINDOWS
 from scapy.supersocket import SuperSocket
 from scapy.error import warning
-from scapy.layers.bluetooth import BluetoothSocketError, BluetoothCommandError, \
+from scapy.layers.bluetooth import BluetoothUserSocket, BluetoothSocketError, BluetoothCommandError, \
     HCI_Hdr
 
+class BluetoothUserSocketFixed(BluetoothUserSocket):
+    pass
+
+'''
 class sockaddr_hci(ctypes.Structure):
     _fields_ = [
         ("sin_family", ctypes.c_ushort),
@@ -53,7 +57,7 @@ class BluetoothUserSocketFixed(SuperSocket):
         if s < 0:
             raise BluetoothSocketError("Unable to open PF_BLUETOOTH socket")
         self.hci_fd = s
-        
+
         sa = sockaddr_hci()
         sa.sin_family = 31  # AF_BLUETOOTH
         sa.hci_dev = adapter_index  # adapter index
@@ -105,3 +109,4 @@ class BluetoothUserSocketFixed(SuperSocket):
             if self.ins and (WINDOWS or self.ins.fileno() != -1):
                 close(self.ins.fileno())
         close(self.hci_fd)
+'''

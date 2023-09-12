@@ -121,4 +121,4 @@ def error_response_to_exc(error_code, request, handle):
     if error_code in RESP_TO_EXC:
         return RESP_TO_EXC[error_code](request, handle)
     else:
-        return AttError
+        return AttError(request, handle)
