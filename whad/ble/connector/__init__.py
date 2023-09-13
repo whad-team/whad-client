@@ -1,8 +1,11 @@
 import struct
+
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
     BTLE_RF, BTLE_CTRL
 from scapy.compat import raw
+from scapy.packet import Packet
+from queue import Queue, Empty
 
 from whad.device import WhadDeviceConnector
 from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCmd, StartCmd, StopCmd, \
@@ -51,10 +54,13 @@ class BLE(WhadDeviceConnector):
         return self.translator.format(packet)
 
 
-    def __init__(self, device=None):
+    def __init__(self, device=None, auto=True):
             """
             Initialize the connector, open the device (if not already opened), discover
             the services (if not already discovered).
+
+            If `auto` is set to True, PDUs must be processed manually and
+            won't be forwarded to PDU-related callbacks. 
             """
             self.__ready = False
             super().__init__(device)
@@ -82,10 +88,55 @@ class BLE(WhadDeviceConnector):
             # Initialize translator
             self.translator = BleMessageTranslator()
 
+            # Determine if we are using synchronous mode or not
+            self.__auto = auto
+            self.__pdu_queue = Queue()
+
 
     def close(self):
         self.device.close()
 
+    #
+    # Reception queue management
+    #
+
+    def auto(self, enabled: bool):
+        '''Enable or disable automatic mode.
+
+        In automatic mode, the PDUs are processed and forwarded to the corresponding
+        callbacks, thus causing the connector to process them through its protocol
+        stack (if any). If automatic mode is disabled, received PDUs are added to
+        a reception queue that could be queried with the `wait_pdu()` method. In this
+        mode, the user is responsible of processing these PDUs.
+
+        :param enabled: If set to `True`, enable the automatic mode and disable it otherwise.
+        :type enabled: bool
+        '''
+        self.__auto = enabled
+
+    def enqueue_pdu(self, pdu: Packet):
+        '''Add a BLE PDU to internal PDU queue
+
+        :param pdu: PDU to add to our reception queue
+        :type pdu: scapy.packet.Packet
+        '''
+        self.__pdu_queue.put(pdu)
+
+    def wait_pdu(self, timeout=None):
+        '''Wait for a pdu from queue, only available when auto mode is
+        disabled.
+
+        :param float timeout: If specified, defines a timeout when querying the PDU queue
+        :return: Received PDU if any, None otherwise
+        :rtype: scapy.packet.Packet
+        '''
+        if not self.__auto:
+            try:
+                return self.__pdu_queue.get(block=True, timeout=timeout)
+            except Empty as no_pdu:
+                return None
+        else:
+            return None
 
     def support_raw_pdu(self):
         """
@@ -585,6 +636,7 @@ class BLE(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
+
     def stop(self):
         """
         Stop currently enabled mode.
@@ -637,7 +689,13 @@ class BLE(WhadDeviceConnector):
                 packet = self.translator.from_message(message, msg_type)
                 if packet is not None:
                     self.monitor_packet_rx(packet)
-                    self.on_adv_pdu(packet)
+
+                    # Forward to advertising PDU callback if auto mode is set.
+                    if self.__auto:
+                        self.on_adv_pdu(packet)
+                    else:
+                        # Else enqueue packet
+                        self.enqueue_pdu(packet)
 
             elif msg_type == 'pdu':
                 if message.pdu.processed:
@@ -649,7 +707,13 @@ class BLE(WhadDeviceConnector):
                     packet = self.translator.from_message(message, msg_type)
                     if packet is not None:
                         self.monitor_packet_rx(packet)
-                        self.on_pdu(packet)
+
+                        # Forward to generic PDU callback if auto mode is set.
+                        if self.__auto:
+                            self.on_pdu(packet)
+                        else:
+                            # Else enqueue packet
+                            self.enqueue_pdu(packet)
 
             elif msg_type == 'raw_pdu':
                 if message.raw_pdu.processed:
@@ -662,7 +726,13 @@ class BLE(WhadDeviceConnector):
                     packet = self.translator.from_message(message, msg_type)
                     if packet is not None:
                         self.monitor_packet_rx(packet)
-                        self.on_raw_pdu(packet)
+
+                        # Forward to raw pdu callback if auto mode is set.
+                        if self.__auto:
+                            self.on_raw_pdu(packet)
+                        else:
+                            # Enqueue
+                            self.enqueue_pdu(packet)
 
             elif msg_type == 'synchronized':
                 self.on_synchronized(
