@@ -1,6 +1,6 @@
 from whad.unifying.connector import Unifying
 from whad.esb.stack import ESBStack
-from whad.unifying.stack import UnifyingApplicativeLayerManager, UnifyingRole
+from whad.unifying.stack import UnifyingApplicativeLayer, UnifyingRole
 from whad.exceptions import UnsupportedCapability
 
 
@@ -14,10 +14,8 @@ class Dongle(Unifying):
         self.__channel = 5
         self.__address = "ca:e9:06:ec:a4"
         self.__started = False
-        self.__stack = ESBStack(
-            self,
-            app_class = UnifyingApplicativeLayerManager
-        )
+        ESBStack.add(UnifyingApplicativeLayer)
+        self.__stack = ESBStack(self)
 
         for name, callback in kwargs.items():
             if name.startswith("on_"):
