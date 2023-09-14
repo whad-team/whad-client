@@ -59,8 +59,8 @@ class BLE(WhadDeviceConnector):
             Initialize the connector, open the device (if not already opened), discover
             the services (if not already discovered).
 
-            If `auto` is set to True, PDUs must be processed manually and
-            won't be forwarded to PDU-related callbacks. 
+            If `auto` is set to False, PDUs must be processed manually and
+            won't be forwarded to PDU-related callbacks.
             """
             self.__ready = False
             super().__init__(device)
