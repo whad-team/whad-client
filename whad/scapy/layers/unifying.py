@@ -4,7 +4,7 @@ from scapy.fields import ByteField, XByteField, X3BytesField, IntField, \
     FieldLenField, StrLenField, StrField, SignedByteField
 from struct import pack
 
-from whad.scapy.layers.esb import ESB_Payload_Hdr, SBAddressField, \
+from whad.scapy.layers.esb import ESB_Payload_Hdr, SBAddressField, ESB_Ping_Request, \
     guess_payload_class_esb
 
 class Logitech_Unifying_Hdr(Packet):
