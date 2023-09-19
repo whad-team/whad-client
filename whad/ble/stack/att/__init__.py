@@ -141,7 +141,7 @@ class ATTLayer(Layer):
         self.get_layer('l2cap').set_remote_mtu(mtu_req.mtu)
 
         # Send back our MTU.
-        self.send(ATT_Exchange_MTU_Response(
+        self.send_data(ATT_Exchange_MTU_Response(
             mtu=self.get_layer('l2cap').get_local_mtu()
         ))
 
