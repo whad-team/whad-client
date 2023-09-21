@@ -266,7 +266,8 @@ class Phy(WhadDeviceConnector):
 
         if self.__cached_supported_frequencies is None:
             self.__cached_supported_frequencies = self.get_supported_frequencies()
-        if all([frequency <= freq_range[0] or frequency >= freq_range[1] for freq_range in self.__cached_supported_frequencies]):
+            print(self.__cached_supported_frequencies)
+        if all([frequency < freq_range[0] or frequency > freq_range[1] for freq_range in self.__cached_supported_frequencies]):
             raise UnsupportedFrequency(frequency)
         msg = Message()
         msg.phy.set_freq.frequency = frequency
