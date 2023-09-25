@@ -139,7 +139,7 @@ class BleConnection(object):
     @property
     def conn_handle(self):
         return self.__conn_handle
-    
+
     @property
     def remote_version(self):
         return self.__version_remote
@@ -310,7 +310,7 @@ class BleConnection(object):
         self.send_control(
             BTLE_CTRL() / LL_FEATURE_RSP(feature_set=[
                 'le_encryption',
-                'le_ping'                
+                'le_ping'
             ])
         )
 
@@ -391,7 +391,7 @@ class BleConnection(object):
                 )
             )
 '''
-            
+
 class BleConnection(object):
 
     def __init__(self, l2cap_instance, conn_handle, local_peer_addr, remote_peer_addr):
@@ -409,7 +409,7 @@ class BleConnection(object):
     @property
     def local_peer(self):
         return self.__local_peer
-    
+
     @property
     def conn_handle(self):
         return self.__conn_handle
@@ -417,11 +417,11 @@ class BleConnection(object):
     @property
     def gatt(self):
         return self.__l2cap.get_layer('gatt')
-    
+
     @property
     def phy(self):
         return self.__l2cap.get_layer('phy')
-    
+
     @property
     def ll(self):
         return self.__l2cap.get_layer('ll')
@@ -486,10 +486,14 @@ class LinkLayerState(LayerState):
             return self.connections[conn_handle]
         else:
             raise IndexError
-        
-    def register_connection(self, conn_handle, l2cap_instance):
+
+    def register_connection(self, conn_handle, l2cap_instance, local_peer_addr, remote_peer_addr):
         self.connections[conn_handle] = {
             'l2cap': l2cap_instance,
+            'local_peer_addr': local_peer_addr.value,
+            'local_peer_addr_type': local_peer_addr.type,
+            'remote_peer_addr': remote_peer_addr.value,
+            'remote_peer_addr_type': remote_peer_addr.type, 
             'version_sent': False,  # version exchanged
             'version_remote': None,
             'nb_pdu_recvd': 0       # number of packets received
@@ -518,7 +522,7 @@ class LinkLayerState(LayerState):
         if conn_handle in self.connections:
             self.connections[conn_handle]['version_sent']
         return False
-    
+
     def set_version_remote(self, conn_handle, version):
         if conn_handle in self.connections:
             self.connections[conn_handle]['version_remote'] = version
@@ -569,7 +573,7 @@ class LinkLayer(Layer):
             conn_l2cap.set_conn_handle(conn_handle)
 
             # Update state with new connection
-            self.state.register_connection(conn_handle, conn_l2cap.name)
+            self.state.register_connection(conn_handle, conn_l2cap.name, local_peer_addr, remote_peer_addr)
 
             # Return connection object
             return BleConnection(
@@ -606,7 +610,7 @@ class LinkLayer(Layer):
         if conn_handle in self.state.connections:
             conn_metadata = self.state.get_connection(conn_handle)
             conn_metadata['nb_pdu_recvd'] += 1
-        
+
         # We received a data PDU
         self.on_data_pdu(pdu, conn_handle)
 
@@ -731,7 +735,7 @@ class LinkLayer(Layer):
             conn_handle,
             LL_FEATURE_RSP(feature_set=[
                 'le_encryption',
-                'le_ping'                
+                'le_ping'
             ])
         )
 
