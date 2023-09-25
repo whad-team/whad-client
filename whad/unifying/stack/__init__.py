@@ -29,6 +29,10 @@ class UnifyingApplicativeLayerState(LayerState):
         self.transmit_timeouts = False
         self.aes_counter = 0
         self.synchronized = False
+        self.check_timeouts = False
+        self.current_timeout = None
+        self.last_timestamp = None
+        self.last_sync = None
 
 @alias('app')
 @state(UnifyingApplicativeLayerState)
@@ -66,15 +70,39 @@ class UnifyingApplicativeLayer(Layer):
     def locale(self, value):
         self.state.locale = value
 
+    def _check_timeouts_thread(self):
+        while self.state.check_timeouts:
+            if self.state.current_timeout is not None and self.state.last_timestamp is not None:
+                if (int(time()*1000) - self.state.last_timestamp) > self.state.current_timeout * 10:
+                    self.state.current_timeout = None
+                    self.state.last_timestamp = None
+                    self.on_desynchronized()
+                else:
+                    sleep(0.1)
+            sleep(0.1)
+
     def _start_timeout_thread(self):
         self._stop_timeout_thread()
         self.state.transmit_timeouts = True
-        self.__timeout_thread = Thread(target=self._transmit_timeouts_thread)
+        self.__timeout_thread = Thread(target=self._transmit_timeouts_thread, daemon=True)
         self.__timeout_thread.start()
 
     def _stop_timeout_thread(self):
         if self.__timeout_thread is not None:
             self.state.transmit_timeouts = False
+            self.__timeout_thread.join()
+            self.__timeout_thread = None
+
+
+    def _start_check_timeout_thread(self):
+        self._stop_check_timeout_thread()
+        self.state.check_timeouts = True
+        self.__timeout_thread = Thread(target=self._check_timeouts_thread, daemon=True)
+        self.__timeout_thread.start()
+
+    def _stop_check_timeout_thread(self):
+        if self.__timeout_thread is not None:
+            self.state.check_timeouts = False
             self.__timeout_thread.join()
             self.__timeout_thread = None
 
@@ -129,7 +157,7 @@ class UnifyingApplicativeLayer(Layer):
 
     def enable_timeouts(self):
         if self.state.role == UnifyingRole.DONGLE:
-            raise RequiredImplementation("WaitingKeepAlives")
+            self._start_check_timeout_thread()
         else:
             self._start_timeout_thread()
 
@@ -280,11 +308,15 @@ class UnifyingApplicativeLayer(Layer):
         if timestamp is None:
             timestamp = time()
         logger.info("Synchronized !")
+        print("sync")
+        if self.state.role == UnifyingRole.DONGLE:
+            self.enable_timeouts()
         self.state.synchronized = True
 
     #@dongle_callback
     @source('ll', 'desynchronized')
     def on_desynchronized(self, timestamp=None):
+        print("desync")
         if timestamp is None:
             timestamp = time()
         logger.info("Desynchronized.")
@@ -305,6 +337,9 @@ class UnifyingApplicativeLayer(Layer):
     #@dongle_callback
     @source('ll', 'data')
     def on_data(self, data):
+        current_time = int(time() * 1000)
+        self.state.last_timestamp = current_time
+
         if self.state.role == UnifyingRole.DONGLE:
             if not self.state.synchronized:
                 self.on_synchronized()
@@ -387,25 +422,30 @@ class UnifyingApplicativeLayer(Layer):
     @dongle_callback
     def on_set_keepalive(self, timeout):
         logger.info("Set keep alive (timeout="+str(timeout)+")")
+        self.state.current_timeout = timeout
 
     @dongle_callback
     def on_keepalive(self, timeout):
         logger.info("Keep alive (timeout="+str(timeout)+")")
+        self.state.current_timeout = timeout
 
     @dongle_callback
     def on_mouse_payload(self, data):
-        logger.info("Mouse payload (payload="+bytes(data).hex()+")")
-        converter = LogitechUnifyingMouseMovementConverter()
-        x, y = converter.get_coordinates_from_hid_data(data.movement)
-        if x != 0 or y != 0:
-            self.on_move_mouse(x, y)
+        try:
+            logger.info("Mouse payload (payload="+bytes(data).hex()+")")
+            converter = LogitechUnifyingMouseMovementConverter()
+            x, y = converter.get_coordinates_from_hid_data(data.movement)
+            if x != 0 or y != 0:
+                self.on_move_mouse(x, y)
 
-        button = ClickType(data.button_mask)
-        if button != ClickType.NONE:
-            self.on_click_mouse(button)
+            button = ClickType(data.button_mask)
+            if button != ClickType.NONE:
+                self.on_click_mouse(button)
 
-        if data.wheel_x != 0 or data.wheel_y != 0:
-            self.on_wheel_mouse(data.wheel_x, data.wheel_y)
+            if data.wheel_x != 0 or data.wheel_y != 0:
+                self.on_wheel_mouse(data.wheel_x, data.wheel_y)
+        except ValueError:
+            pass
 
     @dongle_callback
     def on_wheel_mouse(self, x, y):
@@ -423,6 +463,15 @@ class UnifyingApplicativeLayer(Layer):
     def on_acknowledgement(self, ack):
         pass
 
+    def __del__(self):
+        self.stop()
+
+    def stop(self):
+        if self.__timeout_thread is not None:
+            if self.state.role == UnifyingRole.DONGLE:
+                self._stop_check_timeout_thread()
+            else:
+                self._stop_timeout_thread()
 
 '''
 class UnifyingApplicativeLayerManager:
