@@ -16,8 +16,11 @@ from scapy.layers.bluetooth import SM_Pairing_Request, SM_Pairing_Response, SM_H
     SM_Identity_Information, SM_Signing_Information
 from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, c1, s1
 
+from whad.ble.bdaddr import BDAddress
 from whad.ble.stack.smp.constants import *
 from whad.ble.stack.smp.exceptions import SMInvalidParameterFormat
+
+from whad.common.stack import Layer, alias, source, instance, LayerState, state
 
 import logging
 logger = logging.getLogger(__name__)
@@ -372,7 +375,206 @@ class SM_Peer(object):
         return _confirm
 
 
-class BleSMP(object):
+
+class SecurityManagerState(LayerState):
+
+    STATE_IDLE = 0x00
+    STATE_PAIRING_REQ = 0x01
+    STATE_PAIRING_RSP = 0x02
+    STATE_LEGACY_PAIRING_CONFIRM_SENT = 0x03
+    STATE_LEGACY_PAIRING_CONFIRM_RECVD = 0x04
+    STATE_LEGACY_PAIRING_RANDOM_SENT = 0x05
+    STATE_LEGACY_PAIRING_RANDOM_RECVD = 0x06
+    STATE_LESC_PUBKEY_SENT = 0x07
+    STATE_LESC_PUBKEY_RECVD = 0x08
+    STATE_LESC_PAIRING_CONFIRM_SENT = 0x09
+    STATE_LESC_PAIRING_RANDOM_SENT = 0x0A
+    STATE_LESC_PAIRING_RANDOM_RECVD = 0x0B
+    STATE_LESC_DHK_CHECK_SENT = 0x0C
+    STATE_LESC_DHK_CHECK_RECVD = 0x0D
+    STATE_PAIRING_DONE = 0x0E
+    STATE_DISTRIBUTE_KEY = 0x0F
+    STATE_BONDING_DONE = 0xFF
+
+    def __init__(self):
+        super().__init__()
+
+        # Global configuration
+        self.justworks = True
+        self.lesc = False
+
+        # Capabilities
+        self.capabilities = IOCAP_NOINPUT_NOOUTPUT
+
+        # Peers' states
+        self.initiator = None
+        self.responder = None
+
+        # Current state
+        self.state = SecurityManagerState.STATE_IDLE
+
+        # Crypto manager
+        self.cm = None
+
+        # Initiator Key Distribution
+        self.ikd = None
+
+        # Responder Key Distribution
+        self.rkd = None
+
+        # Pairing material
+        self.pairing_req = None
+        self.pairing_resp = None
+        self.tk = b'\x00'*16
+        self.stk = b'\x00'*16
+        self.ltk = b'\x00'*16
+
+        # Initiator role
+        self.__enc_initiator = False
+
+
+@alias('smp')
+@state(SecurityManagerState)
+class SMPLayer(Layer):
+
+    ##########################################
+    # Incoming requests and responses
+    ##########################################
+
+    @instance('l2cap')
+    def on_packet(self, instance, smp_pkt):
+        """SMP packet reception callback
+
+        This method dispatches every LE SMP packet received.
+
+        :param Packet packet: Scapy packet containing SMP material
+        """
+        print("Incoming packet: ", repr(smp_pkt))
+
+        if SM_Pairing_Request in smp_pkt:
+            self.on_pairing_request(smp_pkt.getlayer(SM_Pairing_Request))
+        elif SM_Pairing_Response in smp_pkt:
+            self.on_pairing_response(smp_pkt.getlayer(SM_Pairing_Response))
+        elif SM_Confirm in smp_pkt:
+            self.on_pairing_confirm(smp_pkt.getlayer(SM_Confirm))
+        elif SM_Random in smp_pkt:
+            self.on_pairing_random(smp_pkt.getlayer(SM_Random))
+
+    def on_pairing_request(self, pairing_req):
+        """Method called when a pairing request is received.
+
+        :param SM_Pairing_Request pairing_req: Pairing request packet
+        """
+        logger.info('Received Pairing Request')
+
+        # Make sure we are in a state that allows this pairing request
+        if self.state.state == SecurityManagerState.STATE_IDLE:
+            logger.info('Pairing Request accepted, processing ...')
+
+            # Save pairing request
+            self.state.pairing_req = pairing_req
+
+
+            # Get the current connection handle
+            conn_handle = self.get_layer('l2cap').state.conn_handle
+
+            # Get the current link layer state
+            local_conn = self.get_layer('ll').state.get_connection(conn_handle)
+
+            # Get the local and remote addresses values and types
+            local_peer_addr = local_conn['local_peer_addr']
+            local_peer_addr_type = local_conn['local_peer_addr_type']
+            print(local_peer_addr, local_peer_addr_type)
+            local_addr_object = BDAddress.from_bytes(
+                local_peer_addr,
+                addr_type = BDAddress.PUBLIC if
+                            local_peer_addr_type == 0 else
+                            BDAddress.RANDOM
+            )
+
+            remote_peer_addr = local_conn['remote_peer_addr']
+            remote_peer_addr_type = local_conn['remote_peer_addr_type']
+
+            remote_addr_object = BDAddress.from_bytes(
+                remote_peer_addr,
+                addr_type = BDAddress.PUBLIC if
+                            remote_peer_addr_type == 0 else
+                            BDAddress.RANDOM
+            )
+
+            # We are definitely not the initiator but the responder
+            self.state.enc_initiator = False
+            self.state.responder = SM_Peer(local_addr_object)
+
+            # Create the initiator SM_Peer instance
+            # (along with all its parameters are defined in the pairing request)
+            self.state.initiator = SM_Peer(remote_addr_object)
+
+            self.state.initiator.set_security_parameters(
+                oob=(pairing_req.oob == 0x01),
+                bonding=((pairing_req.authentication & 0x03) != 0),
+                mitm=((pairing_req.authentication & 0x04) != 0),
+                lesc=((pairing_req.authentication & 0x08) != 0),
+                keypress=((pairing_req.authentication & 0x10) != 0),
+                max_key_size = pairing_req.max_key_size
+            )
+            self.state.initiator.iocap = pairing_req.iocap
+
+            # Store initiator key distribution options
+            self.state.initiator.distribute_keys(
+                enc_key = ((pairing_req.responder_key_distribution & 0x01) != 0),
+                id_key = ((pairing_req.responder_key_distribution & 0x02) != 0),
+                sign_key =((pairing_req.responder_key_distribution & 0x04) != 0),
+                link_key = ((pairing_req.responder_key_distribution & 0x08) != 0)
+            )
+
+            # Send our pairing response
+            pairing_resp = SM_Pairing_Response(
+                iocap=self.state.responder.iocap,
+                oob=self.state.responder.oob,
+                authentication=self.state.responder.authentication,
+                max_key_size=self.state.responder.max_key_size,
+                initiator_key_distribution=self.state.initiator.get_key_distribution(),
+                responder_key_distribution=self.state.responder.get_key_distribution()
+            )
+
+            # Save pairing response
+            self.state.pairing_resp = pairing_resp
+
+            self.send_data(pairing_resp)
+
+            # Update current state
+            self.state.state = SecurityManagerState.STATE_PAIRING_REQ
+
+        else:
+            logger.info('Unexpected packet received, report error and return to idle.')
+
+            # Notify error
+            error = SM_Failed(
+                reason = SM_ERROR_UNSPEC_REASON
+            )
+            self.send(error)
+
+            # Return to IDLE mode
+            self.__state = SecurityManagerState.STATE_IDLE
+
+
+
+    def on_pairing_response(self, pairing_resp):
+        print("Pairing response")
+
+    def on_pairing_confirm(self, pairing_confirm):
+        print("Pairing request")
+
+    def on_pairing_random(self, pairing_random):
+        print("Pairing random")
+
+    def send_data(self, packet):
+        self.send('l2cap', SM_Hdr()/packet)
+
+'''
+@alias('smp')
+class BleSMP(Layer):
 
     STATE_IDLE = 0x00
     STATE_PAIRING_REQ = 0x01
@@ -545,7 +747,7 @@ class BleSMP(object):
             self.on_pairing_confirm(packet.getlayer(SM_Confirm))
         elif SM_Random in packet:
             self.on_pairing_random(packet.getlayer(SM_Random))
-    
+
     def send(self, packet):
         self.__l2cap.send(SM_Hdr()/packet, channel=0x06)
 
@@ -727,7 +929,7 @@ class BleSMP(object):
         """Handling LL_START_ENC_RSP (channel successfully encrypted).
 
         This method is called when we successfully received and decrypted an
-        encrypted LL_START_ENC_RSP packet from the remote peer. 
+        encrypted LL_START_ENC_RSP packet from the remote peer.
         """
         # Previous state was STATE_LEGACY_PAIRING_RANDOM_SENT
         # since LL_ENC_REQ / LL_ENC_RSP / LL_START_ENC_REQ / LL_START_ENC_RSP
@@ -796,3 +998,4 @@ def test_confirm():
 
     print('Computed CONFIRM: %s' % hexlify(_confirm))
     print('Expected CONFIRM: %s' % hexlify(confirm))
+'''
