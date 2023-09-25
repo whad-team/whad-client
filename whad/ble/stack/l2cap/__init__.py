@@ -5,7 +5,7 @@ from struct import unpack, pack
 from scapy.layers.bluetooth import L2CAP_Hdr, ATT_Hdr, SM_Hdr, L2CAP_CmdHdr, \
     L2CAP_Connection_Parameter_Update_Request, L2CAP_Connection_Parameter_Update_Response
 from whad.ble.stack.att import ATTLayer
-from whad.ble.stack.smp import BleSMP
+from whad.ble.stack.smp import SMPLayer
 
 from whad.common.stack import Layer, alias, source, state, LayerState, ContextualLayer
 
@@ -36,9 +36,9 @@ class L2CAPLayer(ContextualLayer):
 
     def get_local_mtu(self):
         return self.state.local_mtu
-        
+
     @source('ll')
-    def on_data_received(self, l2cap_data, fragment=False):          
+    def on_data_received(self, l2cap_data, fragment=False):
         """Handles incoming L2CAP data"""
         if fragment and self.state.fifo is not None:
             logger.debug('[l2cap] Received a L2CAP fragment of %d bytes' % len(l2cap_data))
@@ -55,7 +55,7 @@ class L2CAPLayer(ContextualLayer):
             # Start of L2CAP or complete L2CAP message
             self.state.fifo = l2cap_data
             logger.debug('[l2cap] received start of fragmented or complete message')
-            
+
             # Check if we have a complete L2CAP message
             self.state.expected_len = unpack('<H', self.state.fifo[:2])[0] + 4
             logger.debug('[l2cap] expected l2cap length: %d' % self.state.expected_len)
@@ -74,12 +74,9 @@ class L2CAPLayer(ContextualLayer):
             self.send('att', packet.getlayer(ATT_Hdr))
         elif L2CAP_CmdHdr in packet:
             self.on_cmd_packet(packet.getlayer(L2CAP_CmdHdr))
-
-        """
         elif SM_Hdr in packet:
-            self.__smp.on_smp_packet(packet.getlayer(SM_Hdr))
-        """
-        
+            self.send('smp', packet.getlayer(SM_Hdr))
+
     def on_cmd_packet(self, packet):
         """Handle L2CAP Connection Parameter Update Requests.
 
@@ -88,13 +85,10 @@ class L2CAPLayer(ContextualLayer):
         if L2CAP_Connection_Parameter_Update_Request in packet:
             logger.debug('[l2cap] Received a L2CAP Connection Parameter Update Request, rejecting')
 
-            # Reject it            
+            # Reject it
             self.send('ll', L2CAP_Hdr()/L2CAP_CmdHdr(id=packet[L2CAP_CmdHdr].id)/L2CAP_Connection_Parameter_Update_Response(move_result=1))
 
-    @source('att')
-    def on_att_packet_recv(self, data, channel='attribute'):
-        """Process incoming packets from ATT that must be forwarded to link layer.
-        """
+    def get_fragments(self, data):
         packets=[]
         # If data is bigger than MTU-1, then split
         if len(data) > self.state.remote_mtu:
@@ -109,6 +103,33 @@ class L2CAPLayer(ContextualLayer):
             packets = [
                 data
             ]
+        return packets
+
+    @source('att')
+    def on_att_packet_recv(self, data, channel='attribute'):
+        """Process incoming packets from ATT that must be forwarded to link layer.
+        """
+        packets = self.get_fragments(data)
+
+        # Send packets
+        for i, pkt in enumerate(packets):
+            # First packet is sent with no fragment flag
+            if i == 0:
+                # Send packet to link layer
+                self.send('ll', L2CAP_Hdr(cid=channel, len=len(data))/pkt, fragment=False)
+            else:
+                # Send packet to link layer
+                self.send('ll', pkt, fragment=True)
+
+
+    @source('smp')
+    def on_smp_packet_recv(self, data, channel=0x06):
+        """Process incoming packets from ATT that must be forwarded to link layer.
+        """
+        # Note: we are forced to hardcode the channel in parameters here, because
+        # scapy does not provide a complete dictionary mapping 0x06 to 'smp'.
+
+        packets = self.get_fragments(data)
 
         # Send packets
         for i, pkt in enumerate(packets):
@@ -121,3 +142,4 @@ class L2CAPLayer(ContextualLayer):
                 self.send('ll', pkt, fragment=True)
 
 L2CAPLayer.add(ATTLayer)
+L2CAPLayer.add(SMPLayer)
