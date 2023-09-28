@@ -825,9 +825,13 @@ class LinkLayer(Layer):
 
             # Notify encryption enabled
             if not self.get_layer('phy').set_encryption(
-                enabled = True,
-                key=session_key,
-                iv=iv
+                conn_handle=conn_handle, 
+                enabled=True,
+                ll_key=session_key,
+                ll_iv=iv,
+                key=encryption_key,
+                rand=enc_req.rand,
+                ediv=enc_req.ediv
             ):
                 logger.info('[llm] Cannot enable encryption')
             else:
@@ -870,8 +874,8 @@ class LinkLayer(Layer):
         # Check if we are the encryption initiator,
         # if yes then we need to answer to this encrypted LL_START_ENC_RSP
         # with another encrypted LL_START_ENC_RSP
-        print(self.state.get_connection_l2cap(conn_handle))
-        if not self.state.get_connection_l2cap(conn_handle).get_layer('smp').is_initiator():
+        l2cap_instance = self.state.get_connection_l2cap(conn_handle)
+        if not self.get_layer(l2cap_instance).get_layer('smp').is_initiator():
             self.send_ctrl_pdu(
                 conn_handle,
                 LL_START_ENC_RSP()
@@ -879,7 +883,7 @@ class LinkLayer(Layer):
 
         # Notify SMP channel is now encrypted
 
-        self.state.get_connection_l2cap(conn_handle).get_layer('smp').on_channel_encrypted()
+        self.get_layer(l2cap_instance).get_layer('smp').on_channel_encrypted()
 
     def on_unknown_rsp(self, conn_handle, unk_rsp):
         pass

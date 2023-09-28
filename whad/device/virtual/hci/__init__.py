@@ -14,7 +14,7 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
     HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect, \
     HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, HCI_Event_Disconnection_Complete, \
-    HCI_Cmd_LE_Set_Scan_Response_Data
+    HCI_Cmd_LE_Set_Scan_Response_Data, HCI_Cmd_LE_Long_Term_Key_Request_Reply
 from whad.device.virtual.hci.converter import HCIConverter
 from whad.device.virtual.hci.hciconfig import HCIConfig
 from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState
@@ -524,6 +524,41 @@ class HCIDevice(VirtualDevice):
             if success:
                 self._advertising = enable
             return success
+
+    def _enable_encryption(self, enable=True, handle=None,  key=None, rand=None, ediv=None):
+        print(self.__converter.pending_key_request)
+        if self.__converter.pending_key_request:
+            response = self._write_command(
+                HCI_Cmd_LE_Long_Term_Key_Request_Reply(
+                    handle=handle,
+                    ltk=key
+                )
+            )
+            self.__converter.pending_key_request = False
+        response = self._write_command(
+            HCI_Cmd_LE_Enable_Encryption(
+                handle=handle,
+                ltk=key,
+                rand=rand,
+                ediv=ediv
+            )
+        )
+        return response.status == 0x00
+
+
+    def _on_whad_ble_set_encryption(self, message):
+        success = self._enable_encryption(
+            message.enabled,
+            message.conn_handle,
+            message.key,
+            message.rand,
+            message.ediv
+        )
+        if success:
+            self._send_whad_command_result(ResultCode.SUCCESS)
+            return
+        self._send_whad_command_result(ResultCode.ERROR)
+
 
     def _on_whad_ble_periph_mode(self, message):
         logger.debug('whad ble periph mode message')

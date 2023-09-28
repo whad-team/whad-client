@@ -797,7 +797,7 @@ class SMPLayer(Layer):
 
         if self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT:
             logger.info('[smp] Channel is now successfully encrypted')
-
+            print("Channel is now successfully encrypted")
             self.state.ltk = generate_random_value(2**self.state.initiator.max_key_size)
             self.state.rand = generate_random_value(2**8)
             self.state.ediv = randint(0, 0x10000)

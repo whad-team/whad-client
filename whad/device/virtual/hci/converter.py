@@ -1,11 +1,13 @@
 from scapy.layers.bluetooth import HCI_Event_LE_Meta, HCI_LE_Meta_Advertising_Reports, \
-    HCI_LE_Meta_Connection_Complete, L2CAP_Hdr, HCI_Hdr, HCI_ACL_Hdr, HCI_Event_Disconnection_Complete
-from scapy.layers.bluetooth4LE import BTLE_DATA
+    HCI_LE_Meta_Connection_Complete, L2CAP_Hdr, HCI_Hdr, HCI_ACL_Hdr, HCI_Event_Disconnection_Complete, \
+    HCI_LE_Meta_Long_Term_Key_Request
+from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL, LL_ENC_REQ
 from whad.scapy.layers.hci import HCI_LE_Meta_Enhanced_Connection_Complete
 from scapy.compat import raw
 from whad.exceptions import WhadDeviceUnsupportedOperation
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import BleAdvType, BleAddrType, BleDirection
+from struct import pack, unpack
 from enum import IntEnum
 
 import logging
@@ -29,6 +31,7 @@ class HCIConverter:
     def __init__(self, device):
         self.__device = device
         self.role = HCIRole.NONE
+        self.pending_key_request = False
 
     def process_message(self, message):
         ll_packet = BTLE_DATA(message.pdu)
@@ -51,11 +54,42 @@ class HCIConverter:
                 return self.process_connection_complete(event[HCI_LE_Meta_Connection_Complete:])
             elif HCI_LE_Meta_Enhanced_Connection_Complete in event:
                 return self.process_connection_complete(event[HCI_LE_Meta_Enhanced_Connection_Complete:])
+            elif HCI_LE_Meta_Long_Term_Key_Request in event:
+                return self.process_long_term_key_request(event[HCI_LE_Meta_Long_Term_Key_Request:])
 
         elif HCI_ACL_Hdr in event:
             return self.process_acl_data(event[HCI_ACL_Hdr:])
         elif HCI_Event_Disconnection_Complete in event:
             return self.process_disconnection_complete(event[HCI_Event_Disconnection_Complete:])
+
+    def process_long_term_key_request(self, event):
+
+        msg = Message()
+        pdu = BTLE_DATA()/BTLE_CTRL()/LL_ENC_REQ(
+            rand = unpack('<Q', event.rand)[0],
+            ediv = event.ediv,
+            # SKD and IV are processed in Link Layer and are not transmitted to Host,
+            # so we can't provide the real value. We arbitrarily set them to 0 to allow
+            # BLE stack to continue its operations.
+            skdm = 0,
+            ivm = 0
+        )
+
+
+        direction = (BleDirection.SLAVE_TO_MASTER if
+                     self.role == HCIRole.CENTRAL else
+                     BleDirection.MASTER_TO_SLAVE
+        )
+        processed = False
+        conn_handle = event.handle
+
+        msg.ble.pdu.direction = direction
+        msg.ble.pdu.conn_handle = conn_handle
+        msg.ble.pdu.pdu = raw(pdu)
+        msg.ble.pdu.processed = processed
+
+        self.pending_key_request = True
+        return [msg]
 
     def process_acl_data(self, event):
         if event.PB == 2 and L2CAP_Hdr in event:
