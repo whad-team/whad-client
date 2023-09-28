@@ -26,11 +26,11 @@ class BleStack(Layer):
     @property
     def bt_version(self):
         return self.__version
-    
+
     @property
     def manufacturer_id(self):
         return self.__manufacturer
-    
+
     @property
     def bt_sub_version(self):
         return self.__sub_version
@@ -90,5 +90,10 @@ class BleStack(Layer):
         logger.debug('sending a control PDU (%d bytes) to conn_handle %d' % (len(pdu), conn_handle))
         self.__connector.send_ctrl_pdu(pdu, conn_handle, encrypt=encrypt)
 
-BleStack.add(LinkLayer)
+    def set_encryption(self, enabled=False, key=None, iv=None):
+        '''Enable or disable encryption using underlying WHAD connector.
+        '''
+        logger.debug('%s encryption (key=%s, iv=%s)' % ("enabling" if enabled else "disabling", key.hex(), iv.hex()))
+        self.__connector.set_encryption(enabled=enabled, key=key, iv=iv)
 
+BleStack.add(LinkLayer)

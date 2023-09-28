@@ -24,7 +24,7 @@ class MyPeripheral(GenericProfile):
     )
 
 my_profile = MyPeripheral()
-periph = Peripheral(WhadDevice.create("hci0"), profile=my_profile)
+periph = Peripheral(WhadDevice.create("uart0"), profile=my_profile)
 
 periph.attach_callback(callback=show)
 
