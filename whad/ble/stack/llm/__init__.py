@@ -788,6 +788,93 @@ class LinkLayer(Layer):
                 )
             )
 
+    def on_enc_rsp(self, conn_handle, enc_rsp):
+        """Encryption response handler
+        """
+        # Retrieve connection handle corresponding to the instance
+
+        encryption_key = None
+        if conn_handle is not None:
+            encryption_key = self.state.get_encryption_key(conn_handle)
+
+
+        # Allowed if we have already negociated an STK
+        if encryption_key is not None and conn_handle is not None:
+
+            skdm, ivm = self.state.get_skd_and_iv(conn_handle)
+            rand, ediv = self.state.get_rand_and_ediv(conn_handle)
+
+            logger.info('[llm] Received LL_ENC_RSP: skds=%s ivs=%s' % (
+                hexlify(pack('<Q', enc_rsp.skds)),
+                hexlify(pack('<I', enc_rsp.ivs)),
+            ))
+
+            logger.info('[llm] Initiate connection LinkLayerCryptoManager')
+
+            # Initiate LLCM
+            self.__llcm = LinkLayerCryptoManager(
+                encryption_key,
+                skdm,
+                ivm,
+                enc_rsp.skds,
+                enc_rsp.ivs
+            )
+
+            # Compute session key
+            master_skd = pack(">Q", skdm)
+            master_iv = pack("<L", ivm)
+            slave_skd = pack(">Q", enc_rsp.skds)
+            slave_iv = pack("<L", enc_rsp.ivs)
+
+            # Generate session key diversifier
+            skd = slave_skd + master_skd
+
+            # Generate initialization vector
+            iv = master_iv + slave_iv
+
+            # Generate session key
+            session_key = e(encryption_key, skd)
+
+            logger.info('[llm] master  skd: %s' % hexlify(master_skd))
+            logger.info('[llm] master   iv: %s' % hexlify(master_iv))
+            logger.info('[llm] slave   skd: %s' % hexlify(slave_skd))
+            logger.info('[llm] slave    iv: %s' % hexlify(slave_iv))
+            logger.info('[llm] Session  TK: %s' % hexlify(encryption_key))
+            logger.info('[llm] Session  iv: %s' % hexlify(iv))
+            logger.info('[llm] Exp. Ses iv: %s' % hexlify(self.__llcm.iv))
+            logger.info('[llm] Session key: %s' % hexlify(session_key))
+
+
+            # Notify encryption enabled
+            if not self.get_layer('phy').set_encryption(
+                conn_handle=conn_handle,
+                enabled=True,
+                ll_key=session_key,
+                ll_iv=iv,
+                key=encryption_key,
+                rand=rand,
+                ediv=ediv
+            ):
+                logger.info('[llm] Cannot enable encryption')
+            else:
+                logger.info('[llm] Encryption enabled in hardware')
+
+            # Start encryption (STK as LTK)
+            self.send_ctrl_pdu(
+                conn_handle,
+                LL_START_ENC_REQ(),
+                encrypt=False
+            )
+
+
+        else:
+            self.send_ctrl_pdu(
+                conn_handle,
+                LL_REJECT_IND(
+                    code=0x1A # Unsupported Remote Feature
+                )
+            )
+
 
     def on_enc_req(self, conn_handle, enc_req):
         """Encryption request handler
@@ -893,11 +980,6 @@ class LinkLayer(Layer):
                     code=0x1A # Unsupported Remote Feature
                 )
             )
-
-    def on_enc_rsp(self, conn_handle, enc_rsp):
-        """Encryption not supported yet
-        """
-        self.on_unsupported_opcode(conn_handle, ENC_RSP)
 
     def on_start_enc_req(self, conn_handle, start_enc_req):
         """Encryption not supported yet
