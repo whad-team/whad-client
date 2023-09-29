@@ -5,7 +5,7 @@ from whad.ble.profile.attribute import UUID
 from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
 from whad.device.uart import WhadDevice
 from time import sleep
-
+import sys
 
 def show(packet):
     print(packet.metadata, repr(packet))
@@ -23,8 +23,11 @@ class MyPeripheral(GenericProfile):
         ),
     )
 
+if len(sys.argv) < 2:
+    print("Usage: python3 ble_peripheral_basic.py <interface>")
+    exit()
 my_profile = MyPeripheral()
-periph = Peripheral(WhadDevice.create("hci0"), profile=my_profile)
+periph = Peripheral(WhadDevice.create(sys.argv[1]), profile=my_profile)
 
 periph.attach_callback(callback=show)
 

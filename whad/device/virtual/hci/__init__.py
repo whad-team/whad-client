@@ -14,7 +14,7 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
     HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect, \
     HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, HCI_Event_Disconnection_Complete, \
-    HCI_Cmd_LE_Set_Scan_Response_Data, HCI_Cmd_LE_Long_Term_Key_Request_Reply
+    HCI_Cmd_LE_Set_Scan_Response_Data, HCI_Cmd_LE_Long_Term_Key_Request_Reply, HCI_Cmd_LE_Start_Encryption_Request
 from whad.device.virtual.hci.converter import HCIConverter
 from whad.device.virtual.hci.hciconfig import HCIConfig
 from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState
@@ -531,22 +531,23 @@ class HCIDevice(VirtualDevice):
             response = self._write_command(
                 HCI_Cmd_LE_Long_Term_Key_Request_Reply(
                     handle=handle,
-                    ltk=key
+                    ltk=key[::-1]
                 )
             )
             self.__converter.pending_key_request = False
-        response = self._write_command(
-            HCI_Cmd_LE_Enable_Encryption(
-                handle=handle,
-                ltk=key,
-                rand=rand,
-                ediv=ediv
+        else:
+            response = self._write_command(
+                HCI_Cmd_LE_Start_Encryption_Request(
+                    handle=handle,
+                    ltk=key[::-1],
+                    rand=rand,
+                    ediv=unpack('<H', ediv)[0]
+                )
             )
-        )
         return response.status == 0x00
 
 
-    def _on_whad_ble_set_encryption(self, message):
+    def _on_whad_ble_encryption(self, message):
         success = self._enable_encryption(
             message.enabled,
             message.conn_handle,

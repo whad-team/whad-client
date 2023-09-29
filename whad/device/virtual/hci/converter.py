@@ -1,7 +1,7 @@
 from scapy.layers.bluetooth import HCI_Event_LE_Meta, HCI_LE_Meta_Advertising_Reports, \
     HCI_LE_Meta_Connection_Complete, L2CAP_Hdr, HCI_Hdr, HCI_ACL_Hdr, HCI_Event_Disconnection_Complete, \
-    HCI_LE_Meta_Long_Term_Key_Request
-from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL, LL_ENC_REQ
+    HCI_LE_Meta_Long_Term_Key_Request, HCI_Event_Encryption_Change
+from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL, LL_ENC_REQ, LL_START_ENC_RSP
 from whad.scapy.layers.hci import HCI_LE_Meta_Enhanced_Connection_Complete
 from scapy.compat import raw
 from whad.exceptions import WhadDeviceUnsupportedOperation
@@ -56,11 +56,30 @@ class HCIConverter:
                 return self.process_connection_complete(event[HCI_LE_Meta_Enhanced_Connection_Complete:])
             elif HCI_LE_Meta_Long_Term_Key_Request in event:
                 return self.process_long_term_key_request(event[HCI_LE_Meta_Long_Term_Key_Request:])
-
+        elif HCI_Event_Encryption_Change in event:
+            return self.process_encryption_change_event(event[HCI_Event_Encryption_Change:])
         elif HCI_ACL_Hdr in event:
             return self.process_acl_data(event[HCI_ACL_Hdr:])
         elif HCI_Event_Disconnection_Complete in event:
             return self.process_disconnection_complete(event[HCI_Event_Disconnection_Complete:])
+
+    def process_encryption_change_event(self, event):
+        msg = Message()
+        pdu = BTLE_DATA()/BTLE_CTRL()/LL_START_ENC_RSP()
+
+        direction = (BleDirection.SLAVE_TO_MASTER if
+                     self.role == HCIRole.CENTRAL else
+                     BleDirection.MASTER_TO_SLAVE
+        )
+        processed = False
+        conn_handle = event.handle
+
+        msg.ble.pdu.direction = direction
+        msg.ble.pdu.conn_handle = conn_handle
+        msg.ble.pdu.pdu = raw(pdu)
+        msg.ble.pdu.processed = processed
+
+        return [msg]
 
     def process_long_term_key_request(self, event):
 
