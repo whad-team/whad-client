@@ -746,6 +746,48 @@ class LinkLayer(Layer):
         if conn is not None:
             self.on_disconnect(conn_handle)
 
+    def start_encryption(self, conn_handle, rand, ediv):
+        """
+        Initiate encryption procedure.
+        """
+        # Retrieve connection handle corresponding to the instance
+
+        encryption_key = None
+        if conn_handle is not None:
+            encryption_key = self.state.get_encryption_key(conn_handle)
+
+        # Allowed if we have already negociated an STK
+        if encryption_key is not None and conn_handle is not None:
+
+            # Generate our SKD and IV
+            skd = randint(0, 0x10000000000000000)
+            iv = randint(0, 0x100000000)
+            self.state.register_skd_and_iv(conn_handle, skd, iv)
+
+            logger.info('[llm] Initiate connection LinkLayerCryptoManager')
+
+            # Save master rand/iv
+            self.state.register_rand_and_ediv(conn_handle, rand, ediv)
+
+            # Send back our parameters
+            self.send_ctrl_pdu(
+                conn_handle,
+                LL_ENC_REQ(
+                    rand = rand,
+                    ediv = ediv,
+                    skdm = skd,
+                    ivm = iv
+                )
+            )
+
+        else:
+            self.send_ctrl_pdu(
+                conn_handle,
+                LL_REJECT_IND(
+                    code=0x1A # Unsupported Remote Feature
+                )
+            )
+
 
     def on_enc_req(self, conn_handle, enc_req):
         """Encryption request handler
@@ -825,7 +867,7 @@ class LinkLayer(Layer):
 
             # Notify encryption enabled
             if not self.get_layer('phy').set_encryption(
-                conn_handle=conn_handle, 
+                conn_handle=conn_handle,
                 enabled=True,
                 ll_key=session_key,
                 ll_iv=iv,

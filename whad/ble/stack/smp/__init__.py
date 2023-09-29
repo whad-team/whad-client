@@ -569,6 +569,104 @@ class SMPLayer(Layer):
         elif SM_Random in smp_pkt:
             self.on_pairing_random(smp_pkt.getlayer(SM_Random))
 
+    def initiate_pairing(
+                            self,
+                            oob=False,
+                            bonding=True,
+                            mitm=False,
+                            lesc=False,
+                            keypress=False,
+                            max_key_size=16,
+                            iocap=IOCAP_NOINPUT_NOOUTPUT,
+                            enc_key=True,
+                            id_key=True,
+                            sign_key=True,
+                            link_key=True
+        ):
+        """
+        Initiate a pairing procedure.
+        """
+
+        if self.state.state == SecurityManagerState.STATE_IDLE:
+            logger.info('Pairing Request initiation ...')
+
+            # Get the current connection handle
+            conn_handle = self.get_layer('l2cap').state.conn_handle
+
+            # Get the current link layer state
+            local_conn = self.get_layer('ll').state.get_connection(conn_handle)
+
+            # Get the local and remote addresses values and types
+            local_peer_addr = local_conn['local_peer_addr']
+            local_peer_addr_type = local_conn['local_peer_addr_type']
+            print(local_peer_addr, local_peer_addr_type)
+            local_addr_object = BDAddress.from_bytes(
+                local_peer_addr,
+                addr_type = BDAddress.PUBLIC if
+                            local_peer_addr_type == 0 else
+                            BDAddress.RANDOM
+            )
+
+            remote_peer_addr = local_conn['remote_peer_addr']
+            remote_peer_addr_type = local_conn['remote_peer_addr_type']
+
+            remote_addr_object = BDAddress.from_bytes(
+                remote_peer_addr,
+                addr_type = BDAddress.PUBLIC if
+                            remote_peer_addr_type == 0 else
+                            BDAddress.RANDOM
+            )
+
+            # We are the initiator
+            self.state.enc_initiator = True
+
+            # Create the responder SM_Peer instance
+            # (along with all its parameters are defined in the pairing request)
+            self.state.initiator = SM_Peer(local_addr_object)
+
+            self.state.initiator.set_security_parameters(
+                oob=oob,
+                bonding=bonding,
+                mitm=mitm,
+                lesc=lesc,
+                keypress=keypress,
+                max_key_size = max_key_size
+            )
+
+            self.state.initiator.iocap = iocap
+
+            # Store initiator key distribution options
+            self.state.initiator.distribute_keys(
+                enc_key = enc_key,
+                id_key = id_key,
+                sign_key = sign_key,
+                link_key = link_key
+            )
+
+            # Send our pairing response
+            pairing_req = SM_Pairing_Request(
+                iocap=self.state.initiator.iocap,
+                oob=self.state.initiator.oob,
+                authentication=self.state.initiator.authentication,
+                max_key_size=self.state.initiator.max_key_size,
+                initiator_key_distribution=self.state.initiator.get_key_distribution(),
+                responder_key_distribution=self.state.initiator.get_key_distribution()
+            )
+
+            # Save pairing request
+            self.state.pairing_req = pairing_req
+
+            self.send_data(pairing_req)
+
+            # Update current state
+            self.state.state = SecurityManagerState.STATE_PAIRING_RSP
+        else:
+            logger.info('We are in an inconsistent state, returning to idle.')
+
+            # Return to IDLE mode
+            self.__state = SecurityManagerState.STATE_IDLE
+
+
     def on_pairing_request(self, pairing_req):
         """Method called when a pairing request is received.
 
@@ -670,7 +768,92 @@ class SMPLayer(Layer):
 
 
     def on_pairing_response(self, pairing_resp):
-        print("Pairing response")
+        """Method called when a pairing response is received.
+
+        :param SM_Pairing_Response pairing_resp: Pairing response packet
+        """
+        logger.info('Received Pairing Response')
+
+        # Make sure we are in a state that allows this pairing request
+        if self.state.state == SecurityManagerState.STATE_PAIRING_RSP:
+            logger.info('Pairing Response accepted, processing ...')
+
+            # Save pairing response
+            self.state.pairing_resp = pairing_resp
+
+
+            # Get the current connection handle
+            conn_handle = self.get_layer('l2cap').state.conn_handle
+
+            # Get the current link layer state
+            local_conn = self.get_layer('ll').state.get_connection(conn_handle)
+
+            remote_peer_addr = local_conn['remote_peer_addr']
+            remote_peer_addr_type = local_conn['remote_peer_addr_type']
+
+            remote_addr_object = BDAddress.from_bytes(
+                remote_peer_addr,
+                addr_type = BDAddress.PUBLIC if
+                            remote_peer_addr_type == 0 else
+                            BDAddress.RANDOM
+            )
+
+            #Configure the responder
+            self.state.responder = SM_Peer(remote_addr_object)
+
+            self.state.responder.set_security_parameters(
+                oob=(pairing_resp.oob == 0x01),
+                bonding=((pairing_resp.authentication & 0x03) != 0),
+                mitm=((pairing_resp.authentication & 0x04) != 0),
+                lesc=((pairing_resp.authentication & 0x08) != 0),
+                keypress=((pairing_resp.authentication & 0x10) != 0),
+                max_key_size = pairing_resp.max_key_size
+            )
+            self.state.responder.iocap = pairing_resp.iocap
+
+            # Store responder key distribution options
+            self.state.responder.distribute_keys(
+                enc_key = ((pairing_resp.responder_key_distribution & 0x01) != 0),
+                id_key = ((pairing_resp.responder_key_distribution & 0x02) != 0),
+                sign_key =((pairing_resp.responder_key_distribution & 0x04) != 0),
+                link_key = ((pairing_resp.responder_key_distribution & 0x08) != 0)
+            )
+
+
+            # Generate a RAND and compute CONFIRM
+            self.state.initiator.generate_legacy_rand()
+            self.state.initiator.confirm = self.compute_confirm_value(
+                self.state.tk,
+                self.state.initiator.rand,
+                self.state.pairing_req,
+                self.state.pairing_resp,
+                self.state.initiator,
+                self.state.responder
+            )
+            logger.debug('[send_pairing_confirm] Computed CONFIRM=%s' % hexlify(self.state.initiator.confirm))
+
+            # Send CONFIRM value (again, we need to reverse its bytes)
+            confirm_value = SM_Confirm(
+                confirm = self.state.initiator.confirm[::-1]
+            )
+            confirm_value.show()
+            self.send_data(confirm_value)
+
+            # Update current state
+            self.state.state = SecurityManagerState.STATE_LEGACY_PAIRING_CONFIRM_SENT
+
+        else:
+            logger.info('Unexpected packet received, report error and return to idle.')
+
+            # Notify error
+            error = SM_Failed(
+                reason = SM_ERROR_UNSPEC_REASON
+            )
+            self.send_data(error)
+
+            # Return to IDLE mode
+            self.__state = SecurityManagerState.STATE_IDLE
+
 
     def on_pairing_confirm(self, confirm):
         """Method called whan a pairing confirm value is received.
@@ -705,6 +888,19 @@ class SMPLayer(Layer):
             # Update current state
             self.state.state = SecurityManagerState.STATE_LEGACY_PAIRING_CONFIRM_SENT
 
+
+        elif self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_CONFIRM_SENT:
+
+            # Store remote peer Confirm value (value is stored byte-reversed in Packet)
+            self.state.responder.confirm = confirm.confirm[::-1]
+
+            # Send back our random
+            rand_value = SM_Random(
+                random = self.state.initiator.rand[::-1]
+            )
+            self.send_data(rand_value)
+
+            self.state.state = SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT
         else:
             logger.info('Pairing Confirm dropped because current state is %d' % self.state.state)
 
@@ -722,13 +918,13 @@ class SMPLayer(Layer):
         """Handling random packet
         """
         logger.info('Received Pairing Random value')
+
         if self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_CONFIRM_SENT:
             logger.info('Pairing Random value is expected, processing ...')
 
             # Save initiator RAND (reverse byte order)
             self.state.initiator.rand = random_pkt.random[::-1]
 
-            self.check_initiator_confirm(self.state.tk)
             if self.check_initiator_confirm(self.state.tk):
                 logger.info('Initiator CONFIRM successfully verified')
                 # Send back our random
@@ -759,9 +955,63 @@ class SMPLayer(Layer):
                 local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.__stk)
 
                 #self.__l2cap.connection.set_stk(self.__stk)
+
             else:
                 logger.info('Invalid Initiator CONFIRM value (expected %s)' % (
                     hexlify(self.state.initiator.confirm),
+                ))
+
+                # Send error
+                error = SM_Failed(
+                    reason = SM_ERROR_CONFIRM_VALUE_FAILED
+                )
+                self.send_data(error)
+
+                # Return to IDLE
+                self.state.state = SecurityManagerState.STATE_IDLE
+
+        elif self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT:
+            logger.info('Pairing Random value is expected, processing ...')
+
+            # Save responder RAND (reverse byte order)
+            self.state.responder.rand = random_pkt.random[::-1]
+
+            if self.check_responder_confirm(
+                self.state.tk,
+                self.state.pairing_req,
+                self.state.pairing_resp,
+                self.state.initiator,
+                self.state.responder
+            ):
+                logger.info('Responder CONFIRM successfully verified')
+
+                # Compute our stk
+                self.__stk = s1(
+                    self.state.tk,
+                    self.state.responder.rand,
+                    self.state.initiator.rand
+                )
+
+
+                logger.debug('[on_pairing_random] STK=%s' % hexlify(self.state.stk))
+
+                # Next state
+                self.state.state = SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_RECVD
+
+                # Notify connection that we successfully negociated STK and that
+                # the corresponding material is available.
+
+                # Get the current connection handle
+                conn_handle = self.get_layer('l2cap').state.conn_handle
+
+                # Get the current link layer state
+                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.__stk)
+
+                self.get_layer('ll').start_encryption(conn_handle, 0, 0)
+
+            else:
+                logger.info('Invalid Responder CONFIRM value (expected %s)' % (
+                    hexlify(self.state.responder.confirm),
                 ))
 
                 # Send error
@@ -797,7 +1047,6 @@ class SMPLayer(Layer):
 
         if self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT:
             logger.info('[smp] Channel is now successfully encrypted')
-            print("Channel is now successfully encrypted")
             self.state.ltk = generate_random_value(8*self.state.initiator.max_key_size)
             self.state.rand = generate_random_value(8*8)
             self.state.ediv = randint(0, 0x10000)

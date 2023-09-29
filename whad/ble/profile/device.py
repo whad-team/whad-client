@@ -15,7 +15,7 @@ target, and will return a `PeripheralDevice` object, as shown below::
 
     central = Central(...)
     target = central.connect('00:11:22:33:44:55')
-    
+
 One can then use this object to discover all the services and characteristics::
 
     target.discover()
@@ -66,7 +66,7 @@ class PeripheralCharacteristicDescriptor:
     @property
     def type_uuid(self):
         """Return this attribute type UUID.
-        
+
         :return UUID: Attribute type UUID
         """
         return self.__descriptor.type_uuid
@@ -233,7 +233,7 @@ class PeripheralCharacteristic:
         access_mask = CharacteristicProperties.WRITE_WITHOUT_RESPONSE | CharacteristicProperties.WRITE
         if (self.__characteristic.properties & access_mask) == CharacteristicProperties.WRITE_WITHOUT_RESPONSE:
             without_response = True
-        
+
         if isinstance(value, bytes):
             if without_response:
                 return self.__gatt.write_command(
@@ -284,7 +284,7 @@ class PeripheralCharacteristic:
         :return bool: True if writeable, False otherwise.
         """
         return (
-            ((self.__characteristic.properties & CharacteristicProperties.WRITE) != 0) or 
+            ((self.__characteristic.properties & CharacteristicProperties.WRITE) != 0) or
             ((self.__characteristic.properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE) != 0)
         )
 
@@ -340,7 +340,7 @@ class PeripheralCharacteristic:
                 return True
             else:
                 return False
-    
+
     def unsubscribe(self):
         """Unsubscribe from this characteristic.
         """
@@ -456,6 +456,7 @@ class PeripheralDevice(GenericProfile):
         :type   from_json:      str, optional
         """
         self.__gatt = gatt_client
+        self.__smp = gatt_client.smp
         self.__conn_handle = conn_handle
         self.__central = central
         self.__disconnect_cb = None
@@ -468,6 +469,9 @@ class PeripheralDevice(GenericProfile):
         """
         return self.__conn_handle
 
+
+    def pairing(self):
+        self.__smp.initiate_pairing()
 
     def set_disconnect_cb(self, callback):
         """Set disconnection callback.
@@ -537,7 +541,7 @@ class PeripheralDevice(GenericProfile):
                     return PeripheralCharacteristic(
                         charac,
                         self.__gatt
-                    )  
+                    )
 
 
     def find_object_by_handle(self, handle):
@@ -670,7 +674,7 @@ class PeripheralDevice(GenericProfile):
         else:
             return self.__gatt.read_long(handle)
 
-    
+
     def on_disconnect(self, conn_handle):
         """Disconnection callback
 
@@ -680,11 +684,3 @@ class PeripheralDevice(GenericProfile):
         logger.debug('PeripheralDevice has disconnected')
         if self.__disconnect_cb is not None:
             self.__disconnect_cb()
-
-                    
-
-
-
-
-
-    

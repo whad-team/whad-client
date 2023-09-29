@@ -39,16 +39,16 @@ class GattLayer(Layer):
 
             GattFindInfoRequest: self.on_find_info_request,
             GattFindInfoResponse: self.on_find_info_response,
-            
+
             GattFindByTypeValueRequest: self.on_find_by_type_value_request,
             GattFindByTypeValueResponse: self.on_find_by_type_value_response,
-            
+
             GattReadByTypeRequest: self.on_read_by_type_request,
             GattReadByTypeResponse: self.on_read_by_type_response,
-            
+
             GattReadByGroupTypeRequest: self.on_read_by_group_type_request,
             GattReadByGroupTypeResponse: self.on_read_by_group_type_response,
-            
+
             GattReadRequest: self.on_read_request,
             GattReadResponse: self.on_read_response,
 
@@ -76,6 +76,10 @@ class GattLayer(Layer):
     @property
     def att(self):
         return self.get_layer('att')
+
+    @property
+    def smp(self):
+        return self.get_layer('smp')
 
     @source('att')
     def on_att_packet(self, packet):
@@ -153,7 +157,7 @@ class GattLayer(Layer):
         self.error(
             BleAttOpcode.FIND_INFO_REQUEST, packet.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
-        
+
     def on_find_info_response(self, packet: GattFindInfoResponse):
         '''ATT Find Information Response callback
 
@@ -1619,7 +1623,7 @@ class GattServer(GattLayer):
 
             # Get MTU
             mtu = self.get_layer('l2cap').get_local_mtu()
-            
+
             # Get item size (UUID size + 2)
             uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
             item_size = uuid_size + 5
