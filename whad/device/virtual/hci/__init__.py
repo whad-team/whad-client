@@ -526,7 +526,7 @@ class HCIDevice(VirtualDevice):
             return success
 
     def _enable_encryption(self, enable=True, handle=None,  key=None, rand=None, ediv=None):
-        print(self.__converter.pending_key_request)
+        print("here")
         if self.__converter.pending_key_request:
             response = self._write_command(
                 HCI_Cmd_LE_Long_Term_Key_Request_Reply(

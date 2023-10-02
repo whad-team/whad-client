@@ -859,14 +859,6 @@ class LinkLayer(Layer):
             else:
                 logger.info('[llm] Encryption enabled in hardware')
 
-            # Start encryption (STK as LTK)
-            self.send_ctrl_pdu(
-                conn_handle,
-                LL_START_ENC_REQ(),
-                encrypt=False
-            )
-
-
         else:
             self.send_ctrl_pdu(
                 conn_handle,
@@ -982,9 +974,14 @@ class LinkLayer(Layer):
             )
 
     def on_start_enc_req(self, conn_handle, start_enc_req):
-        """Encryption not supported yet
+        """Encryption start request handler.
         """
-        self.on_unsupported_opcode(conn_handle, START_ENC_REQ)
+
+        # Start encryption (STK as LTK)
+        self.send_ctrl_pdu(
+            conn_handle,
+            LL_START_ENC_RSP()
+        )
 
     def on_start_enc_rsp(self, conn_handle, start_enc_rsp):
         """Encryption start response handler

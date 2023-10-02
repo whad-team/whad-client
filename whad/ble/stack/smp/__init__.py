@@ -69,6 +69,12 @@ class SM_Peer(object):
         self.__dist_irk = False
         self.__dist_csrk = False
 
+        self.__distributed_ltk = None
+        self.__distributed_rand = None
+        self.__distributed_ediv = None
+        self.__distributed_irk  = None
+        self.__distributed_csrk = None
+
         # Pairing method
         self.__pairing_method = PM_LEGACY_JUSTWORKS
 
@@ -236,6 +242,33 @@ class SM_Peer(object):
         if self.__kd_link_key:
             kd |= 0x08
         return kd
+
+    def indicate_ltk_distribution(self, ltk):
+        self.__distributed_ltk = ltk
+
+    def indicate_rand_ediv_distribution(self, rand, ediv):
+        self.__distributed_rand = rand
+        self.__distributed_ediv = ediv
+
+    def indicate_irk_distribution(self, irk):
+        self.__distributed_irk = irk
+
+    def indicate_csrk_distribution(self, csrk):
+        self.__distributed_csrk = csrk
+
+    def is_key_distribution_complete(self):
+        """
+        Indicate if all keys have been distributed.
+        """
+        if self.must_dist_ltk() and self.__distributed_ltk is None:
+            return False
+        if self.must_dist_ediv_rand() and (self.__distributed_rand is None or self.__distributed_ediv is None):
+            return False
+        if self.must_dist_irk() and (self.__distributed_irk is None):
+            return False
+        if self.must_dist_csrk() and (self.__distributed_csrk is None):
+            return False
+        return True
 
     def must_dist_ltk(self):
         return self.__dist_ltk
@@ -568,6 +601,14 @@ class SMPLayer(Layer):
             self.on_pairing_confirm(smp_pkt.getlayer(SM_Confirm))
         elif SM_Random in smp_pkt:
             self.on_pairing_random(smp_pkt.getlayer(SM_Random))
+        elif SM_Encryption_Information in smp_pkt:
+            self.on_encryption_information(smp_pkt.getlayer(SM_Encryption_Information))
+        elif SM_Master_Identification in smp_pkt:
+            self.on_master_identification(smp_pkt.getlayer(SM_Master_Identification))
+        elif SM_Identity_Information in smp_pkt:
+            self.on_identity_information(smp_pkt.getlayer(SM_Identity_Information))
+        elif SM_Signing_Information in smp_pkt:
+            self.on_signing_information(smp_pkt.getlayer(SM_Signing_Information))
 
     def initiate_pairing(
                             self,
@@ -1047,6 +1088,53 @@ class SMPLayer(Layer):
 
         if self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT:
             logger.info('[smp] Channel is now successfully encrypted')
+
+            self.state.state = SecurityManagerState.STATE_BONDING_DONE
+
+        elif self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_RECVD:
+            logger.info('[smp] Channel is now successfully encrypted')
+            if self.state.initiator.is_key_distribution_complete():
+                self.distribute_keys()
+
+        else:
+            logger.error('[smp] Received an unexpected notification (LL_START_ENC_RSP)')
+
+    def distribute_keys(self):
+        if self.is_initiator():
+            print("Key distribution")
+            self.state.ltk = generate_random_value(8*self.state.responder.max_key_size)
+            self.state.rand = generate_random_value(8*8)
+            self.state.ediv = randint(0, 0x10000)
+
+            # Perform key distribution to responder
+            sleep(.5)
+            if self.state.responder.must_dist_ltk():
+                logger.info('[smp] sending generated LTK ...')
+                self.send_data(SM_Encryption_Information(
+                    ltk=self.state.ltk
+                ))
+                logger.info('[smp] LTK sent.')
+            if self.state.responder.must_dist_ediv_rand():
+                logger.info('[smp] sending generated EDIV/RAND ...')
+                self.send_data(SM_Master_Identification(ediv = self.state.ediv, rand = self.state.rand))
+                logger.info('[smp] EDIV/RAND sent.')
+            if self.state.responder.must_dist_irk():
+                logger.info('[smp] sending generated IRK ...')
+                self.state.irk = generate_random_value(16)
+                self.send_data(SM_Identity_Information(
+                    irk = self.state.irk
+                ))
+                logger.info('[smp] IRK sent.')
+            if self.state.responder.must_dist_csrk():
+                logger.info('[smp] sending generated CSRK ...')
+                self.state.csrk = generate_random_value(16)
+                self.send_data(SM_Signing_Information(
+                    csrk=self.state.csrk
+                ))
+                logger.info('[smp] CSRK sent.')
+                self.state.state = SecurityManagerState.STATE_BONDING_DONE
+
+        else:
             self.state.ltk = generate_random_value(8*self.state.initiator.max_key_size)
             self.state.rand = generate_random_value(8*8)
             self.state.ediv = randint(0, 0x10000)
@@ -1077,9 +1165,51 @@ class SMPLayer(Layer):
                     csrk=self.state.csrk
                 ))
                 logger.info('[smp] CSRK sent.')
-            self.state.state = SecurityManagerState.STATE_BONDING_DONE
+            self.state.state = SecurityManagerState.STATE_DISTRIBUTE_KEY
+
+    def on_encryption_information(self, encryption_information):
+        if self.is_initiator():
+            self.state.initiator.indicate_ltk_distribution(encryption_information.ltk)
+            if self.state.initiator.is_key_distribution_complete():
+                self.distribute_keys()
         else:
-            logger.error('[smp] Received an unexpected notification (LL_START_ENC_RSP)')
+            self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
+            if self.state.responder.is_key_distribution_complete():
+                self.state.state = SecurityManagerState.STATE_BONDING_DONE
+
+    def on_master_identification(self, master_identification):
+        if self.is_initiator():
+            self.state.initiator.indicate_rand_ediv_distribution(master_identification.rand, master_identification.ediv)
+            if self.state.initiator.is_key_distribution_complete():
+                self.distribute_keys()
+        else:
+            self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
+            if self.state.responder.is_key_distribution_complete():
+                self.state.state = SecurityManagerState.STATE_BONDING_DONE
+
+
+    def on_identity_information(self, identity_information):
+        if self.is_initiator():
+            self.state.initiator.indicate_irk_distribution(identity_information.irk)
+            if self.state.initiator.is_key_distribution_complete():
+                self.distribute_keys()
+        else:
+            self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
+            if self.state.responder.is_key_distribution_complete():
+                self.state.state = SecurityManagerState.STATE_BONDING_DONE
+
+
+
+    def on_signing_information(self, signing_information):
+        if self.is_initiator():
+            self.state.initiator.indicate_csrk_distribution(signing_information.csrk)
+            if self.state.initiator.is_key_distribution_complete():
+                self.distribute_keys()
+        else:
+            self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
+            if self.state.responder.is_key_distribution_complete():
+                self.state.state = SecurityManagerState.STATE_BONDING_DONE
+
 
 
     def send_data(self, packet):

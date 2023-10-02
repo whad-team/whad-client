@@ -15,7 +15,7 @@ central.attach_callback(show)
 
 print("New connection")
 #print('Using device: %s' % central.device.device_id)
-device = central.connect('74:DA:EA:91:47:E3', random=False)#, random=False, hop_interval=56, channel_map=0x00000300)
+device = central.connect('F8:9E:94:56:35:91', random=False)#, random=False, hop_interval=56, channel_map=0x00000300)
 # Discover
 device.discover()
 for service in device.services():
