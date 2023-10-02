@@ -800,6 +800,13 @@ class SMPLayer(Layer):
                 link_key = ((pairing_req.initiator_key_distribution & 0x08) != 0)
             )
 
+            self.state.responder.distribute_keys(
+                enc_key = ((self.state.responder.get_key_distribution() & 0x01) != 0),
+                id_key = ((self.state.responder.get_key_distribution() & 0x02) != 0),
+                sign_key =((self.state.responder.get_key_distribution() & 0x04) != 0),
+                link_key = ((self.state.responder.get_key_distribution() & 0x08) != 0)
+            )
+
             # Send our pairing response
             pairing_resp = SM_Pairing_Response(
                 iocap=self.state.responder.iocap,
