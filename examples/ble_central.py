@@ -10,7 +10,7 @@ logging.getLogger('whad.ble.stack.smp').setLevel(logging.DEBUG)
 def show(packet):
     print(packet.metadata, repr(packet))
 
-central = Central(WhadDevice.create('uart0'))
+central = Central(WhadDevice.create('hci0'))
 central.attach_callback(show)
 
 print("New connection")

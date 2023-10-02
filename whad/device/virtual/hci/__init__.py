@@ -526,7 +526,7 @@ class HCIDevice(VirtualDevice):
             return success
 
     def _enable_encryption(self, enable=True, handle=None,  key=None, rand=None, ediv=None):
-        print("here")
+
         if self.__converter.pending_key_request:
             response = self._write_command(
                 HCI_Cmd_LE_Long_Term_Key_Request_Reply(
@@ -648,7 +648,7 @@ class HCIDevice(VirtualDevice):
             self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_ble_send_pdu(self, message):
-        logger.debug('Recevied WHAD BLE send_pdu message')
+        logger.debug('Received WHAD BLE send_pdu message')
         if ((self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE) or
            (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
             try:
@@ -665,6 +665,10 @@ class HCIDevice(VirtualDevice):
                     else:
                         logger.debug('send_pdu command failed.')
                         self._send_whad_command_result(ResultCode.ERROR)
+                pending_messages = self.__converter.get_pending_messages()
+                for pending_message in pending_messages:
+                    self._send_whad_message(pending_message)
+
             except WhadDeviceUnsupportedOperation as err:
                 logger.debug('Parameter error')
                 self._send_whad_command_result(ResultCode.PARAMETER_ERROR)

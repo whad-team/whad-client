@@ -3,7 +3,8 @@
 BleSMP provides these different pairing strategies:
 
 - "Just Works"
-
+- "Legacy Passkey"
+- "Numeric Comparison (LESC) - todo"
 """
 from struct import pack
 from binascii import hexlify
@@ -81,7 +82,7 @@ class SM_Peer(object):
         self.__pairing_method = PM_LEGACY_JUSTWORKS
 
         # IO Capabilities
-        self.__io_cap = IOCAP_NOINPUT_NOOUTPUT
+        self.__io_cap = IOCAP_DISPLAY_ONLY#IOCAP_NOINPUT_NOOUTPUT
 
     @property
     def address(self):
@@ -93,6 +94,9 @@ class SM_Peer(object):
 
     def support_lesc(self):
         return self.__lesc
+
+    def support_oob(self):
+        return self.__oob
 
     def requires_bonding(self):
         return self.__bonding
@@ -267,19 +271,14 @@ class SM_Peer(object):
         Indicate if all keys have been distributed.
         """
         if self.__kd_enc_key and self.__distributed_ltk is None:
-            print("Missing ltk")
             return False
         if self.__kd_enc_key and (self.__distributed_rand is None or self.__distributed_ediv is None):
-            print("Missing ediv/rand")
             return False
         if self.__kd_id_key and (self.__distributed_irk is None):
-            print("Missing irk")
             return False
         if self.__kd_id_key and (self.__distributed_address is None and self.__distributed_address_type is None):
-            print("Missing address and address type")
             return False
         if self.__kd_sign_key and (self.__distributed_csrk is None):
-            print("Missing csrk")
             return False
         return True
 
@@ -508,6 +507,37 @@ class SMPLayer(Layer):
     # Helpers
     ##########
 
+    def key_generation_method_selection(self, initiator, responder):
+        """
+        This method returns the key generation method to select according to
+        the exchanged initiator and responder parameters.
+        """
+        use_lesc = False
+        # If initiator and responder supports LE Secure Connections,
+        # use Table 2.7, Vol. 3, Part H, Bluetooth Core Specification v5.3, p. 1573
+        if initiator.support_lesc() and responder.support_lesc():
+            use_lesc = True
+            if initiator.support_oob() or responder.support_oob():
+                return PM_OOB
+            elif not initiator.support_mitm() and not responder.support_mitm():
+                return PM_LESC_JUSTWORKS
+        # if at least one of the device does not support LE Secure Connections,
+        # use Table 2.6, Vol. 3, Part H, Bluetooth Core Specification v5.3, p. 1572
+        else:
+            use_lesc = False
+            if initiator.support_oob() and responder.support_oob():
+                return PM_OOB
+            elif not initiator.support_mitm() and not responder.support_mitm():
+                return PM_LEGACY_JUSTWORKS
+
+        # If we reach this point, we need to define pairing according to IO capabilities
+        # (see Table 2.8, Vol. 3, Part H, Bluetooth Core Specification v5.3, p. 1573)
+        try:
+            return IOCAP_KEY_GENERATION_MAPPING[(initiator.iocap, responder.iocap)][int(use_lesc)]
+        except IndexError:
+            # it looks like an error occured, let's return None
+            return None
+
     def is_initiator(self):
         return self.state.enc_initiator
 
@@ -624,8 +654,6 @@ class SMPLayer(Layer):
 
         :param Packet packet: Scapy packet containing SMP material
         """
-        print("Incoming packet: ", repr(smp_pkt))
-
         if SM_Pairing_Request in smp_pkt:
             self.on_pairing_request(smp_pkt.getlayer(SM_Pairing_Request))
         elif SM_Pairing_Response in smp_pkt:
@@ -675,7 +703,6 @@ class SMPLayer(Layer):
             # Get the local and remote addresses values and types
             local_peer_addr = local_conn['local_peer_addr']
             local_peer_addr_type = local_conn['local_peer_addr_type']
-            print(local_peer_addr, local_peer_addr_type)
             local_addr_object = BDAddress.from_bytes(
                 local_peer_addr,
                 addr_type = BDAddress.PUBLIC if
@@ -767,7 +794,7 @@ class SMPLayer(Layer):
             # Get the local and remote addresses values and types
             local_peer_addr = local_conn['local_peer_addr']
             local_peer_addr_type = local_conn['local_peer_addr_type']
-            print(local_peer_addr, local_peer_addr_type)
+
             local_addr_object = BDAddress.from_bytes(
                 local_peer_addr,
                 addr_type = BDAddress.PUBLIC if
@@ -825,6 +852,16 @@ class SMPLayer(Layer):
             self.state.pairing_resp = pairing_resp
 
             self.send_data(pairing_resp)
+
+
+            # Check key generation method in use
+            method = self.key_generation_method_selection(self.state.initiator, self.state.responder)
+
+            if method == PM_LEGACY_JUSTWORKS:
+                self.state.tk = b"\x00" * 16
+            elif method == PM_LEGACY_PASSKEY:
+                pin = self.get_pin_code() # TODO: allow to pass a callback here to customize PIN entry
+                self.state.tk = bytes.fromhex("00"*12 + "{:08x}".format(pin))
 
             # Update current state
             self.state.state = SecurityManagerState.STATE_PAIRING_REQ
@@ -896,6 +933,15 @@ class SMPLayer(Layer):
             )
 
 
+            # Check key generation method in use
+            method = self.key_generation_method_selection(self.state.initiator, self.state.responder)
+
+            if method == PM_LEGACY_JUSTWORKS:
+                self.state.tk = b"\x00" * 16
+            elif method == PM_LEGACY_PASSKEY:
+                pin = self.get_pin_code() # TODO: allow to pass a callback here to customize PIN entry
+                self.state.tk = bytes.fromhex("00"*12 + "{:08x}".format(pin))
+
             # Generate a RAND and compute CONFIRM
             self.state.initiator.generate_legacy_rand()
             self.state.initiator.confirm = self.compute_confirm_value(
@@ -912,7 +958,6 @@ class SMPLayer(Layer):
             confirm_value = SM_Confirm(
                 confirm = self.state.initiator.confirm[::-1]
             )
-            confirm_value.show()
             self.send_data(confirm_value)
 
             # Update current state
@@ -930,6 +975,18 @@ class SMPLayer(Layer):
             # Return to IDLE mode
             self.__state = SecurityManagerState.STATE_IDLE
 
+
+    def get_pin_code(self):
+        self_iocap = self.state.initiator.iocap if self.is_initiator() else self.state.responder.iocap
+        print(self_iocap)
+        if self_iocap == IOCAP_KEYBD_ONLY:
+            print("Enter pin code: ")
+            pin_code = input()
+            return int(pin_code)
+        else:
+            pin_code = randint(0, 999999)
+            print("Randomly generated pin code: ", pin_code)
+            return pin_code
 
     def on_pairing_confirm(self, confirm):
         """Method called whan a pairing confirm value is received.
@@ -958,7 +1015,6 @@ class SMPLayer(Layer):
             confirm_value = SM_Confirm(
                 confirm = self.state.responder.confirm[::-1]
             )
-            confirm_value.show()
             self.send_data(confirm_value)
 
             # Update current state
@@ -1225,7 +1281,6 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
-            print(self.state.responder.get_key_distribution())
             self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
@@ -1236,7 +1291,6 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
-            print(self.state.responder.get_key_distribution(), self.state.responder.is_key_distribution_complete())
             self.state.responder.indicate_rand_ediv_distribution(master_identification.rand, master_identification.ediv)
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
@@ -1248,7 +1302,6 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
-            print(self.state.responder.get_key_distribution())
             self.state.responder.indicate_irk_distribution(identity_information.irk)
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
@@ -1260,7 +1313,6 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
-            print(self.state.responder.get_key_distribution())
             self.state.responder.indicate_address_distribution(identity_address_information.address, identity_address_information.atype)
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
@@ -1272,7 +1324,6 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
-            print(self.state.responder.get_key_distribution())
             self.state.responder.indicate_csrk_distribution(signing_information.csrk)
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
