@@ -13,7 +13,7 @@ from time import sleep
 
 from scapy.layers.bluetooth import SM_Pairing_Request, SM_Pairing_Response, SM_Hdr,\
     SM_Confirm, SM_Random, SM_Failed, SM_Encryption_Information, SM_Master_Identification, \
-    SM_Identity_Information, SM_Signing_Information
+    SM_Identity_Information, SM_Signing_Information, SM_Identity_Address_Information
 from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, c1, s1
 
 from whad.ble.bdaddr import BDAddress
