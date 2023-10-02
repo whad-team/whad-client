@@ -1261,7 +1261,7 @@ class SMPLayer(Layer):
                 self.perform_key_distribution()
         else:
             print(self.state.responder.get_key_distribution())
-            self.state.initiator.indicate_address_distribution(identity_address_information.address, identity_address_information.atype)
+            self.state.responder.indicate_address_distribution(identity_address_information.address, identity_address_information.atype)
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
 
