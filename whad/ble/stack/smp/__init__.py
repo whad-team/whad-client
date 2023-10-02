@@ -261,12 +261,16 @@ class SM_Peer(object):
         Indicate if all keys have been distributed.
         """
         if self.must_dist_ltk() and self.__distributed_ltk is None:
+            print("Missing ltk")
             return False
         if self.must_dist_ediv_rand() and (self.__distributed_rand is None or self.__distributed_ediv is None):
+            print("Missing ediv/rand")
             return False
         if self.must_dist_irk() and (self.__distributed_irk is None):
+            print("Missing irk")
             return False
         if self.must_dist_csrk() and (self.__distributed_csrk is None):
+            print("Missing csrk")
             return False
         return True
 
@@ -1140,14 +1144,14 @@ class SMPLayer(Layer):
                 logger.info('[smp] EDIV/RAND sent.')
             if self.state.responder.must_dist_irk():
                 logger.info('[smp] sending generated IRK ...')
-                self.state.irk = generate_random_value(16)
+                self.state.irk = generate_random_value(8*self.state.responder.max_key_size)
                 self.send_data(SM_Identity_Information(
                     irk = self.state.irk
                 ))
                 logger.info('[smp] IRK sent.')
             if self.state.responder.must_dist_csrk():
                 logger.info('[smp] sending generated CSRK ...')
-                self.state.csrk = generate_random_value(16)
+                self.state.csrk = generate_random_value(8*self.state.responder.max_key_size)
                 self.send_data(SM_Signing_Information(
                     csrk=self.state.csrk
                 ))
@@ -1173,14 +1177,14 @@ class SMPLayer(Layer):
                 logger.info('[smp] EDIV/RAND sent.')
             if self.state.initiator.must_dist_irk():
                 logger.info('[smp] sending generated IRK ...')
-                self.state.irk = generate_random_value(16)
+                self.state.irk = generate_random_value(8*self.state.responder.max_key_size)
                 self.send_data(SM_Identity_Information(
                     irk = self.state.irk
                 ))
                 logger.info('[smp] IRK sent.')
             if self.state.initiator.must_dist_csrk():
                 logger.info('[smp] sending generated CSRK ...')
-                self.state.csrk = generate_random_value(16)
+                self.state.csrk = generate_random_value(8*self.state.responder.max_key_size)
                 self.send_data(SM_Signing_Information(
                     csrk=self.state.csrk
                 ))
