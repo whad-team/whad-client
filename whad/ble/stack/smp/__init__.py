@@ -1155,7 +1155,8 @@ class SMPLayer(Layer):
                     csrk=self.state.csrk
                 ))
                 logger.info('[smp] CSRK sent.')
-                self.bonding_done()
+
+            self.bonding_done()
 
         else:
             self.state.ltk = generate_random_value(8*self.state.initiator.max_key_size)
@@ -1188,6 +1189,7 @@ class SMPLayer(Layer):
                     csrk=self.state.csrk
                 ))
                 logger.info('[smp] CSRK sent.')
+
             self.state.state = SecurityManagerState.STATE_DISTRIBUTE_KEY
 
     def on_encryption_information(self, encryption_information):
@@ -1196,6 +1198,7 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
+            print(self.state.responder.get_key_distribution())
             self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
@@ -1206,6 +1209,7 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
+            print(self.state.responder.get_key_distribution())
             self.state.responder.indicate_rand_ediv_distribution(master_identification.rand, master_identification.ediv)
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
@@ -1217,6 +1221,7 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
+            print(self.state.responder.get_key_distribution())
             self.state.responder.indicate_irk_distribution(identity_information.irk)
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
@@ -1229,6 +1234,7 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
+            print(self.state.responder.get_key_distribution())
             self.state.responder.indicate_csrk_distribution(signing_information.csrk)
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
