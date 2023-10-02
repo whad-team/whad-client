@@ -260,16 +260,16 @@ class SM_Peer(object):
         """
         Indicate if all keys have been distributed.
         """
-        if self.must_dist_ltk() and self.__distributed_ltk is None:
+        if self.__kd_enc_key and self.__distributed_ltk is None:
             print("Missing ltk")
             return False
-        if self.must_dist_ediv_rand() and (self.__distributed_rand is None or self.__distributed_ediv is None):
+        if self.__kd_enc_key and (self.__distributed_rand is None or self.__distributed_ediv is None):
             print("Missing ediv/rand")
             return False
-        if self.must_dist_irk() and (self.__distributed_irk is None):
+        if self.__kd_id_key and (self.__distributed_irk is None):
             print("Missing irk")
             return False
-        if self.must_dist_csrk() and (self.__distributed_csrk is None):
+        if self.__kd_sign_key and (self.__distributed_csrk is None):
             print("Missing csrk")
             return False
         return True
@@ -800,13 +800,6 @@ class SMPLayer(Layer):
                 link_key = ((pairing_req.initiator_key_distribution & 0x08) != 0)
             )
 
-            self.state.responder.distribute_keys(
-                enc_key = ((self.state.responder.get_key_distribution() & 0x01) != 0),
-                id_key = ((self.state.responder.get_key_distribution() & 0x02) != 0),
-                sign_key =((self.state.responder.get_key_distribution() & 0x04) != 0),
-                link_key = ((self.state.responder.get_key_distribution() & 0x08) != 0)
-            )
-
             # Send our pairing response
             pairing_resp = SM_Pairing_Response(
                 iocap=self.state.responder.iocap,
@@ -1216,7 +1209,7 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
-            print(self.state.responder.get_key_distribution())
+            print(self.state.responder.get_key_distribution(), self.state.responder.is_key_distribution_complete())
             self.state.responder.indicate_rand_ediv_distribution(master_identification.rand, master_identification.ediv)
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
