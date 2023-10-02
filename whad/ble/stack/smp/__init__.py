@@ -43,10 +43,10 @@ class SM_Peer(object):
         self.__address = address
 
         # Key distribution (by default, corresponds to Legacy JustWorks)
-        self.__kd_link_key = False
-        self.__kd_sign_key = False
+        self.__kd_link_key = True
+        self.__kd_sign_key = True
         self.__kd_enc_key = True
-        self.__kd_id_key = False
+        self.__kd_id_key = True
 
         # Default security parameters
         self.__oob = False
@@ -1194,7 +1194,7 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
-            self.state.responder.indicate_irk_distribution(encryption_information.irk)
+            self.state.responder.indicate_irk_distribution(identity_information.irk)
             if self.state.responder.is_key_distribution_complete():
                 self.state.state = SecurityManagerState.STATE_BONDING_DONE
 
@@ -1206,7 +1206,7 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
-            self.state.responder.indicate_csrk_distribution(encryption_information.csrk)
+            self.state.responder.indicate_csrk_distribution(signing_information.csrk)
             if self.state.responder.is_key_distribution_complete():
                 self.state.state = SecurityManagerState.STATE_BONDING_DONE
 
