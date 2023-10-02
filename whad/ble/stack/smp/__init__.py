@@ -770,10 +770,10 @@ class SMPLayer(Layer):
 
             # Store initiator key distribution options
             self.state.initiator.distribute_keys(
-                enc_key = ((pairing_req.responder_key_distribution & 0x01) != 0),
-                id_key = ((pairing_req.responder_key_distribution & 0x02) != 0),
-                sign_key =((pairing_req.responder_key_distribution & 0x04) != 0),
-                link_key = ((pairing_req.responder_key_distribution & 0x08) != 0)
+                enc_key = ((pairing_req.initiator_key_distribution & 0x01) != 0),
+                id_key = ((pairing_req.initiator_key_distribution & 0x02) != 0),
+                sign_key =((pairing_req.initiator_key_distribution & 0x04) != 0),
+                link_key = ((pairing_req.initiator_key_distribution & 0x08) != 0)
             )
 
             # Send our pairing response
