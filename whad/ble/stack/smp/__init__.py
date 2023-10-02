@@ -270,6 +270,26 @@ class SM_Peer(object):
             return False
         return True
 
+    @property
+    def ltk(self):
+        return self.__distributed_ltk
+
+    @property
+    def rand(self):
+        return self.__distributed_rand
+
+    @property
+    def ediv(self):
+        return self.__distributed_ediv
+
+    @property
+    def irk(self):
+        return self.__distributed_irk
+
+    @property
+    def csrk(self):
+        return self.__distributed_csrk
+
     def must_dist_ltk(self):
         return self.__dist_ltk
 
@@ -1089,7 +1109,7 @@ class SMPLayer(Layer):
         if self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT:
             logger.info('[smp] Channel is now successfully encrypted')
             self.perform_key_distribution()
-            self.state.state = SecurityManagerState.STATE_BONDING_DONE
+            self.bonding_done()
 
         elif self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_RECVD:
             logger.info('[smp] Channel is now successfully encrypted')
@@ -1100,7 +1120,7 @@ class SMPLayer(Layer):
             logger.error('[smp] Received an unexpected notification (LL_START_ENC_RSP)')
 
     def perform_key_distribution(self):
-        print("Key distribution")
+
         if self.is_initiator():
             self.state.ltk = generate_random_value(8*self.state.responder.max_key_size)
             self.state.rand = generate_random_value(8*8)
@@ -1132,7 +1152,7 @@ class SMPLayer(Layer):
                     csrk=self.state.csrk
                 ))
                 logger.info('[smp] CSRK sent.')
-                self.state.state = SecurityManagerState.STATE_BONDING_DONE
+                self.bonding_done()
 
         else:
             self.state.ltk = generate_random_value(8*self.state.initiator.max_key_size)
@@ -1175,7 +1195,7 @@ class SMPLayer(Layer):
         else:
             self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
             if self.state.responder.is_key_distribution_complete():
-                self.state.state = SecurityManagerState.STATE_BONDING_DONE
+                self.bonding_done()
 
     def on_master_identification(self, master_identification):
         if self.is_initiator():
@@ -1185,7 +1205,7 @@ class SMPLayer(Layer):
         else:
             self.state.responder.indicate_rand_ediv_distribution(master_identification.rand, master_identification.ediv)
             if self.state.responder.is_key_distribution_complete():
-                self.state.state = SecurityManagerState.STATE_BONDING_DONE
+                self.bonding_done()
 
 
     def on_identity_information(self, identity_information):
@@ -1196,7 +1216,7 @@ class SMPLayer(Layer):
         else:
             self.state.responder.indicate_irk_distribution(identity_information.irk)
             if self.state.responder.is_key_distribution_complete():
-                self.state.state = SecurityManagerState.STATE_BONDING_DONE
+                self.bonding_done()
 
 
 
@@ -1208,9 +1228,57 @@ class SMPLayer(Layer):
         else:
             self.state.responder.indicate_csrk_distribution(signing_information.csrk)
             if self.state.responder.is_key_distribution_complete():
-                self.state.state = SecurityManagerState.STATE_BONDING_DONE
+                self.bonding_done()
 
 
+    def bonding_done(self):
+        print("Bonding done.")
+        if self.is_initiator():
+            if self.state.ltk is not None:
+                print("Distributed LTK: ", self.state.ltk.hex())
+            if self.state.rand is not None:
+                print("Distributed RAND: ", self.state.rand.hex())
+            if self.state.ediv is not None:
+                print("Distributed EDIV: ", hex(self.state.ediv))
+            if self.state.irk is not None:
+                print("Distributed IRK: ", self.state.irk.hex())
+            if self.state.csrk is not None:
+                print("Distributed CSRK: ", self.state.csrk.hex())
+
+            if self.state.initiator.ltk is not None:
+                print("Received LTK: ", self.state.initiator.ltk.hex())
+            if self.state.initiator.rand is not None:
+                print("Received RAND: ", self.state.initiator.rand.hex())
+            if self.state.initiator.ediv is not None:
+                print("Received EDIV: ", hex(self.state.initiator.ediv))
+            if self.state.initiator.irk is not None:
+                print("Received IRK: ", self.state.initiator.irk.hex())
+            if self.state.initiator.csrk is not None:
+                print("Received CSRK: ", self.state.initiator.csrk.hex())
+        else:
+            if self.state.ltk is not None:
+                print("Distributed LTK: ", self.state.ltk.hex())
+            if self.state.rand is not None:
+                print("Distributed RAND: ", self.state.rand.hex())
+            if self.state.ediv is not None:
+                print("Distributed EDIV: ", hex(self.state.ediv))
+            if self.state.irk is not None:
+                print("Distributed IRK: ", self.state.irk.hex())
+            if self.state.csrk is not None:
+                print("Distributed CSRK: ", self.state.csrk.hex())
+
+            if self.state.responder.ltk is not None:
+                print("Received LTK: ", self.state.responder.ltk.hex())
+            if self.state.responder.rand is not None:
+                print("Received RAND: ", self.state.responder.rand.hex())
+            if self.state.responder.ediv is not None:
+                print("Received EDIV: ", hex(self.state.responder.ediv))
+            if self.state.responder.irk is not None:
+                print("Received IRK: ", self.state.responder.irk.hex())
+            if self.state.responder.csrk is not None:
+                print("Received CSRK: ", self.state.responder.csrk.hex())
+
+        self.state.state = SecurityManagerState.STATE_BONDING_DONE
 
     def send_data(self, packet):
         self.send('l2cap', SM_Hdr()/packet)
