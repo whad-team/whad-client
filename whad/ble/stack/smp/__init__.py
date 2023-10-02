@@ -1183,7 +1183,7 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
-            self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
+            self.state.responder.indicate_rand_ediv_distribution(master_identification.rand, master_identification.ediv)
             if self.state.responder.is_key_distribution_complete():
                 self.state.state = SecurityManagerState.STATE_BONDING_DONE
 
@@ -1194,7 +1194,7 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
-            self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
+            self.state.responder.indicate_irk_distribution(encryption_information.irk)
             if self.state.responder.is_key_distribution_complete():
                 self.state.state = SecurityManagerState.STATE_BONDING_DONE
 
@@ -1206,7 +1206,7 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
         else:
-            self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
+            self.state.responder.indicate_csrk_distribution(encryption_information.csrk)
             if self.state.responder.is_key_distribution_complete():
                 self.state.state = SecurityManagerState.STATE_BONDING_DONE
 
