@@ -72,6 +72,8 @@ class SM_Peer(object):
         self.__distributed_ltk = None
         self.__distributed_rand = None
         self.__distributed_ediv = None
+        self.__distributed_address = None
+        self.__distributed_address_type = None
         self.__distributed_irk  = None
         self.__distributed_csrk = None
 
@@ -256,6 +258,10 @@ class SM_Peer(object):
     def indicate_csrk_distribution(self, csrk):
         self.__distributed_csrk = csrk
 
+    def indicate_address_distribution(self, address, address_type):
+        self.__distributed_address = address
+        self.__distributed_address_type = address_type
+
     def is_key_distribution_complete(self):
         """
         Indicate if all keys have been distributed.
@@ -268,6 +274,9 @@ class SM_Peer(object):
             return False
         if self.__kd_id_key and (self.__distributed_irk is None):
             print("Missing irk")
+            return False
+        if self.__kd_id_key and (self.__distributed_address is None and self.__distributed_address_type is None):
+            print("Missing address and address type")
             return False
         if self.__kd_sign_key and (self.__distributed_csrk is None):
             print("Missing csrk")
@@ -631,6 +640,8 @@ class SMPLayer(Layer):
             self.on_master_identification(smp_pkt.getlayer(SM_Master_Identification))
         elif SM_Identity_Information in smp_pkt:
             self.on_identity_information(smp_pkt.getlayer(SM_Identity_Information))
+        elif SM_Identity_Address_Information in smp_pkt:
+            self.on_identity_address_information(smp_pkt.getlayer(SM_Identity_Address_Information))
         elif SM_Signing_Information in smp_pkt:
             self.on_signing_information(smp_pkt.getlayer(SM_Signing_Information))
 
@@ -1242,6 +1253,17 @@ class SMPLayer(Layer):
             if self.state.responder.is_key_distribution_complete():
                 self.bonding_done()
 
+
+    def on_identity_address_information(self, identity_address_information):
+        if self.is_initiator():
+            self.state.initiator.indicate_address_distribution(identity_address_information.address, identity_address_information.atype)
+            if self.state.initiator.is_key_distribution_complete():
+                self.perform_key_distribution()
+        else:
+            print(self.state.responder.get_key_distribution())
+            self.state.initiator.indicate_address_distribution(identity_address_information.address, identity_address_information.atype)
+            if self.state.responder.is_key_distribution_complete():
+                self.bonding_done()
 
 
     def on_signing_information(self, signing_information):
