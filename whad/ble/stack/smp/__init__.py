@@ -1088,20 +1088,20 @@ class SMPLayer(Layer):
 
         if self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT:
             logger.info('[smp] Channel is now successfully encrypted')
-            self.distribute_keys()
+            self.perform_key_distribution()
             self.state.state = SecurityManagerState.STATE_BONDING_DONE
 
         elif self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_RECVD:
             logger.info('[smp] Channel is now successfully encrypted')
             if self.state.initiator.is_key_distribution_complete():
-                self.distribute_keys()
+                self.perform_key_distribution()
 
         else:
             logger.error('[smp] Received an unexpected notification (LL_START_ENC_RSP)')
 
-    def distribute_keys(self):
+    def perform_key_distribution(self):
+        print("Key distribution")
         if self.is_initiator():
-            print("Key distribution")
             self.state.ltk = generate_random_value(8*self.state.responder.max_key_size)
             self.state.rand = generate_random_value(8*8)
             self.state.ediv = randint(0, 0x10000)
@@ -1171,7 +1171,7 @@ class SMPLayer(Layer):
         if self.is_initiator():
             self.state.initiator.indicate_ltk_distribution(encryption_information.ltk)
             if self.state.initiator.is_key_distribution_complete():
-                self.distribute_keys()
+                self.perform_key_distribution()
         else:
             self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
             if self.state.responder.is_key_distribution_complete():
@@ -1181,7 +1181,7 @@ class SMPLayer(Layer):
         if self.is_initiator():
             self.state.initiator.indicate_rand_ediv_distribution(master_identification.rand, master_identification.ediv)
             if self.state.initiator.is_key_distribution_complete():
-                self.distribute_keys()
+                self.perform_key_distribution()
         else:
             self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
             if self.state.responder.is_key_distribution_complete():
@@ -1192,7 +1192,7 @@ class SMPLayer(Layer):
         if self.is_initiator():
             self.state.initiator.indicate_irk_distribution(identity_information.irk)
             if self.state.initiator.is_key_distribution_complete():
-                self.distribute_keys()
+                self.perform_key_distribution()
         else:
             self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
             if self.state.responder.is_key_distribution_complete():
@@ -1204,7 +1204,7 @@ class SMPLayer(Layer):
         if self.is_initiator():
             self.state.initiator.indicate_csrk_distribution(signing_information.csrk)
             if self.state.initiator.is_key_distribution_complete():
-                self.distribute_keys()
+                self.perform_key_distribution()
         else:
             self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
             if self.state.responder.is_key_distribution_complete():
