@@ -1148,6 +1148,15 @@ class SMPLayer(Layer):
                     irk = self.state.irk
                 ))
                 logger.info('[smp] IRK sent.')
+                self.send_data(
+                    SM_Identity_Address_Information(
+                        atype = self.state.initiator.address_type,
+                        address = self.state.initiator.address
+                    )
+                )
+                logger.info('[smp] Address information sent.')
+
+
             if self.state.responder.must_dist_csrk():
                 logger.info('[smp] sending generated CSRK ...')
                 self.state.csrk = generate_random_value(8*self.state.responder.max_key_size)
@@ -1182,6 +1191,13 @@ class SMPLayer(Layer):
                     irk = self.state.irk
                 ))
                 logger.info('[smp] IRK sent.')
+                self.send_data(
+                    SM_Identity_Address_Information(
+                        atype = self.state.responder.address_type,
+                        address = self.state.responder.address
+                    )
+                )
+                logger.info('[smp] Address information sent.')
             if self.state.initiator.must_dist_csrk():
                 logger.info('[smp] sending generated CSRK ...')
                 self.state.csrk = generate_random_value(8*self.state.responder.max_key_size)
