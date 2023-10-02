@@ -1113,7 +1113,6 @@ class SMPLayer(Layer):
         if self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT:
             logger.info('[smp] Channel is now successfully encrypted')
             self.perform_key_distribution()
-            self.bonding_done()
 
         elif self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_RECVD:
             logger.info('[smp] Channel is now successfully encrypted')
