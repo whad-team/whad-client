@@ -139,7 +139,7 @@ class BleConnection(object):
     @property
     def conn_handle(self):
         return self.__conn_handle
-    
+
     @property
     def remote_version(self):
         return self.__version_remote
@@ -310,7 +310,7 @@ class BleConnection(object):
         self.send_control(
             BTLE_CTRL() / LL_FEATURE_RSP(feature_set=[
                 'le_encryption',
-                'le_ping'                
+                'le_ping'
             ])
         )
 
@@ -391,7 +391,7 @@ class BleConnection(object):
                 )
             )
 '''
-            
+
 class BleConnection(object):
 
     def __init__(self, l2cap_instance, conn_handle, local_peer_addr, remote_peer_addr):
@@ -409,19 +409,23 @@ class BleConnection(object):
     @property
     def local_peer(self):
         return self.__local_peer
-    
+
     @property
     def conn_handle(self):
         return self.__conn_handle
 
     @property
+    def l2cap(self):
+        return self.__l2cap
+
+    @property
     def gatt(self):
         return self.__l2cap.get_layer('gatt')
-    
+
     @property
     def phy(self):
         return self.__l2cap.get_layer('phy')
-    
+
     @property
     def ll(self):
         return self.__l2cap.get_layer('ll')
@@ -486,12 +490,21 @@ class LinkLayerState(LayerState):
             return self.connections[conn_handle]
         else:
             raise IndexError
-        
-    def register_connection(self, conn_handle, l2cap_instance):
+
+    def register_connection(self, conn_handle, l2cap_instance, local_peer_addr, remote_peer_addr):
         self.connections[conn_handle] = {
             'l2cap': l2cap_instance,
+            'local_peer_addr': local_peer_addr.value,
+            'local_peer_addr_type': local_peer_addr.type,
+            'remote_peer_addr': remote_peer_addr.value,
+            'remote_peer_addr_type': remote_peer_addr.type,
             'version_sent': False,  # version exchanged
             'version_remote': None,
+            'encryption_key':None,
+            'skd':None,
+            'iv':None,
+            'rand':None,
+            'ediv':None,
             'nb_pdu_recvd': 0       # number of packets received
         }
 
@@ -510,6 +523,40 @@ class LinkLayerState(LayerState):
                 return conn_handle
         return
 
+    def register_encryption_key(self, conn_handle, key):
+        if conn_handle in self.connections:
+            self.connections[conn_handle]['encryption_key'] = key
+
+    def get_encryption_key(self, conn_handle):
+        if conn_handle in self.connections:
+            return self.connections[conn_handle]['encryption_key']
+        return None
+
+    def register_skd_and_iv(self, conn_handle, skd, iv):
+        if conn_handle in self.connections:
+            self.connections[conn_handle]['skd'] = skd
+            self.connections[conn_handle]['iv'] = iv
+
+
+    def get_skd_and_iv(self, conn_handle):
+        if conn_handle in self.connections:
+            skd = self.connections[conn_handle]['skd']
+            iv = self.connections[conn_handle]['iv']
+            return (skd, iv)
+        return (None, None)
+
+    def register_rand_and_ediv(self, conn_handle, rand, ediv):
+        if conn_handle in self.connections:
+            self.connections[conn_handle]['rand'] = rand
+            self.connections[conn_handle]['ediv'] = ediv
+
+    def get_rand_and_ediv(self, conn_handle):
+        if conn_handle in self.connections:
+            rand = self.connections[conn_handle]['rand']
+            ediv = self.connections[conn_handle]['ediv']
+            return (rand, ediv)
+        return (None, None)
+
     def mark_version_sent(self, conn_handle):
         if conn_handle in self.connections:
             self.connections[conn_handle]['version_sent'] = True
@@ -518,7 +565,7 @@ class LinkLayerState(LayerState):
         if conn_handle in self.connections:
             self.connections[conn_handle]['version_sent']
         return False
-    
+
     def set_version_remote(self, conn_handle, version):
         if conn_handle in self.connections:
             self.connections[conn_handle]['version_remote'] = version
@@ -569,7 +616,7 @@ class LinkLayer(Layer):
             conn_l2cap.set_conn_handle(conn_handle)
 
             # Update state with new connection
-            self.state.register_connection(conn_handle, conn_l2cap.name)
+            self.state.register_connection(conn_handle, conn_l2cap.name, local_peer_addr, remote_peer_addr)
 
             # Return connection object
             return BleConnection(
@@ -606,7 +653,7 @@ class LinkLayer(Layer):
         if conn_handle in self.state.connections:
             conn_metadata = self.state.get_connection(conn_handle)
             conn_metadata['nb_pdu_recvd'] += 1
-        
+
         # We received a data PDU
         self.on_data_pdu(pdu, conn_handle)
 
@@ -699,10 +746,107 @@ class LinkLayer(Layer):
         if conn is not None:
             self.on_disconnect(conn_handle)
 
+
     def on_enc_req(self, conn_handle, enc_req):
         """Encryption request handler
         """
-        self.on_unsupported_opcode(conn_handle, ENC_REQ)
+        # Retrieve connection handle corresponding to the instance
+
+        encryption_key = None
+        if conn_handle is not None:
+            encryption_key = self.state.get_encryption_key(conn_handle)
+
+        # Allowed if we have already negociated an STK
+        if encryption_key is not None and conn_handle is not None:
+
+            # Generate our SKD and IV
+            skd = randint(0, 0x10000000000000000)
+            iv = randint(0, 0x100000000)
+            self.state.register_skd_and_iv(conn_handle, skd, iv)
+
+            logger.info('[llm] Received LL_ENC_REQ: rand=%s ediv=%s skd=%s iv=%s' % (
+                hexlify(pack('<Q', enc_req.rand)),
+                hexlify(pack('<H', enc_req.ediv)),
+                hexlify(pack('<Q', enc_req.skdm)),
+                hexlify(pack('<I', enc_req.ivm)),
+            ))
+
+            logger.info('[llm] Initiate connection LinkLayerCryptoManager')
+
+            # Save master rand/iv
+            self.state.register_rand_and_ediv(conn_handle, enc_req.rand, enc_req.ediv)
+
+            # Initiate LLCM
+            self.__llcm = LinkLayerCryptoManager(
+                encryption_key,
+                enc_req.skdm,
+                enc_req.ivm,
+                skd,
+                iv
+            )
+
+            # Compute session key
+            master_skd = pack(">Q", enc_req.skdm)
+            master_iv = pack("<L", enc_req.ivm)
+            slave_skd = pack(">Q", skd)
+            slave_iv = pack("<L", iv)
+
+            # Generate session key diversifier
+            skd = slave_skd + master_skd
+
+            # Generate initialization vector
+            iv = master_iv + slave_iv
+
+            # Generate session key
+            session_key = e(encryption_key, skd)
+
+            logger.info('[llm] master  skd: %s' % hexlify(master_skd))
+            logger.info('[llm] master   iv: %s' % hexlify(master_iv))
+            logger.info('[llm] slave   skd: %s' % hexlify(slave_skd))
+            logger.info('[llm] slave    iv: %s' % hexlify(slave_iv))
+            logger.info('[llm] Session  TK: %s' % hexlify(encryption_key))
+            logger.info('[llm] Session  iv: %s' % hexlify(iv))
+            logger.info('[llm] Exp. Ses iv: %s' % hexlify(self.__llcm.iv))
+            logger.info('[llm] Session key: %s' % hexlify(session_key))
+            skdm, ivm = self.state.get_skd_and_iv(conn_handle)
+            logger.info('[llm] Send LL_ENC_RSP: skd=%s iv=%s' % (
+                hexlify(pack('<Q', skdm)),
+                hexlify(pack('<I', ivm))
+            ))
+
+            # Send back our parameters
+            self.send_ctrl_pdu(
+                conn_handle,
+                LL_ENC_RSP(
+                    skds = skdm,
+                    ivs = ivm
+                )
+            )
+
+            # Notify encryption enabled
+            if not self.get_layer('phy').set_encryption(
+                enabled = True,
+                key=session_key,
+                iv=iv
+            ):
+                logger.info('[llm] Cannot enable encryption')
+            else:
+                logger.info('[llm] Encryption enabled in hardware')
+
+            # Start encryption (STK as LTK)
+            self.send_ctrl_pdu(
+                conn_handle,
+                LL_START_ENC_REQ(),
+                encrypt=False
+            )
+
+        else:
+            self.send_ctrl_pdu(
+                conn_handle,
+                LL_REJECT_IND(
+                    code=0x1A # Unsupported Remote Feature
+                )
+            )
 
     def on_enc_rsp(self, conn_handle, enc_rsp):
         """Encryption not supported yet
@@ -716,8 +860,26 @@ class LinkLayer(Layer):
 
     def on_start_enc_rsp(self, conn_handle, start_enc_rsp):
         """Encryption start response handler
+
+        Normally, we get this packet when a link has successfully
+        been encrypted (with STK or LTK). So we need to notify the
+        SMP that encryption has been acknowledged by the remote peer.
+
+
         """
-        self.on_unsupported_opcode(conn_handle, START_ENC_RSP)
+        # Check if we are the encryption initiator,
+        # if yes then we need to answer to this encrypted LL_START_ENC_RSP
+        # with another encrypted LL_START_ENC_RSP
+        print(self.state.get_connection_l2cap(conn_handle))
+        if not self.state.get_connection_l2cap(conn_handle).get_layer('smp').is_initiator():
+            self.send_ctrl_pdu(
+                conn_handle,
+                LL_START_ENC_RSP()
+            )
+
+        # Notify SMP channel is now encrypted
+
+        self.state.get_connection_l2cap(conn_handle).get_layer('smp').on_channel_encrypted()
 
     def on_unknown_rsp(self, conn_handle, unk_rsp):
         pass
@@ -731,7 +893,7 @@ class LinkLayer(Layer):
             conn_handle,
             LL_FEATURE_RSP(feature_set=[
                 'le_encryption',
-                'le_ping'                
+                'le_ping'
             ])
         )
 

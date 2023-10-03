@@ -86,7 +86,7 @@ class Keyboard(Unifying):
         self.__stack.on_pdu(packet)
 
     def synchronize(self,timeout=10):
-        return self.__stack.ll.synchronize(timeout=10)
+        return self.__stack.ll.synchronize(timeout=timeout)
 
     def lock(self):
         return self.__stack.app.lock_channel()

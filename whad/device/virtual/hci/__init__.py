@@ -282,7 +282,7 @@ class HCIDevice(VirtualDevice):
         Reset HCI device.
         """
         response = self._write_command(HCI_Cmd_Reset())
-        return response.status == 0x00
+        return response is not None and response.status == 0x0
 
 
     def _set_event_filter(self, type=0):
@@ -290,28 +290,28 @@ class HCIDevice(VirtualDevice):
         Configure HCI device event filter.
         """
         response = self._write_command(HCI_Cmd_Set_Event_Filter(type=type))
-        return response.status == 0x00
+        return response is not None and response.status == 0x00
 
     def _set_event_mask(self, mask=b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d"):
         """
         Configure HCI device event mask.
         """
         response = self._write_command(HCI_Cmd_Set_Event_Mask(mask=mask))
-        return response.status == 0x00
+        return response is not None and response.status == 0x00
 
     def _set_connection_accept_timeout(self, timeout=32000):
         """
         Configure HCI device connection accept timeout.
         """
         response = self._write_command(HCI_Cmd_Connect_Accept_Timeout(timeout=timeout))
-        return response.status == 0x00
+        return response is not None and response.status == 0x00
 
     def _indicates_LE_support(self):
         """
         Indicates to HCI Device that the Host supports Low Energy mode.
         """
         response = self._write_command(HCI_Cmd_LE_Host_Supported())
-        return response.status == 0x00
+        return response is not None and response.status == 0x00
 
     def _initialize(self):
         """
@@ -443,14 +443,14 @@ class HCIDevice(VirtualDevice):
         Configure Scan parameters for HCI device.
         """
         response = self._write_command(HCI_Cmd_LE_Set_Scan_Parameters(type=int(active)))
-        return response.status == 0x00
+        return response is not None and response.status == 0x00
 
     def _set_scan_mode(self, enable=True):
         """
         Enable or disable scan mode for HCI device.
         """
         response = self._write_command(HCI_Cmd_LE_Set_Scan_Enable(enable=int(enable), filter_dups=False))
-        return response.status == 0x00
+        return response is not None and response.status == 0x00
 
     def _connect(self, bd_address, bd_address_type=BleAddrType.PUBLIC, hop_interval=96, channel_map=None):
         """
@@ -463,14 +463,14 @@ class HCIDevice(VirtualDevice):
             if response.status != 0x00:
                 return False
         response = self._write_command(HCI_Cmd_LE_Create_Connection(paddr=bd_address, patype=patype, min_interval=hop_interval, max_interval=hop_interval))
-        return response.status == 0x00
+        return response is not None and response.status == 0x00
 
     def _disconnect(self, handle):
         """
         Establish a disconnection using HCI device.
         """
         response = self._write_command(HCI_Cmd_Disconnect(handle=handle))
-        return response.status == 0x00
+        return response is not None and response.status == 0x00
 
     def _set_advertising_data(self, data, wait_response=True):
         """
@@ -483,7 +483,7 @@ class HCIDevice(VirtualDevice):
         # Send command
         if wait_response:
             response = self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data))
-            return response.status == 0x00
+            return response is not None and response.status == 0x0
         else:
             self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data), wait_response=False)
             return True
@@ -497,7 +497,7 @@ class HCIDevice(VirtualDevice):
                     data=data + (31 - len(data)) * b"\x00", len=len(data)
                 )
             )
-            return response.status == 0x00
+            return response is not None and response.status == 0x0
         else:
             response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(
                     data=data + (31 - len(data)) * b"\x00", len=len(data)

@@ -653,6 +653,8 @@ class BLE(WhadDeviceConnector):
 
     def set_encryption(self, enabled=False, key=None, iv=None):
         """Notify WHAD device about encryption status
+
+        TODO: add support of rand and ediv to allow HCI device encryption
         """
         # Send SetEncryptionCmd to device
         msg = Message()
