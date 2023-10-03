@@ -14,9 +14,10 @@ from time import sleep
 
 from scapy.layers.bluetooth import SM_Pairing_Request, SM_Pairing_Response, SM_Hdr,\
     SM_Confirm, SM_Random, SM_Failed, SM_Encryption_Information, SM_Master_Identification, \
-    SM_Identity_Information, SM_Signing_Information, SM_Identity_Address_Information
-from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, c1, s1
-
+    SM_Identity_Information, SM_Signing_Information, SM_Identity_Address_Information, SM_Public_Key
+from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, c1, s1, \
+    generate_public_key_from_coordinates, generate_diffie_hellman_shared_secret, \
+    generate_p256_keypair
 from whad.ble.bdaddr import BDAddress
 from whad.ble.stack.smp.constants import *
 from whad.ble.stack.smp.exceptions import SMInvalidParameterFormat
@@ -53,7 +54,7 @@ class SM_Peer(object):
         self.__oob = False
         self.__bonding = False
         self.__mitm = False
-        self.__lesc = False
+        self.__lesc = True
         self.__keypress = False
         self.__ct2 = False
         self.__max_key_size = 16
@@ -82,7 +83,7 @@ class SM_Peer(object):
         self.__pairing_method = PM_LEGACY_JUSTWORKS
 
         # IO Capabilities
-        self.__io_cap = IOCAP_DISPLAY_ONLY#IOCAP_NOINPUT_NOOUTPUT
+        self.__io_cap = IOCAP_KEYBD_DISPLAY#IOCAP_NOINPUT_NOOUTPUT
 
     @property
     def address(self):
@@ -497,6 +498,10 @@ class SecurityManagerState(LayerState):
         # Initiator role
         self.enc_initiator = False
 
+        # LE Secure Connections
+        self.private_key = None
+        self.public_key = None
+        self.shared_secret = None
 
 @alias('smp')
 @state(SecurityManagerState)
@@ -533,6 +538,7 @@ class SMPLayer(Layer):
         # If we reach this point, we need to define pairing according to IO capabilities
         # (see Table 2.8, Vol. 3, Part H, Bluetooth Core Specification v5.3, p. 1573)
         try:
+            print("here")
             return IOCAP_KEY_GENERATION_MAPPING[(initiator.iocap, responder.iocap)][int(use_lesc)]
         except IndexError:
             # it looks like an error occured, let's return None
@@ -672,6 +678,8 @@ class SMPLayer(Layer):
             self.on_identity_address_information(smp_pkt.getlayer(SM_Identity_Address_Information))
         elif SM_Signing_Information in smp_pkt:
             self.on_signing_information(smp_pkt.getlayer(SM_Signing_Information))
+        elif SM_Public_Key in smp_pkt:
+            self.on_public_key(smp_pkt.getlayer(SM_Public_Key))
 
     def initiate_pairing(
                             self,
@@ -769,6 +777,34 @@ class SMPLayer(Layer):
             # Return to IDLE mode
             self.__state = SecurityManagerState.STATE_IDLE
 
+    def on_public_key(self, public_key_pkt):
+        """Method called when a public key is received.
+
+        :param SM_Public_Key public_key_pkt: Public Key packet
+        """
+
+        public_key_pkt.show()
+        # Extract X and Y from public key packet
+        x = int(public_key_pkt.key_x[::-1].hex(), 16)
+        y = int(public_key_pkt.key_y[::-1].hex(), 16)
+
+        # We can now generate the ECDH shared secret
+        peer_public_key = generate_public_key_from_coordinates(x, y)
+        self.state.shared_secret = generate_diffie_hellman_shared_secret(self.state.private_key, peer_public_key)
+
+        print("Shared secret", self.state.shared_secret)
+
+        # We received the public key, now transmit our own
+        if self.state.state == SecurityManagerState.STATE_PAIRING_REQ:
+            own_x = bytes.fromhex("{:064x}".format(self.state.public_key.public_numbers().x)[::-1])
+            own_y = bytes.fromhex("{:064x}".format(self.state.public_key.public_numbers().y)[::-1])
+
+            self.send_data(
+                SM_Public_Key(
+                    key_x = own_x,
+                    key_y = own_y
+                )
+            )
 
     def on_pairing_request(self, pairing_req):
         """Method called when a pairing request is received.
@@ -856,12 +892,15 @@ class SMPLayer(Layer):
 
             # Check key generation method in use
             method = self.key_generation_method_selection(self.state.initiator, self.state.responder)
-
+            print(method)
             if method == PM_LEGACY_JUSTWORKS:
                 self.state.tk = b"\x00" * 16
             elif method == PM_LEGACY_PASSKEY:
                 pin = self.get_pin_code() # TODO: allow to pass a callback here to customize PIN entry
                 self.state.tk = bytes.fromhex("00"*12 + "{:08x}".format(pin))
+            elif method == PM_LESC_NUMCOMP:
+                # Generate the P256 keypair
+                self.state.private_key, self.state.public_key = generate_p256_keypair()
 
             # Update current state
             self.state.state = SecurityManagerState.STATE_PAIRING_REQ
