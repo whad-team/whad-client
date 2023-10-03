@@ -653,6 +653,7 @@ class HCIDevice(VirtualDevice):
            (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
             try:
                 hci_packets = self.__converter.process_message(message)
+                
                 if hci_packets is not None:
                     logger.debug('sending HCI packets ...')
                     success = True

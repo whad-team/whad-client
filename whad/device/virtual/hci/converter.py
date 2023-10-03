@@ -35,11 +35,29 @@ class HCIConverter:
         self.role = HCIRole.NONE
         self.pending_messages_queue = Queue()
         self.pending_key_request = False
+        self.cached_l2cap_payload = b""
+        self.cached_l2cap_length = 0
+        self.waiting_l2cap_fragments = False
 
     def process_message(self, message):
         ll_packet = BTLE_DATA(message.pdu)
 
-        if L2CAP_Hdr in ll_packet:
+        if L2CAP_Hdr in ll_packet or self.waiting_l2cap_fragments:
+
+            if not self.waiting_l2cap_fragments and len(raw(ll_packet[L2CAP_Hdr:])) < ll_packet[L2CAP_Hdr:].len:
+                self.waiting_l2cap_fragments = True
+                self.cached_l2cap_payload = raw(ll_packet[BTLE_DATA:][1:])
+                self.cached_l2cap_length = ll_packet[L2CAP_Hdr:].len
+                return []
+            elif self.waiting_l2cap_fragments:
+                self.cached_l2cap_payload += raw(ll_packet[BTLE_DATA:][1:])
+                if self.cached_l2cap_length == (len(self.cached_l2cap_payload) - 4):
+                    L2CAP_Hdr(self.cached_l2cap_payload).show()
+                    hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle) / L2CAP_Hdr(self.cached_l2cap_payload)
+                    self.waiting_l2cap_fragments = False
+                    return [hci_packet]
+                else:
+                    return []
             hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle) / ll_packet[L2CAP_Hdr:]
             return [hci_packet]
         elif ll_packet.LLID == 3:
