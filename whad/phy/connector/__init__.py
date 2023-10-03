@@ -5,19 +5,21 @@ from whad.phy.metadata import generate_phy_metadata, PhyMetadata
 from whad.phy.utils.definitions import OOKModulationScheme, ASKModulationScheme, \
     OQPSKModulationScheme, QPSKModulationScheme, BPSKModulationScheme, \
     FSKModulationScheme, GFSKModulationScheme
+from whad.phy.utils.helpers import lora_sf, lora_cr
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.protocol.phy.phy_pb2 import SetASKModulation, SetFSKModulation, \
     SetGFSKModulation, SetBPSKModulation, SetQPSKModulation, Start, Stop, \
     SetBPSKModulationCmd, SetQPSKModulationCmd, GetSupportedFrequenciesCmd, \
     GetSupportedFrequencies, SetFrequency, SetDataRate, SetEndianness, \
     Endianness, SetTXPower, TXPower, SetPacketSize, SetSyncWord, StartCmd, \
-    StopCmd, Send, Sniff, SendRaw, Set4FSKModulation, Set4FSKModulationCmd
+    StopCmd, Send, Sniff, SendRaw, Set4FSKModulation, Set4FSKModulationCmd, \
+    SetLoRaModulation, SetLoRaModulationCmd
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.phy import Phy_Packet
 from whad.exceptions import RequiredImplementation, UnsupportedCapability, UnsupportedDomain
 from whad.phy.exceptions import UnsupportedFrequency, NoModulation, NoDatarate, NoFrequency, \
-    NoSyncWord, NoEndianess, NoPacketSize
+    NoSyncWord, NoEndianess, NoPacketSize, InvalidParameter
 from whad.phy.connector.translator import PhyMessageTranslator
 
 class Phy(WhadDeviceConnector):
@@ -134,6 +136,13 @@ class Phy(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
         return (commands & (1 << SetQPSKModulation)) > 0
+    
+    def can_use_lora(self):
+        """
+        Determine if the device can be configured to use LoRa modulation scheme.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        return (commands & (1 << SetLoRaModulation)) > 0
 
     def set_ask(self, on_off_keying=True):
         """
@@ -225,7 +234,7 @@ class Phy(WhadDeviceConnector):
         return success
 
 
-    def set_qpsk(self):
+    def set_qpsk(self, ):
         """
         Enable Quadrature Phase Shift Keying modulation scheme.
         """
@@ -234,6 +243,48 @@ class Phy(WhadDeviceConnector):
 
         msg = Message()
         msg.phy.mod_qpsk.CopyFrom(SetQPSKModulationCmd())
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        if success:
+            self.__configured_modulation = True
+        return success
+    
+
+    def set_lora(self, sf=7, cr=48, bw=125000, preamble=12, crc=False, explicit=False):
+        """
+        Enable LoRa modulation scheme.
+
+        @param  sf          Spreading factor (values between 7 and 12)
+        @param  cr          Coding rate (values between 45 (4/5) and 48 (4/8))
+        @param  bw          Bandwidth (125, 250 or 500)
+        @param  preamble    Preamble length (0-65535) in number of symbols
+        @param  crc         Enable CRC if set to True, disable it otherwise
+        @param  explicit    LoRa explicit header mode enabled if set to True (implicit header mode if False)
+        """
+        if not self.can_use_lora():
+            raise UnsupportedCapability("LoRaModulation")
+        
+        # Make sure parameters are valid
+        if sf not in range(7, 13):
+            raise InvalidParameter('spreading factor')
+        
+        if cr not in range(45, 49):
+            raise InvalidParameter('coding rate')
+        
+        if bw not in [125000, 250000, 500000]:
+            raise InvalidParameter('bandwidth')
+
+        # Build message
+        msg = Message()
+        msg.phy.mod_lora.CopyFrom(SetLoRaModulationCmd())
+        
+        msg.phy.mod_lora.coding_rate = lora_cr(cr)
+        msg.phy.mod_lora.spreading_factor = lora_sf(sf)
+        msg.phy.mod_lora.bandwidth = bw
+        msg.phy.mod_lora.preamble_length = preamble
+        msg.phy.mod_lora.enable_crc = crc
+        msg.phy.mod_lora.explicit = explicit
+        
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -427,6 +478,7 @@ class Phy(WhadDeviceConnector):
         if iq_stream and not self.support_raw_iq_stream():
             raise UnsupportedCapability("RawIQStream")
 
+        """
         if not self.__configured_modulation:
             raise NoModulation()
         if not self.__configured_datarate:
@@ -439,6 +491,7 @@ class Phy(WhadDeviceConnector):
             raise NoSyncWord()
         if not self.__configured_endianness:
             raise NoEndianess()
+        """
 
         msg = Message()
         msg.phy.sniff.iq_stream = iq_stream

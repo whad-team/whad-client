@@ -55,3 +55,11 @@ class NoPacketSize(Exception):
 
     def __repr__(self):
         return "NoPacketSize: No packet size provided"
+    
+class InvalidParameter(Exception):
+    def __init__(self, parameter):
+        super().__init__()
+        self.__parameter = parameter
+
+    def __repr__(self):
+        return "InvalidParameter: provided %s parameter is not valid" % (self.__parameter)

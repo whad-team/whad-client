@@ -11,6 +11,24 @@ class FSKConfiguration:
     deviation : int = 500000
 
 @dataclass
+class LoRaConfiguration:
+    """
+    Configuration for LoRa modulation.
+
+    :param spreading_factor: select the spreading factor (sf)
+    :param coding_rate: select the coding rate (cr)
+    :param bandwidth: select the bandwidth (bw)
+    :param enable_crc: enable LoRa CRC (crc)
+    :param enable_explicit_mode: enable LoRa explicit mode (em)
+    """
+    spreading_factor : int = 7
+    coding_rate : int = 45
+    bandwidth : int = 125000
+    enable_crc: bool = False
+    enable_explicit_mode: bool = False
+
+
+@dataclass
 class SnifferConfiguration:
     """
     Configuration for sniffing Phy communications.
@@ -26,7 +44,7 @@ class SnifferConfiguration:
     :param qfsk: select QFSK modulation (qfsk)
     :param bpsk: select BPSK modulation (bpsk)
     :param qpsk: select QPSK modulation (qpsk)
-
+    :param lora: select LoRa modulation (lora)
     """
     frequency : int = 2402000000
     little_endian : bool = False
@@ -39,4 +57,6 @@ class SnifferConfiguration:
     qfsk: bool = False
     bpsk: bool = False
     qpsk: bool = False
+    lora: bool = False
     fsk_configuration: FSKConfiguration = None
+    lora_configuration: LoRaConfiguration = None

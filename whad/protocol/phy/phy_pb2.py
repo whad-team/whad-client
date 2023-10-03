@@ -4,7 +4,6 @@
 """Generated protocol buffer code."""
 from google.protobuf.internal import enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
-from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
@@ -15,16 +14,306 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16protocol/phy/phy.proto\x12\x03phy\"\"\n\x13SetASKModulationCmd\x12\x0b\n\x03ook\x18\x01 \x01(\x08\"(\n\x13SetFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14Set4FSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14SetGFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"(\n\x13SetMSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"\x16\n\x14SetBPSKModulationCmd\"+\n\x14SetQPSKModulationCmd\x12\x13\n\x0boffset_qpsk\x18\x01 \x01(\x08\"\x1c\n\x1aGetSupportedFrequenciesCmd\"$\n\x0fSetFrequencyCmd\x12\x11\n\tfrequency\x18\x01 \x01(\r\"\x1e\n\x0eSetDataRateCmd\x12\x0c\n\x04rate\x18\x01 \x01(\r\"7\n\x10SetEndiannessCmd\x12#\n\nendianness\x18\x01 \x01(\x0e\x32\x0f.phy.Endianness\"/\n\rSetTXPowerCmd\x12\x1e\n\x08tx_power\x18\x01 \x01(\x0e\x32\x0c.phy.TXPower\"\'\n\x10SetPacketSizeCmd\x12\x13\n\x0bpacket_size\x18\x01 \x01(\r\"#\n\x0eSetSyncWordCmd\x12\x11\n\tsync_word\x18\x01 \x01(\x0c\"0\n\x08SniffCmd\x12\x16\n\tiq_stream\x18\x01 \x01(\x08H\x00\x88\x01\x01\x42\x0c\n\n_iq_stream\"\x19\n\x07SendCmd\x12\x0e\n\x06packet\x18\x01 \x01(\x0c\"\x1c\n\nSendRawCmd\x12\x0e\n\x02iq\x18\x01 \x03(\x05\x42\x02\x10\x01\"\n\n\x08StartCmd\"\t\n\x07StopCmd\"(\n\x06JamCmd\x12\x1e\n\x04mode\x18\x01 \x01(\x0e\x32\x10.phy.JammingMode\"\x0c\n\nMonitorCmd\"u\n\x0ePacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"\x88\x01\n\x11RawPacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x12\x0e\n\x02iq\x18\x05 \x03(\x05\x42\x02\x10\x01\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"\x1b\n\x06Jammed\x12\x11\n\ttimestamp\x18\x01 \x01(\r\"9\n\x10MonitoringReport\x12\x11\n\ttimestamp\x18\x01 \x01(\r\x12\x12\n\x06report\x18\x02 \x03(\rB\x02\x10\x01\"\x90\x01\n\x18SupportedFrequencyRanges\x12\x46\n\x10\x66requency_ranges\x18\x01 \x03(\x0b\x32,.phy.SupportedFrequencyRanges.FrequencyRange\x1a,\n\x0e\x46requencyRange\x12\r\n\x05start\x18\x01 \x01(\r\x12\x0b\n\x03\x65nd\x18\x02 \x01(\r\"\xd1\x08\n\x07Message\x12+\n\x07mod_ask\x18\x01 \x01(\x0b\x32\x18.phy.SetASKModulationCmdH\x00\x12+\n\x07mod_fsk\x18\x02 \x01(\x0b\x32\x18.phy.SetFSKModulationCmdH\x00\x12-\n\x08mod_gfsk\x18\x03 \x01(\x0b\x32\x19.phy.SetGFSKModulationCmdH\x00\x12-\n\x08mod_bpsk\x18\x04 \x01(\x0b\x32\x19.phy.SetBPSKModulationCmdH\x00\x12-\n\x08mod_qpsk\x18\x05 \x01(\x0b\x32\x19.phy.SetQPSKModulationCmdH\x00\x12-\n\x08mod_4fsk\x18\x06 \x01(\x0b\x32\x19.phy.Set4FSKModulationCmdH\x00\x12+\n\x07mod_msk\x18\x07 \x01(\x0b\x32\x18.phy.SetMSKModulationCmdH\x00\x12=\n\x12get_supported_freq\x18\x08 \x01(\x0b\x32\x1f.phy.GetSupportedFrequenciesCmdH\x00\x12(\n\x08set_freq\x18\t \x01(\x0b\x32\x14.phy.SetFrequencyCmdH\x00\x12\'\n\x08\x64\x61tarate\x18\n \x01(\x0b\x32\x13.phy.SetDataRateCmdH\x00\x12+\n\nendianness\x18\x0b \x01(\x0b\x32\x15.phy.SetEndiannessCmdH\x00\x12&\n\x08tx_power\x18\x0c \x01(\x0b\x32\x12.phy.SetTXPowerCmdH\x00\x12,\n\x0bpacket_size\x18\r \x01(\x0b\x32\x15.phy.SetPacketSizeCmdH\x00\x12(\n\tsync_word\x18\x0e \x01(\x0b\x32\x13.phy.SetSyncWordCmdH\x00\x12\x1e\n\x05sniff\x18\x0f \x01(\x0b\x32\r.phy.SniffCmdH\x00\x12\x1c\n\x04send\x18\x10 \x01(\x0b\x32\x0c.phy.SendCmdH\x00\x12#\n\x08send_raw\x18\x11 \x01(\x0b\x32\x0f.phy.SendRawCmdH\x00\x12\x1e\n\x05start\x18\x12 \x01(\x0b\x32\r.phy.StartCmdH\x00\x12\x1c\n\x04stop\x18\x13 \x01(\x0b\x32\x0c.phy.StopCmdH\x00\x12\x1a\n\x03jam\x18\x14 \x01(\x0b\x32\x0b.phy.JamCmdH\x00\x12\"\n\x07monitor\x18\x15 \x01(\x0b\x32\x0f.phy.MonitorCmdH\x00\x12%\n\x06packet\x18\x16 \x01(\x0b\x32\x13.phy.PacketReceivedH\x00\x12,\n\nraw_packet\x18\x17 \x01(\x0b\x32\x16.phy.RawPacketReceivedH\x00\x12\x1d\n\x06jammed\x18\x18 \x01(\x0b\x32\x0b.phy.JammedH\x00\x12/\n\x0emonitor_report\x18\x19 \x01(\x0b\x32\x15.phy.MonitoringReportH\x00\x12\x37\n\x0esupported_freq\x18\x1a \x01(\x0b\x32\x1d.phy.SupportedFrequencyRangesH\x00\x42\x05\n\x03msg*\xfe\x02\n\nPhyCommand\x12\x14\n\x10SetASKModulation\x10\x00\x12\x14\n\x10SetFSKModulation\x10\x01\x12\x15\n\x11SetGFSKModulation\x10\x02\x12\x15\n\x11SetBPSKModulation\x10\x03\x12\x15\n\x11SetQPSKModulation\x10\x04\x12\x15\n\x11Set4FSKModulation\x10\x05\x12\x14\n\x10SetMSKModulation\x10\x06\x12\x1b\n\x17GetSupportedFrequencies\x10\x07\x12\x10\n\x0cSetFrequency\x10\x08\x12\x0f\n\x0bSetDataRate\x10\t\x12\x11\n\rSetEndianness\x10\n\x12\x0e\n\nSetTXPower\x10\x0b\x12\x11\n\rSetPacketSize\x10\x0c\x12\x0f\n\x0bSetSyncWord\x10\r\x12\t\n\x05Sniff\x10\x0e\x12\x08\n\x04Send\x10\x0f\x12\x0b\n\x07SendRaw\x10\x10\x12\x07\n\x03Jam\x10\x11\x12\x0b\n\x07Monitor\x10\x12\x12\t\n\x05Start\x10\x13\x12\x08\n\x04Stop\x10\x14*!\n\nEndianness\x12\x07\n\x03\x42IG\x10\x00\x12\n\n\x06LITTLE\x10\x01*(\n\x07TXPower\x12\x07\n\x03LOW\x10\x00\x12\n\n\x06MEDIUM\x10\x01\x12\x08\n\x04HIGH\x10\x02*+\n\x0bJammingMode\x12\x0e\n\nCONTINUOUS\x10\x00\x12\x0c\n\x08REACTIVE\x10\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor.FileDescriptor(
+  name='protocol/phy/phy.proto',
+  package='phy',
+  syntax='proto3',
+  serialized_options=None,
+  create_key=_descriptor._internal_create_key,
+  serialized_pb=b'\n\x16protocol/phy/phy.proto\x12\x03phy\"\"\n\x13SetASKModulationCmd\x12\x0b\n\x03ook\x18\x01 \x01(\x08\"(\n\x13SetFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14Set4FSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14SetGFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"(\n\x13SetMSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"\x16\n\x14SetBPSKModulationCmd\"+\n\x14SetQPSKModulationCmd\x12\x13\n\x0boffset_qpsk\x18\x01 \x01(\x08\"\xc6\x01\n\x14SetLoRaModulationCmd\x12\x11\n\tbandwidth\x18\x01 \x01(\r\x12\x32\n\x10spreading_factor\x18\x02 \x01(\x0e\x32\x18.phy.LoRaSpreadingFactor\x12(\n\x0b\x63oding_rate\x18\x03 \x01(\x0e\x32\x13.phy.LoRaCodingRate\x12\x17\n\x0fpreamble_length\x18\x04 \x01(\r\x12\x12\n\nenable_crc\x18\x05 \x01(\x08\x12\x10\n\x08\x65xplicit\x18\x06 \x01(\x08\"\x1c\n\x1aGetSupportedFrequenciesCmd\"$\n\x0fSetFrequencyCmd\x12\x11\n\tfrequency\x18\x01 \x01(\r\"\x1e\n\x0eSetDataRateCmd\x12\x0c\n\x04rate\x18\x01 \x01(\r\"7\n\x10SetEndiannessCmd\x12#\n\nendianness\x18\x01 \x01(\x0e\x32\x0f.phy.Endianness\"/\n\rSetTXPowerCmd\x12\x1e\n\x08tx_power\x18\x01 \x01(\x0e\x32\x0c.phy.TXPower\"\'\n\x10SetPacketSizeCmd\x12\x13\n\x0bpacket_size\x18\x01 \x01(\r\"#\n\x0eSetSyncWordCmd\x12\x11\n\tsync_word\x18\x01 \x01(\x0c\"0\n\x08SniffCmd\x12\x16\n\tiq_stream\x18\x01 \x01(\x08H\x00\x88\x01\x01\x42\x0c\n\n_iq_stream\"\x19\n\x07SendCmd\x12\x0e\n\x06packet\x18\x01 \x01(\x0c\"\x1c\n\nSendRawCmd\x12\x0e\n\x02iq\x18\x01 \x03(\x05\x42\x02\x10\x01\"\n\n\x08StartCmd\"\t\n\x07StopCmd\"(\n\x06JamCmd\x12\x1e\n\x04mode\x18\x01 \x01(\x0e\x32\x10.phy.JammingMode\"\x0c\n\nMonitorCmd\"u\n\x0ePacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"\x88\x01\n\x11RawPacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x12\x0e\n\x02iq\x18\x05 \x03(\x05\x42\x02\x10\x01\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"\x1b\n\x06Jammed\x12\x11\n\ttimestamp\x18\x01 \x01(\r\"9\n\x10MonitoringReport\x12\x11\n\ttimestamp\x18\x01 \x01(\r\x12\x12\n\x06report\x18\x02 \x03(\rB\x02\x10\x01\"\x90\x01\n\x18SupportedFrequencyRanges\x12\x46\n\x10\x66requency_ranges\x18\x01 \x03(\x0b\x32,.phy.SupportedFrequencyRanges.FrequencyRange\x1a,\n\x0e\x46requencyRange\x12\r\n\x05start\x18\x01 \x01(\r\x12\x0b\n\x03\x65nd\x18\x02 \x01(\r\"\x80\t\n\x07Message\x12+\n\x07mod_ask\x18\x01 \x01(\x0b\x32\x18.phy.SetASKModulationCmdH\x00\x12+\n\x07mod_fsk\x18\x02 \x01(\x0b\x32\x18.phy.SetFSKModulationCmdH\x00\x12-\n\x08mod_gfsk\x18\x03 \x01(\x0b\x32\x19.phy.SetGFSKModulationCmdH\x00\x12-\n\x08mod_bpsk\x18\x04 \x01(\x0b\x32\x19.phy.SetBPSKModulationCmdH\x00\x12-\n\x08mod_qpsk\x18\x05 \x01(\x0b\x32\x19.phy.SetQPSKModulationCmdH\x00\x12-\n\x08mod_4fsk\x18\x06 \x01(\x0b\x32\x19.phy.Set4FSKModulationCmdH\x00\x12+\n\x07mod_msk\x18\x07 \x01(\x0b\x32\x18.phy.SetMSKModulationCmdH\x00\x12=\n\x12get_supported_freq\x18\x08 \x01(\x0b\x32\x1f.phy.GetSupportedFrequenciesCmdH\x00\x12(\n\x08set_freq\x18\t \x01(\x0b\x32\x14.phy.SetFrequencyCmdH\x00\x12\'\n\x08\x64\x61tarate\x18\n \x01(\x0b\x32\x13.phy.SetDataRateCmdH\x00\x12+\n\nendianness\x18\x0b \x01(\x0b\x32\x15.phy.SetEndiannessCmdH\x00\x12&\n\x08tx_power\x18\x0c \x01(\x0b\x32\x12.phy.SetTXPowerCmdH\x00\x12,\n\x0bpacket_size\x18\r \x01(\x0b\x32\x15.phy.SetPacketSizeCmdH\x00\x12(\n\tsync_word\x18\x0e \x01(\x0b\x32\x13.phy.SetSyncWordCmdH\x00\x12\x1e\n\x05sniff\x18\x0f \x01(\x0b\x32\r.phy.SniffCmdH\x00\x12\x1c\n\x04send\x18\x10 \x01(\x0b\x32\x0c.phy.SendCmdH\x00\x12#\n\x08send_raw\x18\x11 \x01(\x0b\x32\x0f.phy.SendRawCmdH\x00\x12\x1e\n\x05start\x18\x12 \x01(\x0b\x32\r.phy.StartCmdH\x00\x12\x1c\n\x04stop\x18\x13 \x01(\x0b\x32\x0c.phy.StopCmdH\x00\x12\x1a\n\x03jam\x18\x14 \x01(\x0b\x32\x0b.phy.JamCmdH\x00\x12\"\n\x07monitor\x18\x15 \x01(\x0b\x32\x0f.phy.MonitorCmdH\x00\x12%\n\x06packet\x18\x16 \x01(\x0b\x32\x13.phy.PacketReceivedH\x00\x12,\n\nraw_packet\x18\x17 \x01(\x0b\x32\x16.phy.RawPacketReceivedH\x00\x12\x1d\n\x06jammed\x18\x18 \x01(\x0b\x32\x0b.phy.JammedH\x00\x12/\n\x0emonitor_report\x18\x19 \x01(\x0b\x32\x15.phy.MonitoringReportH\x00\x12\x37\n\x0esupported_freq\x18\x1a \x01(\x0b\x32\x1d.phy.SupportedFrequencyRangesH\x00\x12-\n\x08mod_lora\x18\x1b \x01(\x0b\x32\x19.phy.SetLoRaModulationCmdH\x00\x42\x05\n\x03msg*\x95\x03\n\nPhyCommand\x12\x14\n\x10SetASKModulation\x10\x00\x12\x14\n\x10SetFSKModulation\x10\x01\x12\x15\n\x11SetGFSKModulation\x10\x02\x12\x15\n\x11SetBPSKModulation\x10\x03\x12\x15\n\x11SetQPSKModulation\x10\x04\x12\x15\n\x11Set4FSKModulation\x10\x05\x12\x14\n\x10SetMSKModulation\x10\x06\x12\x1b\n\x17GetSupportedFrequencies\x10\x07\x12\x10\n\x0cSetFrequency\x10\x08\x12\x0f\n\x0bSetDataRate\x10\t\x12\x11\n\rSetEndianness\x10\n\x12\x0e\n\nSetTXPower\x10\x0b\x12\x11\n\rSetPacketSize\x10\x0c\x12\x0f\n\x0bSetSyncWord\x10\r\x12\t\n\x05Sniff\x10\x0e\x12\x08\n\x04Send\x10\x0f\x12\x0b\n\x07SendRaw\x10\x10\x12\x07\n\x03Jam\x10\x11\x12\x0b\n\x07Monitor\x10\x12\x12\t\n\x05Start\x10\x13\x12\x08\n\x04Stop\x10\x14\x12\x15\n\x11SetLoRaModulation\x10\x15*!\n\nEndianness\x12\x07\n\x03\x42IG\x10\x00\x12\n\n\x06LITTLE\x10\x01*(\n\x07TXPower\x12\x07\n\x03LOW\x10\x00\x12\n\n\x06MEDIUM\x10\x01\x12\x08\n\x04HIGH\x10\x02*+\n\x0bJammingMode\x12\x0e\n\nCONTINUOUS\x10\x00\x12\x0c\n\x08REACTIVE\x10\x01*N\n\x13LoRaSpreadingFactor\x12\x07\n\x03SF7\x10\x00\x12\x07\n\x03SF8\x10\x01\x12\x07\n\x03SF9\x10\x02\x12\x08\n\x04SF10\x10\x03\x12\x08\n\x04SF11\x10\x04\x12\x08\n\x04SF12\x10\x05*8\n\x0eLoRaCodingRate\x12\x08\n\x04\x43R45\x10\x00\x12\x08\n\x04\x43R46\x10\x01\x12\x08\n\x04\x43R47\x10\x02\x12\x08\n\x04\x43R48\x10\x03\x62\x06proto3'
+)
 
-_PHYCOMMAND = DESCRIPTOR.enum_types_by_name['PhyCommand']
+_PHYCOMMAND = _descriptor.EnumDescriptor(
+  name='PhyCommand',
+  full_name='phy.PhyCommand',
+  filename=None,
+  file=DESCRIPTOR,
+  create_key=_descriptor._internal_create_key,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='SetASKModulation', index=0, number=0,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetFSKModulation', index=1, number=1,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetGFSKModulation', index=2, number=2,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetBPSKModulation', index=3, number=3,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetQPSKModulation', index=4, number=4,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='Set4FSKModulation', index=5, number=5,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetMSKModulation', index=6, number=6,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='GetSupportedFrequencies', index=7, number=7,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetFrequency', index=8, number=8,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetDataRate', index=9, number=9,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetEndianness', index=10, number=10,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetTXPower', index=11, number=11,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetPacketSize', index=12, number=12,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetSyncWord', index=13, number=13,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='Sniff', index=14, number=14,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='Send', index=15, number=15,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SendRaw', index=16, number=16,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='Jam', index=17, number=17,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='Monitor', index=18, number=18,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='Start', index=19, number=19,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='Stop', index=20, number=20,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SetLoRaModulation', index=21, number=21,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+  ],
+  containing_type=None,
+  serialized_options=None,
+  serialized_start=2626,
+  serialized_end=3031,
+)
+_sym_db.RegisterEnumDescriptor(_PHYCOMMAND)
+
 PhyCommand = enum_type_wrapper.EnumTypeWrapper(_PHYCOMMAND)
-_ENDIANNESS = DESCRIPTOR.enum_types_by_name['Endianness']
+_ENDIANNESS = _descriptor.EnumDescriptor(
+  name='Endianness',
+  full_name='phy.Endianness',
+  filename=None,
+  file=DESCRIPTOR,
+  create_key=_descriptor._internal_create_key,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='BIG', index=0, number=0,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='LITTLE', index=1, number=1,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+  ],
+  containing_type=None,
+  serialized_options=None,
+  serialized_start=3033,
+  serialized_end=3066,
+)
+_sym_db.RegisterEnumDescriptor(_ENDIANNESS)
+
 Endianness = enum_type_wrapper.EnumTypeWrapper(_ENDIANNESS)
-_TXPOWER = DESCRIPTOR.enum_types_by_name['TXPower']
+_TXPOWER = _descriptor.EnumDescriptor(
+  name='TXPower',
+  full_name='phy.TXPower',
+  filename=None,
+  file=DESCRIPTOR,
+  create_key=_descriptor._internal_create_key,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='LOW', index=0, number=0,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='MEDIUM', index=1, number=1,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='HIGH', index=2, number=2,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+  ],
+  containing_type=None,
+  serialized_options=None,
+  serialized_start=3068,
+  serialized_end=3108,
+)
+_sym_db.RegisterEnumDescriptor(_TXPOWER)
+
 TXPower = enum_type_wrapper.EnumTypeWrapper(_TXPOWER)
-_JAMMINGMODE = DESCRIPTOR.enum_types_by_name['JammingMode']
+_JAMMINGMODE = _descriptor.EnumDescriptor(
+  name='JammingMode',
+  full_name='phy.JammingMode',
+  filename=None,
+  file=DESCRIPTOR,
+  create_key=_descriptor._internal_create_key,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='CONTINUOUS', index=0, number=0,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='REACTIVE', index=1, number=1,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+  ],
+  containing_type=None,
+  serialized_options=None,
+  serialized_start=3110,
+  serialized_end=3153,
+)
+_sym_db.RegisterEnumDescriptor(_JAMMINGMODE)
+
 JammingMode = enum_type_wrapper.EnumTypeWrapper(_JAMMINGMODE)
+_LORASPREADINGFACTOR = _descriptor.EnumDescriptor(
+  name='LoRaSpreadingFactor',
+  full_name='phy.LoRaSpreadingFactor',
+  filename=None,
+  file=DESCRIPTOR,
+  create_key=_descriptor._internal_create_key,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='SF7', index=0, number=0,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SF8', index=1, number=1,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SF9', index=2, number=2,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SF10', index=3, number=3,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SF11', index=4, number=4,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='SF12', index=5, number=5,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+  ],
+  containing_type=None,
+  serialized_options=None,
+  serialized_start=3155,
+  serialized_end=3233,
+)
+_sym_db.RegisterEnumDescriptor(_LORASPREADINGFACTOR)
+
+LoRaSpreadingFactor = enum_type_wrapper.EnumTypeWrapper(_LORASPREADINGFACTOR)
+_LORACODINGRATE = _descriptor.EnumDescriptor(
+  name='LoRaCodingRate',
+  full_name='phy.LoRaCodingRate',
+  filename=None,
+  file=DESCRIPTOR,
+  create_key=_descriptor._internal_create_key,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='CR45', index=0, number=0,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='CR46', index=1, number=1,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='CR47', index=2, number=2,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='CR48', index=3, number=3,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+  ],
+  containing_type=None,
+  serialized_options=None,
+  serialized_start=3235,
+  serialized_end=3291,
+)
+_sym_db.RegisterEnumDescriptor(_LORACODINGRATE)
+
+LoRaCodingRate = enum_type_wrapper.EnumTypeWrapper(_LORACODINGRATE)
 SetASKModulation = 0
 SetFSKModulation = 1
 SetGFSKModulation = 2
@@ -46,6 +335,7 @@ Jam = 17
 Monitor = 18
 Start = 19
 Stop = 20
+SetLoRaModulation = 21
 BIG = 0
 LITTLE = 1
 LOW = 0
@@ -53,36 +343,1386 @@ MEDIUM = 1
 HIGH = 2
 CONTINUOUS = 0
 REACTIVE = 1
+SF7 = 0
+SF8 = 1
+SF9 = 2
+SF10 = 3
+SF11 = 4
+SF12 = 5
+CR45 = 0
+CR46 = 1
+CR47 = 2
+CR48 = 3
 
 
-_SETASKMODULATIONCMD = DESCRIPTOR.message_types_by_name['SetASKModulationCmd']
-_SETFSKMODULATIONCMD = DESCRIPTOR.message_types_by_name['SetFSKModulationCmd']
-_SET4FSKMODULATIONCMD = DESCRIPTOR.message_types_by_name['Set4FSKModulationCmd']
-_SETGFSKMODULATIONCMD = DESCRIPTOR.message_types_by_name['SetGFSKModulationCmd']
-_SETMSKMODULATIONCMD = DESCRIPTOR.message_types_by_name['SetMSKModulationCmd']
-_SETBPSKMODULATIONCMD = DESCRIPTOR.message_types_by_name['SetBPSKModulationCmd']
-_SETQPSKMODULATIONCMD = DESCRIPTOR.message_types_by_name['SetQPSKModulationCmd']
-_GETSUPPORTEDFREQUENCIESCMD = DESCRIPTOR.message_types_by_name['GetSupportedFrequenciesCmd']
-_SETFREQUENCYCMD = DESCRIPTOR.message_types_by_name['SetFrequencyCmd']
-_SETDATARATECMD = DESCRIPTOR.message_types_by_name['SetDataRateCmd']
-_SETENDIANNESSCMD = DESCRIPTOR.message_types_by_name['SetEndiannessCmd']
-_SETTXPOWERCMD = DESCRIPTOR.message_types_by_name['SetTXPowerCmd']
-_SETPACKETSIZECMD = DESCRIPTOR.message_types_by_name['SetPacketSizeCmd']
-_SETSYNCWORDCMD = DESCRIPTOR.message_types_by_name['SetSyncWordCmd']
-_SNIFFCMD = DESCRIPTOR.message_types_by_name['SniffCmd']
-_SENDCMD = DESCRIPTOR.message_types_by_name['SendCmd']
-_SENDRAWCMD = DESCRIPTOR.message_types_by_name['SendRawCmd']
-_STARTCMD = DESCRIPTOR.message_types_by_name['StartCmd']
-_STOPCMD = DESCRIPTOR.message_types_by_name['StopCmd']
-_JAMCMD = DESCRIPTOR.message_types_by_name['JamCmd']
-_MONITORCMD = DESCRIPTOR.message_types_by_name['MonitorCmd']
-_PACKETRECEIVED = DESCRIPTOR.message_types_by_name['PacketReceived']
-_RAWPACKETRECEIVED = DESCRIPTOR.message_types_by_name['RawPacketReceived']
-_JAMMED = DESCRIPTOR.message_types_by_name['Jammed']
-_MONITORINGREPORT = DESCRIPTOR.message_types_by_name['MonitoringReport']
-_SUPPORTEDFREQUENCYRANGES = DESCRIPTOR.message_types_by_name['SupportedFrequencyRanges']
-_SUPPORTEDFREQUENCYRANGES_FREQUENCYRANGE = _SUPPORTEDFREQUENCYRANGES.nested_types_by_name['FrequencyRange']
-_MESSAGE = DESCRIPTOR.message_types_by_name['Message']
+
+_SETASKMODULATIONCMD = _descriptor.Descriptor(
+  name='SetASKModulationCmd',
+  full_name='phy.SetASKModulationCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='ook', full_name='phy.SetASKModulationCmd.ook', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=31,
+  serialized_end=65,
+)
+
+
+_SETFSKMODULATIONCMD = _descriptor.Descriptor(
+  name='SetFSKModulationCmd',
+  full_name='phy.SetFSKModulationCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='deviation', full_name='phy.SetFSKModulationCmd.deviation', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=67,
+  serialized_end=107,
+)
+
+
+_SET4FSKMODULATIONCMD = _descriptor.Descriptor(
+  name='Set4FSKModulationCmd',
+  full_name='phy.Set4FSKModulationCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='deviation', full_name='phy.Set4FSKModulationCmd.deviation', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=109,
+  serialized_end=150,
+)
+
+
+_SETGFSKMODULATIONCMD = _descriptor.Descriptor(
+  name='SetGFSKModulationCmd',
+  full_name='phy.SetGFSKModulationCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='deviation', full_name='phy.SetGFSKModulationCmd.deviation', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=152,
+  serialized_end=193,
+)
+
+
+_SETMSKMODULATIONCMD = _descriptor.Descriptor(
+  name='SetMSKModulationCmd',
+  full_name='phy.SetMSKModulationCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='deviation', full_name='phy.SetMSKModulationCmd.deviation', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=195,
+  serialized_end=235,
+)
+
+
+_SETBPSKMODULATIONCMD = _descriptor.Descriptor(
+  name='SetBPSKModulationCmd',
+  full_name='phy.SetBPSKModulationCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=237,
+  serialized_end=259,
+)
+
+
+_SETQPSKMODULATIONCMD = _descriptor.Descriptor(
+  name='SetQPSKModulationCmd',
+  full_name='phy.SetQPSKModulationCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='offset_qpsk', full_name='phy.SetQPSKModulationCmd.offset_qpsk', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=261,
+  serialized_end=304,
+)
+
+
+_SETLORAMODULATIONCMD = _descriptor.Descriptor(
+  name='SetLoRaModulationCmd',
+  full_name='phy.SetLoRaModulationCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='bandwidth', full_name='phy.SetLoRaModulationCmd.bandwidth', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='spreading_factor', full_name='phy.SetLoRaModulationCmd.spreading_factor', index=1,
+      number=2, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='coding_rate', full_name='phy.SetLoRaModulationCmd.coding_rate', index=2,
+      number=3, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='preamble_length', full_name='phy.SetLoRaModulationCmd.preamble_length', index=3,
+      number=4, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='enable_crc', full_name='phy.SetLoRaModulationCmd.enable_crc', index=4,
+      number=5, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='explicit', full_name='phy.SetLoRaModulationCmd.explicit', index=5,
+      number=6, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=307,
+  serialized_end=505,
+)
+
+
+_GETSUPPORTEDFREQUENCIESCMD = _descriptor.Descriptor(
+  name='GetSupportedFrequenciesCmd',
+  full_name='phy.GetSupportedFrequenciesCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=507,
+  serialized_end=535,
+)
+
+
+_SETFREQUENCYCMD = _descriptor.Descriptor(
+  name='SetFrequencyCmd',
+  full_name='phy.SetFrequencyCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='frequency', full_name='phy.SetFrequencyCmd.frequency', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=537,
+  serialized_end=573,
+)
+
+
+_SETDATARATECMD = _descriptor.Descriptor(
+  name='SetDataRateCmd',
+  full_name='phy.SetDataRateCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='rate', full_name='phy.SetDataRateCmd.rate', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=575,
+  serialized_end=605,
+)
+
+
+_SETENDIANNESSCMD = _descriptor.Descriptor(
+  name='SetEndiannessCmd',
+  full_name='phy.SetEndiannessCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='endianness', full_name='phy.SetEndiannessCmd.endianness', index=0,
+      number=1, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=607,
+  serialized_end=662,
+)
+
+
+_SETTXPOWERCMD = _descriptor.Descriptor(
+  name='SetTXPowerCmd',
+  full_name='phy.SetTXPowerCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='tx_power', full_name='phy.SetTXPowerCmd.tx_power', index=0,
+      number=1, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=664,
+  serialized_end=711,
+)
+
+
+_SETPACKETSIZECMD = _descriptor.Descriptor(
+  name='SetPacketSizeCmd',
+  full_name='phy.SetPacketSizeCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='packet_size', full_name='phy.SetPacketSizeCmd.packet_size', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=713,
+  serialized_end=752,
+)
+
+
+_SETSYNCWORDCMD = _descriptor.Descriptor(
+  name='SetSyncWordCmd',
+  full_name='phy.SetSyncWordCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='sync_word', full_name='phy.SetSyncWordCmd.sync_word', index=0,
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=754,
+  serialized_end=789,
+)
+
+
+_SNIFFCMD = _descriptor.Descriptor(
+  name='SniffCmd',
+  full_name='phy.SniffCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='iq_stream', full_name='phy.SniffCmd.iq_stream', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+    _descriptor.OneofDescriptor(
+      name='_iq_stream', full_name='phy.SniffCmd._iq_stream',
+      index=0, containing_type=None,
+      create_key=_descriptor._internal_create_key,
+    fields=[]),
+  ],
+  serialized_start=791,
+  serialized_end=839,
+)
+
+
+_SENDCMD = _descriptor.Descriptor(
+  name='SendCmd',
+  full_name='phy.SendCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='packet', full_name='phy.SendCmd.packet', index=0,
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=841,
+  serialized_end=866,
+)
+
+
+_SENDRAWCMD = _descriptor.Descriptor(
+  name='SendRawCmd',
+  full_name='phy.SendRawCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='iq', full_name='phy.SendRawCmd.iq', index=0,
+      number=1, type=5, cpp_type=1, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=b'\020\001', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=868,
+  serialized_end=896,
+)
+
+
+_STARTCMD = _descriptor.Descriptor(
+  name='StartCmd',
+  full_name='phy.StartCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=898,
+  serialized_end=908,
+)
+
+
+_STOPCMD = _descriptor.Descriptor(
+  name='StopCmd',
+  full_name='phy.StopCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=910,
+  serialized_end=919,
+)
+
+
+_JAMCMD = _descriptor.Descriptor(
+  name='JamCmd',
+  full_name='phy.JamCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='mode', full_name='phy.JamCmd.mode', index=0,
+      number=1, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=921,
+  serialized_end=961,
+)
+
+
+_MONITORCMD = _descriptor.Descriptor(
+  name='MonitorCmd',
+  full_name='phy.MonitorCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=963,
+  serialized_end=975,
+)
+
+
+_PACKETRECEIVED = _descriptor.Descriptor(
+  name='PacketReceived',
+  full_name='phy.PacketReceived',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='frequency', full_name='phy.PacketReceived.frequency', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='rssi', full_name='phy.PacketReceived.rssi', index=1,
+      number=2, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='timestamp', full_name='phy.PacketReceived.timestamp', index=2,
+      number=3, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='packet', full_name='phy.PacketReceived.packet', index=3,
+      number=4, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+    _descriptor.OneofDescriptor(
+      name='_rssi', full_name='phy.PacketReceived._rssi',
+      index=0, containing_type=None,
+      create_key=_descriptor._internal_create_key,
+    fields=[]),
+    _descriptor.OneofDescriptor(
+      name='_timestamp', full_name='phy.PacketReceived._timestamp',
+      index=1, containing_type=None,
+      create_key=_descriptor._internal_create_key,
+    fields=[]),
+  ],
+  serialized_start=977,
+  serialized_end=1094,
+)
+
+
+_RAWPACKETRECEIVED = _descriptor.Descriptor(
+  name='RawPacketReceived',
+  full_name='phy.RawPacketReceived',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='frequency', full_name='phy.RawPacketReceived.frequency', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='rssi', full_name='phy.RawPacketReceived.rssi', index=1,
+      number=2, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='timestamp', full_name='phy.RawPacketReceived.timestamp', index=2,
+      number=3, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='packet', full_name='phy.RawPacketReceived.packet', index=3,
+      number=4, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='iq', full_name='phy.RawPacketReceived.iq', index=4,
+      number=5, type=5, cpp_type=1, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=b'\020\001', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+    _descriptor.OneofDescriptor(
+      name='_rssi', full_name='phy.RawPacketReceived._rssi',
+      index=0, containing_type=None,
+      create_key=_descriptor._internal_create_key,
+    fields=[]),
+    _descriptor.OneofDescriptor(
+      name='_timestamp', full_name='phy.RawPacketReceived._timestamp',
+      index=1, containing_type=None,
+      create_key=_descriptor._internal_create_key,
+    fields=[]),
+  ],
+  serialized_start=1097,
+  serialized_end=1233,
+)
+
+
+_JAMMED = _descriptor.Descriptor(
+  name='Jammed',
+  full_name='phy.Jammed',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='timestamp', full_name='phy.Jammed.timestamp', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1235,
+  serialized_end=1262,
+)
+
+
+_MONITORINGREPORT = _descriptor.Descriptor(
+  name='MonitoringReport',
+  full_name='phy.MonitoringReport',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='timestamp', full_name='phy.MonitoringReport.timestamp', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='report', full_name='phy.MonitoringReport.report', index=1,
+      number=2, type=13, cpp_type=3, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=b'\020\001', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1264,
+  serialized_end=1321,
+)
+
+
+_SUPPORTEDFREQUENCYRANGES_FREQUENCYRANGE = _descriptor.Descriptor(
+  name='FrequencyRange',
+  full_name='phy.SupportedFrequencyRanges.FrequencyRange',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='start', full_name='phy.SupportedFrequencyRanges.FrequencyRange.start', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='end', full_name='phy.SupportedFrequencyRanges.FrequencyRange.end', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1424,
+  serialized_end=1468,
+)
+
+_SUPPORTEDFREQUENCYRANGES = _descriptor.Descriptor(
+  name='SupportedFrequencyRanges',
+  full_name='phy.SupportedFrequencyRanges',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='frequency_ranges', full_name='phy.SupportedFrequencyRanges.frequency_ranges', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[_SUPPORTEDFREQUENCYRANGES_FREQUENCYRANGE, ],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1324,
+  serialized_end=1468,
+)
+
+
+_MESSAGE = _descriptor.Descriptor(
+  name='Message',
+  full_name='phy.Message',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='mod_ask', full_name='phy.Message.mod_ask', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='mod_fsk', full_name='phy.Message.mod_fsk', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='mod_gfsk', full_name='phy.Message.mod_gfsk', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='mod_bpsk', full_name='phy.Message.mod_bpsk', index=3,
+      number=4, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='mod_qpsk', full_name='phy.Message.mod_qpsk', index=4,
+      number=5, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='mod_4fsk', full_name='phy.Message.mod_4fsk', index=5,
+      number=6, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='mod_msk', full_name='phy.Message.mod_msk', index=6,
+      number=7, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='get_supported_freq', full_name='phy.Message.get_supported_freq', index=7,
+      number=8, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='set_freq', full_name='phy.Message.set_freq', index=8,
+      number=9, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='datarate', full_name='phy.Message.datarate', index=9,
+      number=10, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='endianness', full_name='phy.Message.endianness', index=10,
+      number=11, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='tx_power', full_name='phy.Message.tx_power', index=11,
+      number=12, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='packet_size', full_name='phy.Message.packet_size', index=12,
+      number=13, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='sync_word', full_name='phy.Message.sync_word', index=13,
+      number=14, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='sniff', full_name='phy.Message.sniff', index=14,
+      number=15, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='send', full_name='phy.Message.send', index=15,
+      number=16, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='send_raw', full_name='phy.Message.send_raw', index=16,
+      number=17, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='start', full_name='phy.Message.start', index=17,
+      number=18, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='stop', full_name='phy.Message.stop', index=18,
+      number=19, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='jam', full_name='phy.Message.jam', index=19,
+      number=20, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='monitor', full_name='phy.Message.monitor', index=20,
+      number=21, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='packet', full_name='phy.Message.packet', index=21,
+      number=22, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='raw_packet', full_name='phy.Message.raw_packet', index=22,
+      number=23, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='jammed', full_name='phy.Message.jammed', index=23,
+      number=24, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='monitor_report', full_name='phy.Message.monitor_report', index=24,
+      number=25, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='supported_freq', full_name='phy.Message.supported_freq', index=25,
+      number=26, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='mod_lora', full_name='phy.Message.mod_lora', index=26,
+      number=27, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+    _descriptor.OneofDescriptor(
+      name='msg', full_name='phy.Message.msg',
+      index=0, containing_type=None,
+      create_key=_descriptor._internal_create_key,
+    fields=[]),
+  ],
+  serialized_start=1471,
+  serialized_end=2623,
+)
+
+_SETLORAMODULATIONCMD.fields_by_name['spreading_factor'].enum_type = _LORASPREADINGFACTOR
+_SETLORAMODULATIONCMD.fields_by_name['coding_rate'].enum_type = _LORACODINGRATE
+_SETENDIANNESSCMD.fields_by_name['endianness'].enum_type = _ENDIANNESS
+_SETTXPOWERCMD.fields_by_name['tx_power'].enum_type = _TXPOWER
+_SNIFFCMD.oneofs_by_name['_iq_stream'].fields.append(
+  _SNIFFCMD.fields_by_name['iq_stream'])
+_SNIFFCMD.fields_by_name['iq_stream'].containing_oneof = _SNIFFCMD.oneofs_by_name['_iq_stream']
+_JAMCMD.fields_by_name['mode'].enum_type = _JAMMINGMODE
+_PACKETRECEIVED.oneofs_by_name['_rssi'].fields.append(
+  _PACKETRECEIVED.fields_by_name['rssi'])
+_PACKETRECEIVED.fields_by_name['rssi'].containing_oneof = _PACKETRECEIVED.oneofs_by_name['_rssi']
+_PACKETRECEIVED.oneofs_by_name['_timestamp'].fields.append(
+  _PACKETRECEIVED.fields_by_name['timestamp'])
+_PACKETRECEIVED.fields_by_name['timestamp'].containing_oneof = _PACKETRECEIVED.oneofs_by_name['_timestamp']
+_RAWPACKETRECEIVED.oneofs_by_name['_rssi'].fields.append(
+  _RAWPACKETRECEIVED.fields_by_name['rssi'])
+_RAWPACKETRECEIVED.fields_by_name['rssi'].containing_oneof = _RAWPACKETRECEIVED.oneofs_by_name['_rssi']
+_RAWPACKETRECEIVED.oneofs_by_name['_timestamp'].fields.append(
+  _RAWPACKETRECEIVED.fields_by_name['timestamp'])
+_RAWPACKETRECEIVED.fields_by_name['timestamp'].containing_oneof = _RAWPACKETRECEIVED.oneofs_by_name['_timestamp']
+_SUPPORTEDFREQUENCYRANGES_FREQUENCYRANGE.containing_type = _SUPPORTEDFREQUENCYRANGES
+_SUPPORTEDFREQUENCYRANGES.fields_by_name['frequency_ranges'].message_type = _SUPPORTEDFREQUENCYRANGES_FREQUENCYRANGE
+_MESSAGE.fields_by_name['mod_ask'].message_type = _SETASKMODULATIONCMD
+_MESSAGE.fields_by_name['mod_fsk'].message_type = _SETFSKMODULATIONCMD
+_MESSAGE.fields_by_name['mod_gfsk'].message_type = _SETGFSKMODULATIONCMD
+_MESSAGE.fields_by_name['mod_bpsk'].message_type = _SETBPSKMODULATIONCMD
+_MESSAGE.fields_by_name['mod_qpsk'].message_type = _SETQPSKMODULATIONCMD
+_MESSAGE.fields_by_name['mod_4fsk'].message_type = _SET4FSKMODULATIONCMD
+_MESSAGE.fields_by_name['mod_msk'].message_type = _SETMSKMODULATIONCMD
+_MESSAGE.fields_by_name['get_supported_freq'].message_type = _GETSUPPORTEDFREQUENCIESCMD
+_MESSAGE.fields_by_name['set_freq'].message_type = _SETFREQUENCYCMD
+_MESSAGE.fields_by_name['datarate'].message_type = _SETDATARATECMD
+_MESSAGE.fields_by_name['endianness'].message_type = _SETENDIANNESSCMD
+_MESSAGE.fields_by_name['tx_power'].message_type = _SETTXPOWERCMD
+_MESSAGE.fields_by_name['packet_size'].message_type = _SETPACKETSIZECMD
+_MESSAGE.fields_by_name['sync_word'].message_type = _SETSYNCWORDCMD
+_MESSAGE.fields_by_name['sniff'].message_type = _SNIFFCMD
+_MESSAGE.fields_by_name['send'].message_type = _SENDCMD
+_MESSAGE.fields_by_name['send_raw'].message_type = _SENDRAWCMD
+_MESSAGE.fields_by_name['start'].message_type = _STARTCMD
+_MESSAGE.fields_by_name['stop'].message_type = _STOPCMD
+_MESSAGE.fields_by_name['jam'].message_type = _JAMCMD
+_MESSAGE.fields_by_name['monitor'].message_type = _MONITORCMD
+_MESSAGE.fields_by_name['packet'].message_type = _PACKETRECEIVED
+_MESSAGE.fields_by_name['raw_packet'].message_type = _RAWPACKETRECEIVED
+_MESSAGE.fields_by_name['jammed'].message_type = _JAMMED
+_MESSAGE.fields_by_name['monitor_report'].message_type = _MONITORINGREPORT
+_MESSAGE.fields_by_name['supported_freq'].message_type = _SUPPORTEDFREQUENCYRANGES
+_MESSAGE.fields_by_name['mod_lora'].message_type = _SETLORAMODULATIONCMD
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['mod_ask'])
+_MESSAGE.fields_by_name['mod_ask'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['mod_fsk'])
+_MESSAGE.fields_by_name['mod_fsk'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['mod_gfsk'])
+_MESSAGE.fields_by_name['mod_gfsk'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['mod_bpsk'])
+_MESSAGE.fields_by_name['mod_bpsk'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['mod_qpsk'])
+_MESSAGE.fields_by_name['mod_qpsk'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['mod_4fsk'])
+_MESSAGE.fields_by_name['mod_4fsk'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['mod_msk'])
+_MESSAGE.fields_by_name['mod_msk'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['get_supported_freq'])
+_MESSAGE.fields_by_name['get_supported_freq'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['set_freq'])
+_MESSAGE.fields_by_name['set_freq'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['datarate'])
+_MESSAGE.fields_by_name['datarate'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['endianness'])
+_MESSAGE.fields_by_name['endianness'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['tx_power'])
+_MESSAGE.fields_by_name['tx_power'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['packet_size'])
+_MESSAGE.fields_by_name['packet_size'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['sync_word'])
+_MESSAGE.fields_by_name['sync_word'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['sniff'])
+_MESSAGE.fields_by_name['sniff'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['send'])
+_MESSAGE.fields_by_name['send'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['send_raw'])
+_MESSAGE.fields_by_name['send_raw'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['start'])
+_MESSAGE.fields_by_name['start'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['stop'])
+_MESSAGE.fields_by_name['stop'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['jam'])
+_MESSAGE.fields_by_name['jam'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['monitor'])
+_MESSAGE.fields_by_name['monitor'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['packet'])
+_MESSAGE.fields_by_name['packet'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['raw_packet'])
+_MESSAGE.fields_by_name['raw_packet'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['jammed'])
+_MESSAGE.fields_by_name['jammed'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['monitor_report'])
+_MESSAGE.fields_by_name['monitor_report'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['supported_freq'])
+_MESSAGE.fields_by_name['supported_freq'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['mod_lora'])
+_MESSAGE.fields_by_name['mod_lora'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+DESCRIPTOR.message_types_by_name['SetASKModulationCmd'] = _SETASKMODULATIONCMD
+DESCRIPTOR.message_types_by_name['SetFSKModulationCmd'] = _SETFSKMODULATIONCMD
+DESCRIPTOR.message_types_by_name['Set4FSKModulationCmd'] = _SET4FSKMODULATIONCMD
+DESCRIPTOR.message_types_by_name['SetGFSKModulationCmd'] = _SETGFSKMODULATIONCMD
+DESCRIPTOR.message_types_by_name['SetMSKModulationCmd'] = _SETMSKMODULATIONCMD
+DESCRIPTOR.message_types_by_name['SetBPSKModulationCmd'] = _SETBPSKMODULATIONCMD
+DESCRIPTOR.message_types_by_name['SetQPSKModulationCmd'] = _SETQPSKMODULATIONCMD
+DESCRIPTOR.message_types_by_name['SetLoRaModulationCmd'] = _SETLORAMODULATIONCMD
+DESCRIPTOR.message_types_by_name['GetSupportedFrequenciesCmd'] = _GETSUPPORTEDFREQUENCIESCMD
+DESCRIPTOR.message_types_by_name['SetFrequencyCmd'] = _SETFREQUENCYCMD
+DESCRIPTOR.message_types_by_name['SetDataRateCmd'] = _SETDATARATECMD
+DESCRIPTOR.message_types_by_name['SetEndiannessCmd'] = _SETENDIANNESSCMD
+DESCRIPTOR.message_types_by_name['SetTXPowerCmd'] = _SETTXPOWERCMD
+DESCRIPTOR.message_types_by_name['SetPacketSizeCmd'] = _SETPACKETSIZECMD
+DESCRIPTOR.message_types_by_name['SetSyncWordCmd'] = _SETSYNCWORDCMD
+DESCRIPTOR.message_types_by_name['SniffCmd'] = _SNIFFCMD
+DESCRIPTOR.message_types_by_name['SendCmd'] = _SENDCMD
+DESCRIPTOR.message_types_by_name['SendRawCmd'] = _SENDRAWCMD
+DESCRIPTOR.message_types_by_name['StartCmd'] = _STARTCMD
+DESCRIPTOR.message_types_by_name['StopCmd'] = _STOPCMD
+DESCRIPTOR.message_types_by_name['JamCmd'] = _JAMCMD
+DESCRIPTOR.message_types_by_name['MonitorCmd'] = _MONITORCMD
+DESCRIPTOR.message_types_by_name['PacketReceived'] = _PACKETRECEIVED
+DESCRIPTOR.message_types_by_name['RawPacketReceived'] = _RAWPACKETRECEIVED
+DESCRIPTOR.message_types_by_name['Jammed'] = _JAMMED
+DESCRIPTOR.message_types_by_name['MonitoringReport'] = _MONITORINGREPORT
+DESCRIPTOR.message_types_by_name['SupportedFrequencyRanges'] = _SUPPORTEDFREQUENCYRANGES
+DESCRIPTOR.message_types_by_name['Message'] = _MESSAGE
+DESCRIPTOR.enum_types_by_name['PhyCommand'] = _PHYCOMMAND
+DESCRIPTOR.enum_types_by_name['Endianness'] = _ENDIANNESS
+DESCRIPTOR.enum_types_by_name['TXPower'] = _TXPOWER
+DESCRIPTOR.enum_types_by_name['JammingMode'] = _JAMMINGMODE
+DESCRIPTOR.enum_types_by_name['LoRaSpreadingFactor'] = _LORASPREADINGFACTOR
+DESCRIPTOR.enum_types_by_name['LoRaCodingRate'] = _LORACODINGRATE
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
+
 SetASKModulationCmd = _reflection.GeneratedProtocolMessageType('SetASKModulationCmd', (_message.Message,), {
   'DESCRIPTOR' : _SETASKMODULATIONCMD,
   '__module__' : 'protocol.phy.phy_pb2'
@@ -131,6 +1771,13 @@ SetQPSKModulationCmd = _reflection.GeneratedProtocolMessageType('SetQPSKModulati
   # @@protoc_insertion_point(class_scope:phy.SetQPSKModulationCmd)
   })
 _sym_db.RegisterMessage(SetQPSKModulationCmd)
+
+SetLoRaModulationCmd = _reflection.GeneratedProtocolMessageType('SetLoRaModulationCmd', (_message.Message,), {
+  'DESCRIPTOR' : _SETLORAMODULATIONCMD,
+  '__module__' : 'protocol.phy.phy_pb2'
+  # @@protoc_insertion_point(class_scope:phy.SetLoRaModulationCmd)
+  })
+_sym_db.RegisterMessage(SetLoRaModulationCmd)
 
 GetSupportedFrequenciesCmd = _reflection.GeneratedProtocolMessageType('GetSupportedFrequenciesCmd', (_message.Message,), {
   'DESCRIPTOR' : _GETSUPPORTEDFREQUENCIESCMD,
@@ -280,77 +1927,8 @@ Message = _reflection.GeneratedProtocolMessageType('Message', (_message.Message,
   })
 _sym_db.RegisterMessage(Message)
 
-if _descriptor._USE_C_DESCRIPTORS == False:
 
-  DESCRIPTOR._options = None
-  _SENDRAWCMD.fields_by_name['iq']._options = None
-  _SENDRAWCMD.fields_by_name['iq']._serialized_options = b'\020\001'
-  _RAWPACKETRECEIVED.fields_by_name['iq']._options = None
-  _RAWPACKETRECEIVED.fields_by_name['iq']._serialized_options = b'\020\001'
-  _MONITORINGREPORT.fields_by_name['report']._options = None
-  _MONITORINGREPORT.fields_by_name['report']._serialized_options = b'\020\001'
-  _PHYCOMMAND._serialized_start=2378
-  _PHYCOMMAND._serialized_end=2760
-  _ENDIANNESS._serialized_start=2762
-  _ENDIANNESS._serialized_end=2795
-  _TXPOWER._serialized_start=2797
-  _TXPOWER._serialized_end=2837
-  _JAMMINGMODE._serialized_start=2839
-  _JAMMINGMODE._serialized_end=2882
-  _SETASKMODULATIONCMD._serialized_start=31
-  _SETASKMODULATIONCMD._serialized_end=65
-  _SETFSKMODULATIONCMD._serialized_start=67
-  _SETFSKMODULATIONCMD._serialized_end=107
-  _SET4FSKMODULATIONCMD._serialized_start=109
-  _SET4FSKMODULATIONCMD._serialized_end=150
-  _SETGFSKMODULATIONCMD._serialized_start=152
-  _SETGFSKMODULATIONCMD._serialized_end=193
-  _SETMSKMODULATIONCMD._serialized_start=195
-  _SETMSKMODULATIONCMD._serialized_end=235
-  _SETBPSKMODULATIONCMD._serialized_start=237
-  _SETBPSKMODULATIONCMD._serialized_end=259
-  _SETQPSKMODULATIONCMD._serialized_start=261
-  _SETQPSKMODULATIONCMD._serialized_end=304
-  _GETSUPPORTEDFREQUENCIESCMD._serialized_start=306
-  _GETSUPPORTEDFREQUENCIESCMD._serialized_end=334
-  _SETFREQUENCYCMD._serialized_start=336
-  _SETFREQUENCYCMD._serialized_end=372
-  _SETDATARATECMD._serialized_start=374
-  _SETDATARATECMD._serialized_end=404
-  _SETENDIANNESSCMD._serialized_start=406
-  _SETENDIANNESSCMD._serialized_end=461
-  _SETTXPOWERCMD._serialized_start=463
-  _SETTXPOWERCMD._serialized_end=510
-  _SETPACKETSIZECMD._serialized_start=512
-  _SETPACKETSIZECMD._serialized_end=551
-  _SETSYNCWORDCMD._serialized_start=553
-  _SETSYNCWORDCMD._serialized_end=588
-  _SNIFFCMD._serialized_start=590
-  _SNIFFCMD._serialized_end=638
-  _SENDCMD._serialized_start=640
-  _SENDCMD._serialized_end=665
-  _SENDRAWCMD._serialized_start=667
-  _SENDRAWCMD._serialized_end=695
-  _STARTCMD._serialized_start=697
-  _STARTCMD._serialized_end=707
-  _STOPCMD._serialized_start=709
-  _STOPCMD._serialized_end=718
-  _JAMCMD._serialized_start=720
-  _JAMCMD._serialized_end=760
-  _MONITORCMD._serialized_start=762
-  _MONITORCMD._serialized_end=774
-  _PACKETRECEIVED._serialized_start=776
-  _PACKETRECEIVED._serialized_end=893
-  _RAWPACKETRECEIVED._serialized_start=896
-  _RAWPACKETRECEIVED._serialized_end=1032
-  _JAMMED._serialized_start=1034
-  _JAMMED._serialized_end=1061
-  _MONITORINGREPORT._serialized_start=1063
-  _MONITORINGREPORT._serialized_end=1120
-  _SUPPORTEDFREQUENCYRANGES._serialized_start=1123
-  _SUPPORTEDFREQUENCYRANGES._serialized_end=1267
-  _SUPPORTEDFREQUENCYRANGES_FREQUENCYRANGE._serialized_start=1223
-  _SUPPORTEDFREQUENCYRANGES_FREQUENCYRANGE._serialized_end=1267
-  _MESSAGE._serialized_start=1270
-  _MESSAGE._serialized_end=2375
+_SENDRAWCMD.fields_by_name['iq']._options = None
+_RAWPACKETRECEIVED.fields_by_name['iq']._options = None
+_MONITORINGREPORT.fields_by_name['report']._options = None
 # @@protoc_insertion_point(module_scope)
