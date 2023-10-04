@@ -796,8 +796,8 @@ class SMPLayer(Layer):
 
         # We received the public key, now transmit our own
         if self.state.state == SecurityManagerState.STATE_PAIRING_REQ:
-            own_x = bytes.fromhex("{:064x}".format(self.state.public_key.public_numbers().x)[::-1])
-            own_y = bytes.fromhex("{:064x}".format(self.state.public_key.public_numbers().y)[::-1])
+            own_x = bytes.fromhex("{:064x}".format(self.state.public_key.public_numbers().x))[::-1]
+            own_y = bytes.fromhex("{:064x}".format(self.state.public_key.public_numbers().y))[::-1]
 
             self.send_data(
                 SM_Public_Key(
@@ -900,7 +900,7 @@ class SMPLayer(Layer):
                 self.state.tk = bytes.fromhex("00"*12 + "{:08x}".format(pin))
             elif method == PM_LESC_NUMCOMP:
                 # Generate the P256 keypair
-                self.state.private_key, self.state.public_key = generate_p256_keypair()
+                self.state.private_key, self.state.public_key = generate_p256_keypair()#0x3f49f6d4a3c55f3874c9b3e3d2103f504aff607beb40b7995899b8a6cd3c1abd)
 
             # Update current state
             self.state.state = SecurityManagerState.STATE_PAIRING_REQ
