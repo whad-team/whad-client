@@ -41,3 +41,4 @@ print('Press a key to update device name')
 input()
 my_profile.device.device_name.value = b'TestDeviceChanged'
 input()
+input()

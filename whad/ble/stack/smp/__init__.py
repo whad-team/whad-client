@@ -6,7 +6,7 @@ BleSMP provides these different pairing strategies:
 - "Legacy Passkey"
 - "Numeric Comparison (LESC) - todo"
 """
-from struct import pack
+from struct import pack, unpack
 from binascii import hexlify
 from random import randint
 from time import sleep
@@ -14,9 +14,10 @@ from time import sleep
 
 from scapy.layers.bluetooth import SM_Pairing_Request, SM_Pairing_Response, SM_Hdr,\
     SM_Confirm, SM_Random, SM_Failed, SM_Encryption_Information, SM_Master_Identification, \
-    SM_Identity_Information, SM_Signing_Information, SM_Identity_Address_Information, SM_Public_Key
-from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, c1, s1, \
-    generate_public_key_from_coordinates, generate_diffie_hellman_shared_secret, \
+    SM_Identity_Information, SM_Signing_Information, SM_Identity_Address_Information, \
+    SM_DHKey_Check, SM_Public_Key
+from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, c1, s1, f4, g2, \
+    f5, f6, generate_public_key_from_coordinates, generate_diffie_hellman_shared_secret, \
     generate_p256_keypair
 from whad.ble.bdaddr import BDAddress
 from whad.ble.stack.smp.constants import *
@@ -288,7 +289,7 @@ class SM_Peer(object):
         return self.__distributed_ltk
 
     @property
-    def rand(self):
+    def random(self):
         return self.__distributed_rand
 
     @property
@@ -397,7 +398,7 @@ class SM_Peer(object):
         ))
         # First, compute confirm based on rand
         if initiator:
-            _confirm = self.compute_confirm_value(
+            _confirm = self.compute_legacy_confirm_value(
                 tk,
                 preq,
                 pres,
@@ -407,7 +408,7 @@ class SM_Peer(object):
                 peer.address_type,
             )
         else:
-            _confirm = self.compute_confirm_value(
+            _confirm = self.compute_legacy_confirm_value(
                 tk,
                 preq,
                 pres,
@@ -419,7 +420,9 @@ class SM_Peer(object):
         return _confirm == self.get_confirm_value()
 
 
-    def compute_confirm_value(self, tk, preq, pres, init_addr, init_addr_type, resp_addr, resp_addr_type):
+
+
+    def compute_legacy_confirm_value(self, tk, preq, pres, init_addr, init_addr_type, resp_addr, resp_addr_type):
         _confirm = c1(
             tk,
             self.__rand[::-1],
@@ -439,7 +442,6 @@ class SM_Peer(object):
             hexlify(_confirm)
         ))
         return _confirm
-
 
 
 class SecurityManagerState(LayerState):
@@ -501,6 +503,8 @@ class SecurityManagerState(LayerState):
         # LE Secure Connections
         self.private_key = None
         self.public_key = None
+
+        self.peer_public_key = None
         self.shared_secret = None
 
 @alias('smp')
@@ -538,7 +542,6 @@ class SMPLayer(Layer):
         # If we reach this point, we need to define pairing according to IO capabilities
         # (see Table 2.8, Vol. 3, Part H, Bluetooth Core Specification v5.3, p. 1573)
         try:
-            print("here")
             return IOCAP_KEY_GENERATION_MAPPING[(initiator.iocap, responder.iocap)][int(use_lesc)]
         except IndexError:
             # it looks like an error occured, let's return None
@@ -547,7 +550,7 @@ class SMPLayer(Layer):
     def is_initiator(self):
         return self.state.enc_initiator
 
-    def check_initiator_confirm(self, tk):
+    def check_initiator_legacy_confirm(self, tk):
         """Check initiator peer confirm value given a TK and the corresponding random value.
 
         :param SM_Peer: Peer to check
@@ -557,9 +560,9 @@ class SMPLayer(Layer):
         :param SM_Peer initiator: Pairing initiator
         :param SM_Peer responder: Pairing responder
         """
-        logger.debug('[check_initiator_confirm] RAND=%s' % hexlify(self.state.initiator.rand))
+        logger.debug('[check_initiator_legacy_confirm] RAND=%s' % hexlify(self.state.initiator.rand))
         # Compute expected confirm value
-        expected_confirm = self.compute_confirm_value(
+        expected_confirm = self.compute_legacy_confirm_value(
             tk,
             self.state.initiator.rand,
             self.state.pairing_req,
@@ -567,13 +570,13 @@ class SMPLayer(Layer):
             self.state.initiator,
             self.state.responder
         )
-        logger.debug('[check_initiator_confirm] Computed CONFIRM=%s' % hexlify(expected_confirm))
-        logger.debug('[check_initiator_confirm] Expected CONFIRM=%s' % hexlify(self.state.initiator.confirm))
+        logger.debug('[check_initiator_legacy_confirm] Computed CONFIRM=%s' % hexlify(expected_confirm))
+        logger.debug('[check_initiator_legacy_confirm] Expected CONFIRM=%s' % hexlify(self.state.initiator.confirm))
 
         # Compare with confirm value
         return (expected_confirm == self.state.initiator.confirm)
 
-    def check_responder_confirm(self, tk, preq, pres, initiator, responder):
+    def check_responder_legacy_confirm(self, tk, preq, pres, initiator, responder):
         """Check responder peer confirm value given a TK and the corresponding random value.
 
         :param SM_Peer: Peer to check
@@ -583,10 +586,10 @@ class SMPLayer(Layer):
         :param SM_Peer initiator: Pairing initiator
         :param SM_Peer responder: Pairing responder
         """
-        logger.debug('[check_responder_confirm] RAND=%s' % hexlify(self.state.initiator.rand))
+        logger.debug('[check_responder_legacy_confirm] RAND=%s' % hexlify(self.state.initiator.rand))
 
         # Compute expected confirm value
-        expected_confirm = self.compute_confirm_value(
+        expected_confirm = self.compute_legacy_confirm_value(
             tk,
             self.state.responder.rand,
             self.state.pairing_req,
@@ -595,14 +598,65 @@ class SMPLayer(Layer):
             self.state.responder
         )
 
-        logger.debug('[check_initiator_confirm] Computed CONFIRM=%s' % hexlify(expected_confirm))
-        logger.debug('[check_initiator_confirm] Expected CONFIRM=%s' % hexlify(self.state.responder.confirm))
+        logger.debug('[check_initiator_legacy_confirm] Computed CONFIRM=%s' % hexlify(expected_confirm))
+        logger.debug('[check_initiator_legacy_confirm] Expected CONFIRM=%s' % hexlify(self.state.responder.confirm))
 
         # Compare with confirm value
         return (expected_confirm == self.state.responder.confirm)
 
+    def compute_exchange_value(self, mackey, initiator, responder, r, iocap):
+        e = f6(
+            mackey,
+            initiator.rand,
+            responder.rand,
+            b"\x00"*12+pack('>I', r),
+            iocap,
+            pack('<B', initiator.address_type) +
+            initiator.address[::-1],
+            pack('<B', responder.address_type) +
+            responder.address[::-1]
+        )
 
-    def compute_confirm_value(self, tk, rand, preq, pres, initiator, responder):
+        return e
+
+    def compute_ltk_and_mackey(self, shared_secret, initiator, responder):
+        print(initiator.address, responder.address)
+        output = f5(
+            shared_secret,
+            initiator.rand,
+            responder.rand,
+            pack('<B', initiator.address_type) +
+            initiator.address[::-1],
+            pack('<B', responder.address_type) +
+            responder.address[::-1]
+        )
+
+        mac_key, ltk = output[:16], output[16:] # 16 MSB -> macKey, 16 LSB -> LTK
+        return mac_key, ltk
+
+    def compute_lesc_numeric_comparison(self, initiator_public_key, responder_public_key, initiator_rand, responder_rand):
+        _value = g2(
+            bytes.fromhex("{:064x}".format(initiator_public_key.public_numbers().x)),
+            bytes.fromhex("{:064x}".format(responder_public_key.public_numbers().x)),
+            initiator_rand,
+            responder_rand
+        )
+        cropped_digits = unpack(">I", _value)[0] % (10**6)
+        return cropped_digits
+
+    def compute_lesc_confirm_value(self, initiator_public_key, responder_public_key, random_number, r):
+        _confirm = f4(
+            bytes.fromhex("{:064x}".format(responder_public_key.public_numbers().x)),
+            bytes.fromhex("{:064x}".format(initiator_public_key.public_numbers().x)),
+            random_number,
+            r
+        )
+        logger.info('Computed LESC CONFIRM: %s' % (
+            hexlify(_confirm)
+        ))
+        return _confirm
+
+    def compute_legacy_confirm_value(self, tk, rand, preq, pres, initiator, responder):
         """Compute Confirm value as described in [Vol 3] Part H, Section 2.3.5.5
 
         This value is not ready to be set in a SM_Confirm packet as-is, it needs
@@ -680,6 +734,8 @@ class SMPLayer(Layer):
             self.on_signing_information(smp_pkt.getlayer(SM_Signing_Information))
         elif SM_Public_Key in smp_pkt:
             self.on_public_key(smp_pkt.getlayer(SM_Public_Key))
+        elif SM_DHKey_Check in smp_pkt:
+            self.on_dhkey_check(smp_pkt.getlayer(SM_DHKey_Check))
 
     def initiate_pairing(
                             self,
@@ -789,8 +845,8 @@ class SMPLayer(Layer):
         y = int(public_key_pkt.key_y[::-1].hex(), 16)
 
         # We can now generate the ECDH shared secret
-        peer_public_key = generate_public_key_from_coordinates(x, y)
-        self.state.shared_secret = generate_diffie_hellman_shared_secret(self.state.private_key, peer_public_key)
+        self.state.peer_public_key = generate_public_key_from_coordinates(x, y)
+        self.state.shared_secret = generate_diffie_hellman_shared_secret(self.state.private_key, self.state.peer_public_key)
 
         print("Shared secret", self.state.shared_secret)
 
@@ -805,6 +861,25 @@ class SMPLayer(Layer):
                     key_y = own_y
                 )
             )
+
+            # Generate a RAND and compute CONFIRM
+            self.state.responder.generate_legacy_rand()
+            self.state.responder.confirm = self.compute_lesc_confirm_value(
+                self.state.peer_public_key,  # we are the responder, peer is the initiator
+                self.state.public_key,  # set our own public key
+                self.state.responder.rand,
+                b"\x00" # r equals 0 in JustWorks and NumComp
+            )
+
+            logger.debug('[send_pairing_confirm] Computed CONFIRM=%s' % hexlify(self.state.responder.confirm))
+            self.send_data(
+                SM_Confirm(
+                    confirm=self.state.responder.confirm[::-1]
+                )
+            )
+            # Update current state
+            self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT
+
 
     def on_pairing_request(self, pairing_req):
         """Method called when a pairing request is received.
@@ -900,7 +975,7 @@ class SMPLayer(Layer):
                 self.state.tk = bytes.fromhex("00"*12 + "{:08x}".format(pin))
             elif method == PM_LESC_NUMCOMP:
                 # Generate the P256 keypair
-                self.state.private_key, self.state.public_key = generate_p256_keypair()#0x3f49f6d4a3c55f3874c9b3e3d2103f504aff607beb40b7995899b8a6cd3c1abd)
+                self.state.private_key, self.state.public_key = generate_p256_keypair()
 
             # Update current state
             self.state.state = SecurityManagerState.STATE_PAIRING_REQ
@@ -916,6 +991,87 @@ class SMPLayer(Layer):
 
             # Return to IDLE mode
             self.__state = SecurityManagerState.STATE_IDLE
+
+
+
+    def on_dhkey_check(self, dhkey_check):
+        """Method called when a Diffie Hellman check is received.
+
+        :param SM_DHKey_Check dhkey_check: Diffie Hellman check packet
+        """
+        logger.info('Received Diffie Hellman check')
+
+        # Make sure we are in a state that allows this diffie hellman check packet
+        if self.state.state == SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT:
+            logger.info('Diffie Hellman check accepted, processing ...')
+            self.state.ltk, mackey = self.compute_ltk_and_mackey(
+                self.state.shared_secret,
+                self.state.initiator,
+                self.state.responder
+            )
+
+            self.state.rand, self.state.ediv = b"\x00"*8, 0
+            # Indicate LTK as distributed
+            self.state.initiator.indicate_ltk_distribution(self.state.ltk)
+            self.state.initiator.indicate_rand_ediv_distribution(self.state.rand, self.state.ediv)
+            self.state.responder.indicate_ltk_distribution(self.state.ltk)
+            self.state.responder.indicate_rand_ediv_distribution(self.state.rand, self.state.ediv)
+
+            rb = 0 # in num comp and just works, TODO: adapt for passkey
+            # Let's compute EA
+            ea = self.compute_exchange_value(
+                mackey,
+                self.state.initiator,
+                self.state.responder,
+                0,
+                bytes(
+                    [
+                        self.state.initiator.authentication,
+                        self.state.initiator.oob,
+                        self.state.initiator.iocap
+                    ]
+                )
+            )
+            # If we received a valid EA, generate EB and transmit it
+            if ea == dhkey_check.dhkey_check[::-1]:
+                eb = self.compute_exchange_value(
+                    mackey,
+                    self.state.responder,
+                    self.state.initiator,
+                    0,
+                    bytes(
+                        [
+                            self.state.responder.authentication,
+                            self.state.responder.oob,
+                            self.state.responder.iocap
+                        ]
+                    )
+                )
+                self.send_data(
+                    SM_DHKey_Check(
+                        dhkey_check=eb[::-1]
+                    )
+                )
+
+                # Get the current connection handle
+                conn_handle = self.get_layer('l2cap').state.conn_handle
+
+                # Get the current link layer state
+                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk)
+
+                self.state.state = SecurityManagerState.STATE_LESC_DHK_CHECK_SENT
+            # otherwise, fail.
+            else:
+                logger.info('Invalid exchange value received, report error and return to idle.')
+
+                # Notify error
+                error = SM_Failed(
+                    reason = SM_ERROR_DHKEY_CHECK_FAILED
+                )
+                self.send_data(error)
+
+                # Return to IDLE mode
+                self.__state = SecurityManagerState.STATE_IDLE
 
 
 
@@ -983,7 +1139,7 @@ class SMPLayer(Layer):
 
             # Generate a RAND and compute CONFIRM
             self.state.initiator.generate_legacy_rand()
-            self.state.initiator.confirm = self.compute_confirm_value(
+            self.state.initiator.confirm = self.compute_legacy_confirm_value(
                 self.state.tk,
                 self.state.initiator.rand,
                 self.state.pairing_req,
@@ -1040,7 +1196,7 @@ class SMPLayer(Layer):
 
             # Generate a RAND and compute CONFIRM
             self.state.responder.generate_legacy_rand()
-            self.state.responder.confirm = self.compute_confirm_value(
+            self.state.responder.confirm = self.compute_legacy_confirm_value(
                 self.state.tk,
                 self.state.responder.rand,
                 self.state.pairing_req,
@@ -1084,19 +1240,62 @@ class SMPLayer(Layer):
             # Return to IDLE mode
             self.state.state = SecurityManagerState.STATE_IDLE
 
+    def check_lesc_numeric_comparison(self, value):
+        print("Computed value is: ", value)
+        print("y to continue process, n to discard")
+        user_input = input()
+        return user_input.upper().startswith("Y")
+
 
     def on_pairing_random(self, random_pkt):
         """Handling random packet
         """
         logger.info('Received Pairing Random value')
-
-        if self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_CONFIRM_SENT:
+        if self.state.state == SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT:
             logger.info('Pairing Random value is expected, processing ...')
 
             # Save initiator RAND (reverse byte order)
             self.state.initiator.rand = random_pkt.random[::-1]
 
-            if self.check_initiator_confirm(self.state.tk):
+            # Send back our random
+            rand_value = SM_Random(
+                random = self.state.responder.rand[::-1]
+            )
+            self.send_data(rand_value)
+
+            # Now, we need ot display the value for numeric comparison
+            value = self.compute_lesc_numeric_comparison(
+                self.state.peer_public_key,
+                self.state.public_key,
+                self.state.initiator.rand,
+                self.state.responder.rand
+            )
+
+            continue_pairing = self.check_lesc_numeric_comparison(value)
+            if continue_pairing:
+                print("Accepted numeric comparison, continuing...")
+                self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT
+            else:
+                logger.info('Invalid Numeric comparison (expected %s)' % (
+                    str(value),
+                ))
+
+                # Send error
+                error = SM_Failed(
+                    reason = SM_ERROR_NUMCOMP_FAILED
+                )
+                self.send_data(error)
+
+                # Return to IDLE
+                self.state.state = SecurityManagerState.STATE_IDLE
+
+        elif self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_CONFIRM_SENT:
+            logger.info('Pairing Random value is expected, processing ...')
+
+            # Save initiator RAND (reverse byte order)
+            self.state.initiator.rand = random_pkt.random[::-1]
+
+            if self.check_initiator_legacy_confirm(self.state.tk):
                 logger.info('Initiator CONFIRM successfully verified')
                 # Send back our random
                 rand_value = SM_Random(
@@ -1147,7 +1346,7 @@ class SMPLayer(Layer):
             # Save responder RAND (reverse byte order)
             self.state.responder.rand = random_pkt.random[::-1]
 
-            if self.check_responder_confirm(
+            if self.check_responder_legacy_confirm(
                 self.state.tk,
                 self.state.pairing_req,
                 self.state.pairing_resp,
@@ -1225,27 +1424,33 @@ class SMPLayer(Layer):
             if self.state.initiator.is_key_distribution_complete():
                 self.perform_key_distribution()
 
+        elif self.state.state == SecurityManagerState.STATE_LESC_DHK_CHECK_SENT:
+            logger.info('[smp] Channel is now successfully encrypted')
+            self.perform_key_distribution()
         else:
             logger.error('[smp] Received an unexpected notification (LL_START_ENC_RSP)')
 
     def perform_key_distribution(self):
 
         if self.is_initiator():
-            self.state.ltk = generate_random_value(8*self.state.responder.max_key_size)
-            self.state.rand = generate_random_value(8*8)
-            self.state.ediv = randint(0, 0x10000)
+            # If LTK is not None, it has been derivated from DHKey in LE SC
+            # don't distribute LTK, only IRK and CSRK
+            if self.state.ltk is None:
+                self.state.ltk = generate_random_value(8*self.state.responder.max_key_size)
+                self.state.rand = generate_random_value(8*8)
+                self.state.ediv = randint(0, 0x10000)
 
-            # Perform key distribution to responder
-            sleep(.5)
-            if self.state.responder.must_dist_ltk():
-                logger.info('[smp] sending generated LTK ...')
-                self.send_data(SM_Encryption_Information(
-                    ltk=self.state.ltk
-                ))
-                logger.info('[smp] LTK sent.')
-            if self.state.responder.must_dist_ediv_rand():
-                logger.info('[smp] sending generated EDIV/RAND ...')
-                self.send_data(SM_Master_Identification(ediv = self.state.ediv, rand = self.state.rand))
+                # Perform key distribution to responder
+                sleep(.5)
+                if self.state.responder.must_dist_ltk():
+                    logger.info('[smp] sending generated LTK ...')
+                    self.send_data(SM_Encryption_Information(
+                        ltk=self.state.ltk
+                    ))
+                    logger.info('[smp] LTK sent.')
+                if self.state.responder.must_dist_ediv_rand():
+                    logger.info('[smp] sending generated EDIV/RAND ...')
+                    self.send_data(SM_Master_Identification(ediv = self.state.ediv, rand = self.state.rand))
                 logger.info('[smp] EDIV/RAND sent.')
             if self.state.responder.must_dist_irk():
                 logger.info('[smp] sending generated IRK ...')
@@ -1274,22 +1479,23 @@ class SMPLayer(Layer):
             self.bonding_done()
 
         else:
-            self.state.ltk = generate_random_value(8*self.state.initiator.max_key_size)
-            self.state.rand = generate_random_value(8*8)
-            self.state.ediv = randint(0, 0x10000)
+            if self.state.ltk is None:
+                self.state.ltk = generate_random_value(8*self.state.initiator.max_key_size)
+                self.state.rand = generate_random_value(8*8)
+                self.state.ediv = randint(0, 0x10000)
 
-            # Perform key distribution to initiator
-            sleep(.5)
-            if self.state.initiator.must_dist_ltk():
-                logger.info('[smp] sending generated LTK ...')
-                self.send_data(SM_Encryption_Information(
-                    ltk=self.state.ltk
-                ))
-                logger.info('[smp] LTK sent.')
-            if self.state.initiator.must_dist_ediv_rand():
-                logger.info('[smp] sending generated EDIV/RAND ...')
-                self.send_data(SM_Master_Identification(ediv = self.state.ediv, rand = self.state.rand))
-                logger.info('[smp] EDIV/RAND sent.')
+                # Perform key distribution to initiator
+                sleep(.5)
+                if self.state.initiator.must_dist_ltk():
+                    logger.info('[smp] sending generated LTK ...')
+                    self.send_data(SM_Encryption_Information(
+                        ltk=self.state.ltk
+                    ))
+                    logger.info('[smp] LTK sent.')
+                if self.state.initiator.must_dist_ediv_rand():
+                    logger.info('[smp] sending generated EDIV/RAND ...')
+                    self.send_data(SM_Master_Identification(ediv = self.state.ediv, rand = self.state.rand))
+                    logger.info('[smp] EDIV/RAND sent.')
             if self.state.initiator.must_dist_irk():
                 logger.info('[smp] sending generated IRK ...')
                 self.state.irk = generate_random_value(8*self.state.responder.max_key_size)
@@ -1385,7 +1591,7 @@ class SMPLayer(Layer):
             if self.state.initiator.ltk is not None:
                 print("Received LTK: ", self.state.initiator.ltk.hex())
             if self.state.initiator.rand is not None:
-                print("Received RAND: ", self.state.initiator.rand.hex())
+                print("Received RAND: ", self.state.initiator.random.hex())
             if self.state.initiator.ediv is not None:
                 print("Received EDIV: ", hex(self.state.initiator.ediv))
             if self.state.initiator.irk is not None:
@@ -1407,7 +1613,7 @@ class SMPLayer(Layer):
             if self.state.responder.ltk is not None:
                 print("Received LTK: ", self.state.responder.ltk.hex())
             if self.state.responder.rand is not None:
-                print("Received RAND: ", self.state.responder.rand.hex())
+                print("Received RAND: ", self.state.responder.random.hex())
             if self.state.responder.ediv is not None:
                 print("Received EDIV: ", hex(self.state.responder.ediv))
             if self.state.responder.irk is not None:
@@ -1479,7 +1685,7 @@ class BleSMP(Layer):
     # Helpers
     ##
 
-    def compute_confirm_value(self, tk, rand, preq, pres, initiator, responder):
+    def compute_legacy_confirm_value(self, tk, rand, preq, pres, initiator, responder):
         """Compute Confirm value as described in [Vol 3] Part H, Section 2.3.5.5
 
         This value is not ready to be set in a SM_Confirm packet as-is, it needs
@@ -1537,7 +1743,7 @@ class BleSMP(Layer):
         """
         logger.debug('[check_initiator_confirm] RAND=%s' % hexlify(self.__initiator.rand))
         # Compute expected confirm value
-        expected_confirm = self.compute_confirm_value(
+        expected_confirm = self.compute_legacy_confirm_value(
             tk,
             self.__initiator.rand,
             self.__pairing_req,
@@ -1564,7 +1770,7 @@ class BleSMP(Layer):
         logger.debug('[check_responder_confirm] RAND=%s' % hexlify(self.__initiator.rand))
 
         # Compute expected confirm value
-        expected_confirm = self.compute_confirm_value(
+        expected_confirm = self.compute_legacy_confirm_value(
             tk,
             self.__responder.rand,
             self.__pairing_req,
@@ -1681,7 +1887,7 @@ class BleSMP(Layer):
 
             # Generate a RAND and compute CONFIRM
             self.__responder.generate_legacy_rand()
-            self.__responder.confirm = self.compute_confirm_value(
+            self.__responder.confirm = self.compute_legacy_confirm_value(
                 self.__tk,
                 self.__responder.rand,
                 self.__pairing_req,
