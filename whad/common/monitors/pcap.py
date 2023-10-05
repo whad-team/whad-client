@@ -31,6 +31,15 @@ class PcapWriterMonitor(WhadMonitor):
         self._formatter = None
         self._reference_time = None
         self._start_time = None
+        self._nb_pkts_written = 0
+
+
+    @property
+    def packets_written(self):
+        '''Return the number of packets already written
+        '''
+        return self._nb_pkts_written
+
 
     def setup(self):
         # First, we check if the pcap already exists
@@ -118,5 +127,6 @@ class PcapWriterMonitor(WhadMonitor):
             packet.time = timestamp / 1000000
             try:
                 self._writer.write(packet)
+                self._nb_pkts_written += 1
             except BrokenPipeError:
                 pass
