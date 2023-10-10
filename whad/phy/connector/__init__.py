@@ -284,7 +284,6 @@ class Phy(WhadDeviceConnector):
         msg.phy.mod_lora.preamble_length = preamble
         msg.phy.mod_lora.enable_crc = crc
         msg.phy.mod_lora.explicit = explicit
-        
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -636,7 +635,7 @@ class Phy(WhadDeviceConnector):
         self.translator.physical_layer = self.__physical_layer
         return True
 
-    def send(self, packet):
+    def send(self, packet, timestamp=0):
         """
         Send Phy packets .
         """
@@ -650,6 +649,11 @@ class Phy(WhadDeviceConnector):
 
         self.monitor_packet_tx(packet)
         msg = self.translator.from_packet(packet)
+        
+        # Set timestamp
+        msg.phy.send.timestamp = timestamp
+        
+        # Send packet
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 

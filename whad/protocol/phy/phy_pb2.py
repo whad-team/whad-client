@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x16protocol/phy/phy.proto\x12\x03phy\"\"\n\x13SetASKModulationCmd\x12\x0b\n\x03ook\x18\x01 \x01(\x08\"(\n\x13SetFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14Set4FSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14SetGFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"(\n\x13SetMSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"\x16\n\x14SetBPSKModulationCmd\"+\n\x14SetQPSKModulationCmd\x12\x13\n\x0boffset_qpsk\x18\x01 \x01(\x08\"\xc6\x01\n\x14SetLoRaModulationCmd\x12\x11\n\tbandwidth\x18\x01 \x01(\r\x12\x32\n\x10spreading_factor\x18\x02 \x01(\x0e\x32\x18.phy.LoRaSpreadingFactor\x12(\n\x0b\x63oding_rate\x18\x03 \x01(\x0e\x32\x13.phy.LoRaCodingRate\x12\x17\n\x0fpreamble_length\x18\x04 \x01(\r\x12\x12\n\nenable_crc\x18\x05 \x01(\x08\x12\x10\n\x08\x65xplicit\x18\x06 \x01(\x08\"\x1c\n\x1aGetSupportedFrequenciesCmd\"$\n\x0fSetFrequencyCmd\x12\x11\n\tfrequency\x18\x01 \x01(\r\"\x1e\n\x0eSetDataRateCmd\x12\x0c\n\x04rate\x18\x01 \x01(\r\"7\n\x10SetEndiannessCmd\x12#\n\nendianness\x18\x01 \x01(\x0e\x32\x0f.phy.Endianness\"/\n\rSetTXPowerCmd\x12\x1e\n\x08tx_power\x18\x01 \x01(\x0e\x32\x0c.phy.TXPower\"\'\n\x10SetPacketSizeCmd\x12\x13\n\x0bpacket_size\x18\x01 \x01(\r\"#\n\x0eSetSyncWordCmd\x12\x11\n\tsync_word\x18\x01 \x01(\x0c\"0\n\x08SniffCmd\x12\x16\n\tiq_stream\x18\x01 \x01(\x08H\x00\x88\x01\x01\x42\x0c\n\n_iq_stream\"\x19\n\x07SendCmd\x12\x0e\n\x06packet\x18\x01 \x01(\x0c\"\x1c\n\nSendRawCmd\x12\x0e\n\x02iq\x18\x01 \x03(\x05\x42\x02\x10\x01\"\n\n\x08StartCmd\"\t\n\x07StopCmd\"(\n\x06JamCmd\x12\x1e\n\x04mode\x18\x01 \x01(\x0e\x32\x10.phy.JammingMode\"\x0c\n\nMonitorCmd\"u\n\x0ePacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"\x88\x01\n\x11RawPacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x12\x0e\n\x02iq\x18\x05 \x03(\x05\x42\x02\x10\x01\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"\x1b\n\x06Jammed\x12\x11\n\ttimestamp\x18\x01 \x01(\r\"9\n\x10MonitoringReport\x12\x11\n\ttimestamp\x18\x01 \x01(\r\x12\x12\n\x06report\x18\x02 \x03(\rB\x02\x10\x01\"\x90\x01\n\x18SupportedFrequencyRanges\x12\x46\n\x10\x66requency_ranges\x18\x01 \x03(\x0b\x32,.phy.SupportedFrequencyRanges.FrequencyRange\x1a,\n\x0e\x46requencyRange\x12\r\n\x05start\x18\x01 \x01(\r\x12\x0b\n\x03\x65nd\x18\x02 \x01(\r\"\x80\t\n\x07Message\x12+\n\x07mod_ask\x18\x01 \x01(\x0b\x32\x18.phy.SetASKModulationCmdH\x00\x12+\n\x07mod_fsk\x18\x02 \x01(\x0b\x32\x18.phy.SetFSKModulationCmdH\x00\x12-\n\x08mod_gfsk\x18\x03 \x01(\x0b\x32\x19.phy.SetGFSKModulationCmdH\x00\x12-\n\x08mod_bpsk\x18\x04 \x01(\x0b\x32\x19.phy.SetBPSKModulationCmdH\x00\x12-\n\x08mod_qpsk\x18\x05 \x01(\x0b\x32\x19.phy.SetQPSKModulationCmdH\x00\x12-\n\x08mod_4fsk\x18\x06 \x01(\x0b\x32\x19.phy.Set4FSKModulationCmdH\x00\x12+\n\x07mod_msk\x18\x07 \x01(\x0b\x32\x18.phy.SetMSKModulationCmdH\x00\x12=\n\x12get_supported_freq\x18\x08 \x01(\x0b\x32\x1f.phy.GetSupportedFrequenciesCmdH\x00\x12(\n\x08set_freq\x18\t \x01(\x0b\x32\x14.phy.SetFrequencyCmdH\x00\x12\'\n\x08\x64\x61tarate\x18\n \x01(\x0b\x32\x13.phy.SetDataRateCmdH\x00\x12+\n\nendianness\x18\x0b \x01(\x0b\x32\x15.phy.SetEndiannessCmdH\x00\x12&\n\x08tx_power\x18\x0c \x01(\x0b\x32\x12.phy.SetTXPowerCmdH\x00\x12,\n\x0bpacket_size\x18\r \x01(\x0b\x32\x15.phy.SetPacketSizeCmdH\x00\x12(\n\tsync_word\x18\x0e \x01(\x0b\x32\x13.phy.SetSyncWordCmdH\x00\x12\x1e\n\x05sniff\x18\x0f \x01(\x0b\x32\r.phy.SniffCmdH\x00\x12\x1c\n\x04send\x18\x10 \x01(\x0b\x32\x0c.phy.SendCmdH\x00\x12#\n\x08send_raw\x18\x11 \x01(\x0b\x32\x0f.phy.SendRawCmdH\x00\x12\x1e\n\x05start\x18\x12 \x01(\x0b\x32\r.phy.StartCmdH\x00\x12\x1c\n\x04stop\x18\x13 \x01(\x0b\x32\x0c.phy.StopCmdH\x00\x12\x1a\n\x03jam\x18\x14 \x01(\x0b\x32\x0b.phy.JamCmdH\x00\x12\"\n\x07monitor\x18\x15 \x01(\x0b\x32\x0f.phy.MonitorCmdH\x00\x12%\n\x06packet\x18\x16 \x01(\x0b\x32\x13.phy.PacketReceivedH\x00\x12,\n\nraw_packet\x18\x17 \x01(\x0b\x32\x16.phy.RawPacketReceivedH\x00\x12\x1d\n\x06jammed\x18\x18 \x01(\x0b\x32\x0b.phy.JammedH\x00\x12/\n\x0emonitor_report\x18\x19 \x01(\x0b\x32\x15.phy.MonitoringReportH\x00\x12\x37\n\x0esupported_freq\x18\x1a \x01(\x0b\x32\x1d.phy.SupportedFrequencyRangesH\x00\x12-\n\x08mod_lora\x18\x1b \x01(\x0b\x32\x19.phy.SetLoRaModulationCmdH\x00\x42\x05\n\x03msg*\x95\x03\n\nPhyCommand\x12\x14\n\x10SetASKModulation\x10\x00\x12\x14\n\x10SetFSKModulation\x10\x01\x12\x15\n\x11SetGFSKModulation\x10\x02\x12\x15\n\x11SetBPSKModulation\x10\x03\x12\x15\n\x11SetQPSKModulation\x10\x04\x12\x15\n\x11Set4FSKModulation\x10\x05\x12\x14\n\x10SetMSKModulation\x10\x06\x12\x1b\n\x17GetSupportedFrequencies\x10\x07\x12\x10\n\x0cSetFrequency\x10\x08\x12\x0f\n\x0bSetDataRate\x10\t\x12\x11\n\rSetEndianness\x10\n\x12\x0e\n\nSetTXPower\x10\x0b\x12\x11\n\rSetPacketSize\x10\x0c\x12\x0f\n\x0bSetSyncWord\x10\r\x12\t\n\x05Sniff\x10\x0e\x12\x08\n\x04Send\x10\x0f\x12\x0b\n\x07SendRaw\x10\x10\x12\x07\n\x03Jam\x10\x11\x12\x0b\n\x07Monitor\x10\x12\x12\t\n\x05Start\x10\x13\x12\x08\n\x04Stop\x10\x14\x12\x15\n\x11SetLoRaModulation\x10\x15*!\n\nEndianness\x12\x07\n\x03\x42IG\x10\x00\x12\n\n\x06LITTLE\x10\x01*(\n\x07TXPower\x12\x07\n\x03LOW\x10\x00\x12\n\n\x06MEDIUM\x10\x01\x12\x08\n\x04HIGH\x10\x02*+\n\x0bJammingMode\x12\x0e\n\nCONTINUOUS\x10\x00\x12\x0c\n\x08REACTIVE\x10\x01*N\n\x13LoRaSpreadingFactor\x12\x07\n\x03SF7\x10\x00\x12\x07\n\x03SF8\x10\x01\x12\x07\n\x03SF9\x10\x02\x12\x08\n\x04SF10\x10\x03\x12\x08\n\x04SF11\x10\x04\x12\x08\n\x04SF12\x10\x05*8\n\x0eLoRaCodingRate\x12\x08\n\x04\x43R45\x10\x00\x12\x08\n\x04\x43R46\x10\x01\x12\x08\n\x04\x43R47\x10\x02\x12\x08\n\x04\x43R48\x10\x03\x62\x06proto3'
+  serialized_pb=b'\n\x16protocol/phy/phy.proto\x12\x03phy\"\"\n\x13SetASKModulationCmd\x12\x0b\n\x03ook\x18\x01 \x01(\x08\"(\n\x13SetFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14Set4FSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14SetGFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"(\n\x13SetMSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"\x16\n\x14SetBPSKModulationCmd\"+\n\x14SetQPSKModulationCmd\x12\x13\n\x0boffset_qpsk\x18\x01 \x01(\x08\"\xc6\x01\n\x14SetLoRaModulationCmd\x12\x11\n\tbandwidth\x18\x01 \x01(\r\x12\x32\n\x10spreading_factor\x18\x02 \x01(\x0e\x32\x18.phy.LoRaSpreadingFactor\x12(\n\x0b\x63oding_rate\x18\x03 \x01(\x0e\x32\x13.phy.LoRaCodingRate\x12\x17\n\x0fpreamble_length\x18\x04 \x01(\r\x12\x12\n\nenable_crc\x18\x05 \x01(\x08\x12\x10\n\x08\x65xplicit\x18\x06 \x01(\x08\"\x1c\n\x1aGetSupportedFrequenciesCmd\"$\n\x0fSetFrequencyCmd\x12\x11\n\tfrequency\x18\x01 \x01(\r\"\x1e\n\x0eSetDataRateCmd\x12\x0c\n\x04rate\x18\x01 \x01(\r\"7\n\x10SetEndiannessCmd\x12#\n\nendianness\x18\x01 \x01(\x0e\x32\x0f.phy.Endianness\"/\n\rSetTXPowerCmd\x12\x1e\n\x08tx_power\x18\x01 \x01(\x0e\x32\x0c.phy.TXPower\"\'\n\x10SetPacketSizeCmd\x12\x13\n\x0bpacket_size\x18\x01 \x01(\r\"#\n\x0eSetSyncWordCmd\x12\x11\n\tsync_word\x18\x01 \x01(\x0c\"0\n\x08SniffCmd\x12\x16\n\tiq_stream\x18\x01 \x01(\x08H\x00\x88\x01\x01\x42\x0c\n\n_iq_stream\",\n\x07SendCmd\x12\x0e\n\x06packet\x18\x01 \x01(\x0c\x12\x11\n\ttimestamp\x18\x02 \x01(\r\"\x1c\n\nSendRawCmd\x12\x0e\n\x02iq\x18\x01 \x03(\x05\x42\x02\x10\x01\"\n\n\x08StartCmd\"\t\n\x07StopCmd\"(\n\x06JamCmd\x12\x1e\n\x04mode\x18\x01 \x01(\x0e\x32\x10.phy.JammingMode\"\x0c\n\nMonitorCmd\"u\n\x0ePacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"\x88\x01\n\x11RawPacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x12\x0e\n\x02iq\x18\x05 \x03(\x05\x42\x02\x10\x01\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"\x1b\n\x06Jammed\x12\x11\n\ttimestamp\x18\x01 \x01(\r\"9\n\x10MonitoringReport\x12\x11\n\ttimestamp\x18\x01 \x01(\r\x12\x12\n\x06report\x18\x02 \x03(\rB\x02\x10\x01\"\x90\x01\n\x18SupportedFrequencyRanges\x12\x46\n\x10\x66requency_ranges\x18\x01 \x03(\x0b\x32,.phy.SupportedFrequencyRanges.FrequencyRange\x1a,\n\x0e\x46requencyRange\x12\r\n\x05start\x18\x01 \x01(\r\x12\x0b\n\x03\x65nd\x18\x02 \x01(\r\"\x80\t\n\x07Message\x12+\n\x07mod_ask\x18\x01 \x01(\x0b\x32\x18.phy.SetASKModulationCmdH\x00\x12+\n\x07mod_fsk\x18\x02 \x01(\x0b\x32\x18.phy.SetFSKModulationCmdH\x00\x12-\n\x08mod_gfsk\x18\x03 \x01(\x0b\x32\x19.phy.SetGFSKModulationCmdH\x00\x12-\n\x08mod_bpsk\x18\x04 \x01(\x0b\x32\x19.phy.SetBPSKModulationCmdH\x00\x12-\n\x08mod_qpsk\x18\x05 \x01(\x0b\x32\x19.phy.SetQPSKModulationCmdH\x00\x12-\n\x08mod_4fsk\x18\x06 \x01(\x0b\x32\x19.phy.Set4FSKModulationCmdH\x00\x12+\n\x07mod_msk\x18\x07 \x01(\x0b\x32\x18.phy.SetMSKModulationCmdH\x00\x12=\n\x12get_supported_freq\x18\x08 \x01(\x0b\x32\x1f.phy.GetSupportedFrequenciesCmdH\x00\x12(\n\x08set_freq\x18\t \x01(\x0b\x32\x14.phy.SetFrequencyCmdH\x00\x12\'\n\x08\x64\x61tarate\x18\n \x01(\x0b\x32\x13.phy.SetDataRateCmdH\x00\x12+\n\nendianness\x18\x0b \x01(\x0b\x32\x15.phy.SetEndiannessCmdH\x00\x12&\n\x08tx_power\x18\x0c \x01(\x0b\x32\x12.phy.SetTXPowerCmdH\x00\x12,\n\x0bpacket_size\x18\r \x01(\x0b\x32\x15.phy.SetPacketSizeCmdH\x00\x12(\n\tsync_word\x18\x0e \x01(\x0b\x32\x13.phy.SetSyncWordCmdH\x00\x12\x1e\n\x05sniff\x18\x0f \x01(\x0b\x32\r.phy.SniffCmdH\x00\x12\x1c\n\x04send\x18\x10 \x01(\x0b\x32\x0c.phy.SendCmdH\x00\x12#\n\x08send_raw\x18\x11 \x01(\x0b\x32\x0f.phy.SendRawCmdH\x00\x12\x1e\n\x05start\x18\x12 \x01(\x0b\x32\r.phy.StartCmdH\x00\x12\x1c\n\x04stop\x18\x13 \x01(\x0b\x32\x0c.phy.StopCmdH\x00\x12\x1a\n\x03jam\x18\x14 \x01(\x0b\x32\x0b.phy.JamCmdH\x00\x12\"\n\x07monitor\x18\x15 \x01(\x0b\x32\x0f.phy.MonitorCmdH\x00\x12%\n\x06packet\x18\x16 \x01(\x0b\x32\x13.phy.PacketReceivedH\x00\x12,\n\nraw_packet\x18\x17 \x01(\x0b\x32\x16.phy.RawPacketReceivedH\x00\x12\x1d\n\x06jammed\x18\x18 \x01(\x0b\x32\x0b.phy.JammedH\x00\x12/\n\x0emonitor_report\x18\x19 \x01(\x0b\x32\x15.phy.MonitoringReportH\x00\x12\x37\n\x0esupported_freq\x18\x1a \x01(\x0b\x32\x1d.phy.SupportedFrequencyRangesH\x00\x12-\n\x08mod_lora\x18\x1b \x01(\x0b\x32\x19.phy.SetLoRaModulationCmdH\x00\x42\x05\n\x03msg*\x95\x03\n\nPhyCommand\x12\x14\n\x10SetASKModulation\x10\x00\x12\x14\n\x10SetFSKModulation\x10\x01\x12\x15\n\x11SetGFSKModulation\x10\x02\x12\x15\n\x11SetBPSKModulation\x10\x03\x12\x15\n\x11SetQPSKModulation\x10\x04\x12\x15\n\x11Set4FSKModulation\x10\x05\x12\x14\n\x10SetMSKModulation\x10\x06\x12\x1b\n\x17GetSupportedFrequencies\x10\x07\x12\x10\n\x0cSetFrequency\x10\x08\x12\x0f\n\x0bSetDataRate\x10\t\x12\x11\n\rSetEndianness\x10\n\x12\x0e\n\nSetTXPower\x10\x0b\x12\x11\n\rSetPacketSize\x10\x0c\x12\x0f\n\x0bSetSyncWord\x10\r\x12\t\n\x05Sniff\x10\x0e\x12\x08\n\x04Send\x10\x0f\x12\x0b\n\x07SendRaw\x10\x10\x12\x07\n\x03Jam\x10\x11\x12\x0b\n\x07Monitor\x10\x12\x12\t\n\x05Start\x10\x13\x12\x08\n\x04Stop\x10\x14\x12\x15\n\x11SetLoRaModulation\x10\x15*!\n\nEndianness\x12\x07\n\x03\x42IG\x10\x00\x12\n\n\x06LITTLE\x10\x01*(\n\x07TXPower\x12\x07\n\x03LOW\x10\x00\x12\n\n\x06MEDIUM\x10\x01\x12\x08\n\x04HIGH\x10\x02*+\n\x0bJammingMode\x12\x0e\n\nCONTINUOUS\x10\x00\x12\x0c\n\x08REACTIVE\x10\x01*N\n\x13LoRaSpreadingFactor\x12\x07\n\x03SF7\x10\x00\x12\x07\n\x03SF8\x10\x01\x12\x07\n\x03SF9\x10\x02\x12\x08\n\x04SF10\x10\x03\x12\x08\n\x04SF11\x10\x04\x12\x08\n\x04SF12\x10\x05*8\n\x0eLoRaCodingRate\x12\x08\n\x04\x43R45\x10\x00\x12\x08\n\x04\x43R46\x10\x01\x12\x08\n\x04\x43R47\x10\x02\x12\x08\n\x04\x43R48\x10\x03\x62\x06proto3'
 )
 
 _PHYCOMMAND = _descriptor.EnumDescriptor(
@@ -143,8 +143,8 @@ _PHYCOMMAND = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=2626,
-  serialized_end=3031,
+  serialized_start=2645,
+  serialized_end=3050,
 )
 _sym_db.RegisterEnumDescriptor(_PHYCOMMAND)
 
@@ -169,8 +169,8 @@ _ENDIANNESS = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3033,
-  serialized_end=3066,
+  serialized_start=3052,
+  serialized_end=3085,
 )
 _sym_db.RegisterEnumDescriptor(_ENDIANNESS)
 
@@ -200,8 +200,8 @@ _TXPOWER = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3068,
-  serialized_end=3108,
+  serialized_start=3087,
+  serialized_end=3127,
 )
 _sym_db.RegisterEnumDescriptor(_TXPOWER)
 
@@ -226,8 +226,8 @@ _JAMMINGMODE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3110,
-  serialized_end=3153,
+  serialized_start=3129,
+  serialized_end=3172,
 )
 _sym_db.RegisterEnumDescriptor(_JAMMINGMODE)
 
@@ -272,8 +272,8 @@ _LORASPREADINGFACTOR = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3155,
-  serialized_end=3233,
+  serialized_start=3174,
+  serialized_end=3252,
 )
 _sym_db.RegisterEnumDescriptor(_LORASPREADINGFACTOR)
 
@@ -308,8 +308,8 @@ _LORACODINGRATE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3235,
-  serialized_end=3291,
+  serialized_start=3254,
+  serialized_end=3310,
 )
 _sym_db.RegisterEnumDescriptor(_LORACODINGRATE)
 
@@ -909,6 +909,13 @@ _SENDCMD = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='timestamp', full_name='phy.SendCmd.timestamp', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -922,7 +929,7 @@ _SENDCMD = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=841,
-  serialized_end=866,
+  serialized_end=885,
 )
 
 
@@ -953,8 +960,8 @@ _SENDRAWCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=868,
-  serialized_end=896,
+  serialized_start=887,
+  serialized_end=915,
 )
 
 
@@ -978,8 +985,8 @@ _STARTCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=898,
-  serialized_end=908,
+  serialized_start=917,
+  serialized_end=927,
 )
 
 
@@ -1003,8 +1010,8 @@ _STOPCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=910,
-  serialized_end=919,
+  serialized_start=929,
+  serialized_end=938,
 )
 
 
@@ -1035,8 +1042,8 @@ _JAMCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=921,
-  serialized_end=961,
+  serialized_start=940,
+  serialized_end=980,
 )
 
 
@@ -1060,8 +1067,8 @@ _MONITORCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=963,
-  serialized_end=975,
+  serialized_start=982,
+  serialized_end=994,
 )
 
 
@@ -1123,8 +1130,8 @@ _PACKETRECEIVED = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=977,
-  serialized_end=1094,
+  serialized_start=996,
+  serialized_end=1113,
 )
 
 
@@ -1193,8 +1200,8 @@ _RAWPACKETRECEIVED = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=1097,
-  serialized_end=1233,
+  serialized_start=1116,
+  serialized_end=1252,
 )
 
 
@@ -1225,8 +1232,8 @@ _JAMMED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1235,
-  serialized_end=1262,
+  serialized_start=1254,
+  serialized_end=1281,
 )
 
 
@@ -1264,8 +1271,8 @@ _MONITORINGREPORT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1264,
-  serialized_end=1321,
+  serialized_start=1283,
+  serialized_end=1340,
 )
 
 
@@ -1303,8 +1310,8 @@ _SUPPORTEDFREQUENCYRANGES_FREQUENCYRANGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1424,
-  serialized_end=1468,
+  serialized_start=1443,
+  serialized_end=1487,
 )
 
 _SUPPORTEDFREQUENCYRANGES = _descriptor.Descriptor(
@@ -1334,8 +1341,8 @@ _SUPPORTEDFREQUENCYRANGES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1324,
-  serialized_end=1468,
+  serialized_start=1343,
+  serialized_end=1487,
 )
 
 
@@ -1553,8 +1560,8 @@ _MESSAGE = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=1471,
-  serialized_end=2623,
+  serialized_start=1490,
+  serialized_end=2642,
 )
 
 _SETLORAMODULATIONCMD.fields_by_name['spreading_factor'].enum_type = _LORASPREADINGFACTOR
