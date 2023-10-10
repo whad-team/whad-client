@@ -1381,7 +1381,7 @@ class SMPLayer(Layer):
                 self.state.peer_public_key,  # we are the responder, peer is the initiator
                 self.state.public_key,  # set our own public key
                 self.state.responder.rand,
-                bytes([(self.state.passkey_value >> (20 - self.state.passkey_counter)) & 1])
+                bytes([((self.state.passkey_value >> (20 - self.state.passkey_counter)) & 1) + 0x80])
             )
 
             self.send_data(
@@ -1596,12 +1596,13 @@ class SMPLayer(Layer):
             self.state.initiator.rand = random_pkt.random[::-1]
 
             print("val", self.state.passkey_value)
-
+            ri = bytes([((self.state.passkey_value >> (self.state.passkey_counter - 1)) & 1) + 0x80])
+            print(ri)
             computed_confirm = self.compute_lesc_confirm_value(
                 self.state.public_key,
                 self.state.peer_public_key,
                 self.state.initiator.rand,
-                b"\x00"#bytes([(self.state.passkey_value >> (20 - self.state.passkey_counter)) & 1])
+                ri
             )
 
             print("Computed: ", computed_confirm.hex())
