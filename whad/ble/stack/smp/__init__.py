@@ -462,6 +462,7 @@ class SecurityManagerState(LayerState):
     STATE_LESC_DHK_CHECK_RECVD = 0x0D
     STATE_PAIRING_DONE = 0x0E
     STATE_DISTRIBUTE_KEY = 0x0F
+    STATE_LESC_PASSKEY_CHECK = 0x10
     STATE_BONDING_DONE = 0xFF
 
     def __init__(self):
@@ -510,6 +511,11 @@ class SecurityManagerState(LayerState):
 
         # Method
         self.method = None
+
+        # Passkey counter
+        self.passkey_value = None
+        self.passkey_counter = 1
+
 @alias('smp')
 @state(SecurityManagerState)
 class SMPLayer(Layer):
@@ -715,6 +721,25 @@ class SMPLayer(Layer):
         )
         return _confirm
 
+
+
+    def get_passkey_entry(self):
+        print("Enter passkey entry: ")
+        passkey_entry = input()
+        return int(passkey_entry)
+
+    def get_pin_code(self):
+        self_iocap = self.state.initiator.iocap if self.is_initiator() else self.state.responder.iocap
+
+        if self_iocap == IOCAP_KEYBD_ONLY:
+            print("Enter pin code: ")
+            pin_code = input()
+            return int(pin_code)
+        else:
+            pin_code = randint(0, 999999)
+            print("Randomly generated pin code: ", pin_code)
+            return pin_code
+
     ##########################################
     # Incoming requests and responses
     ##########################################
@@ -897,7 +922,12 @@ class SMPLayer(Layer):
                 # Update current state
                 self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT
             else:
-                print("PASSKEY STUFF :)")
+
+                # Set counter to 1
+                self.state.passkey_counter = 1
+
+                self.state.state = SecurityManagerState.STATE_LESC_PASSKEY_CHECK
+                print("Entering passkey entry mode")
         elif self.state.state == SecurityManagerState.STATE_LESC_PUBKEY_SENT:
             public_key_pkt.show()
             # Extract X and Y from public key packet
@@ -1272,19 +1302,6 @@ class SMPLayer(Layer):
             # Return to IDLE mode
             self.__state = SecurityManagerState.STATE_IDLE
 
-
-    def get_pin_code(self):
-        self_iocap = self.state.initiator.iocap if self.is_initiator() else self.state.responder.iocap
-        print(self_iocap)
-        if self_iocap == IOCAP_KEYBD_ONLY:
-            print("Enter pin code: ")
-            pin_code = input()
-            return int(pin_code)
-        else:
-            pin_code = randint(0, 999999)
-            print("Randomly generated pin code: ", pin_code)
-            return pin_code
-
     def on_pairing_confirm(self, confirm):
         """Method called whan a pairing confirm value is received.
         """
@@ -1346,6 +1363,32 @@ class SMPLayer(Layer):
 
             # Update current state
             self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT
+
+        elif self.state.state == SecurityManagerState.STATE_LESC_PASSKEY_CHECK:
+            logger.info('Pairing Confirm value is expected, processing ...')
+            print("rcvd confirm #",self.state.passkey_counter)
+            if self.state.passkey_counter == 1:
+                # Collect passkey entry
+                self.state.passkey_value = self.get_passkey_entry()
+
+            # Extract confirm value
+            self.state.initiator.confirm = confirm.confirm[::-1]
+
+            # Generate Nbi
+            self.state.responder.generate_legacy_rand()
+
+            self.state.responder.confirm = self.compute_lesc_confirm_value(
+                self.state.peer_public_key,  # we are the responder, peer is the initiator
+                self.state.public_key,  # set our own public key
+                self.state.responder.rand,
+                bytes([(self.state.passkey_value >> (20 - self.state.passkey_counter)) & 1])
+            )
+
+            self.send_data(
+                SM_Confirm(
+                    confirm = self.state.responder.confirm[::-1]
+                )
+            )
 
         else:
             logger.info('Pairing Confirm dropped because current state is %d' % self.state.state)
@@ -1548,6 +1591,22 @@ class SMPLayer(Layer):
 
                 # Return to IDLE
                 self.state.state = SecurityManagerState.STATE_IDLE
+
+        elif self.state.state == SecurityManagerState.STATE_LESC_PASSKEY_CHECK:
+            self.state.initiator.rand = random_pkt.random[::-1]
+
+            print("val", self.state.passkey_value)
+
+            computed_confirm = self.compute_lesc_confirm_value(
+                self.state.public_key,
+                self.state.peer_public_key,
+                self.state.initiator.rand,
+                b"\x00"#bytes([(self.state.passkey_value >> (20 - self.state.passkey_counter)) & 1])
+            )
+
+            print("Computed: ", computed_confirm.hex())
+            print("Received: ", self.state.initiator.confirm.hex())
+
 
         elif self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT:
             logger.info('Pairing Random value is expected, processing ...')
