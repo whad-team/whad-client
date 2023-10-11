@@ -12,7 +12,7 @@ from struct import pack, unpack
 import logging
 logging.basicConfig(level=logging.INFO)
 
-NAME = 'WHAT BLE Peripheral Guess Demo'
+NAME = 'WHAD BLE Peripheral Guess Demo'
 
 class MyPeripheral(GenericProfile):
 

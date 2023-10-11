@@ -2,9 +2,12 @@
 
 BleSMP provides these different pairing strategies:
 
-- "Just Works"
-- "Legacy Passkey"
-- "Numeric Comparison (LESC) - todo"
+- "Legacy Just Works"
+- "Legacy Passkey Entry"
+- "LESC JustWorks"
+- "LESC Numeric Comparison"
+- "LESC Passkey Entry"
+
 """
 from struct import pack, unpack
 from binascii import hexlify
@@ -27,6 +30,112 @@ from whad.common.stack import Layer, alias, source, instance, LayerState, state
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+class BLEKey:
+    def __init__(self, key, key_size=None, type="LTK"):
+        self.__key = key
+        self.__key_size = 8*len(key) if key_size is None else key_size
+        self.__type = type
+
+    @property
+    def value(self):
+        return self.__key
+
+    def __repr__(self):
+        return "%s('%s' - %d bits)".format(self.__type, self.__key.hex().lower(), self.__key_size)
+
+class LongTermKey(BLEKey):
+    def __init__(key, rand, ediv, key_size=None):
+        super().__init__(key, key_size=key_size, type="LTK")
+        self.__rand = rand
+        self.__ediv = ediv
+
+    @property
+    def rand(self):
+        return self.__rand
+
+    @property
+    def ediv(self):
+        return self.__ediv
+
+class IdentityResolvingKey(BLEKey):
+    def __init__(key, rand, ediv, key_size=None):
+        super().__init__(key, key_size=key_size, type="IRK")
+
+
+class ConnectionSignatureResolvingKey(BLEKey):
+    def __init__(key, rand, ediv, key_size=None):
+        super().__init__(key, key_size=key_size, type="CSRK")
+
+class CryptographicMaterial:
+
+    @classmethod
+    def from_json(cls, json_value):
+        report = json.loads(json_value)
+        print(report)
+        
+    def to_json(self):
+        report = {
+            "address" : self.__address.value,
+            "address_type" : self.__address.type
+        }
+        if self.has_ltk():
+            report["ltk"] = self.ltk.value
+            report["rand"] = self.ltk.rand
+            report["ediv"] = self.ltk.ediv
+        if self.has_irk():
+            report["irk"] = self.irk.value
+        if self.has_csrk():
+            report["csrk"] = self.csrk.value
+
+        return json.dumps(report)
+
+
+    def __init__(self, address, ltk=None, irk=None, csrk=None):
+        self.__address = address
+        self.__ltk = ltk
+        self.__irk = irk
+        self.__csrk = csrk
+
+    def has_ltk(self):
+        return self.__ltk is not None
+
+    def has_irk(self):
+        return self.__irk is not None
+
+    def has_csrk(self):
+        return self.__csrk is not None
+
+    @property
+    def ltk(self):
+        return self.__ltk
+
+    @property
+    def irk(self):
+        return self.__irk
+
+    @property
+    def csrk(self):
+        return self.__csrk
+
+    @property
+    def address(self):
+        return self.__address
+
+
+    def __repr__(self):
+        output = (
+            "CryptographicMaterial(" +
+            ", ".join(
+                ["address = " + str(self.__address),
+                (("ltk = " + str(self.ltk)) if self.ltk is not None else ""),
+                (("irk = " + str(self.irk)) if self.irk is not None else ""),
+                (("csrk = " + str(self.csrk)) if self.csrk is not None else "")
+                ]
+            ) + ")"
+        )
+        return output
 
 class SM_Peer(object):
     """
@@ -462,7 +571,9 @@ class SecurityManagerState(LayerState):
     STATE_LESC_DHK_CHECK_RECVD = 0x0D
     STATE_PAIRING_DONE = 0x0E
     STATE_DISTRIBUTE_KEY = 0x0F
-    STATE_LESC_PASSKEY_CHECK = 0x10
+    STATE_LESC_PUBKEY_RECVD_STAGEN = 0x10
+    STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN = 0x11
+    STATE_LESC_PAIRING_RANDOM_SENT_STAGEN = 0x12
     STATE_BONDING_DONE = 0xFF
 
     def __init__(self):
@@ -783,7 +894,7 @@ class SMPLayer(Layer):
                             lesc=True,
                             keypress=False,
                             max_key_size=16,
-                            iocap=IOCAP_NOINPUT_NOOUTPUT,
+                            iocap=IOCAP_DISPLAY_ONLY,
                             enc_key=True,
                             id_key=True,
                             sign_key=True,
@@ -926,8 +1037,8 @@ class SMPLayer(Layer):
                 # Set counter to 1
                 self.state.passkey_counter = 1
 
-                self.state.state = SecurityManagerState.STATE_LESC_PASSKEY_CHECK
-                print("Entering passkey entry mode")
+                self.state.state = SecurityManagerState.STATE_LESC_PUBKEY_RECVD_STAGEN
+
         elif self.state.state == SecurityManagerState.STATE_LESC_PUBKEY_SENT:
             public_key_pkt.show()
             # Extract X and Y from public key packet
@@ -940,7 +1051,31 @@ class SMPLayer(Layer):
 
             print("Shared secret", self.state.shared_secret)
 
-            self.state.state = SecurityManagerState.STATE_LESC_PUBKEY_RECVD
+            if self.state.method != PM_LESC_PASSKEY:
+                self.state.state = SecurityManagerState.STATE_LESC_PUBKEY_RECVD
+            else:
+                # Set counter to 1
+                self.state.passkey_counter = 1
+                # Collect passkey entry
+                self.state.passkey_value = self.get_passkey_entry()
+
+                # Generate Nai
+                self.state.initiator.generate_legacy_rand()
+
+                self.state.initiator.confirm = self.compute_lesc_confirm_value(
+                    self.state.peer_public_key,  # set our own public key
+                    self.state.public_key,  # we are the initiator, peer is the responder
+                    self.state.initiator.rand,
+                    bytes([((self.state.passkey_value >> (self.state.passkey_counter - 1)) & 1) + 0x80])
+                )
+
+                self.send_data(
+                    SM_Confirm(
+                        confirm = self.state.initiator.confirm[::-1]
+                    )
+                )
+
+                self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN
 
     def on_pairing_request(self, pairing_req):
         """Method called when a pairing request is received.
@@ -1079,13 +1214,16 @@ class SMPLayer(Layer):
             self.state.responder.indicate_ltk_distribution(self.state.ltk)
             self.state.responder.indicate_rand_ediv_distribution(self.state.rand, self.state.ediv)
 
-            rb = 0 # in num comp and just works, TODO: adapt for passkey
+            if self.state.method != PM_LESC_PASSKEY:
+                rb = 0 # in num comp and just works, TODO: adapt for passkey
+            else:
+                rb = self.state.passkey_value
             # Let's compute EA
             ea = self.compute_exchange_value(
                 self.state.mackey,
                 self.state.initiator,
                 self.state.responder,
-                0,
+                rb,
                 bytes(
                     [
                         self.state.initiator.authentication,
@@ -1100,7 +1238,7 @@ class SMPLayer(Layer):
                     self.state.mackey,
                     self.state.responder,
                     self.state.initiator,
-                    0,
+                    rb,
                     bytes(
                         [
                             self.state.responder.authentication,
@@ -1137,12 +1275,18 @@ class SMPLayer(Layer):
                 self.__state = SecurityManagerState.STATE_IDLE
 
         elif self.state.state == SecurityManagerState.STATE_LESC_DHK_CHECK_SENT:
+
+            if self.state.method == PM_LESC_PASSKEY:
+                rb = self.state.passkey_value
+            else:
+                rb = 0
+
             # Compute EB
             eb = self.compute_exchange_value(
                 self.state.mackey,
                 self.state.responder,
                 self.state.initiator,
-                0,
+                rb,
                 bytes(
                     [
                         self.state.responder.authentication,
@@ -1364,7 +1508,10 @@ class SMPLayer(Layer):
             # Update current state
             self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT
 
-        elif self.state.state == SecurityManagerState.STATE_LESC_PASSKEY_CHECK:
+        elif self.state.state in (
+            SecurityManagerState.STATE_LESC_PUBKEY_RECVD_STAGEN,
+            SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT_STAGEN
+        ):
             logger.info('Pairing Confirm value is expected, processing ...')
             print("rcvd confirm #",self.state.passkey_counter)
             if self.state.passkey_counter == 1:
@@ -1381,7 +1528,7 @@ class SMPLayer(Layer):
                 self.state.peer_public_key,  # we are the responder, peer is the initiator
                 self.state.public_key,  # set our own public key
                 self.state.responder.rand,
-                bytes([((self.state.passkey_value >> (20 - self.state.passkey_counter)) & 1) + 0x80])
+                bytes([((self.state.passkey_value >> (self.state.passkey_counter - 1)) & 1) + 0x80])
             )
 
             self.send_data(
@@ -1389,6 +1536,23 @@ class SMPLayer(Layer):
                     confirm = self.state.responder.confirm[::-1]
                 )
             )
+
+            self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN
+
+        elif self.state.state == SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN:
+            logger.info('Pairing Confirm value is expected, processing ...')
+            print("rcvd confirm #",self.state.passkey_counter)
+
+            # Extract confirm value
+            self.state.responder.confirm = confirm.confirm[::-1]
+
+            # Transmit random
+            self.send_data(
+                SM_Random(
+                    random = self.state.initiator.rand[::-1]
+                )
+            )
+            self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT_STAGEN
 
         else:
             logger.info('Pairing Confirm dropped because current state is %d' % self.state.state)
@@ -1592,7 +1756,97 @@ class SMPLayer(Layer):
                 # Return to IDLE
                 self.state.state = SecurityManagerState.STATE_IDLE
 
-        elif self.state.state == SecurityManagerState.STATE_LESC_PASSKEY_CHECK:
+        elif self.state.state == SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT_STAGEN:
+            self.state.responder.rand = random_pkt.random[::-1]
+            ri = bytes([((self.state.passkey_value >> (self.state.passkey_counter - 1)) & 1) + 0x80])
+            print(ri)
+            computed_confirm = self.compute_lesc_confirm_value(
+                self.state.public_key,
+                self.state.peer_public_key,
+                self.state.responder.rand,
+                ri
+            )
+            print("Computed: ", computed_confirm.hex())
+            print("Received: ", self.state.responder.confirm.hex())
+
+            if computed_confirm == self.state.responder.confirm:
+                if self.state.passkey_counter == 20:
+                    self.state.ltk, self.state.mackey = self.compute_ltk_and_mackey(
+                        self.state.shared_secret,
+                        self.state.initiator,
+                        self.state.responder
+                    )
+
+                    self.state.rand, self.state.ediv = b"\x00"*8, 0
+                    # Indicate LTK as distributed
+                    self.state.initiator.indicate_ltk_distribution(self.state.ltk)
+                    self.state.initiator.indicate_rand_ediv_distribution(self.state.rand, self.state.ediv)
+                    self.state.responder.indicate_ltk_distribution(self.state.ltk)
+                    self.state.responder.indicate_rand_ediv_distribution(self.state.rand, self.state.ediv)
+
+                    ra = self.state.passkey_value
+                    # Let's compute EA
+                    ea = self.compute_exchange_value(
+                        self.state.mackey,
+                        self.state.initiator,
+                        self.state.responder,
+                        ra,
+                        bytes(
+                            [
+                                self.state.initiator.authentication,
+                                self.state.initiator.oob,
+                                self.state.initiator.iocap
+                            ]
+                        )
+                    )
+
+                    # Then transmit it
+                    self.send_data(
+                        SM_DHKey_Check(
+                            dhkey_check = ea[::-1]
+                        )
+                    )
+                    self.state.state = SecurityManagerState.STATE_LESC_DHK_CHECK_SENT
+
+                else:
+                    # Increment counter
+                    self.state.passkey_counter += 1
+
+                    # Generate Nai
+                    self.state.initiator.generate_legacy_rand()
+
+                    self.state.initiator.confirm = self.compute_lesc_confirm_value(
+                        self.state.peer_public_key,  # set our own public key
+                        self.state.public_key,  # we are the initiator, peer is the responder
+                        self.state.initiator.rand,
+                        bytes([((self.state.passkey_value >> (self.state.passkey_counter - 1)) & 1) + 0x80])
+                    )
+
+                    self.send_data(
+                        SM_Confirm(
+                            confirm = self.state.initiator.confirm[::-1]
+                        )
+                    )
+
+                    self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN
+            else:
+
+                logger.info('Invalid responder CONFIRM value (expected %s)' % (
+                    hexlify(self.state.responder.confirm),
+                ))
+
+                # Send error
+                error = SM_Failed(
+                    reason = SM_ERROR_CONFIRM_VALUE_FAILED
+                )
+                self.send_data(error)
+
+                # Return to IDLE
+                self.state.state = SecurityManagerState.STATE_IDLE
+
+
+
+        elif self.state.state == SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN:
             self.state.initiator.rand = random_pkt.random[::-1]
 
             print("val", self.state.passkey_value)
@@ -1604,9 +1858,37 @@ class SMPLayer(Layer):
                 self.state.initiator.rand,
                 ri
             )
-
             print("Computed: ", computed_confirm.hex())
             print("Received: ", self.state.initiator.confirm.hex())
+
+            if computed_confirm == self.state.initiator.confirm:
+                self.send_data(
+                    SM_Random(
+                        random = self.state.responder.rand[::-1]
+                    )
+                )
+
+                if self.state.passkey_counter == 20:
+                    print("here")
+                    self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT
+                else:
+                    self.state.passkey_counter += 1
+                    self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT_STAGEN
+            else:
+
+                logger.info('Invalid Initiator CONFIRM value (expected %s)' % (
+                    hexlify(self.state.initiator.confirm),
+                ))
+
+                # Send error
+                error = SM_Failed(
+                    reason = SM_ERROR_CONFIRM_VALUE_FAILED
+                )
+                self.send_data(error)
+
+                # Return to IDLE
+                self.state.state = SecurityManagerState.STATE_IDLE
+
 
 
         elif self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT:
