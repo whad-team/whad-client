@@ -72,3 +72,59 @@ class BleAttProperties:
     READ = 0x01
     WRITE = 0x02
     DEFAULT = READ | WRITE
+
+
+class SecurityProperty:
+    def __repr__(self):
+        return self.__class__.__name__
+
+class Encryption(SecurityProperty):
+    pass
+
+class Authentication(SecurityProperty):
+    pass
+
+class Authorization(SecurityProperty):
+    pass
+
+class SecurityAccess:
+
+    def __init__(self, property_name, *args):
+        self.__property_name = property_name
+        self.__access = {}
+        if isinstance(args, types.UnionType):
+            self.__access[self.__property_name] = list(args.__args__)
+        else:
+            self.__access[self.__property_name] = args
+
+
+    def requires_encryption(self, property=None):
+        key = property if property is not None else self.__property_name
+        return Encryption in self.__access[key]
+
+    def requires_authentication(self, property=None):
+        key = property if property is not None else self.__property_name
+        return Authentication in self.__access[key]
+
+    def requires_authorization(self, property=None):
+        key = property if property is not None else self.__property_name
+        return Authorization in self.__access[key]
+
+    @property
+    def property_name(self):
+        return self.__property_name
+
+    @property
+    def access(self):
+        return self.__access
+
+    @access.setter
+    def access(self, value):
+        self.__access = value
+
+    def __or__(self, other):
+        self.access.update(other.access)
+
+'''
+ReadAccess(Encryption, Authentication, Authorization) | WriteAccess(Encryption, Authentication)
+'''

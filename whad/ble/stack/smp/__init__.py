@@ -28,6 +28,7 @@ from whad.ble.stack.smp.exceptions import SMInvalidParameterFormat
 
 from whad.common.stack import Layer, alias, source, instance, LayerState, state
 
+import json
 import logging
 logger = logging.getLogger(__name__)
 
@@ -43,10 +44,10 @@ class BLEKey:
         return self.__key
 
     def __repr__(self):
-        return "%s('%s' - %d bits)".format(self.__type, self.__key.hex().lower(), self.__key_size)
+        return "%s('%s' - %d bits)" % (self.__type, self.__key.hex().lower(), self.__key_size)
 
 class LongTermKey(BLEKey):
-    def __init__(key, rand, ediv, key_size=None):
+    def __init__(self, key, rand=b"\x00"*8, ediv=0, key_size=None):
         super().__init__(key, key_size=key_size, type="LTK")
         self.__rand = rand
         self.__ediv = ediv
@@ -60,12 +61,12 @@ class LongTermKey(BLEKey):
         return self.__ediv
 
 class IdentityResolvingKey(BLEKey):
-    def __init__(key, rand, ediv, key_size=None):
+    def __init__(self, key, key_size=None):
         super().__init__(key, key_size=key_size, type="IRK")
 
 
 class ConnectionSignatureResolvingKey(BLEKey):
-    def __init__(key, rand, ediv, key_size=None):
+    def __init__(self, key, key_size=None):
         super().__init__(key, key_size=key_size, type="CSRK")
 
 class CryptographicMaterial:
@@ -73,30 +74,59 @@ class CryptographicMaterial:
     @classmethod
     def from_json(cls, json_value):
         report = json.loads(json_value)
-        print(report)
-        
+        cm = CryptographicMaterial(
+
+            BDAddress(report["address"], random = (report["address_type"] == 1)),
+
+            ltk = LongTermKey(
+                bytes.fromhex(report["ltk"]),
+                rand=bytes.fromhex(report["rand"]),
+                ediv=report["ediv"]
+            ) if "ltk" in report else None,
+
+            irk = IdentityResolvingKey(
+                bytes.fromhex(report["irk"])
+            ) if "irk" in report else None,
+
+            csrk = ConnectionSignatureResolvingKey(
+                bytes.fromhex(report["csrk"])
+            ) if "csrk" in report else None
+        )
+        return cm
+
     def to_json(self):
         report = {
-            "address" : self.__address.value,
+            "address" : ":".join(["{:02x}".format(i) for i in self.__address.value[::-1]]),
             "address_type" : self.__address.type
         }
         if self.has_ltk():
-            report["ltk"] = self.ltk.value
-            report["rand"] = self.ltk.rand
+            report["ltk"] = self.ltk.value.hex()
+            report["rand"] = self.ltk.rand.hex()
             report["ediv"] = self.ltk.ediv
         if self.has_irk():
-            report["irk"] = self.irk.value
+            report["irk"] = self.irk.value.hex()
         if self.has_csrk():
-            report["csrk"] = self.csrk.value
+            report["csrk"] = self.csrk.value.hex()
 
         return json.dumps(report)
 
 
     def __init__(self, address, ltk=None, irk=None, csrk=None):
         self.__address = address
-        self.__ltk = ltk
-        self.__irk = irk
-        self.__csrk = csrk
+        if isinstance(ltk, bytes):
+            self.__ltk = LongTermKey(ltk)
+        else:
+            self.__ltk = ltk
+
+        if isinstance(irk, bytes):
+            self.__irk = IdentityResolvingKey(irk)
+        else:
+            self.__irk = irk
+
+        if isinstance(csrk, bytes):
+            self.__csrk = ConnectionSignatureResolvingKey(csrk)
+        else:
+            self.__csrk = csrk
 
     def has_ltk(self):
         return self.__ltk is not None

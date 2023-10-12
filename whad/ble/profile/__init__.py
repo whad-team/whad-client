@@ -161,7 +161,7 @@ class Characteristic(object):
     """GATT characteristic.
     """
 
-    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False, **kwargs):
+    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False, encryption=False, authentication=False, authorization=False, **kwargs):
         """Declares a GATT characteristic.
 
         Other named arguments are used to declare characteristic's descriptors.
@@ -176,6 +176,12 @@ class Characteristic(object):
         :type   notify:         bool
         :param  indicate:       Enable indications
         :type   indicate:       bool
+        :param encryption:      Indicate that encryption is required to access the characteristic
+        :type encryption:       bool
+        :param authentication:  Indicate that authentication is required to access the characteristic
+        :type authentication:   bool
+        :param authorization:   Indicate that authorization is required to access the characteristic
+        :type authorization:    bool
         """
         self.__handle = 0
         self.__name = name
@@ -184,6 +190,9 @@ class Characteristic(object):
         self.__perms = permissions
         self.__notify = notify
         self.__indicate = indicate
+        self.__encryption = encryption
+        self.__authentication = authentication
+        self.__authorization = authorization
         self.__service = None
         self.__descriptors = []
 
@@ -194,7 +203,7 @@ class Characteristic(object):
                 descriptor.handle = 0
                 descriptor.name = arg
                 self.add_descriptor(descriptor)
-                
+
                 # Add descriptor to a property to this ServiceModel instance
                 if not hasattr(self, arg):
                     setattr(self, arg, descriptor)
@@ -220,7 +229,7 @@ class Characteristic(object):
 
         :return: Number of handles
         :rtype: int
-        """    
+        """
         handles = 2
         # A more handle as we may need a ClientCharacteristicConfiguration descriptor
         if self.__notify or self.__indicate:
@@ -305,6 +314,24 @@ class Characteristic(object):
         """
         return self.__service
 
+    @property
+    def require_encryption(self) -> bool:
+        """Check if encryption is required to access the characteristic.
+        """
+        return self.__encryption
+
+    @property
+    def require_authentication(self) -> bool:
+        """Check if authentication is required to access the characteristic.
+        """
+        return self.__authentication
+
+    @property
+    def require_authorization(self) -> bool:
+        """Check if authorization is required to access the characteristic.
+        """
+        return self.__authorization
+
 
 class ServiceModel(object):
 
@@ -336,7 +363,7 @@ class ServiceModel(object):
                 charac.name = arg
                 self.add_characteristic(charac)
                 charac.attach(self)
-                
+
                 # Add characteristic to a property to this ServiceModel instance
                 if not hasattr(self, arg):
                     setattr(self, arg, charac)
@@ -375,7 +402,7 @@ class ServiceModel(object):
     @handle.setter
     def handle(self, value):
         self.__handle = value
-    
+
     def characteristics(self):
         for charac in self.__characteristics:
             yield charac
@@ -473,7 +500,7 @@ class GenericProfile(object):
                                 value=b'',
                                 properties=charac['properties']
                             )
-                            
+
                             # Loop on descriptors, only support CCC at the moment
                             for desc in charac['descriptors']:
                                 if UUID(desc['uuid']) == UUID(0x2902):
@@ -526,7 +553,7 @@ class GenericProfile(object):
                     )
                     self.__attr_db[service_obj.handle] = service_obj
                 else:
-                    continue 
+                    continue
 
                 # Create the corresponding instance property
                 setattr(self, service.name, service_obj)
@@ -713,7 +740,7 @@ class GenericProfile(object):
             service_obj = self.get_service_by_UUID(service)
         else:
             service_obj = None
-        
+
         # Process service object
         if service_obj is not None:
             # Remove service and all its characteristics from the attribute DB
@@ -730,7 +757,7 @@ class GenericProfile(object):
                 for desc in charac.descriptors():
                     if desc.handle in self.__attr_db:
                         del self.__attr_db[desc.handle]
-            
+
             # Remove service object from attribute db
             del self.__attr_db[service_obj.handle]
 
@@ -772,7 +799,7 @@ class GenericProfile(object):
             return True
         except IndexError as notfound:
             return False
-        
+
     def find_object_by_handle(self, handle) -> Attribute:
         """Find an object by its handle value
 
@@ -780,13 +807,13 @@ class GenericProfile(object):
         :type   handle: int
         :return: Object if handle is valid, or raise an IndexError exception otherwise
         :rtype: :class:`whad.ble.profile.attribute.Attribute`
-        :raises: IndexError 
+        :raises: IndexError
         """
         if handle in self.__attr_db:
             return self.__attr_db[handle]
         else:
             raise IndexError
-    
+
     def find_objects_by_range(self, start, end) -> List[Attribute]:
         """Find attributes with handles belonging in the [start, end+1] interval.
 
@@ -804,7 +831,7 @@ class GenericProfile(object):
         handles.sort()
         return [self.find_object_by_handle(handle) for handle in handles]
 
-    
+
     def find_characteristic_by_value_handle(self, value_handle) -> BleCharacteristic:
         """Find characteristic object by its value handle.
 
@@ -840,7 +867,7 @@ class GenericProfile(object):
             service_char_handles=[]
             for characteristic in service.characteristics():
                 service_char_handles.append(characteristic.handle)
-            
+
             # Sort handles
             service_char_handles.sort()
             idx = service_char_handles.index(handle)
@@ -861,7 +888,7 @@ class GenericProfile(object):
         :type   handle: int
         :rtype: :class:`whad.ble.profile.service.Service`
         :return: Service object containing the specified characteristic
-        
+
         :raises: :class:`whad.ble.exceptions.InvalidHandleValueException`
         """
         try:
@@ -898,7 +925,7 @@ class GenericProfile(object):
             if isinstance(object, BlePrimaryService) or isinstance(object, BleSecondaryService):
                 if object.uuid == service_uuid:
                     return object
-        
+
         # Not found
         return None
 
@@ -914,7 +941,7 @@ class GenericProfile(object):
             object = self.__attr_db[handle]
             if isinstance(object, BleCharacteristic):
                 if object.uuid == charac_uuid:
-                    return object        
+                    return object
 
 
     def attr_by_type_uuid(self, uuid, start=1, end=0xFFFF) -> Iterator[Attribute]:
@@ -999,7 +1026,7 @@ class GenericProfile(object):
         """Connection hook.
 
         This hook is only used to notify the connection of a device.
-        
+
         :param  conn_handle:    Connection handle
         :type   conn_handle:    int
         """
@@ -1027,7 +1054,7 @@ class GenericProfile(object):
         If this method returns a byte array, this byte array will be sent back to the
         GATT client. If this method returns None, then the read operation will return an
         error (not allowed to read characteristic value).
-        
+
 
         :param  service:        Service owning the characteristic
         :type   service:        :class:`whad.ble.profile.service.Service`
@@ -1037,7 +1064,7 @@ class GenericProfile(object):
         :type   offset:         int
         :param  length:         Max read length
         :type   length:         int
-        
+
         :return:    Value to return to the GATT client
         :rtype:     bytes
         """
@@ -1158,12 +1185,12 @@ class GenericProfile(object):
         """Characteristic indication hook.
 
         This hook is called when a indication is sent to a characteristic.
-        
+
         :param  service:            Service owning the characteristic
         :type   service:            :class:`whad.ble.profile.service.Service`
         :param  characteristic:     Characteristic object
         :type   characteristic:     :class:`whad.ble.profile.characteristic.Characteristic`
         :param  value:              Characteristic value
         :type   value:              bytes
-        """        
+        """
         pass
