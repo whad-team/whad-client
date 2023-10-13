@@ -9,7 +9,8 @@ from struct import unpack, pack
 from whad.ble.exceptions import HookReturnValue, HookReturnAuthentRequired,\
     HookReturnAuthorRequired, HookReturnAccessDenied, HookReturnGattError, \
     HookReturnNotFound, ConnectionLostException
-from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
+from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode, ReadAccess, \
+    WriteAccess, Authentication, Authorization, Encryption
 from whad.ble.stack.att.exceptions import error_response_to_exc, AttErrorCode
 from whad.ble.stack.gatt.helpers import get_uuid_alias
 from whad.ble.stack.gatt.message import *
@@ -1040,6 +1041,13 @@ class GattServer(GattLayer):
 
                 # Check characteristic is readable
                 charac = self.__server_model.find_object_by_handle(request.handle - 1)
+
+                if charac.check_security_property(ReadAccess, Authentication):
+                    print("[i] authentication required for read access !")
+                if charac.check_security_property(ReadAccess, Encryption):
+                    print("[i] encryption required for read access !")
+                if charac.check_security_property(ReadAccess, Authorization):
+                    print("[i] authorization required for read access !")
 
                 if charac.readable():
                     try:

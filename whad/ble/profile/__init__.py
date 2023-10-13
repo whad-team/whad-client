@@ -20,7 +20,8 @@ from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,
 from whad.ble.profile.service import PrimaryService as BlePrimaryService, \
     SecondaryService as BleSecondaryService, Service
 from whad.ble.exceptions import InvalidHandleValueException
-from whad.ble.stack.att.constants import BleAttProperties
+from whad.ble.stack.att.constants import BleAttProperties, SecurityProperty, \
+    SecurityAccess, ReadAccess, WriteAccess, Authentication, Authorization, Encryption
 
 import logging
 logger = logging.getLogger(__name__)
@@ -161,7 +162,7 @@ class Characteristic(object):
     """GATT characteristic.
     """
 
-    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False, encryption=False, authentication=False, authorization=False, **kwargs):
+    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False, security = [], **kwargs):
         """Declares a GATT characteristic.
 
         Other named arguments are used to declare characteristic's descriptors.
@@ -176,12 +177,8 @@ class Characteristic(object):
         :type   notify:         bool
         :param  indicate:       Enable indications
         :type   indicate:       bool
-        :param encryption:      Indicate that encryption is required to access the characteristic
-        :type encryption:       bool
-        :param authentication:  Indicate that authentication is required to access the characteristic
-        :type authentication:   bool
-        :param authorization:   Indicate that authorization is required to access the characteristic
-        :type authorization:    bool
+        :param security:        Indicate the security property associated to this characteristic
+        :type security:         SecurityAccess
         """
         self.__handle = 0
         self.__name = name
@@ -190,9 +187,7 @@ class Characteristic(object):
         self.__perms = permissions
         self.__notify = notify
         self.__indicate = indicate
-        self.__encryption = encryption
-        self.__authentication = authentication
-        self.__authorization = authorization
+        self.__security = SecurityAccess.generate(security)
         self.__service = None
         self.__descriptors = []
 
@@ -315,23 +310,10 @@ class Characteristic(object):
         return self.__service
 
     @property
-    def require_encryption(self) -> bool:
-        """Check if encryption is required to access the characteristic.
+    def security(self) -> SecurityAccess:
+        """Returns security access property
         """
-        return self.__encryption
-
-    @property
-    def require_authentication(self) -> bool:
-        """Check if authentication is required to access the characteristic.
-        """
-        return self.__authentication
-
-    @property
-    def require_authorization(self) -> bool:
-        """Check if authorization is required to access the characteristic.
-        """
-        return self.__authorization
-
+        return self.__security
 
 class ServiceModel(object):
 
@@ -498,7 +480,8 @@ class GenericProfile(object):
                                 uuid=UUID(charac['value']['uuid']),
                                 handle=charac['handle'],
                                 value=b'',
-                                properties=charac['properties']
+                                properties=charac['properties'],
+                                security=SecurityAccess.int_to_accesses(charac['security'])
                             )
 
                             # Loop on descriptors, only support CCC at the moment
@@ -575,7 +558,8 @@ class GenericProfile(object):
                         uuid=charac.uuid,
                         handle=self.__alloc_handle(1),
                         value=charac.value,
-                        properties=charac_props
+                        properties=charac_props,
+                        security=charac.security
                     )
                     logger.info(' creating characteristic %s (handle:%d)' % (
                         charac_obj.uuid, charac_obj.handle
@@ -981,6 +965,7 @@ class GenericProfile(object):
                     'handle': charac.handle,
                     'uuid': str(charac.type_uuid),
                     'properties': charac.properties,
+                    'security': SecurityAccess.accesses_to_int(charac.security),
                     'value': {
                         'handle': charac.value_handle,
                         'uuid': str(charac.uuid),

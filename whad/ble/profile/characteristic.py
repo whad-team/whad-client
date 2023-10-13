@@ -2,7 +2,7 @@
 BLE GATT Characteristic Model
 =============================
 """
-from whad.ble.stack.att.constants import BleAttProperties
+from whad.ble.stack.att.constants import BleAttProperties, SecurityAccess
 from whad.ble.stack.gatt.helpers import get_uuid_alias
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.exceptions import InvalidHandleValueException
@@ -92,7 +92,7 @@ class Characteristic(Attribute):
     """BLE Characteristic
     """
 
-    def __init__(self, uuid, handle=0, end_handle=0, value=b'', properties=BleAttProperties.DEFAULT):
+    def __init__(self, uuid, handle=0, end_handle=0, value=b'', properties=BleAttProperties.DEFAULT, security=[]):
         """Instanciate a BLE characteristic object
 
         :param uuid: 16-bit or 128-bit UUID
@@ -122,6 +122,9 @@ class Characteristic(Attribute):
 
         # Permissions
         self.__properties = properties
+
+        # Security properties
+        self.__security = security
 
         # Descriptors
         self.__descriptors = []
@@ -300,3 +303,33 @@ class Characteristic(Attribute):
             if isinstance(desc, ClientCharacteristicConfig):
                 return desc
         return None
+
+    @property
+    def security(self) -> SecurityAccess:
+        """Returns security access property
+        """
+        return self.__security
+
+    def get_security_access(self, access_type):
+        """Returns the security access properties linked to an access type.
+
+        :param access_type: access type to check
+        :type access_type: SecurityAccess
+        """
+        for access in self.__security:
+            if isinstance(access, access_type):
+                return access
+        return None
+
+    def check_security_property(self, access_type, property):
+        """Returns a boolean indicating if a property is required for a given access type.
+
+        :param access_type: access type to check
+        :type access_type: SecurityAccess
+        :param property: security property to check
+        :type property: SecurityProperty
+        """
+        access = self.get_security_access(access_type)
+        if access is not None:
+            return property in access.access
+        return False

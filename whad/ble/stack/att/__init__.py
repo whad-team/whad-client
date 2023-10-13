@@ -17,7 +17,7 @@ from scapy.layers.bluetooth import ATT_Error_Response, ATT_Exchange_MTU_Request,
     ATT_Read_By_Type_Request_128bit, ATT_Hdr
 from scapy.packet import bind_layers, Packet
 
-from whad.ble.stack.att.constants import BleAttOpcode
+from whad.ble.stack.att.constants import BleAttOpcode, SecurityProperty, SecurityAccess
 
 from whad.common.stack import Layer, alias, source, instance
 

@@ -43,6 +43,14 @@ class BLEKey:
     def value(self):
         return self.__key
 
+    def __eq__(self, other):
+        if isinstance(other, bytes):
+            return other == self.value
+        else:
+            return (
+                other.value == self.value
+            )
+
     def __repr__(self):
         return "%s('%s' - %d bits)" % (self.__type, self.__key.hex().lower(), self.__key_size)
 
@@ -60,6 +68,16 @@ class LongTermKey(BLEKey):
     def ediv(self):
         return self.__ediv
 
+    def __eq__(self, other):
+        if isinstance(other, bytes):
+            return other == self.value
+        else:
+            return (
+                other.rand == self.rand and
+                other.ediv == self.ediv and
+                other.value == self.value
+            )
+
 class IdentityResolvingKey(BLEKey):
     def __init__(self, key, key_size=None):
         super().__init__(key, key_size=key_size, type="IRK")
@@ -69,11 +87,13 @@ class ConnectionSignatureResolvingKey(BLEKey):
     def __init__(self, key, key_size=None):
         super().__init__(key, key_size=key_size, type="CSRK")
 
+
 class CryptographicMaterial:
 
     @classmethod
     def from_json(cls, json_value):
         report = json.loads(json_value)
+
         cm = CryptographicMaterial(
 
             BDAddress(report["address"], random = (report["address_type"] == 1)),
@@ -111,8 +131,10 @@ class CryptographicMaterial:
         return json.dumps(report)
 
 
-    def __init__(self, address, ltk=None, irk=None, csrk=None):
+    def __init__(self, address, authenticated=False, ltk=None, irk=None, csrk=None):
         self.__address = address
+        self.__authenticated = authenticated
+
         if isinstance(ltk, bytes):
             self.__ltk = LongTermKey(ltk)
         else:
@@ -127,6 +149,9 @@ class CryptographicMaterial:
             self.__csrk = ConnectionSignatureResolvingKey(csrk)
         else:
             self.__csrk = csrk
+
+    def is_authenticated(self):
+        return self.__authenticated
 
     def has_ltk(self):
         return self.__ltk is not None
@@ -158,14 +183,105 @@ class CryptographicMaterial:
         output = (
             "CryptographicMaterial(" +
             ", ".join(
-                ["address = " + str(self.__address),
-                (("ltk = " + str(self.ltk)) if self.ltk is not None else ""),
-                (("irk = " + str(self.irk)) if self.irk is not None else ""),
-                (("csrk = " + str(self.csrk)) if self.csrk is not None else "")
-                ]
+                ["address = " + str(self.__address)] +
+                ["authenticated = " + ("yes" if self.is_authenticated() else "no")] +
+                ([("ltk = " + str(self.ltk))] if self.ltk is not None else []) +
+                ([("irk = " + str(self.irk))] if self.irk is not None else []) +
+                ([("csrk = " + str(self.csrk))] if self.csrk is not None else [])
+
             ) + ")"
         )
         return output
+
+class CryptographicDatabase:
+
+    def to_json(self):
+        entries = []
+        for entry in self.__entries:
+            entries += [json.loads(entry.to_json())]
+        return json.dumps(entries)
+
+    def __init__(self, *entries, from_json=None):
+        self.__entries = []
+        if from_json is not None:
+            json_list = json.loads(from_json)
+            for json_entry in json_list:
+                self.__entries.append(
+                    CryptographicMaterial.from_json(
+                        json.dumps(json_entry)
+                    )
+                )
+        else:
+            if len(entries) > 0:
+                for entry in entries:
+                    self.__entries.append(entry)
+
+    def get(self, **kwargs):
+        filter = {}
+        for name, value in kwargs.items():
+            filter[name] = value
+
+        for entry in self.__entries:
+            if all(
+                [
+                    hasattr(entry, filter_name) and getattr(entry, filter_name) == filter_value
+                    for filter_name, filter_value in filter.items()
+                ]):
+                return entry
+
+        return None
+
+    def __repr__(self):
+        output = (
+                    "CryptographicDatabase(" +
+                    ("\n" if len(self.__entries) > 0 else "") +
+                    ",\n".join([str(e) for e in self.__entries]) +
+                    ("\n" if len(self.__entries) > 0 else "") +
+                    ")"
+        )
+        return output
+
+    def remove(self, **kwargs):
+        entry = self.get(**kwargs)
+        if entry is None:
+            return False
+        self.__entries.remove(entry)
+
+    def add(self, address, authenticated=False, ltk=None , rand=None, ediv=None, irk=None, csrk=None):
+
+        long_term_key = None
+        identity_resolving_key = None
+        connection_signature_resolving_key = None
+
+        if ltk is not None:
+            if rand is None or ediv is None:
+                long_term_key = LongTermKey(ltk)
+            else:
+                long_term_key = LongTermKey(ltk, rand=rand, ediv=ediv)
+        if irk is not None:
+            identity_resolving_key = IdentityResolvingKey(irk=irk)
+        if csrk is not None:
+            connection_signature_resolving_key = ConnectionSignatureResolvingKey(csrk=csrk)
+
+        bd_address = None
+        if isinstance(address, BDAddress):
+            bd_address = address
+        elif isinstance(address, bytes):
+            bd_address = BDAddress.from_bytes(address)
+        elif isinstance(address, str):
+            bd_address = BDAddress(address)
+        else:
+            return False
+
+        cm = CryptographicMaterial(
+            bd_address,
+            authenticated=authenticated,
+            ltk=long_term_key,
+            irk=identity_resolving_key,
+            csrk=connection_signature_resolving_key
+        )
+        self.__entries.append(cm)
+        return True
 
 class SM_Peer(object):
     """
@@ -583,6 +699,37 @@ class SM_Peer(object):
         return _confirm
 
 
+class PairingParameters:
+    def __init__(
+        self,
+        oob=False,
+        bonding=True,
+        mitm=False,
+        lesc=True,
+        keypress=False,
+        max_key_size=16,
+        iocap=IOCAP_DISPLAY_ONLY,
+        enc_key=True,
+        id_key=True,
+        sign_key=True,
+        link_key=True,
+        get_pin_code=SMPLayer.get_pin_code,
+        get_passkey_entry=SMPLayer.get_passkey_entry
+    ):
+        self.oob = oob
+        self.bonding = bonding
+        self.mitm = mitm
+        self.lesc = lesc
+        self.keypress = keypress
+        self.max_key_size = max_key_size
+        self.iocap = iocap
+        self.enc_key = enc_key
+        self.id_key = id_key
+        self.sign_key = sign_key
+        self.link_key = link_key
+        self.get_pin_code = get_pin_code
+        self.get_passkey_entry = get_passkey_entry
+
 class SecurityManagerState(LayerState):
 
     STATE_IDLE = 0x00
@@ -657,10 +804,13 @@ class SecurityManagerState(LayerState):
         self.passkey_value = None
         self.passkey_counter = 1
 
+
+        # Security database in use
+        self.database = None
+
 @alias('smp')
 @state(SecurityManagerState)
 class SMPLayer(Layer):
-
 
     ##########
     # Helpers
@@ -696,6 +846,15 @@ class SMPLayer(Layer):
         except IndexError:
             # it looks like an error occured, let's return None
             return None
+
+    def set_security_database(self, database):
+        self.state.database = database
+
+    def set_initiator_role(self):
+        self.state.enc_initiator = True
+
+    def set_responder_role(self):
+        self.state.enc_initiator = False
 
     def is_initiator(self):
         return self.state.enc_initiator

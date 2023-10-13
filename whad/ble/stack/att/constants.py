@@ -1,6 +1,8 @@
 """ATT constants (error and operation codes)
 """
 
+from types import UnionType
+
 class BleAttOpcode:
     """ATT operation codes
     """
@@ -88,42 +90,95 @@ class Authorization(SecurityProperty):
     pass
 
 class SecurityAccess:
+    TYPE = ""
 
-    def __init__(self, property_name, *args):
-        self.__property_name = property_name
-        self.__access = {}
-        if isinstance(args, types.UnionType):
-            self.__access[self.__property_name] = list(args.__args__)
+    def __init__(self, *args):
+        if len(args) > 0:
+            if isinstance(args[0], UnionType):
+                self.__access = list(args[0].__args__)
+            else:
+                self.__access = list(args)
         else:
-            self.__access[self.__property_name] = args
+            self.__access = []
 
+    def requires_encryption(self):
+        return Encryption in self.__access
 
-    def requires_encryption(self, property=None):
-        key = property if property is not None else self.__property_name
-        return Encryption in self.__access[key]
+    def requires_authentication(self):
+        return Authentication in self.__access
 
-    def requires_authentication(self, property=None):
-        key = property if property is not None else self.__property_name
-        return Authentication in self.__access[key]
-
-    def requires_authorization(self, property=None):
-        key = property if property is not None else self.__property_name
-        return Authorization in self.__access[key]
-
-    @property
-    def property_name(self):
-        return self.__property_name
+    def requires_authorization(self):
+        return Authorization in self.__access
 
     @property
     def access(self):
         return self.__access
 
-    @access.setter
-    def access(self, value):
-        self.__access = value
+    def __repr__(self):
+        return "%s (%s)" % (self.__class__.TYPE, " | ".join([a.__name__ for a in self.access]))
+
+    @classmethod
+    def generate(cls, val):
+        if isinstance(val, list) and all([isinstance(i, SecurityAccess) for i in val]):
+            return val
+        elif isinstance(val, SecurityAccess):
+            return [val]
+        else:
+            return []
 
     def __or__(self, other):
-        self.access.update(other.access)
+        if isinstance(other, SecurityAccess):
+            return [self, other]
+        else:
+            return [self]
+
+    @classmethod
+    def accesses_to_int(cls, value):
+        return_value = 0
+        for access in value:
+            if isinstance(access, ReadAccess):
+                shift = 0
+            elif isinstance(access, WriteAccess):
+                shift = 4
+
+            if Encryption in access.access:
+                return_value |= (1 << shift)
+            if Authentication in access.access:
+                return_value |= (2 << shift)
+            if Authorization in access.access:
+                return_value |= (4 << shift)
+        return return_value
+
+    @classmethod
+    def int_to_accesses(cls, value):
+        accesses = []
+        read_properties = []
+        if bool(value & 1):
+            read_properties.append(Encryption)
+        if bool(value & 2):
+            read_properties.append(Authentication)
+        if bool(value & 4):
+            read_properties.append(Authorization)
+        if len(read_properties) > 0:
+            accesses.append(ReadAccess(*read_properties))
+
+        value = value >> 4
+        write_properties = []
+        if bool(value & 1):
+            write_properties.append(Encryption)
+        if bool(value & 2):
+            write_properties.append(Authentication)
+        if bool(value & 4):
+            write_properties.append(Authorization)
+        if len(write_properties) > 0:
+            accesses.append(WriteAccess(*write_properties))
+        return accesses
+
+class ReadAccess(SecurityAccess):
+    TYPE = "Read"
+
+class WriteAccess(SecurityAccess):
+    TYPE = "Write"
 
 '''
 ReadAccess(Encryption, Authentication, Authorization) | WriteAccess(Encryption, Authentication)

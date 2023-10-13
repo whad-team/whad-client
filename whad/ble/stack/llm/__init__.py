@@ -423,6 +423,10 @@ class BleConnection(object):
         return self.__l2cap.get_layer('gatt')
 
     @property
+    def smp(self):
+        return self.__l2cap.get_layer('smp')
+
+    @property
     def phy(self):
         return self.__l2cap.get_layer('phy')
 

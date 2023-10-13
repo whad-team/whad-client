@@ -2,7 +2,8 @@ from whad.ble import Peripheral
 from whad.ble.profile.advdata import AdvCompleteLocalName, \
                                      AdvDataFieldList, AdvFlagsField
 from whad.ble.profile.attribute import UUID
-from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
+from whad.ble.profile import PrimaryService, Characteristic, GenericProfile, \
+    ReadAccess, WriteAccess, Authentication, Encryption, Authorization
 from whad.device import WhadDevice
 from random import randint
 from whad.ble.exceptions import HookReturnAuthorRequired, HookReturnValue
@@ -22,7 +23,8 @@ class MyPeripheral(GenericProfile):
             uuid=UUID(0x2A00),
             permissions=['read', 'write'],
             notify=True,
-            value=bytes(NAME, 'utf-8')
+            value=bytes(NAME, 'utf-8'),
+            security=WriteAccess(Authentication) | ReadAccess(Authorization | Encryption)
         ),
     )
 
@@ -96,12 +98,12 @@ if __name__ == '__main__':
     print(f'======== {NAME} ===========')
     my_profile = MyPeripheral() #GenericProfile(from_json="lightbulb2.json")
     periph = Peripheral(WhadDevice.create('hci0'), profile=my_profile)
-    periph.attach_callback(callback=show)
+    #periph.attach_callback(callback=show)
     periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
         AdvCompleteLocalName(b'Guess Me!'),
         AdvFlagsField()
     ))
-
-    update_number()
+    
+    #update_number()
     print('Press a key to QUIT')
     input()

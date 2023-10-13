@@ -15,6 +15,7 @@ from whad.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
 from whad.ble.stack.gatt import GattServer, GattClientServer
 from whad.ble.stack.att import ATTLayer
+from whad.ble.stack.smp import CryptographicDatabase
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.device import PeripheralDevice
 from whad.protocol.ble.ble_pb2 import BleDirection
@@ -35,7 +36,7 @@ class Peripheral(BLE):
     defined by a specific profile.
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, stack=BleStack):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, stack=BleStack, security_database=None):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -52,6 +53,7 @@ class Peripheral(BLE):
 
         # Initialize stack
         self.__stack = stack(self)
+        self.connection = None
         self.__connected = False
 
         # Initialize profile
@@ -61,6 +63,14 @@ class Peripheral(BLE):
         else:
             logger.info('Peripheral will use the provided profile.')
             self.__profile = profile
+
+        # Initialize security database
+        if security_database is None:
+            logger.info('No security database provided to this Peripheral instance, use a default one.')
+            self.__security_database = CryptographicDatabase()
+        else:
+            logger.info('Peripheral will use the provided security database.')
+            self.__security_database = security_database
 
         # Check if device accepts peripheral mode
         if not self.can_be_peripheral():
@@ -128,8 +138,20 @@ class Peripheral(BLE):
         self.__stack = clazz(self)
 
     @property
+    def smp(self):
+        if self.connection is not None:
+            return self.connection.smp
+        return None
+
+    @property
     def gatt(self):
-        return self.__gatt_server
+        if self.connection is not None:
+            return self.connection.gatt
+        return None
+
+    @property
+    def security_database(self):
+        return self.__security_database
 
     ##############################
     # Incoming events
@@ -209,8 +231,15 @@ class Peripheral(BLE):
 
         # Retrieve GATT server
         self.__gatt_server = connection.gatt
+
         self.__gatt_server.set_server_model(self.__profile)
         self.__connected = True
+
+        # Configure SMP layer
+        # we set the security database
+        self.connection.smp.set_security_database(self.__security_database)
+        # we indicate that we are a responder
+        self.connection.smp.set_responder_role()
 
         # Notify our profile about this connection
         self.__profile.on_connect(self.connection.conn_handle)
@@ -239,7 +268,7 @@ class PeripheralClient(Peripheral):
 
     def on_new_connection(self, connection):
         super().on_new_connection(connection)
-        
+
         # Create a new peripheral device to represent the central device
         # that has just connected
         print(connection.gatt)
