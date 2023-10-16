@@ -28,6 +28,12 @@ class L2CAPLayer(ContextualLayer):
         '''
         self.state.conn_handle = conn_handle
 
+    def set_local_mtu(self, mtu):
+        '''Set local MTU
+        '''
+        logger.debug('local MTU changed to %d for conn_handle %d' % (mtu, self.state.conn_handle))
+        self.state.local_mtu = mtu
+
     def set_remote_mtu(self, mtu):
         '''Set remote MTU
         '''
