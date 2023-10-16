@@ -823,7 +823,13 @@ class GattClient(GattLayer):
         :param int start: Start handle value
         :param int end: End handle value
         """
-        self.att.read_by_type_request(start, end, uuid.value())
+        if uuid.type == UUID.TYPE_16:
+            self.att.read_by_type_request(start, end, uuid.value())
+        elif uuid.type == UUID.TYPE_128:
+            # Required by scapy
+            uuid1 = unpack('<Q', uuid.packed[:8])[0]
+            uuid2 = unpack('<Q', uuid.packed[8:])[0]
+            self.att.read_by_type_request_128bit(start, end, uuid1, uuid2)
         msg = self.wait_for_message(GattReadByTypeResponse)
         if isinstance(msg, GattReadByTypeResponse):
             output = []
