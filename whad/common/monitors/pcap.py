@@ -6,6 +6,7 @@ from os.path import exists
 from time import time
 from os import stat, remove
 from stat import S_ISFIFO
+from threading import Lock
 
 import logging
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ class PcapWriterMonitor(WhadMonitor):
         self._reference_time = None
         self._start_time = None
         self._nb_pkts_written = 0
+        self._writer_lock = Lock()
 
 
     @property
@@ -84,11 +86,20 @@ class PcapWriterMonitor(WhadMonitor):
 
     def close(self):
         if hasattr(self, "_writer") and self._writer is not None:
+            # Acquire lock on writer
+            self._writer_lock.acquire()
+
+            # Close writer
             try:
                 self._writer.close()
             except BrokenPipeError:
                 pass
+
+            # Mark writer as not available anymore
             self._writer = None
+
+            # Release lock on writer
+            self._writer_lock.release()
 
     def default_formatter(self, packet):
         """
@@ -126,7 +137,19 @@ class PcapWriterMonitor(WhadMonitor):
             # Convert timestamp to second (float)
             packet.time = timestamp / 1000000
             try:
-                self._writer.write(packet)
-                self._nb_pkts_written += 1
+                if self._writer is not None:
+                    # Acquire lock on writer
+                    self._writer_lock.acquire()
+
+                    # Write packet
+                    self._writer.write(packet)
+                    self._nb_pkts_written += 1
+
+                    # Release lock
+                    self._writer_lock.release()
+                else:
+                    # We are trying to write to a closed PCAP monitor,
+                    # issue a warning message
+                    logger.warning('cannot write to PCAP: file has already been closed')
             except BrokenPipeError:
                 pass
