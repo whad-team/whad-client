@@ -16,7 +16,9 @@ from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,
     CharacteristicProperties, ClientCharacteristicConfig, \
     CharacteristicValue as BleCharacteristicValue, \
     CharacteristicDescriptor as BleCharacteristicDescriptor, \
-    ReportReferenceDescriptor as BleReportReferenceDescriptor
+    ReportReferenceDescriptor as BleReportReferenceDescriptor, \
+    CharacteristicUserDescriptionDescriptor as BleCharacteristicUserDescriptionDescriptor
+
 from whad.ble.profile.service import PrimaryService as BlePrimaryService, \
     SecondaryService as BleSecondaryService, Service
 from whad.ble.exceptions import InvalidHandleValueException
@@ -156,12 +158,18 @@ class ReportReferenceDescriptor(CharacteristicDescriptor):
     def __init__(self, permissions=None):
         super().__init__(BleReportReferenceDescriptor)
 
+class UserDescriptionDescriptor(CharacteristicDescriptor):
+    """User description model
+    """
+    def __init__(self, description=''):
+        super().__init__(BleCharacteristicUserDescriptionDescriptor)
+
 
 class Characteristic(object):
     """GATT characteristic.
     """
 
-    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False, **kwargs):
+    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False, description=None, **kwargs):
         """Declares a GATT characteristic.
 
         Other named arguments are used to declare characteristic's descriptors.
@@ -176,6 +184,8 @@ class Characteristic(object):
         :type   notify:         bool
         :param  indicate:       Enable indications
         :type   indicate:       bool
+        :param  description:    Textual description for this characteristic
+        :type   description:    str
         """
         self.__handle = 0
         self.__name = name
@@ -185,6 +195,7 @@ class Characteristic(object):
         self.__notify = notify
         self.__indicate = indicate
         self.__service = None
+        self.__description = description
         self.__descriptors = []
 
         # Loop on kwargs to find descriptos
@@ -298,6 +309,12 @@ class Characteristic(object):
         """Check if indication has to be sent on value change.
         """
         return self.__indicate
+
+    @property
+    def description(self) -> str:
+        """Return characteristic textual description, if any
+        """
+        return self.__description
 
     @property
     def service(self) -> Service:
@@ -572,6 +589,21 @@ class GenericProfile(object):
                         ))
                         charac_obj.add_descriptor(ccc_desc)
                         self.register_attribute(ccc_desc)
+
+                    # If characteristic description has been set, add a descriptor
+                    if charac.description is not None:
+                        cudd_desc = BleCharacteristicUserDescriptionDescriptor(
+                            charac_obj,
+                            handle=self.__alloc_handle(),
+                            description=charac.description
+                        )
+                        logger.info('  creating cudd (handle:%d) with text "%s"' % (
+                            cudd_desc.handle,
+                            charac.description
+                        ))
+                        charac_obj.add_descriptor(cudd_desc)
+                        self.register_attribute(cudd_desc)
+
 
                     # Loop on other characteristic descriptors and add them
                     for descriptor in charac.descriptors():

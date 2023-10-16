@@ -73,6 +73,22 @@ class ReportReferenceDescriptor(CharacteristicDescriptor):
             value=b''
         )
 
+class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
+    """Characteristic description defined by user, contains
+    a textual description of the related characteristic.
+    """
+    def __init__(self, characteristic, handle=None, description=''):
+        """Instanciate a Characteristic User Description descriptor
+
+        :param description: Set characteristic text description
+        """
+        super().__init__(
+            characteristic,
+            uuid=UUID(0x2901),
+            handle=handle,
+            value=description.encode('utf-8')
+        )
+
 
 class CharacteristicValue(Attribute):
     def __init__(self, uuid, handle=None, value=b'', characteristic=None):
@@ -92,7 +108,7 @@ class Characteristic(Attribute):
     """BLE Characteristic
     """
 
-    def __init__(self, uuid, handle=0, end_handle=0, value=b'', properties=BleAttProperties.DEFAULT):
+    def __init__(self, uuid, handle=0, end_handle=0, value=b'', properties=BleAttProperties.DEFAULT, description=None):
         """Instanciate a BLE characteristic object
 
         :param uuid: 16-bit or 128-bit UUID
