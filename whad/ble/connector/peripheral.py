@@ -52,6 +52,7 @@ class Peripheral(BLE):
 
         # Initialize stack
         self.__stack = stack(self)
+        self.__conn_handle = None
         self.__connected = False
 
         # Initialize profile
@@ -154,6 +155,7 @@ class Peripheral(BLE):
                 connection_data.init_addr_type
             )
         )
+        self.__conn_handle = connection_data.conn_handle
 
     def on_disconnected(self, disconnection_data):
         """A device has just disconnected from this peripheral.
@@ -215,6 +217,12 @@ class Peripheral(BLE):
         # Notify our profile about this connection
         self.__profile.on_connect(self.connection.conn_handle)
 
+    def terminate(self):
+        """Terminate the current connection
+        """
+        if self.__conn_handle is not None:
+            self.disconnect(self.__conn_handle)
+
 
 class PeripheralClient(Peripheral):
     '''This BLE connector provides a way to create a peripheral device with
@@ -242,8 +250,6 @@ class PeripheralClient(Peripheral):
         
         # Create a new peripheral device to represent the central device
         # that has just connected
-        print(connection.gatt)
-        print(connection.conn_handle)
         self.__peripheral = PeripheralDevice(
             self,
             connection.gatt,
