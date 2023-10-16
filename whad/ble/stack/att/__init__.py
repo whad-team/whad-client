@@ -462,7 +462,12 @@ class ATTLayer(Layer):
         :param uuid1: UUID part 1
         :param uuid2: UUID part 2
         """
-        pass
+        self.send_data(ATT_Read_By_Type_Request_128bit(
+            start=start,
+            end=end,
+            uuid1=uuid1,
+            uuid2=uuid2
+        ))
 
     def read_by_type_response(self, item_length, handles):
         """Sends an ATT Read By Type Response
