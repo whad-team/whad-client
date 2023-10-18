@@ -10,6 +10,8 @@ The connector provides some callbacks such as :meth:`Peripheral.on_connected` to
 react on specific events.
 """
 
+from time import sleep
+
 from whad.ble.connector import BLE
 from whad.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
@@ -216,6 +218,19 @@ class Peripheral(BLE):
 
         # Notify our profile about this connection
         self.__profile.on_connect(self.connection.conn_handle)
+
+    def is_connected(self):
+        """Determine if this peripheral is connected to a central.
+
+        :return:    True if connected, False otherwise.
+        """
+        return self.__connected
+
+    def wait_connection(self):
+        """Wait for a connection.
+        """
+        while not self.is_connected():
+            sleep(.5)
 
     def terminate(self):
         """Terminate the current connection
