@@ -1,5 +1,19 @@
 """Bluetooth LE SMP constants
 """
+SM_PAIRING_REQUEST              = 1
+SM_PAIRING_RESPONSE             = 2
+SM_CONFIRM                      = 3
+SM_RANDOM                       = 4
+SM_FAILED                       = 5
+SM_ENCRYPTION_INFORMATION       = 6
+SM_MASTER_IDENTIFICATION        = 7
+SM_IDENTITY_INFORMATION         = 8
+SM_IDENTITY_ADDRESS_INFORMATION = 9
+SM_SIGNING_INFORMATION          = 0x0a
+SM_PUBLIC_KEY                   = 0x0c
+SM_DHKEY_CHECK                  = 0x0d
+
+
 OOB_DISABLED = 0x00
 OOB_ENABLED = 0x01
 

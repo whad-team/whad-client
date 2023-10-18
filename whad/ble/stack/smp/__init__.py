@@ -713,8 +713,6 @@ class PairingParameters:
         id_key=True,
         sign_key=True,
         link_key=True,
-        get_pin_code=SMPLayer.get_pin_code,
-        get_passkey_entry=SMPLayer.get_passkey_entry
     ):
         self.oob = oob
         self.bonding = bonding
@@ -727,8 +725,6 @@ class PairingParameters:
         self.id_key = id_key
         self.sign_key = sign_key
         self.link_key = link_key
-        self.get_pin_code = get_pin_code
-        self.get_passkey_entry = get_passkey_entry
 
 class SecurityManagerState(LayerState):
 
@@ -811,7 +807,22 @@ class SecurityManagerState(LayerState):
 @alias('smp')
 @state(SecurityManagerState)
 class SMPLayer(Layer):
-
+    def configure(self, options={}):
+        # SM packets dispatch
+        self.__handlers = {
+            SM_PAIRING_REQUEST : self.on_pairing_request,
+            SM_PAIRING_RESPONSE : self.on_pairing_response,
+            SM_CONFIRM : self.on_pairing_confirm,
+            SM_RANDOM : self.on_pairing_random,
+            SM_FAILED : self.on_pairing_failed,
+            SM_ENCRYPTION_INFORMATION : self.on_encryption_information,
+            SM_MASTER_IDENTIFICATION : self.on_master_identification,
+            SM_IDENTITY_INFORMATION : self.on_identity_information,
+            SM_IDENTITY_ADDRESS_INFORMATION : self.on_identity_address_information,
+            SM_SIGNING_INFORMATION : self.on_signing_information,
+            SM_PUBLIC_KEY : self.on_public_key,
+            SM_DHKEY_CHECK : self.on_dhkey_check,
+        }
     ##########
     # Helpers
     ##########
@@ -1023,12 +1034,63 @@ class SMPLayer(Layer):
 
 
 
+    def check_lesc_numeric_comparison(self, value):
+        """Ask the user to check if the numeric comparison is valid.
+        """
+        print("Computed value is: ", value)
+        print("y to continue process, n to discard")
+        user_input = input()
+        return user_input.upper().startswith("Y")
+
+    def generate_p256_keypair(self):
+        """Generate the P256 private key / public key
+        """
+        return generate_p256_keypair()
+
+    def generate_legacy_ltk(self):
+        """Generate the LTK used in legacy pairing.
+        """
+        if self.is_initiator():
+            return generate_random_value(8*self.state.initiator.max_key_size)
+        else:
+            return generate_random_value(8*self.state.responder.max_key_size)
+
+    def generate_legacy_random(self):
+        """Generate the rand used in legacy pairing.
+        """
+        return self.generate_random_value(8*8)
+
+    def generate_legacy_ediv(self):
+        """Generate the EDIV used in legacy pairing.
+        """
+        return randint(0, 0x10000)
+
+    def generate_irk(self):
+        """Generate the IRK used in legacy and secure pairing.
+        """
+        if self.is_initiator():
+            return generate_random_value(8*self.state.initiator.max_key_size)
+        else:
+            return generate_random_value(8*self.state.responder.max_key_size)
+
+    def generate_csrk(self):
+        """Generate the CSRK used in legacy and secure pairing.
+        """
+        if self.is_initiator():
+            return generate_random_value(8*self.state.initiator.max_key_size)
+        else:
+            return generate_random_value(8*self.state.responder.max_key_size)
+
     def get_passkey_entry(self):
+        """Ask the user to enter the passkey entry.
+        """
         print("Enter passkey entry: ")
         passkey_entry = input()
         return int(passkey_entry)
 
     def get_pin_code(self):
+        """Ask the user to enter the PIN code (a.k.a. Temporary Key)
+        """
         self_iocap = self.state.initiator.iocap if self.is_initiator() else self.state.responder.iocap
 
         if self_iocap == IOCAP_KEYBD_ONLY:
@@ -1052,28 +1114,9 @@ class SMPLayer(Layer):
 
         :param Packet packet: Scapy packet containing SMP material
         """
-        if SM_Pairing_Request in smp_pkt:
-            self.on_pairing_request(smp_pkt.getlayer(SM_Pairing_Request))
-        elif SM_Pairing_Response in smp_pkt:
-            self.on_pairing_response(smp_pkt.getlayer(SM_Pairing_Response))
-        elif SM_Confirm in smp_pkt:
-            self.on_pairing_confirm(smp_pkt.getlayer(SM_Confirm))
-        elif SM_Random in smp_pkt:
-            self.on_pairing_random(smp_pkt.getlayer(SM_Random))
-        elif SM_Encryption_Information in smp_pkt:
-            self.on_encryption_information(smp_pkt.getlayer(SM_Encryption_Information))
-        elif SM_Master_Identification in smp_pkt:
-            self.on_master_identification(smp_pkt.getlayer(SM_Master_Identification))
-        elif SM_Identity_Information in smp_pkt:
-            self.on_identity_information(smp_pkt.getlayer(SM_Identity_Information))
-        elif SM_Identity_Address_Information in smp_pkt:
-            self.on_identity_address_information(smp_pkt.getlayer(SM_Identity_Address_Information))
-        elif SM_Signing_Information in smp_pkt:
-            self.on_signing_information(smp_pkt.getlayer(SM_Signing_Information))
-        elif SM_Public_Key in smp_pkt:
-            self.on_public_key(smp_pkt.getlayer(SM_Public_Key))
-        elif SM_DHKey_Check in smp_pkt:
-            self.on_dhkey_check(smp_pkt.getlayer(SM_DHKey_Check))
+
+        if smp_pkt.sm_command in self.__handlers:
+            self.__handlers[int(smp_pkt.sm_command)](smp_pkt.getlayer(1))
 
     def initiate_pairing(
                             self,
@@ -1169,7 +1212,7 @@ class SMPLayer(Layer):
             logger.info('We are in an inconsistent state, returning to idle.')
 
             # Return to IDLE mode
-            self.__state = SecurityManagerState.STATE_IDLE
+            self.state.state = SecurityManagerState.STATE_IDLE
 
     def on_public_key(self, public_key_pkt):
         """Method called when a public key is received.
@@ -1266,6 +1309,7 @@ class SMPLayer(Layer):
 
                 self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN
 
+
     def on_pairing_request(self, pairing_req):
         """Method called when a pairing request is received.
 
@@ -1360,7 +1404,7 @@ class SMPLayer(Layer):
                 self.state.tk = bytes.fromhex("00"*12 + "{:08x}".format(pin))
             elif self.state.method in (PM_LESC_NUMCOMP, PM_LESC_JUSTWORKS, PM_LESC_PASSKEY):
                 # Generate the P256 keypair
-                self.state.private_key, self.state.public_key = generate_p256_keypair()
+                self.state.private_key, self.state.public_key = self.generate_p256_keypair()
 
             print("Method: ", self.state.method)
             # Update current state
@@ -1376,9 +1420,15 @@ class SMPLayer(Layer):
             self.send_data(error)
 
             # Return to IDLE mode
-            self.__state = SecurityManagerState.STATE_IDLE
+            self.state.state = SecurityManagerState.STATE_IDLE
 
 
+    def on_pairing_failed(self, pairing_failed):
+        """Method called when a pairing failed is received.
+        """
+        logger.info("Pairing failed (reason=%d)" % pairing_failed.reason)
+        # Return to IDLE mode
+        self.state.state = SecurityManagerState.STATE_IDLE
 
     def on_dhkey_check(self, dhkey_check):
         """Method called when a Diffie Hellman check is received.
@@ -1396,6 +1446,7 @@ class SMPLayer(Layer):
                 self.state.responder
             )
 
+
             self.state.rand, self.state.ediv = b"\x00"*8, 0
             # Indicate LTK as distributed
             self.state.initiator.indicate_ltk_distribution(self.state.ltk)
@@ -1407,6 +1458,7 @@ class SMPLayer(Layer):
                 rb = 0 # in num comp and just works, TODO: adapt for passkey
             else:
                 rb = self.state.passkey_value
+            print(self.state.mackey)
             # Let's compute EA
             ea = self.compute_exchange_value(
                 self.state.mackey,
@@ -1461,7 +1513,7 @@ class SMPLayer(Layer):
                 self.send_data(error)
 
                 # Return to IDLE mode
-                self.__state = SecurityManagerState.STATE_IDLE
+                self.state.state = SecurityManagerState.STATE_IDLE
 
         elif self.state.state == SecurityManagerState.STATE_LESC_DHK_CHECK_SENT:
 
@@ -1509,7 +1561,7 @@ class SMPLayer(Layer):
                 self.send_data(error)
 
                 # Return to IDLE mode
-                self.__state = SecurityManagerState.STATE_IDLE
+                self.state.state = SecurityManagerState.STATE_IDLE
 
         else:
             logger.info('Unexpected packet received, report error and return to idle.')
@@ -1521,7 +1573,7 @@ class SMPLayer(Layer):
             self.send_data(error)
 
             # Return to IDLE mode
-            self.__state = SecurityManagerState.STATE_IDLE
+            self.state.state = SecurityManagerState.STATE_IDLE
 
     def on_pairing_response(self, pairing_resp):
         """Method called when a pairing response is received.
@@ -1633,7 +1685,7 @@ class SMPLayer(Layer):
             self.send_data(error)
 
             # Return to IDLE mode
-            self.__state = SecurityManagerState.STATE_IDLE
+            self.state.state = SecurityManagerState.STATE_IDLE
 
     def on_pairing_confirm(self, confirm):
         """Method called whan a pairing confirm value is received.
@@ -1755,11 +1807,6 @@ class SMPLayer(Layer):
             # Return to IDLE mode
             self.state.state = SecurityManagerState.STATE_IDLE
 
-    def check_lesc_numeric_comparison(self, value):
-        print("Computed value is: ", value)
-        print("y to continue process, n to discard")
-        user_input = input()
-        return user_input.upper().startswith("Y")
 
 
     def on_pairing_random(self, random_pkt):
@@ -2176,9 +2223,9 @@ class SMPLayer(Layer):
             # If LTK is not None, it has been derivated from DHKey in LE SC
             # don't distribute LTK, only IRK and CSRK
             if self.state.ltk is None:
-                self.state.ltk = generate_random_value(8*self.state.responder.max_key_size)
-                self.state.rand = generate_random_value(8*8)
-                self.state.ediv = randint(0, 0x10000)
+                self.state.ltk = self.generate_legacy_ltk()
+                self.state.rand = self.generate_legacy_random()
+                self.state.ediv = self.generate_legacy_ediv()
 
                 # Perform key distribution to responder
                 sleep(.5)
@@ -2194,7 +2241,7 @@ class SMPLayer(Layer):
                 logger.info('[smp] EDIV/RAND sent.')
             if self.state.responder.must_dist_irk():
                 logger.info('[smp] sending generated IRK ...')
-                self.state.irk = generate_random_value(8*self.state.responder.max_key_size)
+                self.state.irk = self.generate_irk()
                 self.send_data(SM_Identity_Information(
                     irk = self.state.irk
                 ))
@@ -2210,7 +2257,7 @@ class SMPLayer(Layer):
 
             if self.state.responder.must_dist_csrk():
                 logger.info('[smp] sending generated CSRK ...')
-                self.state.csrk = generate_random_value(8*self.state.responder.max_key_size)
+                self.state.csrk = self.generate_csrk()
                 self.send_data(SM_Signing_Information(
                     csrk=self.state.csrk
                 ))
@@ -2220,9 +2267,9 @@ class SMPLayer(Layer):
 
         else:
             if self.state.ltk is None:
-                self.state.ltk = generate_random_value(8*self.state.initiator.max_key_size)
-                self.state.rand = generate_random_value(8*8)
-                self.state.ediv = randint(0, 0x10000)
+                self.state.ltk = self.generate_legacy_ltk()
+                self.state.rand = self.generate_legacy_random()
+                self.state.ediv = self.generate_legacy_ediv()
 
                 # Perform key distribution to initiator
                 sleep(.5)
@@ -2238,7 +2285,7 @@ class SMPLayer(Layer):
                     logger.info('[smp] EDIV/RAND sent.')
             if self.state.initiator.must_dist_irk():
                 logger.info('[smp] sending generated IRK ...')
-                self.state.irk = generate_random_value(8*self.state.responder.max_key_size)
+                self.state.irk = self.generate_irk()
                 self.send_data(SM_Identity_Information(
                     irk = self.state.irk
                 ))
@@ -2252,7 +2299,7 @@ class SMPLayer(Layer):
                 logger.info('[smp] Address information sent.')
             if self.state.initiator.must_dist_csrk():
                 logger.info('[smp] sending generated CSRK ...')
-                self.state.csrk = generate_random_value(8*self.state.responder.max_key_size)
+                self.state.csrk = self.generate_csrk()
                 self.send_data(SM_Signing_Information(
                     csrk=self.state.csrk
                 ))
