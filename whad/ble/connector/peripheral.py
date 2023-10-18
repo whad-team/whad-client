@@ -175,6 +175,9 @@ class Peripheral(BLE):
         if self.__profile is not None:
             self.__profile.on_disconnect(disconnection_data.conn_handle)
 
+        # We are now disconnected
+        self.__connected = False
+
 
     def on_ctl_pdu(self, pdu):
         """This method is called whenever a control PDU is received.
