@@ -15,7 +15,7 @@ from whad.ble.stack.att.exceptions import error_response_to_exc, AttErrorCode
 from whad.ble.stack.gatt.helpers import get_uuid_alias
 from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
-from whad.ble.profile import GenericProfile
+from whad.ble.profile import GenericProfile, Pairing
 from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
 from whad.ble.profile.service import PrimaryService, SecondaryService
 
@@ -897,6 +897,7 @@ class GattServer(GattLayer):
         '''This method is used with GattClientServer to specify the GATT
         server profile.
         '''
+        # Note: redundant with set_server_model
         self.__server_model = model
 
     def configure(self, options):
@@ -1131,7 +1132,6 @@ class GattServer(GattLayer):
                 request.handle,
                 BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
-
 
     def on_read_blob_request(self, request: GattReadBlobRequest):
         """Read blob request
@@ -1739,6 +1739,14 @@ class GattServer(GattLayer):
             charac.set_indication_callback(None)
         self.__subscribed_characs = []
 
+    def pairing(self, pairing=None):
+        pairing_parameters = Pairing()
+        if pairing is None:
+            pairing_parameters = self.__server_model.get_pairing_parameters()
+        elif isinstance(pairing, Pairing):
+            pairing_parameters = pairing
+
+        self.smp.request_pairing(pairing=pairing_parameters)
 
 class GattClientServer(GattServer, GattClient):
 

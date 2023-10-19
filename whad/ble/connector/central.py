@@ -30,9 +30,9 @@ class Central(BLE):
 
     """
 
-    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack, client=GattClient):
+    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack, client=GattClient, security_database=None):
         super().__init__(device)
-        
+
         """Attach a GATT client if specified in parameter
 
         If `client` is set to None, the default GATT layer is used, which does
@@ -55,12 +55,25 @@ class Central(BLE):
         if not self.can_be_central():
             raise UnsupportedCapability('Central')
 
+        # Initialize security database
+        if security_database is None:
+            logger.info('No security database provided to this Peripheral instance, use a default one.')
+            self.__security_database = CryptographicDatabase()
+        else:
+            logger.info('Peripheral will use the provided security database.')
+            self.__security_database = security_database
+
         # If a connection already exists, just feed the stack with the parameters
         if existing_connection is not None:
             self.on_connected(existing_connection)
         else:
             # self.stop() # ButteRFly doesn't support calling stop when spawning central
             self.enable_central_mode()
+
+
+    @property
+    def security_database(self):
+        return self.__security_database
 
     @property
     def local_peer(self) -> BDAddress:
@@ -263,6 +276,10 @@ class Central(BLE):
         self.__gatt_client = connection.gatt
         self.__gatt_client.set_client_model(self.__peripheral)
         self.__connected = True
+
+        # Configure SMP layer
+        # we set the security database
+        self.connection.smp.set_security_database(self.__security_database)
 
         # Notify peripheral about this connection
         self.__peripheral.on_connect(self.connection.conn_handle)

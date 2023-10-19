@@ -10,7 +10,7 @@ allows to interact with it:
 """
 import json
 from typing import List, Iterator
-
+from whad.ble.stack.smp import Pairing
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,\
     CharacteristicProperties, ClientCharacteristicConfig, \
@@ -191,7 +191,7 @@ class Characteristic(object):
         self.__service = None
         self.__descriptors = []
 
-        # Loop on kwargs to find descriptos
+        # Loop on kwargs to find descriptors
         for arg in kwargs:
             if isinstance(kwargs[arg], CharacteristicDescriptor):
                 descriptor = kwargs[arg]
@@ -515,6 +515,7 @@ class GenericProfile(object):
                         service = getattr(self, prop)
                         service.name = prop
                         services.append(service)
+
 
             # Instanciate each service, and for each of them the corresponding
             # characteristics

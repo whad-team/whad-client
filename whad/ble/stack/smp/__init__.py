@@ -10,9 +10,8 @@ BleSMP provides these different pairing strategies:
 
 """
 # TODO
-# updating the security database when keys are distributed
 # implementing a mechanism to identify if pairing was successful or not (Exception ? Report Object ? )
-# interfacing with Peripheral (pass Pairing class to provided Profile) and Central (parameter of pair ?)
+# checking bugs on API
 # refactoring, maybe some states can be merged
 
 from struct import pack, unpack
@@ -266,9 +265,9 @@ class CryptographicDatabase:
             else:
                 long_term_key = LongTermKey(ltk, rand=rand, ediv=ediv)
         if irk is not None:
-            identity_resolving_key = IdentityResolvingKey(irk=irk)
+            identity_resolving_key = IdentityResolvingKey(irk)
         if csrk is not None:
-            connection_signature_resolving_key = ConnectionSignatureResolvingKey(csrk=csrk)
+            connection_signature_resolving_key = ConnectionSignatureResolvingKey(csrk)
 
         bd_address = None
         if isinstance(address, BDAddress):
@@ -355,6 +354,10 @@ class SM_Peer(object):
     @property
     def address_type(self):
         return self.__address.type
+
+    @property
+    def bd_address(self):
+        return self.__address
 
     def support_lesc(self):
         return self.__lesc
@@ -480,7 +483,7 @@ class SM_Peer(object):
                 keys.append('csrk')
                 self.__dist_csrk = True
             logger.debug('Set distribute key for peer: %s' % (','.join(keys)))
-        elif self.__pairing_method in [PM_LESC_JUSTWORKS, PM_LESC_NUMCOMP, PM_OOB]:
+        elif self.__pairing_method in [PM_LESC_JUSTWORKS, PM_LESC_NUMCOMP, PM_LESC_OOB]:
             keys=[]
             if self.__kd_id_key:
                 keys.append('irk')
@@ -831,6 +834,11 @@ class SMPLayer(Layer):
     # Helpers
     ##########
 
+    def is_pairing_authenticated(self):
+        """Indicates if the pairing uses a pairing method enforcing authentication.
+        """
+        return self.state.method in AUTHENTICATED_METHODS
+
     def key_generation_method_selection(self, initiator, responder):
         """
         This method returns the key generation method to select according to
@@ -842,7 +850,7 @@ class SMPLayer(Layer):
         if initiator.support_lesc() and responder.support_lesc():
             use_lesc = True
             if initiator.support_oob() or responder.support_oob():
-                return PM_OOB
+                return PM_LESC_OOB
             elif not initiator.support_mitm() and not responder.support_mitm():
                 return PM_LESC_JUSTWORKS
         # if at least one of the device does not support LE Secure Connections,
@@ -850,7 +858,7 @@ class SMPLayer(Layer):
         else:
             use_lesc = False
             if initiator.support_oob() and responder.support_oob():
-                return PM_OOB
+                return PM_LEGACY_OOB
             elif not initiator.support_mitm() and not responder.support_mitm():
                 return PM_LEGACY_JUSTWORKS
 
@@ -1335,6 +1343,7 @@ class SMPLayer(Layer):
     def on_security_request(self, security_request):
         """Method called when a security request is received.
         """
+        # Note: For now I keep this out of the set of states of SMP layer.
         logger.info("Receiving Security Request")
         if self.state.state == SecurityManagerState.STATE_IDLE:
             if self.pairing_parameters.accept_pairing:
@@ -1475,7 +1484,7 @@ class SMPLayer(Layer):
                 if self.state.method == PM_LEGACY_JUSTWORKS:
                     self.state.tk = b"\x00" * 16
                 elif self.state.method == PM_LEGACY_PASSKEY:
-                    pin = self.get_custom_function("get_pin_code")() # TODO: allow to pass a callback here to customize PIN entry
+                    pin = self.get_custom_function("get_pin_code")()
                     self.state.tk = bytes.fromhex("00"*12 + "{:08x}".format(pin))
                 elif self.state.method in (PM_LESC_NUMCOMP, PM_LESC_JUSTWORKS, PM_LESC_PASSKEY):
                     # Generate the P256 keypair
@@ -2467,6 +2476,30 @@ class SMPLayer(Layer):
                 logger.info("Received IRK: %s" % self.state.initiator.irk.hex())
             if self.state.initiator.csrk is not None:
                 logger.info("Received CSRK: %s" % self.state.initiator.csrk.hex())
+
+            # If bonding is enabled, we register in the security DB
+            # both our own and the peer cryptographic material
+            if self.pairing_parameters.bonding:
+                logger.info("Saving cryptographic materials in security database")
+                self.state.database.add(
+                    self.state.initiator.bd_address,
+                    authenticated=self.is_pairing_authenticated(),
+                    ltk=self.state.ltk,
+                    rand=self.state.rand,
+                    ediv=self.state.ediv,
+                    irk=self.state.irk,
+                    csrk=self.state.csrk
+                )
+                self.state.database.add(
+                    self.state.responder.bd_address,
+                    authenticated=self.is_pairing_authenticated(),
+                    ltk=self.state.initiator.ltk,
+                    rand=self.state.initiator.rand,
+                    ediv=self.state.initiator.ediv,
+                    irk=self.state.initiator.irk,
+                    csrk=self.state.initiator.csrk
+                )
+
         else:
             if self.state.ltk is not None:
                 logger.info("Distributed LTK: %s" % self.state.ltk.hex())
@@ -2490,6 +2523,29 @@ class SMPLayer(Layer):
             if self.state.responder.csrk is not None:
                 logger.info("Received CSRK: %s" % self.state.responder.csrk.hex())
 
+            # If bonding is enabled, we register in the security DB
+            # both our own and the peer cryptographic material
+            if self.pairing_parameters.bonding:
+                logger.info("Saving cryptographic materials in security database")
+                self.state.database.add(
+                    self.state.responder.bd_address,
+                    authenticated=self.is_pairing_authenticated(),
+                    ltk=self.state.ltk,
+                    rand=self.state.rand,
+                    ediv=self.state.ediv,
+                    irk=self.state.irk,
+                    csrk=self.state.csrk
+                )
+                self.state.database.add(
+                    self.state.initiator.bd_address,
+                    authenticated=self.is_pairing_authenticated(),
+                    ltk=self.state.responder.ltk,
+                    rand=self.state.responder.rand,
+                    ediv=self.state.responder.ediv,
+                    irk=self.state.responder.irk,
+                    csrk=self.state.responder.csrk
+                )
+        print(self.state.database)
         self.state.state = SecurityManagerState.STATE_BONDING_DONE
 
     def send_data(self, packet):

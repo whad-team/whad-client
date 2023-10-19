@@ -24,7 +24,7 @@ class MyPeripheral(GenericProfile):
             permissions=['read', 'write'],
             notify=True,
             value=bytes(NAME, 'utf-8'),
-            security=WriteAccess(Authentication) | ReadAccess(Authorization | Encryption)
+            security= ReadAccess(Encryption) | WriteAccess(Authentication)
         ),
     )
 

@@ -470,8 +470,11 @@ class PeripheralDevice(GenericProfile):
         return self.__conn_handle
 
 
-    def pairing(self):
-        self.__smp.initiate_pairing()
+    def pairing(self, pairing=None):
+        """Trigger a pairing according to provided parameters.
+        Default parameters will be used if pairing parameter is None.
+        """
+        self.__smp.initiate_pairing(parameters=pairing)
 
     def set_disconnect_cb(self, callback):
         """Set disconnection callback.

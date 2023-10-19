@@ -3,6 +3,7 @@ from whad.common.monitors import WiresharkMonitor
 from whad.ble.profile.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
+from whad.ble.stack.smp import Pairing, IOCAP_NOINPUT_NOOUTPUT
 from whad.device.uart import WhadDevice
 from time import sleep
 import sys
@@ -41,4 +42,6 @@ print('Press a key to update device name')
 input()
 my_profile.device.device_name.value = b'TestDeviceChanged'
 input()
+print("Press a key to request pairing")
+periph.pairing()
 input()

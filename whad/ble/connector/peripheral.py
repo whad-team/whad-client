@@ -15,7 +15,7 @@ from whad.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
 from whad.ble.stack.gatt import GattServer, GattClientServer
 from whad.ble.stack.att import ATTLayer
-from whad.ble.stack.smp import CryptographicDatabase
+from whad.ble.stack.smp import CryptographicDatabase, Pairing
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.device import PeripheralDevice
 from whad.protocol.ble.ble_pb2 import BleDirection
@@ -36,7 +36,7 @@ class Peripheral(BLE):
     defined by a specific profile.
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, stack=BleStack, security_database=None):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, stack=BleStack, pairing=Pairing(), security_database=None):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -72,6 +72,9 @@ class Peripheral(BLE):
             logger.info('Peripheral will use the provided security database.')
             self.__security_database = security_database
 
+        # Initiate pairing parameters
+        self.__pairing_parameters = pairing
+
         # Check if device accepts peripheral mode
         if not self.can_be_peripheral():
             logger.info('Capability MasterRole not supported by this WHAD device')
@@ -90,6 +93,11 @@ class Peripheral(BLE):
             if existing_connection is not None:
                 self.on_connected(existing_connection)
 
+
+    def get_pairing_parameters(self):
+        """Returns the provided pairing parameters, if any.
+        """
+        return self.__pairing_parameters
 
     def send_data_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None) -> bool:
         """Send a PDU to the central device this peripheral device is connected to.
@@ -142,6 +150,14 @@ class Peripheral(BLE):
         if self.connection is not None:
             return self.connection.smp
         return None
+
+    def pairing(self, pairing=None):
+        # TODO: not working for some reason
+        if self.smp is None:
+            return False
+        if pairing is not None:
+            self.__pairing_parameters = pairing
+        self.smp.request_pairing(self.__pairing_parameters)
 
     @property
     def gatt(self):
