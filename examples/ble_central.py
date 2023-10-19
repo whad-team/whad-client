@@ -5,7 +5,8 @@ from time import sleep
 from scapy.all import BTLE_DATA, ATT_Hdr, L2CAP_Hdr, ATT_Read_Request, ATT_Write_Request, ATT_Error_Response, BTLE_EMPTY_PDU, BTLE_CTRL, LL_ENC_REQ
 import logging
 
-logging.getLogger('whad.ble.stack.smp').setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger('whad.ble.stack.smp').setLevel(logging.INFO)
 
 def show(packet):
     print(packet.metadata, repr(packet))
@@ -15,7 +16,7 @@ central.attach_callback(show)
 
 print("New connection")
 #print('Using device: %s' % central.device.device_id)
-device = central.connect('48:7F:38:3F:A6:E2', random=True)#, random=False, hop_interval=56, channel_map=0x00000300)
+device = central.connect('4B:71:09:74:A7:F1', random=True)#, random=False, hop_interval=56, channel_map=0x00000300)
 # Discover
 device.discover()
 for service in device.services():

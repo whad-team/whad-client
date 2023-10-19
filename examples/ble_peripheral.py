@@ -11,7 +11,7 @@ from whad.ble.profile import read, written, subscribed
 from struct import pack, unpack
 
 import logging
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 
 NAME = 'WHAD BLE Peripheral Guess Demo'
 
@@ -98,12 +98,17 @@ if __name__ == '__main__':
     print(f'======== {NAME} ===========')
     my_profile = MyPeripheral() #GenericProfile(from_json="lightbulb2.json")
     periph = Peripheral(WhadDevice.create('hci0'), profile=my_profile)
-    #periph.attach_callback(callback=show)
+    periph.attach_callback(callback=show)
     periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
         AdvCompleteLocalName(b'Guess Me!'),
         AdvFlagsField()
     ))
-    
+
     #update_number()
+    print('Press a key to trigger a pairing')
+    input()
+    periph.smp.request_pairing()
     print('Press a key to QUIT')
     input()
+    while True:
+        pass
