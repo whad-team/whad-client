@@ -196,15 +196,10 @@ class Central(BLE):
 
         self.__stack.on_connection(
             connection_data.conn_handle,
-            BDAddress.from_bytes(
-                connection_data.initiator,
-                addr_type=connection_data.init_addr_type
-            ),
-            BDAddress.from_bytes(
-                connection_data.advertiser,
-                connection_data.adv_addr_type
-            )
+            self.__local,
+            self.__target
         )
+
 
     def on_disconnected(self, disconnection_data):
         """Callback method to handle disconnection event.
@@ -280,6 +275,15 @@ class Central(BLE):
         # Configure SMP layer
         # we set the security database
         self.connection.smp.set_security_database(self.__security_database)
+
+        # Check if we got a matching LTK
+        crypto_material = self.security_database.get(address=self.__target)
+
+        if crypto_material is not None and crypto_material.has_ltk():
+            self.__stack.get_layer('ll').state.register_encryption_key(
+                connection.conn_handle,
+                crypto_material.ltk.value
+            )
 
         # Notify peripheral about this connection
         self.__peripheral.on_connect(self.connection.conn_handle)

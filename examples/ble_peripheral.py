@@ -107,8 +107,6 @@ if __name__ == '__main__':
     #update_number()
     print('Press a key to trigger a pairing')
     input()
-    periph.smp.request_pairing()
-    print('Press a key to QUIT')
-    input()
+    periph.pairing()
     while True:
         pass

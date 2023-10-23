@@ -20,7 +20,7 @@ from whad.ble.profile import GenericProfile
 from whad.ble.profile.device import PeripheralDevice
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
-
+from time import sleep
 
 from binascii import hexlify
 
@@ -152,12 +152,21 @@ class Peripheral(BLE):
         return None
 
     def pairing(self, pairing=None):
-        # TODO: not working for some reason
         if self.smp is None:
             return False
         if pairing is not None:
             self.__pairing_parameters = pairing
-        self.smp.request_pairing(self.__pairing_parameters)
+
+        if not self.smp.request_pairing(self.__pairing_parameters):
+            return False
+
+        while not self.smp.is_pairing_done():
+            sleep(0.1)
+            if self.smp.is_pairing_failed():
+                return False
+
+        self.smp.reset_state()
+        return True
 
     @property
     def gatt(self):
@@ -254,6 +263,17 @@ class Peripheral(BLE):
         # Configure SMP layer
         # we set the security database
         self.connection.smp.set_security_database(self.__security_database)
+
+
+        # Check if we got a matching LTK
+        crypto_material = self.security_database.get(address=self.__target)
+
+        if crypto_material is not None and crypto_material.has_ltk():
+            self.__stack.get_layer('ll').state.register_encryption_key(
+                conn_handle,
+                crypto_material.ltk.value
+            )
+
         # we indicate that we are a responder
         self.connection.smp.set_responder_role()
 

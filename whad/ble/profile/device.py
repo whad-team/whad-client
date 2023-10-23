@@ -40,6 +40,9 @@ from whad.ble.profile import GenericProfile
 from whad.ble.stack.att.constants import BleAttProperties
 from whad.ble.profile.attribute import UUID
 
+from struct import unpack
+from time import sleep
+
 logger = logging.getLogger(__name__)
 
 class PeripheralCharacteristicDescriptor:
@@ -457,6 +460,7 @@ class PeripheralDevice(GenericProfile):
         """
         self.__gatt = gatt_client
         self.__smp = gatt_client.smp
+        self.__ll = gatt_client.get_layer('ll')
         self.__conn_handle = conn_handle
         self.__central = central
         self.__disconnect_cb = None
@@ -470,11 +474,38 @@ class PeripheralDevice(GenericProfile):
         return self.__conn_handle
 
 
+    def start_encryption(self):
+        security_database = self.__smp.security_database
+
+
+        crypto_material = security_database.get(address=self.__central.target_peer)
+        conn_handle = self.__smp.get_layer('l2cap').state.conn_handle
+        if crypto_material is not None and crypto_material.has_ltk():
+            print(
+                conn_handle,
+                crypto_material.ltk.rand,
+                crypto_material.ltk.ediv
+            )
+            self.__ll.start_encryption(
+                conn_handle,
+                unpack('>Q', crypto_material.ltk.rand)[0],
+                crypto_material.ltk.ediv
+            )
+
     def pairing(self, pairing=None):
         """Trigger a pairing according to provided parameters.
         Default parameters will be used if pairing parameter is None.
         """
-        self.__smp.initiate_pairing(parameters=pairing)
+        if not self.__smp.initiate_pairing(parameters=pairing):
+            return False
+
+        while not self.__smp.is_pairing_done():
+            sleep(0.1)
+            if self.__smp.is_pairing_failed():
+                return False
+
+        self.__smp.reset_state()
+        return True
 
     def set_disconnect_cb(self, callback):
         """Set disconnection callback.
