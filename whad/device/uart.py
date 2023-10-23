@@ -48,8 +48,9 @@ class UartDevice(WhadDevice):
         '''
         supported_uart_devices = (
             (0xc0ff, 0xeeee, "WHAD", "ButteRFly dongle"), # Butterfly Dongle
-            (0x303A, None, None, None), # Espressif ESP-32 board
+            (0x303A, None, None, None),   # Espressif ESP-32 board
             (0x10C4, 0xEA60, None, None), # Espressif ESP-32 CP2102 board
+            (0x0483, 0x374e, None, None), # Nucleo WL55
         )
         devices = []
         for uart_dev in comports():
