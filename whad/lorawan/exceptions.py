@@ -20,3 +20,26 @@ class InvalidDataRate(Exception):
 class NotStartedException(Exception):
     def __init__(self):
         super().__init__()
+
+class BadEuiFormat(Exception):
+    def __init__(self):
+        super().__init__()
+
+class BadMICError(Exception):
+    def __init__(self):
+        super().__init__()
+
+class MissingKeyError(Exception):
+    def __init__(self, keyname):
+        super().__init__()
+        self.keyname = keyname
+
+    def __repr__(self):
+        return 'MissingKeyError(%s)' % self.keyname
+    
+class InvalidNodeRegistryError(Exception):
+    def __init__(self, registry_path):
+        self.registry_path = registry_path
+
+    def __repr__(self):
+        return 'InvalidNodeRegistryError(path="%s")' % self.registry_path

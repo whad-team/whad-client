@@ -46,7 +46,7 @@ class LoRaWAN(LoRa):
         self.uplink()
 
 
-    def reconfigure(self, channel: ChannelModParams, crc: bool = True):
+    def reconfigure(self, channel: ChannelModParams, crc: bool = True, invert_iq : bool = False):
         '''Reconfigure hardware with provided parameters.
 
         :param channel: Target channel modulation parameters.
@@ -66,6 +66,7 @@ class LoRaWAN(LoRa):
         self.sf = channel.spreading_factor
         self.bw = channel.bandwidth
         self.preamble_length = 8
+        self.invert_iq = invert_iq
         logger.debug('Enabling CRC: %s' % crc)
         self.enable_crc(crc)
         self.enable_explicit_mode(True)
@@ -83,6 +84,7 @@ class LoRaWAN(LoRa):
         '''
         self.__current_channel = self.__channel_plan.pick_channel()
         self.reconfigure(self.__current_channel)
+        logger.debug('TX channel: %s' % self.__current_channel)
 
     def rx1(self):
         '''Configure hardware to listen on RX1.
@@ -93,7 +95,7 @@ class LoRaWAN(LoRa):
 
         # Change hardware configuration only if needed
         if rx1_channel != self.__current_channel or self.crc_enabled:
-            self.reconfigure(rx1_channel, crc=False)
+            self.reconfigure(rx1_channel, crc=False, invert_iq=True)
 
     def rx2(self):
         '''Configure hardware to listen on RX2.
@@ -103,7 +105,7 @@ class LoRaWAN(LoRa):
 
         # Change hardware configuration only if needed
         if rx2_channel != self.__current_channel or self.crc_enabled:
-            self.reconfigure(rx2_channel, crc=False)
+            self.reconfigure(rx2_channel, crc=False, invert_iq=True)
 
 
     def start(self, coding_rate: int=45):
@@ -125,24 +127,22 @@ class LoRaWAN(LoRa):
         self.__started = False
 
 
-    def send(self, packet, timestamp=0):
-        '''Send a LoRaWAN frame
+    def send(self, packet, timestamp: float = None):
+        '''Send a LoRaWAN frame with current LoRa modulation parameters.
         '''
         # Make sure hardware has been started
         if not self.__started:
             raise NotStartedException
-        
-        # Hardware is running, pick a TX channel and reconfigure
-        tx_channel = self.__channel_plan.pick_channel()
-        logger.debug('TX channel: %s' % tx_channel)
-        self.reconfigure(tx_channel)
 
         # Send LoRaWAN frame
-        if timestamp > 0:
-            logger.debug('Programming packet %s at %d' % (hexlify(bytes(packet)), timestamp))
+        if timestamp is not None:
+            logger.debug('Programming packet %s at %f' % (hexlify(bytes(packet)), timestamp))
+            pkt_id = super().schedule_send(packet, timestamp)
+            logger.debug('packet id is %d' % pkt_id)
+            return pkt_id
         else:
             logger.debug('Sending packet %s' % hexlify(bytes(packet)))
-        super().send(packet, timestamp=timestamp)
+            super().send(packet)
 
 
     def on_packet(self, packet):

@@ -124,9 +124,9 @@ class ChannelPlan(object):
 
         for channel in channels:
             if isinstance(channel, Downlink):
-                self.__uplink_channels[channel.number] = channel
-            else: 
                 self.__downlink_channels[channel.number] = channel
+            else: 
+                self.__uplink_channels[channel.number] = channel
 
     def get_rx1(self, chan_number: int) -> ChannelModParams:
         '''Retrieve RX1 channel based on TX channel.
@@ -218,10 +218,10 @@ class ChannelPlan(object):
             channel = self.__uplink_channels[chan_index]
             if channel.data_rate < len(self.__datarates):
                 return ChannelModParams(
-                    self.__rx2.frequency,
-                    self.__rx2.data_rate,
-                    self.__datarates[self.__rx2.data_rate].spreading_factor,
-                    self.__datarates[self.__rx2.data_rate].bandwidth,
+                    channel.frequency,
+                    channel.data_rate,
+                    self.__datarates[channel.data_rate].spreading_factor,
+                    self.__datarates[channel.data_rate].bandwidth,
                     channel.number
                 )
             else:
