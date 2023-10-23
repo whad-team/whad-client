@@ -37,7 +37,7 @@ class Peripheral(BLE):
     defined by a specific profile.
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, stack=BleStack):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, public=True, stack=BleStack):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -46,6 +46,13 @@ class Peripheral(BLE):
         :type   profile:    :class:`whad.ble.profile.GenericProfile`
         :param  adv_data:   Advertisement data
         :type   adv_data:   :class:`whad.ble.profile.advdata.AdvDataFieldList`
+        :param  scan_data:  Advertisement data sent in Scan Response
+        :type   scan_data:  :class:`whad.ble.profile.advdata.AdvDataFieldList`
+        :param  bd_address: Bluetooth Device address to use
+        :type   bd_address: str
+        :param  public:     Set to True to use a public Bluetooth Device address, False to use a random one
+        :type   public:     bool
+        :param  stack:      Bluetooth Low Energy stack to use, :class:`whad.ble.stack.BleStack` by default
         """
         super().__init__(device)
 
@@ -73,7 +80,7 @@ class Peripheral(BLE):
             # Set bd address if provided
             if bd_address is not None:
                 logger.info('Set BD address to %s' % bd_address)
-                self.set_bd_address(bd_address)
+                self.set_bd_address(bd_address, public=public)
 
             # Enable peripheral mode
             logger.info('Enable peripheral mode with advertising data: %s' % adv_data)
