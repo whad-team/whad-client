@@ -483,12 +483,12 @@ class PeripheralDevice(GenericProfile):
         if crypto_material is not None and crypto_material.has_ltk():
             print(
                 conn_handle,
-                crypto_material.ltk.rand,
+                crypto_material.ltk.rand[::-1],
                 crypto_material.ltk.ediv
             )
             self.__ll.start_encryption(
                 conn_handle,
-                unpack('>Q', crypto_material.ltk.rand)[0],
+                unpack('>Q', crypto_material.ltk.rand[::-1])[0],
                 crypto_material.ltk.ediv
             )
 

@@ -96,6 +96,7 @@ class HCIDevice(VirtualDevice):
         self.__timeout = 1.0
         self._connected = False
         self._active_handles = []
+        self._waiting_disconnect = False
 
     @property
     def identifier(self):
@@ -174,6 +175,8 @@ class HCIDevice(VirtualDevice):
                             self._send_whad_message(message)
                     # If the connection is stopped and peripheral mode is started,
                     # automatically re-enable advertising based on cached data
+                    if HCI_Event_Disconnection_Complete in event:
+                        self._waiting_disconnect = False
                     if HCI_Event_Disconnection_Complete in event and self.__internal_state == HCIInternalState.PERIPHERAL:
                         # If advertising was not enabled, skip
                         if not self._advertising:
@@ -470,6 +473,9 @@ class HCIDevice(VirtualDevice):
         Establish a disconnection using HCI device.
         """
         response = self._write_command(HCI_Cmd_Disconnect(handle=handle))
+        self._waiting_disconnect = True
+        while self._waiting_disconnect:
+            sleep(0.1)
         return response is not None and response.status == 0x00
 
     def _set_advertising_data(self, data, wait_response=True):
@@ -536,6 +542,12 @@ class HCIDevice(VirtualDevice):
             )
             self.__converter.pending_key_request = False
         else:
+            HCI_Cmd_LE_Start_Encryption_Request(
+                handle=handle,
+                ltk=key[::-1],
+                rand=rand,
+                ediv=unpack('<H', ediv)[0]
+            ).show()
             response = self._write_command(
                 HCI_Cmd_LE_Start_Encryption_Request(
                     handle=handle,
@@ -653,7 +665,7 @@ class HCIDevice(VirtualDevice):
            (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
             try:
                 hci_packets = self.__converter.process_message(message)
-                
+
                 if hci_packets is not None:
                     logger.debug('sending HCI packets ...')
                     success = True

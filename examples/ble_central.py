@@ -14,18 +14,22 @@ def show(packet):
     print(packet.metadata, repr(packet))
 
 security_database = CryptographicDatabase()
+'''
 security_database.add(
-    BDAddress('42:b6:bb:60:8d:b3', random=True),
-    ltk=bytes.fromhex("fbd94c40777bf8bd81f806671d80b9a8"),
-    rand=bytes.fromhex("3b0f231f60c59624")[::-1],
-    ediv=0xd299
-)
+    BDAddress('F8:9E:94:56:35:91', random=False),
+    ltk=bytes.fromhex("fe393733041a1e50144c8b7f9c0f7a07"),
+    rand=bytes.fromhex("0000000000000000"),
+    ediv=0x0000
+)'''
 central = Central(WhadDevice.create('hci0'), security_database=security_database)
 central.attach_callback(show)
-'''
+
+
+
 print("New connection")
 #print('Using device: %s' % central.device.device_id)
-device = central.connect('42:b6:bb:60:8d:b3', random=True)#, random=False, hop_interval=56, channel_map=0x00000300)
+
+device = central.connect('F8:9E:94:56:35:91', random=False)#, random=False, hop_interval=56, channel_map=0x00000300)
 # Discover
 device.discover()
 for service in device.services():
@@ -34,8 +38,6 @@ for service in device.services():
         print(' + Characteristic %s' % charac.uuid)
 
 # Read Device Name characteristic (Generic Access Service)
-c = device.get_characteristic(UUID('1800'), UUID('2A00'))
-print(c.value)
 input()
 
 print(device.pairing(pairing=
@@ -43,7 +45,11 @@ print(device.pairing(pairing=
         lesc=False,
         mitm=False,
         bonding=True,
-        iocap=IOCAP_NOINPUT_NOOUTPUT
+        iocap=IOCAP_NOINPUT_NOOUTPUT,
+        sign_key=False,
+        id_key=False,
+        link_key=False,
+        enc_key=True
     )
 ))
 
@@ -56,8 +62,7 @@ except KeyboardInterrupt:
 # Disconnect
 print("Stop connection")
 device.disconnect()
-'''
-device2 = central.connect('42:b6:bb:60:8d:b3', random=True)#, random=False, hop_interval=56, channel_map=0x00000300)
+device2 = central.connect('F8:9E:94:56:35:91', random=False)#, random=False, hop_interval=56, channel_map=0x00000300)
 device2.start_encryption()
 try:
     while True:

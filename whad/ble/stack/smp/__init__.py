@@ -2109,7 +2109,7 @@ class SMPLayer(Layer):
                 self.send_data(rand_value)
 
                 # Compute our stk
-                self.__stk = s1(
+                self.state.stk = s1(
                     self.state.tk,
                     self.state.responder.rand,
                     self.state.initiator.rand
@@ -2127,9 +2127,9 @@ class SMPLayer(Layer):
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
                 # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.__stk)
+                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.stk)
 
-                #self.__l2cap.connection.set_stk(self.__stk)
+                #self.__l2cap.connection.set_stk(self.state.stk)
 
             else:
                 logger.info('Invalid Initiator CONFIRM value (expected %s)' % (
@@ -2293,7 +2293,7 @@ class SMPLayer(Layer):
                 logger.info('Responder CONFIRM successfully verified')
 
                 # Compute our stk
-                self.__stk = s1(
+                self.state.stk = s1(
                     self.state.tk,
                     self.state.responder.rand,
                     self.state.initiator.rand
@@ -2312,7 +2312,7 @@ class SMPLayer(Layer):
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
                 # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.__stk)
+                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.stk)
 
                 self.get_layer('ll').start_encryption(conn_handle, 0, 0)
 
@@ -2360,7 +2360,7 @@ class SMPLayer(Layer):
 
         elif self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_RECVD:
             logger.info('[smp] Channel is now successfully encrypted')
-            if self.state.initiator.is_key_distribution_complete():
+            if self.state.responder.is_key_distribution_complete():
                 self.perform_key_distribution()
 
         elif self.state.state == SecurityManagerState.STATE_LESC_DHK_CHECK_SENT:
@@ -2461,55 +2461,55 @@ class SMPLayer(Layer):
 
     def on_encryption_information(self, encryption_information):
         if self.is_initiator():
-            self.state.initiator.indicate_ltk_distribution(encryption_information.ltk)
-            if self.state.initiator.is_key_distribution_complete():
-                self.perform_key_distribution()
-        else:
             self.state.responder.indicate_ltk_distribution(encryption_information.ltk)
             if self.state.responder.is_key_distribution_complete():
+                self.perform_key_distribution()
+        else:
+            self.state.initiator.indicate_ltk_distribution(encryption_information.ltk)
+            if self.state.initiator.is_key_distribution_complete():
                 self.pairing_done()
 
     def on_master_identification(self, master_identification):
         if self.is_initiator():
-            self.state.initiator.indicate_rand_ediv_distribution(master_identification.rand, master_identification.ediv)
-            if self.state.initiator.is_key_distribution_complete():
-                self.perform_key_distribution()
-        else:
             self.state.responder.indicate_rand_ediv_distribution(master_identification.rand, master_identification.ediv)
             if self.state.responder.is_key_distribution_complete():
+                self.perform_key_distribution()
+        else:
+            self.state.initiator.indicate_rand_ediv_distribution(master_identification.rand, master_identification.ediv)
+            if self.state.initiator.is_key_distribution_complete():
                 self.pairing_done()
 
 
     def on_identity_information(self, identity_information):
         if self.is_initiator():
-            self.state.initiator.indicate_irk_distribution(identity_information.irk)
-            if self.state.initiator.is_key_distribution_complete():
-                self.perform_key_distribution()
-        else:
             self.state.responder.indicate_irk_distribution(identity_information.irk)
             if self.state.responder.is_key_distribution_complete():
+                self.perform_key_distribution()
+        else:
+            self.state.initiator.indicate_irk_distribution(identity_information.irk)
+            if self.state.initiator.is_key_distribution_complete():
                 self.pairing_done()
 
 
     def on_identity_address_information(self, identity_address_information):
         if self.is_initiator():
-            self.state.initiator.indicate_address_distribution(identity_address_information.address, identity_address_information.atype)
-            if self.state.initiator.is_key_distribution_complete():
-                self.perform_key_distribution()
-        else:
             self.state.responder.indicate_address_distribution(identity_address_information.address, identity_address_information.atype)
             if self.state.responder.is_key_distribution_complete():
+                self.perform_key_distribution()
+        else:
+            self.state.initiator.indicate_address_distribution(identity_address_information.address, identity_address_information.atype)
+            if self.state.initiator.is_key_distribution_complete():
                 self.pairing_done()
 
 
     def on_signing_information(self, signing_information):
         if self.is_initiator():
-            self.state.initiator.indicate_csrk_distribution(signing_information.csrk)
-            if self.state.initiator.is_key_distribution_complete():
-                self.perform_key_distribution()
-        else:
             self.state.responder.indicate_csrk_distribution(signing_information.csrk)
             if self.state.responder.is_key_distribution_complete():
+                self.perform_key_distribution()
+        else:
+            self.state.initiator.indicate_csrk_distribution(signing_information.csrk)
+            if self.state.initiator.is_key_distribution_complete():
                 self.pairing_done()
 
     def is_pairing_done(self):
@@ -2532,54 +2532,8 @@ class SMPLayer(Layer):
             if self.state.csrk is not None:
                 logger.info("Distributed CSRK: %s" % self.state.csrk.hex())
 
-            if self.state.initiator.ltk is not None:
-                logger.info("Received LTK: %s" %  self.state.initiator.ltk.hex())
-            if self.state.initiator.random is not None:
-                logger.info("Received RAND: %s" % self.state.initiator.random.hex())
-            if self.state.initiator.ediv is not None:
-                logger.info("Received EDIV: %s" % hex(self.state.initiator.ediv))
-            if self.state.initiator.irk is not None:
-                logger.info("Received IRK: %s" % self.state.initiator.irk.hex())
-            if self.state.initiator.csrk is not None:
-                logger.info("Received CSRK: %s" % self.state.initiator.csrk.hex())
-
-            # If bonding is enabled, we register in the security DB
-            # both our own and the peer cryptographic material
-            if self.pairing_parameters.bonding:
-                logger.info("Saving cryptographic materials in security database")
-                self.state.database.add(
-                    self.state.initiator.bd_address,
-                    authenticated=self.is_pairing_authenticated(),
-                    ltk=self.state.ltk,
-                    rand=self.state.rand,
-                    ediv=self.state.ediv,
-                    irk=self.state.irk,
-                    csrk=self.state.csrk
-                )
-                self.state.database.add(
-                    self.state.responder.bd_address,
-                    authenticated=self.is_pairing_authenticated(),
-                    ltk=self.state.initiator.ltk,
-                    rand=self.state.initiator.random,
-                    ediv=self.state.initiator.ediv,
-                    irk=self.state.initiator.irk,
-                    csrk=self.state.initiator.csrk
-                )
-
-        else:
-            if self.state.ltk is not None:
-                logger.info("Distributed LTK: %s" % self.state.ltk.hex())
-            if self.state.rand is not None:
-                logger.info("Distributed RAND: %s" % self.state.rand.hex())
-            if self.state.ediv is not None:
-                logger.info("Distributed EDIV: %s" % hex(self.state.ediv))
-            if self.state.irk is not None:
-                logger.info("Distributed IRK: %s" % self.state.irk.hex())
-            if self.state.csrk is not None:
-                logger.info("Distributed CSRK: %s" % self.state.csrk.hex())
-
             if self.state.responder.ltk is not None:
-                logger.info("Received LTK: %s" % self.state.responder.ltk.hex())
+                logger.info("Received LTK: %s" %  self.state.responder.ltk.hex())
             if self.state.responder.random is not None:
                 logger.info("Received RAND: %s" % self.state.responder.random.hex())
             if self.state.responder.ediv is not None:
@@ -2594,6 +2548,52 @@ class SMPLayer(Layer):
             if self.pairing_parameters.bonding:
                 logger.info("Saving cryptographic materials in security database")
                 self.state.database.add(
+                    self.state.initiator.bd_address,
+                    authenticated=self.is_pairing_authenticated(),
+                    ltk=self.state.ltk,
+                    rand=self.state.rand,
+                    ediv=self.state.ediv,
+                    irk=self.state.irk,
+                    csrk=self.state.csrk
+                )
+                self.state.database.add(
+                    self.state.responder.bd_address,
+                    authenticated=self.is_pairing_authenticated(),
+                    ltk=self.state.responder.ltk,
+                    rand=self.state.responder.random,
+                    ediv=self.state.responder.ediv,
+                    irk=self.state.responder.irk,
+                    csrk=self.state.responder.csrk
+                )
+
+        else:
+            if self.state.ltk is not None:
+                logger.info("Distributed LTK: %s" % self.state.ltk.hex())
+            if self.state.rand is not None:
+                logger.info("Distributed RAND: %s" % self.state.rand.hex())
+            if self.state.ediv is not None:
+                logger.info("Distributed EDIV: %s" % hex(self.state.ediv))
+            if self.state.irk is not None:
+                logger.info("Distributed IRK: %s" % self.state.irk.hex())
+            if self.state.csrk is not None:
+                logger.info("Distributed CSRK: %s" % self.state.csrk.hex())
+
+            if self.state.initiator.ltk is not None:
+                logger.info("Received LTK: %s" % self.state.initiator.ltk.hex())
+            if self.state.initiator.random is not None:
+                logger.info("Received RAND: %s" % self.state.initiator.random.hex())
+            if self.state.initiator.ediv is not None:
+                logger.info("Received EDIV: %s" % hex(self.state.initiator.ediv))
+            if self.state.initiator.irk is not None:
+                logger.info("Received IRK: %s" % self.state.initiator.irk.hex())
+            if self.state.initiator.csrk is not None:
+                logger.info("Received CSRK: %s" % self.state.initiator.csrk.hex())
+
+            # If bonding is enabled, we register in the security DB
+            # both our own and the peer cryptographic material
+            if self.pairing_parameters.bonding:
+                logger.info("Saving cryptographic materials in security database")
+                self.state.database.add(
                     self.state.responder.bd_address,
                     authenticated=self.is_pairing_authenticated(),
                     ltk=self.state.ltk,
@@ -2605,11 +2605,11 @@ class SMPLayer(Layer):
                 self.state.database.add(
                     self.state.initiator.bd_address,
                     authenticated=self.is_pairing_authenticated(),
-                    ltk=self.state.responder.ltk,
-                    rand=self.state.responder.random,
-                    ediv=self.state.responder.ediv,
-                    irk=self.state.responder.irk,
-                    csrk=self.state.responder.csrk
+                    ltk=self.state.initiator.ltk,
+                    rand=self.state.initiator.random,
+                    ediv=self.state.initiator.ediv,
+                    irk=self.state.initiator.irk,
+                    csrk=self.state.initiator.csrk
                 )
 
         self.state.state = SecurityManagerState.STATE_PAIRING_DONE
