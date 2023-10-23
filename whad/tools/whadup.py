@@ -116,10 +116,11 @@ PHY_COMMANDS = {
     PhyCommand.Sniff: "Sniff: can receive arbitrary packets",
     PhyCommand.Send: "Send: can transmit arbitrary packets",
     PhyCommand.SendRaw: "SendRaw: can transmit arbitrary IQ streams" ,
+    PhyCommand.ScheduleSend: "ScheduleSend: can schedule a packet to be sent at a specific time",
     PhyCommand.Jam: "Jam: can jam a physical medium",
     PhyCommand.Monitor: "Monitor: can monitor a physical medium",
     PhyCommand.Start: "Start: can start depending on the current mode",
-    PhyCommand.Stop: "Stop: can stop depending on the current mode"
+    PhyCommand.Stop: "Stop: can stop depending on the current mode",
 }
 COMMANDS = {
     WhadDomain.BtLE: BLE_COMMANDS,
