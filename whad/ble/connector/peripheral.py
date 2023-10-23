@@ -254,7 +254,7 @@ class PeripheralClient(Peripheral):
     both GATT server and client roles.
     '''
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, stack=BleStack):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, public=True, stack=BleStack):
         super().__init__(
             device,
             existing_connection=existing_connection,
@@ -262,6 +262,7 @@ class PeripheralClient(Peripheral):
             adv_data=adv_data,
             scan_data=scan_data,
             bd_address=bd_address,
+            public=public,
             stack=stack
         )
 
