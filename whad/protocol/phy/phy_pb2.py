@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x16protocol/phy/phy.proto\x12\x03phy\"\"\n\x13SetASKModulationCmd\x12\x0b\n\x03ook\x18\x01 \x01(\x08\"(\n\x13SetFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14Set4FSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14SetGFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"(\n\x13SetMSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"\x16\n\x14SetBPSKModulationCmd\"+\n\x14SetQPSKModulationCmd\x12\x13\n\x0boffset_qpsk\x18\x01 \x01(\x08\"\xc6\x01\n\x14SetLoRaModulationCmd\x12\x11\n\tbandwidth\x18\x01 \x01(\r\x12\x32\n\x10spreading_factor\x18\x02 \x01(\x0e\x32\x18.phy.LoRaSpreadingFactor\x12(\n\x0b\x63oding_rate\x18\x03 \x01(\x0e\x32\x13.phy.LoRaCodingRate\x12\x17\n\x0fpreamble_length\x18\x04 \x01(\r\x12\x12\n\nenable_crc\x18\x05 \x01(\x08\x12\x10\n\x08\x65xplicit\x18\x06 \x01(\x08\"\x1c\n\x1aGetSupportedFrequenciesCmd\"$\n\x0fSetFrequencyCmd\x12\x11\n\tfrequency\x18\x01 \x01(\r\"\x1e\n\x0eSetDataRateCmd\x12\x0c\n\x04rate\x18\x01 \x01(\r\"7\n\x10SetEndiannessCmd\x12#\n\nendianness\x18\x01 \x01(\x0e\x32\x0f.phy.Endianness\"/\n\rSetTXPowerCmd\x12\x1e\n\x08tx_power\x18\x01 \x01(\x0e\x32\x0c.phy.TXPower\"\'\n\x10SetPacketSizeCmd\x12\x13\n\x0bpacket_size\x18\x01 \x01(\r\"#\n\x0eSetSyncWordCmd\x12\x11\n\tsync_word\x18\x01 \x01(\x0c\"0\n\x08SniffCmd\x12\x16\n\tiq_stream\x18\x01 \x01(\x08H\x00\x88\x01\x01\x42\x0c\n\n_iq_stream\",\n\x07SendCmd\x12\x0e\n\x06packet\x18\x01 \x01(\x0c\x12\x11\n\ttimestamp\x18\x02 \x01(\r\"\x1c\n\nSendRawCmd\x12\x0e\n\x02iq\x18\x01 \x03(\x05\x42\x02\x10\x01\"\n\n\x08StartCmd\"\t\n\x07StopCmd\"(\n\x06JamCmd\x12\x1e\n\x04mode\x18\x01 \x01(\x0e\x32\x10.phy.JammingMode\"\x0c\n\nMonitorCmd\"u\n\x0ePacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"\x88\x01\n\x11RawPacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x12\x0e\n\x02iq\x18\x05 \x03(\x05\x42\x02\x10\x01\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"\x1b\n\x06Jammed\x12\x11\n\ttimestamp\x18\x01 \x01(\r\"9\n\x10MonitoringReport\x12\x11\n\ttimestamp\x18\x01 \x01(\r\x12\x12\n\x06report\x18\x02 \x03(\rB\x02\x10\x01\"\x90\x01\n\x18SupportedFrequencyRanges\x12\x46\n\x10\x66requency_ranges\x18\x01 \x03(\x0b\x32,.phy.SupportedFrequencyRanges.FrequencyRange\x1a,\n\x0e\x46requencyRange\x12\r\n\x05start\x18\x01 \x01(\r\x12\x0b\n\x03\x65nd\x18\x02 \x01(\r\"\x80\t\n\x07Message\x12+\n\x07mod_ask\x18\x01 \x01(\x0b\x32\x18.phy.SetASKModulationCmdH\x00\x12+\n\x07mod_fsk\x18\x02 \x01(\x0b\x32\x18.phy.SetFSKModulationCmdH\x00\x12-\n\x08mod_gfsk\x18\x03 \x01(\x0b\x32\x19.phy.SetGFSKModulationCmdH\x00\x12-\n\x08mod_bpsk\x18\x04 \x01(\x0b\x32\x19.phy.SetBPSKModulationCmdH\x00\x12-\n\x08mod_qpsk\x18\x05 \x01(\x0b\x32\x19.phy.SetQPSKModulationCmdH\x00\x12-\n\x08mod_4fsk\x18\x06 \x01(\x0b\x32\x19.phy.Set4FSKModulationCmdH\x00\x12+\n\x07mod_msk\x18\x07 \x01(\x0b\x32\x18.phy.SetMSKModulationCmdH\x00\x12=\n\x12get_supported_freq\x18\x08 \x01(\x0b\x32\x1f.phy.GetSupportedFrequenciesCmdH\x00\x12(\n\x08set_freq\x18\t \x01(\x0b\x32\x14.phy.SetFrequencyCmdH\x00\x12\'\n\x08\x64\x61tarate\x18\n \x01(\x0b\x32\x13.phy.SetDataRateCmdH\x00\x12+\n\nendianness\x18\x0b \x01(\x0b\x32\x15.phy.SetEndiannessCmdH\x00\x12&\n\x08tx_power\x18\x0c \x01(\x0b\x32\x12.phy.SetTXPowerCmdH\x00\x12,\n\x0bpacket_size\x18\r \x01(\x0b\x32\x15.phy.SetPacketSizeCmdH\x00\x12(\n\tsync_word\x18\x0e \x01(\x0b\x32\x13.phy.SetSyncWordCmdH\x00\x12\x1e\n\x05sniff\x18\x0f \x01(\x0b\x32\r.phy.SniffCmdH\x00\x12\x1c\n\x04send\x18\x10 \x01(\x0b\x32\x0c.phy.SendCmdH\x00\x12#\n\x08send_raw\x18\x11 \x01(\x0b\x32\x0f.phy.SendRawCmdH\x00\x12\x1e\n\x05start\x18\x12 \x01(\x0b\x32\r.phy.StartCmdH\x00\x12\x1c\n\x04stop\x18\x13 \x01(\x0b\x32\x0c.phy.StopCmdH\x00\x12\x1a\n\x03jam\x18\x14 \x01(\x0b\x32\x0b.phy.JamCmdH\x00\x12\"\n\x07monitor\x18\x15 \x01(\x0b\x32\x0f.phy.MonitorCmdH\x00\x12%\n\x06packet\x18\x16 \x01(\x0b\x32\x13.phy.PacketReceivedH\x00\x12,\n\nraw_packet\x18\x17 \x01(\x0b\x32\x16.phy.RawPacketReceivedH\x00\x12\x1d\n\x06jammed\x18\x18 \x01(\x0b\x32\x0b.phy.JammedH\x00\x12/\n\x0emonitor_report\x18\x19 \x01(\x0b\x32\x15.phy.MonitoringReportH\x00\x12\x37\n\x0esupported_freq\x18\x1a \x01(\x0b\x32\x1d.phy.SupportedFrequencyRangesH\x00\x12-\n\x08mod_lora\x18\x1b \x01(\x0b\x32\x19.phy.SetLoRaModulationCmdH\x00\x42\x05\n\x03msg*\x95\x03\n\nPhyCommand\x12\x14\n\x10SetASKModulation\x10\x00\x12\x14\n\x10SetFSKModulation\x10\x01\x12\x15\n\x11SetGFSKModulation\x10\x02\x12\x15\n\x11SetBPSKModulation\x10\x03\x12\x15\n\x11SetQPSKModulation\x10\x04\x12\x15\n\x11Set4FSKModulation\x10\x05\x12\x14\n\x10SetMSKModulation\x10\x06\x12\x1b\n\x17GetSupportedFrequencies\x10\x07\x12\x10\n\x0cSetFrequency\x10\x08\x12\x0f\n\x0bSetDataRate\x10\t\x12\x11\n\rSetEndianness\x10\n\x12\x0e\n\nSetTXPower\x10\x0b\x12\x11\n\rSetPacketSize\x10\x0c\x12\x0f\n\x0bSetSyncWord\x10\r\x12\t\n\x05Sniff\x10\x0e\x12\x08\n\x04Send\x10\x0f\x12\x0b\n\x07SendRaw\x10\x10\x12\x07\n\x03Jam\x10\x11\x12\x0b\n\x07Monitor\x10\x12\x12\t\n\x05Start\x10\x13\x12\x08\n\x04Stop\x10\x14\x12\x15\n\x11SetLoRaModulation\x10\x15*!\n\nEndianness\x12\x07\n\x03\x42IG\x10\x00\x12\n\n\x06LITTLE\x10\x01*(\n\x07TXPower\x12\x07\n\x03LOW\x10\x00\x12\n\n\x06MEDIUM\x10\x01\x12\x08\n\x04HIGH\x10\x02*+\n\x0bJammingMode\x12\x0e\n\nCONTINUOUS\x10\x00\x12\x0c\n\x08REACTIVE\x10\x01*N\n\x13LoRaSpreadingFactor\x12\x07\n\x03SF7\x10\x00\x12\x07\n\x03SF8\x10\x01\x12\x07\n\x03SF9\x10\x02\x12\x08\n\x04SF10\x10\x03\x12\x08\n\x04SF11\x10\x04\x12\x08\n\x04SF12\x10\x05*8\n\x0eLoRaCodingRate\x12\x08\n\x04\x43R45\x10\x00\x12\x08\n\x04\x43R46\x10\x01\x12\x08\n\x04\x43R47\x10\x02\x12\x08\n\x04\x43R48\x10\x03\x62\x06proto3'
+  serialized_pb=b'\n\x16protocol/phy/phy.proto\x12\x03phy\"&\n\ttimestamp\x12\x0b\n\x03sec\x18\x01 \x01(\r\x12\x0c\n\x04usec\x18\x02 \x01(\r\"\"\n\x13SetASKModulationCmd\x12\x0b\n\x03ook\x18\x01 \x01(\x08\"(\n\x13SetFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14Set4FSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\")\n\x14SetGFSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"(\n\x13SetMSKModulationCmd\x12\x11\n\tdeviation\x18\x01 \x01(\r\"\x16\n\x14SetBPSKModulationCmd\"+\n\x14SetQPSKModulationCmd\x12\x13\n\x0boffset_qpsk\x18\x01 \x01(\x08\"\xd9\x01\n\x14SetLoRaModulationCmd\x12\x11\n\tbandwidth\x18\x01 \x01(\r\x12\x32\n\x10spreading_factor\x18\x02 \x01(\x0e\x32\x18.phy.LoRaSpreadingFactor\x12(\n\x0b\x63oding_rate\x18\x03 \x01(\x0e\x32\x13.phy.LoRaCodingRate\x12\x17\n\x0fpreamble_length\x18\x04 \x01(\r\x12\x12\n\nenable_crc\x18\x05 \x01(\x08\x12\x10\n\x08\x65xplicit\x18\x06 \x01(\x08\x12\x11\n\tinvert_iq\x18\x07 \x01(\x08\"\x1c\n\x1aGetSupportedFrequenciesCmd\"$\n\x0fSetFrequencyCmd\x12\x11\n\tfrequency\x18\x01 \x01(\r\"\x1e\n\x0eSetDataRateCmd\x12\x0c\n\x04rate\x18\x01 \x01(\r\"7\n\x10SetEndiannessCmd\x12#\n\nendianness\x18\x01 \x01(\x0e\x32\x0f.phy.Endianness\"/\n\rSetTXPowerCmd\x12\x1e\n\x08tx_power\x18\x01 \x01(\x0e\x32\x0c.phy.TXPower\"\'\n\x10SetPacketSizeCmd\x12\x13\n\x0bpacket_size\x18\x01 \x01(\r\"#\n\x0eSetSyncWordCmd\x12\x11\n\tsync_word\x18\x01 \x01(\x0c\"0\n\x08SniffCmd\x12\x16\n\tiq_stream\x18\x01 \x01(\x08H\x00\x88\x01\x01\x42\x0c\n\n_iq_stream\"\x19\n\x07SendCmd\x12\x0e\n\x06packet\x18\x01 \x01(\x0c\"\x1c\n\nSendRawCmd\x12\x0e\n\x02iq\x18\x01 \x03(\x05\x42\x02\x10\x01\"D\n\x0fScheduleSendCmd\x12\x0e\n\x06packet\x18\x01 \x01(\x0c\x12!\n\ttimestamp\x18\x02 \x01(\x0b\x32\x0e.phy.timestamp\"<\n\x12SchedulePacketResp\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x11\n\x04\x66ull\x18\x02 \x01(\x08H\x00\x88\x01\x01\x42\x07\n\x05_full\" \n\x12SchedulePacketSent\x12\n\n\x02id\x18\x01 \x01(\x05\"\n\n\x08StartCmd\"\t\n\x07StopCmd\"(\n\x06JamCmd\x12\x1e\n\x04mode\x18\x01 \x01(\x0e\x32\x10.phy.JammingMode\"\x0c\n\nMonitorCmd\"\x85\x01\n\x0ePacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12&\n\ttimestamp\x18\x03 \x01(\x0b\x32\x0e.phy.timestampH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"\x98\x01\n\x11RawPacketReceived\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12&\n\ttimestamp\x18\x03 \x01(\x0b\x32\x0e.phy.timestampH\x01\x88\x01\x01\x12\x0e\n\x06packet\x18\x04 \x01(\x0c\x12\x0e\n\x02iq\x18\x05 \x03(\x05\x42\x02\x10\x01\x42\x07\n\x05_rssiB\x0c\n\n_timestamp\"/\n\nPacketSent\x12!\n\ttimestamp\x18\x01 \x01(\x0b\x32\x0e.phy.timestamp\"+\n\x06Jammed\x12!\n\ttimestamp\x18\x01 \x01(\x0b\x32\x0e.phy.timestamp\"9\n\x10MonitoringReport\x12\x11\n\ttimestamp\x18\x01 \x01(\r\x12\x12\n\x06report\x18\x02 \x03(\rB\x02\x10\x01\"\x90\x01\n\x18SupportedFrequencyRanges\x12\x46\n\x10\x66requency_ranges\x18\x01 \x03(\x0b\x32,.phy.SupportedFrequencyRanges.FrequencyRange\x1a,\n\x0e\x46requencyRange\x12\r\n\x05start\x18\x01 \x01(\r\x12\x0b\n\x03\x65nd\x18\x02 \x01(\r\"\x91\n\n\x07Message\x12+\n\x07mod_ask\x18\x01 \x01(\x0b\x32\x18.phy.SetASKModulationCmdH\x00\x12+\n\x07mod_fsk\x18\x02 \x01(\x0b\x32\x18.phy.SetFSKModulationCmdH\x00\x12-\n\x08mod_gfsk\x18\x03 \x01(\x0b\x32\x19.phy.SetGFSKModulationCmdH\x00\x12-\n\x08mod_bpsk\x18\x04 \x01(\x0b\x32\x19.phy.SetBPSKModulationCmdH\x00\x12-\n\x08mod_qpsk\x18\x05 \x01(\x0b\x32\x19.phy.SetQPSKModulationCmdH\x00\x12-\n\x08mod_4fsk\x18\x06 \x01(\x0b\x32\x19.phy.Set4FSKModulationCmdH\x00\x12+\n\x07mod_msk\x18\x07 \x01(\x0b\x32\x18.phy.SetMSKModulationCmdH\x00\x12=\n\x12get_supported_freq\x18\x08 \x01(\x0b\x32\x1f.phy.GetSupportedFrequenciesCmdH\x00\x12(\n\x08set_freq\x18\t \x01(\x0b\x32\x14.phy.SetFrequencyCmdH\x00\x12\'\n\x08\x64\x61tarate\x18\n \x01(\x0b\x32\x13.phy.SetDataRateCmdH\x00\x12+\n\nendianness\x18\x0b \x01(\x0b\x32\x15.phy.SetEndiannessCmdH\x00\x12&\n\x08tx_power\x18\x0c \x01(\x0b\x32\x12.phy.SetTXPowerCmdH\x00\x12,\n\x0bpacket_size\x18\r \x01(\x0b\x32\x15.phy.SetPacketSizeCmdH\x00\x12(\n\tsync_word\x18\x0e \x01(\x0b\x32\x13.phy.SetSyncWordCmdH\x00\x12\x1e\n\x05sniff\x18\x0f \x01(\x0b\x32\r.phy.SniffCmdH\x00\x12\x1c\n\x04send\x18\x10 \x01(\x0b\x32\x0c.phy.SendCmdH\x00\x12#\n\x08send_raw\x18\x11 \x01(\x0b\x32\x0f.phy.SendRawCmdH\x00\x12\x1e\n\x05start\x18\x12 \x01(\x0b\x32\r.phy.StartCmdH\x00\x12\x1c\n\x04stop\x18\x13 \x01(\x0b\x32\x0c.phy.StopCmdH\x00\x12\x1a\n\x03jam\x18\x14 \x01(\x0b\x32\x0b.phy.JamCmdH\x00\x12\"\n\x07monitor\x18\x15 \x01(\x0b\x32\x0f.phy.MonitorCmdH\x00\x12%\n\x06packet\x18\x16 \x01(\x0b\x32\x13.phy.PacketReceivedH\x00\x12,\n\nraw_packet\x18\x17 \x01(\x0b\x32\x16.phy.RawPacketReceivedH\x00\x12\x1d\n\x06jammed\x18\x18 \x01(\x0b\x32\x0b.phy.JammedH\x00\x12/\n\x0emonitor_report\x18\x19 \x01(\x0b\x32\x15.phy.MonitoringReportH\x00\x12\x37\n\x0esupported_freq\x18\x1a \x01(\x0b\x32\x1d.phy.SupportedFrequencyRangesH\x00\x12-\n\x08mod_lora\x18\x1b \x01(\x0b\x32\x19.phy.SetLoRaModulationCmdH\x00\x12*\n\nsched_send\x18\x1c \x01(\x0b\x32\x14.phy.ScheduleSendCmdH\x00\x12\x30\n\rsched_pkt_rsp\x18\x1d \x01(\x0b\x32\x17.phy.SchedulePacketRespH\x00\x12\x31\n\x0esched_pkt_sent\x18\x1e \x01(\x0b\x32\x17.phy.SchedulePacketSentH\x00\x42\x05\n\x03msg*\xa7\x03\n\nPhyCommand\x12\x14\n\x10SetASKModulation\x10\x00\x12\x14\n\x10SetFSKModulation\x10\x01\x12\x15\n\x11SetGFSKModulation\x10\x02\x12\x15\n\x11SetBPSKModulation\x10\x03\x12\x15\n\x11SetQPSKModulation\x10\x04\x12\x15\n\x11Set4FSKModulation\x10\x05\x12\x14\n\x10SetMSKModulation\x10\x06\x12\x1b\n\x17GetSupportedFrequencies\x10\x07\x12\x10\n\x0cSetFrequency\x10\x08\x12\x0f\n\x0bSetDataRate\x10\t\x12\x11\n\rSetEndianness\x10\n\x12\x0e\n\nSetTXPower\x10\x0b\x12\x11\n\rSetPacketSize\x10\x0c\x12\x0f\n\x0bSetSyncWord\x10\r\x12\t\n\x05Sniff\x10\x0e\x12\x08\n\x04Send\x10\x0f\x12\x0b\n\x07SendRaw\x10\x10\x12\x07\n\x03Jam\x10\x11\x12\x0b\n\x07Monitor\x10\x12\x12\t\n\x05Start\x10\x13\x12\x08\n\x04Stop\x10\x14\x12\x15\n\x11SetLoRaModulation\x10\x15\x12\x10\n\x0cScheduleSend\x10\x16*!\n\nEndianness\x12\x07\n\x03\x42IG\x10\x00\x12\n\n\x06LITTLE\x10\x01*(\n\x07TXPower\x12\x07\n\x03LOW\x10\x00\x12\n\n\x06MEDIUM\x10\x01\x12\x08\n\x04HIGH\x10\x02*+\n\x0bJammingMode\x12\x0e\n\nCONTINUOUS\x10\x00\x12\x0c\n\x08REACTIVE\x10\x01*N\n\x13LoRaSpreadingFactor\x12\x07\n\x03SF7\x10\x00\x12\x07\n\x03SF8\x10\x01\x12\x07\n\x03SF9\x10\x02\x12\x08\n\x04SF10\x10\x03\x12\x08\n\x04SF11\x10\x04\x12\x08\n\x04SF12\x10\x05*8\n\x0eLoRaCodingRate\x12\x08\n\x04\x43R45\x10\x00\x12\x08\n\x04\x43R46\x10\x01\x12\x08\n\x04\x43R47\x10\x02\x12\x08\n\x04\x43R48\x10\x03\x62\x06proto3'
 )
 
 _PHYCOMMAND = _descriptor.EnumDescriptor(
@@ -140,11 +140,16 @@ _PHYCOMMAND = _descriptor.EnumDescriptor(
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='ScheduleSend', index=22, number=22,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=2645,
-  serialized_end=3050,
+  serialized_start=3094,
+  serialized_end=3517,
 )
 _sym_db.RegisterEnumDescriptor(_PHYCOMMAND)
 
@@ -169,8 +174,8 @@ _ENDIANNESS = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3052,
-  serialized_end=3085,
+  serialized_start=3519,
+  serialized_end=3552,
 )
 _sym_db.RegisterEnumDescriptor(_ENDIANNESS)
 
@@ -200,8 +205,8 @@ _TXPOWER = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3087,
-  serialized_end=3127,
+  serialized_start=3554,
+  serialized_end=3594,
 )
 _sym_db.RegisterEnumDescriptor(_TXPOWER)
 
@@ -226,8 +231,8 @@ _JAMMINGMODE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3129,
-  serialized_end=3172,
+  serialized_start=3596,
+  serialized_end=3639,
 )
 _sym_db.RegisterEnumDescriptor(_JAMMINGMODE)
 
@@ -272,8 +277,8 @@ _LORASPREADINGFACTOR = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3174,
-  serialized_end=3252,
+  serialized_start=3641,
+  serialized_end=3719,
 )
 _sym_db.RegisterEnumDescriptor(_LORASPREADINGFACTOR)
 
@@ -308,8 +313,8 @@ _LORACODINGRATE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3254,
-  serialized_end=3310,
+  serialized_start=3721,
+  serialized_end=3777,
 )
 _sym_db.RegisterEnumDescriptor(_LORACODINGRATE)
 
@@ -336,6 +341,7 @@ Monitor = 18
 Start = 19
 Stop = 20
 SetLoRaModulation = 21
+ScheduleSend = 22
 BIG = 0
 LITTLE = 1
 LOW = 0
@@ -354,6 +360,45 @@ CR46 = 1
 CR47 = 2
 CR48 = 3
 
+
+
+_TIMESTAMP = _descriptor.Descriptor(
+  name='timestamp',
+  full_name='phy.timestamp',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='sec', full_name='phy.timestamp.sec', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='usec', full_name='phy.timestamp.usec', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=31,
+  serialized_end=69,
+)
 
 
 _SETASKMODULATIONCMD = _descriptor.Descriptor(
@@ -383,8 +428,8 @@ _SETASKMODULATIONCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=31,
-  serialized_end=65,
+  serialized_start=71,
+  serialized_end=105,
 )
 
 
@@ -415,8 +460,8 @@ _SETFSKMODULATIONCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=67,
-  serialized_end=107,
+  serialized_start=107,
+  serialized_end=147,
 )
 
 
@@ -447,8 +492,8 @@ _SET4FSKMODULATIONCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=109,
-  serialized_end=150,
+  serialized_start=149,
+  serialized_end=190,
 )
 
 
@@ -479,8 +524,8 @@ _SETGFSKMODULATIONCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=152,
-  serialized_end=193,
+  serialized_start=192,
+  serialized_end=233,
 )
 
 
@@ -511,8 +556,8 @@ _SETMSKMODULATIONCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=195,
-  serialized_end=235,
+  serialized_start=235,
+  serialized_end=275,
 )
 
 
@@ -536,8 +581,8 @@ _SETBPSKMODULATIONCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=237,
-  serialized_end=259,
+  serialized_start=277,
+  serialized_end=299,
 )
 
 
@@ -568,8 +613,8 @@ _SETQPSKMODULATIONCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=261,
-  serialized_end=304,
+  serialized_start=301,
+  serialized_end=344,
 )
 
 
@@ -623,6 +668,13 @@ _SETLORAMODULATIONCMD = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='invert_iq', full_name='phy.SetLoRaModulationCmd.invert_iq', index=6,
+      number=7, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -635,8 +687,8 @@ _SETLORAMODULATIONCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=307,
-  serialized_end=505,
+  serialized_start=347,
+  serialized_end=564,
 )
 
 
@@ -660,8 +712,8 @@ _GETSUPPORTEDFREQUENCIESCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=507,
-  serialized_end=535,
+  serialized_start=566,
+  serialized_end=594,
 )
 
 
@@ -692,8 +744,8 @@ _SETFREQUENCYCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=537,
-  serialized_end=573,
+  serialized_start=596,
+  serialized_end=632,
 )
 
 
@@ -724,8 +776,8 @@ _SETDATARATECMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=575,
-  serialized_end=605,
+  serialized_start=634,
+  serialized_end=664,
 )
 
 
@@ -756,8 +808,8 @@ _SETENDIANNESSCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=607,
-  serialized_end=662,
+  serialized_start=666,
+  serialized_end=721,
 )
 
 
@@ -788,8 +840,8 @@ _SETTXPOWERCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=664,
-  serialized_end=711,
+  serialized_start=723,
+  serialized_end=770,
 )
 
 
@@ -820,8 +872,8 @@ _SETPACKETSIZECMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=713,
-  serialized_end=752,
+  serialized_start=772,
+  serialized_end=811,
 )
 
 
@@ -852,8 +904,8 @@ _SETSYNCWORDCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=754,
-  serialized_end=789,
+  serialized_start=813,
+  serialized_end=848,
 )
 
 
@@ -889,8 +941,8 @@ _SNIFFCMD = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=791,
-  serialized_end=839,
+  serialized_start=850,
+  serialized_end=898,
 )
 
 
@@ -909,13 +961,6 @@ _SENDCMD = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='timestamp', full_name='phy.SendCmd.timestamp', index=1,
-      number=2, type=13, cpp_type=3, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -928,8 +973,8 @@ _SENDCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=841,
-  serialized_end=885,
+  serialized_start=900,
+  serialized_end=925,
 )
 
 
@@ -960,8 +1005,123 @@ _SENDRAWCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=887,
-  serialized_end=915,
+  serialized_start=927,
+  serialized_end=955,
+)
+
+
+_SCHEDULESENDCMD = _descriptor.Descriptor(
+  name='ScheduleSendCmd',
+  full_name='phy.ScheduleSendCmd',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='packet', full_name='phy.ScheduleSendCmd.packet', index=0,
+      number=1, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='timestamp', full_name='phy.ScheduleSendCmd.timestamp', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=957,
+  serialized_end=1025,
+)
+
+
+_SCHEDULEPACKETRESP = _descriptor.Descriptor(
+  name='SchedulePacketResp',
+  full_name='phy.SchedulePacketResp',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='id', full_name='phy.SchedulePacketResp.id', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='full', full_name='phy.SchedulePacketResp.full', index=1,
+      number=2, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+    _descriptor.OneofDescriptor(
+      name='_full', full_name='phy.SchedulePacketResp._full',
+      index=0, containing_type=None,
+      create_key=_descriptor._internal_create_key,
+    fields=[]),
+  ],
+  serialized_start=1027,
+  serialized_end=1087,
+)
+
+
+_SCHEDULEPACKETSENT = _descriptor.Descriptor(
+  name='SchedulePacketSent',
+  full_name='phy.SchedulePacketSent',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='id', full_name='phy.SchedulePacketSent.id', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1089,
+  serialized_end=1121,
 )
 
 
@@ -985,8 +1145,8 @@ _STARTCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=917,
-  serialized_end=927,
+  serialized_start=1123,
+  serialized_end=1133,
 )
 
 
@@ -1010,8 +1170,8 @@ _STOPCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=929,
-  serialized_end=938,
+  serialized_start=1135,
+  serialized_end=1144,
 )
 
 
@@ -1042,8 +1202,8 @@ _JAMCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=940,
-  serialized_end=980,
+  serialized_start=1146,
+  serialized_end=1186,
 )
 
 
@@ -1067,8 +1227,8 @@ _MONITORCMD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=982,
-  serialized_end=994,
+  serialized_start=1188,
+  serialized_end=1200,
 )
 
 
@@ -1096,8 +1256,8 @@ _PACKETRECEIVED = _descriptor.Descriptor(
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='timestamp', full_name='phy.PacketReceived.timestamp', index=2,
-      number=3, type=13, cpp_type=3, label=1,
-      has_default_value=False, default_value=0,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
@@ -1130,8 +1290,8 @@ _PACKETRECEIVED = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=996,
-  serialized_end=1113,
+  serialized_start=1203,
+  serialized_end=1336,
 )
 
 
@@ -1159,8 +1319,8 @@ _RAWPACKETRECEIVED = _descriptor.Descriptor(
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='timestamp', full_name='phy.RawPacketReceived.timestamp', index=2,
-      number=3, type=13, cpp_type=3, label=1,
-      has_default_value=False, default_value=0,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
@@ -1200,23 +1360,23 @@ _RAWPACKETRECEIVED = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=1116,
-  serialized_end=1252,
+  serialized_start=1339,
+  serialized_end=1491,
 )
 
 
-_JAMMED = _descriptor.Descriptor(
-  name='Jammed',
-  full_name='phy.Jammed',
+_PACKETSENT = _descriptor.Descriptor(
+  name='PacketSent',
+  full_name='phy.PacketSent',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='timestamp', full_name='phy.Jammed.timestamp', index=0,
-      number=1, type=13, cpp_type=3, label=1,
-      has_default_value=False, default_value=0,
+      name='timestamp', full_name='phy.PacketSent.timestamp', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
@@ -1232,8 +1392,40 @@ _JAMMED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1254,
-  serialized_end=1281,
+  serialized_start=1493,
+  serialized_end=1540,
+)
+
+
+_JAMMED = _descriptor.Descriptor(
+  name='Jammed',
+  full_name='phy.Jammed',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='timestamp', full_name='phy.Jammed.timestamp', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1542,
+  serialized_end=1585,
 )
 
 
@@ -1271,8 +1463,8 @@ _MONITORINGREPORT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1283,
-  serialized_end=1340,
+  serialized_start=1587,
+  serialized_end=1644,
 )
 
 
@@ -1310,8 +1502,8 @@ _SUPPORTEDFREQUENCYRANGES_FREQUENCYRANGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1443,
-  serialized_end=1487,
+  serialized_start=1747,
+  serialized_end=1791,
 )
 
 _SUPPORTEDFREQUENCYRANGES = _descriptor.Descriptor(
@@ -1341,8 +1533,8 @@ _SUPPORTEDFREQUENCYRANGES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1343,
-  serialized_end=1487,
+  serialized_start=1647,
+  serialized_end=1791,
 )
 
 
@@ -1543,6 +1735,27 @@ _MESSAGE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='sched_send', full_name='phy.Message.sched_send', index=27,
+      number=28, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='sched_pkt_rsp', full_name='phy.Message.sched_pkt_rsp', index=28,
+      number=29, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='sched_pkt_sent', full_name='phy.Message.sched_pkt_sent', index=29,
+      number=30, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -1560,8 +1773,8 @@ _MESSAGE = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=1490,
-  serialized_end=2642,
+  serialized_start=1794,
+  serialized_end=3091,
 )
 
 _SETLORAMODULATIONCMD.fields_by_name['spreading_factor'].enum_type = _LORASPREADINGFACTOR
@@ -1571,19 +1784,27 @@ _SETTXPOWERCMD.fields_by_name['tx_power'].enum_type = _TXPOWER
 _SNIFFCMD.oneofs_by_name['_iq_stream'].fields.append(
   _SNIFFCMD.fields_by_name['iq_stream'])
 _SNIFFCMD.fields_by_name['iq_stream'].containing_oneof = _SNIFFCMD.oneofs_by_name['_iq_stream']
+_SCHEDULESENDCMD.fields_by_name['timestamp'].message_type = _TIMESTAMP
+_SCHEDULEPACKETRESP.oneofs_by_name['_full'].fields.append(
+  _SCHEDULEPACKETRESP.fields_by_name['full'])
+_SCHEDULEPACKETRESP.fields_by_name['full'].containing_oneof = _SCHEDULEPACKETRESP.oneofs_by_name['_full']
 _JAMCMD.fields_by_name['mode'].enum_type = _JAMMINGMODE
+_PACKETRECEIVED.fields_by_name['timestamp'].message_type = _TIMESTAMP
 _PACKETRECEIVED.oneofs_by_name['_rssi'].fields.append(
   _PACKETRECEIVED.fields_by_name['rssi'])
 _PACKETRECEIVED.fields_by_name['rssi'].containing_oneof = _PACKETRECEIVED.oneofs_by_name['_rssi']
 _PACKETRECEIVED.oneofs_by_name['_timestamp'].fields.append(
   _PACKETRECEIVED.fields_by_name['timestamp'])
 _PACKETRECEIVED.fields_by_name['timestamp'].containing_oneof = _PACKETRECEIVED.oneofs_by_name['_timestamp']
+_RAWPACKETRECEIVED.fields_by_name['timestamp'].message_type = _TIMESTAMP
 _RAWPACKETRECEIVED.oneofs_by_name['_rssi'].fields.append(
   _RAWPACKETRECEIVED.fields_by_name['rssi'])
 _RAWPACKETRECEIVED.fields_by_name['rssi'].containing_oneof = _RAWPACKETRECEIVED.oneofs_by_name['_rssi']
 _RAWPACKETRECEIVED.oneofs_by_name['_timestamp'].fields.append(
   _RAWPACKETRECEIVED.fields_by_name['timestamp'])
 _RAWPACKETRECEIVED.fields_by_name['timestamp'].containing_oneof = _RAWPACKETRECEIVED.oneofs_by_name['_timestamp']
+_PACKETSENT.fields_by_name['timestamp'].message_type = _TIMESTAMP
+_JAMMED.fields_by_name['timestamp'].message_type = _TIMESTAMP
 _SUPPORTEDFREQUENCYRANGES_FREQUENCYRANGE.containing_type = _SUPPORTEDFREQUENCYRANGES
 _SUPPORTEDFREQUENCYRANGES.fields_by_name['frequency_ranges'].message_type = _SUPPORTEDFREQUENCYRANGES_FREQUENCYRANGE
 _MESSAGE.fields_by_name['mod_ask'].message_type = _SETASKMODULATIONCMD
@@ -1613,6 +1834,9 @@ _MESSAGE.fields_by_name['jammed'].message_type = _JAMMED
 _MESSAGE.fields_by_name['monitor_report'].message_type = _MONITORINGREPORT
 _MESSAGE.fields_by_name['supported_freq'].message_type = _SUPPORTEDFREQUENCYRANGES
 _MESSAGE.fields_by_name['mod_lora'].message_type = _SETLORAMODULATIONCMD
+_MESSAGE.fields_by_name['sched_send'].message_type = _SCHEDULESENDCMD
+_MESSAGE.fields_by_name['sched_pkt_rsp'].message_type = _SCHEDULEPACKETRESP
+_MESSAGE.fields_by_name['sched_pkt_sent'].message_type = _SCHEDULEPACKETSENT
 _MESSAGE.oneofs_by_name['msg'].fields.append(
   _MESSAGE.fields_by_name['mod_ask'])
 _MESSAGE.fields_by_name['mod_ask'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
@@ -1694,6 +1918,16 @@ _MESSAGE.fields_by_name['supported_freq'].containing_oneof = _MESSAGE.oneofs_by_
 _MESSAGE.oneofs_by_name['msg'].fields.append(
   _MESSAGE.fields_by_name['mod_lora'])
 _MESSAGE.fields_by_name['mod_lora'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['sched_send'])
+_MESSAGE.fields_by_name['sched_send'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['sched_pkt_rsp'])
+_MESSAGE.fields_by_name['sched_pkt_rsp'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+_MESSAGE.oneofs_by_name['msg'].fields.append(
+  _MESSAGE.fields_by_name['sched_pkt_sent'])
+_MESSAGE.fields_by_name['sched_pkt_sent'].containing_oneof = _MESSAGE.oneofs_by_name['msg']
+DESCRIPTOR.message_types_by_name['timestamp'] = _TIMESTAMP
 DESCRIPTOR.message_types_by_name['SetASKModulationCmd'] = _SETASKMODULATIONCMD
 DESCRIPTOR.message_types_by_name['SetFSKModulationCmd'] = _SETFSKMODULATIONCMD
 DESCRIPTOR.message_types_by_name['Set4FSKModulationCmd'] = _SET4FSKMODULATIONCMD
@@ -1712,12 +1946,16 @@ DESCRIPTOR.message_types_by_name['SetSyncWordCmd'] = _SETSYNCWORDCMD
 DESCRIPTOR.message_types_by_name['SniffCmd'] = _SNIFFCMD
 DESCRIPTOR.message_types_by_name['SendCmd'] = _SENDCMD
 DESCRIPTOR.message_types_by_name['SendRawCmd'] = _SENDRAWCMD
+DESCRIPTOR.message_types_by_name['ScheduleSendCmd'] = _SCHEDULESENDCMD
+DESCRIPTOR.message_types_by_name['SchedulePacketResp'] = _SCHEDULEPACKETRESP
+DESCRIPTOR.message_types_by_name['SchedulePacketSent'] = _SCHEDULEPACKETSENT
 DESCRIPTOR.message_types_by_name['StartCmd'] = _STARTCMD
 DESCRIPTOR.message_types_by_name['StopCmd'] = _STOPCMD
 DESCRIPTOR.message_types_by_name['JamCmd'] = _JAMCMD
 DESCRIPTOR.message_types_by_name['MonitorCmd'] = _MONITORCMD
 DESCRIPTOR.message_types_by_name['PacketReceived'] = _PACKETRECEIVED
 DESCRIPTOR.message_types_by_name['RawPacketReceived'] = _RAWPACKETRECEIVED
+DESCRIPTOR.message_types_by_name['PacketSent'] = _PACKETSENT
 DESCRIPTOR.message_types_by_name['Jammed'] = _JAMMED
 DESCRIPTOR.message_types_by_name['MonitoringReport'] = _MONITORINGREPORT
 DESCRIPTOR.message_types_by_name['SupportedFrequencyRanges'] = _SUPPORTEDFREQUENCYRANGES
@@ -1729,6 +1967,13 @@ DESCRIPTOR.enum_types_by_name['JammingMode'] = _JAMMINGMODE
 DESCRIPTOR.enum_types_by_name['LoRaSpreadingFactor'] = _LORASPREADINGFACTOR
 DESCRIPTOR.enum_types_by_name['LoRaCodingRate'] = _LORACODINGRATE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
+
+timestamp = _reflection.GeneratedProtocolMessageType('timestamp', (_message.Message,), {
+  'DESCRIPTOR' : _TIMESTAMP,
+  '__module__' : 'protocol.phy.phy_pb2'
+  # @@protoc_insertion_point(class_scope:phy.timestamp)
+  })
+_sym_db.RegisterMessage(timestamp)
 
 SetASKModulationCmd = _reflection.GeneratedProtocolMessageType('SetASKModulationCmd', (_message.Message,), {
   'DESCRIPTOR' : _SETASKMODULATIONCMD,
@@ -1856,6 +2101,27 @@ SendRawCmd = _reflection.GeneratedProtocolMessageType('SendRawCmd', (_message.Me
   })
 _sym_db.RegisterMessage(SendRawCmd)
 
+ScheduleSendCmd = _reflection.GeneratedProtocolMessageType('ScheduleSendCmd', (_message.Message,), {
+  'DESCRIPTOR' : _SCHEDULESENDCMD,
+  '__module__' : 'protocol.phy.phy_pb2'
+  # @@protoc_insertion_point(class_scope:phy.ScheduleSendCmd)
+  })
+_sym_db.RegisterMessage(ScheduleSendCmd)
+
+SchedulePacketResp = _reflection.GeneratedProtocolMessageType('SchedulePacketResp', (_message.Message,), {
+  'DESCRIPTOR' : _SCHEDULEPACKETRESP,
+  '__module__' : 'protocol.phy.phy_pb2'
+  # @@protoc_insertion_point(class_scope:phy.SchedulePacketResp)
+  })
+_sym_db.RegisterMessage(SchedulePacketResp)
+
+SchedulePacketSent = _reflection.GeneratedProtocolMessageType('SchedulePacketSent', (_message.Message,), {
+  'DESCRIPTOR' : _SCHEDULEPACKETSENT,
+  '__module__' : 'protocol.phy.phy_pb2'
+  # @@protoc_insertion_point(class_scope:phy.SchedulePacketSent)
+  })
+_sym_db.RegisterMessage(SchedulePacketSent)
+
 StartCmd = _reflection.GeneratedProtocolMessageType('StartCmd', (_message.Message,), {
   'DESCRIPTOR' : _STARTCMD,
   '__module__' : 'protocol.phy.phy_pb2'
@@ -1897,6 +2163,13 @@ RawPacketReceived = _reflection.GeneratedProtocolMessageType('RawPacketReceived'
   # @@protoc_insertion_point(class_scope:phy.RawPacketReceived)
   })
 _sym_db.RegisterMessage(RawPacketReceived)
+
+PacketSent = _reflection.GeneratedProtocolMessageType('PacketSent', (_message.Message,), {
+  'DESCRIPTOR' : _PACKETSENT,
+  '__module__' : 'protocol.phy.phy_pb2'
+  # @@protoc_insertion_point(class_scope:phy.PacketSent)
+  })
+_sym_db.RegisterMessage(PacketSent)
 
 Jammed = _reflection.GeneratedProtocolMessageType('Jammed', (_message.Message,), {
   'DESCRIPTOR' : _JAMMED,
