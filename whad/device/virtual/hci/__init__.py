@@ -635,7 +635,7 @@ class HCIDevice(VirtualDevice):
 
     def _on_whad_ble_set_bd_addr(self, message):
         logger.debug('Received WHAD BLE set_bd_addr message')
-        if self._set_BD_address(message.bd_address):
+        if self._set_BD_address(message.bd_address, message.addr_type):
             logger.debug('HCI adapter BD address set to %s' % str(message.bd_address))
             self._send_whad_command_result(ResultCode.SUCCESS)
         else:
