@@ -13,13 +13,13 @@ from whad.protocol.phy.phy_pb2 import SetASKModulation, SetFSKModulation, \
     GetSupportedFrequencies, SetFrequency, SetDataRate, SetEndianness, \
     Endianness, SetTXPower, TXPower, SetPacketSize, SetSyncWord, StartCmd, \
     StopCmd, Send, Sniff, SendRaw, Set4FSKModulation, Set4FSKModulationCmd, \
-    SetLoRaModulation, SetLoRaModulationCmd
+    SetLoRaModulation, SetLoRaModulationCmd, ScheduleSend
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.phy import Phy_Packet
 from whad.exceptions import RequiredImplementation, UnsupportedCapability, UnsupportedDomain
 from whad.phy.exceptions import UnsupportedFrequency, NoModulation, NoDatarate, NoFrequency, \
-    NoSyncWord, NoEndianess, NoPacketSize, InvalidParameter
+    NoSyncWord, NoEndianess, NoPacketSize, InvalidParameter, ScheduleFifoFull
 from whad.phy.connector.translator import PhyMessageTranslator
 
 class Phy(WhadDeviceConnector):
@@ -143,6 +143,13 @@ class Phy(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
         return (commands & (1 << SetLoRaModulation)) > 0
+    
+    def can_schedule_packets(self):
+        """
+        Determine if the device can send scheduled packets.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        return (commands & (1 << ScheduleSend)) > 0
 
     def set_ask(self, on_off_keying=True):
         """
@@ -250,7 +257,7 @@ class Phy(WhadDeviceConnector):
         return success
     
 
-    def set_lora(self, sf=7, cr=48, bw=125000, preamble=12, crc=False, explicit=False):
+    def set_lora(self, sf=7, cr=48, bw=125000, preamble=12, crc=False, explicit=False, invert_iq=False):
         """
         Enable LoRa modulation scheme.
 
@@ -284,6 +291,8 @@ class Phy(WhadDeviceConnector):
         msg.phy.mod_lora.preamble_length = preamble
         msg.phy.mod_lora.enable_crc = crc
         msg.phy.mod_lora.explicit = explicit
+        msg.phy.mod_lora.invert_iq = invert_iq
+        print(msg)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -635,7 +644,7 @@ class Phy(WhadDeviceConnector):
         self.translator.physical_layer = self.__physical_layer
         return True
 
-    def send(self, packet, timestamp=0):
+    def send(self, packet):
         """
         Send Phy packets .
         """
@@ -649,14 +658,41 @@ class Phy(WhadDeviceConnector):
 
         self.monitor_packet_tx(packet)
         msg = self.translator.from_packet(packet)
-        
-        # Set timestamp
-        msg.phy.send.timestamp = timestamp
-        
+
         # Send packet
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
+    def schedule_send(self, packet, timestamp: float = 0.0) -> int:
+        """Schedule a packet to be sent at a given time.
+        """
+        if not self.can_send():
+            raise UnsupportedCapability("Send")
+        if not self.can_schedule_packets():
+            raise UnsupportedCapability("ScheduledSend")
+        
+        if isinstance(packet, bytes):
+            packet = Phy_Packet(packet)
+
+        # Generate TX metadata
+        packet.metadata = PhyMetadata()
+        packet.metadata.frequency = self.__cached_frequency
+
+        msg = self.translator.from_packet(packet)
+        
+        # Set timestamp
+        ts_sec = int(timestamp)
+        ts_usec = int((timestamp - ts_sec)*1000000)
+        msg.phy.sched_send.timestamp.sec = ts_sec
+        msg.phy.sched_send.timestamp.usec = ts_usec
+        msg.phy.sched_send.packet = bytes(packet)
+
+        # Schedule a packet
+        resp = self.send_command(msg, message_filter('phy', 'sched_pkt_rsp'))
+        if resp.phy.sched_pkt_rsp.full:
+            raise ScheduleFifoFull
+        else:
+            return resp.phy.sched_pkt_rsp.id
 
     def on_discovery_msg(self, message):
         pass

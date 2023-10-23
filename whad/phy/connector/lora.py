@@ -30,6 +30,7 @@ class LoRa(Phy):
         self.__preamble_length = 12             # Preamble length (in symbols)
         self.__crc_enabled = False              # CRC disabled by default
         self.__explicit_mode = False            # Explicit mode is disabled by default
+        self.__invert_iq = False                # Invert IQ is disabled by default
         self.__syncword = LoRa.SYNCWORD_M2M     # LoRa M2M by default
 
         self.__pkt_queue = Queue()
@@ -132,6 +133,14 @@ class LoRa(Phy):
         '''
         self.__explicit_mode = enabled
 
+    @property
+    def invert_iq(self):
+        return self.__invert_iq
+    
+    @invert_iq.setter
+    def invert_iq(self, enabled : bool):
+        self.__invert_iq = enabled
+
 
     @property
     def syncword(self):
@@ -161,7 +170,8 @@ class LoRa(Phy):
             self.__bandwidth,
             self.__preamble_length,
             self.__crc_enabled,
-            self.__explicit_mode
+            self.__explicit_mode,
+            self.__invert_iq
         )
 
         # Set syncword
