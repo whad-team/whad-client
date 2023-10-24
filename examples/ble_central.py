@@ -16,20 +16,20 @@ def show(packet):
 security_database = CryptographicDatabase()
 '''
 security_database.add(
-    BDAddress('F8:9E:94:56:35:91', random=False),
-    ltk=bytes.fromhex("fe393733041a1e50144c8b7f9c0f7a07"),
-    rand=bytes.fromhex("0000000000000000"),
-    ediv=0x0000
-)'''
+    BDAddress('6e:36:c4:60:fa:b2', random=True),
+    ltk=bytes.fromhex("f80fcaf8884bcc70e8135ecf53f09c8b"),
+    rand=bytes.fromhex("170dee04a32ee3fa"),
+    ediv=0x87e9
+)
+'''
 central = Central(WhadDevice.create('hci0'), security_database=security_database)
 central.attach_callback(show)
-
 
 
 print("New connection")
 #print('Using device: %s' % central.device.device_id)
 
-device = central.connect('F8:9E:94:56:35:91', random=False)#, random=False, hop_interval=56, channel_map=0x00000300)
+device = central.connect('4d:38:a1:e8:d1:e8', random=True)#, random=False, hop_interval=56, channel_map=0x00000300)
 # Discover
 device.discover()
 for service in device.services():
@@ -62,7 +62,7 @@ except KeyboardInterrupt:
 # Disconnect
 print("Stop connection")
 device.disconnect()
-device2 = central.connect('F8:9E:94:56:35:91', random=False)#, random=False, hop_interval=56, channel_map=0x00000300)
+device2 = central.connect('4d:38:a1:e8:d1:e8', random=True)#, random=False, hop_interval=56, channel_map=0x00000300)
 device2.start_encryption()
 try:
     while True:

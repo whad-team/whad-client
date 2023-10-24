@@ -2559,8 +2559,8 @@ class SMPLayer(Layer):
                 self.state.database.add(
                     self.state.responder.bd_address,
                     authenticated=self.is_pairing_authenticated(),
-                    ltk=self.state.responder.ltk,
-                    rand=self.state.responder.random,
+                    ltk=self.state.responder.ltk[::-1],
+                    rand=self.state.responder.random[::-1],
                     ediv=self.state.responder.ediv,
                     irk=self.state.responder.irk,
                     csrk=self.state.responder.csrk
@@ -2605,8 +2605,8 @@ class SMPLayer(Layer):
                 self.state.database.add(
                     self.state.initiator.bd_address,
                     authenticated=self.is_pairing_authenticated(),
-                    ltk=self.state.initiator.ltk,
-                    rand=self.state.initiator.random,
+                    ltk=self.state.initiator.ltk[::-1],
+                    rand=self.state.initiator.random[::-1],
                     ediv=self.state.initiator.ediv,
                     irk=self.state.initiator.irk,
                     csrk=self.state.initiator.csrk

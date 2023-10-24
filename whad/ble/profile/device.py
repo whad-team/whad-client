@@ -481,14 +481,9 @@ class PeripheralDevice(GenericProfile):
         crypto_material = security_database.get(address=self.__central.target_peer)
         conn_handle = self.__smp.get_layer('l2cap').state.conn_handle
         if crypto_material is not None and crypto_material.has_ltk():
-            print(
-                conn_handle,
-                crypto_material.ltk.rand[::-1],
-                crypto_material.ltk.ediv
-            )
             self.__ll.start_encryption(
                 conn_handle,
-                unpack('>Q', crypto_material.ltk.rand[::-1])[0],
+                unpack('>Q', crypto_material.ltk.rand)[0],
                 crypto_material.ltk.ediv
             )
 
