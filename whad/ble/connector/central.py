@@ -284,6 +284,11 @@ class Central(BLE):
                 connection.conn_handle,
                 crypto_material.ltk.value
             )
+            if crypto_material.is_authenticated():
+                print("Marked as authenticated")
+                self.__stack.get_layer('ll').state.mark_as_authenticated(connection.conn_handle)
+            else:
+                print("Marked as unauthenticated")
 
         # Notify peripheral about this connection
         self.__peripheral.on_connect(self.connection.conn_handle)

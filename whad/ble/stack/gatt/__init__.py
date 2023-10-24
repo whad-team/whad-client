@@ -1043,13 +1043,34 @@ class GattServer(GattLayer):
                 # Check characteristic is readable
                 charac = self.__server_model.find_object_by_handle(request.handle - 1)
 
+                conn_handle = self.get_layer('l2cap').state.conn_handle
                 if charac.check_security_property(ReadAccess, Authentication):
                     print("[i] authentication required for read access !")
+                    if not self.get_layer('ll').state.is_authenticated(conn_handle):
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                        return
                 if charac.check_security_property(ReadAccess, Encryption):
                     print("[i] encryption required for read access !")
+                    if not self.get_layer('ll').state.is_encrypted(conn_handle):
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_ENCRYPTION
+                        )
+                        return
                 if charac.check_security_property(ReadAccess, Authorization):
                     print("[i] authorization required for read access !")
-
+                    # TODO: not supported for now
+                    self.error(
+                        BleAttOpcode.READ_REQUEST,
+                        request.handle,
+                        BleAttErrorCode.INSUFFICIENT_AUTHOR
+                    )
+                    return
                 if charac.readable():
                     try:
                         service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
@@ -1150,6 +1171,35 @@ class GattServer(GattLayer):
                     try:
                         charac = self.__server_model.find_object_by_handle(request.handle - 1)
                         service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
+
+                        conn_handle = self.get_layer('l2cap').state.conn_handle
+                        if charac.check_security_property(ReadAccess, Authentication):
+                            print("[i] authentication required for read access !")
+                            if not self.get_layer('ll').state.is_authenticated(conn_handle):
+                                self.error(
+                                    BleAttOpcode.READ_BLOB_REQUEST,
+                                    request.handle,
+                                    BleAttErrorCode.INSUFFICIENT_AUTHENT
+                                )
+                                return
+                        if charac.check_security_property(ReadAccess, Encryption):
+                            print("[i] encryption required for read access !")
+                            if not self.get_layer('ll').state.is_encrypted(conn_handle):
+                                self.error(
+                                    BleAttOpcode.READ_BLOB_REQUEST,
+                                    request.handle,
+                                    BleAttErrorCode.INSUFFICIENT_ENCRYPTION
+                                )
+                                return
+                        if charac.check_security_property(ReadAccess, Authorization):
+                            print("[i] authorization required for read access !")
+                            # TODO: not supported for now
+                            self.error(
+                                BleAttOpcode.READ_BLOB_REQUEST,
+                                request.handle,
+                                BleAttErrorCode.INSUFFICIENT_AUTHOR
+                            )
+                            return
                         if not charac.readable():
                             self.error(
                                 BleAttOpcode.READ_BLOB_REQUEST,
@@ -1243,6 +1293,35 @@ class GattServer(GattLayer):
             if isinstance(attr, CharacteristicValue):
                 # Check the corresponding characteristic is writeable
                 charac = self.__server_model.find_object_by_handle(request.handle - 1)
+
+                conn_handle = self.get_layer('l2cap').state.conn_handle
+                if charac.check_security_property(WriteAccess, Authentication):
+                    print("[i] authentication required for write access !")
+                    if not self.get_layer('ll').state.is_authenticated(conn_handle):
+                        self.error(
+                            BleAttOpcode.WRITE_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                        return
+                if charac.check_security_property(WriteAccess, Encryption):
+                    print("[i] encryption required for write access !")
+                    if not self.get_layer('ll').state.is_encrypted(conn_handle):
+                        self.error(
+                            BleAttOpcode.WRITE_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_ENCRYPTION
+                        )
+                        return
+                if charac.check_security_property(WriteAccess, Authorization):
+                    print("[i] authorization required for write access !")
+                    # TODO: not supported for now
+                    self.error(
+                        BleAttOpcode.WRITE_REQUEST,
+                        request.handle,
+                        BleAttErrorCode.INSUFFICIENT_AUTHOR
+                    )
+                    return
                 if charac.writeable():
                     # Retrieve corresponding service info
                     service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
@@ -1387,6 +1466,35 @@ class GattServer(GattLayer):
             if isinstance(attr, CharacteristicValue):
                 # Check the corresponding characteristic is writeable
                 charac = self.__server_model.find_object_by_handle(request.handle - 1)
+
+                conn_handle = self.get_layer('l2cap').state.conn_handle
+                if charac.check_security_property(WriteAccess, Authentication):
+                    print("[i] authentication required for write access !")
+                    if not self.get_layer('ll').state.is_authenticated(conn_handle):
+                        self.error(
+                            BleAttOpcode.WRITE_COMMAND,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                        return
+                if charac.check_security_property(WriteAccess, Encryption):
+                    print("[i] encryption required for write access !")
+                    if not self.get_layer('ll').state.is_encrypted(conn_handle):
+                        self.error(
+                            BleAttOpcode.WRITE_COMMAND,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_ENCRYPTION
+                        )
+                        return
+                if charac.check_security_property(WriteAccess, Authorization):
+                    print("[i] authorization required for write access !")
+                    # TODO: not supported for now
+                    self.error(
+                        BleAttOpcode.WRITE_COMMAND,
+                        request.handle,
+                        BleAttErrorCode.INSUFFICIENT_AUTHOR
+                    )
+                    return
                 if charac.writeable():
                     # Retrieve corresponding service info
                     service = self.__server_model.find_service_by_characteristic_handle(charac.handle)

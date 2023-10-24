@@ -9,9 +9,12 @@ from random import randint
 from whad.ble.exceptions import HookReturnAuthorRequired, HookReturnValue
 from whad.ble.profile import read, written, subscribed
 from struct import pack, unpack
+from whad.ble.stack.smp import Pairing, IOCAP_KEYBD_ONLY, IOCAP_NOINPUT_NOOUTPUT, CryptographicDatabase
 
 import logging
-#logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger('whad.ble.stack.ll').setLevel(logging.INFO)
+logging.getLogger('whad.ble.stack.smp').setLevel(logging.INFO)
 
 NAME = 'WHAD BLE Peripheral Guess Demo'
 
@@ -97,7 +100,20 @@ def update_number():
 if __name__ == '__main__':
     print(f'======== {NAME} ===========')
     my_profile = MyPeripheral() #GenericProfile(from_json="lightbulb2.json")
-    periph = Peripheral(WhadDevice.create('hci0'), profile=my_profile)
+    pairing = Pairing(
+        lesc=True,
+        mitm=True,
+        bonding=True,
+    )
+    '''
+    iocap=IOCAP_NOINPUT_NOOUTPUT,
+    sign_key=False,
+    id_key=False,
+    link_key=False,
+    enc_key=True
+    '''
+
+    periph = Peripheral(WhadDevice.create('hci0'), profile=my_profile, pairing=pairing)
     periph.attach_callback(callback=show)
     periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
         AdvCompleteLocalName(b'Guess Me!'),
@@ -107,6 +123,6 @@ if __name__ == '__main__':
     #update_number()
     print('Press a key to trigger a pairing')
     input()
-    periph.pairing()
+    periph.pairing(pairing=pairing)
     while True:
         pass

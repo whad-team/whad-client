@@ -29,7 +29,7 @@ central.attach_callback(show)
 print("New connection")
 #print('Using device: %s' % central.device.device_id)
 
-device = central.connect('4d:38:a1:e8:d1:e8', random=True)#, random=False, hop_interval=56, channel_map=0x00000300)
+device = central.connect('43:1B:16:A6:E6:D6', random=True)#, random=False, hop_interval=56, channel_map=0x00000300)
 # Discover
 device.discover()
 for service in device.services():
@@ -62,7 +62,7 @@ except KeyboardInterrupt:
 # Disconnect
 print("Stop connection")
 device.disconnect()
-device2 = central.connect('4d:38:a1:e8:d1:e8', random=True)#, random=False, hop_interval=56, channel_map=0x00000300)
+device2 = central.connect('43:1B:16:A6:E6:D6', random=True)#, random=False, hop_interval=56, channel_map=0x00000300)
 device2.start_encryption()
 try:
     while True:

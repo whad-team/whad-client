@@ -505,6 +505,8 @@ class LinkLayerState(LayerState):
             'version_sent': False,  # version exchanged
             'version_remote': None,
             'encryption_key':None,
+            'authenticated':False,
+            'encrypted':False,
             'skd':None,
             'iv':None,
             'rand':None,
@@ -530,6 +532,22 @@ class LinkLayerState(LayerState):
     def register_encryption_key(self, conn_handle, key):
         if conn_handle in self.connections:
             self.connections[conn_handle]['encryption_key'] = key
+
+    def is_authenticated(self, conn_handle):
+        if conn_handle in self.connections:
+            return self.connections[conn_handle]['authenticated']
+
+    def is_encrypted(self, conn_handle):
+        if conn_handle in self.connections:
+            return self.connections[conn_handle]['encrypted']
+            
+    def mark_as_authenticated(self, conn_handle):
+        if conn_handle in self.connections:
+            self.connections[conn_handle]['authenticated'] = True
+
+    def mark_as_encrypted(self, conn_handle):
+        if conn_handle in self.connections:
+            self.connections[conn_handle]['encrypted'] = True
 
     def get_encryption_key(self, conn_handle):
         if conn_handle in self.connections:
@@ -1006,8 +1024,10 @@ class LinkLayer(Layer):
                 LL_START_ENC_RSP()
             )
 
-        # Notify SMP channel is now encrypted
+        print("Marked as encrypted")
+        self.state.mark_as_encrypted(conn_handle)
 
+        # Notify SMP channel is now encrypted
         self.get_layer(l2cap_instance).get_layer('smp').on_channel_encrypted()
 
     def on_unknown_rsp(self, conn_handle, unk_rsp):

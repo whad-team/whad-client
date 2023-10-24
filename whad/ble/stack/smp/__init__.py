@@ -1587,7 +1587,7 @@ class SMPLayer(Layer):
                 self.state.initiator,
                 self.state.responder
             )
-
+            self.state.ltk = self.state.ltk[::-1]
 
             self.state.rand, self.state.ediv = b"\x00"*8, 0
             # Indicate LTK as distributed
@@ -1642,7 +1642,7 @@ class SMPLayer(Layer):
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
                 # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk)
+                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk[::-1])
 
 
                 self.state.state = SecurityManagerState.STATE_LESC_DHK_CHECK_SENT
@@ -1691,7 +1691,7 @@ class SMPLayer(Layer):
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
                 # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk)
+                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk[::-1])
                 # Start encryption
                 self.get_layer('ll').start_encryption(conn_handle, 0, 0)
 
@@ -1996,7 +1996,7 @@ class SMPLayer(Layer):
                         self.state.initiator,
                         self.state.responder
                     )
-
+                    self.state.ltk = self.state.ltk[::-1]
                     self.state.rand, self.state.ediv = b"\x00"*8, 0
                     # Indicate LTK as distributed
                     self.state.initiator.indicate_ltk_distribution(self.state.ltk)
@@ -2164,7 +2164,7 @@ class SMPLayer(Layer):
                         self.state.initiator,
                         self.state.responder
                     )
-
+                    self.state.ltk = self.state.ltk[::-1]
                     self.state.rand, self.state.ediv = b"\x00"*8, 0
                     # Indicate LTK as distributed
                     self.state.initiator.indicate_ltk_distribution(self.state.ltk)
@@ -2381,17 +2381,17 @@ class SMPLayer(Layer):
 
                 # Perform key distribution to responder
                 sleep(.5)
-                if self.state.responder.must_dist_ltk():
+                if self.state.initiator.must_dist_ltk():
                     logger.info('[smp] sending generated LTK ...')
                     self.send_data(SM_Encryption_Information(
                         ltk=self.state.ltk
                     ))
                     logger.info('[smp] LTK sent.')
-                if self.state.responder.must_dist_ediv_rand():
+                if self.state.initiator.must_dist_ediv_rand():
                     logger.info('[smp] sending generated EDIV/RAND ...')
                     self.send_data(SM_Master_Identification(ediv = self.state.ediv, rand = self.state.rand))
                 logger.info('[smp] EDIV/RAND sent.')
-            if self.state.responder.must_dist_irk():
+            if self.state.initiator.must_dist_irk():
                 logger.info('[smp] sending generated IRK ...')
                 self.state.irk = self.get_custom_function("generate_irk")()
                 self.send_data(SM_Identity_Information(
@@ -2407,7 +2407,7 @@ class SMPLayer(Layer):
                 logger.info('[smp] Address information sent.')
 
 
-            if self.state.responder.must_dist_csrk():
+            if self.state.initiator.must_dist_csrk():
                 logger.info('[smp] sending generated CSRK ...')
                 self.state.csrk = self.get_custom_function("generate_csrk")()
                 self.send_data(SM_Signing_Information(
@@ -2425,17 +2425,17 @@ class SMPLayer(Layer):
 
                 # Perform key distribution to initiator
                 sleep(.5)
-                if self.state.initiator.must_dist_ltk():
+                if self.state.responder.must_dist_ltk():
                     logger.info('[smp] sending generated LTK ...')
                     self.send_data(SM_Encryption_Information(
                         ltk=self.state.ltk
                     ))
                     logger.info('[smp] LTK sent.')
-                if self.state.initiator.must_dist_ediv_rand():
+                if self.state.responder.must_dist_ediv_rand():
                     logger.info('[smp] sending generated EDIV/RAND ...')
                     self.send_data(SM_Master_Identification(ediv = self.state.ediv, rand = self.state.rand))
                     logger.info('[smp] EDIV/RAND sent.')
-            if self.state.initiator.must_dist_irk():
+            if self.state.responder.must_dist_irk():
                 logger.info('[smp] sending generated IRK ...')
                 self.state.irk = self.get_custom_function("generate_irk")()
                 self.send_data(SM_Identity_Information(
@@ -2449,7 +2449,7 @@ class SMPLayer(Layer):
                     )
                 )
                 logger.info('[smp] Address information sent.')
-            if self.state.initiator.must_dist_csrk():
+            if self.state.responder.must_dist_csrk():
                 logger.info('[smp] sending generated CSRK ...')
                 self.state.csrk = self.get_custom_function("generate_csrk")()
                 self.send_data(SM_Signing_Information(
@@ -2519,6 +2519,8 @@ class SMPLayer(Layer):
         return self.state.last_failure is not None
 
     def pairing_done(self):
+        print(self.state.database)
+
         logger.info("Pairing done.")
         if self.is_initiator():
             if self.state.ltk is not None:
@@ -2676,6 +2678,7 @@ class SMPLayer(Layer):
                         )
                 )
 
+        print(self.state.database)
         self.state.state = SecurityManagerState.STATE_PAIRING_DONE
 
     def send_data(self, packet):
