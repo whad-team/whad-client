@@ -2550,20 +2550,52 @@ class SMPLayer(Layer):
                 self.state.database.add(
                     self.state.initiator.bd_address,
                     authenticated=self.is_pairing_authenticated(),
-                    ltk=self.state.ltk,
-                    rand=self.state.rand,
+                    ltk=(
+                        self.state.ltk[::-1]
+                        if self.state.ltk is not None else
+                        None
+                        ),
+                    rand=(
+                        self.state.rand[::-1]
+                        if self.state.rand is not None else
+                        None
+                        ),
                     ediv=self.state.ediv,
-                    irk=self.state.irk,
-                    csrk=self.state.csrk
+                    irk=(
+                        self.state.irk[::-1]
+                        if self.state.irk is not None else
+                        None
+                        ),
+                    csrk=(
+                        self.state.csrk[::-1]
+                        if self.state.csrk is not None else
+                        None
+                        )
                 )
                 self.state.database.add(
                     self.state.responder.bd_address,
                     authenticated=self.is_pairing_authenticated(),
-                    ltk=self.state.responder.ltk[::-1],
-                    rand=self.state.responder.random[::-1],
+                    ltk=(
+                        self.state.responder.ltk[::-1]
+                        if self.state.responder.ltk is not None else
+                        None
+                        ),
+                    rand=(
+                        self.state.responder.random[::-1]
+                        if self.state.responder.random is not None else
+                        None
+                        ),
                     ediv=self.state.responder.ediv,
-                    irk=self.state.responder.irk,
-                    csrk=self.state.responder.csrk
+                    irk=(
+                        self.state.responder.irk[::-1]
+                        if self.state.responder.irk is not None else
+                        None
+                        ),
+                    csrk=(
+                        self.state.responder.csrk[::-1]
+                        if self.state.responder.csrk is not None else
+                        None
+                        )
                 )
 
         else:
@@ -2596,20 +2628,52 @@ class SMPLayer(Layer):
                 self.state.database.add(
                     self.state.responder.bd_address,
                     authenticated=self.is_pairing_authenticated(),
-                    ltk=self.state.ltk,
-                    rand=self.state.rand,
+                    ltk=(
+                        self.state.ltk[::-1]
+                        if self.state.ltk is not None else
+                        None
+                        ),
+                    rand=(
+                        self.state.rand[::-1]
+                        if self.state.rand is not None else
+                        None
+                        ),
                     ediv=self.state.ediv,
-                    irk=self.state.irk,
-                    csrk=self.state.csrk
+                    irk=(
+                        self.state.irk[::-1]
+                        if self.state.irk is not None else
+                        None
+                        ),
+                    csrk=(
+                        self.state.csrk[::-1]
+                        if self.state.csrk is not None else
+                        None
+                        )
                 )
                 self.state.database.add(
                     self.state.initiator.bd_address,
                     authenticated=self.is_pairing_authenticated(),
-                    ltk=self.state.initiator.ltk[::-1],
-                    rand=self.state.initiator.random[::-1],
+                    ltk=(
+                        self.state.initiator.ltk[::-1]
+                        if self.state.initiator.ltk is not None else
+                        None
+                        ),
+                    rand=(
+                        self.state.initiator.random[::-1]
+                        if self.state.initiator.random is not None else
+                        None
+                        ),
                     ediv=self.state.initiator.ediv,
-                    irk=self.state.initiator.irk,
-                    csrk=self.state.initiator.csrk
+                    irk=(
+                        self.state.initiator.irk[::-1]
+                        if self.state.initiator.irk is not None else
+                        None
+                        ),
+                    csrk=(
+                        self.state.initiator.csrk[::-1]
+                        if self.state.initiator.csrk is not None else
+                        None
+                        )
                 )
 
         self.state.state = SecurityManagerState.STATE_PAIRING_DONE
