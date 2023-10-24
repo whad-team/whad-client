@@ -14,7 +14,7 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
     HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect, \
     HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, HCI_Event_Disconnection_Complete, \
-    HCI_Cmd_LE_Set_Scan_Response_Data
+    HCI_Cmd_LE_Set_Scan_Response_Data, HCI_Cmd_LE_Set_Random_Address
 from whad.device.virtual.hci.converter import HCIConverter
 from whad.device.virtual.hci.hciconfig import HCIConfig
 from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState
@@ -434,7 +434,7 @@ class HCIDevice(VirtualDevice):
                 return False
         else:
             self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
-            self._bd_address = bd_address
+            self._bd_address = self._read_BD_address()
             self._bd_address_type = BleAddrType.RANDOM
             return True
 
