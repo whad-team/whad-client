@@ -66,13 +66,16 @@ class PcapWriterMonitor(WhadMonitor):
                     # Pcap is empty, remove it and open a new one
                     remove(self._pcap_file)
                     existing_pcap_file = False
+
         # Instanciate the PCAP Writer with the appropriate parameters
+        self._writer_lock.acquire()
         self._writer = PcapWriter(
                                     self._pcap_file,
                                     append=existing_pcap_file and not sync,
                                     sync=sync
         )
-
+        self._writer_lock.release()
+        
         # Checks if there is a scapy packet formatter associated with the connector.
         # A formatter allows to describe manually how to build the packet, it is mainly
         # useful to populate a relevant header for PCAP export.
@@ -85,9 +88,11 @@ class PcapWriterMonitor(WhadMonitor):
 
 
     def close(self):
+        # Acquire lock on writer
+        self._writer_lock.acquire()
+
         if hasattr(self, "_writer") and self._writer is not None:
-            # Acquire lock on writer
-            self._writer_lock.acquire()
+
 
             # Close writer
             try:
@@ -98,8 +103,8 @@ class PcapWriterMonitor(WhadMonitor):
             # Mark writer as not available anymore
             self._writer = None
 
-            # Release lock on writer
-            self._writer_lock.release()
+        # Release lock on writer
+        self._writer_lock.release()
 
     def default_formatter(self, packet):
         """
@@ -115,6 +120,9 @@ class PcapWriterMonitor(WhadMonitor):
             return packet, None
 
     def process_packet(self, packet):
+        # Acquire lock on writer lock acquire multithread error
+        self._writer_lock.acquire()
+        
         if self._processing:
             # Note the current local clock timestamp in us
             now = time() * 1000000
@@ -138,18 +146,16 @@ class PcapWriterMonitor(WhadMonitor):
             packet.time = timestamp / 1000000
             try:
                 if self._writer is not None:
-                    # Acquire lock on writer
-                    self._writer_lock.acquire()
 
                     # Write packet
                     self._writer.write(packet)
                     self._nb_pkts_written += 1
-
-                    # Release lock
-                    self._writer_lock.release()
                 else:
                     # We are trying to write to a closed PCAP monitor,
                     # issue a warning message
                     logger.warning('cannot write to PCAP: file has already been closed')
             except BrokenPipeError:
                 pass
+
+        # Release lock
+        self._writer_lock.release()
