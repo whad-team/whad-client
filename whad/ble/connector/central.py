@@ -11,6 +11,7 @@ from whad.ble.stack import BleStack, BtVersion
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
 from whad.ble.stack.gatt import GattClient
 from whad.ble.stack.att import ATTLayer
+from whad.ble.stack.smp import CryptographicDatabase
 from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
 from whad.ble.profile.device import PeripheralDevice
 from whad.common.stack import Layer

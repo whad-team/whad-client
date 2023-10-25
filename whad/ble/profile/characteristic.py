@@ -70,7 +70,7 @@ class ReportReferenceDescriptor(CharacteristicDescriptor):
             characteristic,
             uuid=UUID(0x2908),
             handle=handle,
-            value=b''
+            value=b'\x01\x01'
         )
 
 

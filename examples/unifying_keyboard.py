@@ -19,14 +19,15 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
 
-            #connector.key = bytes.fromhex("08f59b42d06fd3bdc588cd4d1c244018")
-            #connector.aes_counter = 0
             #connector.attach_callback(show, on_reception=True, on_transmission=False)
 
             connector = Keyboard(dev)
             connector.start()
+            # Program key and AES counter
+            connector.key = bytes.fromhex("08f59b42c46f2a139688a44d69ac4066")
+            connector.aes_counter = 0
             # Select a specific address
-            connector.address = "ca:e9:06:ec:a4"
+            connector.address = "9b:0a:90:42:a7"
 
             # Synchronize with the dongle
             connector.synchronize()
