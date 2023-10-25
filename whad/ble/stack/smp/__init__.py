@@ -10,8 +10,6 @@ BleSMP provides these different pairing strategies:
 
 """
 # TODO
-# implementing a mechanism to identify if pairing was successful or not (Exception ? Report Object ? )
-# checking bugs on API
 # refactoring, maybe some states can be merged
 
 from struct import pack, unpack
