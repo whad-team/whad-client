@@ -63,3 +63,10 @@ class InvalidParameter(Exception):
 
     def __repr__(self):
         return "InvalidParameter: provided %s parameter is not valid" % (self.__parameter)
+    
+class ScheduleFifoFull(Exception):
+    def __init__(self):
+        super().__init__()
+
+    def __repr__(self):
+        return "Schedule packets FIFO is full"
