@@ -212,7 +212,7 @@ class LWApplication(object):
             self.__registry = LWNodeRegistry(path=node_db_path)
         else:
             self.__registry = LWNodeRegistry(
-                path='%s.json' % self.__eui
+                path='%s.json' % self.__eui.replace(':','')
             )
 
         # Load registry with devices
