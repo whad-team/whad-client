@@ -29,12 +29,19 @@ class LWGwLinkLayerState(LayerState):
         self.join_delay1 = 5.0
         self.join_delay2 = 6.0
 
-    def has_devaddr(self, dev_addr):
+    def has_devaddr(self, dev_addr : int) -> bool:
         """Check if a device address is already registered
+
+        :param dev_addr: Device address
+        :type dev_addr: int
+
+        :returns: True if device address is known, False otherwise.
+        :return-type: bool
         """
         return (dev_addr in self.connections)
 
-    def register_connection(self, dev_addr: int, dev_eui:EUI=None, mac_node=None, appskey:bytes=None,nwkskey:bytes=None, timestamp:float = None):
+    def register_connection(self, dev_addr : int, dev_eui : EUI = None, mac_node : str = None,
+                            appskey : bytes = None, nwkskey : bytes = None, timestamp : float = None):
         """Register a device connection.
 
         Keeps track of MAC instance name associated with the device as well as the
@@ -59,18 +66,28 @@ class LWGwLinkLayerState(LayerState):
                 'timestamp': timestamp
             }
 
-    def update_connection(self, dev_addr, timestamp=None):
+    def update_connection(self, dev_addr : int, timestamp : float = None):
+        """Update connection timestamp
+
+
+        :param dev_addr: Device network address
+        :type dev_addr: int
+        :param timestamp: Timestamp in seconds
+        :type timestamp: float
+        """
         connection = self.get_connection(dev_addr)
         if connection is not None:
             if timestamp is not None:
                 connection['timestamp'] = timestamp
 
-    def get_connection(self, dev_addr: int) -> dict:
+    def get_connection(self, dev_addr : int) -> dict:
         """Retrieve a connection associated with a given
         device address.
 
         :param dev_addr: device address
         :type dev_addr: int
+        :returns: connection data
+        :return-type: dict
         """
         if self.has_devaddr(dev_addr):
             return self.connections[dev_addr]
@@ -78,7 +95,15 @@ class LWGwLinkLayerState(LayerState):
             return None
 
 
-    def get_connection_from_node(self, mac_node):
+    def get_connection_from_node(self, mac_node : str) -> dict:
+        """Get connection data from MAC layer node
+
+        :param mac_node: MACLayer instance name
+        :type mac_node: str
+        
+        :returns: Connection data or None if not found
+        :return-type: dict
+        """
         for dev_addr in self.connections:
             if self.connections[dev_addr]['mac_node'] == mac_node:
                 return self.connections[dev_addr]
@@ -96,7 +121,8 @@ class LWGwLinkLayer(Layer):
     """
 
     def configure(self, options={}):
-
+        """Configure Link layer state
+        """
         # Process options
         if 'rx_delay1' in options:
             self.state.rx_delay1 = options['rx_delay1']
@@ -107,15 +133,23 @@ class LWGwLinkLayer(Layer):
         if 'join_delay2' in options:
             self.state.join_delay2 = options['join_delay2']
 
-    def generate_devaddr(self):
+    def generate_devaddr(self) -> int:
+        """Generate a free device network address
+
+        :returns: Attributed device network address
+        :return-type: int
+        """
         nok = True
         while nok:
             dev_addr = randint(0, 0xffffff)
             nok = self.state.has_devaddr(dev_addr)
         return dev_addr
 
-    def on_join_request(self, frame):
+    def on_join_request(self, frame : PHYPayload):
         """Process an incoming Join Request
+
+        :param frame: LoRaWAN frame
+        :type frame: PHYPayload
         """
         
         # Retrieve APPKey and APPEUI
@@ -204,14 +238,53 @@ class LWGwLinkLayer(Layer):
                 hexlify(exp_mic)
             ))
 
+    def add_provisioned_device(self, dev_addr : int, dev_eui : str, appskey : bytes,
+                               nwkskey : bytes, upcount : int, dncount : int):
+        """Add a pre-provisioned device to our current state.
+
+        :param dev_addr: Device network address
+        :type dev_addr: int
+        :param dev_eui: Device EUI
+        :type dev_eui: str
+        :param dev_appskey: Device application session key
+        :type dev_appskey: bytes
+        :param dev_nwkskey: Device network encryption session key
+        :type dev_nwkskey: bytes
+        """
+        logger.debug('add a pre-provisioned device (address 0x%08x, eui: %s)' % (
+            dev_addr, dev_eui
+        ))
+
+        # Instanciate a node for our connection
+        conn_mac = self.instantiate(LWMacLayer)
+        conn_mac.set_devaddr(dev_addr)
+        logger.debug('created a LWMACLayer instance for device: %s' % conn_mac.name)
+
+        # Set uplink/downlink frame counters
+        conn_mac.set_up_counter(upcount)
+        conn_mac.set_down_counter(dncount)
+
+        # Save node information
+        self.state.register_connection(
+            dev_addr,
+            dev_eui,
+            conn_mac.name,
+            appskey,
+            nwkskey,
+        )
 
     def on_rejoin_request(self, rejoin_request):
         """Process a Rejoin Request
+
+        Not implemented for now :(
         """
         pass
 
-    def on_unconfirmed_data_up(self, unc_data_up):
-        """Process an unconfirmed data up
+    def on_unconfirmed_data_up(self, unc_data_up : PHYPayload):
+        """Process an unconfirmed data up.
+
+        :param unc_data_up: LoRaWAN unconfirmed data up frame
+        :type unc_data_up: PHYPayload
         """
         mac_layer = unc_data_up.getlayer(MACPayloadUplink)
 
@@ -241,14 +314,23 @@ class LWGwLinkLayer(Layer):
         else:
             logger.debug('Device address 0x%08x is not known' % mac_layer.dev_addr)
 
-    def on_confirmed_data_up(self, conf_data_up):
+    def on_confirmed_data_up(self, conf_data_up : PHYPayload):
         """Process a confirmed data up.
+
+        Not supported yet.
+
+        :param conf_data_up: LoRaWAN confirmed data up frame
+        :type conf_data_up: PHYPayload
         """
         pass
+
 
     @source('phy')
     def on_phy_frame(self, frame: PHYPayload):
         """Process a frame coming from our gateway PHY layer.
+
+        :param frame: LoRaWAN frame
+        :type frame: PHYPayload
         """
         # Is it a join request ?
         if frame.mtype == 0:
@@ -264,8 +346,15 @@ class LWGwLinkLayer(Layer):
             self.on_rejoin_request(frame)
 
     @instance('mac')
-    def on_mac_response(self, inst_name, frame: MACPayloadDownlink, confirmed=False):
+    def on_mac_response(self, inst_name : str, frame : MACPayloadDownlink, confirmed : bool = False):
         """Send downlink message to remote device.
+
+        :param inst_name: Name of the MAC instance that called this method
+        :type inst_name: str
+        :param frame: LoRaWAN downlink MAC frame to send
+        :type frame: MACPayloadDownlink
+        :param confirmed: Confirmed downlink frame must be sent
+        :type confirmed: bool
         """
         # Find node from instance name
         connection = self.state.get_connection_from_node(inst_name)
@@ -298,8 +387,15 @@ class LWGwLinkLayer(Layer):
         else:
             logger.debug('[llm] MAC instance %s not found' % inst_name)
 
-    def on_data_received(self, dev_addr, data:bytes, upcount=0):
+    def on_data_received(self, dev_addr : int, data : bytes, upcount : int = 0):
         """Report data reception to phy
+
+        :param dev_addr: Device network address
+        :type dev_addr: int
+        :param data: Data received
+        :type data: bytes
+        :param upcount: Uplink frame counter
+        :type upcount: int
         """
         connection = self.state.get_connection(dev_addr)
         if connection is not None:

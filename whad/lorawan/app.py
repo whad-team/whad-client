@@ -1,7 +1,9 @@
 """LoRaWAN application template.
 """
 import json
-from os.path import exists, isfile, join
+from os import unlink
+from os.path import exists, isfile
+from binascii import hexlify, unhexlify
 
 from whad.lorawan.exceptions import InvalidNodeRegistryError
 
@@ -19,6 +21,16 @@ class LWNode(object):
         self.__nwkskey = nwkskey
         self.__upcount = upcount
         self.__dncount = dncount
+
+    def __repr__(self):
+        return 'LWNode(eui:%s, address:%s, appskey:%s, nwkskey:%s, uplink_count:%d, downlink_count:%d)' % (
+            self.dev_eui,
+            self.dev_addr,
+            hexlify(self.__appskey).decode('ascii'),
+            hexlify(self.__nwkskey).decode('ascii'),
+            self.__upcount,
+            self.__dncount
+        )
 
     @property
     def dev_eui(self):
@@ -67,17 +79,24 @@ class LWNode(object):
         self.__dncount = (self.__dncount + 1) & 0xffffffff
 
     def toDict(self):
-        return json.dumps({
+        return {
             'dev_eui': self.dev_eui,
             'dev_addr': self.dev_addr,
-            'appskey': self.appskey,
-            'nwkskey': self.nwkskey
-        })
+            'appskey': hexlify(self.appskey).decode('ascii'),
+            'nwkskey': hexlify(self.nwkskey).decode('ascii'),
+            'upcount': self.upcount,
+            'dncount': self.dncount
+        }
     
     @staticmethod
-    def fromJSON(self, data):
+    def fromJSON(data):
         return LWNode(
-            data['']
+            data['dev_eui'],
+            data['dev_addr'],
+            unhexlify(data['appskey']),
+            unhexlify(data['nwkskey']),
+            data['upcount'],
+            data['dncount']
         )
     
 
@@ -91,8 +110,11 @@ class LWNodeRegistry(object):
     Data is stored in a flat json file.
     """
 
-    def __init__(self, path='default_node.json'):
+    def __init__(self, path:str ='default_node.json'):
         """Load node registry file.
+
+        :param path: Default registry file
+        :type path: str
         """
         self.__path = path
         self.__nodes = {}
@@ -105,10 +127,14 @@ class LWNodeRegistry(object):
                     # Loop on nodes and load our lookup table
                     for node in nodes:
                         node_ = LWNode.fromJSON(node)
-                        self.__nodes[node.dev_eui] = node_
+                        self.__nodes[node_.dev_eui] = node_
                     registry.close()
             except IOError as file_err:
                 raise InvalidNodeRegistryError(path)
+            except Exception as other_err:
+                # Oops, error while loading registry. Unlink file.
+                logger.error('Error while loading registry file %s, removing file.' % path)
+                unlink(path)
         else:
             # File does not exist, create it.
             try:
@@ -118,20 +144,34 @@ class LWNodeRegistry(object):
             
     def add_node(self, node: LWNode):
         """Register a LoRaWAN node.
+
+        :param node: Node to add to this registry
+        :type node: LWNode
         """
         if node.dev_eui in self.__nodes:
             logger.warning('Device %s is already present in node registry' % (
                 node.dev_eui
             ))
-        self.__nodes[node.dev_eui] = node
+        else:
+            logger.debug('adding node %s' % node)
+            self.__nodes[node.dev_eui] = node
 
-    def get_node(self, eui=None):
+    def get_node(self, eui:str = None):
         """Retrieve node by DEV EUI.
+
+        :param eui: Node EUI
+        :type eui: str
         """
         if str(eui) in self.__nodes:
             return self.__nodes[str(eui)]
         else:
             return None
+
+    def iterate(self):
+        """Iterate over registered nodes.
+        """
+        for dev_eui in self.__nodes:
+            yield self.__nodes[dev_eui]
 
     def save(self):
         """Save registry to file
@@ -140,7 +180,7 @@ class LWNodeRegistry(object):
             with open(self.__path, 'w') as registry:
                 nodes = []
                 for node_eui in self.__nodes:
-                    registry.append(self.__nodes[node_eui].toDict())
+                    nodes.append(self.__nodes[node_eui].toDict())
                 json.dump(nodes, registry)
                 registry.close()
         except IOError as file_err:
@@ -152,6 +192,17 @@ class LWApplication(object):
     """
 
     def __init__(self, eui=None, key=None, node_db_path=None, devices:[LWNode] = []):
+        """Initialize a LoRaWAN application
+
+        :param eui: Application EUI
+        :type eui: str
+        :param key: Application key in hexadecimal form
+        :type key: str
+        :param node_db_path: Application database path, default is named <APP_EUI>.json
+        :type node_db_path: str
+        :param devices: Allowed devices
+        :type devices: list
+        """
         # Save application EUI and main key
         self.__eui = str(eui).lower()
         self.__key = key
@@ -173,14 +224,28 @@ class LWApplication(object):
 
     @property
     def eui(self):
+        """Return application EUI
+        """
         return self.__eui
     
     @property
     def key(self):
+        """Return application key
+        """
         return self.__key
     
+    def nodes(self):
+        """Iterate over registered nodes.
+        """
+        for node in self.__registry.iterate():
+            print(node)
+            yield node
+
     def add_node(self, node: LWNode = None):
         """Dynamically add a node to application registry.
+
+        :param node: Node to add to this application
+        :type node: LWNode
         """
         if node is not None:
             self.__registry.add_node(node)
@@ -204,6 +269,17 @@ class LWApplication(object):
 
     def on_device_joined(self, dev_eui, dev_addr, appskey, nwkskey):
         """Handles device join procedure
+
+        This method is called whenever a device has joined the network through OTAA.
+
+        :param dev_eui: Device EUI
+        :type dev_eui: str
+        :param dev_addr: Device network address
+        :type dev_addr: int
+        :param appskey: Device's application session key
+        :type appskey: bytes
+        :param nwkskey: Device's network session encryption key
+        :type nwkskey: int
         """
         # Add this device to our registry
         self.__registry.add_node(LWNode(
@@ -248,5 +324,13 @@ class LWApplication(object):
         to the device through a downlink transmission.
 
         If None is returned, nothing is sent back to the device.
+
+        :param node: Node that sent the data
+        :type node: LWNode
+        :param data: Data sent by the node
+        :type data: bytes
+
+        :returns: Data to send back to the device
+        :return-type: bytes
         """
         return None
