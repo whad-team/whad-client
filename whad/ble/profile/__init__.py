@@ -877,9 +877,8 @@ class GenericProfile(object):
         :raises: :class:`whad.ble.exceptions.InvalidHandleValueException`
         """
         try:
-            charac = self.find_object_by_handle(handle)
-            if charac.handle in self.__service_by_characteristic_handle:
-                return self.__service_by_characteristic_handle[charac.handle]
+            if handle in self.__service_by_characteristic_handle:
+                return self.__service_by_characteristic_handle[handle]
             else:
                 raise InvalidHandleValueException
         except IndexError:
