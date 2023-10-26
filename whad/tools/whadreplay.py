@@ -255,6 +255,15 @@ class WhadReplayApp(CommandLineApp):
             help='Specify the stop position in the PCAP file'
         )
 
+        self.add_argument(
+            '-d',
+            '--delay',
+            dest='offset',
+            default=100,
+            type=int,
+            help='Additional delay between packets, in milliseconds'
+        )
+
         subparsers = self.add_subparsers(
             required=True,
             dest="domain",
@@ -461,7 +470,8 @@ class WhadReplayApp(CommandLineApp):
                         
                         # PCAPReader will send back packets in a timely manner, according to PCAP timestamps.
                         reader = PCAPReader(self.args.pcapfile)
-                        for packet in reader.packets(start=self.args.start_pos, count=count, offset=.1):
+                        for packet in reader.packets(start=self.args.start_pos, count=count,
+                                                     offset=self.args.offset/1000.):
                             replay.send_packet(packet)
 
                     # Stop our replay instance
