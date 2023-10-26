@@ -610,7 +610,7 @@ class BLE(WhadDeviceConnector):
             msg.ble.connect.hop_interval = hop_interval
         if hop_increment is not None:
             msg.ble.connect.hop_increment = hop_increment
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return self.send_command(msg, message_filter('generic', 'cmd_result'))
 
     def start(self):
         """

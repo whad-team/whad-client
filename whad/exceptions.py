@@ -102,3 +102,11 @@ class TriggerNotAssociated(Exception):
 class InvalidTriggerPattern(Exception):
     def __init__(self):
         super().__init__()
+
+# Generic replay
+class ReplayInvalidRole(Exception):
+    def __init__(self):
+        super().__init__()
+        
+    def __repr__(self):
+        return 'ReplayInvalidRole'
