@@ -2,6 +2,7 @@ from whad.ble.exceptions import InvalidAccessAddressException
 from dataclasses import dataclass
 from whad.ble.utils.phy import is_access_address_valid
 from whad.common.sniffing import SniffingEvent
+
 @dataclass
 class SynchronizedConnection:
     access_address : int = None

@@ -629,9 +629,17 @@ class HCIDevice(VirtualDevice):
                     else:
                         logger.debug('send_pdu command failed.')
                         self._send_whad_command_result(ResultCode.ERROR)
+                else:
+                    # Error while converting packets
+                    logger.debug('error while converting message to packet')
+                    self._send_whad_command_result(ResultCode.ERROR)                   
             except WhadDeviceUnsupportedOperation as err:
                 logger.debug('Parameter error')
                 self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+        else:
+            # Wrong state, cannot send PDU
+            logger.debug('wrong state or packet direction.')
+            self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_ble_set_bd_addr(self, message):
         logger.debug('Received WHAD BLE set_bd_addr message')
