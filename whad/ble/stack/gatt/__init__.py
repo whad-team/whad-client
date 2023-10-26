@@ -5,6 +5,7 @@ import logging
 from time import time
 from queue import Queue, Empty
 from struct import unpack, pack
+from threading import Lock
 
 from whad.ble.exceptions import HookReturnValue, HookReturnAuthentRequired,\
     HookReturnAuthorRequired, HookReturnAccessDenied, HookReturnGattError, \
@@ -22,6 +23,22 @@ from whad.common.stack import Layer, source, alias
 
 logger = logging.getLogger(__name__)
 
+def txlock(f):
+    def _wrapper(self, *args, **kwargs):
+        self.lock_tx()
+        result = f(self, *args, **kwargs)
+        self.unlock_tx()
+        return result
+    return _wrapper
+
+def proclock(f):
+    def _wrapper(self, *args, **kwargs):
+        self.procedure_start()
+        result = f(self, *args, **kwargs)
+        self.procedure_stop()
+        return result
+    return _wrapper
+
 @alias('gatt')
 class GattLayer(Layer):
     '''Gatt client/server base class
@@ -31,6 +48,8 @@ class GattLayer(Layer):
         '''Configure the GATT layer
         '''
         self.__queue = Queue()
+        self.__proc_lock = Lock()
+        self.__tx_lock = Lock()
         self.state.terminated = False
 
         # Dispatch rules
@@ -88,6 +107,33 @@ class GattLayer(Layer):
         else:
             logger.error('no GATT handler for packet type %s' % packet_type.__name__)
 
+    def procedure_start(self):
+        """
+        Lock GATT client or server to avoid a new procedure to be initiated while
+        another is actually in progress.
+        """
+        logger.debug('Start of GATT procedure ...')
+        self.__proc_lock.acquire()
+
+    def procedure_stop(self):
+        """Unlock GATT client or server to allow other pocedures to be executed.
+        """
+        logger.debug('End of GATT procedure')
+        self.__proc_lock.release()
+
+    def lock_tx(self):
+        """Lock GATT client or server to process a single PDU and avoid other PDUs
+        to be sent in-between.
+        """
+        logger.debug('Start handling PDU (tx/rx)')
+        self.__tx_lock.acquire()
+
+    def unlock_tx(self):
+        """Unlock GATT client or server in order to allow other PDUs to be processed.
+        """
+        logger.debug('End handling PDU (tx/rx)')
+        self.__tx_lock.release()
+
     def indicate(self, characteristic):
         """Send an indication to a GATT client. Not implemented by default.
         """
@@ -138,7 +184,7 @@ class GattLayer(Layer):
     def on_error_response(self, error: GattErrorResponse):
         self.on_gatt_message(error)
 
-
+    @txlock
     def on_find_info_request(self, packet: GattFindInfoRequest):
         '''ATT Find Information Request callback
 
@@ -162,6 +208,7 @@ class GattLayer(Layer):
         '''
         pass
 
+    @txlock
     def on_find_by_type_value_request(self, request: GattFindByTypeValueRequest):
         """ATT Find By Type Value Request callback
 
@@ -179,7 +226,7 @@ class GattLayer(Layer):
         """
         pass
 
-
+    @txlock
     def on_read_by_type_request(self, request: GattReadByTypeRequest):
         """ATT Read By Type Request callback
 
@@ -198,6 +245,7 @@ class GattLayer(Layer):
         """
         pass
 
+    @txlock
     def on_read_by_group_type_request(self, request: GattReadByGroupTypeRequest):
         """ATT Read By Group Type Request callback
 
@@ -217,7 +265,8 @@ class GattLayer(Layer):
         :param data: List of items
         """
         pass
-
+    
+    @txlock
     def on_read_request(self, request: GattReadRequest):
         """ATT Read Request callback
 
@@ -234,6 +283,7 @@ class GattLayer(Layer):
         """
         pass
 
+    @txlock
     def on_read_blob_request(self, request: GattReadBlobRequest):
         """ATT Read Blob Request callback
 
@@ -251,6 +301,7 @@ class GattLayer(Layer):
         """
         pass
 
+    @txlock
     def on_read_multiple_request(self, request: GattReadMultipleRequest):
         """ATT Read Multiple Request callback
 
@@ -267,6 +318,8 @@ class GattLayer(Layer):
         """
         pass
 
+
+    @txlock
     def on_write_request(self, request: GattWriteRequest):
         """ATT Write Request callback
 
@@ -282,6 +335,7 @@ class GattLayer(Layer):
         """
         pass
 
+    @txlock
     def on_write_command(self, request: GattWriteCommand):
         """ATT Write Command callback
 
@@ -300,14 +354,16 @@ class GattLayer(Layer):
         """
         pass
 
+    @txlock
     def on_handle_value_indication(self, indication: GattHandleValueIndication):
         """ATT Handle Value Indication
 
         :param int handle: Attribute handle
         :param value: Attribute value
         """
-        pass
+        self.att.handle_value_confirmation()
 
+    @txlock
     def on_prepare_write_request(self, request: GattPrepareWriteRequest):
         """ATT Prepare Write request callback
 
@@ -379,7 +435,6 @@ class GattClient(GattLayer):
 
     def on_read_by_group_type_response(self, response: GattReadByGroupTypeResponse):
         """ATT Read By Group Type Response callback
-
         """
         self.on_gatt_message(response)
 
@@ -391,14 +446,12 @@ class GattClient(GattLayer):
         """
         self.on_gatt_message(response)
 
-
     def on_read_response(self, response):
         """ATT Read Response callback
 
         :param value: Attribute value
         """
         self.on_gatt_message(response)
-
 
     def on_read_by_type_response(self, response: GattReadByTypeResponse):
         """ATT Read By Type Response callback
@@ -407,7 +460,6 @@ class GattClient(GattLayer):
         """
         self.on_gatt_message(response)
 
-
     def on_read_blob_response(self, response: GattReadBlobResponse):
         """ATT Read Blob Response callback
 
@@ -415,12 +467,10 @@ class GattClient(GattLayer):
         """
         self.on_gatt_message(response)
 
-
     def on_write_response(self, response):
         """ATT Write Response callback
         """
         self.on_gatt_message(response)
-
 
     def on_prepare_write_response(self, response):
         """ATT Prepare Write Response Callback
@@ -443,7 +493,6 @@ class GattClient(GattLayer):
         """
         self.on_gatt_message(response)
 
-
     def on_handle_value_notification(self, notification):
         """ATT Handle Value Notification
 
@@ -457,6 +506,7 @@ class GattClient(GattLayer):
                 indication=False
             )
 
+    @txlock
     def on_handle_value_indication(self, notification):
         """ATT Handle Value Indication
 
@@ -494,18 +544,23 @@ class GattClient(GattLayer):
         """
         self.__notification_callbacks = {}
 
+    @proclock
     def discover_primary_service_by_uuid(self, uuid):
         """Discover a primary service by its UUID.
 
         :param UUID uuid: Service UUID
         :return: Service if service has been found, None otherwise
         """
+        # Send FindByTypeValueRequest
+        self.lock_tx()
         self.att.find_by_type_value_request(
             1,
             0xFFFF,
             0x2800,
             uuid.packed
         )
+        self.unlock_tx()
+
         msg = self.wait_for_message(GattFindByTypeValueResponse)
         if isinstance(msg, GattFindByTypeValueResponse):
             for item in msg:
@@ -520,7 +575,7 @@ class GattClient(GattLayer):
             else:
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
-
+    @proclock
     def discover_primary_services(self):
         """Discover remote Primary Services.
 
@@ -530,11 +585,13 @@ class GattClient(GattLayer):
         handle = 1
         while True:
             # Send a Read By Group Type Request
+            self.lock_tx()
             self.att.read_by_group_type_request(
                 handle,
                 0xFFFF,
                 0x2800
             )
+            self.unlock_tx()
 
             msg = self.wait_for_message(GattReadByGroupTypeResponse)
             if isinstance(msg, GattReadByGroupTypeResponse):
@@ -556,6 +613,7 @@ class GattClient(GattLayer):
                 else:
                     error_response_to_exc(msg.reason, msg.request, msg.handle)
 
+    @proclock
     def discover_secondary_services(self):
         """Discover remote Secondary Services.
         """
@@ -563,11 +621,13 @@ class GattClient(GattLayer):
         handle = 1
         while True:
             # Send a Read By Group Type Request
+            self.lock_tx()
             self.att.read_by_group_type_request(
                 handle,
                 0xFFFF,
                 0x2801
             )
+            self.unlock_tx()
 
             msg = self.wait_for_message(GattReadByGroupTypeResponse)
             if isinstance(msg, GattReadByGroupTypeResponse):
@@ -589,6 +649,7 @@ class GattClient(GattLayer):
                 else:
                     error_response_to_exc(msg.reason, msg.request, msg.handle)
 
+    @proclock
     def discover_characteristics(self, service):
         """
         Discover service characteristics
@@ -604,11 +665,13 @@ class GattClient(GattLayer):
 
         while handle <= service.end_handle:
             logger.debug('service end handle is: %d' % service.end_handle)
+            self.lock_tx()
             self.att.read_by_type_request(
                 handle,
                 service.end_handle,
                 0x2803
             )
+            self.unlock_tx()
 
             msg = self.wait_for_message(GattReadByTypeResponse)
             if isinstance(msg, GattReadByTypeResponse):
@@ -634,6 +697,7 @@ class GattClient(GattLayer):
                 else:
                     error_response_to_exc(msg.reason, msg.request, msg.handle)
 
+    @proclock
     def discover_characteristic_descriptors(self, characteristic):
         """Find characteristic descriptor
         """
@@ -641,10 +705,12 @@ class GattClient(GattLayer):
             handle = characteristic.value_handle + 1
             end_handle = self.__model.find_characteristic_end_handle(characteristic.handle)
             while handle <= end_handle:
+                self.lock_tx()
                 self.att.find_info_request(
                     handle,
                     end_handle
                 )
+                self.unlock_tx()
 
                 msg = self.wait_for_message(GattFindInfoResponse)
                 if isinstance(msg, GattFindInfoResponse):
@@ -687,32 +753,40 @@ class GattClient(GattLayer):
                             )
                         )
 
+    @proclock
     def read(self, handle):
         """Read a characteristic or a descriptor.
 
         :param int handle: Handle of the attribute to read (descriptor or characteristic)
         """
+        self.lock_tx()
         self.att.read_request(gatt_handle=handle)
+        self.unlock_tx()
+
         msg = self.wait_for_message(GattReadResponse)
         if isinstance(msg, GattReadResponse):
             return msg.value
         elif isinstance(msg, GattErrorResponse):
             raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
+    @proclock
     def read_blob(self, handle, offset=0):
         """Read a characteristic or a descriptor starting from `offset`.
 
         :param int handle: Handle of the characteristic value or descriptor to read.
         :param int offset: Start reading from this offset value (default: 0)
         """
+        self.lock_tx()
         self.att.read_blob_request(handle, offset)
+        self.lock_tx()
+
         msg = self.wait_for_message(GattReadBlobResponse)
         if isinstance(msg, GattReadBlobResponse):
             return msg.value
         elif isinstance(msg, GattErrorResponse):
             raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
-
+    @proclock
     def read_long(self, handle):
         """Read a long characteristic or descriptor
 
@@ -723,7 +797,11 @@ class GattClient(GattLayer):
         value=b''
         offset=0
         while True:
+            # Send a ReadBlob request
+            self.lock_tx()
             self.att.read_blob_request(handle, offset)
+            self.unlock_tx()
+
             msg = self.wait_for_message(GattReadBlobResponse)
             if isinstance(msg, GattReadBlobResponse):
                 if len(msg.value) < (local_mtu - 1):
@@ -736,6 +814,7 @@ class GattClient(GattLayer):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
         return value
 
+    @proclock
     def write(self, handle, value):
         """Write data to a characteristic or a descriptor
 
@@ -749,32 +828,37 @@ class GattClient(GattLayer):
             return self.write_long(handle, value)
         else:
             # If data can be sent in a single write request, just send it :)
+            self.lock_tx()
             self.att.write_request(
                 handle,
                 value
             )
+            self.unlock_tx()
+
             msg = self.wait_for_message(GattWriteResponse)
             if isinstance(msg, GattWriteResponse):
                 return True
             elif isinstance(msg, GattErrorResponse):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
-
+    @proclock
     def write_command(self, handle, value):
         """Write data to a characteristic or a descriptor, do not expect an answer.
 
         :param int handle: Target characteristic or descriptor handle
         :param bytes value: Data to write
         """
+        self.lock_tx()
         self.att.write_command(
             handle,
             value
         )
+        self.unlock_tx()
 
         # Write command does not cause the GATT server to return a response.
         return True
 
-
+    @proclock
     def write_long(self, handle, value):
         """Write long data (size > ATT_MTU-2) to a characteristic value.
 
@@ -797,7 +881,10 @@ class GattClient(GattLayer):
         # Send prepared write requests
         offset = 0
         for i in range(nb_chunks):
+            self.lock_tx()
             self.att.prepare_write_request(handle, offset, value[offset:offset + chunk_size])
+            self.unlock_tx()
+
             msg = self.wait_for_message(GattPrepareWriteResponse)
             if isinstance(msg, GattPrepareWriteResponse):
                 if msg.value is not None:
@@ -808,14 +895,17 @@ class GattClient(GattLayer):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
         # Execute write request
+        self.lock_tx()
         self.att.execute_write_request(1)
+        self.unlock_tx()
+
         msg = self.wait_for_message(GattExecuteWriteResponse)
         if isinstance(msg, GattExecuteWriteResponse):
             return True
         elif isinstance(msg, GattErrorResponse):
             raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
-
+    @proclock
     def read_characteristic_by_uuid(self, uuid, start=1, end=0xFFFF):
         """Read a characteristic given its UUID if its handle is comprised in a given range.
 
@@ -829,7 +919,11 @@ class GattClient(GattLayer):
             # Required by scapy
             uuid1 = unpack('<Q', uuid.packed[:8])[0]
             uuid2 = unpack('<Q', uuid.packed[8:])[0]
+            
+            self.lock_tx()
             self.att.read_by_type_request_128bit(start, end, uuid1, uuid2)
+            self.unlock_tx()
+
         msg = self.wait_for_message(GattReadByTypeResponse)
         if isinstance(msg, GattReadByTypeResponse):
             output = []
@@ -842,7 +936,7 @@ class GattClient(GattLayer):
         elif isinstance(msg, GattErrorResponse):
             raise error_response_to_exc(msg.reason, msg.request, msg.handle)
 
-
+    @proclock
     def set_mtu(self, mtu):
         '''Set (G)ATT client MTU (must be >= ATT_MTU, i.e. 23).
 
@@ -853,7 +947,10 @@ class GattClient(GattLayer):
         :return int: remote device MTU
         '''
         if mtu >= 23:
+            self.lock_tx()
             self.att.exch_mtu_request(mtu)
+            self.unlock_tx()
+
             msg = self.wait_for_message(GattExchangeMtuResponse)
             if isinstance(msg, GattExchangeMtuResponse):
                 return msg.mtu
@@ -861,7 +958,6 @@ class GattClient(GattLayer):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
         else:
             return None
-
 
     def services(self):
         return self.__model.services()
@@ -943,6 +1039,7 @@ class GattServer(GattLayer):
                 value_override.value[:local_mtu-3]
             )
 
+    @proclock
     def indicate(self, characteristic):
         """Sends an indication to a GATT client for a given characteristic.
 
@@ -971,6 +1068,7 @@ class GattServer(GattLayer):
                 value_override.value[:local_mtu-3]
             )
 
+    @txlock
     def on_find_info_request(self, request):
         """Find information request
         """
@@ -1025,7 +1123,7 @@ class GattServer(GattLayer):
                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
 
-
+    @txlock
     def on_read_request(self, request):
         """Read attribute value (if any)
 
@@ -1126,7 +1224,7 @@ class GattServer(GattLayer):
                 BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
 
-
+    @txlock
     def on_read_blob_request(self, request: GattReadBlobRequest):
         """Read blob request
         """
@@ -1227,7 +1325,7 @@ class GattServer(GattLayer):
                 BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
 
-
+    @txlock
     def on_write_request(self, request):
         """Write request for characteristic or descriptor value
         """
@@ -1372,6 +1470,7 @@ class GattServer(GattLayer):
                 BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
 
+    @txlock
     def on_write_command(self, request):
         """Write command (without response)
         """
@@ -1521,7 +1620,7 @@ class GattServer(GattLayer):
                 BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
 
-
+    @txlock
     def on_prepare_write_request(self, request: GattPrepareWriteRequest):
         """Prepare write request
         """
@@ -1548,6 +1647,7 @@ class GattServer(GattLayer):
                 BleAttErrorCode.INVALID_HANDLE
             )
 
+    @txlock
     def on_execute_write_request(self, request: GattExecuteWriteRequest):
         """Execute write request
         """
@@ -1609,6 +1709,7 @@ class GattServer(GattLayer):
             # Unknown flag !
             pass
 
+    @txlock
     def on_read_by_type_request(self, request: GattReadByTypeRequest):
         """Read attribute by type request
         """
@@ -1673,7 +1774,7 @@ class GattServer(GattLayer):
                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
 
-
+    @txlock
     def on_read_by_group_type_request(self, request: GattReadByGroupTypeRequest):
         """Read by group type request
 
