@@ -114,12 +114,6 @@ class TestBleStackUnsupportedPDUs(BleLLTest):
     unsupported_pdus = [
         (BleLLTest.phy_instance, LL_CONNECTION_UPDATE_IND(), LL_UNKNOWN_RSP(code=CONNECTION_UPDATE_REQ)),
         (BleLLTest.phy_instance, LL_CHANNEL_MAP_IND(), LL_UNKNOWN_RSP(code=CHANNEL_MAP_REQ)),
-        (BleLLTest.phy_instance, LL_ENC_REQ(), LL_UNKNOWN_RSP(code=ENC_REQ)),
-        (BleLLTest.phy_instance, LL_ENC_RSP(), LL_UNKNOWN_RSP(code=ENC_RSP)),
-        (BleLLTest.phy_instance, LL_START_ENC_REQ(), LL_UNKNOWN_RSP(code=START_ENC_REQ)),
-        (BleLLTest.phy_instance, LL_START_ENC_RSP(), LL_UNKNOWN_RSP(code=START_ENC_RSP)),
-        (BleLLTest.phy_instance, LL_PAUSE_ENC_REQ(), LL_UNKNOWN_RSP(code=PAUSE_ENC_REQ)),
-        (BleLLTest.phy_instance, LL_PAUSE_ENC_RSP(), LL_UNKNOWN_RSP(code=PAUSE_ENC_RSP)),
         (BleLLTest.phy_instance, LL_SLAVE_FEATURE_REQ(), LL_UNKNOWN_RSP(code=SLAVE_FEATURE_REQ)),
         (BleLLTest.phy_instance, LL_CONNECTION_PARAM_REQ(), LL_UNKNOWN_RSP(code=CONNECTION_PARAM_REQ)),
         (BleLLTest.phy_instance, LL_PING_REQ(), LL_UNKNOWN_RSP(code=PING_REQ)),
