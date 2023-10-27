@@ -237,14 +237,22 @@ class EU868(ChannelPlan):
         super().__init__(
             channels = [
                 # Uplink (1-8, DR5)
-                Channel(1, 868100000, 5),
-                Channel(2, 868300000, 5),
-                Channel(3, 868500000, 5),
-                Channel(4, 867100000, 5),
-                Channel(5, 867300000, 5),
-                Channel(6, 867500000, 5),
-                Channel(7, 867700000, 5),
-                Channel(8, 867900000, 5),
+                Uplink(1, 868100000, 5),
+                Uplink(2, 868300000, 5),
+                Uplink(3, 868500000, 5),
+                Uplink(4, 867100000, 5),
+                Uplink(5, 867300000, 5),
+                Uplink(6, 867500000, 5),
+                Uplink(7, 867700000, 5),
+                Uplink(8, 867900000, 5),
+                Downlink(1, 868100000, 5),
+                Downlink(2, 868300000, 5),
+                Downlink(3, 868500000, 5),
+                Downlink(4, 867100000, 5),
+                Downlink(5, 867300000, 5),
+                Downlink(6, 867500000, 5),
+                Downlink(7, 867700000, 5),
+                Downlink(8, 867900000, 5),
             ],
 
             datarates = [
@@ -257,6 +265,6 @@ class EU868(ChannelPlan):
             ],
 
             # Downlink RX2, DR0
-            rx2=Channel(10, 869525000, 0)
+            rx2=Downlink(10, 869525000, 0)
         )
 
