@@ -43,10 +43,13 @@ We do also provide a set of WHAD-enable firmwares for various hardware platforms
 
 * ESP32-WROOM-32 (NodeMCU)
 * nRF52840 dongle
+* NUCLEO WL55 from STMicro Electronics
+* LoRa-e5-Mini from SeeedStudio
 
 Some other devices were made compatible with WHAD through an adaptation layer (no firmware update required):
 
 * Ubertooth One
+* Yard Stick One
 * Bluetooth HCI dongles
 
 

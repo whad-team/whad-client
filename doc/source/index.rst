@@ -24,6 +24,15 @@ Welcome to WHAD's documentation!
     ble/profile
 
 .. toctree::
+    :maxdepth: 1
+    :caption: LoRaWAN API
+
+    lorawan/started
+    lorawan/gateway
+    lorawan/lorawan
+    lorawan/channel
+
+.. toctree::
     :maxdepth: 2
     :caption: Contributing
 
