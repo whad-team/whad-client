@@ -14,7 +14,7 @@ class LWNode(object):
     """LoRaWAN node.
     """
 
-    def __init__(self, dev_eui, dev_addr=None, appskey=None, nwkskey=None, upcount=0, dncount=0):
+    def __init__(self, dev_eui, dev_addr=0, appskey=b'', nwkskey=b'', upcount=0, dncount=0):
         self.__dev_eui = str(dev_eui).lower()
         self.__dev_addr = dev_addr
         self.__appskey = appskey
@@ -26,8 +26,8 @@ class LWNode(object):
         return 'LWNode(eui:%s, address:%s, appskey:%s, nwkskey:%s, uplink_count:%d, downlink_count:%d)' % (
             self.dev_eui,
             self.dev_addr,
-            hexlify(self.__appskey).decode('ascii'),
-            hexlify(self.__nwkskey).decode('ascii'),
+            hexlify(self.__appskey).decode('ascii') if self.__appskey is not None else None,
+            hexlify(self.__nwkskey).decode('ascii') if self.__nwkskey is not None else None,
             self.__upcount,
             self.__dncount
         )
