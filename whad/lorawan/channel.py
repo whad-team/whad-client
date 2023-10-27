@@ -245,6 +245,14 @@ class EU868(ChannelPlan):
                 Uplink(6, 867500000, 5),
                 Uplink(7, 867700000, 5),
                 Uplink(8, 867900000, 5),
+                Downlink(1, 868100000, 5),
+                Downlink(2, 868300000, 5),
+                Downlink(3, 868500000, 5),
+                Downlink(4, 867100000, 5),
+                Downlink(5, 867300000, 5),
+                Downlink(6, 867500000, 5),
+                Downlink(7, 867700000, 5),
+                Downlink(8, 867900000, 5),
             ],
 
             datarates = [
