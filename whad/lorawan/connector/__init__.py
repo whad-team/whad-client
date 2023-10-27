@@ -1,4 +1,4 @@
-"""LoRaWAN connector.
+"""This module provides a connector to use LoRaWAN capable hardware.
 """
 from time import sleep
 from binascii import hexlify, unhexlify
@@ -8,8 +8,9 @@ from Cryptodome.Cipher import AES
 from Cryptodome.Hash import CMAC
 from scapy.contrib.loraphy2wan import PHYPayload, Join_Request, Join_Accept
 
+from whad.device import WhadDevice
 from whad.phy.connector.lora import LoRa
-from whad.lorawan.channel import EU868, ChannelModParams
+from whad.lorawan.channel import EU868, ChannelModParams, ChannelPlan
 from whad.lorawan.exceptions import NotStartedException
 
 import logging
@@ -27,10 +28,20 @@ def compute_mic(appkey, buffer):
 
 
 class LoRaWAN(LoRa):
-    '''LoRaWAN connector
+    '''Basic LoRaWAN connector to use with a LoRa compatible hardware.
+
+    This connector provides the basic features to send and receive LoRaWAN packets
+    with a specific channel plan.
     '''
 
-    def __init__(self, device=None, channel_plan=EU868):
+    def __init__(self, device : WhadDevice = None, channel_plan : ChannelPlan = EU868):
+        """Initialize this LoRaWAN connector.
+
+        :param device: Compatible device to use.
+        :type device: :class:`whad.device.WhadDevice`
+        :param channel_plan: Channel plan to use
+        :type channel_plan: :class:`whad.lorawan.channel.ChannelPlan`
+        """
         super().__init__(device)
 
         # Configure channel plan
@@ -45,12 +56,15 @@ class LoRaWAN(LoRa):
         # Default mode is uplink
         self.uplink()
 
-
     def reconfigure(self, channel: ChannelModParams, crc: bool = True, invert_iq : bool = False):
         '''Reconfigure hardware with provided parameters.
 
         :param channel: Target channel modulation parameters.
-        :type channel: whad.lorawan.channel.ChannelModParams
+        :type channel: :class:`whad.lorawan.channel.ChannelModParams`
+        :param crc: Enable CRC if set to `True`, disabled if set to `False`
+        :type crc: bool, optional
+        :param invert_iq: Invert IQ if set to `True`
+        :type invert_iq: bool, optional
         '''
         logger.debug('Reconfiguring hardware for channel %s' % channel)
 
@@ -80,7 +94,11 @@ class LoRaWAN(LoRa):
             self.start()
 
     def uplink(self):
-        '''Configure hardware to transmit on a random uplink channel
+        '''Configure hardware to transmit on a random uplink channel.
+
+        A random uplink channel is picked from the ones defined in the channel
+        plan, and hardware is reconfigured to listen and send on the corresponding
+        frequency with the associated modulation parameters.
         '''
         self.__current_channel = self.__channel_plan.pick_channel()
         self.reconfigure(self.__current_channel)
@@ -88,6 +106,8 @@ class LoRaWAN(LoRa):
 
     def rx1(self):
         '''Configure hardware to listen on RX1.
+        
+        RX1 channel is chosen depending on the channel plan.
         '''
         # Retrieve RX1 channel modulation parameters from channel plan
         rx1_channel = self.__channel_plan.get_rx1(self.__current_channel.number)
@@ -99,6 +119,9 @@ class LoRaWAN(LoRa):
 
     def rx2(self):
         '''Configure hardware to listen on RX2.
+
+        RX2 channel is usually a single channel with more reliable modulation
+        parameters used as a backup channel for downlink communication.
         '''
         rx2_channel = self.__channel_plan.get_rx2()
         logger.debug('RX2 channel: %s' % rx2_channel)
@@ -110,8 +133,6 @@ class LoRaWAN(LoRa):
 
     def start(self, coding_rate: int=45):
         """Start the LoRaWAN adapter into receive mode by default.
-
-        We pick a random channel from our frequency plan and wait for a frame.
         """
         # Start listening
         logger.debug('Starting hardware (RX mode)')
@@ -129,6 +150,11 @@ class LoRaWAN(LoRa):
 
     def send(self, packet, timestamp: float = None):
         '''Send a LoRaWAN frame with current LoRa modulation parameters.
+
+        :param packet: Packet to send
+        :type packet: :class:`whad.scapy.layers.lorawan.PHYPayload`
+        :param timestamp: If provided, will send the packet at the given timestamp
+        :type timestamp: float, optional
         '''
         # Make sure hardware has been started
         if not self.__started:
@@ -145,8 +171,11 @@ class LoRaWAN(LoRa):
             super().send(packet)
 
 
-    def on_packet(self, packet):
+    def on_packet(self, packet : PHYPayload):
         """Callback method for incoming packet processing
+
+        :param packet: Received packet
+        :type packet: :class:`whad.scapy.layers.lorawan.PHYPayload`
         """
         logger.debug('Received LoRaWAN payload: %s' % hexlify(bytes(packet)))
 
@@ -156,8 +185,15 @@ class LoRaWAN(LoRa):
         self.__pkt_queue.put(pkt)
 
 
-    def wait_packet(self, timeout=None):
-        """Wait for a LoRaWAN packet
+    def wait_packet(self, timeout : float = None):
+        """Wait for a LoRaWAN packet.
+
+        If timeout is set, wait for the given time and return None if no
+        packet has been received. If timeout is not provided, this method
+        will block until a valid packet is received.
+
+        :param timeout: Timeout in seconds
+        :type timeout: float, optional
         """
         try:
             logger.debug('Waiting for incoming packet ...')
@@ -194,10 +230,19 @@ class LoRaWAN(LoRa):
                 logger.debug('MIC does not match (expected: %s)' % exp_mic)
                 return None
 
-    def join(self, app_key, app_eui, dev_eui, dev_nonce):
+    def join(self, app_key : bytes, app_eui : str, dev_eui : str, dev_nonce : int):
         '''Perform an OTAA join procedure
 
         See section 6.2.1 from LoRaWAN Specifications version 1.1
+
+        :param app_key: Application key
+        :type app_key: bytes
+        :param app_eui: Application EUI
+        :type app_eui: str
+        :param dev_eui: Device EUI
+        :type dev_eui: str
+        :param dev_nonce: Device nonce
+        :type dev_nonce: str
         '''
         logger.debug('Building a join request for APPEUI %s, DEVEUI %s' % (
             app_eui,
