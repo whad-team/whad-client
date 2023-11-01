@@ -1,4 +1,61 @@
-"""LoRaWAN Frequency Plan management.
+"""LoRaWAN Channel Plan management
+
+LoRaWAN Channel Plan
+--------------------
+
+LoRaWAN networks deployed in various regions of the globe don't use the same
+frequencies as unlicensed frequencies may vary from one country to another. The
+LoRaWAN specification defines a set of default frequencies (known as channels) for
+each region of the globe and some associated mechanisms for its RX1 and RX2 receiving
+windows that may vary from one region to another.
+
+This module provides some default classes that represent the default channel plans
+for different regions but also let the user free to create a new one based on his
+needs. 
+
+A channel plan is defined by a set of uplink and downlink channels, a special backup
+downlink channel (called RX2), and a mechanism used to deduce the first receiving channel
+characteristics. In our implementation, the channel plan also embeds a set of datarates
+and the supported datarate for each channel. This deviates from the specification but
+since the hardware we are using does not accept different datarates on a single channel,
+we don't have any other choice than to assign a single datarate to each channel.
+
+A simple channel plan is defined as follows:
+
+``` python
+class MyChannelPlan(ChannelPlan):
+
+    def __init__(self):
+        super().__init__(
+            channels=[
+                Uplink(1, 868100000, 0),
+                Downlink(1, 868100000, 1),
+            ],
+            datarates=[
+                DataRate(sf=7, bw=125000),
+                DataRate(sf=12, bw=125000)
+            ],
+            rx2=Downlink(2, 868269000, 1)
+        )
+```
+
+This channel plan defines a single uplink channel on 868.1 MHz using datarate 0 that is defined
+as a spreading factor (sf) of 7 and a bandwidth of 125 kHz (first datarate in our `datarates` parameter).
+A downlink channel is also declared using the same frequency than the uplink channel but a different
+datarate (spreading factor of 12 and bandwidth of 125 kHz). Last but not least, a backup downlink channel
+is defined using the 868.268 MHz frequency and datarate 1 (spreading factor of 12 and bandwidth of 125 kHz).
+
+RX1 selection behavior
+----------------------
+
+When a LoRaWAN gateway successfully receives a frame on one of its uplink channels, it then needs to switch
+to a downlink channel (if required) to send some data back to the device that sent the frame. This downlink
+channel is usually chosen based on the uplink channel characteristicsm therefore the `ChannelPlan` class
+provides a `get_rx1()` method that can be overriden to implement a specific RX1 selection behavior.
+
+This method takes the uplink channel number in parameter allowing to perform some computations to determine
+the downlink channel to use.
+
 """
 from random import choice
 

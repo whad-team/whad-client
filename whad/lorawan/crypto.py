@@ -4,7 +4,6 @@ This module provides multiple cryptographic primitives as specified
 in the LoRaWAN 1.0 specifications, including various MIC computations,
 key derivation and frame encryption/decryption.
 """
-from binascii import hexlify
 from struct import pack, unpack
 from scapy.packet import Raw
 from Cryptodome.Cipher import AES
@@ -26,12 +25,34 @@ def MIC(key : bytes, buffer : bytes) -> bytes:
 
 def MIC_Uplink(key : bytes, dev_addr : int, fcnt : int, frame : bytes) -> bytes:
     """Compute uplink frame MIC
+
+    :param key: Encryption key (depends on external conditions)
+    :type key: bytes
+    :param dev_addr: Device network address
+    :type dev_addr: int
+    :param fcnt: Current uplink frame counter
+    :type fcnt: int
+    :param frame: Frame used to generate the corresponding MIC
+    :type frame: bytes
+    :return: 4-byte message integrity code
+    :rtype: bytes
     """
     b0 = pack('<BIBIIBB', 0x49, 0, 0, dev_addr, fcnt, 0, len(frame))
     return MIC(key, b0 + frame)
 
 def MIC_Downlink(key : bytes, dev_addr : int, fcnt : int, frame : bytes) -> bytes:
-    """Compute uplink frame MIC
+    """Compute downlink frame MIC
+
+    :param key: Encryption key (depends on external conditions)
+    :type key: bytes
+    :param dev_addr: Device network address
+    :type dev_addr: int
+    :param fcnt: Current downlink frame counter
+    :type fcnt: int
+    :param frame: Frame used to generate the corresponding MIC
+    :type frame: bytes
+    :return: 4-byte message integrity code
+    :rtype: bytes
     """
     b0 = pack('<BIBIIBB', 0x49, 0, 1, dev_addr, fcnt, 0, len(frame))
     return MIC(key, b0 + frame)
@@ -42,7 +63,8 @@ def pad16(data : bytes) -> bytes:
 
     :param data: Data to pad
     :type data: bytes
-    :returns: bytes
+    :return: 16-byte padded data
+    :rtype: bytes
     """
     r = len(data)%16
     if r > 0:
@@ -62,6 +84,8 @@ def derive_nwkskey(appkey : bytes, join_nonce : int, netid : int, dev_nonce : in
     :type netid: int
     :param dev_nonce: Device nonce
     :type dev_nonce: int
+    :return: Derived network session encryption key
+    :rtype: bytes
     """
     c = AES.new(appkey, mode=AES.MODE_ECB)
     buffer = b'\x01' + pack('<BHBHH', join_nonce&0xff, (join_nonce>>8)&0xffff, netid&0xff, (netid>>8)&0xffff , dev_nonce)
@@ -80,6 +104,8 @@ def derive_appskey(appkey : bytes, join_nonce : int, netid : int, dev_nonce : in
     :type netid: int
     :param dev_nonce: Device nonce
     :type dev_nonce: int
+    :return: Derived application session key
+    :rtype: bytes
     """
     c = AES.new(appkey, mode=AES.MODE_ECB)
     buffer = b'\x02' + pack('<BHBHH', join_nonce&0xff, (join_nonce>>8)&0xffff, netid&0xff, (netid>>8)&0xffff , dev_nonce)
@@ -100,7 +126,8 @@ def encrypt_frame(key : bytes, dev_addr : int, fcnt : int, frame : bytes, uplink
     :param uplink: Uplink frame if True, downlink frame otherwise
     :type uplink: bool
 
-    :returns: Encrypted or decrypted frame
+    :return: Encrypted or decrypted frame
+    :rtype: bytes
     """
     # Compute number of Ai blocks to generate
     frame_length = len(frame)
@@ -142,7 +169,8 @@ def encrypt_fopts(key : bytes, dev_addr : int, fcnt : int, fopts : bytes, uplink
     :param uplink: Uplink frame if True, downlink frame otherwise
     :type uplink: bool
 
-    :returns: Encrypted or decrypted frame
+    :return: Encrypted or decrypted frame options
+    :rtype: bytes
     """
 
     # Generate A block
@@ -170,6 +198,12 @@ def decrypt_packet(packet : PHYPayload, appkey=None, appskey=None, nwkskey=None)
     :param appskey: LoRaWAN Application Session Key
     :type appskey: bytes
     :param nwkskey: LoRaWAN Network Session Key
+
+    :raises BadMICError: Incorrect MIC detected
+    :raises MissingKeyError: A required encryption key is missing
+
+    :return: decrypted LoRaWAN PHY packet
+    :rtype: PHYPayload
     """
     if packet.mtype == 0x01:
         # Join Accept packet is encrypted with the appkey
@@ -257,6 +291,11 @@ def encrypt_packet(packet : PHYPayload, appkey=None, appskey=None, nwkskey=None)
     :param appskey: LoRaWAN Application Session Key
     :type appskey: bytes
     :param nwkskey: LoRaWAN Network Session Key
+
+    :raises MissingKeyError: A required encryption key is missing
+
+    :return: Encrypted LoRaWAN PHY packet
+    :rtype: PHYPayload
     """
     if packet.mtype == 0x01:
         # Join Accept packet is encrypted with the appkey
