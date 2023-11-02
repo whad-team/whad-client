@@ -399,12 +399,12 @@ class CommandLineApp(ArgumentParser):
     def warning(self, message):
         """Display a warning message in orange (if color is enabled)
         """
-        print_formatted_text(HTML('<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % message))
+        print_formatted_text(HTML('\r<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % message))
 
     def error(self, message):
         """Display an error message in red (if color is enabled)
         """
-        print_formatted_text(HTML('<ansired>[!] <b>%s</b></ansired>' % message))
+        print_formatted_text(HTML('\r<ansired>[!] <b>%s</b></ansired>' % message))
 
 
 if __name__ == '__main__':
