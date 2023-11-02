@@ -290,7 +290,7 @@ class Phy(WhadDeviceConnector):
         msg.phy.mod_lora.bandwidth = bw
         msg.phy.mod_lora.preamble_length = preamble
         msg.phy.mod_lora.enable_crc = crc
-        msg.phy.mod_lora.explicit = explicit
+        msg.phy.mod_lora.explicit_mode = explicit
         msg.phy.mod_lora.invert_iq = invert_iq
         print(msg)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
