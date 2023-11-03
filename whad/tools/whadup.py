@@ -11,6 +11,9 @@ from whad.protocol.unifying.unifying_pb2 import UnifyingCommand
 from whad.protocol.phy.phy_pb2 import PhyCommand
 from whad import WhadDomain, WhadCapability
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 DOMAINS = {
     WhadDomain.Phy: 'Physical Layer',
     WhadDomain.ANT: 'ANT',

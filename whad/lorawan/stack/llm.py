@@ -288,9 +288,10 @@ class LWGwLinkLayer(Layer):
         """
         mac_layer = unc_data_up.getlayer(MACPayloadUplink)
 
-        # Get the device address and check if it is known
+        # Get the device address and check if it is known and that we have
+        # at least seen one uplink packet
         connection = self.state.get_connection(mac_layer.dev_addr)
-        if connection is not None:
+        if connection is not None and connection['timestamp'] is not None:
             # Update connection last packet timestamp
             ts = unc_data_up.metadata.timestamp.sec + unc_data_up.metadata.timestamp.usec/1000000.
             self.state.update_connection(
