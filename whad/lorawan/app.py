@@ -15,7 +15,7 @@ import json
 from os import unlink
 from os.path import exists, isfile
 from binascii import hexlify, unhexlify
-from collections.abc import Generator
+from collections.abc import Iterator
 
 from whad.lorawan.exceptions import InvalidNodeRegistryError
 
@@ -323,7 +323,7 @@ class LWApplication(object):
         """
         return self.__key
     
-    def nodes(self) -> Generator[LWNode, None, None]:
+    def nodes(self) -> Iterator[LWNode]:
         """Iterate over registered nodes.
         """
         for node in self.__registry.iterate():
