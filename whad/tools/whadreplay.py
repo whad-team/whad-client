@@ -432,55 +432,59 @@ class WhadReplayApp(CommandLineApp):
                 if self.args.domain is not None:
                     # Parse the arguments to populate a replay configuration
                     configuration = build_configuration_from_args(self.environment, self.args)
+                    
+                    # Make sure we have a target set
+                    if configuration.target is not None:
+                        # Generate a replay based on the selected domain
+                        replay = self.environment[self.args.domain]["replay_class"](
+                            self.interface,
+                            self.args.pcapfile,
+                            role=role
+                        )
 
-                    # Generate a replay based on the selected domain
-                    replay = self.environment[self.args.domain]["replay_class"](
-                        self.interface,
-                        self.args.pcapfile,
-                        role=role
-                    )
+                        # Add our own monitor for CLI reporting
+                        cli_monitor = self.build_monitor()
+                        cli_monitor.attach(replay)
+                        cli_monitor.start()
+                        monitors.append(cli_monitor)
 
-                    # Add our own monitor for CLI reporting
-                    cli_monitor = self.build_monitor()
-                    cli_monitor.attach(replay)
-                    cli_monitor.start()
-                    monitors.append(cli_monitor)
+                        # If output parameter is selected, add a PCAP Writer monitor
+                        if self.args.output is not None:
+                            monitor_pcap = PcapWriterMonitor(self.args.output)
+                            monitor_pcap.attach(replay)
+                            monitor_pcap.start()
+                            monitors.append(monitor_pcap)
 
-                    # If output parameter is selected, add a PCAP Writer monitor
-                    if self.args.output is not None:
-                        monitor_pcap = PcapWriterMonitor(self.args.output)
-                        monitor_pcap.attach(replay)
-                        monitor_pcap.start()
-                        monitors.append(monitor_pcap)
+                        # If wireshark parameter is selected, add a WiresharkMonitor
+                        if self.args.wireshark:
+                            monitor_wireshark = WiresharkMonitor()
+                            monitor_wireshark.attach(replay)
+                            monitor_wireshark.start()
+                            monitors.append(monitor_wireshark)
 
-                    # If wireshark parameter is selected, add a WiresharkMonitor
-                    if self.args.wireshark:
-                        monitor_wireshark = WiresharkMonitor()
-                        monitor_wireshark.attach(replay)
-                        monitor_wireshark.start()
-                        monitors.append(monitor_wireshark)
+                        # Prepare the replay instance
+                        if replay.prepare(configuration):
+                            # Now we can feed our replay instance with packets
+                            if self.args.stop_pos >= 0:
+                                count = self.args.stop_pos - self.args.start_pos + 1
+                            else:
+                                count = None
+                            
+                            # PCAPReader will send back packets in a timely manner, according to PCAP timestamps.
+                            reader = PCAPReader(self.args.pcapfile)
+                            for packet in reader.packets(start=self.args.start_pos, count=count,
+                                                        offset=self.args.offset/1000.):
+                                replay.send_packet(packet)
 
-                    # Prepare the replay instance
-                    if replay.prepare(configuration):
-                        # Now we can feed our replay instance with packets
-                        if self.args.stop_pos >= 0:
-                            count = self.args.stop_pos - self.args.start_pos + 1
-                        else:
-                            count = None
-                        
-                        # PCAPReader will send back packets in a timely manner, according to PCAP timestamps.
-                        reader = PCAPReader(self.args.pcapfile)
-                        for packet in reader.packets(start=self.args.start_pos, count=count,
-                                                     offset=self.args.offset/1000.):
-                            replay.send_packet(packet)
+                        # Stop our replay instance
+                        replay.stop()
+                        replay.close()
 
-                    # Stop our replay instance
-                    replay.stop()
-                    replay.close()
-
-                    # Close all monitors
-                    for monitor in monitors:
-                        monitor.close()
+                        # Close all monitors
+                        for monitor in monitors:
+                            monitor.close()
+                    else:
+                        self.error("You must specify a target BD address with option --target.")
                 else:
                     self.error("You need to specify a domain.")
             else:
