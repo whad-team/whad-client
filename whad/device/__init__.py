@@ -179,7 +179,7 @@ class WhadDeviceConnector(object):
 
         # Synchronous mode (not enabled by default)
         self.__synchronous = False
-        self.__pending_packets = Queue()
+        self.__pending_pdus = Queue()
 
 
     def attach_error_callback(self, callback, context=None):
@@ -349,7 +349,7 @@ class WhadDeviceConnector(object):
         """
         # Clear pending packets if we are disabling this feature.
         if not enabled:
-            self.__pending_packets.clear()
+            self.__pending_pdus.queue.clear()
 
         # Update state
         self.__synchronous = enabled
@@ -361,25 +361,26 @@ class WhadDeviceConnector(object):
         """
         return self.__synchronous
 
-    def add_pending_packet(self, packet):
-        """Add a pending packet if in synchronous mode.
+    def add_pending_pdu(self, pdu):
+        """Add a pending protocol data unit (PDU) if in synchronous mode.
 
-        :param packet: Pending packet to add to our queue of pending packets
-        :type packet: scapy.packet.Packet
+        :param pdu: Pending PDU to add to our queue of pending PDUs
+        :type pdu: scapy.packet.Packet
         """
         if self.__synchronous:
-            self.__pending_packets.put(packet)
+            self.__pending_pdus.put(pdu)
 
-    def wait_packet(self, timeout):
-        '''Wait for a packet when in synchronous mode.
+    def wait_pdu(self, timeout:float = None):
+        '''Wait for a protocol data unit (PDU) when in synchronous mode.
 
-        :param float timeout: If specified, defines a timeout when querying the PDU queue
+        :param timeout: If specified, defines a timeout when querying the PDU queue
+        :type timeout: float, optional
         :return: Received packet if any, None otherwise
         :rtype: scapy.packet.Packet
         '''
         if self.__synchronous:
             try:
-                return self.__pending_packets.get(block=True, timeout=timeout)
+                return self.__pending_pdus.get(block=True, timeout=timeout)
             except Empty as no_pdu:
                 return None
         else:
