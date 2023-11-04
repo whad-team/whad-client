@@ -11,11 +11,17 @@ The `LWApplication provides some useful features:
 Registered nodes state is kept in a JSON file named by default on the name of the application's EUI, and stored in
 the working directory. This file is managed by the `LWNodeRegistry` class.
 """
+import sys
 import json
 from os import unlink
 from os.path import exists, isfile
 from binascii import hexlify, unhexlify
-from collections.abc import Iterator
+
+# Including type hint Iterator based on python version
+if sys.version_info[0] == 3 and sys.version_info[1] >= 9:
+    from collections.abc import Iterator
+else:
+    from typing import Iterator
 
 from whad.lorawan.exceptions import InvalidNodeRegistryError
 
