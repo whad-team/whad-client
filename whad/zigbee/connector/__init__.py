@@ -24,17 +24,13 @@ class Zigbee(WhadDeviceConnector):
     domain-specific messages.
     """
 
-    def __init__(self, device=None, auto=True):
+    def __init__(self, device=None, synchronous=False):
         """
         Initialize the connector, open the device (if not already opened), discover
         the services (if not already discovered).
         """
         self.__ready = False
         super().__init__(device)
-
-        # Auto mode
-        self.__auto = auto
-        self.__pdu_queue = Queue()
 
         # Capability cache
         self.__can_send = None
@@ -52,32 +48,11 @@ class Zigbee(WhadDeviceConnector):
             conf.dot15d4_protocol = 'zigbee'
             self.translator = ZigbeeMessageTranslator()
 
-    @property
-    def auto(self):
-        return self.__auto
+        self.enable_synchronous(synchronous)
 
     def close(self):
         self.stop()
         self.device.close()
-
-    def enqueue(self, packet):
-        self.__pdu_queue.put(packet)
-
-    def wait_pdu(self, timeout=None):
-        '''Wait for a pdu from queue, only available when auto mode is
-        disabled.
-
-        :param float timeout: If specified, defines a timeout when querying the PDU queue
-        :return: Received PDU if any, None otherwise
-        :rtype: scapy.packet.Packet
-        '''
-        if not self.__auto:
-            try:
-                return self.__pdu_queue.get(block=True, timeout=timeout)
-            except Empty as no_pdu:
-                return None
-        else:
-            return None
 
     def format(self, packet):
         return self.translator.format(packet)
@@ -184,9 +159,16 @@ class Zigbee(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-    def send(self,pdu,channel=11):
+    def send(self, pdu, channel:int = 11) -> bool:
         """
         Send Zigbee packets (on a single channel).
+
+        :param pdu: Zigbee packet to send
+        :type pdu: scapy.layers.dot15d4.Dot15d4, scapy.layers.dot15d4.Dot15d4FCS
+        :param channel: Channel on which the packet has to be sent
+        :type channel: int
+        :return: `True` if packet has been correctly sent, `False` otherwise.
+        :rtype: bool
         """
         if self.can_send():
             if self.support_raw_pdu():
@@ -283,9 +265,9 @@ class Zigbee(WhadDeviceConnector):
         self.on_pdu(pdu)
 
     def on_pdu(self, packet):
-        # Enqueue PDU if not in auto mode
-        if not self.auto:
-            self.enqueue(packet)
+        # Enqueue PDU if in synchronous mode
+        if self.is_synchronous():
+            self.add_pending_pdu(packet)
         else:
             pass
 
