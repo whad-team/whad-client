@@ -1,3 +1,5 @@
+from queue import Queue, Empty
+from binascii import hexlify
 from scapy.compat import raw
 from scapy.config import conf
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
@@ -22,13 +24,17 @@ class Zigbee(WhadDeviceConnector):
     domain-specific messages.
     """
 
-    def __init__(self, device=None):
+    def __init__(self, device=None, auto=True):
         """
         Initialize the connector, open the device (if not already opened), discover
         the services (if not already discovered).
         """
         self.__ready = False
         super().__init__(device)
+
+        # Auto mode
+        self.__auto = auto
+        self.__pdu_queue = Queue()
 
         # Capability cache
         self.__can_send = None
@@ -46,9 +52,32 @@ class Zigbee(WhadDeviceConnector):
             conf.dot15d4_protocol = 'zigbee'
             self.translator = ZigbeeMessageTranslator()
 
+    @property
+    def auto(self):
+        return self.__auto
+
     def close(self):
         self.stop()
         self.device.close()
+
+    def enqueue(self, packet):
+        self.__pdu_queue.put(packet)
+
+    def wait_pdu(self, timeout=None):
+        '''Wait for a pdu from queue, only available when auto mode is
+        disabled.
+
+        :param float timeout: If specified, defines a timeout when querying the PDU queue
+        :return: Received PDU if any, None otherwise
+        :rtype: scapy.packet.Packet
+        '''
+        if not self.__auto:
+            try:
+                return self.__pdu_queue.get(block=True, timeout=timeout)
+            except Empty as no_pdu:
+                return None
+        else:
+            return None
 
     def format(self, packet):
         return self.translator.format(packet)
@@ -166,7 +195,7 @@ class Zigbee(WhadDeviceConnector):
                 else:
                     packet = pdu
             elif Dot15d4FCS in pdu:
-                pdu = Dot15d4(raw(pdu)[:-2])
+                packet = Dot15d4(raw(pdu)[:-2])
             else:
                 packet = pdu
 
@@ -178,6 +207,20 @@ class Zigbee(WhadDeviceConnector):
 
         else:
             return False
+        
+    def send_mac(self, pdu, channel=11, add_fcs=False):
+        if self.can_send():
+            if add_fcs:
+                fcs = Dot15d4FCS().compute_fcs(bytes(pdu))
+                pdu += fcs
+            else:
+                packet = pdu / raw(b'\x00\x00')
+
+            msg = self.translator.from_packet(packet, channel)
+            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        else:
+            return False            
 
     def perform_ed_scan(self, channel=11):
         """
@@ -240,11 +283,14 @@ class Zigbee(WhadDeviceConnector):
         self.on_pdu(pdu)
 
     def on_pdu(self, packet):
-        pass
+        # Enqueue PDU if not in auto mode
+        if not self.auto:
+            self.enqueue(packet)
+        else:
+            pass
 
     def on_ed_sample(self, timestamp, sample):
         pass
-
 
 from whad.zigbee.connector.sniffer import Sniffer
 from whad.zigbee.connector.enddevice import EndDevice

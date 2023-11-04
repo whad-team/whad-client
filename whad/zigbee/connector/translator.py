@@ -64,6 +64,8 @@ class ZigbeeMessageTranslator(object):
             pdu = bytes(packet)
             msg.zigbee.send.pdu = pdu
         else:
-            msg = None
-
+            # Raw MAC
+            msg.zigbee.send.channel = channel
+            pdu = bytes(packet)
+            msg.zigbee.send.pdu = pdu
         return msg
