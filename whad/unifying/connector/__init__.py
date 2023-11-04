@@ -32,7 +32,7 @@ class Unifying(WhadDeviceConnector):
         """
         return self.translator.format(packet)
 
-    def __init__(self, device=None, auto=True):
+    def __init__(self, device=None, synchronous=False):
         """
         Initialize the connector, open the device (if not already opened), discover
         the services (if not already discovered).
@@ -65,57 +65,12 @@ class Unifying(WhadDeviceConnector):
         # Initialize translator
         self.translator = ESBMessageTranslator("unifying")
 
-
-        # Determine if we are using synchronous mode or not
-        self.__auto = auto
-        self.__pdu_queue = Queue()
+        # Set synchronous mode
+        self.enable_synchronous(synchronous)
 
     def close(self):
         self.stop()
         self.device.close()
-
-
-    #
-    # Reception queue management
-    #
-
-    def auto(self, enabled: bool):
-        '''Enable or disable automatic mode.
-
-        In automatic mode, the PDUs are processed and forwarded to the corresponding
-        callbacks, thus causing the connector to process them through its protocol
-        stack (if any). If automatic mode is disabled, received PDUs are added to
-        a reception queue that could be queried with the `wait_pdu()` method. In this
-        mode, the user is responsible of processing these PDUs.
-
-        :param enabled: If set to `True`, enable the automatic mode and disable it otherwise.
-        :type enabled: bool
-        '''
-        self.__auto = enabled
-
-    def enqueue_pdu(self, pdu: Packet):
-        '''Add a ESB PDU to internal PDU queue
-
-        :param pdu: PDU to add to our reception queue
-        :type pdu: scapy.packet.Packet
-        '''
-        self.__pdu_queue.put(pdu)
-
-    def wait_pdu(self, timeout=None):
-        '''Wait for a pdu from queue, only available when auto mode is
-        disabled.
-
-        :param float timeout: If specified, defines a timeout when querying the PDU queue
-        :return: Received PDU if any, None otherwise
-        :rtype: scapy.packet.Packet
-        '''
-        if not self.__auto:
-            try:
-                return self.__pdu_queue.get(block=True, timeout=timeout)
-            except Empty as no_pdu:
-                return None
-        else:
-            return None
 
     def can_sniff(self):
         """
