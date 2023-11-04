@@ -323,11 +323,10 @@ class LWApplication(object):
         """
         return self.__key
     
-    def nodes(self) -> Generator[LWNode]:
+    def nodes(self) -> Generator[LWNode, None, None]:
         """Iterate over registered nodes.
         """
         for node in self.__registry.iterate():
-            print(node)
             yield node
 
     def add_node(self, node: LWNode = None):
