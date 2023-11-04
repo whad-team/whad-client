@@ -250,7 +250,7 @@ class LWNodeRegistry(object):
         else:
             return None
 
-    def iterate(self):
+    def iterate(self) -> Iterator[LWNode]:
         """Iterate over registered nodes.
         """
         for dev_eui in self.__nodes:
