@@ -177,6 +177,10 @@ class WhadDeviceConnector(object):
         self.__transmission_callbacks = {}
         self.__error_callbacks = []
 
+        # Synchronous mode (not enabled by default)
+        self.__synchronous = False
+        self.__pending_packets = Queue()
+
 
     def attach_error_callback(self, callback, context=None):
         '''Attach an error callback to this connector.
@@ -331,6 +335,55 @@ class WhadDeviceConnector(object):
     @property
     def device(self):
         return self.__device
+
+    def enable_synchronous(self, enabled : bool):
+        """Enable or disable synchronous mode
+
+        Synchronous mode is a mode in which the connector expects sone third-party code to
+        retrieve the received packets instead of forwarding them to the `on_packet()` callback.
+        It is then possible to wait for some packet to be received and avoid the automatic
+        behavior triggered by a call to `on_packet()`.
+
+        :param enabled: If set to `True`, enable synchronous mode. Otherwise disable it.
+        :type enabled: bool
+        """
+        # Clear pending packets if we are disabling this feature.
+        if not enabled:
+            self.__pending_packets.clear()
+
+        # Update state
+        self.__synchronous = enabled
+
+    def is_synchronous(self):
+        """Determine if the conncetor is in synchronous mode.
+
+        :return: `True` if synchronous mode is enabled, `False` otherwise.
+        """
+        return self.__synchronous
+
+    def add_pending_packet(self, packet):
+        """Add a pending packet if in synchronous mode.
+
+        :param packet: Pending packet to add to our queue of pending packets
+        :type packet: scapy.packet.Packet
+        """
+        if self.__synchronous:
+            self.__pending_packets.put(packet)
+
+    def wait_packet(self, timeout):
+        '''Wait for a packet when in synchronous mode.
+
+        :param float timeout: If specified, defines a timeout when querying the PDU queue
+        :return: Received packet if any, None otherwise
+        :rtype: scapy.packet.Packet
+        '''
+        if self.__synchronous:
+            try:
+                return self.__pending_packets.get(block=True, timeout=timeout)
+            except Empty as no_pdu:
+                return None
+        else:
+            return None
 
     # Device interaction
     def send_message(self, message, filter=None):
