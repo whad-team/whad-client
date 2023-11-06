@@ -9,7 +9,8 @@ from whad.device import WhadDevice
 from whad.exceptions import UnsupportedCapability
 from whad.ble.connector import Central
 from whad.ble.exceptions import PeripheralNotFound
-from whad.scapy.layers import NordicBLE, BTLE_DATA
+from whad.scapy.layers import NordicBLE
+from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_RF
 from whad.common.replay import ReplayRole, ReplayInterface
 
 @dataclass
@@ -69,6 +70,15 @@ class Replay(Central, ReplayInterface):
 
                     # Packet sent, return True
                     return True
+        elif packet.haslayer(BTLE_RF):
+            btle_rf = packet[BTLE_RF]
+            if btle_rf.haslayer(BTLE_DATA):
+                pdu = btle_rf[BTLE_DATA]
+
+                # Only allow replay of packets sent by master (central device)
+                if btle_rf.type == 0x2 and self.is_emitter():
+                    pdu.show()
+                    self.send_data_pdu(pdu, conn_handle=self.__target.conn_handle)
         
         # Packet cannot be sent, return False
         return False
