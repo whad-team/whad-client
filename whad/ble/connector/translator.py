@@ -14,6 +14,14 @@ from whad.ble.metadata import generate_ble_metadata
 
 logger = logging.getLogger(__name__)
 
+def packet_to_bytes(packet):
+    """Convert packet to bytes
+    """
+    try:
+        return raw(packet)
+    except TypeError as type_err:
+        return bytes(packet.__bytes__())
+
 class BleMessageTranslator(object):
     """BLE Whad message translator.
 
@@ -129,13 +137,12 @@ class BleMessageTranslator(object):
             msg.ble.send_pdu.direction = direction
             msg.ble.send_pdu.conn_handle = connection_handle
             msg.ble.send_pdu.encrypt = encrypt
-
             if BTLE_DATA in packet:
-                msg.ble.send_pdu.pdu = raw(packet[BTLE_DATA:])
+                msg.ble.send_pdu.pdu = packet_to_bytes(packet[BTLE_DATA:])
             elif BTLE_CTRL in packet:
-                msg.ble.send_pdu.pdu = raw(packet[BTLE_CTRL:])
+                msg.ble.send_pdu.pdu = packet_to_bytes(packet[BTLE_CTRL:])
             elif BTLE_ADV in packet:
-                msg.ble.send_pdu.pdu = raw(packet[BTLE_ADV:])
+                msg.ble.send_pdu.pdu = packet_to_bytes(packet[BTLE_ADV:])
             else:
                 return None
 
