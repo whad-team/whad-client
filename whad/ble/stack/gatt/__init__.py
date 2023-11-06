@@ -1049,7 +1049,7 @@ class GattServer(GattLayer):
                 # Check characteristic is readable
                 charac = self.__server_model.find_object_by_handle(request.handle - 1)
 
-                conn_handle = self.get_layer('l2cap').state.conn_handle
+                conn_handle = self.get_layer('l2cap').get_conn_handle()
                 if charac.check_security_property(ReadAccess, Authentication):
                     print("[i] authentication required for read access !")
                     if not self.get_layer('ll').state.is_authenticated(conn_handle):
@@ -1178,7 +1178,7 @@ class GattServer(GattLayer):
                         charac = self.__server_model.find_object_by_handle(request.handle - 1)
                         service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
 
-                        conn_handle = self.get_layer('l2cap').state.conn_handle
+                        conn_handle = self.get_layer('l2cap').get_conn_handle()
                         if charac.check_security_property(ReadAccess, Authentication):
                             print("[i] authentication required for read access !")
                             if not self.get_layer('ll').state.is_authenticated(conn_handle):
@@ -1300,7 +1300,7 @@ class GattServer(GattLayer):
                 # Check the corresponding characteristic is writeable
                 charac = self.__server_model.find_object_by_handle(request.handle - 1)
 
-                conn_handle = self.get_layer('l2cap').state.conn_handle
+                conn_handle = self.get_layer('l2cap').get_conn_handle()
                 if charac.check_security_property(WriteAccess, Authentication):
                     print("[i] authentication required for write access !")
                     if not self.get_layer('ll').state.is_authenticated(conn_handle):
@@ -1473,7 +1473,7 @@ class GattServer(GattLayer):
                 # Check the corresponding characteristic is writeable
                 charac = self.__server_model.find_object_by_handle(request.handle - 1)
 
-                conn_handle = self.get_layer('l2cap').state.conn_handle
+                conn_handle = self.get_layer('l2cap').get_conn_handle()
                 if charac.check_security_property(WriteAccess, Authentication):
                     print("[i] authentication required for write access !")
                     if not self.get_layer('ll').state.is_authenticated(conn_handle):

@@ -28,6 +28,11 @@ class L2CAPLayer(ContextualLayer):
         '''
         self.state.conn_handle = conn_handle
 
+    def get_conn_handle(self):
+        """Retrieve current connection handle
+        """
+        return self.state.conn_handle
+
     def set_local_mtu(self, mtu):
         '''Set local MTU
         '''
