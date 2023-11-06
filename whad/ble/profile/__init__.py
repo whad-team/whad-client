@@ -10,7 +10,7 @@ allows to interact with it:
 """
 import json
 from typing import List, Iterator
-
+from whad.ble.stack.smp import Pairing
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,\
     CharacteristicProperties, ClientCharacteristicConfig, \
@@ -22,7 +22,8 @@ from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,
 from whad.ble.profile.service import PrimaryService as BlePrimaryService, \
     SecondaryService as BleSecondaryService, Service
 from whad.ble.exceptions import InvalidHandleValueException
-from whad.ble.stack.att.constants import BleAttProperties
+from whad.ble.stack.att.constants import BleAttProperties, SecurityProperty, \
+    SecurityAccess, ReadAccess, WriteAccess, Authentication, Authorization, Encryption
 
 import logging
 logger = logging.getLogger(__name__)
@@ -168,8 +169,7 @@ class UserDescriptionDescriptor(CharacteristicDescriptor):
 class Characteristic(object):
     """GATT characteristic.
     """
-
-    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False, description=None, **kwargs):
+    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False, description=None, security = [], **kwargs):
         """Declares a GATT characteristic.
 
         Other named arguments are used to declare characteristic's descriptors.
@@ -186,6 +186,8 @@ class Characteristic(object):
         :type   indicate:       bool
         :param  description:    Textual description for this characteristic
         :type   description:    str
+        :param security:        Indicate the security property associated to this characteristic
+        :type security:         SecurityAccess
         """
         self.__handle = 0
         self.__name = name
@@ -194,18 +196,19 @@ class Characteristic(object):
         self.__perms = permissions
         self.__notify = notify
         self.__indicate = indicate
+        self.__security = SecurityAccess.generate(security)
         self.__service = None
         self.__description = description
         self.__descriptors = []
 
-        # Loop on kwargs to find descriptos
+        # Loop on kwargs to find descriptors
         for arg in kwargs:
             if isinstance(kwargs[arg], CharacteristicDescriptor):
                 descriptor = kwargs[arg]
                 descriptor.handle = 0
                 descriptor.name = arg
                 self.add_descriptor(descriptor)
-                
+
                 # Add descriptor to a property to this ServiceModel instance
                 if not hasattr(self, arg):
                     setattr(self, arg, descriptor)
@@ -231,7 +234,7 @@ class Characteristic(object):
 
         :return: Number of handles
         :rtype: int
-        """    
+        """
         handles = 2
         # A more handle as we may need a ClientCharacteristicConfiguration descriptor
         if self.__notify or self.__indicate:
@@ -322,6 +325,11 @@ class Characteristic(object):
         """
         return self.__service
 
+    @property
+    def security(self) -> SecurityAccess:
+        """Returns security access property
+        """
+        return self.__security
 
 class ServiceModel(object):
 
@@ -353,7 +361,7 @@ class ServiceModel(object):
                 charac.name = arg
                 self.add_characteristic(charac)
                 charac.attach(self)
-                
+
                 # Add characteristic to a property to this ServiceModel instance
                 if not hasattr(self, arg):
                     setattr(self, arg, charac)
@@ -392,7 +400,7 @@ class ServiceModel(object):
     @handle.setter
     def handle(self, value):
         self.__handle = value
-    
+
     def characteristics(self):
         for charac in self.__characteristics:
             yield charac
@@ -488,9 +496,10 @@ class GenericProfile(object):
                                 uuid=UUID(charac['value']['uuid']),
                                 handle=charac['handle'],
                                 value=b'',
-                                properties=charac['properties']
+                                properties=charac['properties'],
+                                security=SecurityAccess.int_to_accesses(charac['security'])
                             )
-                            
+
                             # Loop on descriptors, only support CCC at the moment
                             for desc in charac['descriptors']:
                                 if UUID(desc['uuid']) == UUID(0x2902):
@@ -523,6 +532,7 @@ class GenericProfile(object):
                         service.name = prop
                         services.append(service)
 
+
             # Instanciate each service, and for each of them the corresponding
             # characteristics
             for service in services:
@@ -543,7 +553,7 @@ class GenericProfile(object):
                     )
                     self.__attr_db[service_obj.handle] = service_obj
                 else:
-                    continue 
+                    continue
 
                 # Create the corresponding instance property
                 setattr(self, service.name, service_obj)
@@ -565,7 +575,8 @@ class GenericProfile(object):
                         uuid=charac.uuid,
                         handle=self.__alloc_handle(1),
                         value=charac.value,
-                        properties=charac_props
+                        properties=charac_props,
+                        security=charac.security
                     )
                     logger.info(' creating characteristic %s (handle:%d)' % (
                         charac_obj.uuid, charac_obj.handle
@@ -745,7 +756,7 @@ class GenericProfile(object):
             service_obj = self.get_service_by_UUID(service)
         else:
             service_obj = None
-        
+
         # Process service object
         if service_obj is not None:
             # Remove service and all its characteristics from the attribute DB
@@ -762,7 +773,7 @@ class GenericProfile(object):
                 for desc in charac.descriptors():
                     if desc.handle in self.__attr_db:
                         del self.__attr_db[desc.handle]
-            
+
             # Remove service object from attribute db
             del self.__attr_db[service_obj.handle]
 
@@ -804,7 +815,7 @@ class GenericProfile(object):
             return True
         except IndexError as notfound:
             return False
-        
+
     def find_object_by_handle(self, handle) -> Attribute:
         """Find an object by its handle value
 
@@ -812,13 +823,13 @@ class GenericProfile(object):
         :type   handle: int
         :return: Object if handle is valid, or raise an IndexError exception otherwise
         :rtype: :class:`whad.ble.profile.attribute.Attribute`
-        :raises: IndexError 
+        :raises: IndexError
         """
         if handle in self.__attr_db:
             return self.__attr_db[handle]
         else:
             raise IndexError
-    
+
     def find_objects_by_range(self, start, end) -> List[Attribute]:
         """Find attributes with handles belonging in the [start, end+1] interval.
 
@@ -836,7 +847,7 @@ class GenericProfile(object):
         handles.sort()
         return [self.find_object_by_handle(handle) for handle in handles]
 
-    
+
     def find_characteristic_by_value_handle(self, value_handle) -> BleCharacteristic:
         """Find characteristic object by its value handle.
 
@@ -872,7 +883,7 @@ class GenericProfile(object):
             service_char_handles=[]
             for characteristic in service.characteristics():
                 service_char_handles.append(characteristic.handle)
-            
+
             # Sort handles
             service_char_handles.sort()
             idx = service_char_handles.index(handle)
@@ -893,13 +904,12 @@ class GenericProfile(object):
         :type   handle: int
         :rtype: :class:`whad.ble.profile.service.Service`
         :return: Service object containing the specified characteristic
-        
+
         :raises: :class:`whad.ble.exceptions.InvalidHandleValueException`
         """
         try:
-            charac = self.find_object_by_handle(handle)
-            if charac.handle in self.__service_by_characteristic_handle:
-                return self.__service_by_characteristic_handle[charac.handle]
+            if handle in self.__service_by_characteristic_handle:
+                return self.__service_by_characteristic_handle[handle]
             else:
                 raise InvalidHandleValueException
         except IndexError:
@@ -930,7 +940,7 @@ class GenericProfile(object):
             if isinstance(object, BlePrimaryService) or isinstance(object, BleSecondaryService):
                 if object.uuid == service_uuid:
                     return object
-        
+
         # Not found
         return None
 
@@ -946,7 +956,7 @@ class GenericProfile(object):
             object = self.__attr_db[handle]
             if isinstance(object, BleCharacteristic):
                 if object.uuid == charac_uuid:
-                    return object        
+                    return object
 
 
     def attr_by_type_uuid(self, uuid, start=1, end=0xFFFF) -> Iterator[Attribute]:
@@ -986,6 +996,7 @@ class GenericProfile(object):
                     'handle': charac.handle,
                     'uuid': str(charac.type_uuid),
                     'properties': charac.properties,
+                    'security': SecurityAccess.accesses_to_int(charac.security),
                     'value': {
                         'handle': charac.value_handle,
                         'uuid': str(charac.uuid),
@@ -1031,7 +1042,7 @@ class GenericProfile(object):
         """Connection hook.
 
         This hook is only used to notify the connection of a device.
-        
+
         :param  conn_handle:    Connection handle
         :type   conn_handle:    int
         """
@@ -1059,7 +1070,7 @@ class GenericProfile(object):
         If this method returns a byte array, this byte array will be sent back to the
         GATT client. If this method returns None, then the read operation will return an
         error (not allowed to read characteristic value).
-        
+
 
         :param  service:        Service owning the characteristic
         :type   service:        :class:`whad.ble.profile.service.Service`
@@ -1069,7 +1080,7 @@ class GenericProfile(object):
         :type   offset:         int
         :param  length:         Max read length
         :type   length:         int
-        
+
         :return:    Value to return to the GATT client
         :rtype:     bytes
         """
@@ -1190,12 +1201,12 @@ class GenericProfile(object):
         """Characteristic indication hook.
 
         This hook is called when a indication is sent to a characteristic.
-        
+
         :param  service:            Service owning the characteristic
         :type   service:            :class:`whad.ble.profile.service.Service`
         :param  characteristic:     Characteristic object
         :type   characteristic:     :class:`whad.ble.profile.characteristic.Characteristic`
         :param  value:              Characteristic value
         :type   value:              bytes
-        """        
+        """
         pass

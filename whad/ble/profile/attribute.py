@@ -2,6 +2,7 @@
 """
 
 from whad.ble.exceptions import InvalidHandleValueException, InvalidUUIDException
+from whad.ble.stack.gatt.helpers import get_alias_uuid
 from struct import pack, unpack
 from binascii import unhexlify, hexlify
 
@@ -78,6 +79,9 @@ class UUID:
         else:
             raise ValueError
 
+    @classmethod
+    def from_name(cls, name):
+        return get_alias_uuid(name)
 
 class Attribute(object):
     """GATT Attribute model

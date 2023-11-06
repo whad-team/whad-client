@@ -423,6 +423,10 @@ class BleConnection(object):
         return self.__l2cap.get_layer('gatt')
 
     @property
+    def smp(self):
+        return self.__l2cap.get_layer('smp')
+
+    @property
     def phy(self):
         return self.__l2cap.get_layer('phy')
 
@@ -501,6 +505,8 @@ class LinkLayerState(LayerState):
             'version_sent': False,  # version exchanged
             'version_remote': None,
             'encryption_key':None,
+            'authenticated':False,
+            'encrypted':False,
             'skd':None,
             'iv':None,
             'rand':None,
@@ -526,6 +532,22 @@ class LinkLayerState(LayerState):
     def register_encryption_key(self, conn_handle, key):
         if conn_handle in self.connections:
             self.connections[conn_handle]['encryption_key'] = key
+
+    def is_authenticated(self, conn_handle):
+        if conn_handle in self.connections:
+            return self.connections[conn_handle]['authenticated']
+
+    def is_encrypted(self, conn_handle):
+        if conn_handle in self.connections:
+            return self.connections[conn_handle]['encrypted']
+            
+    def mark_as_authenticated(self, conn_handle):
+        if conn_handle in self.connections:
+            self.connections[conn_handle]['authenticated'] = True
+
+    def mark_as_encrypted(self, conn_handle):
+        if conn_handle in self.connections:
+            self.connections[conn_handle]['encrypted'] = True
 
     def get_encryption_key(self, conn_handle):
         if conn_handle in self.connections:
@@ -746,6 +768,127 @@ class LinkLayer(Layer):
         if conn is not None:
             self.on_disconnect(conn_handle)
 
+    def start_encryption(self, conn_handle, rand, ediv):
+        """
+        Initiate encryption procedure.
+        """
+        # Retrieve connection handle corresponding to the instance
+
+        encryption_key = None
+        if conn_handle is not None:
+            encryption_key = self.state.get_encryption_key(conn_handle)
+
+        # Allowed if we have already negociated an STK
+        if encryption_key is not None and conn_handle is not None:
+
+            # Generate our SKD and IV
+            skd = randint(0, 0x10000000000000000)
+            iv = randint(0, 0x100000000)
+            self.state.register_skd_and_iv(conn_handle, skd, iv)
+
+            logger.info('[llm] Initiate connection LinkLayerCryptoManager')
+
+            # Save master rand/iv
+            self.state.register_rand_and_ediv(conn_handle, rand, ediv)
+
+            # Send back our parameters
+            self.send_ctrl_pdu(
+                conn_handle,
+                LL_ENC_REQ(
+                    rand = rand,
+                    ediv = ediv,
+                    skdm = skd,
+                    ivm = iv
+                )
+            )
+
+        else:
+            self.send_ctrl_pdu(
+                conn_handle,
+                LL_REJECT_IND(
+                    code=0x1A # Unsupported Remote Feature
+                )
+            )
+
+    def on_enc_rsp(self, conn_handle, enc_rsp):
+        """Encryption response handler
+        """
+        # Retrieve connection handle corresponding to the instance
+
+        encryption_key = None
+        if conn_handle is not None:
+            encryption_key = self.state.get_encryption_key(conn_handle)
+
+
+        # Allowed if we have already negociated an STK
+        if encryption_key is not None and conn_handle is not None:
+
+            skdm, ivm = self.state.get_skd_and_iv(conn_handle)
+            rand, ediv = self.state.get_rand_and_ediv(conn_handle)
+
+            logger.info('[llm] Received LL_ENC_RSP: skds=%s ivs=%s' % (
+                hexlify(pack('<Q', enc_rsp.skds)),
+                hexlify(pack('<I', enc_rsp.ivs)),
+            ))
+
+            logger.info('[llm] Initiate connection LinkLayerCryptoManager')
+
+            # Initiate LLCM
+            self.__llcm = LinkLayerCryptoManager(
+                encryption_key,
+                skdm,
+                ivm,
+                enc_rsp.skds,
+                enc_rsp.ivs
+            )
+
+            # Compute session key
+            master_skd = pack(">Q", skdm)
+            master_iv = pack("<L", ivm)
+            slave_skd = pack(">Q", enc_rsp.skds)
+            slave_iv = pack("<L", enc_rsp.ivs)
+
+            # Generate session key diversifier
+            skd = slave_skd + master_skd
+
+            # Generate initialization vector
+            iv = master_iv + slave_iv
+
+            # Generate session key
+            session_key = e(encryption_key, skd)
+
+            logger.info('[llm] master  skd: %s' % hexlify(master_skd))
+            logger.info('[llm] master   iv: %s' % hexlify(master_iv))
+            logger.info('[llm] slave   skd: %s' % hexlify(slave_skd))
+            logger.info('[llm] slave    iv: %s' % hexlify(slave_iv))
+            logger.info('[llm] Session  TK: %s' % hexlify(encryption_key))
+            logger.info('[llm] Session  iv: %s' % hexlify(iv))
+            logger.info('[llm] Exp. Ses iv: %s' % hexlify(self.__llcm.iv))
+            logger.info('[llm] Session key: %s' % hexlify(session_key))
+
+
+            # Notify encryption enabled
+            if not self.get_layer('phy').set_encryption(
+                conn_handle=conn_handle,
+                enabled=True,
+                ll_key=session_key,
+                ll_iv=iv,
+                key=encryption_key,
+                rand=rand,
+                ediv=ediv
+            ):
+                logger.info('[llm] Cannot enable encryption')
+            else:
+                logger.info('[llm] Encryption enabled in hardware')
+
+        else:
+            self.send_ctrl_pdu(
+                conn_handle,
+                LL_REJECT_IND(
+                    code=0x1A # Unsupported Remote Feature
+                )
+            )
+
 
     def on_enc_req(self, conn_handle, enc_req):
         """Encryption request handler
@@ -825,9 +968,13 @@ class LinkLayer(Layer):
 
             # Notify encryption enabled
             if not self.get_layer('phy').set_encryption(
-                enabled = True,
-                key=session_key,
-                iv=iv
+                conn_handle=conn_handle,
+                enabled=True,
+                ll_key=session_key,
+                ll_iv=iv,
+                key=encryption_key,
+                rand=enc_req.rand,
+                ediv=enc_req.ediv
             ):
                 logger.info('[llm] Cannot enable encryption')
             else:
@@ -848,15 +995,15 @@ class LinkLayer(Layer):
                 )
             )
 
-    def on_enc_rsp(self, conn_handle, enc_rsp):
-        """Encryption not supported yet
-        """
-        self.on_unsupported_opcode(conn_handle, ENC_RSP)
-
     def on_start_enc_req(self, conn_handle, start_enc_req):
-        """Encryption not supported yet
+        """Encryption start request handler.
         """
-        self.on_unsupported_opcode(conn_handle, START_ENC_REQ)
+
+        # Start encryption (STK as LTK)
+        self.send_ctrl_pdu(
+            conn_handle,
+            LL_START_ENC_RSP()
+        )
 
     def on_start_enc_rsp(self, conn_handle, start_enc_rsp):
         """Encryption start response handler
@@ -870,16 +1017,18 @@ class LinkLayer(Layer):
         # Check if we are the encryption initiator,
         # if yes then we need to answer to this encrypted LL_START_ENC_RSP
         # with another encrypted LL_START_ENC_RSP
-        print(self.state.get_connection_l2cap(conn_handle))
-        if not self.state.get_connection_l2cap(conn_handle).get_layer('smp').is_initiator():
+        l2cap_instance = self.state.get_connection_l2cap(conn_handle)
+        if not self.get_layer(l2cap_instance).get_layer('smp').is_initiator():
             self.send_ctrl_pdu(
                 conn_handle,
                 LL_START_ENC_RSP()
             )
 
-        # Notify SMP channel is now encrypted
+        print("Marked as encrypted")
+        self.state.mark_as_encrypted(conn_handle)
 
-        self.state.get_connection_l2cap(conn_handle).get_layer('smp').on_channel_encrypted()
+        # Notify SMP channel is now encrypted
+        self.get_layer(l2cap_instance).get_layer('smp').on_channel_encrypted()
 
     def on_unknown_rsp(self, conn_handle, unk_rsp):
         pass

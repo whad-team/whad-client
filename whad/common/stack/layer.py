@@ -350,10 +350,10 @@ class Layer(object):
             if hasattr(method, 'match_sources') and isinstance(getattr(method, 'match_sources'), dict):
                 match_sources = getattr(method, 'match_sources')
                 for source in match_sources:
-                    if source not in self.__handlers:
-                        self.__handlers[source] = [(method, match_sources[source])]
-                    else:
-                        self.__handlers[source].append((method, match_sources[source]))
+                    tags = match_sources[source]
+                    for tag in tags:
+                        handler_key = '%s:%s'%(source,tag)
+                    self.__handlers[handler_key] = method
         
         # Call configure to set up options
         self.configure(options)
@@ -445,16 +445,16 @@ class Layer(object):
     def get_handler(self, source, tag='default'):
         """Retrieve the registered handler for a given source and tag (if any).
         """
-        if source in self.__handlers:
-            # Search method with the exact tag
-            for method, tags in self.__handlers[source]:
-                if tag in tags:
-                    return method
+        handler_key = '%s:%s'%(source, tag)
+        if handler_key in self.__handlers:
+            return self.__handlers[handler_key]
             
-            # If not found, fall back on 'default' tag
-            for method, tags in self.__handlers[source]:
-                if 'default' in tags:
-                    return method
+        # If not found, fall back on 'default' tag
+        handler_key = '%s:%s'%(source, 'default')
+        if handler_key in self.__handlers:
+            return self.__handlers[handler_key]
+
+        # Not found
         return None
 
     def get_layer(self, name, children_only=False):
@@ -484,7 +484,14 @@ class Layer(object):
                 
                 # If not, we ask our parent to get it
                 if not children_only and self.__parent is not None:
-                    return self.__parent.get_layer(name)
+                    layer = self.__parent.get_layer(name)
+                    
+                    # Save layer in cache
+                    if layer is not None:
+                        self.__layer_cache[name] = layer
+                    
+                    # Return layer
+                    return layer
             
             # If anyone has this layer, it does not exist
             return None
@@ -592,7 +599,7 @@ class Layer(object):
         # Find the target layer object
         target_layer = self.get_layer(destination)
         if target_layer is not None:
-# Then we search the corresponding handler for our source
+            # Then we search the corresponding handler for our source
             handler = target_layer.get_handler(source_layer, tag)
             if handler is not None:
                 if handler.is_contextual:

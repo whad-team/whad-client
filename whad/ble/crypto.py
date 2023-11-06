@@ -1,6 +1,9 @@
 from Cryptodome.Cipher import AES
 from Cryptodome.Hash import CMAC
 from Cryptodome.Random import get_random_bytes
+from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, \
+    generate_private_key, derive_private_key, EllipticCurvePublicNumbers, \
+    ECDH
 from whad.protocol.ble.ble_pb2 import BleDirection
 from struct import pack
 from binascii import hexlify
@@ -140,6 +143,32 @@ def h7(salt, W):
     return (
             aes_cmac(salt,W)
     )
+
+def generate_p256_keypair(private_number=None):
+    """
+    Generate a P256 valid secret key and the associated public key.
+    If a private number is provided, use it to derive the private key.
+    Otherwise, generate it from scratch.
+    """
+    if private_number is None:
+        private_key = generate_private_key(SECP256R1())
+    else:
+        private_key = derive_private_key(private_number, SECP256R1())
+
+    return private_key, private_key.public_key()
+
+def generate_public_key_from_coordinates(x, y):
+    """
+    Generate the associated public key from the X and Y coordinates on the curve.
+    """
+    return EllipticCurvePublicNumbers(x, y, SECP256R1()).public_key()
+
+def generate_diffie_hellman_shared_secret(own_private_key, peer_public_key):
+    """
+    Generate the shared secret from a private key and the peer public key.
+    """
+    shared_key = own_private_key.exchange(ECDH(), peer_public_key)
+    return shared_key
 
 class LinkLayerCryptoManager:
     """

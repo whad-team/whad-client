@@ -15,7 +15,7 @@ target, and will return a `PeripheralDevice` object, as shown below::
 
     central = Central(...)
     target = central.connect('00:11:22:33:44:55')
-    
+
 One can then use this object to discover all the services and characteristics::
 
     target.discover()
@@ -39,6 +39,9 @@ from whad.ble.profile.characteristic import CharacteristicDescriptor, \
 from whad.ble.profile import GenericProfile
 from whad.ble.stack.att.constants import BleAttProperties
 from whad.ble.profile.attribute import UUID
+
+from struct import unpack
+from time import sleep
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +69,7 @@ class PeripheralCharacteristicDescriptor:
     @property
     def type_uuid(self):
         """Return this attribute type UUID.
-        
+
         :return UUID: Attribute type UUID
         """
         return self.__descriptor.type_uuid
@@ -233,7 +236,7 @@ class PeripheralCharacteristic:
         access_mask = CharacteristicProperties.WRITE_WITHOUT_RESPONSE | CharacteristicProperties.WRITE
         if (self.__characteristic.properties & access_mask) == CharacteristicProperties.WRITE_WITHOUT_RESPONSE:
             without_response = True
-        
+
         if isinstance(value, bytes):
             if without_response:
                 return self.__gatt.write_command(
@@ -284,7 +287,7 @@ class PeripheralCharacteristic:
         :return bool: True if writeable, False otherwise.
         """
         return (
-            ((self.__characteristic.properties & CharacteristicProperties.WRITE) != 0) or 
+            ((self.__characteristic.properties & CharacteristicProperties.WRITE) != 0) or
             ((self.__characteristic.properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE) != 0)
         )
 
@@ -340,7 +343,7 @@ class PeripheralCharacteristic:
                 return True
             else:
                 return False
-    
+
     def unsubscribe(self):
         """Unsubscribe from this characteristic.
         """
@@ -456,6 +459,8 @@ class PeripheralDevice(GenericProfile):
         :type   from_json:      str, optional
         """
         self.__gatt = gatt_client
+        self.__smp = gatt_client.smp
+        self.__ll = gatt_client.get_layer('ll')
         self.__conn_handle = conn_handle
         self.__central = central
         self.__disconnect_cb = None
@@ -468,6 +473,34 @@ class PeripheralDevice(GenericProfile):
         """
         return self.__conn_handle
 
+
+    def start_encryption(self):
+        security_database = self.__smp.security_database
+
+
+        crypto_material = security_database.get(address=self.__central.target_peer)
+        conn_handle = self.__smp.get_layer('l2cap').state.conn_handle
+        if crypto_material is not None and crypto_material.has_ltk():
+            self.__ll.start_encryption(
+                conn_handle,
+                unpack('>Q', crypto_material.ltk.rand)[0],
+                crypto_material.ltk.ediv
+            )
+
+    def pairing(self, pairing=None):
+        """Trigger a pairing according to provided parameters.
+        Default parameters will be used if pairing parameter is None.
+        """
+        if not self.__smp.initiate_pairing(parameters=pairing):
+            return False
+
+        while not self.__smp.is_pairing_done():
+            sleep(0.1)
+            if self.__smp.is_pairing_failed():
+                return False
+
+        self.__smp.reset_state()
+        return True
 
     def set_disconnect_cb(self, callback):
         """Set disconnection callback.
@@ -537,7 +570,7 @@ class PeripheralDevice(GenericProfile):
                     return PeripheralCharacteristic(
                         charac,
                         self.__gatt
-                    )  
+                    )
 
 
     def find_object_by_handle(self, handle):
@@ -670,7 +703,7 @@ class PeripheralDevice(GenericProfile):
         else:
             return self.__gatt.read_long(handle)
 
-    
+
     def on_disconnect(self, conn_handle):
         """Disconnection callback
 
@@ -680,11 +713,3 @@ class PeripheralDevice(GenericProfile):
         logger.debug('PeripheralDevice has disconnected')
         if self.__disconnect_cb is not None:
             self.__disconnect_cb()
-
-                    
-
-
-
-
-
-    

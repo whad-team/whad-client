@@ -12,7 +12,7 @@ device.
 
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL
 from scapy.layers.bluetooth import L2CAP_Hdr
-from whad.ble.connector import BLE, Central, Peripheral, BleDirection
+from whad.ble.connector import BLE, Central, Peripheral, Scanner, BleDirection
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvCompleteLocalName
 from whad.ble.profile import GenericProfile
 from whad.ble.exceptions import HookReturnValue, HookDontForward
@@ -20,7 +20,7 @@ from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.exceptions import WhadDeviceNotFound
 from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
 from binascii import hexlify
-
+from time import time
 # Logging
 import logging
 logger = logging.getLogger(__name__)
@@ -95,19 +95,19 @@ class LowLevelPeripheral(Peripheral):
 
     def on_connected(self, connection_data):
         """Callback to handle link-layer connection from the underlying peripheral connector
-        
+
         :param connection_data: Connection data object
         """
         self.__connected = True
         if connection_data.conn_handle is None:
            self.__conn_handle = 0
-        else: 
+        else:
             self.__conn_handle = connection_data.conn_handle
-        
+
         # Notify proxy that a connection has been established
         if self.__proxy is not None:
             self.__proxy.on_connect()
-        
+
         # Foward pending PDUs
         if len(self.__pending_control_pdus) > 0:
             for _pdu in self.__pending_control_pdus:
@@ -117,7 +117,7 @@ class LowLevelPeripheral(Peripheral):
                         self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
                 else:
                     self.send_pdu(reshape_pdu(_pdu), self.__conn_handle)
-        
+
         if len(self.__pending_data_pdus) > 0:
             for _pdu in self.__pending_data_pdus:
                 if self.__proxy is not None:
@@ -217,7 +217,7 @@ class LowLevelCentral(Central):
 
     This class implements a Central role that is able to initiate a BLE connection
     to a target device and then forward all the control and data PDUs to the attached
-    LowLevelPeripheral instance. 
+    LowLevelPeripheral instance.
 
     No BLE stack is bound tho this Central role, only raw PDUs sent by the target
     device or received from the associated peripheral.
@@ -229,6 +229,7 @@ class LowLevelCentral(Central):
         :param WhadDevice device: Underlying WHAD device to use.
         """
         super().__init__(device, existing_connection=connection_data)
+        self.__connected = False
         self.__other_half = None
 
 
@@ -264,7 +265,7 @@ class LowLevelCentral(Central):
         self.__connected = True
         if connection_data.conn_handle is None:
            self.__conn_handle = 0
-        else: 
+        else:
             self.__conn_handle = connection_data.conn_handle
 
 
@@ -349,7 +350,7 @@ class LinkLayerProxy(object):
             )
         else:
             self.__adv_data = adv_data
-        
+
         self.__scan_data = scan_data
 
         # Save both devices
@@ -400,14 +401,14 @@ class LinkLayerProxy(object):
 
         The proxy device will be set as a peripheral
         """
-        
+
         # First, connect our central device to our target device
         logger.info('create low-level central device ...')
         self.__central = LowLevelCentral(self.__target)
         logger.info('connecting to target device ...')
         if self.__central.connect(self.__target_bd_addr) is not None:
             logger.info('proxy is connected to target device, create our own device ...')
-            
+
             # Once connected, we start our peripheral
             self.__peripheral = LowLevelPeripheral(
                 self,
@@ -422,7 +423,7 @@ class LinkLayerProxy(object):
             self.__peripheral.set_other_half(self.__central)
             self.__central.set_other_half(self.__peripheral)
             logger.info('central and peripheral devices are now interconnected')
-            
+
             # Start advertising
             logger.info('starting advertising our proxy device')
             self.__peripheral.start()
@@ -720,7 +721,7 @@ class GattProxy(object):
         Raise a :class:`HookReturnValue` exception to override the value that will be written
         in the target characteristic.
 
-        Raise any other hook exception (:class:`HookReturnAccessDenied`, :class:`HookReturnNotFound`, 
+        Raise any other hook exception (:class:`HookReturnAccessDenied`, :class:`HookReturnNotFound`,
         :class:`HookReturnAuthentRequired` or :class:`HookReturnAuthorRequired`) to force the proxy
         to return a specific error to the initiator device.
 
@@ -781,7 +782,7 @@ class GattProxy(object):
                 self.__target.discover()
                 logger.info('services and characs discovered')
                 target_profile = self.__target.export_json()
-            
+
             # Once connected, we start our peripheral
             logger.info('create a peripheral with similar profile ...')
             self.__profile = ImportedDevice(
@@ -800,5 +801,3 @@ class GattProxy(object):
             logger.info('starting advertising')
             self.__peripheral.start()
             logger.info('GattProxy instance is ready')
-
-
