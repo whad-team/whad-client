@@ -9,12 +9,13 @@ from struct import unpack, pack
 from whad.ble.exceptions import HookReturnValue, HookReturnAuthentRequired,\
     HookReturnAuthorRequired, HookReturnAccessDenied, HookReturnGattError, \
     HookReturnNotFound, ConnectionLostException
-from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
+from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode, ReadAccess, \
+    WriteAccess, Authentication, Authorization, Encryption
 from whad.ble.stack.att.exceptions import error_response_to_exc, AttErrorCode
 from whad.ble.stack.gatt.helpers import get_uuid_alias
 from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
-from whad.ble.profile import GenericProfile
+from whad.ble.profile import GenericProfile, Pairing
 from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
 from whad.ble.profile.service import PrimaryService, SecondaryService
 
@@ -39,16 +40,16 @@ class GattLayer(Layer):
 
             GattFindInfoRequest: self.on_find_info_request,
             GattFindInfoResponse: self.on_find_info_response,
-            
+
             GattFindByTypeValueRequest: self.on_find_by_type_value_request,
             GattFindByTypeValueResponse: self.on_find_by_type_value_response,
-            
+
             GattReadByTypeRequest: self.on_read_by_type_request,
             GattReadByTypeResponse: self.on_read_by_type_response,
-            
+
             GattReadByGroupTypeRequest: self.on_read_by_group_type_request,
             GattReadByGroupTypeResponse: self.on_read_by_group_type_response,
-            
+
             GattReadRequest: self.on_read_request,
             GattReadResponse: self.on_read_response,
 
@@ -76,6 +77,10 @@ class GattLayer(Layer):
     @property
     def att(self):
         return self.get_layer('att')
+
+    @property
+    def smp(self):
+        return self.get_layer('smp')
 
     @source('att')
     def on_att_packet(self, packet):
@@ -153,7 +158,7 @@ class GattLayer(Layer):
         self.error(
             BleAttOpcode.FIND_INFO_REQUEST, packet.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
-        
+
     def on_find_info_response(self, packet: GattFindInfoResponse):
         '''ATT Find Information Response callback
 
@@ -898,6 +903,7 @@ class GattServer(GattLayer):
         '''This method is used with GattClientServer to specify the GATT
         server profile.
         '''
+        # Note: redundant with set_server_model
         self.__server_model = model
 
     def configure(self, options):
@@ -1043,6 +1049,34 @@ class GattServer(GattLayer):
                 # Check characteristic is readable
                 charac = self.__server_model.find_object_by_handle(request.handle - 1)
 
+                conn_handle = self.get_layer('l2cap').state.conn_handle
+                if charac.check_security_property(ReadAccess, Authentication):
+                    print("[i] authentication required for read access !")
+                    if not self.get_layer('ll').state.is_authenticated(conn_handle):
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                        return
+                if charac.check_security_property(ReadAccess, Encryption):
+                    print("[i] encryption required for read access !")
+                    if not self.get_layer('ll').state.is_encrypted(conn_handle):
+                        self.error(
+                            BleAttOpcode.READ_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_ENCRYPTION
+                        )
+                        return
+                if charac.check_security_property(ReadAccess, Authorization):
+                    print("[i] authorization required for read access !")
+                    # TODO: not supported for now
+                    self.error(
+                        BleAttOpcode.READ_REQUEST,
+                        request.handle,
+                        BleAttErrorCode.INSUFFICIENT_AUTHOR
+                    )
+                    return
                 if charac.readable():
                     try:
                         service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
@@ -1126,7 +1160,6 @@ class GattServer(GattLayer):
                 BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
 
-
     def on_read_blob_request(self, request: GattReadBlobRequest):
         """Read blob request
         """
@@ -1144,6 +1177,35 @@ class GattServer(GattLayer):
                     try:
                         charac = self.__server_model.find_object_by_handle(request.handle - 1)
                         service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
+
+                        conn_handle = self.get_layer('l2cap').state.conn_handle
+                        if charac.check_security_property(ReadAccess, Authentication):
+                            print("[i] authentication required for read access !")
+                            if not self.get_layer('ll').state.is_authenticated(conn_handle):
+                                self.error(
+                                    BleAttOpcode.READ_BLOB_REQUEST,
+                                    request.handle,
+                                    BleAttErrorCode.INSUFFICIENT_AUTHENT
+                                )
+                                return
+                        if charac.check_security_property(ReadAccess, Encryption):
+                            print("[i] encryption required for read access !")
+                            if not self.get_layer('ll').state.is_encrypted(conn_handle):
+                                self.error(
+                                    BleAttOpcode.READ_BLOB_REQUEST,
+                                    request.handle,
+                                    BleAttErrorCode.INSUFFICIENT_ENCRYPTION
+                                )
+                                return
+                        if charac.check_security_property(ReadAccess, Authorization):
+                            print("[i] authorization required for read access !")
+                            # TODO: not supported for now
+                            self.error(
+                                BleAttOpcode.READ_BLOB_REQUEST,
+                                request.handle,
+                                BleAttErrorCode.INSUFFICIENT_AUTHOR
+                            )
+                            return
                         if not charac.readable():
                             self.error(
                                 BleAttOpcode.READ_BLOB_REQUEST,
@@ -1237,6 +1299,35 @@ class GattServer(GattLayer):
             if isinstance(attr, CharacteristicValue):
                 # Check the corresponding characteristic is writeable
                 charac = self.__server_model.find_object_by_handle(request.handle - 1)
+
+                conn_handle = self.get_layer('l2cap').state.conn_handle
+                if charac.check_security_property(WriteAccess, Authentication):
+                    print("[i] authentication required for write access !")
+                    if not self.get_layer('ll').state.is_authenticated(conn_handle):
+                        self.error(
+                            BleAttOpcode.WRITE_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                        return
+                if charac.check_security_property(WriteAccess, Encryption):
+                    print("[i] encryption required for write access !")
+                    if not self.get_layer('ll').state.is_encrypted(conn_handle):
+                        self.error(
+                            BleAttOpcode.WRITE_REQUEST,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_ENCRYPTION
+                        )
+                        return
+                if charac.check_security_property(WriteAccess, Authorization):
+                    print("[i] authorization required for write access !")
+                    # TODO: not supported for now
+                    self.error(
+                        BleAttOpcode.WRITE_REQUEST,
+                        request.handle,
+                        BleAttErrorCode.INSUFFICIENT_AUTHOR
+                    )
+                    return
                 if charac.writeable():
                     # Retrieve corresponding service info
                     service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
@@ -1381,6 +1472,35 @@ class GattServer(GattLayer):
             if isinstance(attr, CharacteristicValue):
                 # Check the corresponding characteristic is writeable
                 charac = self.__server_model.find_object_by_handle(request.handle - 1)
+
+                conn_handle = self.get_layer('l2cap').state.conn_handle
+                if charac.check_security_property(WriteAccess, Authentication):
+                    print("[i] authentication required for write access !")
+                    if not self.get_layer('ll').state.is_authenticated(conn_handle):
+                        self.error(
+                            BleAttOpcode.WRITE_COMMAND,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_AUTHENT
+                        )
+                        return
+                if charac.check_security_property(WriteAccess, Encryption):
+                    print("[i] encryption required for write access !")
+                    if not self.get_layer('ll').state.is_encrypted(conn_handle):
+                        self.error(
+                            BleAttOpcode.WRITE_COMMAND,
+                            request.handle,
+                            BleAttErrorCode.INSUFFICIENT_ENCRYPTION
+                        )
+                        return
+                if charac.check_security_property(WriteAccess, Authorization):
+                    print("[i] authorization required for write access !")
+                    # TODO: not supported for now
+                    self.error(
+                        BleAttOpcode.WRITE_COMMAND,
+                        request.handle,
+                        BleAttErrorCode.INSUFFICIENT_AUTHOR
+                    )
+                    return
                 if charac.writeable():
                     # Retrieve corresponding service info
                     service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
@@ -1625,7 +1745,7 @@ class GattServer(GattLayer):
 
             # Get MTU
             mtu = self.get_layer('l2cap').get_local_mtu()
-            
+
             # Get item size (UUID size + 2)
             uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
             item_size = uuid_size + 5
@@ -1733,6 +1853,14 @@ class GattServer(GattLayer):
             charac.set_indication_callback(None)
         self.__subscribed_characs = []
 
+    def pairing(self, pairing=None):
+        pairing_parameters = Pairing()
+        if pairing is None:
+            pairing_parameters = self.__server_model.get_pairing_parameters()
+        elif isinstance(pairing, Pairing):
+            pairing_parameters = pairing
+
+        self.smp.request_pairing(pairing=pairing_parameters)
 
 class GattClientServer(GattServer, GattClient):
 

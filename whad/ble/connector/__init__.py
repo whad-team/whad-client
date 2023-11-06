@@ -607,18 +607,24 @@ class BLE(WhadDeviceConnector):
         self.__triggers = []
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-    def set_encryption(self, enabled=False, key=None, iv=None):
+    def set_encryption(self, conn_handle, enabled=False, ll_key=None, ll_iv=None, key=None, rand=None, ediv=None):
         """Notify WHAD device about encryption status
-
-        TODO: add support of rand and ediv to allow HCI device encryption
         """
+        print("set_encryption", enabled, ll_key.hex(), ll_iv.hex(), key.hex(), rand, ediv)
         # Send SetEncryptionCmd to device
         msg = Message()
         msg.ble.encryption.enabled = enabled
+        msg.ble.encryption.conn_handle = conn_handle
+        if ll_key is not None:
+            msg.ble.encryption.ll_key = ll_key
+        if ll_iv is not None:
+            msg.ble.encryption.ll_iv = ll_iv
         if key is not None:
             msg.ble.encryption.key = key
-        if iv is not None:
-            msg.ble.encryption.iv = iv
+        if rand is not None:
+            msg.ble.encryption.rand = struct.pack('<Q', rand)
+        if ediv is not None:
+            msg.ble.encryption.ediv = struct.pack('<H', ediv)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
         # Update LL encryption status

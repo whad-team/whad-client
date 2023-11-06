@@ -14,7 +14,9 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
     HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect, \
     HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, HCI_Event_Disconnection_Complete, \
-    HCI_Cmd_LE_Set_Scan_Response_Data, HCI_Cmd_LE_Set_Random_Address
+    HCI_Cmd_LE_Set_Scan_Response_Data, HCI_Cmd_LE_Set_Random_Address, HCI_Cmd_LE_Long_Term_Key_Request_Reply,\
+    HCI_Cmd_LE_Start_Encryption_Request
+
 from whad.device.virtual.hci.converter import HCIConverter
 from whad.device.virtual.hci.hciconfig import HCIConfig
 from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState
@@ -96,6 +98,7 @@ class HCIDevice(VirtualDevice):
         self.__timeout = 1.0
         self._connected = False
         self._active_handles = []
+        self._waiting_disconnect = False
 
     @property
     def identifier(self):
@@ -174,6 +177,8 @@ class HCIDevice(VirtualDevice):
                             self._send_whad_message(message)
                     # If the connection is stopped and peripheral mode is started,
                     # automatically re-enable advertising based on cached data
+                    if HCI_Event_Disconnection_Complete in event:
+                        self._waiting_disconnect = False
                     if HCI_Event_Disconnection_Complete in event and self.__internal_state == HCIInternalState.PERIPHERAL:
                         # If advertising was not enabled, skip
                         if not self._advertising:
@@ -462,7 +467,14 @@ class HCIDevice(VirtualDevice):
             response = self._write_command(HCI_Cmd_LE_Set_Host_Channel_Classification(chM=formatted_channel_map))
             if response.status != 0x00:
                 return False
-        response = self._write_command(HCI_Cmd_LE_Create_Connection(paddr=bd_address, patype=patype, min_interval=hop_interval, max_interval=hop_interval))
+        response = self._write_command(
+            HCI_Cmd_LE_Create_Connection(
+                paddr=bd_address,
+                patype=patype,
+                min_interval=hop_interval,
+                max_interval=hop_interval
+            )
+        )
         return response is not None and response.status == 0x00
 
     def _disconnect(self, handle):
@@ -470,6 +482,9 @@ class HCIDevice(VirtualDevice):
         Establish a disconnection using HCI device.
         """
         response = self._write_command(HCI_Cmd_Disconnect(handle=handle))
+        self._waiting_disconnect = True
+        while self._waiting_disconnect:
+            sleep(0.1)
         return response is not None and response.status == 0x00
 
     def _set_advertising_data(self, data, wait_response=True):
@@ -524,6 +539,48 @@ class HCIDevice(VirtualDevice):
             if success:
                 self._advertising = enable
             return success
+
+    def _enable_encryption(self, enable=True, handle=None,  key=None, rand=None, ediv=None):
+
+        if self.__converter.pending_key_request:
+            response = self._write_command(
+                HCI_Cmd_LE_Long_Term_Key_Request_Reply(
+                    handle=handle,
+                    ltk=key[::-1]
+                )
+            )
+            self.__converter.pending_key_request = False
+        else:
+            HCI_Cmd_LE_Start_Encryption_Request(
+                handle=handle,
+                ltk=key[::-1],
+                rand=rand,
+                ediv=unpack('<H', ediv)[0]
+            ).show()
+            response = self._write_command(
+                HCI_Cmd_LE_Start_Encryption_Request(
+                    handle=handle,
+                    ltk=key[::-1],
+                    rand=rand,
+                    ediv=unpack('<H', ediv)[0]
+                )
+            )
+        return response.status == 0x00
+
+
+    def _on_whad_ble_encryption(self, message):
+        success = self._enable_encryption(
+            message.enabled,
+            message.conn_handle,
+            message.key,
+            message.rand,
+            message.ediv
+        )
+        if success:
+            self._send_whad_command_result(ResultCode.SUCCESS)
+            return
+        self._send_whad_command_result(ResultCode.ERROR)
+
 
     def _on_whad_ble_periph_mode(self, message):
         logger.debug('whad ble periph mode message')
@@ -612,11 +669,12 @@ class HCIDevice(VirtualDevice):
             self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_ble_send_pdu(self, message):
-        logger.debug('Recevied WHAD BLE send_pdu message')
+        logger.debug('Received WHAD BLE send_pdu message')
         if ((self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE) or
            (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
             try:
                 hci_packets = self.__converter.process_message(message)
+
                 if hci_packets is not None:
                     logger.debug('sending HCI packets ...')
                     success = True
@@ -629,10 +687,10 @@ class HCIDevice(VirtualDevice):
                     else:
                         logger.debug('send_pdu command failed.')
                         self._send_whad_command_result(ResultCode.ERROR)
-                else:
-                    # Error while converting packets
-                    logger.debug('error while converting message to packet')
-                    self._send_whad_command_result(ResultCode.ERROR)                   
+                pending_messages = self.__converter.get_pending_messages()
+                for pending_message in pending_messages:
+                    self._send_whad_message(pending_message)
+
             except WhadDeviceUnsupportedOperation as err:
                 logger.debug('Parameter error')
                 self._send_whad_command_result(ResultCode.PARAMETER_ERROR)

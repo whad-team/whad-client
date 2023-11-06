@@ -90,10 +90,18 @@ class BleStack(Layer):
         logger.debug('sending a control PDU (%d bytes) to conn_handle %d' % (len(pdu), conn_handle))
         self.__connector.send_ctrl_pdu(pdu, conn_handle, encrypt=encrypt)
 
-    def set_encryption(self, enabled=False, key=None, iv=None):
+    def set_encryption(self, conn_handle=None, enabled=True,ll_key=None, ll_iv=None, key=None, rand=None, ediv=None):
         '''Enable or disable encryption using underlying WHAD connector.
         '''
-        logger.debug('%s encryption (key=%s, iv=%s)' % ("enabling" if enabled else "disabling", key.hex(), iv.hex()))
-        self.__connector.set_encryption(enabled=enabled, key=key, iv=iv)
+        logger.debug('%s encryption (key=%s, iv=%s)' % ("enabling" if enabled else "disabling", ll_key.hex(), ll_iv.hex()))
+        self.__connector.set_encryption(
+            conn_handle=conn_handle,
+            enabled=enabled,
+            ll_key=ll_key,
+            ll_iv=ll_iv,
+            key=key,
+            rand=rand,
+            ediv=ediv
+        )
 
 BleStack.add(LinkLayer)

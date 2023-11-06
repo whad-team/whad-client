@@ -1,6 +1,7 @@
 from whad import WhadCapability
 from whad.protocol.ble.ble_pb2 import Start, Stop, AdvMode, SetAdvData, \
-    ScanMode, CentralMode, ConnectTo, SendPDU, PeripheralMode, Disconnect
+    ScanMode, CentralMode, ConnectTo, SendPDU, PeripheralMode, Disconnect, \
+    SetEncryption
 from whad.ble.stack.constants import BT_MANUFACTURERS
 from enum import IntEnum
 
@@ -17,8 +18,8 @@ LE_STATES = {
     3 : ("High Duty Cycle Directed Advertising State", 0,  [Start, Stop, AdvMode, SetAdvData]),
     4 : ("Passive Scanning State", WhadCapability.Scan, [Start, Stop, ScanMode]),
     5 : ("Active Scanning State", WhadCapability.Scan,[Start, Stop, ScanMode]),
-    6 : ("Initiating State and Connection State (Central Role)", WhadCapability.SimulateRole, [Start, Stop, CentralMode, ConnectTo,Disconnect, SendPDU]),
-    7 : ("Connection State (Peripheral Role)", WhadCapability.SimulateRole,  [Start, Stop, PeripheralMode, SendPDU, Disconnect])
+    6 : ("Initiating State and Connection State (Central Role)", WhadCapability.SimulateRole, [Start, Stop, CentralMode, ConnectTo,Disconnect, SendPDU, SetEncryption]),
+    7 : ("Connection State (Peripheral Role)", WhadCapability.SimulateRole,  [Start, Stop, PeripheralMode, SendPDU, Disconnect, SetEncryption])
 }
 
 ADDRESS_MODIFICATION_VENDORS = [

@@ -17,11 +17,12 @@ from whad.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
 from whad.ble.stack.gatt import GattServer, GattClientServer
 from whad.ble.stack.att import ATTLayer
+from whad.ble.stack.smp import CryptographicDatabase, Pairing
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.device import PeripheralDevice
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
-
+from time import sleep
 
 from binascii import hexlify
 
@@ -37,7 +38,7 @@ class Peripheral(BLE):
     defined by a specific profile.
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, public=True, stack=BleStack):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, stack=BleStack, pairing=Pairing(), security_database=None):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -61,7 +62,7 @@ class Peripheral(BLE):
 
         # Initialize stack
         self.__stack = stack(self)
-        self.__conn_handle = None
+        self.connection = None
         self.__connected = False
 
         # Initialize profile
@@ -71,6 +72,17 @@ class Peripheral(BLE):
         else:
             logger.info('Peripheral will use the provided profile.')
             self.__profile = profile
+
+        # Initialize security database
+        if security_database is None:
+            logger.info('No security database provided to this Peripheral instance, use a default one.')
+            self.__security_database = CryptographicDatabase()
+        else:
+            logger.info('Peripheral will use the provided security database.')
+            self.__security_database = security_database
+
+        # Initiate pairing parameters
+        self.__pairing_parameters = pairing
 
         # Check if device accepts peripheral mode
         if not self.can_be_peripheral():
@@ -90,6 +102,11 @@ class Peripheral(BLE):
             if existing_connection is not None:
                 self.on_connected(existing_connection)
 
+
+    def get_pairing_parameters(self):
+        """Returns the provided pairing parameters, if any.
+        """
+        return self.__pairing_parameters
 
     def send_data_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None) -> bool:
         """Send a PDU to the central device this peripheral device is connected to.
@@ -138,8 +155,37 @@ class Peripheral(BLE):
         self.__stack = clazz(self)
 
     @property
+    def smp(self):
+        if self.connection is not None:
+            return self.connection.smp
+        return None
+
+    def pairing(self, pairing=None):
+        if self.smp is None:
+            return False
+        if pairing is not None:
+            self.__pairing_parameters = pairing
+
+        if not self.smp.request_pairing(self.__pairing_parameters):
+            return False
+
+        while not self.smp.is_pairing_done():
+            sleep(0.1)
+            if self.smp.is_pairing_failed():
+                return False
+
+        self.smp.reset_state()
+        return True
+
+    @property
     def gatt(self):
-        return self.__gatt_server
+        if self.connection is not None:
+            return self.connection.gatt
+        return None
+
+    @property
+    def security_database(self):
+        return self.__security_database
 
     ##############################
     # Incoming events
@@ -153,16 +199,18 @@ class Peripheral(BLE):
         """
         # Retrieve the GATT server instance and set its profile
         logger.info('a device is now connected (connection handle: %d)' % connection_data.conn_handle)
+        self.__local = BDAddress.from_bytes(
+            connection_data.advertiser,
+            connection_data.adv_addr_type
+        )
+        self.__target = BDAddress.from_bytes(
+            connection_data.initiator,
+            connection_data.init_addr_type
+        )
         self.__stack.on_connection(
             connection_data.conn_handle,
-            BDAddress.from_bytes(
-                connection_data.advertiser,
-                connection_data.adv_addr_type
-            ),
-            BDAddress.from_bytes(
-                connection_data.initiator,
-                connection_data.init_addr_type
-            )
+            self.__local,
+            self.__target
         )
         self.__conn_handle = connection_data.conn_handle
 
@@ -172,6 +220,7 @@ class Peripheral(BLE):
         :param  connection_data:    Connection data
         :type   connection_data:    :class:`whad.protocol.ble_pb2.Disconnected`
         """
+
         logger.info('a device has just connected (connection handle: %d)' % disconnection_data.conn_handle)
         self.__stack.on_disconnection(
             disconnection_data.conn_handle,
@@ -223,32 +272,50 @@ class Peripheral(BLE):
 
         # Retrieve GATT server
         self.__gatt_server = connection.gatt
+
         self.__gatt_server.set_server_model(self.__profile)
         self.__connected = True
 
+        # Configure SMP layer
+        # we set the security database
+        self.connection.smp.set_security_database(self.__security_database)
+        self.connection.smp.pairing_parameters = self.__pairing_parameters
+
+        # Check if we got a matching LTK
+        crypto_material = self.security_database.get(address=self.__local)
+
+        if crypto_material is not None and crypto_material.has_ltk():
+            conn_handle = connection.conn_handle
+            self.__stack.get_layer('ll').state.register_encryption_key(
+                conn_handle,
+                crypto_material.ltk.value
+            )
+            if crypto_material.is_authenticated():
+                print("Marked as authenticated")
+                self.__stack.get_layer('ll').state.mark_as_authenticated(connection.conn_handle)
+            else:
+                print("Marked as unauthenticated")
+
+
+        # we indicate that we are a responder
+        self.connection.smp.set_responder_role()
+
         # Notify our profile about this connection
         self.__profile.on_connect(self.connection.conn_handle)
+    '''
+    def start_encryption(self):
+        # Check if we got a matching LTK
+        crypto_material = self.security_database.get(address=self.__target)
 
-    def is_connected(self):
-        """Determine if this peripheral is connected to a central.
-
-        :return:    True if connected, False otherwise.
-        """
-        return self.__connected
-
-    def wait_connection(self):
-        """Wait for a connection.
-        """
-        while not self.is_connected():
-            sleep(.5)
-
-    def terminate(self):
-        """Terminate the current connection
-        """
-        if self.__conn_handle is not None:
-            self.disconnect(self.__conn_handle)
-
-
+        if crypto_material is not None and crypto_material.has_ltk():
+            conn_handle = self.connection.smp.get_layer('l2cap').state.conn_handle
+            if crypto_material is not None and crypto_material.has_ltk():
+                self.connection.smp.get_layer('ll').start_encryption(
+                    conn_handle,
+                    unpack('>Q', crypto_material.ltk.rand)[0],
+                    crypto_material.ltk.ediv
+                )
+    '''
 class PeripheralClient(Peripheral):
     '''This BLE connector provides a way to create a peripheral device with
     both GATT server and client roles.
@@ -273,9 +340,10 @@ class PeripheralClient(Peripheral):
 
     def on_new_connection(self, connection):
         super().on_new_connection(connection)
-        
+
         # Create a new peripheral device to represent the central device
         # that has just connected
+
         self.__peripheral = PeripheralDevice(
             self,
             connection.gatt,

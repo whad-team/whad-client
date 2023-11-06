@@ -7,9 +7,19 @@ from ctypes import sizeof
 from scapy.data import MTU
 from scapy.consts import WINDOWS
 from scapy.supersocket import SuperSocket
+from scapy.packet import bind_layers, Packet
+from scapy.fields import BitField
 from scapy.error import warning
 from scapy.layers.bluetooth import BluetoothUserSocket, BluetoothSocketError, BluetoothCommandError, \
-    HCI_Hdr
+    HCI_Hdr, SM_Hdr
+
+class SM_Security_Request(Packet):
+    name = "Security Request"
+    fields_desc = [
+       BitField("authentication", 0, 8)
+    ]
+
+bind_layers(SM_Hdr, SM_Security_Request, sm_command=0x0b)
 
 class BluetoothUserSocketFixed(BluetoothUserSocket):
     pass

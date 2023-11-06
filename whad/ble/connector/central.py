@@ -11,6 +11,7 @@ from whad.ble.stack import BleStack, BtVersion
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
 from whad.ble.stack.gatt import GattClient
 from whad.ble.stack.att import ATTLayer
+from whad.ble.stack.smp import CryptographicDatabase
 from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
 from whad.ble.profile.device import PeripheralDevice
 from whad.common.stack import Layer
@@ -30,9 +31,9 @@ class Central(BLE):
 
     """
 
-    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack, client=GattClient):
+    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack, client=GattClient, security_database=None):
         super().__init__(device)
-        
+
         """Attach a GATT client if specified in parameter
 
         If `client` is set to None, the default GATT layer is used, which does
@@ -55,12 +56,25 @@ class Central(BLE):
         if not self.can_be_central():
             raise UnsupportedCapability('Central')
 
+        # Initialize security database
+        if security_database is None:
+            logger.info('No security database provided to this Peripheral instance, use a default one.')
+            self.__security_database = CryptographicDatabase()
+        else:
+            logger.info('Peripheral will use the provided security database.')
+            self.__security_database = security_database
+
         # If a connection already exists, just feed the stack with the parameters
         if existing_connection is not None:
             self.on_connected(existing_connection)
         else:
             # self.stop() # ButteRFly doesn't support calling stop when spawning central
             self.enable_central_mode()
+
+
+    @property
+    def security_database(self):
+        return self.__security_database
 
     @property
     def local_peer(self) -> BDAddress:
@@ -183,15 +197,10 @@ class Central(BLE):
 
         self.__stack.on_connection(
             connection_data.conn_handle,
-            BDAddress.from_bytes(
-                connection_data.initiator,
-                addr_type=connection_data.init_addr_type
-            ),
-            BDAddress.from_bytes(
-                connection_data.advertiser,
-                connection_data.adv_addr_type
-            )
+            self.__local,
+            self.__target
         )
+
 
     def on_disconnected(self, disconnection_data):
         """Callback method to handle disconnection event.
@@ -263,6 +272,24 @@ class Central(BLE):
         self.__gatt_client = connection.gatt
         self.__gatt_client.set_client_model(self.__peripheral)
         self.__connected = True
+
+        # Configure SMP layer
+        # we set the security database
+        self.connection.smp.set_security_database(self.__security_database)
+
+        # Check if we got a matching LTK
+        crypto_material = self.security_database.get(address=self.__target)
+
+        if crypto_material is not None and crypto_material.has_ltk():
+            self.__stack.get_layer('ll').state.register_encryption_key(
+                connection.conn_handle,
+                crypto_material.ltk.value
+            )
+            if crypto_material.is_authenticated():
+                print("Marked as authenticated")
+                self.__stack.get_layer('ll').state.mark_as_authenticated(connection.conn_handle)
+            else:
+                print("Marked as unauthenticated")
 
         # Notify peripheral about this connection
         self.__peripheral.on_connect(self.connection.conn_handle)

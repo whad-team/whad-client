@@ -90,7 +90,6 @@ class L2CAPLayer(ContextualLayer):
         """
         if L2CAP_Connection_Parameter_Update_Request in packet:
             logger.debug('[l2cap] Received a L2CAP Connection Parameter Update Request, rejecting')
-
             # Reject it
             self.send('ll', L2CAP_Hdr()/L2CAP_CmdHdr(id=packet[L2CAP_CmdHdr].id)/L2CAP_Connection_Parameter_Update_Response(move_result=1))
 
