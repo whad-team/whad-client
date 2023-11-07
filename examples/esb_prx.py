@@ -17,8 +17,8 @@ if __name__ == '__main__':
         try:
             dev = WhadDevice.create(interface)
             connector = PRX(dev)
-            connector.address = "ca:e9:06:ec:a4"
-            connector.channel = 8
+            connector.address = "e7:e7:e7:e7:e7"#"34:51:97:49:00"#"ca:e9:06:ec:a4"
+            connector.channel = 5
             connector.start()
             for pkt in connector.stream():
                 pkt.show()

@@ -31,8 +31,8 @@ if __name__ == '__main__':
 
             #connector.address = "9b:0a:90:42:99"
             #connector.key = bytes.fromhex("08f59b42156fa86c4288b64d02ca4006")
-            connector.address =  "ca:e9:06:ec:a4"
-            connector.channel = 8
+            connector.address =  "34:51:97:49:00"#"ca:e9:06:ec:a4"
+            connector.channel = 5
 
             connector.start()
             #connector.wait_wakeup()
