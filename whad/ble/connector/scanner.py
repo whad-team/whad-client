@@ -50,7 +50,11 @@ class Scanner(BLE):
 
         # Check device accept scanning mode
         if not self.can_scan():
-            raise UnsupportedCapability('Scan')
+            # Does our device accept sniffing mode and is able of sniffing advertising reports ?
+            if not self.can_sniff_advertisements():
+                raise UnsupportedCapability('Scan')
+            self.stop()
+            self.sniff_advertisements()
         else:
             self.stop()
             self.enable_scan_mode(True)
