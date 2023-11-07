@@ -374,6 +374,8 @@ class TestGattClientProcedures(object):
 class GattServerSandbox(Sandbox):
     def get_local_mtu(self):
         return 23
+    def get_conn_handle(self):
+        return 1
 GattServerSandbox.add(ATTLayer)
 GattServerSandbox.add(GattServer)
 
