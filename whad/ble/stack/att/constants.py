@@ -1,7 +1,16 @@
 """ATT constants (error and operation codes)
 """
+import sys
 
-from types import UnionType
+if sys.version_info[0] == 3 and sys.version_info[1] >= 10:
+    # Import UnionType only for Python >= 3.10
+    from types import UnionType
+    def is_union_type(obj):
+        return isinstance(obj, UnionType)
+else:
+    # UnionType is not available
+    def is_union_type(obj):
+        return False
 
 class BleAttOpcode:
     """ATT operation codes
@@ -94,7 +103,7 @@ class SecurityAccess:
 
     def __init__(self, *args):
         if len(args) > 0:
-            if isinstance(args[0], UnionType):
+            if is_union_type(args[0]):
                 self.__access = list(args[0].__args__)
             else:
                 self.__access = list(args)
