@@ -1031,6 +1031,76 @@ class GattServer(GattLayer):
                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
 
+    def on_find_by_type_value_request(self, request: GattFindByTypeValueRequest):
+        """ATT Find By Type Value Request callback
+
+        :param GattFindByTypeValueRequest request: Request
+        """
+        # List attributes by type UUID, sorted by handles
+        attrs = {}
+        attrs_handles = []
+        for attribute in self.__server_model.find_objects_by_range(request.start, request.end):
+            attrs[attribute.handle] = attribute
+            attrs_handles.append(attribute.handle)
+        attrs_handles.sort()
+
+        # Loop on attributes and return the attributes with a value that matches the request value
+        matching_attrs = []
+        for handle in attrs_handles:
+            # Retrieve attribute based on handle
+            attr = attrs[handle]
+
+            # If attribute is a characteristic value or a descriptor, we make sure the characteristic
+            # is readable before matching its value with the request value
+            if isinstance(attr, CharacteristicValue) or isinstance(attr, CharacteristicDescriptor):
+                if attr.characteristic.readable():
+                    # Find characteristic end handle
+                    if attrs[handle].value == request.value:
+                        matching_attrs.append((handle, attr.characteristic.end_handle))
+            else:
+                # In other cases, match on this attribute value
+                if attrs[handle].value == request.value:
+                    # PrimaryService and SecondaryService are grouping
+                    if isinstance(attr, PrimaryService) or isinstance(attr, SecondaryService):
+                        matching_attrs.append((handle, attr.end_handle))
+                    else:
+                        matching_attrs.append((handle, handle))
+        
+        # If we have found at least one attribute that matches the request, return a
+        # FindByTypeValueResponse PDU
+        if len(matching_attrs) > 0:
+            # Build the response
+            mtu = self.get_layer('l2cap').get_local_mtu()
+            max_nb_items = int((mtu - 1) / 4)
+
+            # Create our datalist
+            handles_list = GattFindByTypeValueResponse(4)
+
+            # Iterate over items while UUID size matches and data fits in MTU
+            for i in range(max_nb_items):
+                if i < len(matching_attrs):
+                    handle, end_handle = matching_attrs[i]
+                    attr_obj = attrs[handle]
+                    handles_list.append(
+                        GattHandleItem(
+                            handle,
+                            end_handle
+                        )
+                    )
+                else:
+                    break
+
+            # Once datalist created, send answer
+            handles_list_raw = handles_list.to_bytes()
+            self.att.on_find_by_type_value_response(handles_list_raw)
+        else:
+            # Attribute not found
+            self.error(
+               BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST,
+               request.start,
+               BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            )
+
 
     def on_read_request(self, request):
         """Read attribute value (if any)

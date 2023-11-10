@@ -440,6 +440,14 @@ class ATTLayer(Layer):
             data=value
         ))
 
+    def  find_by_type_value_response(self, handles):
+        """Sends an ATT Find By Type Value Response
+        """
+
+        self.send_data(ATT_Find_By_Type_Value_Response(
+            handles=handles
+        ))
+
     def read_by_type_request(self, start, end, uuid):
         """Sends an ATT Read By Type Request
 
