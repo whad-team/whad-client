@@ -5,7 +5,7 @@ This layer manager mostly translates Scapy ATT packets into GATT messages requir
 layer, and exposes an interface to the GATT layer in order to allow ATT packets to be forged
 and sent to the underlying layer (L2CAP).
 """
-
+from typing import List
 from scapy.layers.bluetooth import ATT_Error_Response, ATT_Exchange_MTU_Request, \
     ATT_Exchange_MTU_Response, ATT_Execute_Write_Request, ATT_Execute_Write_Response, \
     ATT_Find_By_Type_Value_Request, ATT_Find_By_Type_Value_Response, ATT_Find_Information_Request, \
@@ -14,7 +14,7 @@ from scapy.layers.bluetooth import ATT_Error_Response, ATT_Exchange_MTU_Request,
     ATT_Read_Blob_Response, ATT_Read_By_Group_Type_Request, ATT_Read_By_Group_Type_Response, \
     ATT_Read_By_Type_Request, ATT_Read_By_Type_Response, ATT_Read_Multiple_Request, ATT_Read_Multiple_Response, \
     ATT_Read_Request, ATT_Read_Response, ATT_Write_Command, ATT_Write_Response, ATT_Write_Request, \
-    ATT_Read_By_Type_Request_128bit, ATT_Hdr
+    ATT_Read_By_Type_Request_128bit, ATT_Hdr, ATT_Handle
 from scapy.packet import bind_layers, Packet
 
 from whad.ble.stack.att.constants import BleAttOpcode, SecurityProperty, SecurityAccess
@@ -440,10 +440,9 @@ class ATTLayer(Layer):
             data=value
         ))
 
-    def  find_by_type_value_response(self, handles):
+    def  find_by_type_value_response(self, handles: List[ATT_Handle]):
         """Sends an ATT Find By Type Value Response
         """
-
         self.send_data(ATT_Find_By_Type_Value_Response(
             handles=handles
         ))

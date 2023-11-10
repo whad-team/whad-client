@@ -570,6 +570,60 @@ class TestGattServerProcedures(object):
             ATT_Hdr() / ATT_Execute_Write_Response()
         ))
 
+    def test_find_by_type_value_request(self, sandbox, gatt):
+        '''Test GATT server find type by
+        '''
+        # Initialize our model
+        model = GattDeviceModel()
+        model.device.device_name.value = b'test'
+        gatt.set_model(model)
+
+        # Search for Generic Device Profile service (0x1800)
+        gatt.on_find_by_type_value_request(GattFindByTypeValueRequest(
+            start=0,
+            end=5,
+            attr_type=UUID(0x2800),
+            attr_value=UUID(0x1800).packed
+        ))
+
+        assert sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Find_By_Type_Value_Response(
+                handles=[ATT_Handle(
+                    handle=1,
+                    value=4
+                )]
+            )
+        ))
+
+    def test_find_by_type_value_request_fail(self, sandbox, gatt):
+        '''Test GATT server find type by
+        '''
+        # Initialize our model
+        model = GattDeviceModel()
+        model.device.device_name.value = b'test'
+        gatt.set_model(model)
+
+        # Search for Generic Device Profile service (0x1800)
+        gatt.on_find_by_type_value_request(GattFindByTypeValueRequest(
+            start=0,
+            end=5,
+            attr_type=UUID(0x2800),
+            attr_value=UUID(0x1F00).packed
+        ))
+
+        assert sandbox.expect(LayerMessage(
+            'att',
+            'l2cap',
+            ATT_Hdr() / ATT_Error_Response(
+                request=BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST,
+                handle=0,
+                ecode=BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+            )
+        ))
+
+
     def test_read_by_type_request(self, sandbox, gatt):
         '''Test GATT server read by type handling
         '''

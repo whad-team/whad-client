@@ -7,6 +7,8 @@ from queue import Queue, Empty
 from struct import unpack, pack
 from threading import Lock
 
+from scapy.layers.bluetooth import ATT_Handle
+
 from whad.ble.exceptions import HookReturnValue, HookReturnAuthentRequired,\
     HookReturnAuthorRequired, HookReturnAccessDenied, HookReturnGattError, \
     HookReturnNotFound, ConnectionLostException
@@ -783,7 +785,7 @@ class GattClient(GattLayer):
         """
         self.lock_tx()
         self.att.read_blob_request(handle, offset)
-        self.lock_tx()
+        self.unlock_tx()
 
         msg = self.wait_for_message(GattReadBlobResponse)
         if isinstance(msg, GattReadBlobResponse):
@@ -830,7 +832,8 @@ class GattClient(GattLayer):
 
         # Check if data to write is longer than MTU
         if len(value) > (local_mtu - 3):
-            return self.write_long(handle, value)
+            # Redirect to write_long_nolock()
+            return self.write_long_nolock(handle, value)
         else:
             # If data can be sent in a single write request, just send it :)
             self.lock_tx()
@@ -865,6 +868,14 @@ class GattClient(GattLayer):
 
     @proclock
     def write_long(self, handle, value):
+        """Write a long value into a characteristic
+
+        This function wraps a call to `write_long_nolock()` to ensure this procedure
+        is not started while another GATT procedure is in progress.
+        """
+        return self.write_long_nolock(handle, value)
+    
+    def write_long_nolock(self, handle, value):
         """Write long data (size > ATT_MTU-2) to a characteristic value.
 
         This method uses Prepared Write requests as described in Vol 3, Part G,
@@ -884,12 +895,15 @@ class GattClient(GattLayer):
         chunk_size = local_mtu - 5
 
         # Send prepared write requests
+        print('need %d chunks' % nb_chunks)
         offset = 0
         for i in range(nb_chunks):
+            print('send prepare write req')
             self.lock_tx()
             self.att.prepare_write_request(handle, offset, value[offset:offset + chunk_size])
             self.unlock_tx()
 
+            print('wait message')
             msg = self.wait_for_message(GattPrepareWriteResponse)
             if isinstance(msg, GattPrepareWriteResponse):
                 if msg.value is not None:
@@ -1142,6 +1156,8 @@ class GattServer(GattLayer):
             attrs[attribute.handle] = attribute
             attrs_handles.append(attribute.handle)
         attrs_handles.sort()
+        print(attrs_handles)
+        print(request.value)
 
         # Loop on attributes and return the attributes with a value that matches the request value
         matching_attrs = []
@@ -1154,15 +1170,15 @@ class GattServer(GattLayer):
             if isinstance(attr, CharacteristicValue) or isinstance(attr, CharacteristicDescriptor):
                 if attr.characteristic.readable():
                     # Find characteristic end handle
-                    if attrs[handle].value == request.value:
+                    if attr.value == request.value:
                         matching_attrs.append((handle, attr.characteristic.end_handle))
             else:
-                # In other cases, match on this attribute value
-                if attrs[handle].value == request.value:
-                    # PrimaryService and SecondaryService are grouping
-                    if isinstance(attr, PrimaryService) or isinstance(attr, SecondaryService):
+                # PrimaryService and SecondaryService are grouping types
+                if isinstance(attr, PrimaryService) or isinstance(attr, SecondaryService):
+                    if attr.value == request.value:
                         matching_attrs.append((handle, attr.end_handle))
-                    else:
+                else:
+                    if attr.value == request.value:
                         matching_attrs.append((handle, handle))
         
         # If we have found at least one attribute that matches the request, return a
@@ -1173,7 +1189,7 @@ class GattServer(GattLayer):
             max_nb_items = int((mtu - 1) / 4)
 
             # Create our datalist
-            handles_list = GattFindByTypeValueResponse(4)
+            handles_list = []
 
             # Iterate over items while UUID size matches and data fits in MTU
             for i in range(max_nb_items):
@@ -1181,17 +1197,16 @@ class GattServer(GattLayer):
                     handle, end_handle = matching_attrs[i]
                     attr_obj = attrs[handle]
                     handles_list.append(
-                        GattHandleItem(
-                            handle,
-                            end_handle
+                        ATT_Handle(
+                            handle=handle,
+                            value=end_handle
                         )
                     )
                 else:
                     break
 
             # Once datalist created, send answer
-            handles_list_raw = handles_list.to_bytes()
-            self.att.on_find_by_type_value_response(handles_list_raw)
+            self.att.find_by_type_value_response(handles_list)
         else:
             # Attribute not found
             self.error(

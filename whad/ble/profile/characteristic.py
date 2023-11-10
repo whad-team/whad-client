@@ -116,7 +116,8 @@ class Characteristic(Attribute):
         :param bytes value: Characteristic value
         :param int perms: Permissions
         """
-        super().__init__(uuid=UUID(0x2803), handle=handle)
+        super().__init__(uuid=UUID(0x2803), handle=handle,
+                         value=pack('<BH', properties & 0xff, handle+1)+uuid.to_bytes())
         self.__handle = handle
         if end_handle == 0:
             self.__end_handle = handle

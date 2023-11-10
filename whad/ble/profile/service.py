@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class Service(Attribute):
     def __init__(self, uuid, type_uuid, handle=0, end_handle=0):
-        super().__init__(uuid=type_uuid,handle=handle)
+        super().__init__(uuid=type_uuid,handle=handle, value=uuid.to_bytes())
         self.__service_uuid = uuid
         if handle > 0:
             self.__end_handle = end_handle if end_handle > 0 else handle
