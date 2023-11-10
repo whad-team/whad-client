@@ -1128,7 +1128,8 @@ class GattServer(GattLayer):
                request.start,
                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
-
+    
+    @txlock
     def on_find_by_type_value_request(self, request: GattFindByTypeValueRequest):
         """ATT Find By Type Value Request callback
 
