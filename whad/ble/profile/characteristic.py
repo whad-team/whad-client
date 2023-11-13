@@ -29,6 +29,9 @@ class CharacteristicDescriptor(Attribute):
     def characteristic(self):
         return self.__characteristic
 
+    @property
+    def uuid(self):
+        return self.type_uuid
 
 class ClientCharacteristicConfig(CharacteristicDescriptor):
     """Client Characteristic Configuration Descriptor
