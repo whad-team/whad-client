@@ -38,7 +38,7 @@ class Peripheral(BLE):
     defined by a specific profile.
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, stack=BleStack, pairing=Pairing(), security_database=None):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, public=False, stack=BleStack, pairing=Pairing(), security_database=None):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
