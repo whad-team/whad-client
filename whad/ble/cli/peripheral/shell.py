@@ -16,7 +16,7 @@ from whad.ble import Peripheral, GenericProfile, AdvDataFieldList, \
 from whad.ble.profile.service import PrimaryService
 from whad.ble.profile.characteristic import Characteristic, CharacteristicProperties, \
     ClientCharacteristicConfig, CharacteristicValue
-from whad.ble.utils.att import UUID
+from whad.ble.profile.attribute import UUID
 from whad.ble.stack.constants import BT_MANUFACTURERS
 from whad.ble.stack.gatt.constants import CHARACS_UUID, SERVICES_UUID
 from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
