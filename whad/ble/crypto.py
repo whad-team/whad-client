@@ -222,8 +222,8 @@ class LinkLayerCryptoManager:
         """
         Generate a nonce according to the counter value, the direction and the IV.
         """
-        counter = pack("i",self.master_cnt if direction == BleDirection.MASTER_TO_SLAVE else self.slave_cnt)
-        direction = b"\x80" if direction == BleDirection.MASTER_TO_SLAVE else b"\x00"
+        counter = pack("I",self.master_cnt if direction == BleDirection.MASTER_TO_SLAVE else self.slave_cnt)
+        direction = b"\x00" if direction == BleDirection.MASTER_TO_SLAVE else b"\x80"
         return counter + direction + self.iv
 
     def encrypt(self, payload, direction=BleDirection.MASTER_TO_SLAVE):
