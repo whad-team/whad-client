@@ -1,11 +1,21 @@
 from whad.ble.crypto import LinkLayerCryptoManager, BleDirection
 from whad.common.pcap import PCAPReader
 from scapy.all import BTLE_DATA, BTLE
+from whad.ble.crypto import EncryptedSessionInitialization, BLEDecryptor
 
-reader = PCAPReader("pcaps/comm.pcap")
+t = EncryptedSessionInitialization()
+d = BLEDecryptor(bytes.fromhex("0e0596ef16cf17cc48357ee19da96728"))
+reader = PCAPReader("ressources/pcaps/comm.pcap")
 for pkt in reader.packets():
+    #print(repr(pkt[BTLE]))
     if BTLE_DATA in pkt and pkt[BTLE_DATA].len != 0:
-        print(repr(pkt[BTLE]))
+        print(repr(pkt[BTLE_DATA]))
+        t.process_packet(pkt[BTLE_DATA])
+        if t.encryption:
+            d.add_crypto_material(*t.crypto_material)
+            decrypted, success = d.attempt_to_decrypt(pkt[BTLE])
+            pkt.decrypted = decrypted
+            print("Decrypted: ", pkt.decrypted)
 
 '''
 traffic = [

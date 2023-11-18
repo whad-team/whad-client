@@ -139,3 +139,14 @@ class HookReturnAuthorRequired(Exception):
 
     def __init__(self):
         super().__init__()
+
+#######################
+#Crypto Exceptions
+#######################
+
+class MissingCryptographicMaterial(Exception):
+    """Raise this exception if a decryption is attempted without having cryptographic material available.
+    """
+
+    def __init__(self):
+        super().__init__()

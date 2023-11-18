@@ -1,7 +1,9 @@
 from whad.ble.connector import BLE, Injector, Hijacker
 from whad.ble.utils.phy import is_access_address_valid
 from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress, SynchronizationEvent, DesynchronizationEvent
+from whad.ble.crypto import EncryptedSessionInitialization, LinkLayerDecryptor
 from whad.ble import UnsupportedCapability, message_filter
+from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE
 from whad.common.sniffing import EventsManager
 from struct import pack
 from time import sleep
@@ -19,6 +21,8 @@ class Sniffer(BLE, EventsManager):
         self.__synchronized = False
         self.__connection = None
         self.__access_addresses = {}
+        self.__decryptor = LinkLayerDecryptor()
+        self.__encrypted_session_initialization = EncryptedSessionInitialization()
         self.__configuration = SnifferConfiguration()
 
         # Check if device accepts advertisements or connection sniffing
@@ -101,6 +105,9 @@ class Sniffer(BLE, EventsManager):
             self.discover_access_addresses()
 
         elif self.__configuration.active_connection is not None:
+            for key in self.__configuration.keys:
+                self.__decryptor.add_key(key)
+
             access_address = self.__configuration.active_connection.access_address
             crc_init = self.__configuration.active_connection.crc_init
             channel_map = self.__configuration.active_connection.channel_map
@@ -109,6 +116,9 @@ class Sniffer(BLE, EventsManager):
             self.sniff_active_connection(access_address, crc_init, channel_map, hop_interval, hop_increment)
 
         elif self.__configuration.follow_connection:
+            for key in self.__configuration.keys:
+                self.__decryptor.add_key(key)
+
             if not self.can_sniff_new_connection():
                 raise UnsupportedCapability("Sniff")
             else:
@@ -127,6 +137,26 @@ class Sniffer(BLE, EventsManager):
                     bd_address=self.__configuration.filter
                 )
 
+
+    def add_key(self, key):
+        self.stop()
+        self.__configuration.keys.append(key)
+        self._enable_sniffing()
+
+    def clear_keys(self):
+        self.stop()
+        self.__configuration.keys = []
+        self._enable_sniffing()
+
+    @property
+    def decrypt(self):
+        return self.__configuration.decrypt
+
+    @decrypt.setter
+    def decrypt(self, decrypt):
+        self.stop()
+        self.__configuration.decrypt = decrypt
+        self._enable_sniffing()
 
     @property
     def configuration(self):
@@ -224,5 +254,14 @@ class Sniffer(BLE, EventsManager):
 
                 message = self.wait_for_message(filter=message_filter('ble', message_type))
                 packet = self.translator.from_message(message.ble, message_type)
+
+                if self.__configuration.decrypt and BTLE_DATA in packet:
+                    self.__encrypted_session_initialization.process_packet(packet)
+                    if self.__encrypted_session_initialization.encryption:
+                        self.__decryptor.add_crypto_material(*self.__encrypted_session_initialization.crypto_material)
+                        decrypted, success = self.__decryptor.attempt_to_decrypt(packet[BTLE])
+                        if success:
+                            packet.decrypted = decrypted
+
                 self.monitor_packet_rx(packet)
                 yield packet
