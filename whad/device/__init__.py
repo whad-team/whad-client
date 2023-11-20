@@ -1050,13 +1050,12 @@ class WhadDevice(object):
         """
         if self.__closing:
             return
-        print(message)
+        
         logger.debug(message)
         logger.debug(self.__mq_filter)
         # If message queue filter is defined and message matches this filter,
         # move it into our message queue.
         if self.__mq_filter is not None and self.__mq_filter(message):
-            #print('msgqueue: %s' % message)
             logger.info('message does match current filter, save it for processing')
             self.__msg_queue.put(message, block=True)
         else:

@@ -551,12 +551,6 @@ class HCIDevice(VirtualDevice):
             )
             self.__converter.pending_key_request = False
         else:
-            HCI_Cmd_LE_Start_Encryption_Request(
-                handle=handle,
-                ltk=key[::-1],
-                rand=rand,
-                ediv=unpack('<H', ediv)[0]
-            ).show()
             response = self._write_command(
                 HCI_Cmd_LE_Start_Encryption_Request(
                     handle=handle,
