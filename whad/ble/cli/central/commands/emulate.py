@@ -8,7 +8,7 @@ from whad.ble.profile.characteristic import CharacteristicProperties
 from whad.cli.app import command
 from whad.ble import Peripheral, GenericProfile, AdvDataFieldList
 from hexdump import hexdump
-from whad.ble.utils.att import UUID
+from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.central.helpers import show_att_error

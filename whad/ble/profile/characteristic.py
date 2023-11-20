@@ -3,8 +3,7 @@ BLE GATT Characteristic Model
 =============================
 """
 from whad.ble.stack.att.constants import BleAttProperties, SecurityAccess
-from whad.ble.stack.gatt.helpers import get_uuid_alias
-from whad.ble.profile.attribute import Attribute, UUID
+from whad.ble.profile.attribute import Attribute, UUID, get_uuid_alias
 from whad.ble.exceptions import InvalidHandleValueException
 from struct import pack, unpack
 
@@ -32,6 +31,17 @@ class CharacteristicDescriptor(Attribute):
     @property
     def uuid(self):
         return self.type_uuid
+    
+    @property
+    def name(self):
+        alias = get_uuid_alias(self.type_uuid)
+        if alias is not None:
+            return '%s (0x%s)' % (
+                alias,
+                str(self.type_uuid)
+            )
+        else:
+            return str(self.type_uuid)
 
 class ClientCharacteristicConfig(CharacteristicDescriptor):
     """Client Characteristic Configuration Descriptor

@@ -5,9 +5,8 @@ BLE GATT Service Model
 import logging
 
 from whad.ble.exceptions import InvalidHandleValueException
-from whad.ble.profile.attribute import Attribute, UUID
+from whad.ble.profile.attribute import Attribute, UUID, get_uuid_alias
 from whad.ble.profile.characteristic import Characteristic
-from whad.ble.stack.gatt.helpers import get_uuid_alias
 
 logger = logging.getLogger(__name__)
 

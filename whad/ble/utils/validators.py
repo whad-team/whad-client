@@ -139,7 +139,7 @@ def validate_bluetooth_address(address):
 
 
 def validate_attribute_uuid(uuid):
-    from whad.ble.utils.att import UUID
+    from whad.ble.profile.attribute import UUID
     if uuid is None:
         raise InvalidUUIDException(uuid)
     # When attribute UUID is read from JSON, it can be encoded as unicode, which will break the UUID class

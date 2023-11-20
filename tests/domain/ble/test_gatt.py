@@ -16,7 +16,7 @@ from whad.common.stack.tests import Sandbox, LayerMessage
 
 from whad.ble.stack.att import ATTLayer
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
-from whad.ble.utils.att import UUID
+from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.exceptions import *
 
 from whad.ble.stack.gatt import GattClient, GattServer

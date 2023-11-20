@@ -7,7 +7,7 @@ from whad.ble.bdaddr import BDAddress
 from binascii import unhexlify, Error as BinasciiError
 
 from whad.ble import BDAddress
-from whad.ble.utils.att import UUID
+from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.central.helpers import show_att_error, create_central

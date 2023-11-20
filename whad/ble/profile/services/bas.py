@@ -1,7 +1,7 @@
 """Bluetooth Low Energy Battery Service Profile
 """
 from struct import pack, unpack
-from whad.ble.utils.att import UUID
+from whad.ble.profile.attribute import UUID
 from whad.ble.profile import PrimaryService, Characteristic
 
 class BatteryService(object):

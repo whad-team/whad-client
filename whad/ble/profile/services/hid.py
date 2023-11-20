@@ -3,7 +3,7 @@
 Still a work in progress, but looks cool :D
 """
 
-from whad.ble.utils.att import UUID
+from whad.ble.profile.attribute import UUID
 from whad.ble.profile import PrimaryService, Characteristic, CharacteristicDescriptor
 from whad.ble.profile.services import BatteryService, DeviceInformationService
 

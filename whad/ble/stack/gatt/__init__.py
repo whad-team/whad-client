@@ -15,7 +15,6 @@ from whad.ble.exceptions import HookReturnValue, HookReturnAuthentRequired,\
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode, ReadAccess, \
     WriteAccess, Authentication, Authorization, Encryption
 from whad.ble.stack.att.exceptions import error_response_to_exc, AttErrorCode
-from whad.ble.stack.gatt.helpers import get_uuid_alias
 from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.profile import GenericProfile, Pairing
