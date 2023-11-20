@@ -38,6 +38,15 @@ ble-central, the WHAD Bluetooth Low Energy central utility
 
 BDADDR_REGEXP = '^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$'
 
+DESCRIPTORS_NAME = {
+    '2900': "Characteristic Extended Properties",
+    '2901': "Characteristic User Description",
+    '2902': "Client Characteristic Configuration",
+    '2903': "Server Characteristic Configuration",
+    '2904': "Characteristic Presentation Format",
+    '2905': "Characteristic Aggregate Format"
+}
+
 def show_adv_record(offset, raw_record):
     """Display advertising record as hexdump.
 
@@ -469,6 +478,15 @@ class BleCentralShell(InteractiveShell):
                         charac.uuid, charac.handle, charac.value_handle
                     )))
                     print_formatted_text(HTML('  | <ansicyan>access rights:</ansicyan> <b>%s</b>' % ', '.join(charac_rights)))
+
+                    for desc in charac.descriptors():
+                        if desc.type_uuid.uuid in DESCRIPTORS_NAME:
+                            print_formatted_text(HTML(
+                                '  | <ansiblue><b>Descriptor type %s</b></ansiblue> handle: <b>%d</b>' % (
+                                    DESCRIPTORS_NAME[desc.type_uuid.uuid],
+                                    desc.handle
+                                ) 
+                            ))
                 print('')
 
 
@@ -545,6 +563,15 @@ class BleCentralShell(InteractiveShell):
                         charac.uuid, charac.handle, charac.value_handle
                     )))
                     print_formatted_text(HTML('  | <ansicyan>access rights:</ansicyan> <b>%s</b>' % ', '.join(charac_rights)))
+                    
+                    for desc in charac.descriptors():
+                        if desc.type_uuid.uuid in DESCRIPTORS_NAME:
+                            print_formatted_text(HTML(
+                                '  | <ansiblue><b>Descriptor type %s</b></ansiblue> handle: <b>%d</b>' % (
+                                    DESCRIPTORS_NAME[desc.type_uuid.uuid],
+                                    desc.handle
+                                ) 
+                            ))
         else:
             self.error('No device connected.')
 
