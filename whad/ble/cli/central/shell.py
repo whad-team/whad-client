@@ -460,7 +460,7 @@ class BleCentralShell(InteractiveShell):
 
             # Show services and characteristics
             for service in self.__target.services():
-                print_formatted_text(HTML('<ansigreen><b>Service %s</b></ansigreen>\n' % service.uuid))
+                print_formatted_text(HTML('<ansigreen><b>Service %s</b></ansigreen>\n' % service.name))
                 for charac in service.characteristics():
                     properties = charac.properties
                     charac_rights = []
@@ -475,7 +475,7 @@ class BleCentralShell(InteractiveShell):
                     if properties & CharacteristicProperties.NOTIFY != 0:
                         charac_rights.append('notify')
                     print_formatted_text(HTML(' <b>%s</b> handle: <b>%d</b>, value handle: <b>%d</b>' % (
-                        charac.uuid, charac.handle, charac.value_handle
+                        charac.name, charac.handle, charac.value_handle
                     )))
                     print_formatted_text(HTML('  | <ansicyan>access rights:</ansicyan> <b>%s</b>' % ', '.join(charac_rights)))
 

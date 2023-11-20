@@ -62,7 +62,7 @@ def profile_discover(app, device):
 
             for desc in charac.descriptors():
                 print_formatted_text(HTML(
-                    '    Descriptor type %s, handle 0x%04x' % (
+                    '    <ansiblue>Descriptor type %s</ansiblue>, handle 0x%04x' % (
                         desc.type_uuid,
                         desc.handle
                     ) 
