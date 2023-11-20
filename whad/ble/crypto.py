@@ -4,7 +4,9 @@ from Cryptodome.Random import get_random_bytes
 from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, \
     generate_private_key, derive_private_key, EllipticCurvePublicNumbers, \
     ECDH
+from scapy.layers.bluetooth4LE import LL_ENC_REQ, LL_ENC_RSP, LL_START_ENC_REQ, BTLE_CTRL, BTLE_DATA, BTLE
 from whad.protocol.ble.ble_pb2 import BleDirection
+from whad.ble.exceptions import MissingCryptographicMaterial
 from struct import pack
 from binascii import hexlify
 
@@ -222,8 +224,8 @@ class LinkLayerCryptoManager:
         """
         Generate a nonce according to the counter value, the direction and the IV.
         """
-        counter = pack("i",self.master_cnt if direction == BleDirection.MASTER_TO_SLAVE else self.slave_cnt)
-        direction = b"\x80" if direction == BleDirection.MASTER_TO_SLAVE else b"\x00"
+        counter = pack("I",self.master_cnt if direction == BleDirection.MASTER_TO_SLAVE else self.slave_cnt)
+        direction = b"\x00" if direction == BleDirection.MASTER_TO_SLAVE else b"\x80"
         return counter + direction + self.iv
 
     def encrypt(self, payload, direction=BleDirection.MASTER_TO_SLAVE):
@@ -247,7 +249,6 @@ class LinkLayerCryptoManager:
         ciphertext = payload[2:-4]
         mic = payload[-4:]
         nonce = self.generate_nonce(direction)
-        print(hexlify(nonce))
         cipher = AES.new(self.session_key, AES.MODE_CCM, nonce=nonce, mac_len=4, assoc_len=len(header))
         cipher.update(header)
         plaintext = cipher.decrypt(ciphertext)
@@ -256,3 +257,125 @@ class LinkLayerCryptoManager:
             return (payload[:2] + plaintext, True)
         except ValueError:
             return (payload[:2] + plaintext, False)
+
+
+
+class EncryptedSessionInitialization:
+    def __init__(self, master_skd = None, master_iv = None, slave_skd = None, slave_iv = None):
+        self.master_skd = master_skd
+        self.master_iv = master_iv
+        self.slave_skd = slave_skd
+        self.slave_iv = slave_iv
+        self.started = False
+
+    def process_packet(self, packet):
+        if BTLE_CTRL not in packet:
+            return
+
+        if LL_ENC_REQ in packet:
+            self.master_skd = packet.skdm
+            self.master_iv = packet.ivm
+        elif LL_ENC_RSP in packet:
+            self.slave_skd = packet.skds
+            self.slave_iv = packet.ivs
+        elif LL_START_ENC_REQ in packet or packet.opcode == 0x05:
+            self.started = True
+
+    @property
+    def crypto_material(self):
+        if (
+                self.master_skd is not None and
+                self.master_iv is not None and
+                self.slave_skd is not None and
+                self.slave_iv is not None
+        ):
+            return (self.master_skd, self.master_iv, self.slave_skd, self.slave_iv)
+        else:
+            return None
+
+    @property
+    def encryption(self):
+        return self.crypto_material is not None or self.started
+
+    def reset(self):
+        self.master_skd = None
+        self.master_iv = None
+        self.slave_skd = None
+        self.slave_iv = None
+        self.started = False
+
+
+
+class LinkLayerDecryptor:
+    def __init__(self, *keys):
+        self.keys = list(keys)
+        self.managers = {}
+        self.master_skd = None
+        self.master_iv = None
+        self.slave_skd = None
+        self.slave_iv = None
+
+
+    def add_crypto_material(self, master_skd, master_iv, slave_skd, slave_iv):
+        self.master_skd = master_skd
+        self.master_iv = master_iv
+        self.slave_skd = slave_skd
+        self.slave_iv = slave_iv
+
+
+    def add_key(self, key):
+        if isinstance(key, str):
+            if len(key) == 16:
+                key = key.encode('ascii')
+            else:
+                try:
+                    key = bytes.fromhex(key.replace(":",""))
+                except ValueError:
+                    return False
+
+        if not isinstance(key, bytes) or len(key) != 16:
+            return False
+
+        if key not in self.keys:
+            self.keys.append(key)
+            return True
+        return False
+
+    def attempt_to_decrypt(self, packet):
+        if (
+                self.master_skd is None or
+                self.master_iv is None or
+                self.slave_skd is None or
+                self.slave_iv is None or
+                len(self.keys) == 0
+        ):
+            raise MissingCryptographicMaterial()
+
+        if BTLE_DATA not in packet:
+            return (None, False)
+
+        if packet.len == 0 and packet.LLID == 1:
+            return (None, False)
+
+        for key in self.keys:
+            if key not in self.managers:
+                manager = LinkLayerCryptoManager(key, self.master_skd, self.master_iv, self.slave_skd, self.slave_iv)
+            else:
+                manager = self.managers[key]
+
+            plaintext, success = manager.decrypt(bytes(packet)[4:-3], direction=BleDirection.MASTER_TO_SLAVE)
+            if success:
+                manager.increment_master_counter()
+                self.managers[key] = manager
+            else:
+                plaintext, success = manager.decrypt(bytes(packet)[4:-3], direction=BleDirection.SLAVE_TO_MASTER)
+                if success:
+                    manager.increment_slave_counter()
+                    self.managers[key] = manager
+
+            if success:
+                decrypted_packet = BTLE_DATA(plaintext)
+                decrypted_packet.len = decrypted_packet.len - 4
+                return (decrypted_packet, True)
+            else:
+                return (None, False)

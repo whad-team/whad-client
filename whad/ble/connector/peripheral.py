@@ -38,7 +38,7 @@ class Peripheral(BLE):
     defined by a specific profile.
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, stack=BleStack, pairing=Pairing(), security_database=None):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, public=True, stack=BleStack, pairing=Pairing(), security_database=None):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -64,6 +64,7 @@ class Peripheral(BLE):
         self.__stack = stack(self)
         self.connection = None
         self.__connected = False
+        self.__conn_handle = None
 
         # Initialize profile
         if profile is None:
@@ -187,6 +188,20 @@ class Peripheral(BLE):
     def security_database(self):
         return self.__security_database
 
+    def is_connected(self) -> bool:
+        """Determine if the peripheral has an active connection from a
+        GATT client.
+        """
+        return self.__connected
+    
+    def wait_connection(self):
+        """Wait for a GATT client to connect to the peripheral. If a connection
+        is already active, returns immediately.
+        """
+        while not self.is_connected():
+            sleep(.5)
+
+
     ##############################
     # Incoming events
     ##############################
@@ -212,6 +227,9 @@ class Peripheral(BLE):
             self.__local,
             self.__target
         )
+
+        # GATT server is now connected
+        self.__connected = True
         self.__conn_handle = connection_data.conn_handle
 
     def on_disconnected(self, disconnection_data):
@@ -353,7 +371,6 @@ class PeripheralClient(Peripheral):
         # Retrieve GATT client
         self.__central = connection.gatt
         self.__central.set_client_model(self.__peripheral)
-        #self.__connected = True
 
     @property
     def central_device(self):

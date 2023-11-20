@@ -1,5 +1,5 @@
 from whad.ble.exceptions import InvalidAccessAddressException
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from whad.ble.utils.phy import is_access_address_valid
 from whad.common.sniffing import SniffingEvent
 
@@ -16,7 +16,7 @@ class ConnectionConfiguration(SynchronizedConnection):
     Configuration for sniffing an existing Bluetooth Low Energy.
 
     :param access_address: indicate access address of the targeted connection (aa)
-    :param crc_init: indicate CRCInit of the targeted connection (k)
+    :param crc_init: indicate CRCInit of the targeted connection (crc)
     :param hop_interval: indicate Hop Interval of the targeted connection (int)
     :param hop_increment: indicate Hop Increment of the targeted connection (inc)
     :param channel_map: indicate Channel Map of the targeted connection (chm)
@@ -51,10 +51,12 @@ class SnifferConfiguration:
     :param show_advertisements: enable advertisement sniffing (a)
     :param follow_connection: enable new connection sniffing (f)
     :param show_empty_packets: display empty packets during connection (e)
-    :param access_addresses_discovery: discover access addresses of existing connections (d)
+    :param access_addresses_discovery: discover access addresses of existing connections
     :param active_connection: enable and configure existing connection sniffing
     :param channel: select the channel to sniff (c)
     :param filter: display only the packets matching the filter BD address (m)
+    :param decrypt: indicate if decryption is enabled (d)
+    :param keys: provide decryption keys (k)
     """
     show_advertisements : bool = True
     follow_connection : bool = False
@@ -63,6 +65,8 @@ class SnifferConfiguration:
     active_connection : ConnectionConfiguration = None
     channel : int = 37
     filter : str = "FF:FF:FF:FF:FF:FF"
+    decrypt : bool = False
+    keys : list = field(default_factory=lambda: [])
 
 class AccessAddress:
     def __init__(self, access_address, timestamp=None, rssi=None):
