@@ -13,7 +13,7 @@ from whad.cli.app import command
 from whad.ble import Central, Scanner
 from whad.ble.exceptions import ConnectionLostException
 from whad.ble.bdaddr import BDAddress
-from whad.ble.utils.att import UUID
+from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.central.helpers import show_att_error
@@ -31,7 +31,7 @@ def profile_discover(app, device):
     # Show discovered services and characteristics
     for service in device.services():
         print_formatted_text(HTML(
-            '<ansicyan><b>Service %s</b></ansicyan> (handle 0x%04x to 0x%04x)' % (
+            '<ansicyan><b>Service %s</b></ansicyan> (handle %d to %d)' % (
                 service.name,
                 service.handle,
                 service.end_handle
@@ -52,7 +52,7 @@ def profile_discover(app, device):
                 rights += '<ansiblue>N</ansiblue>'
             
             print_formatted_text(HTML(
-                '  <b>%s</b> %s, handle 0x%04x, value handle 0x%04x' % (
+                '  <b>%s</b> %s, handle %d, value handle: %d' % (
                     charac.name,
                     rights,
                     charac.handle,
@@ -62,8 +62,8 @@ def profile_discover(app, device):
 
             for desc in charac.descriptors():
                 print_formatted_text(HTML(
-                    '    <ansiblue>Descriptor type %s</ansiblue>, handle 0x%04x' % (
-                        desc.type_uuid,
+                    '    <ansiblue>Descriptor type %s</ansiblue>, handle: %d' % (
+                        desc.name,
                         desc.handle
                     ) 
                 ))

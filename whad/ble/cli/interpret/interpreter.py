@@ -54,7 +54,7 @@ from whad.ble.stack.gatt import GattReadByGroupTypeResponse, GattReadByTypeRespo
     GattFindInfoResponse
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
 from whad.ble.stack.att.constants import BleAttErrorCode
-from whad.ble.utils.att import UUID
+from whad.ble.profile.attribute import UUID
 
 # Logging
 import logging
