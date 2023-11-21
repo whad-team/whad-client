@@ -12,6 +12,7 @@ from whad.ble.exceptions import PeripheralNotFound
 from whad.scapy.layers import NordicBLE
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_RF, BTLE_CTRL, LL_CONNECTION_PARAM_REQ, LL_FEATURE_REQ, \
     LL_VERSION_IND, LL_PING_REQ, LL_PING_RSP, LL_CONNECTION_PARAM_RSP, LL_FEATURE_RSP
+from scapy.layers.bluetooth import L2CAP_Connection_Parameter_Update_Request, L2CAP_Connection_Parameter_Update_Response
 from whad.common.replay import ReplayRole, ReplayInterface
 
 @dataclass
@@ -85,6 +86,9 @@ class Replay(Central, ReplayInterface):
         # Or a feature exchange procedure ?
         elif packet.haslayer(LL_FEATURE_REQ):
             self.__active_procedures.append('features')
+        # Or a L2CAP connection parameter update procedure ?
+        elif packet.haslayer(L2CAP_Connection_Parameter_Update_Request):
+            self.__active_procedures.append('llconnparams')
         
 
     def should_send_pdu(self, packet: BTLE_DATA):
@@ -107,6 +111,10 @@ class Replay(Central, ReplayInterface):
         elif packet.haslayer(LL_FEATURE_RSP):
             # Procedure is complete
             self.__active_procedures.remove('features')
+            return False
+        elif packet.haslayer(L2CAP_Connection_Parameter_Update_Response) and 'llconnparams' in self.__active_procedures:
+            # Procedure is complete
+            self.__active_procedures.remove('llconnparams')
             return False
         else:
             # Check if interface supports sending control PDUs (required to send control PDUs)
