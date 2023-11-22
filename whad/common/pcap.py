@@ -27,7 +27,7 @@ class PCAPReader(object):
         if count is None:
             for pos, packet in enumerate(self.__packets[start:]):
                 # Packet must be excluded ?
-                if pos in exclude:
+                if (pos+1) in exclude:
                     # continue
                     #timestamp = float(packet.time)
                     continue
@@ -47,7 +47,7 @@ class PCAPReader(object):
             for packet in self.__packets[start:start+count]:
                 
                 # Packet must be excluded ?
-                if pos in exclude:
+                if (pos+1) in exclude:
                     # continue
                     #timestamp = float(packet.time)
                     continue
