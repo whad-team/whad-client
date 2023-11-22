@@ -13,7 +13,7 @@ class PCAPReader(object):
         # Load packets from PCAP file
         self.__packets = rdpcap(pcapfile)
 
-    def packets(self, start=0, count=None, accurate=True, offset=0.0, filter=lambda x: True):
+    def packets(self, start=0, count=None, accurate=True, offset=0.0, exclude=[], filter=lambda x: True):
         """Filter packets from PCAP file and yields them.
 
         :param start: Start position in the PCAP
@@ -25,7 +25,14 @@ class PCAPReader(object):
         """
         timestamp = None
         if count is None:
-            for packet in self.__packets[start:]:
+            for pos, packet in enumerate(self.__packets[start:]):
+                # Packet must be excluded ?
+                if pos in exclude:
+                    # continue
+                    #timestamp = float(packet.time)
+                    continue
+
+                # Process packet
                 if timestamp is None:
                     timestamp = float(packet.time)
                 else:
@@ -33,10 +40,19 @@ class PCAPReader(object):
                     timestamp = float(packet.time)
                     if accurate:
                         sleep(delay + offset)
+
                 if filter(packet):
                     yield packet
         else:
             for packet in self.__packets[start:start+count]:
+                
+                # Packet must be excluded ?
+                if pos in exclude:
+                    # continue
+                    #timestamp = float(packet.time)
+                    continue
+
+                # Process packet
                 if timestamp is None:
                     timestamp = float(packet.time)
                 else:

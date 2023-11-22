@@ -256,6 +256,16 @@ class WhadReplayApp(CommandLineApp):
         )
 
         self.add_argument(
+            '-x',
+            '--exclude',
+            dest='exclude',
+            action='append',
+            help='Ignore a specific packet',
+            type=int,
+            default=[]
+        )
+
+        self.add_argument(
             '-d',
             '--delay',
             dest='offset',
@@ -473,7 +483,7 @@ class WhadReplayApp(CommandLineApp):
                             # PCAPReader will send back packets in a timely manner, according to PCAP timestamps.
                             reader = PCAPReader(self.args.pcapfile)
                             for packet in reader.packets(start=self.args.start_pos, count=count,
-                                                        offset=self.args.offset/1000.):
+                                                        offset=self.args.offset/1000., exclude=self.args.exclude):
                                 replay.send_packet(packet)
 
                         # Stop our replay instance
