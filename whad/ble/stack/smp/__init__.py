@@ -1279,10 +1279,11 @@ class SMPLayer(Layer):
             # Save pairing request
             self.state.pairing_req = pairing_req
 
-            self.send_data(pairing_req)
 
             # Update current state
             self.state.state = SecurityManagerState.STATE_PAIRING_RSP
+
+            self.send_data(pairing_req)
             return True
         else:
             logger.info('We are in an inconsistent state.')
@@ -1330,13 +1331,14 @@ class SMPLayer(Layer):
 
                 logger.debug('[send_pairing_confirm] Computed CONFIRM=%s' % hexlify(self.state.responder.confirm))
 
+                # Update current state
+                self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT
+
                 self.send_data(
                     SM_Confirm(
                         confirm=self.state.responder.confirm[::-1]
                     )
                 )
-                # Update current state
-                self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT
             else:
 
                 # Set counter to 1
@@ -1372,13 +1374,13 @@ class SMPLayer(Layer):
                     bytes([((self.state.passkey_value >> (self.state.passkey_counter - 1)) & 1) + 0x80])
                 )
 
+                self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN
                 self.send_data(
                     SM_Confirm(
                         confirm = self.state.initiator.confirm[::-1]
                     )
                 )
 
-                self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN
 
 
     def on_security_request(self, security_request):
@@ -1518,6 +1520,9 @@ class SMPLayer(Layer):
                 # Save pairing response
                 self.state.pairing_resp = pairing_resp
 
+                # Update current state
+                self.state.state = SecurityManagerState.STATE_PAIRING_REQ
+
                 self.send_data(pairing_resp)
 
 
@@ -1533,8 +1538,6 @@ class SMPLayer(Layer):
                     # Generate the P256 keypair
                     self.state.private_key, self.state.public_key = self.get_custom_function("generate_p256_keypair")()
 
-                # Update current state
-                self.state.state = SecurityManagerState.STATE_PAIRING_REQ
             else:
                 logger.info('Pairing declined.')
 
@@ -1630,6 +1633,10 @@ class SMPLayer(Layer):
                         ]
                     )
                 )
+
+
+                self.state.state = SecurityManagerState.STATE_LESC_DHK_CHECK_SENT
+
                 self.send_data(
                     SM_DHKey_Check(
                         dhkey_check=eb[::-1]
@@ -1641,9 +1648,6 @@ class SMPLayer(Layer):
 
                 # Get the current link layer state
                 local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk[::-1])
-
-
-                self.state.state = SecurityManagerState.STATE_LESC_DHK_CHECK_SENT
             # otherwise, fail.
             else:
                 logger.info('Invalid exchange value received, report error and return to idle.')
@@ -1805,15 +1809,18 @@ class SMPLayer(Layer):
                 confirm_value = SM_Confirm(
                     confirm = self.state.initiator.confirm[::-1]
                 )
-                self.send_data(confirm_value)
-
                 # Update current state
                 self.state.state = SecurityManagerState.STATE_LEGACY_PAIRING_CONFIRM_SENT
+
+                self.send_data(confirm_value)
+
             else:
 
                 # Let's transmit our public key
                 own_x = bytes.fromhex("{:064x}".format(self.state.public_key.public_numbers().x))[::-1]
                 own_y = bytes.fromhex("{:064x}".format(self.state.public_key.public_numbers().y))[::-1]
+
+                self.state.state = SecurityManagerState.STATE_LESC_PUBKEY_SENT
 
                 self.send_data(
                     SM_Public_Key(
@@ -1821,7 +1828,6 @@ class SMPLayer(Layer):
                         key_y = own_y
                     )
                 )
-                self.state.state = SecurityManagerState.STATE_LESC_PUBKEY_SENT
 
         else:
             logger.info('Unexpected packet received, report error and return to idle.')
@@ -1863,10 +1869,11 @@ class SMPLayer(Layer):
             confirm_value = SM_Confirm(
                 confirm = self.state.responder.confirm[::-1]
             )
-            self.send_data(confirm_value)
-
             # Update current state
             self.state.state = SecurityManagerState.STATE_LEGACY_PAIRING_CONFIRM_SENT
+
+            self.send_data(confirm_value)
+
 
 
         elif self.state.state == SecurityManagerState.STATE_LEGACY_PAIRING_CONFIRM_SENT:
@@ -1878,9 +1885,9 @@ class SMPLayer(Layer):
             rand_value = SM_Random(
                 random = self.state.initiator.rand[::-1]
             )
-            self.send_data(rand_value)
 
             self.state.state = SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT
+            self.send_data(rand_value)
 
         elif self.state.state == SecurityManagerState.STATE_LESC_PUBKEY_RECVD:
             logger.info('Pairing Confirm value is expected, processing ...')
@@ -1893,10 +1900,11 @@ class SMPLayer(Layer):
             rand_value = SM_Random(
                 random = self.state.initiator.rand[::-1]
             )
-            self.send_data(rand_value)
 
             # Update current state
             self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT
+
+            self.send_data(rand_value)
 
         elif self.state.state in (
             SecurityManagerState.STATE_LESC_PUBKEY_RECVD_STAGEN,
@@ -1921,13 +1929,13 @@ class SMPLayer(Layer):
                 bytes([((self.state.passkey_value >> (self.state.passkey_counter - 1)) & 1) + 0x80])
             )
 
+            self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN
+
             self.send_data(
                 SM_Confirm(
                     confirm = self.state.responder.confirm[::-1]
                 )
             )
-
-            self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN
 
         elif self.state.state == SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN:
             logger.info('Pairing Confirm value is expected, processing ... [iteration=%d]' % self.state.passkey_counter)
@@ -1935,13 +1943,14 @@ class SMPLayer(Layer):
             # Extract confirm value
             self.state.responder.confirm = confirm.confirm[::-1]
 
+            self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT_STAGEN
+
             # Transmit random
             self.send_data(
                 SM_Random(
                     random = self.state.initiator.rand[::-1]
                 )
             )
-            self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT_STAGEN
 
         else:
             logger.info('Pairing Confirm dropped because current state is %d' % self.state.state)
@@ -2017,6 +2026,7 @@ class SMPLayer(Layer):
                             ]
                         )
                     )
+                    self.state.state = SecurityManagerState.STATE_LESC_DHK_CHECK_SENT
                     #Transmit EA
                     self.send_data(
                         SM_DHKey_Check(
@@ -2024,7 +2034,6 @@ class SMPLayer(Layer):
                         )
                     )
 
-                    self.state.state = SecurityManagerState.STATE_LESC_DHK_CHECK_SENT
                 else:
                     logger.info('Invalid Numeric comparison (expected %s)' % (
                         str(value),
@@ -2104,6 +2113,10 @@ class SMPLayer(Layer):
                 rand_value = SM_Random(
                     random = self.state.responder.rand[::-1]
                 )
+
+                # Next state
+                self.state.state = SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT
+
                 self.send_data(rand_value)
 
                 # Compute our stk
@@ -2114,9 +2127,6 @@ class SMPLayer(Layer):
                 )
 
                 logger.debug('[on_pairing_random] STK=%s' % hexlify(self.state.stk))
-
-                # Next state
-                self.state.state = SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_SENT
 
                 # Notify connection that we successfully negociated STK and that
                 # the corresponding material is available.
@@ -2186,13 +2196,13 @@ class SMPLayer(Layer):
                         )
                     )
 
+                    self.state.state = SecurityManagerState.STATE_LESC_DHK_CHECK_SENT
                     # Then transmit it
                     self.send_data(
                         SM_DHKey_Check(
                             dhkey_check = ea[::-1]
                         )
                     )
-                    self.state.state = SecurityManagerState.STATE_LESC_DHK_CHECK_SENT
 
                 else:
                     # Increment counter
@@ -2208,13 +2218,14 @@ class SMPLayer(Layer):
                         bytes([((self.state.passkey_value >> (self.state.passkey_counter - 1)) & 1) + 0x80])
                     )
 
+                    self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN
+
                     self.send_data(
                         SM_Confirm(
                             confirm = self.state.initiator.confirm[::-1]
                         )
                     )
 
-                    self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN
             else:
 
                 logger.info('Invalid responder CONFIRM value (expected %s)' % (
@@ -2246,17 +2257,18 @@ class SMPLayer(Layer):
             )
 
             if computed_confirm == self.state.initiator.confirm:
-                self.send_data(
-                    SM_Random(
-                        random = self.state.responder.rand[::-1]
-                    )
-                )
 
                 if self.state.passkey_counter == 20:
                     self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT
                 else:
                     self.state.passkey_counter += 1
                     self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT_STAGEN
+
+                self.send_data(
+                    SM_Random(
+                        random = self.state.responder.rand[::-1]
+                    )
+                )
             else:
 
                 logger.info('Invalid Initiator CONFIRM value (expected %s)' % (
@@ -2450,12 +2462,14 @@ class SMPLayer(Layer):
             if self.state.responder.must_dist_csrk():
                 logger.info('[smp] sending generated CSRK ...')
                 self.state.csrk = self.get_custom_function("generate_csrk")()
+
+                self.state.state = SecurityManagerState.STATE_DISTRIBUTE_KEY
+
                 self.send_data(SM_Signing_Information(
                     csrk=self.state.csrk
                 ))
                 logger.info('[smp] CSRK sent.')
 
-            self.state.state = SecurityManagerState.STATE_DISTRIBUTE_KEY
 
     def on_encryption_information(self, encryption_information):
         if self.is_initiator():
