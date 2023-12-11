@@ -43,6 +43,19 @@ class DesynchronizationEvent(SniffingEvent):
     def __init__(self):
         super().__init__("Connection desynchronized")
 
+
+
+class KeyExtractedEvent(SniffingEvent):
+    """Event indicating that a key has been extracted from pairing
+    """
+    def __init__(self, key):
+        super().__init__("Key extracted")
+        self.key = key
+
+    @property
+    def message(self):
+        return "key={}".format(self.key.hex())
+
 @dataclass
 class SnifferConfiguration:
     """
@@ -52,6 +65,7 @@ class SnifferConfiguration:
     :param follow_connection: enable new connection sniffing (f)
     :param show_empty_packets: display empty packets during connection (e)
     :param access_addresses_discovery: discover access addresses of existing connections
+    :param pairing: perform attack on legacy pairing (p)
     :param active_connection: enable and configure existing connection sniffing
     :param channel: select the channel to sniff (c)
     :param filter: display only the packets matching the filter BD address (m)
@@ -62,6 +76,7 @@ class SnifferConfiguration:
     follow_connection : bool = False
     show_empty_packets : bool = False
     access_addresses_discovery : bool = False
+    pairing : bool = False
     active_connection : ConnectionConfiguration = None
     channel : int = 37
     filter : str = "FF:FF:FF:FF:FF:FF"

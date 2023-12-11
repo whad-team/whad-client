@@ -282,6 +282,7 @@ class EncryptedSessionInitialization:
         elif LL_ENC_RSP in packet:
             self.slave_skd = packet.skds
             self.slave_iv = packet.ivs
+            self.started = True
         elif LL_START_ENC_REQ in packet or packet.opcode == 0x05:
             self.started = True
 
@@ -299,7 +300,7 @@ class EncryptedSessionInitialization:
 
     @property
     def encryption(self):
-        return self.crypto_material is not None or self.started
+        return self.crypto_material is not None and self.started
 
     def reset(self):
         self.master_skd = None
@@ -391,8 +392,10 @@ class LegacyPairingCracking:
             responder = None,
             pairing_req = None,
             pairing_rsp = None,
-            confirm = None,
-            random = None
+            master_confirm = None,
+            master_random = None,
+            slave_confirm = None,
+            slave_random = None
         ):
 
             self.initiator = initiator
@@ -400,8 +403,10 @@ class LegacyPairingCracking:
 
             self.pairing_req = pairing_req
             self.pairing_rsp = pairing_rsp
-            self.confirm = confirm
-            self.random = random
+            self.master_confirm = master_confirm
+            self.master_random = master_random
+            self.slave_confirm = slave_confirm
+            self.slave_random = slave_random
 
         def process_packet(self, pkt):
             if BTLE_CONNECT_REQ in pkt:
@@ -410,19 +415,23 @@ class LegacyPairingCracking:
 
             elif SM_Pairing_Request in pkt:
                 self.pairing_req = bytes(pkt[SM_Hdr].build()) # why scapy why
-                print("preq", self.pairing_req)
+
 
             elif SM_Pairing_Response in pkt:
                 self.pairing_rsp = bytes(pkt[SM_Hdr].build())
-                print("prsp", self.pairing_rsp)
 
-            elif SM_Confirm in pkt and self.confirm is None:
-                self.confirm = bytes(pkt.confirm)
-                print("confirm", self.confirm)
 
-            elif SM_Random in pkt and self.random is None:
-                self.random = bytes(pkt.random)
-                print("random", self.random)
+            elif SM_Confirm in pkt and self.master_confirm is None:
+                self.master_confirm = bytes(pkt.confirm)
+
+            elif SM_Confirm in pkt and self.master_confirm is not None:
+                self.slave_confirm = bytes(pkt.confirm)
+
+            elif SM_Random in pkt and self.master_random is None:
+                self.master_random = bytes(pkt.random)
+
+            elif SM_Random in pkt and self.master_random is not None:
+                self.slave_random = bytes(pkt.random)
 
         def process_connected(self, initiator, responder):
             self.initiator = initiator
@@ -436,33 +445,48 @@ class LegacyPairingCracking:
                 self.responder is not None and
                 self.pairing_req is not None and
                 self.pairing_rsp is not None and
-                self.confirm is not None and
-                self.random is not None
+                (
+                    (self.master_confirm is not None or
+                     self.slave_confirm is not None)
+                    and
+                    (self.master_random is not None and
+                    self.slave_random is not None)
+                )
             )
 
         @property
-        def key(self):
-            xor = lambda a1, b1: bytes([a ^ b for a,b in zip(a1,b1)])
+        def keys(self):
+
+            if self.master_confirm is not None and self.master_random is not None:
+                rand = self.master_random
+                confirm = self.master_confirm
+            elif  self.slave_confirm is not None and self.slave_random is not None:
+                rand = self.slave_random
+                confirm = self.slave_confirm
+            else:
+                return None
+
             for i in range(0,1000000):
                 tk = pack(">IIII", 0,0,0,i)
-                print(tk.hex())
+
                 p1 = self.pairing_rsp[::-1] + self.pairing_req[::-1] + (
                     (b"\x01" if self.responder.is_random() else b"\x00") +
                     (b"\x01" if self.initiator.is_random() else b"\x00")
                 )
-                print(self.initiator.value.hex(), self.responder.value.hex())
-                p2 = b"\x00\x00\x00\x00" + self.initiator.value[::-1] + self.responder.value[::-1]
-                print("p1", p1.hex(), "p2", p2.hex())
 
-                a = xor(p1, self.random[::-1])
+                p2 = b"\x00\x00\x00\x00" + self.initiator.value[::-1] + self.responder.value[::-1]
+
+                a = xor(p1, rand[::-1])
                 aes = AES.new(tk, AES.MODE_ECB)
                 res1 = aes.encrypt(a)
                 b = xor(res1, p2)
                 res2 = aes.encrypt(b)
-                print(res2.hex(), self.confirm[::-1].hex())
-                if res2 == self.confirm[::-1]:
-                    print("success", i)
-                    break
+
+                if res2 == confirm[::-1]:
+
+                    stk = s1(tk, self.slave_random[::-1], self.master_random[::-1])[::-1]
+                    return (tk, stk)
+            return None
 
         def reset(self):
             self.initiator = None

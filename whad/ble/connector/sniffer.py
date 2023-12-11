@@ -1,7 +1,8 @@
 from whad.ble.connector import BLE, Injector, Hijacker
 from whad.ble.utils.phy import is_access_address_valid
-from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress, SynchronizationEvent, DesynchronizationEvent
-from whad.ble.crypto import EncryptedSessionInitialization, LinkLayerDecryptor
+from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress, \
+    SynchronizationEvent, DesynchronizationEvent, KeyExtractedEvent
+from whad.ble.crypto import EncryptedSessionInitialization, LinkLayerDecryptor, LegacyPairingCracking
 from whad.ble import UnsupportedCapability, message_filter
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE
 from whad.common.sniffing import EventsManager
@@ -23,6 +24,7 @@ class Sniffer(BLE, EventsManager):
         self.__access_addresses = {}
         self.__decryptor = LinkLayerDecryptor()
         self.__encrypted_session_initialization = EncryptedSessionInitialization()
+        self.__legacy_pairing_cracking = LegacyPairingCracking()
         self.__configuration = SnifferConfiguration()
 
         # Check if device accepts advertisements or connection sniffing
@@ -259,9 +261,22 @@ class Sniffer(BLE, EventsManager):
                     self.__encrypted_session_initialization.process_packet(packet)
                     if self.__encrypted_session_initialization.encryption:
                         self.__decryptor.add_crypto_material(*self.__encrypted_session_initialization.crypto_material)
+
                         decrypted, success = self.__decryptor.attempt_to_decrypt(packet[BTLE])
                         if success:
                             packet.decrypted = decrypted
+
+                if self.__configuration.pairing:
+                    self.__legacy_pairing_cracking.process_packet(packet[BTLE])
+                    if self.__legacy_pairing_cracking.ready:
+                        keys = self.__legacy_pairing_cracking.keys
+                        if keys is not None:
+                            tk, stk = keys
+                            logger.info("[i] New temporary key extracted: ", tk.hex())
+                            logger.info("[i] New short term key extracted: ", stk.hex())
+                            self.trigger_event(KeyExtractedEvent(stk))
+                            self.__decryptor.add_key(stk[::-1])
+                            self.__legacy_pairing_cracking.reset()
 
                 self.monitor_packet_rx(packet)
                 yield packet
