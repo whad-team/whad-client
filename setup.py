@@ -6,6 +6,7 @@ try:
     from os.path import exists, realpath
     from shutil import copy
     from os import listdir, geteuid, getlogin
+    from grp import getgrall
 except ImportError:
     print("Your operating system is not supported.")
 
@@ -47,7 +48,16 @@ class DevicesInstall(install):
 
     def install_serial_port_capabilities(self):
         print("Installing serial port capabilities...")
-        process = Popen(['usermod', '-a', '-G', 'dialout', getlogin()], stdout=PIPE, stderr=PIPE)
+        # Find the right group which depends on the distribution (e.g. dialout
+        # for Debian, uucp for Arch-Linux).
+        groups = [ group.gr_name for group in getgrall() ]
+        if "dialout" in groups:
+            group = "dialout"
+        elif "uucp" in groups:
+            group = "uucp"
+        else:
+            raise Exception("Group granting serial port capabilities not found!")
+        process = Popen(['usermod', '-a', '-G', group, getlogin()], stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
 
         if len(stderr) > 0:
