@@ -38,7 +38,7 @@ class Peripheral(BLE):
     defined by a specific profile.
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, public=True, stack=BleStack, pairing=Pairing(), security_database=None):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, public=True, stack=BleStack, gatt=GattServer, pairing=Pairing(), security_database=None):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -54,11 +54,14 @@ class Peripheral(BLE):
         :param  public:     Set to True to use a public Bluetooth Device address, False to use a random one
         :type   public:     bool
         :param  stack:      Bluetooth Low Energy stack to use, :class:`whad.ble.stack.BleStack` by default
+        :param  gatt:       Bluetooth Low Energy GATT
         """
         super().__init__(device)
 
         # Attach a GATT server to our stack ATT layer
-        ATTLayer.add(GattServer)
+        att_layer = stack.find('att')
+        if att_layer is not None:
+            att_layer.add(gatt)
 
         # Initialize stack
         self.__stack = stack(self)
