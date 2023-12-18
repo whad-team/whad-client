@@ -296,6 +296,22 @@ class Layer(object):
         return False
 
     @classmethod
+    def find(cls, alias):
+        """Find a sub-layer class based on its alias
+        """
+        # First look into our sub-layers
+        if hasattr(cls, 'LAYERS'):
+            if alias in cls.LAYERS:
+                return cls.LAYERS[alias]
+        
+            # If not found, propagate to our sub-layer classes
+            for layer in cls.LAYERS:
+                result = cls.LAYERS[layer].find(alias)
+                if result is not None:
+                    return result
+        return None
+
+    @classmethod
     def add(cls, clazz, input=False):
         """Add a sub-layer class.
         """
