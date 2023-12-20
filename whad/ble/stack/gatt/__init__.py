@@ -1939,7 +1939,7 @@ class GattServer(GattLayer):
             # be 16-bit or 128-bit long so we shall only put in the same
             # answer characteristics with same size UUIDs.
 
-            if request.type == 0x2803:
+            if UUID(request.type) == UUID(0x2803):
 
                 # Get item size (UUID size + 2)
                 uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
@@ -1948,7 +1948,7 @@ class GattServer(GattLayer):
 
                 # Create our datalist
                 datalist = GattAttributeDataList(item_size)
-            elif request.type == 0x2802:
+            elif UUID(request.type) == UUID(0x2802):
 
                 # If client is looking for included services,
                 # we compute the correct item size and maximum number
