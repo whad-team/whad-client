@@ -20,7 +20,8 @@ from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,
     CharacteristicUserDescriptionDescriptor as BleCharacteristicUserDescriptionDescriptor
 
 from whad.ble.profile.service import PrimaryService as BlePrimaryService, \
-    SecondaryService as BleSecondaryService, Service
+    SecondaryService as BleSecondaryService, IncludeService as BleIncludeService, \
+    Service
 from whad.ble.exceptions import InvalidHandleValueException
 from whad.ble.stack.att.constants import BleAttProperties, SecurityProperty, \
     SecurityAccess, ReadAccess, WriteAccess, Authentication, Authorization, Encryption
@@ -342,6 +343,7 @@ class ServiceModel(object):
         self.__uuid = uuid
         self.__name = name
         self.__characteristics = []
+        self.__included_services = []
 
         if start_handle is None:
             self.__handle = 0
@@ -353,7 +355,7 @@ class ServiceModel(object):
         else:
             self.__end_handle = end_handle
 
-        # Loop on kwargs to find characteristics
+        # Loop on kwargs to find characteristics and included services
         for arg in kwargs:
             if isinstance(kwargs[arg], Characteristic):
                 charac = kwargs[arg]
@@ -365,6 +367,14 @@ class ServiceModel(object):
                 # Add characteristic to a property to this ServiceModel instance
                 if not hasattr(self, arg):
                     setattr(self, arg, charac)
+            elif isinstance(kwargs[arg], SecondaryService):
+                # We must include this secondary service in this service
+                service = kwargs[arg]
+                self.add_included_service(service)
+
+                # Add included service to a property to this ServiceModel instance
+                if not hasattr(self, arg):
+                    setattr(self, arg, service)
 
 
     def add_characteristic(self, characteristic_model):
@@ -373,9 +383,18 @@ class ServiceModel(object):
         # Add characteristic to the list of our characteristics
         self.__characteristics.append(characteristic_model)
 
-        # Update end handle value
-        if characteristic_model.end_handle >= self.__end_handle:
-            self.__end_handle = characteristic_model.end_handle
+        # Update end handle value (include definition is a single attribute)
+        if characteristic_model.handle >= self.__end_handle:
+            self.__end_handle = characteristic_model.handle
+
+    def add_included_service(self, service_model):
+        """Add an included service to the model
+        """
+        self.__included_services.append(service_model)
+
+        # Update end handle value
+        if service_model.end >= self.__end_handle:
+            self.__end_handle = service_model.end
 
     @property
     def uuid(self):
@@ -404,6 +423,10 @@ class ServiceModel(object):
     def characteristics(self):
         for charac in self.__characteristics:
             yield charac
+
+    def included_services(self):
+        for inc_service in self.__included_services:
+            yield inc_service
 
 class PrimaryService(ServiceModel):
     def __init__(self, uuid=None, start_handle=0, end_handle=0, name=None, **kwargs):
@@ -558,6 +581,20 @@ class GenericProfile(object):
                 # Create the corresponding instance property
                 setattr(self, service.name, service_obj)
 
+                # Loop on included services and create them if required
+                for inc_service in service.included_services():
+                    inc_service_obj = BleIncludeService(
+                        uuid=inc_service.uuid,
+                        handle=self.__alloc_handle(1),
+                        start_handle=inc_service.handle,
+                        end_handle=inc_service.end
+                    )
+                    self.__handle = inc_service_obj.end_handle
+
+                    # Register this service include definition
+                    self.register_attribute(inc_service_obj)
+                    service_obj.add_include_service(inc_service_obj)
+
                 # Loop on underlying characteristics, and create them too.
                 for charac in service.characteristics():
                     charac_props = 0
@@ -635,6 +672,19 @@ class GenericProfile(object):
 
                 self.add_service(service_obj)
 
+            # We then need to update included service start and end handles
+            for inc_service in self.included_services():
+                # Retrieve the included service UUID
+                service_uuid = inc_service.service_uuid
+                
+                # Retrieve the corresponding object by UUID
+                service_obj = self.get_service_by_UUID(service_uuid)
+
+                # If found, update start and end handles
+                if service_obj is not None:
+                    inc_service.service_start_handle = service_obj.handle
+                    inc_service.service_end_handle = service_obj.end_handle
+
         # Register any hook function
         props = dir(self)
         for prop in props:
@@ -669,6 +719,9 @@ class GenericProfile(object):
                 service.handle,
                 service.end_handle
             )
+
+            for inc_service in service.included_services():
+                output += '  Included service %s (handle:%d, start_handle:%d, end_handle:%d)\n' % (inc_service.service_uuid, inc_service.handle, inc_service.service_start_handle, inc_service.service_end_handle)
             for charac in service.characteristics():
                 properties = charac.properties
                 charac_rights = ''
@@ -925,6 +978,12 @@ class GenericProfile(object):
         for handle in self.__attr_db:
             object = self.__attr_db[handle]
             if isinstance(object, BlePrimaryService) or isinstance(object, BleSecondaryService):
+                yield object
+
+    def included_services(self) -> Iterator[BleIncludeService]:
+        for handle in self.__attr_db:
+            object = self.__attr_db[handle]
+            if isinstance(object, BleIncludeService):
                 yield object
 
     def get_service_by_UUID(self, service_uuid: UUID):
