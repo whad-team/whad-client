@@ -19,7 +19,7 @@ from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.profile import GenericProfile, Pairing
 from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
-from whad.ble.profile.service import PrimaryService, SecondaryService
+from whad.ble.profile.service import PrimaryService, SecondaryService, IncludeService
 
 from whad.common.stack import Layer, source, alias
 
@@ -894,15 +894,12 @@ class GattClient(GattLayer):
         chunk_size = local_mtu - 5
 
         # Send prepared write requests
-        print('need %d chunks' % nb_chunks)
         offset = 0
         for i in range(nb_chunks):
-            print('send prepare write req')
             self.lock_tx()
             self.att.prepare_write_request(handle, offset, value[offset:offset + chunk_size])
             self.unlock_tx()
 
-            print('wait message')
             msg = self.wait_for_message(GattPrepareWriteResponse)
             if isinstance(msg, GattPrepareWriteResponse):
                 if msg.value is not None:
@@ -1934,13 +1931,40 @@ class GattServer(GattLayer):
             # Get MTU
             mtu = self.get_layer('l2cap').get_local_mtu()
 
-            # Get item size (UUID size + 2)
-            uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
-            item_size = uuid_size + 5
-            max_nb_items = int((mtu - 2) / item_size)
+            # If client is looking for characteristic declaration,
+            # we compute the correct item size and maximum number
+            # of items we can put in a response PDU
+            # 
+            # In the case of a characteristic declaration, UUID could
+            # be 16-bit or 128-bit long so we shall only put in the same
+            # answer characteristics with same size UUIDs.
 
-            # Create our datalist
-            datalist = GattAttributeDataList(item_size)
+            if request.type == 0x2803:
+
+                # Get item size (UUID size + 2)
+                uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
+                item_size = uuid_size + 5
+                max_nb_items = int((mtu - 2) / item_size)
+
+                # Create our datalist
+                datalist = GattAttributeDataList(item_size)
+            elif request.type == 0x2802:
+
+                # If client is looking for included services,
+                # we compute the correct item size and maximum number
+                # of items we can put in a response PDU
+                #
+                # In the case of an included service declaration, UUID could
+                # be 16-bit or 128-bit long so we shall only put in the same
+                # answer characteristics with same size UUIDs.
+
+                # Get item size
+                uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
+                item_size = uuid_size + 6
+                max_nb_items = int((mtu - 2) / item_size)
+
+                # Create our datalist
+                datalist = GattAttributeDataList(item_size)
 
             # Iterate over items while UUID size matches and data fits in MTU
             for i in range(max_nb_items):
@@ -1959,6 +1983,29 @@ class GattServer(GattLayer):
                                     ) + attr_obj.uuid.packed
                                 )
                             )
+                        elif isinstance(attrs[handle], IncludeService):
+                            if attrs[handle].service_uuid.type == UUID.TYPE_16:
+                                datalist.append(
+                                    GattAttributeValueItem(
+                                        handle,
+                                        pack(
+                                            '<HH',
+                                            attr_obj.service_start_handle,
+                                            attr_obj.service_end_handle,
+                                        ) + attr_obj.service_uuid.packed                                   
+                                    )
+                                )
+                            else:
+                                datalist.append(
+                                    GattAttributeValueItem(
+                                        handle,
+                                        pack(
+                                            '<HH',
+                                            attr_obj.service_start_handle,
+                                            attr_obj.service_end_handle,
+                                        )                                  
+                                    )
+                                )                                
                 else:
                     break
 
