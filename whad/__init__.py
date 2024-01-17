@@ -7,7 +7,7 @@ class WhadDomain(object):
     Phy = Domain.Phy
     BtClassic = Domain.BtClassic
     BtLE = Domain.BtLE
-    Zigbee = Domain.Zigbee
+    Dot15d4 = Domain.Dot15d4
     SixLowPan = Domain.SixLowPan
     Esb = Domain.Esb
     LogitechUnifying = Domain.LogitechUnifying

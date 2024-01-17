@@ -6,7 +6,7 @@ from whad.protocol.whad_pb2 import Message
 from whad import WhadDomain, WhadCapability
 from whad.zigbee.utils.phy import channel_to_frequency, frequency_to_channel
 from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.zigbee.zigbee_pb2 import Sniff, Send, Start, Stop
+from whad.protocol.dot15d4.dot15d4_pb2 import Sniff, Send, Start, Stop
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from serial import Serial,PARITY_NONE
 from serial.tools.list_ports import comports

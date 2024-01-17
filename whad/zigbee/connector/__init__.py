@@ -11,7 +11,7 @@ from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.zigbee.metadata import generate_zigbee_metadata, ZigbeeMetadata
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.zigbee.zigbee_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
+from whad.protocol.dot15d4.dot15d4_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
     Send, SendCmd, EnergyDetection, EnergyDetectionCmd, EndDeviceMode, SetNodeAddress, \
     AddressType, SendRawCmd, SendRaw
 
@@ -189,7 +189,7 @@ class Zigbee(WhadDeviceConnector):
 
         else:
             return False
-        
+
     def send_mac(self, pdu, channel=11, add_fcs=False):
         if self.can_send():
             if add_fcs:
@@ -202,7 +202,7 @@ class Zigbee(WhadDeviceConnector):
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         else:
-            return False            
+            return False
 
     def perform_ed_scan(self, channel=11):
         """

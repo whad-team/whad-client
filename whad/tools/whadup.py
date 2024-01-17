@@ -5,7 +5,7 @@ import sys
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.device import WhadDevice
 from whad.protocol.ble.ble_pb2 import BleCommand
-from whad.protocol.zigbee.zigbee_pb2 import ZigbeeCommand
+from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4Command
 from whad.protocol.esb.esb_pb2 import ESBCommand
 from whad.protocol.unifying.unifying_pb2 import UnifyingCommand
 from whad.protocol.phy.phy_pb2 import PhyCommand
@@ -25,7 +25,7 @@ DOMAINS = {
     WhadDomain.LogitechUnifying: 'Logitech Unifying',
     WhadDomain.Mosart: 'Mosart',
     WhadDomain.SixLowPan: '6LowPan',
-    WhadDomain.Zigbee: 'ZigBee'
+    WhadDomain.Dot15d4: '802.15.4'
 }
 
 CAPABILITIES = {
@@ -70,18 +70,18 @@ BLE_COMMANDS = {
 
 }
 
-ZIGBEE_COMMANDS = {
-    ZigbeeCommand.SetNodeAddress: "SetNodeAddress: can set Node address",
-    ZigbeeCommand.Sniff: "Sniff: can sniff Zigbee packets",
-    ZigbeeCommand.EnergyDetection: "EnergyDetection: can perform energy detection scans",
-    ZigbeeCommand.Jam: "Jam: can jam Zigbee packets",
-    ZigbeeCommand.Send: "Send: can transmit Zigbee packets",
-    ZigbeeCommand.EndDeviceMode: "EndDeviceMode: can act as an End Device",
-    ZigbeeCommand.CoordinatorMode: "CoordinatorMode: can act as a Coordinator",
-    ZigbeeCommand.RouterMode: "RouterMode: can act as a Router",
-    ZigbeeCommand.Start: "Start: can start depending on the current mode",
-    ZigbeeCommand.Stop: "Stop: can stop depending on the current mode",
-    ZigbeeCommand.ManInTheMiddle: "ManInTheMiddle: can perform a Man-in-the-Middle attack",
+DOT15D4_COMMANDS = {
+    Dot15d4Command.SetNodeAddress: "SetNodeAddress: can set Node address",
+    Dot15d4Command.Sniff: "Sniff: can sniff 802.15.4 packets",
+    Dot15d4Command.EnergyDetection: "EnergyDetection: can perform energy detection scans",
+    Dot15d4Command.Jam: "Jam: can jam 802.15.4 packets",
+    Dot15d4Command.Send: "Send: can transmit 802.15.4 packets",
+    Dot15d4Command.EndDeviceMode: "EndDeviceMode: can act as an End Device",
+    Dot15d4Command.CoordinatorMode: "CoordinatorMode: can act as a Coordinator",
+    Dot15d4Command.RouterMode: "RouterMode: can act as a Router",
+    Dot15d4Command.Start: "Start: can start depending on the current mode",
+    Dot15d4Command.Stop: "Stop: can stop depending on the current mode",
+    Dot15d4Command.ManInTheMiddle: "ManInTheMiddle: can perform a Man-in-the-Middle attack",
 }
 
 ESB_COMMANDS = {
@@ -133,7 +133,7 @@ PHY_COMMANDS = {
 COMMANDS = {
     WhadDomain.BtLE: BLE_COMMANDS,
     WhadDomain.Esb: ESB_COMMANDS,
-    WhadDomain.Zigbee: ZIGBEE_COMMANDS,
+    WhadDomain.Dot15d4: DOT15D4_COMMANDS,
     WhadDomain.LogitechUnifying: UNIFYING_COMMANDS,
     WhadDomain.Phy: PHY_COMMANDS
 

@@ -1,7 +1,7 @@
 from .mac import MACManager
 from .nwk import NWKManager
 from .constants import Dot15d4Phy
-from whad.protocol.zigbee.zigbee_pb2 import AddressType
+from whad.protocol.dot15d4.dot15d4_pb2 import AddressType
 from whad.exceptions import RequiredImplementation
 from scapy.config import conf
 """
