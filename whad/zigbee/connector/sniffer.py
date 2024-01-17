@@ -41,15 +41,6 @@ class Sniffer(Zigbee, EventsManager):
     def decrypt(self, decrypt):
         self.__configuration.decrypt = decrypt
 
-    @property
-    def configuration(self):
-        return self.__configuration
-
-    @configuration.setter
-    def configuration(self, new_configuration):
-        self.stop()
-        self.__configuration = new_configuration
-        self._enable_sniffing()
 
     @property
     def channel(self):
@@ -62,9 +53,15 @@ class Sniffer(Zigbee, EventsManager):
         self._enable_sniffing()
 
 
-    def available_actions(self, filter=None):
-        actions = []
-        return [action for action in actions if filter is None or isinstance(action, filter)]
+    @property
+    def configuration(self):
+        return self.__configuration
+
+    @configuration.setter
+    def configuration(self, new_configuration):
+        self.stop()
+        self.__configuration = new_configuration
+        self._enable_sniffing()
 
     def sniff(self):
         while True:
@@ -73,8 +70,8 @@ class Sniffer(Zigbee, EventsManager):
             else:
                 message_type = "pdu"
 
-            message = self.wait_for_message(filter=message_filter('zigbee', message_type))
-            packet = self.translator.from_message(message.zigbee, message_type)
+            message = self.wait_for_message(filter=message_filter('dot15d4', message_type))
+            packet = self.translator.from_message(message.dot15d4, message_type)
             self.monitor_packet_rx(packet)
 
             if ZigbeeSecurityHeader in packet and self.__configuration.decrypt:
