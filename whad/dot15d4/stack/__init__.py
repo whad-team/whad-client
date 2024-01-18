@@ -4,6 +4,7 @@ Pythonic 802.15.4 stack
 
 from whad.protocol.dot15d4.dot15d4_pb2 import AddressType
 from whad.dot15d4.utils.phy import PHYS
+from whad.dot15d4.stack.mac import MACManager
 
 from whad.common.stack import Layer, alias, source
 
@@ -89,7 +90,9 @@ class Dot15d4Stack(Layer):
         self.__connector.perform_ed_scan(channel)
 
     @source('mac', 'pdu')
-    def send(self, packet):
+    def transmit(self, packet):
         '''Send PDU to the underlying WHAD connector.
         '''
         self.__connector.send(packet)
+
+Dot15d4Stack.add(MACManager)

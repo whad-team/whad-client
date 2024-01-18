@@ -1,6 +1,7 @@
 from scapy.compat import raw
 from scapy.config import conf
-from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
+from scapy.layers.dot15d4 import Dot15d4FCS
+from scapy.layers.dot15d4 import Dot15d4 as Dot15d4NoFCS
 from whad.dot15d4.connector.translator import Dot15d4MessageTranslator
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
@@ -31,6 +32,7 @@ class Dot15d4(WhadDeviceConnector):
         the services (if not already discovered).
         """
         self.__ready = False
+        print("> device", device)
         super().__init__(device)
 
         # Capability cache
@@ -58,7 +60,7 @@ class Dot15d4(WhadDeviceConnector):
         self.stop()
         self.device.close()
 
-    def format(self, packet:Union[Dot15d4,Dot15d4FCS]) -> Tuple[Dot15d4TAP_Hdr, int]:
+    def format(self, packet:Union[Dot15d4NoFCS,Dot15d4FCS]) -> Tuple[Dot15d4TAP_Hdr, int]:
         """
         Format a packet using the underlying translator.
         """
@@ -181,7 +183,7 @@ class Dot15d4(WhadDeviceConnector):
                     packet = pdu
             # If we only support normal PDU, crop the FCS
             elif Dot15d4FCS in pdu:
-                packet = Dot15d4(raw(pdu)[:-2])
+                packet = Dot15d4NoFCS(raw(pdu)[:-2])
             else:
                 packet = pdu
 
@@ -262,7 +264,7 @@ class Dot15d4(WhadDeviceConnector):
         """
         Raw PDU processing (Dot15d4FCS).
         """
-        pdu = Dot15d4(raw(packet)[:-2])
+        pdu = Dot15d4NoFCS(raw(packet)[:-2])
         pdu.metadata = packet.metadata
         self.on_pdu(pdu)
 
@@ -283,3 +285,4 @@ class Dot15d4(WhadDeviceConnector):
         pass
 
 from whad.dot15d4.connector.sniffer import Sniffer
+from whad.dot15d4.connector.enddevice import EndDevice
