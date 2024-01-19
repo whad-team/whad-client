@@ -6,7 +6,11 @@ from inspect import signature
 import logging
 
 class Dot15d4Service:
-
+    """
+    This class represents a 802.15.4 service, connected to a manager (e.g., WHAD generic stack Layer).
+    It also implements a set of decorators to identify wireless stack mechanisms type according to
+    802.15.4 specification (e.g., request, response, indication).
+    """
     def __init__(self, manager, name=None, timeout_exception_class=Dot15d4TimeoutException):
         self._logger = logging.getLogger(self.__module__)
         self._manager = manager
@@ -54,6 +58,8 @@ class Dot15d4Service:
 
     # Services primitives decorator
     def request(request_name):
+        """ Mark the associated method as a "Request".
+        """
         def _request(func):
             @wraps(func)
             def request_decorator(*args, **kwargs):
@@ -67,6 +73,8 @@ class Dot15d4Service:
 
 
     def response(response_name):
+        """ Mark the associated method as a "Response".
+        """
         def _response(func):
             @wraps(func)
             def response_decorator(*args, **kwargs):
@@ -79,11 +87,17 @@ class Dot15d4Service:
 
 
     def indication(indication_name):
+        """ Mark the associated method as an "Indication".
+        """
         def _indication(func):
             @wraps(func)
             def indication_decorator(*args, **kwargs):
                 self = args[0]
                 pdu, parameters = func(*args, **kwargs)
+
+                if self._manager.upper_layer is None:
+                    self._logger.warning("[{}] {} indication not transmitted, no upper layer !".format(self._name, indication_name))
+                    return None
 
                 upper = self._manager.upper_layer.alias
                 callback_kwargs = {"tag":indication_name}

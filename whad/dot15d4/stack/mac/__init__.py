@@ -1,42 +1,30 @@
 from whad.dot15d4.stack.manager import Dot15d4Manager
-from whad.dot15d4.stack.database import Dot15d4Database
 from whad.dot15d4.stack.service import Dot15d4Service
+from whad.dot15d4.stack.mac.database import MACPIB
+from whad.dot15d4.stack.mac.exceptions import MACTimeoutException, MACAssociationFailure
 from whad.common.stack import Layer, alias, source, state
 
 
-class MACPIB(Dot15d4Database):
+class MACService(Dot15d4Service):
     """
-    802.15.4 MAC PIB Database of attributes.
+    This class represents a MAC service, exposing a standardized API.
     """
+    def __init__(self, manager, name=None):
+        super().__init__(
+            manager,
+            name=name,
+            timeout_exception_class=MACTimeoutException
+        )
 
-    def reset(self):
-        """
-        Reset the PIB database to its default value.
-        """
-        self.macExtendedAddress = 0xababababcdcdcdcd
-        self.macAssociatedPanCoord = False
-        self.macAssociationPermit = False
-        self.macAutoRequest = False
-        self.macDataSequenceNumber = 0
-        self.macBeaconSequenceNumber = 0
-        self.macPanId = 0xFFFF
-        self.macShortAddress = 0xFFFF
-        self.macCoordShortAddress = 0
-        self.macCoordExtendedAddress = 0
-        self.macPromiscuousMode = False
-        self.macImplicitBroadcast = False
-        self.macResponseWaitTime = 32
+class MACDataService(MACService):
+    pass
 
 
-
-class Dot15d4ManagementService(Dot15d4Service):
-    @Dot15d4Service.indication("TEST")
-    def indicate_test(self):
-        return (b"\x01\x02", {
-            "a" : 1 ,
-            "b" : 2,
-            "c" : 3
-        })
+class MACManagementService(MACService):
+    """
+    MAC service processing Management packets.
+    """
+    pass
 
 @state(MACPIB)
 @alias('mac')
@@ -47,7 +35,7 @@ class MACManager(Dot15d4Manager):
         self.add_service("data", None)
 
     def show(self):
-        print(self.upper_layer.alias, self.lower_layer.alias)
+        #print(self.upper_layer.alias, self.lower_layer.alias)
         print(self.database)
         print(self.database.get("macResponseWaitTime"))
         self.get_service('management').indicate_test()
@@ -65,4 +53,4 @@ class NWKManager(Dot15d4Manager):
 
 
 
-MACManager.add(NWKManager)
+#MACManager.add(NWKManager)
