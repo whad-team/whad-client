@@ -32,7 +32,6 @@ class Dot15d4(WhadDeviceConnector):
         the services (if not already discovered).
         """
         self.__ready = False
-        print("> device", device)
         super().__init__(device)
 
         # Capability cache
@@ -244,7 +243,6 @@ class Dot15d4(WhadDeviceConnector):
         """
         if not self.__ready:
             return
-
         if domain == 'dot15d4':
             msg_type = message.WhichOneof('msg')
             if msg_type == 'pdu':

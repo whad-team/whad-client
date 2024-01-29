@@ -349,6 +349,7 @@ class MACManagementService(MACService):
 
     def _perform_ed_scan(self, channel_page, channels, duration):
         ed_measurements = []
+
         for channel in channels:
             self.manager.set_channel_page(channel_page)
             self._samples_queue.queue.clear()
@@ -403,7 +404,8 @@ class MACManager(Dot15d4Manager):
         self.add_service("data", MACDataService(self))
         self.add_service("management", MACManagementService(self))
         self.__ack_queue = Queue()
-        self.set_extended_address(self.database.get("macExtendedAddress"))
+        # Move it to connector ? 
+        #self.set_extended_address(self.database.get("macExtendedAddress"))
 
 
     @source('phy', 'energy_detection')

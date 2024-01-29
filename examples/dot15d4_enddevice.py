@@ -1,6 +1,7 @@
 from whad.device import WhadDevice
 from whad.dot15d4 import EndDevice
 from whad.exceptions import WhadDeviceNotFound
+from whad.dot15d4.stack.mac import MACScanType
 from scapy.compat import raw
 import sys
 
@@ -16,10 +17,10 @@ if __name__ == '__main__':
         try:
             dev = WhadDevice.create(interface)
             connector = EndDevice(dev)
-            connector.stack.get_layer('mac').show()
             input()
             connector.attach_callback(show)
             connector.start()
+            print(connector.stack.get_layer('mac').get_service("management").scan())
             while True:
                 input()
         except (KeyboardInterrupt, SystemExit):
