@@ -1,11 +1,17 @@
 from whad.dot15d4.stack.manager import Dot15d4Manager
 from whad.dot15d4.stack.service import Dot15d4Service
+from whad.dot15d4.stack.mac.constants import MACAddressMode, MACScanType, \
+    MACDeviceType, MACPowerSource, MACConstants
 from whad.zigbee.stack.nwk.exceptions import NWKTimeoutException, NWKInvalidKey
 from whad.zigbee.stack.nwk.database import NWKIB
+from whad.zigbee.stack.nwk.neighbors import NWKNeighborTable
 from whad.zigbee.stack.nwk.security import NetworkSecurityMaterial
-from whad.zigbee.stack.nwk.constants import ZigbeeDeviceType
+from whad.zigbee.stack.nwk.network import ZigbeeNetwork
+from whad.zigbee.stack.nwk.constants import ZigbeeDeviceType, NWKAddressMode, \
+    NWKJoinMode, ZigbeeRelationship
 from whad.zigbee.crypto import NetworkLayerCryptoManager
 from whad.common.stack import Layer, alias, source, state
+from whad.exceptions import RequiredImplementation
 
 from scapy.layers.zigbee import ZigBeeBeacon, ZigbeeNWKStub, ZigbeeNWK, \
     ZigbeeSecurityHeader, ZigbeeNWKCommandPayload, ZigbeeAppDataPayload, \
@@ -37,12 +43,469 @@ class NWKDataService(NWKService):
     def __init__(self, manager):
         super().__init__(manager, name="nwk_data")
 
+    @Dot15d4Service.request("NLDE-DATA")
+    def data(
+        self,
+        nsdu,
+        nsdu_handle=0,
+        alias_address=None,
+        alias_sequence_number=0,
+        destination_address_mode=NWKAddressMode.UNICAST,
+        destination_address=0xFFFF,
+        radius=0,
+        non_member_radius=7,
+        discover_route=False,
+        security_enable=False
+    ):
+        """
+        Request allowing to transmit NSPDU to MAC layer.
+        """
+        if alias_address is not None:
+            source_address = alias_address
+            sequence_number = alias_sequence_number
+        else:
+            source_address = self.manager.get_layer('mac').get_service("management").get("macShortAddress")
+            sequence_number = self.database.get("nwkSequenceNumber")
+            self.database.set("nwkSequenceNumber", sequence_number+1)
+
+        if radius == 0:
+            radius = self.database.get("nwkMaxDepth") * 2
+
+        flags = []
+        if destination_address_mode == NWKAddressMode.MULTICAST:
+            flags.append("multicast")
+            raise RequiredImplementation("Routing/Multicasting")
+
+        npdu = ZigbeeNWK(
+            discover_route=int(discover_route),
+            seqnum=sequence_number,
+            radius=radius,
+            flags=flags,
+            destination=destination_address,
+            source=source_address
+        )
+        if destination_address in BROADCAST_ADDRESSES.keys():
+            destination_pan_id = self.database.get("nwkPANId")
+            acknowledged = False
+        else:
+            destination_pan_id = self.database.get("nwkPANId")
+            acknowledged = True
+
+        if self.database.get("nwkSecurityLevel") != 0 and security_enable:
+            npdu.flags.security = True
+            selected_key_material = None
+
+            security_material_set = self.database.get("nwkSecurityMaterialSet")
+            for key_material in security_material_set:
+                if key_material.key_sequence_number == self.database.get("nwkActiveKeySeqNumber"):
+                    selected_key_material = key_material
+                    break
+
+            if selected_key_material is None:
+                return False
+
+            msdu = npdu / ZigbeeSecurityHeader(
+                nwk_seclevel = self.database.get("nwkSecurityLevel"),
+                source = self.database.get("nwkIeeeAddress"),
+                key_type=1,
+                key_seqnum=self.database.get("nwkActiveKeySeqNumber"),
+                fc=selected_key_material.outgoing_frame_counter,
+                data=bytes(nsdu)
+            )
+            crypto_manager = NetworkLayerCryptoManager(selected_key_material.key)
+            msdu = crypto_manager.encrypt(msdu)
+            selected_key_material.outgoing_frame_counter += 1
+        else:
+            msdu = npdu / nsdu
+
+        return self.manager.get_layer('mac').get_service("data").data(
+                    msdu,
+                    msdu_handle=0,
+                    source_address_mode=MACAddressMode.SHORT,
+                    destination_pan_id=destination_pan_id,
+                    destination_address=destination_address,
+                    pan_id_suppressed=False,
+                    sequence_number_suppressed=False,
+                    wait_for_ack=acknowledged
+        )
+
+
+    def on_data_npdu(self, npdu, link_quality=255):
+        """
+        Callback processing NPDU from NWK manager.
+
+        It forwards the NPDU to indicate_data method.
+        """
+        self.indicate_data(npdu, link_quality=link_quality)
+
+    @Dot15d4Service.indication("NLDE-DATA")
+    def indicate_data(self, npdu, link_quality=255):
+        """
+        Indication transmitting NPDU to upper layer.
+        """
+        destination_address_mode = (
+            NWKAddressMode.MULTICAST if "multicast" in npdu.flags else
+            NWKAddressMode.UNICAST
+        )
+        destination_address = npdu.destination
+        source_address = npdu.source
+        security_use = ZigbeeSecurityHeader in npdu and npdu[ZigbeeSecurityHeader].underlayer.__class__ is ZigbeeNWK
+        if security_use:
+            nsdu = ZigbeeAppDataPayload(npdu.data)
+        else:
+            nsdu = npdu[ZigbeeAppDataPayload]
+
+        return (
+            nsdu, {
+                "destination_address_mode":destination_address_mode,
+                "destination_address":destination_address,
+                "source_address":source_address,
+                "security_use":security_use,
+                "link_quality":link_quality
+            }
+        )
+
+
 class NWKManagementService(NWKService):
     """
     NWK service processing Management packets.
     """
     def __init__(self, manager):
         super().__init__(manager, name="nwk_management")
+
+
+    @Dot15d4Service.request("NLME-RESET")
+    def reset(self, warm_start=False):
+        """
+        Request resetting NWK layer to default state.
+        """
+        if warm_start:
+            self.database.set("nwkNeighborTable",NWKNeighborTable())
+            self.database.set("nwkRouteTable",[])
+            return True
+        else:
+            confirm = self.manager.get_layer('mac').get_service("management").reset(set_default_pib=True)
+            if confirm:
+                self.database.reset()
+                return True
+        return False
+
+
+    @Dot15d4Service.request("NLME-GET")
+    def get(self, attribute):
+        """
+        Implement the NLME-GET request operation.
+
+        Allows to get access to an attribute value stored in NWIB database.
+        """
+        return self.database.get(attribute)
+
+    @Dot15d4Service.request("NLME-SET")
+    def set(self, attribute, value):
+        """
+        Implement the NLME-SET request operation.
+
+        Allows to set value to an attribute stored in NWIB database.
+        """
+        return self.database.set(attribute, value)
+
+
+    @Dot15d4Service.request("NLME-ED-SCAN")
+    def ed_scan(self, scan_channels=0x7fff800, scan_duration=2):
+        """
+        Implements the NLME-ED-SCAN request.
+
+        Allows to perform an Energy Detection scan.
+        """
+        confirm = self.manager.get_layer('mac').get_service("management").scan(
+            scan_type=MACScanType.ENERGY_DETECTION,
+            channel_page=0,
+            scan_channels=scan_channels,
+            scan_duration=scan_duration
+        )
+        return confirm
+
+
+    @Dot15d4Service.request("NLME-LEAVE")
+    def leave(self, device_address=None, remove_children=False, rejoin=True):
+        """
+        Implements the NLME-LEAVE request.
+
+        Allows to leave a ZigBee network.
+        """
+        network_address = self.database.get("nwkNetworkAddress")
+        if network_address == 0xFFFF:
+            # We are not present in the network, exit the procedure
+            return False
+
+        if device_address is None or device_address == self.database.get("nwkIeeeAddress"):
+            parent = self.database.get("nwkNeighborTable").get_parent()
+            if parent is None:
+                return False
+
+            sequence_number = self.database.get("nwkSequenceNumber")
+            self.database.set("nwkSequenceNumber", sequence_number+1)
+
+            # We are exiting the network, build the leave command
+            leave_command = ZigbeeNWK(
+                frametype=1,
+                seqnum=sequence_number,
+                destination=parent.address,
+                source=network_address,
+            )/ZigbeeNWKCommandPayload(
+                cmd_identifier=4,
+                remove_children=int(remove_children),
+                request=1,
+                rejoin=int(rejoin)
+            )
+            self.manager.get_layer('mac').get_service("data").data(
+                leave_command,
+                source_address_mode=MACAddressMode.SHORT,
+                destination_pan_id=parent.pan_id,
+                destination_address=parent.address,
+                wait_for_ack=False
+            )
+            return True
+
+
+    @Dot15d4Service.request("NLME-JOIN")
+    def join(self, extended_pan_id, association_type=NWKJoinMode.NEW_JOIN, scan_channels=0x7fff800, scan_duration=4, join_as_router=False, rx_on_when_idle=True, mains_powered_device=True, security_enable=False):
+        """
+        Implements the NLME-JOIN request.
+
+        Allows to join or rejoin a ZigBee network.
+        """
+        # In case of new join
+        if association_type == NWKJoinMode.NEW_JOIN:
+            # Try successively available neighbors that can be considered potential parents
+            table = self.database.get("nwkNeighborTable")
+            while True:
+                candidate_parents = table.select_suitable_parent(extended_pan_id, self.database.get("nwkUpdateId"))
+                if len(candidate_parents) == 0:
+                    return False
+
+                selected_parent = candidate_parents[0]
+                for candidate_parent in candidate_parents[1:]:
+                    if candidate_parent.depth < selected_parent.depth:
+                        selected_parent = candidate_parent
+
+                self.database.set("nwkParentInformation", 0)
+
+                device_type = (
+                                MACDeviceType.FFD if
+                                join_as_router else
+                                MACDeviceType.RFD
+                )
+                power_source = (
+                                MACPowerSource.ALTERNATING_CURRENT_SOURCE if
+                                mains_powered_device else
+                                MACPowerSource.BATTERY_SOURCE
+                )
+
+                capability_information = (
+                    0 |
+                    (int(join_as_router) << 1) |
+                    (int(mains_powered_device) << 2) |
+                    (int(rx_on_when_idle) << 3) |
+                    (0 << 4) |
+                    (0 << 6) |
+                    (1 << 7)
+                )
+                self.database.set("nwkCapabilityInformation", capability_information)
+                # Trigger an association at the MAC layer
+                if self.manager.get_layer('mac').get_service("management").associate(
+                    channel_page=0,
+                    channel=selected_parent.logical_channel,
+                    coordinator_pan_id=selected_parent.pan_id,
+                    coordinator_address=selected_parent.address,
+                    device_type=device_type,
+                    power_source=power_source,
+                    idle_receiving=rx_on_when_idle,
+                    allocate_address=True,
+                    security_capability=False,
+                    fast_association=False
+                ):
+                    # Update database according to successful association
+                    macShortAddress = self.manager.get_layer('mac').database.get("macShortAddress")
+                    self.database.set("nwkNetworkAddress", macShortAddress)
+                    self.database.set("nwkUpdateId", selected_parent.update_id)
+                    self.database.set("nwkPANId", selected_parent.pan_id)
+                    self.database.set("nwkExtendedPANID", extended_pan_id)
+                    selected_parent.relationship = ZigbeeRelationship.IS_PARENT
+                    if selected_parent.extended_address is not None and selected_parent.address is not None:
+                        nwkAddressMap = self.database.get("nwkAddressMap")
+                        nwkAddressMap[selected_parent.extended_address] = selected_parent.address
+                    return True
+                else:
+                    selected_parent.potential_parent = 0
+
+        # In the case of a rejoin
+        elif association_type == NWKJoinMode.REJOIN:
+            # Check if we need to allocate a new address
+            if self.database.get("nwkNetworkAddress") != 0xFFFF:
+                network_address = self.database.get("nwkNetworkAddress")
+                allocate_address = False
+            else:
+                network_address = randint(1,0xFFF0)
+                allocate_address = False
+
+            if self.database.get("nwkAddrAlloc") == 2:
+                allocate_address = False
+
+            # Perform a network discovery to infer surounding networks
+            candidate_zigbee_networks  = self.network_discovery(
+                scan_channels=scan_channels,
+                scan_duration=scan_duration
+            )
+            selected_zigbee_network = None
+            # Select the zigbee network according to provided extended PAN ID
+            for candidate_zigbee_network in candidate_zigbee_networks:
+                if candidate_zigbee_network.extended_pan_id == extended_pan_id:
+                    selected_zigbee_network = candidate_zigbee_network
+                    break
+
+            if selected_zigbee_network is None:
+                return False
+
+            # Select the right channel accordingly
+            self.manager.get_layer('mac').set_channel_page(0)
+            self.manager.get_layer('mac').set_channel(selected_zigbee_network.channel)
+            table = self.database.get("nwkNeighborTable")
+            while True:
+                candidate_parents = table.select_suitable_parent(
+                    extended_pan_id,
+                    self.database.get("nwkUpdateId"),
+                    no_permit_check=True
+                )
+                if len(candidate_parents) == 0:
+                    return False
+                selected_parent = candidate_parents[0]
+                for candidate_parent in candidate_parents[1:]:
+                    if candidate_parent.depth < selected_parent.depth:
+                        selected_parent = candidate_parent
+
+                self.database.set("nwkParentInformation", 0)
+
+                device_type = (
+                                MACDeviceType.FFD if
+                                join_as_router else
+                                MACDeviceType.RFD
+                )
+                power_source = (
+                    MACPowerSource.ALTERNATING_CURRENT_SOURCE if
+                    mains_powered_device else
+                    MACPowerSource.BATTERY_SOURCE
+                )
+
+                capability_information = (
+                    0 |
+                    (int(join_as_router) << 1) |
+                    (int(mains_powered_device) << 2) |
+                    (int(rx_on_when_idle) << 3) |
+                    (0 << 4) |
+                    (0 << 6) |
+                    (1 << 7)
+                )
+                self.database.set("nwkCapabilityInformation", capability_information)
+
+                radius = self.database.get("nwkMaxDepth") * 2
+
+                sequence_number = self.database.get("nwkSequenceNumber")
+                self.database.set("nwkSequenceNumber", sequence_number+1)
+
+                # Build rejoin request
+                rejoin_request = ZigbeeNWK(
+                    frametype=1,
+                    discover_route=0,
+                    seqnum=sequence_number,
+                    radius=radius,
+                    flags=["extended_src", "extended_dst"],
+                    destination=selected_parent.address,
+                    source=network_address,
+                    ext_dst=0xf4ce364269d30198, # ?
+                    ext_src=self.database.get("nwkIeeeAddress")
+                )/ZigbeeNWKCommandPayload(
+                    cmd_identifier=6,
+                    allocate_address=int(allocate_address),
+                    security_capability=False,
+                    receiver_on_when_idle=int(rx_on_when_idle),
+                    power_source=int(power_source),
+                    device_type=int(device_type),
+                    alternate_pan_coordinator=0
+                )
+
+                self.manager.get_layer('mac').get_service("data").data(
+                    rejoin_request,
+                    source_address_mode=MACAddressMode.SHORT,
+                    destination_pan_id=selected_parent.pan_id,
+                    destination_address=selected_parent.address,
+                    wait_for_ack=False
+                )
+                duration = (
+                            self.manager.get_layer('mac').database.get("macResponseWaitTime") *
+                            MACConstants.A_BASE_SUPERFRAME_DURATION *
+                            self.manager.get_layer('phy').symbol_duration
+                )
+                rejoin_response = None
+                try:
+                    rejoin_response = self.wait_for_packet(
+                        lambda pkt:ZigbeeNWKCommandPayload in pkt and pkt.cmd_identifier==7,
+                        timeout=duration
+                    )
+                except NWKTimeoutException:
+                    selected_parent.potential_parent = 0
+
+                if rejoin_response is not None and rejoin_response.rejoin_status == 0:
+                    self.database.set("nwkNetworkAddress", rejoin_response.network_address)
+                    self.manager.get_layer('mac').database.set(
+                        "macShortAddress",
+                        rejoin_response.network_address
+                    )
+                    self.database.set("nwkUpdateId", selected_parent.update_id)
+                    self.database.set("nwkPANId", selected_parent.pan_id)
+                    self.database.set("nwkExtendedPANID", extended_pan_id)
+                    selected_parent.relationship = ZigbeeRelationship.IS_PARENT
+                    if selected_parent.extended_address is not None and selected_parent.address is not None:
+                        nwkAddressMap = self.database.get("nwkAddressMap")
+                        nwkAddressMap[selected_parent.extended_address] = selected_parent.address
+                    return True
+                else:
+                    selected_parent.potential_parent = 0
+
+
+    @Dot15d4Service.request("NLME-NETWORK-DISCOVERY")
+    def network_discovery(self, scan_channels=0x7fff800, scan_duration=6):
+        """
+        Implements the NLME-NETWORK-DISCOVERY request.
+
+        Allows to discover a network.
+        """
+        confirm = self.manager.get_layer('mac').get_service("management").scan(
+            scan_type=MACScanType.ACTIVE,
+            channel_page=0,
+            scan_channels=scan_channels,
+            scan_duration=scan_duration
+        )
+        zigbee_networks = []
+        notifications_left = True
+        while notifications_left:
+            try:
+                beacon = self.wait_for_packet(lambda pkt:ZigBeeBeacon in pkt, timeout=0.1)
+                if beacon.pan_descriptor in confirm:
+                    network = ZigbeeNetwork(beacon)
+                    if network not in zigbee_networks:
+                        zigbee_networks.append(network)
+
+            except NWKTimeoutException:
+                notifications_left = False
+        return zigbee_networks
+
+    def on_beacon_npdu(self, pan_descriptor, beacon_payload):
+        """
+        Callback processing Beacon NPDU forwarded from NWK manager.
+        """
+        beacon_payload.pan_descriptor = pan_descriptor
+        self.add_packet_to_queue(beacon_payload)
 
 class NWKInterpanService(NWKService):
     """

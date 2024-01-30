@@ -404,7 +404,7 @@ class MACManager(Dot15d4Manager):
         self.add_service("data", MACDataService(self))
         self.add_service("management", MACManagementService(self))
         self.__ack_queue = Queue()
-        # Move it to connector ? 
+        # Move it to connector ?
         #self.set_extended_address(self.database.get("macExtendedAddress"))
 
 
