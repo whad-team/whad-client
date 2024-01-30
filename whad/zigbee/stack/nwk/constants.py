@@ -1,5 +1,7 @@
 from enum import IntEnum
-
+"""
+Constants implemented as Enum for Zigbee NWK layer.
+"""
 
 class ZigbeeDeviceType(IntEnum):
     """
