@@ -507,12 +507,114 @@ class NWKManagementService(NWKService):
         beacon_payload.pan_descriptor = pan_descriptor
         self.add_packet_to_queue(beacon_payload)
 
+
+    def on_command_npdu(self, npdu, link_quality):
+        """
+        Callback processing Commands NPDU forwarded from NWK manager.
+        """
+        # Check if security header is present
+        security_use = ZigbeeSecurityHeader in npdu and npdu[ZigbeeSecurityHeader].underlayer.__class__ is ZigbeeNWK
+        if security_use:
+            nsdu = ZigbeeNWKCommandPayload(npdu.data)
+        else:
+            nsdu = npdu[ZigbeeNWKCommandPayload]
+
+        # Add packet to FIFO
+        self.add_packet_to_queue(nsdu)
+
 class NWKInterpanService(NWKService):
     """
     NWK pseudo-service forwarding InterPAN packets.
     """
     def __init__(self, manager):
         super().__init__(manager, name="nwk_interpan")
+
+    @Dot15d4Service.request("INTRP-DATA")
+    def interpan_data(
+                        self,
+                        asdu,
+                        asdu_handle=0,
+                        source_address_mode=MACAddressMode.EXTENDED,
+                        destination_address_mode=MACAddressMode.SHORT,
+                        destination_pan_id=0xFFFF,
+                        destination_address=0xFFFF,
+                        profile_id=0,
+                        cluster_id=0,
+                        acknowledged_transmission=False
+    ):
+    """
+    Implements INTRP-DATA Request.
+
+    Transmits InterPAN PDU.
+    """
+        # Infer delivery mode from destination address
+        if destination_address == 0xFFFF:
+            delivery_mode = 2
+        else:
+            delivery_mode = 0
+
+        # Build scapy packet for InterPAN PDU
+        data = ZigbeeNWKStub()/ZigbeeAppDataPayloadStub(
+            cluster=cluster_id,
+            profile=profile_id,
+            delivery_mode=delivery_mode,
+            data=asdu
+        )
+
+        self.manager.get_layer('mac').get_service("data").data(
+            data,
+            source_address_mode=source_address_mode,
+            destination_pan_id=destination_pan_id,
+            destination_address=destination_address,
+            destination_address_mode=destination_address_mode,
+            wait_for_ack=acknowledged_transmission
+        )
+
+    def on_interpan_npdu(self, pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality):
+        """
+        Callback processing InterPAN NPDU forwarded by NWK manager.
+        """
+
+        # Populate profile ID & Cluster
+        profile_id = pdu.profile
+        cluster_id = pdu.cluster
+
+        # Encapsulate PDU according to the selected profile (needed for correct scapy encapsulation)
+        if NewZigbeeAppDataPayloadStub in pdu:
+            asdu = bytes(pdu[NewZigbeeAppDataPayloadStub].payload)
+        elif ZigbeeAppDataPayloadStub in pdu:
+            asdu = pdu[ZigbeeAppDataPayloadStub].data
+
+        if profile_id == 0xc05e and cluster_id == 0x1000:
+            asdu = ZigbeeZLLCommissioningCluster(asdu)
+
+        # Let's trigger an InterPAN indication
+        self.indicate_interpan_data(
+                                    asdu,
+                                    profile_id=profile_id,
+                                    cluster_id=cluster_id,
+                                    destination_pan_id=destination_pan_id,
+                                    destination_address=destination_address,
+                                    source_pan_id=source_pan_id,
+                                    source_address=source_address,
+                                    link_quality=link_quality
+        )
+
+    @Dot15d4Service.indication("INTRP-DATA")
+    def indicate_interpan_data(self, asdu, profile_id=0, cluster_id=0, destination_pan_id=0xFFFF, destination_address=0xFFFF, source_pan_id=0xFFFF, source_address=0xFFFF, link_quality=255):
+        """
+        Implements INTRP-DATA indication.
+        """
+        return (asdu,
+            {
+            "profile_id":profile_id,
+            "cluster_id":cluster_id,
+            "destination_pan_id":destination_pan_id,
+            "destination_address":destination_address,
+            "source_pan_id":source_pan_id,
+            "source_address":source_address,
+            "link_quality":link_quality
+        })
 
 
 @state(NWKIB)
