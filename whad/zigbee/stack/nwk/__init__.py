@@ -601,7 +601,17 @@ class NWKInterpanService(NWKService):
         )
 
     @Dot15d4Service.indication("INTRP-DATA")
-    def indicate_interpan_data(self, asdu, profile_id=0, cluster_id=0, destination_pan_id=0xFFFF, destination_address=0xFFFF, source_pan_id=0xFFFF, source_address=0xFFFF, link_quality=255):
+    def indicate_interpan_data(
+                                self,
+                                asdu,
+                                profile_id=0,
+                                cluster_id=0,
+                                destination_pan_id=0xFFFF,
+                                destination_address=0xFFFF,
+                                source_pan_id=0xFFFF,
+                                source_address=0xFFFF,
+                                link_quality=255
+    ):
         """
         Implements INTRP-DATA indication.
         """
@@ -718,7 +728,14 @@ class NWKManager(Dot15d4Manager):
         """
         # If we have an InterPAN PDU, forwards it to the NWK InterPAN service
         if ZigbeeNWKStub in pdu and (ZigbeeAppDataPayloadStub in pdu or NewZigbeeAppDataPayloadStub in pdu):
-            self.get_service("interpan").on_interpan_npdu(pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality)
+            self.get_service("interpan").on_interpan_npdu(
+                pdu,
+                destination_pan_id,
+                destination_address,
+                source_pan_id,
+                source_address,
+                link_quality
+            )
 
         # If we have a regular NWK PDU:
         elif ZigbeeNWK in pdu:
@@ -744,7 +761,14 @@ class NWKManager(Dot15d4Manager):
                 self.get_service("management").on_command_npdu(pdu, link_quality)
             else:
                 # InterPAN PDU, forward to NWK InterPAN Service
-                self.get_service("interpan").on_interpan_npdu(pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality)
+                self.get_service("interpan").on_interpan_npdu(
+                    pdu,
+                    destination_pan_id,
+                    destination_address,
+                    source_pan_id,
+                    source_address,
+                    link_quality
+                )
 
     @source('mac', 'MLME-BEACON-NOTIFY')
     def on_mlme_beacon_notify(self, beacon_payload, pan_descriptor):
