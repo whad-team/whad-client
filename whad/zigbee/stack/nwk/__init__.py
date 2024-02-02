@@ -9,6 +9,9 @@ from whad.zigbee.stack.nwk.security import NetworkSecurityMaterial
 from whad.zigbee.stack.nwk.network import ZigbeeNetwork
 from whad.zigbee.stack.nwk.constants import ZigbeeDeviceType, NWKAddressMode, \
     NWKJoinMode, ZigbeeRelationship
+
+from whad.zigbee.stack.aps import APSManager
+
 from whad.zigbee.crypto import NetworkLayerCryptoManager
 from whad.common.stack import Layer, alias, source, state
 from whad.exceptions import RequiredImplementation
@@ -491,6 +494,7 @@ class NWKManagementService(NWKService):
         while notifications_left:
             try:
                 beacon = self.wait_for_packet(lambda pkt:ZigBeeBeacon in pkt, timeout=0.1)
+                print("> ", beacon)
                 if beacon.pan_descriptor in confirm:
                     network = ZigbeeNetwork(beacon)
                     if network not in zigbee_networks:
@@ -542,11 +546,11 @@ class NWKInterpanService(NWKService):
                         cluster_id=0,
                         acknowledged_transmission=False
     ):
-    """
-    Implements INTRP-DATA Request.
+        """
+        Implements INTRP-DATA Request.
 
-    Transmits InterPAN PDU.
-    """
+        Transmits InterPAN PDU.
+        """
         # Infer delivery mode from destination address
         if destination_address == 0xFFFF:
             delivery_mode = 2
@@ -778,9 +782,8 @@ class NWKManager(Dot15d4Manager):
         # If we got bytes here, encapsulate into scapy ZigBeeBeacon
         if isinstance(beacon_payload, bytes):
             beacon_payload = ZigBeeBeacon(beacon_payload)
-
         # Check if this is a Zigbee beacon
-        if hasattr(beacon_payload, "proto_id") and beacon_payload.proto_id == 0:
+        if hasattr(beacon_payload, "proto_id") and beacon_payload.proto_id in (0, 75): #TODO: proto id filter at 0 does not match esp32c6 implem ? check 
             # Forward it to NWK management service
             self.get_service("management").on_beacon_npdu(pan_descriptor, beacon_payload)
 
@@ -807,3 +810,5 @@ class NWKManager(Dot15d4Manager):
                 update_id=beacon_payload.update_id,
                 pan_id=pan_descriptor.coord_pan_id
             )
+
+NWKManager.add(APSManager)

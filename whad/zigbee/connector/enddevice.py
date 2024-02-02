@@ -1,5 +1,7 @@
 from whad.zigbee.connector import Zigbee
 from whad.dot15d4.stack import Dot15d4Stack
+from whad.dot15d4.stack.mac import MACManager
+from whad.zigbee.stack.nwk import NWKManager
 from whad.exceptions import UnsupportedCapability
 
 class EndDevice(Zigbee):
@@ -13,6 +15,7 @@ class EndDevice(Zigbee):
             raise UnsupportedCapability("EndDevice")
 
         # Stack initialization
+        MACManager.add(NWKManager)
         self.__stack = Dot15d4Stack(self)
 
         # Channel initialization

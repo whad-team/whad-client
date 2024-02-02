@@ -1,5 +1,5 @@
 from whad.dot15d4.stack.mac.constants import MACAddressMode
-from whad.zigbee.stack.manager import Dot15d4Manager
+from whad.dot15d4.stack.manager import Dot15d4Manager
 from whad.common.stack import alias, source, state # state may not be necessary ?
 import logging
 

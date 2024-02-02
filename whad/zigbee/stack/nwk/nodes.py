@@ -1,5 +1,5 @@
 from whad.zigbee.stack.nwk.constants import ZigbeeRelationship, ZigbeeDeviceType
-
+from time import time
 class ZigbeeNode:
     """
     Class representing a Zigbee device.

@@ -11,6 +11,7 @@ from whad.zigbee.stack.aps.constants import APSSecurityStatus, \
 from whad.zigbee.stack.nwk.constants import NWKAddressMode
 from whad.zigbee.crypto import ApplicationSubLayerCryptoManager
 
+from whad.zigbee.stack.apl import APLManager
 from whad.common.stack import alias, source, state
 
 from scapy.layers.zigbee import ZigbeeSecurityHeader, ZigbeeAppDataPayload, \
@@ -57,11 +58,11 @@ class APSDataService(APSService):
                 fragmentation_permitted=False,
                 include_extended_nonce=False
     ):
-    """
-    Implements the APSDE-DATA Request.
+        """
+        Implements the APSDE-DATA Request.
 
-    Processes and transmits Data PDU to lowest layers.
-    """
+        Processes and transmits Data PDU to lowest layers.
+        """
         multicast = False
         # If transmission must be secured, select the key pair, encrypt and add a security header accordingly
         if security_enabled_transmission:
@@ -300,9 +301,9 @@ class APSDataService(APSService):
                         security_status,
                         link_quality
     ):
-    """
-    Callback processing APDU data forwarded by the APS Manager.
-    """
+        """
+        Callback processing APDU data forwarded by the APS Manager.
+        """
         self.indicate_data(
                             apdu,
                             destination_address_mode,
@@ -431,9 +432,9 @@ class APSManagementService(APSService):
                         security_status,
                         link_quality
     ):
-    """
-    Callback processing APDU commands transmitted by the APS Manager.
-    """
+        """
+        Callback processing APDU commands transmitted by the APS Manager.
+        """
         # Format APDU command to facilitate parsing
         if ZigbeeSecurityHeader in nsdu:
             asdu = ZigbeeAppCommandPayload(nsdu.data)
@@ -658,3 +659,5 @@ class APSManager(Dot15d4Manager):
             source_address=source_address,
             link_quality=link_quality
         )
+
+APSManager.add(APLManager)
