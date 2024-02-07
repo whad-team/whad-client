@@ -1,4 +1,4 @@
-from whad.zigbee.stack.mac.constants import MACAddressMode
+from whad.dot15d4.stack.mac.constants import MACAddressMode
 
 class ApplicationObject:
     """
@@ -78,6 +78,9 @@ class ApplicationObject:
         """
         Transmits a Data PDU through the APL layer.
         """
+        if self.manager is None:
+            return False
+
         return self.manager.send_data(
             asdu,
             destination_address_mode,
@@ -110,6 +113,10 @@ class ApplicationObject:
         """
         Transmits an InterPAN PDU through the APL layer.
         """
+
+        if self.manager is None:
+            return False
+
         return self.manager.send_interpan_data(
             asdu,
             asdu_handle=asdu_handle,
