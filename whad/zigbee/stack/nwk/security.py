@@ -1,7 +1,9 @@
 from whad.zigbee.stack.nwk.exceptions import NWKInvalidKey
 
 class NetworkSecurityMaterial:
+
     KEY_COUNTER = 0
+
     def __init__(self, key, key_sequence_number=None, outgoing_frame_counter=0):
         if isinstance(key,str):
             try:
