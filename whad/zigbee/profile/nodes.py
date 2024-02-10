@@ -33,8 +33,12 @@ class Node:
         """
         Returns the node descriptor.
         """
-        if self.__node_descriptor is None and self.__network.is_associated() and self.__network.is_authorized():
-            self.__node_descriptor = self.stack.apl.get_application_by_name("zdo").device_and_service_discovery.get_node_descriptor(self.__address)
+        if (
+            self.__node_descriptor is None and
+            self.__network.is_associated() and
+            self.__network.is_authorized()
+        ):
+            self.__node_descriptor = self.stack.get_layer('apl').get_application_by_name("zdo").device_and_service_discovery.get_node_descriptor(self.__address)
         return self.__node_descriptor
 
     @property
@@ -42,9 +46,13 @@ class Node:
         """
         Returns the list of active endpoints.
         """
-        if self.__active_endpoints is None and self.__network.is_associated() and self.__network.is_authorized():
+        if (
+            self.__active_endpoints is None and
+            self.__network.is_associated() and
+            self.__network.is_authorized()
+        ):
             self.__active_endpoints = []
-            for endpoint in self.stack.apl.get_application_by_name("zdo").device_and_service_discovery.get_active_endpoints(self.__address):
+            for endpoint in self.stack.get_layer('apl').get_application_by_name("zdo").device_and_service_discovery.get_active_endpoints(self.__address):
                 self.__active_endpoints.append(Endpoint(endpoint, self))
         return self.__active_endpoints
 
