@@ -47,7 +47,11 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
 
         # Trigger a Simple Descriptor Request
         transaction = self.transaction
-        self.zdo.clusters["simple_desc_req"](node_address, endpoint, transaction)
+        self.zdo.clusters["simple_desc_req"].send_data(
+            node_address,
+            endpoint,
+            transaction
+        )
         self.transaction += 1
 
         # Get Simple Descriptor Response or trigger an error if timeout
