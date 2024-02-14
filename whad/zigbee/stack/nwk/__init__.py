@@ -781,10 +781,13 @@ class NWKManager(Dot15d4Manager):
         Callback processing MAC Beacon Notify indication.
         """
         # If we got bytes here, encapsulate into scapy ZigBeeBeacon
+        beacon_payload = bytes(beacon_payload)
+        print(beacon_payload.hex())
         if isinstance(beacon_payload, bytes):
             beacon_payload = ZigBeeBeacon(beacon_payload)
-        # Check if this is a Zigbee beacon
-        if hasattr(beacon_payload, "proto_id") and beacon_payload.proto_id in (0, 75, 252): #TODO: proto id filter at 0 does not match esp32c6 implem ? check
+            # Check if this is a Zigbee beacon
+            beacon_payload.show()
+        if hasattr(beacon_payload, "proto_id") and beacon_payload.proto_id in (0, 75, 92): #TODO: proto id filter at 0 does not match esp32c6 implem ? check
             # Forward it to NWK management service
             self.get_service("management").on_beacon_npdu(pan_descriptor, beacon_payload)
 
