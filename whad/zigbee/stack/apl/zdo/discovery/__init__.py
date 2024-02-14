@@ -4,6 +4,7 @@ from whad.zigbee.profile.nodes import CoordinatorNode, EndDeviceNode, RouterNode
 from whad.dot15d4.stack.mac.constants import MACDeviceType, MACPowerSource
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.apl.zdo.discovery.exceptions import ZDODeviceAndServiceDiscoveryTimeoutException
+from whad.scapy.layers.zdp import ZDPSimpleDescRsp, ZDPActiveEPRsp, ZDPNodeDescRsp, ZDPIEEEAddrRsp
 from queue import Queue, Empty
 from time import time, sleep
 
