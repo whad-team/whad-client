@@ -2,7 +2,7 @@ from whad.zigbee.stack.apl.zdo.descriptors import NodeDescriptor, SimpleDescript
 from whad.zigbee.stack.aps.constants import APSDestinationAddressMode
 from whad.zigbee.stack.apl.cluster import Cluster
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
-from whad.zigbee.stack.mac.constants import MACDeviceType, MACPowerSource
+from whad.dot15d4.stack.mac.constants import MACDeviceType, MACPowerSource
 from scapy.layers.zigbee import  ZigbeeDeviceProfile
 from whad.scapy.layers.zdp import ZDPDeviceAnnce, ZDPNodeDescReq, ZDPNodeDescRsp, ZDPNWKAddrReq, \
     ZDPIEEEAddrReq, ZDPIEEEAddrRsp, ZDPActiveEPReq, ZDPActiveEPRsp, ZDPSimpleDescReq, ZDPSimpleDescRsp
@@ -20,7 +20,7 @@ class ZDPCluster(Cluster):
                     command,
                     transaction,
                     destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT,
-                    destination_address=address,
+                    destination_address=0xFFFF,
                     use_network_key=True,
                     destination_endpoint=0
     ):

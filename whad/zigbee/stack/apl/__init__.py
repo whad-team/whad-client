@@ -1,5 +1,6 @@
 from whad.dot15d4.stack.mac.constants import MACAddressMode
 from whad.dot15d4.stack.manager import Dot15d4Manager
+from whad.zigbee.stack.apl.zdo import ZigbeeDeviceObjects
 from whad.common.stack import alias, source, state # state may not be necessary ?
 import logging
 
@@ -26,6 +27,7 @@ class APLManager(Dot15d4Manager):
         # Initialize Endpoints
         self.endpoints = {}
 
+        self.attach_application(ZigbeeDeviceObjects(), 0)
 
     # API to manipulate applications
     def initialize(self):

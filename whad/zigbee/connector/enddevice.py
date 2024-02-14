@@ -24,6 +24,12 @@ class EndDevice(Zigbee):
 
         self.enable_reception()
 
+        self.__stack.get_layer('apl').initialize()
+
+
+    def discover_networks(self):
+        return self.__stack.get_layer('apl').get_application_by_name("zdo").network_manager.discover_networks()
+
     @property
     def stack(self):
         return self.__stack

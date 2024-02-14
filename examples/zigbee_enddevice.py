@@ -15,11 +15,16 @@ if __name__ == '__main__':
 
         try:
             dev = WhadDevice.create(interface)
-            connector = EndDevice(dev)
+            end_device = EndDevice(dev)
             input()
-            connector.attach_callback(show)
-            connector.start()
-            print(connector.stack.get_layer('nwk').get_service("management").network_discovery())
+            end_device.attach_callback(show)
+            end_device.start()
+
+            selected_network = None
+            print("[i] Discovering networks.")
+            for network in end_device.discover_networks():
+                print("[i] Network detected: ", network)
+
             while True:
                 input()
         except (KeyboardInterrupt, SystemExit):

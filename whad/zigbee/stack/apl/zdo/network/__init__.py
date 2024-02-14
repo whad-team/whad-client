@@ -6,7 +6,7 @@ from whad.exceptions import RequiredImplementation
 
 # Wrappers
 from whad.zigbee.profile.network import Network
-from whad.zigbee.profile.device import CoordinatorNode, EndDeviceNode, RouterNode
+from whad.zigbee.profile.nodes import CoordinatorNode, EndDeviceNode, RouterNode
 
 from time import sleep
 from random import randint
@@ -29,7 +29,7 @@ class ZDONetworkManager(ZDOObject):
 
         nwk_layer.database.set("nwkNetworkAddress", short_address)
         mac_layer.database.set("macShortAddress", short_address)
-        phy_layer.stack.set_short_address(short_address)
+        phy_layer.set_short_address(short_address)
 
     def configure_extended_address(self, extended_address):
         """
@@ -93,7 +93,7 @@ class ZDONetworkManager(ZDOObject):
         networks = {}
         for network in nwk_management.network_discovery():
             # Create a wrapper for network
-
+            print(network)
             networks[network.extended_pan_id] = Network(
                     network,
                     stack = phy_layer

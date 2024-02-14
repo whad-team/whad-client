@@ -489,6 +489,7 @@ class NWKManagementService(NWKService):
             scan_channels=scan_channels,
             scan_duration=scan_duration
         )
+        print(confirm)
         zigbee_networks = []
         notifications_left = True
         while notifications_left:
@@ -783,7 +784,7 @@ class NWKManager(Dot15d4Manager):
         if isinstance(beacon_payload, bytes):
             beacon_payload = ZigBeeBeacon(beacon_payload)
         # Check if this is a Zigbee beacon
-        if hasattr(beacon_payload, "proto_id") and beacon_payload.proto_id in (0, 75): #TODO: proto id filter at 0 does not match esp32c6 implem ? check 
+        if hasattr(beacon_payload, "proto_id") and beacon_payload.proto_id in (0, 75, 252): #TODO: proto id filter at 0 does not match esp32c6 implem ? check
             # Forward it to NWK management service
             self.get_service("management").on_beacon_npdu(pan_descriptor, beacon_payload)
 
