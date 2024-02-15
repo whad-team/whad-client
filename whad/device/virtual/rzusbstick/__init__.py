@@ -191,14 +191,14 @@ class RZUSBStickDevice(VirtualDevice):
     def _get_capabilities(self):
         if "KILLERB" in self.__rzusbstick.product:
             capabilities = {
-                WhadDomain.Zigbee : (
+                WhadDomain.Dot15d4 : (
                                     (WhadCapability.Sniff | WhadCapability.Inject),
                                     [Sniff, Send, Start, Stop]
                 )
             }
         else:
             capabilities = {
-                WhadDomain.Zigbee : (
+                WhadDomain.Dot15d4 : (
                                     (WhadCapability.Sniff),
                                     [Sniff, Start, Stop]
                 )
