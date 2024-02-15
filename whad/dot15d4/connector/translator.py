@@ -39,7 +39,7 @@ class Dot15d4MessageTranslator(object):
     def from_message(self, message:Message, msg_type:str) -> Union[Dot15d4, Dot15d4FCS, None]:
         try:
             if msg_type == 'raw_pdu':
-                packet = Dot15d4FCS(bytes(message.raw_pdu.pdu) + bytes(pack(">H", message.raw_pdu.fcs)))
+                packet = Dot15d4FCS(bytes(message.raw_pdu.pdu) + bytes(pack("<H", message.raw_pdu.fcs)))
                 packet.metadata = generate_dot15d4_metadata(message, msg_type)
                 return packet
 
