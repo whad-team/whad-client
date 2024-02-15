@@ -129,25 +129,25 @@ class RZUSBStickDevice(VirtualDevice):
         pdu = packet[:-2]
         fcs = unpack("H",packet[-2:])[0]
         msg = Message()
-        msg.zigbee.raw_pdu.channel = self.__channel
+        msg.dot15d4.raw_pdu.channel = self.__channel
         if rssi is not None:
-            msg.zigbee.raw_pdu.rssi = rssi
+            msg.dot15d4.raw_pdu.rssi = rssi
         if timestamp is not None:
-            msg.zigbee.raw_pdu.timestamp = timestamp
-        msg.zigbee.raw_pdu.fcs_validity = is_fcs_valid
-        msg.zigbee.raw_pdu.pdu = pdu
-        msg.zigbee.raw_pdu.fcs = fcs
+            msg.dot15d4.raw_pdu.timestamp = timestamp
+        msg.dot15d4.raw_pdu.fcs_validity = is_fcs_valid
+        msg.dot15d4.raw_pdu.pdu = pdu
+        msg.dot15d4.raw_pdu.fcs = fcs
         self._send_whad_message(msg)
 
 
     # Virtual device whad message callbacks
-    def _on_whad_zigbee_stop(self, message):
+    def _on_whad_dot15d4_stop(self, message):
         if self._stop():
             self._send_whad_command_result(ResultCode.SUCCESS)
         else:
             self._send_whad_command_result(ResultCode.ERROR)
 
-    def _on_whad_zigbee_send_raw(self, message):
+    def _on_whad_dot15d4_send_raw(self, message):
         channel = message.channel
 
         if self._set_channel(channel):
@@ -157,13 +157,13 @@ class RZUSBStickDevice(VirtualDevice):
             success = False
         self._send_whad_command_result(ResultCode.SUCCESS if success else ResultCode.ERROR)
 
-    def _on_whad_zigbee_sniff(self, message):
+    def _on_whad_dot15d4_sniff(self, message):
         channel = message.channel
         self.__future_channel = channel
         self.__internal_state = RZUSBStickInternalStates.SNIFFING
         self._send_whad_command_result(ResultCode.SUCCESS)
 
-    def _on_whad_zigbee_start(self, message):
+    def _on_whad_dot15d4_start(self, message):
         self.__input_buffer = b""
         self.__input_buffer_length = 0
         self.__input_header = b""
