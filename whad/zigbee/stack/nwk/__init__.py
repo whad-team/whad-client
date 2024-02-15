@@ -8,7 +8,7 @@ from whad.zigbee.stack.nwk.neighbors import NWKNeighborTable
 from whad.zigbee.stack.nwk.security import NetworkSecurityMaterial
 from whad.zigbee.stack.nwk.network import ZigbeeNetwork
 from whad.zigbee.stack.nwk.constants import ZigbeeDeviceType, NWKAddressMode, \
-    NWKJoinMode, ZigbeeRelationship
+    NWKJoinMode, ZigbeeRelationship, BROADCAST_ADDRESSES
 
 from whad.zigbee.stack.aps import APSManager
 

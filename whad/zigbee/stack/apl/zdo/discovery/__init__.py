@@ -175,6 +175,12 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         except ZDODeviceAndServiceDiscoveryTimeoutException:
             return None
 
+    def device_annce(self, transaction=0):
+        """
+        Annonce the current node.
+        """
+        self.zdo.clusters["device_annce"].send_data(transaction)
+
 
     def discover_nodes(self):
         """

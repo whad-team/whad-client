@@ -1,6 +1,7 @@
 from whad.dot15d4.stack.manager import Dot15d4Manager
 from whad.dot15d4.stack.service import Dot15d4Service
 from whad.dot15d4.stack.mac.constants import MACAddressMode
+from whad.dot15d4.stack.mac.helpers import is_short_address
 
 from whad.zigbee.stack.aps.exceptions import APSTimeoutException
 from whad.zigbee.stack.aps.database import APSIB
@@ -265,7 +266,7 @@ class APSDataService(APSService):
                 counter=asdu.counter
             )
 
-            self.manager.nwk.get_service("data").data(
+            self.manager.get_layer('nwk').get_service("data").data(
                 acknowledgement,
                 nsdu_handle=0,
                 destination_address_mode=NWKAddressMode.UNICAST,

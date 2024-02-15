@@ -5,6 +5,12 @@ from whad.exceptions import WhadDeviceNotFound
 from scapy.compat import raw
 import sys
 
+import logging
+
+logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.apl.zcl').setLevel(logging.INFO)
+
+
 def show(pkt):
     if hasattr(pkt, "metadata"):
         print(pkt.metadata, bytes(pkt).hex(), repr(pkt))

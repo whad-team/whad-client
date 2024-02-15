@@ -42,38 +42,38 @@ class ZigbeeDeviceObjects(ApplicationObject):
             0x0000, # device ID
             device_version=0,
             input_clusters=[
-                self.clusters["zdo_node_desc_req"],
-                self.clusters["zdo_nwk_addr_rsp"],
-                self.clusters["zdo_ieee_addr_rsp"],
-                self.clusters["zdo_node_desc_rsp"],
-                self.clusters["zdo_active_ep_rsp"],
-                self.clusters["zdo_simple_desc_rsp"],
+                self.clusters["node_desc_req"],
+                self.clusters["nwk_addr_rsp"],
+                self.clusters["ieee_addr_rsp"],
+                self.clusters["node_desc_rsp"],
+                self.clusters["active_ep_rsp"],
+                self.clusters["simple_desc_rsp"],
 
             ],
             output_clusters=[
-                self.clusters["zdo_nwk_addr_req"],
-                self.clusters["zdo_active_ep_req"],
-                self.clusters["zdo_ieee_addr_req"],
-                self.clusters["zdo_device_annce"],
-                self.clusters["zdo_node_desc_rsp"],
-                self.clusters["zdo_simple_desc_req"],
+                self.clusters["nwk_addr_req"],
+                self.clusters["active_ep_req"],
+                self.clusters["ieee_addr_req"],
+                self.clusters["device_annce"],
+                self.clusters["node_desc_rsp"],
+                self.clusters["simple_desc_req"],
             ]
         )
 
 
     def setup_clusters(self):
         self.clusters = {
-            "zdo_device_annce"      : ZDODeviceAnnce(self.device_and_service_discovery),
-            "zdo_node_desc_req"     : ZDONodeDescReq(self.device_and_service_discovery),
-            "zdo_node_desc_rsp"     : ZDONodeDescRsp(self.device_and_service_discovery),
-            "zdo_nwk_addr_req"      : ZDONWKAddrReq(self.device_and_service_discovery),
-            "zdo_nwk_addr_rsp"      : ZDONWKAddrRsp(self.device_and_service_discovery),
-            "zdo_ieee_addr_req"     : ZDOIEEEAddrReq(self.device_and_service_discovery),
-            "zdo_ieee_addr_rsp"     : ZDOIEEEAddrRsp(self.device_and_service_discovery),
-            "zdo_active_ep_req"     : ZDOActiveEPReq(self.device_and_service_discovery),
-            "zdo_active_ep_rsp"     : ZDOActiveEPRsp(self.device_and_service_discovery),
-            "zdo_simple_desc_req"   : ZDOSimpleDescReq(self.device_and_service_discovery),
-            "zdo_simple_desc_rsp"   : ZDOSimpleDescRsp(self.device_and_service_discovery),
+            "device_annce"      : ZDODeviceAnnce(self.device_and_service_discovery),
+            "node_desc_req"     : ZDONodeDescReq(self.device_and_service_discovery),
+            "node_desc_rsp"     : ZDONodeDescRsp(self.device_and_service_discovery),
+            "nwk_addr_req"      : ZDONWKAddrReq(self.device_and_service_discovery),
+            "nwk_addr_rsp"      : ZDONWKAddrRsp(self.device_and_service_discovery),
+            "ieee_addr_req"     : ZDOIEEEAddrReq(self.device_and_service_discovery),
+            "ieee_addr_rsp"     : ZDOIEEEAddrRsp(self.device_and_service_discovery),
+            "active_ep_req"     : ZDOActiveEPReq(self.device_and_service_discovery),
+            "active_ep_rsp"     : ZDOActiveEPRsp(self.device_and_service_discovery),
+            "simple_desc_req"   : ZDOSimpleDescReq(self.device_and_service_discovery),
+            "simple_desc_rsp"   : ZDOSimpleDescRsp(self.device_and_service_discovery),
         }
 
     def initialize(self):
