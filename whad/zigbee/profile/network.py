@@ -83,8 +83,8 @@ class Network:
             raise NotAssociated
         if not self.is_authorized():
             raise NotAuthorized
-        devices = self.stack.get_layer('apl').get_application_by_name("zdo").device_and_service_discovery.discover_devices()
-        return self.devices
+        devices = self.stack.get_layer('apl').get_application_by_name("zdo").device_and_service_discovery.discover_nodes()
+        return self.nodes
 
     def join(self):
         """

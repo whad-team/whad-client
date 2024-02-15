@@ -131,7 +131,7 @@ class ZDONetworkManager(ZDOObject):
         apsUseInsecureJoin = aps_management.get("apsUseInsecureJoin")
         apsChannelMask = aps_management.get("apsChannelMask")
 
-        aps.database.set("apsUseExtendedPANID", network.extended_pan_id)
+        aps_layer.database.set("apsUseExtendedPANID", network.extended_pan_id)
         apsUseExtendedPANID = aps_management.get("apsUseExtendedPANID")
         logger.info("[zdo_network_manager] Joining specific network: %s.", repr(network))
 

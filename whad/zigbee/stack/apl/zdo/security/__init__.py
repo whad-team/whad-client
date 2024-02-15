@@ -22,7 +22,7 @@ class ZDOSecurityManager(ZDOObject):
         Provision a new network key in the NWK layer.
         """
         # Get the Security Material set
-        nwkSecurityMaterialSet = set.zdo.nwk_management.get("nwkSecurityMaterialSet")
+        nwkSecurityMaterialSet = self.zdo.nwk_management.get("nwkSecurityMaterialSet")
 
         # Create a new Network key Material, and add it to the set if it's new
         new_key = NetworkSecurityMaterial(

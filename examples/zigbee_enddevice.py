@@ -30,8 +30,29 @@ if __name__ == '__main__':
             print("[i] Discovering networks.")
             for network in end_device.discover_networks():
                 print("[i] Network detected: ", network)
-                if network.extended_pan_id == 0xf4ce3673877b2d89:
+                if network.extended_pan_id == 0x6055f90000f714e4:
                     selected_network = network
+            print("Selected: ", selected_network)
+
+            selected_network.join()
+            try:
+                print("[i] Network key:", selected_network.network_key)
+
+                devices = selected_network.discover()
+                for device in devices:
+                    print("[i] New device discovered:", device)
+                '''
+                for device in selected_network.devices:
+                    for endpoint in device.endpoints:
+                        if endpoint.profile_id == 0x0104 and 6 in endpoint.input_clusters:
+                            onoff = endpoint.attach_to_input_cluster(6)
+                            while True:
+                                input()
+                                print("[i] lightbulb toggled")
+                                onoff.toggle()
+                '''
+            except KeyboardInterrupt:
+                selected_network.leave()
 
             while True:
                 input()
