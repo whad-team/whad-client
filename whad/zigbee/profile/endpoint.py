@@ -26,7 +26,7 @@ class Endpoint:
             self.__node.network.is_associated() and
             self.__node.network.is_authorized()
         ):
-            self.__descriptor = self.stack.apl.get_application_by_name("zdo").device_and_service_discovery.get_simple_descriptor(
+            self.__descriptor = self.stack.get_layer('apl').get_application_by_name("zdo").device_and_service_discovery.get_simple_descriptor(
                 self.__node.address,
                 self.__number
             )
@@ -88,7 +88,7 @@ class Endpoint:
 
         # Select the first application matching the profile
         selected_application = None
-        for application in self.stack.apl.get_applications():
+        for application in self.stack.get_layer('apl').get_applications():
             if application.profile_id == self.profile_id:
                 selected_application = application
                 break
@@ -109,7 +109,7 @@ class Endpoint:
 
         if selected_cluster is not None:
             selected_application.add_output_cluster(selected_cluster)
-            selected_cluster.connect(self.device.address, self.number)
+            selected_cluster.connect(self.node.address, self.number)
 
         return selected_cluster
 

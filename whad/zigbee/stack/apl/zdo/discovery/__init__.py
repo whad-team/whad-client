@@ -60,7 +60,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         # Get Simple Descriptor Response or trigger an error if timeout
         try:
             response = self.wait_for_response(filter_function=
-                lambda pkt:ZDPSimpleDescRsp in pkt and pkt.trans_seqnum == self.transaction
+                lambda pkt:ZDPSimpleDescRsp in pkt# and pkt.trans_seqnum == self.transaction
             )
             (asdu, source_address, source_address_mode, security_status, link_quality) = response
 
@@ -101,9 +101,10 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         # Get Active Endpoint Response or trigger an error if timeout
         try:
             response = self.wait_for_response(
-                filter_function=lambda pkt:ZDPActiveEPRsp in pkt and pkt.trans_seqnum == self.transaction
+                filter_function=lambda pkt:ZDPActiveEPRsp in pkt# and pkt.trans_seqnum == self.transaction
             )
             (asdu, source_address, source_address_mode, security_status, link_quality) = response
+
 
             # If successful, return the list of active endpoints
             if asdu.status == 0:
@@ -135,7 +136,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         # Get Node Descriptor Response or trigger an error if timeout
         try:
             response = self.wait_for_response(
-                filter_function=lambda pkt:ZDPNodeDescRsp in pkt and pkt.trans_seqnum == self.transaction
+                filter_function=lambda pkt:ZDPNodeDescRsp in pkt# and pkt.trans_seqnum == self.transaction
             )
             (asdu, source_address, source_address_mode, security_status, link_quality) = response
 
@@ -208,7 +209,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         try:
             while True:
                 response = self.wait_for_response(
-                    filter_function=lambda pkt:ZDPIEEEAddrRsp in pkt and pkt.trans_seqnum == self.transaction
+                    filter_function=lambda pkt:ZDPIEEEAddrRsp in pkt# and pkt.trans_seqnum == self.transaction
                 )
                 (asdu, source_address, source_address_mode, security_status, link_quality) = response
 
@@ -232,7 +233,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
             self.transaction += 1
             try:
                 response = self.wait_for_response(
-                    filter_function=lambda pkt:ZDPIEEEAddrRsp in pkt and pkt.trans_seqnum == self.transaction
+                    filter_function=lambda pkt:ZDPIEEEAddrRsp in pkt# and pkt.trans_seqnum == self.transaction
                 )
                 (asdu, source_address, source_address_mode, security_status, link_quality) = response
 

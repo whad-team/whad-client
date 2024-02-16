@@ -12,6 +12,7 @@ from scapy.layers.zigbee import ZigbeeClusterLibrary, ZCLGeneralReadAttributes
 from whad.scapy.layers.zll import ZCLGeneralDiscoverAttributes, \
     ZCLGeneralDiscoverAttributesResponse, ZigbeeZLLCommissioningCluster
 
+from inspect import stack,signature
 from time import time
 import logging
 

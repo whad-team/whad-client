@@ -210,7 +210,7 @@ class ZDOSimpleDescReq(ZDPCluster):
     def __init__(self, zdo_object):
         super().__init__(zdo_object, cluster_id=0x0004)
 
-    def send_data(self, address, transaction=0):
+    def send_data(self, address, endpoint, transaction=0):
         command = ZDPSimpleDescReq(
             nwk_addr = address,
             endpoint = endpoint
