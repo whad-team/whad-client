@@ -213,7 +213,7 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
             del self.destinations[i]
 
 
-    def wait_response(self, transaction=None, timeout=2):
+    def wait_response(self, transaction=None, timeout=1):
         """
         Wait for the response associated to a specific transaction (default: last transaction).
         """

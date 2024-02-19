@@ -489,13 +489,13 @@ class NWKManagementService(NWKService):
             scan_channels=scan_channels,
             scan_duration=scan_duration
         )
-        print(confirm)
+        
         zigbee_networks = []
         notifications_left = True
         while notifications_left:
             try:
                 beacon = self.wait_for_packet(lambda pkt:ZigBeeBeacon in pkt, timeout=0.1)
-                print("> ", beacon)
+
                 if beacon.pan_descriptor in confirm:
                     network = ZigbeeNetwork(beacon)
                     if network not in zigbee_networks:

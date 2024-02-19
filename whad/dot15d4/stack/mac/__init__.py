@@ -467,7 +467,7 @@ class MACManager(Dot15d4Manager):
         return True
 
 
-    def wait_for_ack(self, timeout=1):
+    def wait_for_ack(self, timeout=0.3):
         """Wait for a ACK or error.
 
         :param float timeout: Timeout value (default: 30 seconds)
