@@ -1,8 +1,11 @@
 from whad.device import WhadDevice
 from whad.zigbee import EndDevice
 from whad.common.monitors import WiresharkMonitor
+from whad.zigbee.stack.apl.zcl.clusters.touchlink import ZCLTouchLinkClient
+from whad.zigbee.stack.apl.application import ApplicationObject
 from whad.exceptions import WhadDeviceNotFound
 from scapy.compat import raw
+from random import randint
 import sys
 
 import logging
@@ -25,25 +28,33 @@ if __name__ == '__main__':
             monitor = WiresharkMonitor()
 
             dev = WhadDevice.create(interface)
+
+            touchlink = ZCLTouchLinkClient()
+            zll = ApplicationObject("zll_app", 0xc05e, 0x0100, device_version=0, input_clusters=[], output_clusters=[])
+            zll.add_output_cluster(touchlink)
+
             end_device = EndDevice(dev)
+            #end_device = EndDevice(dev, applications=[zll])
             monitor.attach(end_device)
             monitor.start()
-            input()
-            #end_device.attach_callback(show)
+            end_device.attach_callback(show)
             end_device.start()
+
 
             selected_network = None
             print("[i] Discovering networks.")
             for network in end_device.discover_networks():
                 print("[i] Network detected: ", network)
-                if network.extended_pan_id == 0x6055f90000f714e4:
-                    selected_network = network
+                selected_network = network
             print("Selected: ", selected_network)
+            #network_address = touchlink.scan(address_assignment=True, factory_new=False, link_initiator=True)
+            #selected_network.network_key = bytes.fromhex("01020102030403040506050607080708")
+            #input()
 
             selected_network.join()
             try:
                 print("[i] Network key:", selected_network.network_key)
-
+                #end_device.stack.get_layer('apl').get_application_by_name('zdo').network_manager.network = selected_network
                 devices = selected_network.discover()
                 for device in devices:
                     print("[i] New device discovered:", device)

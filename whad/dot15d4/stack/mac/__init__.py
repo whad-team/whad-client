@@ -15,6 +15,10 @@ from whad.exceptions import RequiredImplementation
 from time import time, sleep
 from queue import Queue, Empty
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 
 class MACService(Dot15d4Service):
@@ -46,6 +50,7 @@ class MACDataService(MACService):
                 destination_address=0xFFFF,
                 destination_address_mode=MACAddressMode.SHORT,
                 pan_id_suppressed=False,
+                pan_id_compress=False,
                 sequence_number_suppressed=False,
                 wait_for_ack=False
     ):
@@ -69,7 +74,8 @@ class MACDataService(MACService):
                                         data,
                                         wait_for_ack=wait_for_ack,
                                         source_address_mode=source_address_mode,
-                                        destination_address_mode=destination_address_mode
+                                        destination_address_mode=destination_address_mode,
+                                        pan_id_compress=pan_id_compress
         )
         return ack
 
@@ -140,7 +146,7 @@ class MACManagementService(MACService):
         return False
 
     @Dot15d4Service.request("MLME-POLL")
-    def poll(self, coordinator_pan_id=0, coordinator_address=0):
+    def poll(self, coordinator_pan_id=0, coordinator_address=0, pan_id_compress=False):
         """
         Implement the MLME-POLL request operation.
         """
@@ -153,8 +159,13 @@ class MACManagementService(MACService):
                 src_panid = self.database.get("macPanId")
             ),
             wait_for_ack=True,
-            return_ack=True
+            return_ack=True,
+            pan_id_compress=pan_id_compress,
+            source_address_mode=MACAddressMode.SHORT,
+            destination_address_mode=MACAddressMode.SHORT,
         )
+        if ack is None:
+            return False
         if ack.fcf_pending:
             try:
                 data = self.manager.get_service("data").wait_for_packet(
@@ -379,10 +390,10 @@ class MACManagementService(MACService):
                 extendedAddress = self.database.get("macExtendedAddress")
                 shortAddress = self.database.get("macShortAddress")
                 if (
-                        extendedAddress in beacon.pa_long_addresses or
-                        shortAddress in beacon.pa_short_addresses
+                        extendedAddress in pdu.pa_long_addresses or
+                        shortAddress in pdu.pa_short_addresses
                 ):
-                    self.poll(coordinator_pan_id=beacon.src_panid, coordinator_address=beacon.src_addr)
+                    self.poll(coordinator_pan_id=pdu.src_panid, coordinator_address=pdu.src_addr)
 
     def on_ed_sample(self, timestamp, sample):
         self.add_ed_sample_to_queue(sample)
@@ -481,7 +492,7 @@ class MACManager(Dot15d4Manager):
                 pass
         raise MACTimeoutException
 
-    def send_data(self, packet, wait_for_ack=False, return_ack=False, source_address_mode=None, destination_address_mode=None):
+    def send_data(self, packet, wait_for_ack=False, return_ack=False, source_address_mode=None, destination_address_mode=None, pan_id_compress=False):
         if source_address_mode is not None:
             if source_address_mode == MACAddressMode.NONE:
                 fcf_srcaddrmode = 0
@@ -509,6 +520,8 @@ class MACManager(Dot15d4Manager):
 
         if wait_for_ack:
             packet.fcf_ackreq = 1
+        if pan_id_compress:
+            packet.fcf_panidcompress = 1
         sequence_number = self.database.get("macDataSequenceNumber")
         packet.seqnum = sequence_number
         self.database.set("macDataSequenceNumber", sequence_number + 1)
@@ -518,6 +531,8 @@ class MACManager(Dot15d4Manager):
                 ack = None
                 while ack is None or ack.seqnum != sequence_number:
                     ack = self.wait_for_ack()
+                if return_ack:
+                    return ack
                 return True
             except MACTimeoutException:
                 if return_ack:

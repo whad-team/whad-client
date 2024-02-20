@@ -197,7 +197,7 @@ class ZLLNetworkStartRequest(Packet):
         # Key index (1 octets)
         ByteField("key_index", 4),  # default: Master key
         # Encrypted network key (16 octets)
-        XBitField("encrypted_network_key", 0, 128),
+        StrFixedLenField("encrypted_network_key", None, length=16),#XBitField("encrypted_network_key", 0, 128),
         # Logical channel (1 octet)
         ByteField("channel", 0),
         # PAN identifier (2 octets)

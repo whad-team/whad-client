@@ -1,5 +1,7 @@
 from whad.zigbee.stack.nwk.constants import ZigbeeDeviceType
 from whad.zigbee.profile.nodes import CoordinatorNode, EndDeviceNode, RouterNode
+
+from random import randint
 from time import sleep
 
 class JoiningForbidden(Exception):
@@ -102,6 +104,24 @@ class Network:
         else:
             raise JoiningForbidden
 
+    def rejoin(self, address=None):
+        """
+        Rejoin the network (if permitted).
+
+        This method is blocking and wait until we are both associated AND authorized on the network.
+        """
+        if address is None:
+            address = randint(0x0001, 0xFFF0)
+        print("rejoining...")
+        self.stack.get_layer('apl').get_application_by_name("zdo").network_manager.configure_short_address(address)
+        rejoin_success = self.stack.get_layer('apl').get_application_by_name("zdo").network_manager.rejoin(self)
+
+        if rejoin_success:
+            while not self.is_authorized():
+                sleep(0.1)
+            return True
+        return False
+
     def is_joining_permitted(self):
         """
         Indicates if joining the network is permitted.
@@ -130,6 +150,13 @@ class Network:
             return nwk_material[0].key
         else:
             return None
+
+    @network_key.setter
+    def network_key(self, value):
+        """
+        Configure the network key associated with this network.
+        """
+        self.stack.get_layer('apl').get_application_by_name("zdo").security_manager.provision_network_key(value)
 
     def leave(self):
         """

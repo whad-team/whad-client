@@ -93,7 +93,6 @@ class ZDONetworkManager(ZDOObject):
         networks = {}
         for network in nwk_management.network_discovery():
             # Create a wrapper for network
-            print(network)
             networks[network.extended_pan_id] = Network(
                     network,
                     stack = phy_layer
@@ -145,6 +144,40 @@ class ZDONetworkManager(ZDOObject):
             return False
 
         self.network = network
+        return True
+
+
+
+    def rejoin(self, network):
+        """
+        Rejoin a specific network.
+        """
+        nwk_layer = self.zdo.manager.get_layer('nwk')
+        nwk_management = nwk_layer.get_service('management')
+        aps_layer = self.zdo.manager.get_layer('aps')
+        aps_management = aps_layer.get_service('management')
+
+        nwkExtendedPANID = nwk_management.get("nwkExtendedPANID")
+        apsDesignatedCoordinator = aps_management.get("apsDesignatedCoordinator")
+        apsUseInsecureJoin = aps_management.get("apsUseInsecureJoin")
+        apsChannelMask = aps_management.get("apsChannelMask")
+
+        aps_layer.database.set("apsUseExtendedPANID", network.extended_pan_id)
+        apsUseExtendedPANID = aps_management.get("apsUseExtendedPANID")
+        logger.info("[zdo_network_manager] Rejoining specific network: %s.", repr(network))
+        print(apsUseExtendedPANID)
+        join_success = nwk_management.join(
+            apsUseExtendedPANID,
+            association_type=NWKJoinMode.REJOIN,
+            scan_channels=apsChannelMask,
+            security_enable=True
+        )
+        if not join_success:
+            logger.info("[zdo_network_manager] failure during network rejoin, exiting.")
+            return False
+
+        self.network = network
+        self.on_authorization()
         return True
 
     def leave(self):

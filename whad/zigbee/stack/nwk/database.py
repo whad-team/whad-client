@@ -38,7 +38,7 @@ class NWKIB(Dot15d4Database):
         self.nwkSecurityLevel = 0
         self.nwkSecurityMaterialSet = []
         self.nwkActiveKeySeqNumber = 0
-        self.nwkSecureAllFrames = True
+        self.nwkSecureAllFrames = False
         self.nwkAllFresh = False
         self.nwkLinkStatusPeriod = 0x0f
         self.nwkRouterAgeLimit = 3

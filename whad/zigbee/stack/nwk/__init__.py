@@ -21,6 +21,7 @@ from scapy.layers.zigbee import ZigBeeBeacon, ZigbeeNWKStub, ZigbeeNWK, \
     ZigbeeAppDataPayloadStub, LinkStatusEntry
 from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster, NewZigbeeAppDataPayloadStub
 
+from random import randint
 from scapy.fields import FlagValueIter
 
 import logging
@@ -272,7 +273,7 @@ class NWKManagementService(NWKService):
 
 
     @Dot15d4Service.request("NLME-JOIN")
-    def join(self, extended_pan_id, association_type=NWKJoinMode.NEW_JOIN, scan_channels=0x7fff800, scan_duration=4, join_as_router=False, rx_on_when_idle=True, mains_powered_device=True, security_enable=False):
+    def join(self, extended_pan_id, association_type=NWKJoinMode.NEW_JOIN, scan_channels=0x7fff800, scan_duration=4, join_as_router=False, rx_on_when_idle=True, mains_powered_device=False, security_enable=False):
         """
         Implements the NLME-JOIN request.
 
@@ -349,7 +350,7 @@ class NWKManagementService(NWKService):
                 network_address = self.database.get("nwkNetworkAddress")
                 allocate_address = False
             else:
-                network_address = randint(1,0xFFF0)
+                network_address = randint(1,0xFFF0) if self.database.get("nwkNetworkAddress") == 0xFFFF else self.database.get("nwkNetworkAddress")
                 allocate_address = False
 
             if self.database.get("nwkAddrAlloc") == 2:
@@ -417,19 +418,20 @@ class NWKManagementService(NWKService):
                 self.database.set("nwkSequenceNumber", sequence_number+1)
 
                 # Build rejoin request
-                rejoin_request = ZigbeeNWK(
+                npdu = ZigbeeNWK(
                     frametype=1,
                     discover_route=0,
                     seqnum=sequence_number,
                     radius=radius,
-                    flags=["extended_src", "extended_dst"],
+                    flags=["extended_src"], #, "extended_dst"],
                     destination=selected_parent.address,
                     source=network_address,
-                    ext_dst=0xf4ce364269d30198, # ?
+                    #ext_dst=selected_parent.extended_address, # ?
                     ext_src=self.database.get("nwkIeeeAddress")
-                )/ZigbeeNWKCommandPayload(
+                )
+                nsdu = ZigbeeNWKCommandPayload(
                     cmd_identifier=6,
-                    allocate_address=int(allocate_address),
+                    allocate_address=int(1),
                     security_capability=False,
                     receiver_on_when_idle=int(rx_on_when_idle),
                     power_source=int(power_source),
@@ -437,23 +439,61 @@ class NWKManagementService(NWKService):
                     alternate_pan_coordinator=0
                 )
 
+
+                if self.database.get("nwkSecurityLevel") != 0 and security_enable:
+                    npdu.flags.security = True
+                    selected_key_material = None
+
+                    security_material_set = self.database.get("nwkSecurityMaterialSet")
+                    for key_material in security_material_set:
+                        if key_material.key_sequence_number == self.database.get("nwkActiveKeySeqNumber"):
+                            selected_key_material = key_material
+                            break
+
+                    if selected_key_material is None:
+                        return False
+
+                    msdu = npdu / ZigbeeSecurityHeader(
+                        nwk_seclevel = self.database.get("nwkSecurityLevel"),
+                        source = self.database.get("nwkIeeeAddress"),
+                        key_type=1,
+                        key_seqnum=self.database.get("nwkActiveKeySeqNumber"),
+                        fc=selected_key_material.outgoing_frame_counter,
+                        data=bytes(nsdu)
+                    )
+                    crypto_manager = NetworkLayerCryptoManager(selected_key_material.key)
+                    msdu = crypto_manager.encrypt(msdu)
+                    selected_key_material.outgoing_frame_counter += 1
+                else:
+                    msdu = npdu / nsdu
+
                 self.manager.get_layer('mac').get_service("data").data(
-                    rejoin_request,
+                    msdu,
+                    destination_address_mode=MACAddressMode.SHORT,
                     source_address_mode=MACAddressMode.SHORT,
                     destination_pan_id=selected_parent.pan_id,
                     destination_address=selected_parent.address,
-                    wait_for_ack=False
+                    wait_for_ack=True,
+                    pan_id_compress=True
                 )
                 duration = (
                             self.manager.get_layer('mac').database.get("macResponseWaitTime") *
                             MACConstants.A_BASE_SUPERFRAME_DURATION *
                             self.manager.get_layer('phy').symbol_duration
                 )
+                self.manager.get_layer('mac').database.set("macPanId", selected_parent.pan_id)
+
+                self.manager.get_layer('mac').get_service('management').poll(
+                    coordinator_pan_id=selected_parent.pan_id,
+                    coordinator_address=selected_parent.address,
+                    pan_id_compress=True
+                )
+
                 rejoin_response = None
                 try:
                     rejoin_response = self.wait_for_packet(
                         lambda pkt:ZigbeeNWKCommandPayload in pkt and pkt.cmd_identifier==7,
-                        timeout=duration
+                        timeout=3
                     )
                 except NWKTimeoutException:
                     selected_parent.potential_parent = 0
@@ -489,7 +529,7 @@ class NWKManagementService(NWKService):
             scan_channels=scan_channels,
             scan_duration=scan_duration
         )
-        
+
         zigbee_networks = []
         notifications_left = True
         while notifications_left:
@@ -741,7 +781,6 @@ class NWKManager(Dot15d4Manager):
                 source_address,
                 link_quality
             )
-
         # If we have a regular NWK PDU:
         elif ZigbeeNWK in pdu:
             # If PDU unencrypted, check if we allow it in current configuration
@@ -756,6 +795,7 @@ class NWKManager(Dot15d4Manager):
                     pdu = decrypted
                 else:
                     return
+
 
             # Once decrypted, forward to the right service depending on the frame type
             if pdu.frametype == 0:
@@ -782,11 +822,11 @@ class NWKManager(Dot15d4Manager):
         """
         # If we got bytes here, encapsulate into scapy ZigBeeBeacon
         beacon_payload = bytes(beacon_payload)
-        print(beacon_payload.hex())
+
         if isinstance(beacon_payload, bytes):
             beacon_payload = ZigBeeBeacon(beacon_payload)
             # Check if this is a Zigbee beacon
-            beacon_payload.show()
+
         if hasattr(beacon_payload, "proto_id") and beacon_payload.proto_id in (0, 75, 92): #TODO: proto id filter at 0 does not match esp32c6 implem ? check
             # Forward it to NWK management service
             self.get_service("management").on_beacon_npdu(pan_descriptor, beacon_payload)
