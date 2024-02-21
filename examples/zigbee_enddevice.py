@@ -49,8 +49,9 @@ if __name__ == '__main__':
             print("Selected: ", selected_network)
             #network_address = touchlink.scan(address_assignment=True, factory_new=False, link_initiator=True)
             #selected_network.network_key = bytes.fromhex("01020102030403040506050607080708")
-            #input()
 
+            #while not selected_network.rejoin(0x0003):
+            #    pass
             selected_network.join()
             try:
                 print("[i] Network key:", selected_network.network_key)

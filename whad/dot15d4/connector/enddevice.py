@@ -28,6 +28,12 @@ class EndDevice(Dot15d4):
         self.__channel = channel
         self.enable_reception()
 
+    def get_channel(self):
+        return self.__channel
+
+    def get_channel_page(self):
+        return self.__channel_page
+
     def perform_ed_scan(self, channel):
         if not self.can_perform_ed_scan():
             raise UnsupportedCapability("EnergyDetection")

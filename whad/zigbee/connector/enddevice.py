@@ -66,6 +66,13 @@ class EndDevice(Zigbee):
         else:
             self.__channel_page = page
 
+    def get_channel(self):
+        return self.__channel
+
+    def get_channel_page(self):
+        return self.__channel_page
+
+
     def send(self, packet):
         super().send(packet, channel=self.__channel)
 

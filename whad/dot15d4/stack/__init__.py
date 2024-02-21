@@ -85,6 +85,16 @@ class Dot15d4Stack(Layer):
         '''
         self.__connector.set_channel_page(page)
 
+    def get_channel(self):
+        '''Get channel.
+        '''
+        return self.__connector.get_channel()
+
+    def get_channel_page(self):
+        '''Get channel page.
+        '''
+        return self.__connector.get_channel_page()
+
     def perform_ed_scan(self, channel):
         '''Start an Energy Detection scan.
         '''

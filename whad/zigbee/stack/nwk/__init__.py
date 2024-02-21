@@ -545,6 +545,52 @@ class NWKManagementService(NWKService):
                 notifications_left = False
         return zigbee_networks
 
+
+    @Dot15d4Service.request("NLME-SYNC")
+    def sync(self,track=False):
+        """
+        Implements the NLME-SYNC request.
+
+        Allows to synchronize on the coordinator or router of a network.
+        """
+        macRxOnWhenIdle = self.manager.get_layer('mac').database.get("macRxOnWhenIdle")
+        if not track:
+            # If non enabled beacon network ...
+            if macRxOnWhenIdle:
+                # Get parent address (or terminate if not found)
+                table = self.database.get("nwkNeighborTable")
+                parent = table.get_parent()
+                if parent is None:
+                    return False
+
+                # Perform a poll operation
+                return self.manager.get_layer('mac').get_service('management').poll(
+                    coordinator_pan_id=parent.pan_id,
+                    coordinator_address=parent.address,
+                    pan_id_compress=True
+                )
+            else:
+                # Enable auto request
+                self.manager.get_layer('mac').database.set("macAutoRequest", True)
+                # Perform a synchronization
+                return self.manager.get_layer('mac').get_service('management').sync(
+                    channel = self.manager.get_layer('phy').get_channel(),
+                    channel_page = self.manager.get_layer('phy').get_channel_page(),
+                    track_beacon=False
+                )
+        else:
+            if macRxOnWhenIdle:
+                return False
+            else:
+                # Enable auto request
+                self.manager.get_layer('mac').database.set("macAutoRequest", True)
+                # Perform a synchronization
+                return self.manager.get_layer('mac').get_service('management').sync(
+                    channel = self.manager.get_layer('phy').get_channel(),
+                    channel_page = self.manager.get_layer('phy').get_channel_page(),
+                    track_beacon=True
+                )
+
     def on_beacon_npdu(self, pan_descriptor, beacon_payload):
         """
         Callback processing Beacon NPDU forwarded from NWK manager.

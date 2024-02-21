@@ -145,6 +145,25 @@ class MACManagementService(MACService):
             return True
         return False
 
+
+    @Dot15d4Service.request("MLME-SYNC")
+    def sync(
+                self,
+                channel_page=0,
+                channel=11,
+                track_beacon=False
+    ):
+        """
+        Implement the MLME-SYNC request operation.
+        """
+        self.manager.set_channel_page(channel_page)
+        self.manager.set_channel(channel)
+
+        # we don't do anything according to track beacon parameter,
+        # because our radio will always remain enabled.
+        return True
+
+
     @Dot15d4Service.request("MLME-POLL")
     def poll(self, coordinator_pan_id=0, coordinator_address=0, pan_id_compress=False):
         """
@@ -249,6 +268,7 @@ class MACManagementService(MACService):
                             lambda pkt: Dot15d4CmdAssocResp in pkt, timeout=5.0
                         )
                         if association_response.association_status == 0:
+                            self.database.set("macRxOnWhenIdle", idle_receiving)
                             self.manager.set_short_address(association_response.short_address)
                             if association_response.fcf_srcaddrmode == 2:
                                 self.database.set("macCoordShortAddress", association_response.src_addr)

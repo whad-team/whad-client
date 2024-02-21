@@ -15,6 +15,8 @@ class MACPIB(Dot15d4Database):
         self.macAutoRequest = False
         self.macDataSequenceNumber = 0
         self.macBeaconSequenceNumber = 0
+        self.macBeaconOrder = 15
+        self.macRxOnWhenIdle = True
         self.macPanId = 0xFFFF
         self.macShortAddress = 0xFFFF
         self.macCoordShortAddress = 0
