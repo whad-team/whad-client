@@ -14,7 +14,7 @@ from typing import Union, Tuple
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr
 from whad.protocol.dot15d4.dot15d4_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
     Send, SendCmd, EnergyDetection, EnergyDetectionCmd, EndDeviceMode, SetNodeAddress, \
-    AddressType, SendRawCmd, SendRaw
+    AddressType, SendRawCmd, SendRaw, CoordinatorMode
 
 
 class Dot15d4(WhadDeviceConnector):
@@ -162,6 +162,31 @@ class Dot15d4(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
+
+    def can_be_coordinator(self) -> bool:
+        """
+        Determine if the device implements a Coordinator role mode.
+        """
+        commands = self.device.get_domain_commands(WhadDomain.Dot15d4)
+        return (
+            (commands & (1 << CoordinatorMode)) > 0 and
+            (commands & (1 << Start))>0 and
+            (commands & (1 << Stop))>0
+        )
+
+
+    def set_coordinator_mode(self, channel:int = 11) -> bool:
+        """
+        Acts as a 802.15.4 Coordinator.
+        """
+        if not self.can_be_coordinator():
+            raise UnsupportedCapability("Coordinator")
+
+        msg = Message()
+        msg.dot15d4.coordinator.channel = channel
+        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
     def send(self, pdu, channel:int = 11) -> bool:
         """
         Send 802.15.4 packets (on a single channel).
@@ -284,3 +309,4 @@ class Dot15d4(WhadDeviceConnector):
 
 from whad.dot15d4.connector.sniffer import Sniffer
 from whad.dot15d4.connector.enddevice import EndDevice
+from whad.dot15d4.connector.coordinator import Coordinator

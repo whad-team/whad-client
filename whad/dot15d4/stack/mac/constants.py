@@ -40,6 +40,15 @@ class MACNetworkType(IntEnum):
     BEACON_ENABLED = 0
     NON_BEACON_ENABLED = 1
 
+
+class MACBeaconType(IntEnum):
+    """
+    Enum representing the different beacon type supported by 802.15.4.
+    """
+    BEACON = 0
+    ENHANCED_BEACON = 1
+
+
 class MACConstants:
     """
     Constants used by 802.15.4 MAC layer.

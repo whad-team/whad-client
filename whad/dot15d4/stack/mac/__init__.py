@@ -4,7 +4,7 @@ from whad.dot15d4.stack.mac.database import MACPIB
 from whad.dot15d4.stack.mac.exceptions import MACTimeoutException, MACAssociationFailure
 from whad.dot15d4.stack.mac.helpers import is_short_address
 from whad.dot15d4.stack.mac.constants import MACScanType, MACConstants, MACAddressMode, \
-    MACDeviceType, MACPowerSource
+    MACDeviceType, MACPowerSource, MACBeaconType
 from whad.dot15d4.stack.mac.network import Dot15d4PANNetwork
 from whad.dot15d4.stack.mac.energy import EDMeasurement
 from whad.common.stack import Layer, alias, source, state
@@ -12,6 +12,7 @@ from scapy.layers.dot15d4 import Dot15d4Data, Dot15d4Beacon, Dot15d4Cmd, \
     Dot15d4Ack, Dot15d4, Dot15d4CmdAssocReq, Dot15d4CmdAssocResp
 from whad.exceptions import RequiredImplementation
 
+from threading import Thread
 from time import time, sleep
 from queue import Queue, Empty
 
@@ -110,6 +111,8 @@ class MACManagementService(MACService):
     """
     def __init__(self, manager):
         super().__init__(manager, name="mac_management")
+        self._beaconing_thread = None
+        self._beaconing_thread_enabled = False
         self._samples_queue = Queue()
 
 
@@ -195,6 +198,109 @@ class MACManagementService(MACService):
                 return False
         return False
 
+
+    @Dot15d4Service.request("MLME-BEACON")
+    def beacon(
+                    self,
+                    beacon_type=MACBeaconType.BEACON,
+                    channel_page=0,
+                    channel=11,
+                    superframe_order=15,
+                    header_ie_list=[],
+                    payload_ie_list=[],
+                    header_ie_id_list=[],
+                    nested_ie_sub_id_list=[],
+                    beacon_security_level=0,
+                    beacon_key_id_mode=0,
+                    beacon_key_source=b"",
+                    beacon_key_index=0,
+                    source_address_mode=MACAddressMode.SHORT,
+                    destination_address_mode=MACAddressMode.NONE,
+                    destination_address=0xFFFF,
+                    bsn_suppression=False
+    ):
+        if beacon_type == MACBeaconType.ENHANCED_BEACON:
+            raise RequiredImplementation("EnhancedBeacon")
+
+        src_panid = self.database.get("macPanId")
+        src_addr = (
+            self.database.get("macShortAddress") if
+            source_address_mode == MACAddressMode.SHORT else
+            self.database.get("macExtendedAddress")
+        )
+
+        sf_beaconorder = self.database.get("macBeaconOrder")
+        sf_assocpermit = self.database.get("macAssociationPermit")
+        is_coordinator = (
+            self.database.get("macCoordShortAddress") == self.database.get("macShortAddress")
+        )
+        sf_battlifeextend = self.database.get("macBattLifeExt")
+        beacon_payload = self.database.get("macBeaconPayload")
+
+        beacon = Dot15d4Beacon(
+            src_panid=src_panid,
+            src_addr=src_addr,
+            sf_sforder=superframe_order,
+            sf_beaconorder=sf_beaconorder,
+            sf_assocpermit=sf_assocpermit,
+            sf_pancoord=is_coordinator,
+            sf_battlifeextend=sf_battlifeextend
+        ) / beacon_payload
+
+        self.manager.send_beacon(
+            beacon,
+            source_address_mode=source_address_mode,
+            destination_address_mode=destination_address_mode
+        )
+        return True
+
+    @Dot15d4Service.request("MLME-START")
+    def start(
+                    self,
+                    pan_id,
+                    channel_page=0,
+                    channel=11,
+                    start_time=0,
+                    beacon_order=15,
+                    superframe_order=15,
+                    pan_coordinator=True,
+                    battery_life_extension=False,
+                    coord_realignement=False,
+                    coord_realign_security_level=0,
+                    coord_realign_key_id_mode=0,
+                    coord_realign_key_index=0,
+                    coord_realign_key_source=b"",
+                    beacon_security_level=0,
+                    beacon_key_id_mode=0,
+                    beacon_key_source=b"",
+                    beacon_key_index=0,
+                    header_ie_list=[],
+                    payload_ie_list=[],
+                    header_ie_id_list=[],
+                    nested_ie_sub_id_list=[]
+    ):
+        """
+        Implement the MLME-START request operation.
+        """
+        if coord_realignement:
+            raise RequiredImplementation("CoordinatorRealignment")
+        else:
+            self.database.set("macBeaconOrder", 3)
+            self.database.set("macSuperframeOrder", 1)
+            self.database.set("macPanId", pan_id)
+            self.manager.get_layer('phy').set_channel_page(channel_page)
+            self.manager.get_layer('phy').set_channel(channel)
+
+            # if beaconOrder < 15, we start a beacon-enabled network
+            if beacon_order < 15:
+                self.database.set("macBattLifeExt", battery_life_extension)
+                if pan_coordinator == False:
+                    # Start beaconing after start time
+                    self._start_beaconing(start_time)
+                else:
+                    # Start transmitting immediatly
+                    self._start_beaconing()
+                    
     @Dot15d4Service.request("MLME-ASSOCIATE")
     def associate(
                     self,
@@ -341,6 +447,43 @@ class MACManagementService(MACService):
                     "pan_descriptor": pan_descriptor,
         })
 
+    @Dot15d4Service.indication("MLME-BEACON-REQUEST")
+    def indicate_beacon_request(self, pdu):
+        """
+        Implements the MLME-BEACON-REQUEST indication operation.
+        """
+        if pdu.fcf_srcaddrmode == 0:
+            source_address_mode = MACAddressMode.NONE
+        elif pdu.fcf_srcaddrmode == 2:
+            source_address_mode = MACAddressMode.SHORT
+        elif pdu.fcf_srcaddrmode == 3:
+            source_address_mode = MACAddressMode.EXTENDED
+        else:
+            source_address_mode = MACAddressMode.NONE
+
+        source_address = pdu.src_addr if hasattr(pdu, "src_addr") else None
+        destination_pan_id = pdu.dest_panid if hasattr(pdu, "dest_panid") else 0xFFFF
+
+        # Not processed for now, default values
+        beacon_type = MACBeaconType.BEACON
+        header_ie_list = []
+        payload_ie_list = []
+        print((beacon_type, {
+                    "source_address_mode": source_address_mode,
+                    "source_address": source_address,
+                    "destination_pan_id": destination_pan_id,
+                    "header_ie_list": header_ie_list,
+                    "payload_ie_list": payload_ie_list
+        })
+        )
+        return (beacon_type, {
+                    "source_address_mode": source_address_mode,
+                    "source_address": source_address,
+                    "destination_pan_id": destination_pan_id,
+                    "header_ie_list": header_ie_list,
+                    "payload_ie_list": payload_ie_list
+        })
+
     # Low level primitives and helpers
     def _perform_legacy_scan(self, channel_page, channels, duration, active=True):
         pan_descriptors = []
@@ -397,8 +540,69 @@ class MACManagementService(MACService):
             ed_measurements.append(EDMeasurement(samples, channel_page, channel))
         return ed_measurements
 
+    def _start_beaconing(self, start_time=0):
+        # Check if we are beacon-enabled PAN
+        if self.database.get("macBeaconOrder") == 15:
+            # non beacon-enabled, terminate
+            return False
+
+        beacon_interval = (
+            MACConstants.A_BASE_SUPERFRAME_DURATION *
+            (2**self.database.get("macBeaconOrder"))
+        )
+
+        if self.database.get("macSuperframeOrder") == 15:
+            superframe = False
+        else:
+            superframe = True
+
+        superframe_duration = (
+            MACConstants.A_BASE_SUPERFRAME_DURATION *
+            (2**self.database.get("macSuperframeOrder"))
+        )
+
+        if self._beaconing_thread is not None:
+                self._stop_beaconing()
+
+        # Waiting time before start
+        init_time = time()
+        while (time() - init_time) < start_time:
+            pass
+
+        self._beaconing_thread_enabled = True
+        self._beaconing_thread = Thread(target=self._beaconing,args=(beacon_interval, superframe, superframe_duration), daemon=True)
+        self._beaconing_thread.start()
+
+    def _stop_beaconing(self):
+        self._beaconing_thread_enabled = False
+        self._beaconing_thread = None
+
+    def _beaconing(self, beacon_interval, superframe, superframe_duration):
+        """
+        Thread responsible of transmitting beacon and managing superframe.
+        """
+        last_beacon_time = None
+        in_superframe = False
+
+        while self._beaconing_thread_enabled:
+            current_time = time() * 1000
+            if last_beacon_time is None or (current_time - last_beacon_time) >= beacon_interval:
+                last_beacon_time = current_time
+                in_superframe = True
+                self.beacon()
+                print("superframe opened")
+            if superframe and in_superframe and (current_time - last_beacon_time) >= superframe_duration:
+                in_superframe = False
+                print("superframe closed")
+            sleep(0.01)
+
     # Input callbacks
     def on_cmd_pdu(self, pdu):
+        if pdu.cmd_id == 7: # Beacon Request
+            if self.database.get("macBeaconAutoRespond"):
+                self.beacon()
+            else:
+                self.indicate_beacon_request(pdu)
         self.add_packet_to_queue(pdu)
 
     def on_beacon_pdu(self, pdu):
@@ -578,8 +782,35 @@ class MACManager(Dot15d4Manager):
     def perform_ed_scan(self, channel):
         self.get_layer('phy').perform_ed_scan(channel)
 
-    def send_beacon(self, packet):
-        packet = Dot15d4()/packet
+    def send_beacon(self, packet, source_address_mode=None, destination_address_mode=None, pan_id_compress=False):
+        if source_address_mode is not None:
+            if source_address_mode == MACAddressMode.NONE:
+                fcf_srcaddrmode = 0
+            elif source_address_mode == MACAddressMode.SHORT:
+                fcf_srcaddrmode = 2
+            else:
+                fcf_srcaddrmode = 3
+        else:
+            fcf_srcaddrmode = 0
+
+        if destination_address_mode is not None:
+            if destination_address_mode == MACAddressMode.NONE:
+                fcf_destaddrmode = 0
+            elif destination_address_mode == MACAddressMode.SHORT:
+                fcf_destaddrmode = 2
+            else:
+                fcf_destaddrmode = 3
+        else:
+            fcf_destaddrmode = 2
+
+        packet = Dot15d4(
+                    fcf_srcaddrmode=fcf_srcaddrmode,
+                    fcf_destaddrmode=fcf_destaddrmode
+        )/packet
+
+        if pan_id_compress:
+            packet.fcf_panidcompress = pan_id_compress
+
         sequence_number = self.database.get("macBeaconSequenceNumber")
         packet.seqnum = sequence_number
         self.database.set("macBeaconSequenceNumber", sequence_number + 1)
