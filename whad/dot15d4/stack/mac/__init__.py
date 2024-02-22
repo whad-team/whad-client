@@ -51,7 +51,6 @@ class MACDataService(MACService):
                 destination_address=0xFFFF,
                 destination_address_mode=MACAddressMode.SHORT,
                 pan_id_suppressed=False,
-                pan_id_compress=False,
                 sequence_number_suppressed=False,
                 wait_for_ack=False
     ):
@@ -75,8 +74,7 @@ class MACDataService(MACService):
                                         data,
                                         wait_for_ack=wait_for_ack,
                                         source_address_mode=source_address_mode,
-                                        destination_address_mode=destination_address_mode,
-                                        pan_id_compress=pan_id_compress
+                                        destination_address_mode=destination_address_mode
         )
         return ack
 
@@ -168,7 +166,7 @@ class MACManagementService(MACService):
 
 
     @Dot15d4Service.request("MLME-POLL")
-    def poll(self, coordinator_pan_id=0, coordinator_address=0, pan_id_compress=False):
+    def poll(self, coordinator_pan_id=0, coordinator_address=0):
         """
         Implement the MLME-POLL request operation.
         """
@@ -182,7 +180,6 @@ class MACManagementService(MACService):
             ),
             wait_for_ack=True,
             return_ack=True,
-            pan_id_compress=pan_id_compress,
             source_address_mode=MACAddressMode.SHORT,
             destination_address_mode=MACAddressMode.SHORT,
         )
@@ -331,13 +328,19 @@ class MACManagementService(MACService):
             short_address = assoc_short_address,
             association_status = int(association_status)
         )
-
+        self.manager.add_pending_transaction(
+            association_response,
+            source_address_mode=MACAddressMode.EXTENDED,
+            destination_address_mode=MACAddressMode.EXTENDED
+        )
+        '''
         self.manager.send_data(
             association_response,
             source_address_mode=MACAddressMode.EXTENDED,
             destination_address_mode=MACAddressMode.EXTENDED,
             wait_for_ack=True
         )
+        '''
     @Dot15d4Service.request("MLME-ASSOCIATE")
     def associate(
                     self,
@@ -534,7 +537,7 @@ class MACManagementService(MACService):
         direction = 0
         allocation_order = 0
         hopping_sequence_request = False
-        #self.associate_response(source_address, 0xabcd)
+        self.associate_response(source_address, 0xabcd)
         return (
             source_address,
             {
@@ -704,6 +707,8 @@ class MACManagementService(MACService):
     def on_cmd_pdu(self, pdu):
         if pdu.cmd_id == 1: # Association Request
             self.indicate_associate(pdu)
+        elif pdu.cmd_id == 4:
+            self.on_data_request(pdu)
         elif pdu.cmd_id == 7: # Beacon Request
             if self.database.get("macBeaconAutoRespond"):
                 self.beacon()
@@ -711,12 +716,32 @@ class MACManagementService(MACService):
                 self.indicate_beacon_request(pdu)
         self.add_packet_to_queue(pdu)
 
+    def on_data_request(self, pdu):
+        """
+        Callback triggered when a data request is received.
+
+        This method will check if some pending data are available and transmit it if necessary.
+        """
+        pending = self.manager.get_pending_transaction(pdu.src_addr)
+        if pending is not None:
+            packet, source_address_mode, destination_address_mode = pending
+            self.manager.send_data(
+                packet,
+                source_address_mode=source_address_mode,
+                destination_address_mode=destination_address_mode,
+                #wait_for_ack=True
+            )
+
     def on_beacon_pdu(self, pdu):
+        """
+        Callback triggered when a beacon is received.
+        """
         self.add_packet_to_queue(pdu)
         macAutoRequest = self.database.get("macAutoRequest")
         if macAutoRequest:
             macPanId = self.database.get("macPanId")
             if pdu.src_panid == macPanId:
+                # Check if some data are pending for us, and transmit a Data Request if necessary.
                 extendedAddress = self.database.get("macExtendedAddress")
                 shortAddress = self.database.get("macShortAddress")
                 if (
@@ -745,9 +770,27 @@ class MACManager(Dot15d4Manager):
         self.add_service("data", MACDataService(self))
         self.add_service("management", MACManagementService(self))
         self.__ack_queue = Queue()
+        self.__pending_transactions = {}
         # Move it to connector ?
         #self.set_extended_address(self.database.get("macExtendedAddress"))
 
+
+    def add_pending_transaction(self, packet, source_address_mode=None, destination_address_mode=None):
+        if packet.dest_addr not in self.__pending_transactions:
+            self.__pending_transactions[packet.dest_addr] = Queue()
+
+        self.__pending_transactions[packet.dest_addr].put(
+            (packet, source_address_mode, destination_address_mode)
+        )
+
+    def get_pending_transaction(self, address):
+        if (
+            address in self.__pending_transactions and
+            not self.__pending_transactions[address].empty()
+        ):
+            return self.__pending_transactions[address].get()
+        else:
+            return None
 
     @source('phy', 'energy_detection')
     def on_ed_sample(self, sample, timestamp):
@@ -822,7 +865,56 @@ class MACManager(Dot15d4Manager):
                 pass
         raise MACTimeoutException
 
-    def send_data(self, packet, wait_for_ack=False, return_ack=False, source_address_mode=None, destination_address_mode=None, pan_id_compress=False):
+    def _choose_pan_id_compression(self, packet, destination_address_mode, source_address_mode):
+        if packet.fcf_framever in (0, 1):
+            if (
+                destination_address_mode != MACAddressMode.NONE and
+                source_address_mode != MACAddressMode.NONE
+            ):
+                if (
+                    hasattr(packet, "dest_panid") and
+                    hasattr(packet, "src_panid") and
+                    packet.dest_panid == packet.src_panid
+                ):
+                    packet.fcf_panidcompress = 1
+                else:
+                    packet.fcf_panidcompress = 0
+            else:
+                packet.fcf_panidcompress = 0
+        elif packet.fcf_framever == 2:
+            framecompress = PANID_COMPRESSION_TABLE[
+                (
+                    destination_address_mode,
+                    source_address_mode,
+                    hasattr(packet, "dest_panid"),
+                    hasattr(packet, "src_panid")
+                )
+            ]
+            if (
+                (
+                    source_address_mode == MACAddressMode.SHORT and
+                    destination_address_mode != MACAddressMode.NONE
+                ) or
+                (
+                    destination_address_mode == MACAddressMode.SHORT and
+                    source_address_mode != MACAddressMode.NONE
+                )
+            ):
+                if (
+                    hasattr(packet, "dest_panid") and
+                    hasattr(packet, "src_panid") and
+                    packet.dest_panid == packet.src_panid
+                ):
+                    packet.fcf_panidcompress = 1
+                else:
+                    packet.fcf_panidcompress = 0
+            else:
+                packet.fcf_panidcompress = framecompress
+        else:
+            packet.fcf_panidcompress = 0
+        return packet
+
+    def send_data(self, packet, wait_for_ack=False, return_ack=False, source_address_mode=None, destination_address_mode=None):
         if source_address_mode is not None:
             if source_address_mode == MACAddressMode.NONE:
                 fcf_srcaddrmode = 0
@@ -831,6 +923,7 @@ class MACManager(Dot15d4Manager):
             else:
                 fcf_srcaddrmode = 3
         else:
+            source_address_mode = MACAddressMode.NONE
             fcf_srcaddrmode = 0
 
         if destination_address_mode is not None:
@@ -841,6 +934,7 @@ class MACManager(Dot15d4Manager):
             else:
                 fcf_destaddrmode = 3
         else:
+            destination_address_mode = MACAddressMode.SHORT
             fcf_destaddrmode = 2
 
         packet = Dot15d4(
@@ -850,8 +944,12 @@ class MACManager(Dot15d4Manager):
 
         if wait_for_ack:
             packet.fcf_ackreq = 1
-        if pan_id_compress:
-            packet.fcf_panidcompress = 1
+
+        # Build PAN ID compression field
+        packet = self._choose_pan_id_compression(packet, destination_address_mode, source_address_mode)
+
+        #    packet.fcf_panidcompress = 1
+
         sequence_number = self.database.get("macDataSequenceNumber")
         packet.seqnum = sequence_number
         self.database.set("macDataSequenceNumber", sequence_number + 1)
@@ -888,7 +986,7 @@ class MACManager(Dot15d4Manager):
     def perform_ed_scan(self, channel):
         self.get_layer('phy').perform_ed_scan(channel)
 
-    def send_beacon(self, packet, source_address_mode=None, destination_address_mode=None, pan_id_compress=False):
+    def send_beacon(self, packet, source_address_mode=None, destination_address_mode=None):
         if source_address_mode is not None:
             if source_address_mode == MACAddressMode.NONE:
                 fcf_srcaddrmode = 0
@@ -897,6 +995,7 @@ class MACManager(Dot15d4Manager):
             else:
                 fcf_srcaddrmode = 3
         else:
+            source_address_mode = MACAddressMode.NONE
             fcf_srcaddrmode = 0
 
         if destination_address_mode is not None:
@@ -907,6 +1006,7 @@ class MACManager(Dot15d4Manager):
             else:
                 fcf_destaddrmode = 3
         else:
+            destination_address_mode = MACAddressMode.NONE
             fcf_destaddrmode = 2
 
         packet = Dot15d4(
@@ -914,8 +1014,9 @@ class MACManager(Dot15d4Manager):
                     fcf_destaddrmode=fcf_destaddrmode
         )/packet
 
-        if pan_id_compress:
-            packet.fcf_panidcompress = pan_id_compress
+
+        # Build PAN ID compression field
+        packet = self._choose_pan_id_compression(packet, destination_address_mode, source_address_mode)
 
         sequence_number = self.database.get("macBeaconSequenceNumber")
         packet.seqnum = sequence_number

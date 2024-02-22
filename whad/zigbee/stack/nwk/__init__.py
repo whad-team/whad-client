@@ -473,8 +473,7 @@ class NWKManagementService(NWKService):
                     source_address_mode=MACAddressMode.SHORT,
                     destination_pan_id=selected_parent.pan_id,
                     destination_address=selected_parent.address,
-                    wait_for_ack=True,
-                    pan_id_compress=True
+                    wait_for_ack=True
                 )
                 duration = (
                             self.manager.get_layer('mac').database.get("macResponseWaitTime") *
@@ -485,8 +484,7 @@ class NWKManagementService(NWKService):
 
                 self.manager.get_layer('mac').get_service('management').poll(
                     coordinator_pan_id=selected_parent.pan_id,
-                    coordinator_address=selected_parent.address,
-                    pan_id_compress=True
+                    coordinator_address=selected_parent.address
                 )
 
                 rejoin_response = None
@@ -661,8 +659,7 @@ class NWKManagementService(NWKService):
                 # Perform a poll operation
                 return self.manager.get_layer('mac').get_service('management').poll(
                     coordinator_pan_id=parent.pan_id,
-                    coordinator_address=parent.address,
-                    pan_id_compress=True
+                    coordinator_address=parent.address
                 )
             else:
                 # Enable auto request

@@ -71,3 +71,35 @@ class MACConstants:
     A_BASE_SUPERFRAME_DURATION = 960
     A_UNIT_BACKOFF_PERIOD = None
     A_RCCN_BASE_SLOT_DURATION = 60
+
+PANID_COMPRESSION_TABLE = {
+    # (Dest. Addr, Src Addr, Dest. PAN ID, Src PAN ID) : pan_id_compress bit
+    (MACAddressMode.NONE, MACAddressMode.NONE, False, False) : 0,
+
+    (MACAddressMode.NONE, MACAddressMode.NONE, True, False) : 1,
+
+    (MACAddressMode.SHORT, MACAddressMode.NONE, True, False) : 0,
+    (MACAddressMode.EXTENDED, MACAddressMode.NONE, True, False) : 0,
+
+    (MACAddressMode.SHORT, MACAddressMode.NONE, False, False) : 1,
+    (MACAddressMode.EXTENDED, MACAddressMode.NONE, False, False) : 1,
+
+    (MACAddressMode.NONE, MACAddressMode.SHORT, False, True) : 0,
+    (MACAddressMode.NONE, MACAddressMode.EXTENDED, False, True) : 0,
+
+    (MACAddressMode.NONE, MACAddressMode.SHORT, False, False) : 1,
+    (MACAddressMode.NONE, MACAddressMode.EXTENDED, False, False) : 1,
+
+    (MACAddressMode.EXTENDED, MACAddressMode.EXTENDED, True, False) : 0,
+
+    (MACAddressMode.EXTENDED, MACAddressMode.EXTENDED, False, False) : 1,
+
+    (MACAddressMode.SHORT, MACAddressMode.SHORT, True, True) : 0,
+    (MACAddressMode.SHORT, MACAddressMode.EXTENDED, True, True) : 0,
+    (MACAddressMode.EXTENDED, MACAddressMode.SHORT, True, True) : 0,
+
+    (MACAddressMode.SHORT, MACAddressMode.EXTENDED, True, False) : 1,
+    (MACAddressMode.EXTENDED, MACAddressMode.SHORT, True, False) : 1,
+    (MACAddressMode.SHORT, MACAddressMode.SHORT, True, False) : 1,
+
+}
