@@ -48,6 +48,15 @@ class MACBeaconType(IntEnum):
     BEACON = 0
     ENHANCED_BEACON = 1
 
+class MACAssociationStatus(IntEnum):
+    """
+    Enum representing the different association status supported by 802.15.4.
+    """
+    ASSOCIATION_SUCCESSFUL = 0
+    PAN_AT_CAPACITY = 1
+    PAN_ACCESS_DENIED = 2
+    HOPPING_SEQUENCE_OFFSET_DUPLICATION = 3
+    FAST_ASSOCIATION_SUCCESSFUL = 0x80
 
 class MACConstants:
     """

@@ -22,3 +22,4 @@ class Zigbee(Dot15d4):
 
 from whad.zigbee.connector.sniffer import Sniffer
 from whad.zigbee.connector.enddevice import EndDevice
+from whad.zigbee.connector.coordinator import Coordinator

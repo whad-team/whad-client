@@ -31,9 +31,12 @@ class NWKIB(Dot15d4Database):
         self.nwkStackProfile = None
         self.nwkExtendedPANID = 0x0000000000000000
         self.nwkPANId = 0xFFFF
-        self.nwkIeeeAddress = 0xababababcdcdcdcd
+        self.nwkIeeeAddress = 0x6055f90000f714e4
         self.nwkLeaveRequestAllowed = True
         self.nwkTxTotal = 0
+
+        self.nwkStackProfile = 3
+        self.nwkcProtocolVersion = 3
 
         self.nwkSecurityLevel = 0
         self.nwkSecurityMaterialSet = []

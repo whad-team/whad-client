@@ -545,6 +545,101 @@ class NWKManagementService(NWKService):
                 notifications_left = False
         return zigbee_networks
 
+    @Dot15d4Service.request("NLME-NETWORK-FORMATION")
+    def network_formation(
+                            self,
+                            pan_id=None,
+                            channel=None,
+                            scan_channels=0x7fff800,
+                            scan_duration=4,
+                            beacon_order=15,
+                            superframe_order=15,
+                            battery_life_extension=False,
+                            distributed_network=False,
+                            distributed_network_address=0x0001
+    ):
+        """
+        Implements the NLME-NETWORK-FORMATION request.
+        """
+        if distributed_network:
+            raise RequiredImplementation("DistributedNetworkFormation")
+
+        # Select the best channel according to an Energy Detection scan
+        ed_reports = self.ed_scan(
+            scan_channels=scan_channels,
+            scan_duration=scan_duration
+        )
+
+        if channel is None:
+            minimal_measurement = None
+            for ed_report in ed_reports:
+                if (
+                    minimal_measurement is None or
+                    minimal_measurement.max_sample > ed_report.max_sample
+                ):
+                    minimal_measurement = ed_report
+
+            best_channel = minimal_measurement.channel_number
+        else:
+            best_channel = channel
+
+        if pan_id is None:
+            # Perform an active scan to prevent the use of already in use PAN ID
+            active_scan_reports = self.network_discovery(
+                scan_channels=scan_channels,
+                scan_duration=scan_duration
+            )
+
+            # Pick a PAN ID which is not already in use
+            active_networks_pan_ids = [network.dot15d4_pan_network.coord_pan_id for network in active_scan_reports]
+
+            selected_pan_id = randint(1,0xFFFD)
+            while selected_pan_id in active_networks_pan_ids:
+                selected_pan_id = randint(1,0xFFFD)
+        else:
+            selected_pan_id = pan_id
+
+        self.manager.get_layer('mac').set_channel_page(0)
+        self.manager.get_layer('mac').set_channel(best_channel)
+
+        # Select network address
+        if not distributed_network:
+            network_address = 0x0000
+        else:
+            network_address = distributed_network_address
+
+        # Espressif hijack coord: self.database.set("nwkExtendedPANID", 0x6055f90000f714e4)
+        # Update the mac layer with the selected address
+
+        self.manager.get_layer('mac').set_short_address(network_address)
+
+        if self.database.get("nwkExtendedPANID") == 0:
+            self.database.set(
+                "nwkExtendedPANID",
+                self.manager.get_layer('mac').database.get("macExtendedAddress")
+            )
+
+        # Build ZigBee beacon payload
+        beacon_payload = ZigBeeBeacon(
+            proto_id = 0,
+            stack_profile = self.database.get("nwkStackProfile"),
+            nwkc_protocol_version = self.database.get("nwkcProtocolVersion"),
+            router_capacity = 1, #((self.database.get("nwkCapabilityInformation") >> 1) & 1),
+            end_device_capacity = 1,
+            device_depth = self.database.get("nwkMaxDepth"),
+            extended_pan_id = self.database.get("nwkExtendedPANID"),
+            tx_offset = 0xFFFFFF, # non beacon network, default value
+            update_id = self.database.get("nwkUpdateId")
+        )
+        self.manager.get_layer('mac').database.set("macBeaconPayload", bytes(beacon_payload))
+        return self.manager.get_layer('mac').get_service('management').start(
+            selected_pan_id,
+            pan_coordinator=True,
+            beacon_order=beacon_order,
+            superframe_order=superframe_order,
+            battery_life_extension=battery_life_extension,
+            coord_realignement=False # for now, should be different if we update an existing PAN
+        )
 
     @Dot15d4Service.request("NLME-SYNC")
     def sync(self,track=False):

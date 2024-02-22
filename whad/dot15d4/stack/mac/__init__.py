@@ -4,7 +4,7 @@ from whad.dot15d4.stack.mac.database import MACPIB
 from whad.dot15d4.stack.mac.exceptions import MACTimeoutException, MACAssociationFailure
 from whad.dot15d4.stack.mac.helpers import is_short_address
 from whad.dot15d4.stack.mac.constants import MACScanType, MACConstants, MACAddressMode, \
-    MACDeviceType, MACPowerSource, MACBeaconType
+    MACDeviceType, MACPowerSource, MACBeaconType, MACAssociationStatus
 from whad.dot15d4.stack.mac.network import Dot15d4PANNetwork
 from whad.dot15d4.stack.mac.energy import EDMeasurement
 from whad.common.stack import Layer, alias, source, state
@@ -300,7 +300,44 @@ class MACManagementService(MACService):
                 else:
                     # Start transmitting immediatly
                     self._start_beaconing()
-                    
+
+    @Dot15d4Service.request("MLME-ASSOCIATE")
+    def associate_response(
+        self,
+        device_address,
+        assoc_short_address,
+        security_level=0,
+        key_id_mode=0,
+        key_source=0,
+        key_index=0,
+        channel_offset=0,
+        hopping_sequence=b"",
+        dsme_association=False,
+        allocation_order=0,
+        bi_index=0,
+        superframe_id=0,
+        slot_id=0,
+        channel_index=0,
+        association_status=MACAssociationStatus.ASSOCIATION_SUCCESSFUL
+    ):
+
+        association_response = Dot15d4Cmd(
+            cmd_id="AssocResp",
+            dest_addr = device_address,
+            src_addr = self.database.get("macExtendedAddress"),
+            dest_panid = self.database.get("macPanId"),
+
+        ) / Dot15d4CmdAssocResp(
+            short_address = assoc_short_address,
+            association_status = int(association_status)
+        )
+
+        self.manager.send_data(
+            association_response,
+            source_address_mode=MACAddressMode.EXTENDED,
+            destination_address_mode=MACAddressMode.EXTENDED,
+            wait_for_ack=True
+        )
     @Dot15d4Service.request("MLME-ASSOCIATE")
     def associate(
                     self,
@@ -447,6 +484,73 @@ class MACManagementService(MACService):
                     "pan_descriptor": pan_descriptor,
         })
 
+    @Dot15d4Service.indication("MLME-ASSOCIATE")
+    def indicate_associate(self, pdu):
+        """
+        Implements the MLME-ASSOCIATE indication operation.
+        """
+        source_address = pdu.src_addr if hasattr(pdu, "src_addr") else None
+        capability_information = (
+            0 |
+            (int(pdu.device_type) << 1) |
+            (int(pdu.power_source) << 2) |
+            (int(pdu.receiver_on_when_idle) << 3) |
+            (int(pdu.alternate_pan_coordinator) << 4) |
+            (int(pdu.security_capability) << 6) |
+            (int(pdu.allocate_address) << 7)
+        )
+        security_level = (
+            pdu.sec_sc_seclevel if
+            hasattr(pdu, "sec_sc_seclevel") and
+            hasattr(pdu, "fcf_security") and
+            pdu.fcf_security else
+            0
+        )
+        key_id_mode = (
+            pdu.sec_sc_keyidmode if
+            hasattr(pdu, "sec_sc_keyidmode") and
+            hasattr(pdu, "fcf_security") and
+            pdu.fcf_security else
+            0
+        )
+        key_source = (
+            pdu.sec_keyid_keysource if
+            hasattr(pdu, "sec_keyid_keysource") and
+            hasattr(pdu, "fcf_security") and
+            pdu.fcf_security else
+            0
+        )
+        key_index = (
+            pdu.sec_keyid_keyindex if
+            hasattr(pdu, "sec_keyid_keyindex") and
+            hasattr(pdu, "fcf_security") and
+            pdu.fcf_security else
+            0
+        )
+        # Default values here
+        channel_offset = 0
+        hopping_sequence_id = 0
+        dsme_association = False
+        direction = 0
+        allocation_order = 0
+        hopping_sequence_request = False
+        #self.associate_response(source_address, 0xabcd)
+        return (
+            source_address,
+            {
+                "capability_information":capability_information,
+                "security_level":security_level,
+                "key_id_mode":key_id_mode,
+                "key_source":key_source,
+                "key_index":key_index,
+                "channel_offset":channel_offset,
+                "hopping_sequence_id": hopping_sequence_id,
+                "dsme_association":dsme_association,
+                "direction":direction,
+                "allocation_order": allocation_order,
+                "hopping_sequence_request":hopping_sequence_request
+            }
+        )
     @Dot15d4Service.indication("MLME-BEACON-REQUEST")
     def indicate_beacon_request(self, pdu):
         """
@@ -598,7 +702,9 @@ class MACManagementService(MACService):
 
     # Input callbacks
     def on_cmd_pdu(self, pdu):
-        if pdu.cmd_id == 7: # Beacon Request
+        if pdu.cmd_id == 1: # Association Request
+            self.indicate_associate(pdu)
+        elif pdu.cmd_id == 7: # Beacon Request
             if self.database.get("macBeaconAutoRespond"):
                 self.beacon()
             else:
