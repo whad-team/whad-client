@@ -51,7 +51,7 @@ class ZDONetworkManager(ZDOObject):
 
         nwk_layer.database.set("nwkExtendedPANID", extended_pan_id)
 
-    def initialize(self):
+    def initialize(self, logical_type=LogicalDeviceType.END_DEVICE):
         """
         Initialize the network manager according to current configuration.
         """
@@ -61,15 +61,26 @@ class ZDONetworkManager(ZDOObject):
         self.network = None
         # By default we are unauthorized on the network
         self.authorized = False
+
+        # Get the logical type
+        logical_type = self.zdo.configuration.get("configNodeDescriptor").logical_type
+
         # Check if we are an end device
-        if self.zdo.configuration.get("configNodeDescriptor").logical_type == LogicalDeviceType.END_DEVICE:
-            # TODO: refactor to simplify access to different stack layers
+        if logical_type == LogicalDeviceType.END_DEVICE:
             self.configure_extended_address(randint(0, 0xffffffffffffffff))
             self.configure_short_address(0xFFFF)
             self.configure_extended_pan_id(0x0000000000000000)
             aps_layer.database.set("apsDesignatedCoordinator", False)
             aps_layer.database.set("apsChannelMask", 0x7fff800)
             aps_layer.database.set("apsUseExtendedPANID", 0x0000000000000000)
+            aps_layer.database.set("apsUseInsecureJoin", True)
+
+        elif logical_type == LogicalDeviceType.COORDINATOR:
+            self.configure_extended_address(randint(0, 0xffffffffffffffff))
+            self.configure_short_address(0x0000)
+            aps_layer.database.set("apsDesignatedCoordinator", True)
+            aps_layer.database.set("apsUseExtendedPANID", randint(0, 0xffffffffffffffff))
+            self.configure_extended_pan_id(0x0000000000000000)
             aps_layer.database.set("apsUseInsecureJoin", True)
 
     def on_authorization(self):
@@ -208,7 +219,14 @@ class ZDONetworkManager(ZDOObject):
 
         if apsDesignatedCoordinator:
             # We are a coordinator not connected, start NLME-NETWORK-FORMATION
-            raise RequiredImplementation("ZigbeeNetworkFormation")
+            if apsUseExtendedPANID != 0:
+                nwk_management.set("nwkExtendedPANID", apsUseExtendedPANID)
+
+            nwk_management.network_formation(
+                pan_id=None,
+                channel=None,
+                scan_channels=apsChannelMask,
+            )
 
         else:
             # We are a router or an end device, attempt to join or rejoin a network
@@ -263,8 +281,10 @@ class ZDONetworkManager(ZDOObject):
                     if selected_zigbee_network is not None:
                         break
                     else:
-                        sleep(self.zdo.configuration.get("configNWKTimeBetweenScans") * SYMBOL_DURATION[Dot15d4Phy.OQPSK] * 2)
-
+                        sleep(
+                                self.zdo.configuration.get("configNWKTimeBetweenScans") *
+                                phy_layer.symbol_duration * 2
+                        )
                 if selected_zigbee_network is None:
                     logger.info("[zdo_network_manager] no target network found, exiting.")
                     return False

@@ -13,9 +13,9 @@ class NWKIB(Dot15d4Database):
         self.nwkSequenceNumber = 0
         #self.nwkPassiveAckTimeout = None
         self.nwkMaxBroadcastRetries = 3
-        #self.nwkMaxChildren = None
-        self.nwkMaxDepth = 30 # ?
-        #self.nwkMaxRouters = None
+        self.nwkMaxChildren = 4
+        self.nwkMaxDepth = 4 # ?
+        self.nwkMaxRouters = 6
         self.nwkNeighborTable = NWKNeighborTable()
         #self.nwkNetworkBroadcastDeliveryTime = None
         self.nwkReportConstantCost = 0

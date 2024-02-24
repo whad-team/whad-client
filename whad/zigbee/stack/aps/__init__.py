@@ -8,7 +8,7 @@ from whad.zigbee.stack.aps.database import APSIB
 from whad.zigbee.stack.aps.security import APSApplicationLinkKeyData, \
     APSNetworkKeyData, APSTrustCenterLinkKeyData
 from whad.zigbee.stack.aps.constants import APSSecurityStatus, \
-    APSSourceAddressMode, APSDestinationAddressMode
+    APSSourceAddressMode, APSDestinationAddressMode, APSKeyType
 from whad.zigbee.stack.nwk.constants import NWKAddressMode
 from whad.zigbee.crypto import ApplicationSubLayerCryptoManager
 
@@ -348,12 +348,65 @@ class APSManagementService(APSService):
         Indicates to upper layer that a transport key has been received.
         """
         return (
-            transport_key_data, # IMPORTANT: parameters order has been switched here, correction needed in APL !
+            transport_key_data,
             {
                 "standard_key_type":standard_key_type,
                 "source_address":source_address
             }
         )
+
+    @Dot15d4Service.request("APSME-TRANSPORT-KEY")
+    def transport_key(self, destination_address, standard_key_type, transport_key_data):
+
+        if standard_key_type == APSKeyType.TRUST_CENTER_LINK_KEY:
+            raise RequiredImplementation("TrustCenterLinkKey")
+        elif standard_key_type == APSKeyType.STANDARD_NETWORK_KEY:
+            apdu = ZigbeeAppDataPayload(
+                delivery_mode=0,
+            ) / ZigbeeAppCommandPayload(
+                cmd_identifier = 5,
+                key_type = standard_key_type,
+                key = transport_key_data.key,
+                key_seqnum = transport_key_data.key_sequence_number,
+                dest_addr = destination_address,
+                src_addr = self.get.database("nwkNetworkAddress")
+            )
+            return self.manager.get_layer('nwk').get_service("data").data(
+                apdu,
+                nsdu_handle=0,
+                destination_address_mode=NWKAddressMode.UNICAST,
+                destination_address=(
+                    transport_key_data.parent_address if
+                    transport_key_data.use_parent else
+                    destination_address
+                ),
+                discover_route=False,
+                #security_enable=True
+            )
+        elif standard_key_type == APSKeyType.APPLICATION_LINK_KEY:
+            apdu = ZigbeeAppDataPayload(
+                delivery_mode=0,
+            ) / ZigbeeAppCommandPayload(
+                cmd_identifier = 5,
+                key_type = standard_key_type,
+                key = transport_key_data.key,
+                partner_addr = transport_key_data.partner_address,
+                dest_addr = destination_address,
+                initiator = 1,
+                src_addr = self.get.database("nwkNetworkAddress")
+            )
+            return self.manager.get_layer('nwk').get_service("data").data(
+                apdu,
+                nsdu_handle=0,
+                destination_address_mode=NWKAddressMode.UNICAST,
+                destination_address=(
+                    transport_key_data.parent_address if
+                    transport_key_data.use_parent else
+                    destination_address
+                ),
+                discover_route=False,
+                #security_enable=True
+            )
 
     def process_transport_key(self, nsdu, source_address, security_status):
         """
@@ -367,14 +420,17 @@ class APSManagementService(APSService):
             asdu = nsdu[ZigbeeAppCommandPayload]
 
         if (
-                (asdu.key_type in (3, 4) and authorized and security_status != APSSecurityStatus.SECURED_LINK_KEY) or
+                (
+                    asdu.key_type in (APSKeyType.APPLICATION_LINK_KEY, APSKeyType.TRUST_CENTER_LINK_KEY) and
+                    authorized and security_status != APSSecurityStatus.SECURED_LINK_KEY
+                ) or
                 (asdu.key_type == 1 and security_status != APSSecurityStatus.SECURED_LINK_KEY)
             ):
             logger.info("[aps_management] transport key doesn't match the security policy, discarding.")
             return
 
         # If we got an APS Application Link Key, indicate transport key using APSME-TRANSPORT-KEY
-        if asdu.key_type == 3:
+        if asdu.key_type == APSKeyType.APPLICATION_LINK_KEY:
             source = source_address
             standard_key_type = asdu.key_type
             transport_key_data = APSApplicationLinkKeyData(asdu.key, asdu.src_addr)
@@ -385,17 +441,17 @@ class APSManagementService(APSService):
         # indicate key to upper layer using APSME-TRANSPORT-KEY indication.
         if (
                 (
-                    asdu.key_type in (1,4) and
+                    asdu.key_type in (APSKeyType.STANDARD_NETWORK_KEY, APSKeyType.TRUST_CENTER_LINK_KEY) and
                     asdu.dest_addr == self.manager.get_layer('nwk').database.get("nwkIeeeAddress")
                 )
                 or
-                ( asdu.key_type == 1 and asdu.dest_addr == 0x0000000000000000 )
+                ( asdu.key_type == APSKeyType.STANDARD_NETWORK_KEY and asdu.dest_addr == 0x0000000000000000 )
         ):
 
             source = asdu.src_addr
             standard_key_type = asdu.key_type
 
-            if asdu.key_type == 1:
+            if asdu.key_type == APSKeyType.STANDARD_NETWORK_KEY:
                 transport_key_data = APSNetworkKeyData(asdu.key, asdu.key_seqnum, False)
             else:
                 transport_key_data = APSTrustCenterLinkKeyData(asdu.key)
@@ -404,7 +460,7 @@ class APSManagementService(APSService):
 
         # If we got a Network key and dest address equals to 0xFFFFFFFFFFFFFFFF (distributed security network),
         # update APS Trust Center Address and indicate to upper layer using APSME-TRANSPORT-KEY indication.
-        if asdu.key_type == 1 and asdu.dest_addr == 0xFFFFFFFFFFFFFFFF:
+        if asdu.key_type == APSKeyType.STANDARD_NETWORK_KEY and asdu.dest_addr == 0xFFFFFFFFFFFFFFFF:
 
             source = asdu.src_addr
             standard_key_type = asdu.key_type
@@ -414,7 +470,10 @@ class APSManagementService(APSService):
             return self.indicate_transport_key(source, standard_key_type, transport_key_data)
 
         # If the packet is not indicated for us, let's just route it to the destination using data service.
-        if asdu.key_type in (1,4) and asdu.dest_addr != self.manager.get_layer('nwk').database.get("nwkIeeeAddress"):
+        if (
+            asdu.key_type in (APSKeyType.STANDARD_NETWORK_KEY,APSKeyType.TRUST_CENTER_LINK_KEY) and
+            asdu.dest_addr != self.manager.get_layer('nwk').database.get("nwkIeeeAddress")
+        ):
 
             # Forward to destination device
             self.manager.get_layer('nwk').get_service("data").data(

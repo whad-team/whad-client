@@ -31,6 +31,26 @@ class NWKNeighborTable:
                 return False
             return True
 
+    def select_by_extended_address(self, extended_address):
+        for address, node in self.table.items():
+            if node.extended_address == extended_address:
+                return node
+        return None
+
+    def select_routers_by_pan_id(self, pan_id):
+        routers = []
+        for address, device in self.table.items():
+            if device.device_type == ZigbeeDeviceType.ROUTER and device.pan_id == pan_id:
+                routers.append(device)
+        return routers
+
+    def select_end_devices_by_pan_id(self, pan_id):
+        end_devices = []
+        for address, device in self.table.items():
+            if device.device_type == ZigbeeDeviceType.END_DEVICE and device.pan_id == pan_id:
+                end_devices.append(device)
+        return end_devices
+
     def select_suitable_parent(self, extended_pan_id, nwk_update_id, no_permit_check=False):
         selected_devices = []
         for address, device in self.table.items():

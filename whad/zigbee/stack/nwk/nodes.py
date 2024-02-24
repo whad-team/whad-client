@@ -25,7 +25,8 @@ class ZigbeeNode:
                     permit_joining=None,
                     potential_parent=None,
                     update_id=None,
-                    pan_id=None
+                    pan_id=None,
+                    relationship=ZigbeeRelationship.NONE
     ):
         self.address = address
         self.device_type = device_type
@@ -46,7 +47,7 @@ class ZigbeeNode:
         self.beacon_order = beacon_order
         self.permit_joining = permit_joining
         self.potential_parent = potential_parent
-        self.relationship = ZigbeeRelationship.NONE
+        self.relationship = relationship
         self.pan_id = pan_id
         self.lqis = [lqi] if lqi is not None else []
         self.last_update = time()
@@ -104,7 +105,8 @@ class ZigbeeEndDevice(ZigbeeNode):
                     permit_joining=None,
                     potential_parent=None,
                     update_id=None,
-                    pan_id=None
+                    pan_id=None,
+                    relationship=ZigbeeRelationship.NONE
     ):
         super().__init__(
                             address,
@@ -126,7 +128,8 @@ class ZigbeeEndDevice(ZigbeeNode):
                             permit_joining=permit_joining,
                             potential_parent=potential_parent,
                             update_id=update_id,
-                            pan_id=pan_id
+                            pan_id=pan_id,
+                            relationship=relationship
         )
 
 class ZigbeeCoordinator(ZigbeeNode):
@@ -150,7 +153,8 @@ class ZigbeeCoordinator(ZigbeeNode):
                     permit_joining=None,
                     potential_parent=None,
                     update_id=None,
-                    pan_id=None
+                    pan_id=None,
+                    relationship=ZigbeeRelationship.NONE
     ):
         super().__init__(
                             address,
@@ -172,7 +176,8 @@ class ZigbeeCoordinator(ZigbeeNode):
                             permit_joining=permit_joining,
                             potential_parent=potential_parent,
                             update_id=update_id,
-                            pan_id=pan_id
+                            pan_id=pan_id,
+                            relationship=relationship
         )
 
 class ZigbeeRouter(ZigbeeNode):
@@ -196,7 +201,8 @@ class ZigbeeRouter(ZigbeeNode):
                     permit_joining=None,
                     potential_parent=None,
                     update_id=None,
-                    pan_id=None
+                    pan_id=None,
+                    relationship=ZigbeeRelationship.NONE
     ):
         super().__init__(
                             address,
@@ -218,5 +224,6 @@ class ZigbeeRouter(ZigbeeNode):
                             permit_joining=permit_joining,
                             potential_parent=potential_parent,
                             update_id=update_id,
-                            pan_id=pan_id
+                            pan_id=pan_id,
+                            relationship=relationship
         )

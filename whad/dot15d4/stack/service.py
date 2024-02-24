@@ -79,7 +79,7 @@ class Dot15d4Service:
             @wraps(func)
             def response_decorator(*args, **kwargs):
                 self = args[0]
-                self._logger.info("[{}] {} response ({},{})".format(args[0]._name, request_name, str(args[1:]),str(kwargs)))
+                self._logger.info("[{}] {} response ({},{})".format(args[0]._name, response_name, str(args[1:]),str(kwargs)))
                 result = func(*args, **kwargs)
                 return result
             return response_decorator

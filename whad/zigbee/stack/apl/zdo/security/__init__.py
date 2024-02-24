@@ -37,6 +37,30 @@ class ZDOSecurityManager(ZDOObject):
         logger.info("[zdo_security_manager] new network key provisioned.")
         self.zdo.nwk_management.set("nwkSecurityLevel", 5)
 
+    def send_transport_key(self, destination_address):
+        """
+        Transmit the transport key to a new joining device.
+        """
+        # REFACTORING NEEDED HERE
+        apsTrustCenterAddress = self.zdo.aps_management.get("apsTrustCenterAddress")
+        nwkIeeeAddress = self.zdo.nwk_management.get("nwkIeeeAddress")
+        # maybe this test  should be in network manager instead of security manager,
+        # since it processes not only transport key but also dev update.
+        if apsTrustCenterAddress != 0xFFFFFFFFFFFFFFFF:
+            # Centralized network
+            if apsTrustCenterAddress == nwkIeeeAddress:
+                # We are the trust center, implement 4.6.3.2.2 (p431)
+                pass
+            else:
+                # Here we should trigger:
+                # - APSME-UPDATE-DEVICE with:
+                #    + destAddr = apsTrustCenterAddress
+                #    + deviceAddr = address of the new device
+                raise RequiredImplementation("TransportKeyTrustCenterAddress")
+        else:
+            # Distributed security network
+            raise RequiredImplementation("TransportKeyDistributedSecurityNetwork")
+
     def on_transport_key(self, source_address, standard_key_type, transport_key_data):
         """
         Process all transport keys forwarded by the ZDO.

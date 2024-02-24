@@ -36,7 +36,7 @@ if __name__ == '__main__':
             pan_id = 0x1234
             channel = 11
             print("[i] network formation: ", hex(pan_id), "  / channel=", channel)
-            coordinator.network_formation(pan_id=pan_id, channel=channel)
+            coordinator.start_network()
             while True:
                 input()
         except (KeyboardInterrupt, SystemExit):

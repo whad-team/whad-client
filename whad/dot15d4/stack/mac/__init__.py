@@ -298,7 +298,7 @@ class MACManagementService(MACService):
                     # Start transmitting immediatly
                     self._start_beaconing()
 
-    @Dot15d4Service.request("MLME-ASSOCIATE")
+    @Dot15d4Service.response("MLME-ASSOCIATE")
     def associate_response(
         self,
         device_address,
@@ -333,6 +333,7 @@ class MACManagementService(MACService):
             source_address_mode=MACAddressMode.EXTENDED,
             destination_address_mode=MACAddressMode.EXTENDED
         )
+        return True
         '''
         self.manager.send_data(
             association_response,
@@ -537,7 +538,7 @@ class MACManagementService(MACService):
         direction = 0
         allocation_order = 0
         hopping_sequence_request = False
-        self.associate_response(source_address, 0xabcd)
+
         return (
             source_address,
             {
@@ -776,6 +777,9 @@ class MACManager(Dot15d4Manager):
 
 
     def add_pending_transaction(self, packet, source_address_mode=None, destination_address_mode=None):
+        """
+        Put outgoing data as pending.
+        """
         if packet.dest_addr not in self.__pending_transactions:
             self.__pending_transactions[packet.dest_addr] = Queue()
 
@@ -784,6 +788,11 @@ class MACManager(Dot15d4Manager):
         )
 
     def get_pending_transaction(self, address):
+        """
+        Get the latest pending transaction available.
+
+        Return None if transaction queue is empty.
+        """
         if (
             address in self.__pending_transactions and
             not self.__pending_transactions[address].empty()
@@ -1022,18 +1031,3 @@ class MACManager(Dot15d4Manager):
         packet.seqnum = sequence_number
         self.database.set("macBeaconSequenceNumber", sequence_number + 1)
         self.send('phy', packet, tag='pdu')
-
-'''
-@alias('nwk')
-class NWKManager(Dot15d4Manager):
-
-    @source('mac', 'TEST')
-    def on_test(self, pdu, a, b, c):
-        print(pdu)
-        print("a = ", a)
-        print("b = ", b)
-        print("c = ", c)
-'''
-
-
-#MACManager.add(NWKManager)

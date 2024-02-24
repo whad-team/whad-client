@@ -2,11 +2,13 @@ from whad.zigbee.connector import Zigbee
 from whad.dot15d4.stack import Dot15d4Stack
 from whad.dot15d4.stack.mac import MACManager
 from whad.zigbee.stack.nwk import NWKManager
+from whad.zigbee.stack.apl.application import ApplicationObject
+from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.exceptions import UnsupportedCapability
 
 class Coordinator(Zigbee):
     """
-    Zigbee End Device interface for compatible WHAD device.
+    Zigbee Coordinator interface for compatible WHAD device.
     """
     def __init__(self, device, applications=[]):
         super().__init__(device)
@@ -24,8 +26,24 @@ class Coordinator(Zigbee):
 
         self.enable_reception()
 
-        #self.__stack.get_layer('apl').initialize()
-        #self._init_applications(applications)
+        self.__stack.get_layer('apl').get_application_by_name("zdo").configuration.get("configNodeDescriptor").logical_type = LogicalDeviceType.COORDINATOR
+        self.__stack.get_layer('apl').initialize()
+        self._init_applications(applications)
+
+    def _init_applications(self, applications):
+        if applications == []:
+            # If no application provided, attach a default ZCL application on endpoint 1
+            app = ApplicationObject("zcl_app", 0x0104, 0x0100, device_version=0, input_clusters=[], output_clusters=[])
+            self.__stack.get_layer('apl').attach_application(app, endpoint=1)
+
+        else:
+            for app in applications:
+                endpoint = 1
+                self.__stack.get_layer('apl').attach_application(app, endpoint=endpoint)
+                endpoint += 1
+
+    def start_network(self):
+        return self.__stack.get_layer('apl').get_application_by_name('zdo').network_manager.startup()
 
     def network_formation(self, pan_id=None, channel=None):
         return self.__stack.get_layer('nwk').get_service("management").network_formation(

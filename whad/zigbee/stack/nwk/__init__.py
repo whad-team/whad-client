@@ -1,7 +1,8 @@
 from whad.dot15d4.stack.manager import Dot15d4Manager
 from whad.dot15d4.stack.service import Dot15d4Service
 from whad.dot15d4.stack.mac.constants import MACAddressMode, MACScanType, \
-    MACDeviceType, MACPowerSource, MACConstants
+    MACDeviceType, MACPowerSource, MACConstants, MACAssociationStatus
+
 from whad.zigbee.stack.nwk.exceptions import NWKTimeoutException, NWKInvalidKey
 from whad.zigbee.stack.nwk.database import NWKIB
 from whad.zigbee.stack.nwk.neighbors import NWKNeighborTable
@@ -175,6 +176,8 @@ class NWKManagementService(NWKService):
     NWK service processing Management packets.
     """
     def __init__(self, manager):
+        self.joining_thread_running = False
+        self.joining_thread = None
         super().__init__(manager, name="nwk_management")
 
 
@@ -296,14 +299,14 @@ class NWKManagementService(NWKService):
                 self.database.set("nwkParentInformation", 0)
 
                 device_type = (
-                                MACDeviceType.FFD if
-                                join_as_router else
-                                MACDeviceType.RFD
+                    MACDeviceType.FFD if
+                    join_as_router else
+                    MACDeviceType.RFD
                 )
                 power_source = (
-                                MACPowerSource.ALTERNATING_CURRENT_SOURCE if
-                                mains_powered_device else
-                                MACPowerSource.BATTERY_SOURCE
+                    MACPowerSource.ALTERNATING_CURRENT_SOURCE if
+                    mains_powered_device else
+                    MACPowerSource.BATTERY_SOURCE
                 )
 
                 capability_information = (
@@ -513,7 +516,18 @@ class NWKManagementService(NWKService):
                 else:
                     selected_parent.potential_parent = 0
 
-
+    @Dot15d4Service.indication("NLME-JOIN")
+    def indicate_join(self, network_address, extended_address, capability_information, rejoin=False, secure_rejoin=False):
+        print("[indicate join]")
+        return (
+            network_address,
+            {
+                "extended_address":extended_address,
+                "capability_information":capability_information,
+                "rejoin":rejoin,
+                "secure_rejoin":secure_rejoin
+            }
+        )
     @Dot15d4Service.request("NLME-NETWORK-DISCOVERY")
     def network_discovery(self, scan_channels=0x7fff800, scan_duration=6):
         """
@@ -543,6 +557,36 @@ class NWKManagementService(NWKService):
                 notifications_left = False
         return zigbee_networks
 
+    @Dot15d4Service.request("NLME-PERMIT-JOINING")
+    def permit_joining(self, duration=0xFF):
+        self._stop_joining_timeout()
+        if duration == 0:
+            self.manager.get_layer("mac").database.set("macAssociationPermit", False)
+            return True
+        elif duration == 0xFF:
+            self.manager.get_layer("mac").database.set("macAssociationPermit", True)
+            return True
+        else:
+            self.manager.get_layer("mac").database.set("macAssociationPermit", True)
+            self._start_joining_timeout(duration)
+            return True
+
+    def _stop_joining_timeout(self):
+        self.joining_thread_running = False
+        self.joining_thread = None
+
+    def _start_joining_timeout(self, duration):
+        self.joining_thread_running = True
+        self.joining_thread = Thread(target=self._joining_timeout, args=(duration, ), daemon=True)
+        self.joining_thread.start()
+
+    def _joining_timeout(self, duration):
+        starting_time = time()
+        while self.joining_thread_running and (time() - starting_time) < duration:
+            sleep(0.1)
+        # Turn off joining timeout
+        self.manager.get_layer("mac").database.set("macAssociationPermit", False)
+
     @Dot15d4Service.request("NLME-NETWORK-FORMATION")
     def network_formation(
                             self,
@@ -568,6 +612,7 @@ class NWKManagementService(NWKService):
             scan_duration=scan_duration
         )
 
+        print("[i] channel measurement")
         if channel is None:
             minimal_measurement = None
             for ed_report in ed_reports:
@@ -581,6 +626,7 @@ class NWKManagementService(NWKService):
         else:
             best_channel = channel
 
+        print("[i] active scan")
         if pan_id is None:
             # Perform an active scan to prevent the use of already in use PAN ID
             active_scan_reports = self.network_discovery(
@@ -610,7 +656,7 @@ class NWKManagementService(NWKService):
         # Update the mac layer with the selected address
 
         self.manager.get_layer('mac').set_short_address(network_address)
-
+        self.database.set("nwkNetworkAddress", network_address)
         if self.database.get("nwkExtendedPANID") == 0:
             self.database.set(
                 "nwkExtendedPANID",
@@ -624,7 +670,7 @@ class NWKManagementService(NWKService):
             nwkc_protocol_version = self.database.get("nwkcProtocolVersion"),
             router_capacity = 1, #((self.database.get("nwkCapabilityInformation") >> 1) & 1),
             end_device_capacity = 1,
-            device_depth = self.database.get("nwkMaxDepth"),
+            device_depth = 0 if network_address == 0 else 1,
             extended_pan_id = self.database.get("nwkExtendedPANID"),
             tx_offset = 0xFFFFFF, # non beacon network, default value
             update_id = self.database.get("nwkUpdateId")
@@ -952,6 +998,144 @@ class NWKManager(Dot15d4Manager):
                     source_address,
                     link_quality
                 )
+
+    @source('mac', 'MLME-ASSOCIATE')
+    def on_mlme_associate(
+                            self,
+                            source_address,
+                            capability_information,
+                            security_level,
+                            key_id_mode,
+                            key_source,
+                            key_index,
+                            channel_offset,
+                            hopping_sequence_id,
+                            dsme_association,
+                            direction,
+                            allocation_order,
+                            hopping_sequence_request
+    ):
+        """
+        Callback processing MAC Association indication.
+        """
+        # Check if another device exists with the same address
+        table = self.database.get("nwkNeighborTable")
+        node = table.select_by_extended_address(source_address)
+        router = (((capability_information >> 1) & 1) == 0)
+        if node is not None:
+            if not router:
+                device_type = ZigbeeDeviceType.END_DEVICE
+            else:
+                device_type = ZigbeeDeviceType.ROUTER
+
+            if device_type == node.device_type:
+                success = self.get_layer('mac').get_service("management").associate_response(
+                    source_address,
+                    node.address,
+                    association_status=MACAssociationStatus.ASSOCIATION_SUCCESSFUL
+                )
+                if success:
+                    self.get_service("management").indicate_join(
+                        new_address,
+                        source_address,
+                        capability_information,
+                        rejoin=False,
+                        secure_rejoin=False
+                    )
+                return success
+            else:
+                table.delete(node.address)
+
+        new_address = self._address_assignment(
+            depth=0, # we only consider a depth of 0 (coordinator) for now
+            router_node=router
+        )
+        if new_address is None:
+            self.get_layer('mac').get_service("management").associate_response(
+                source_address,
+                0,
+                association_status=MACAssociationStatus.PAN_AT_CAPACITY
+            )
+        else:
+            routers = table.select_routers_by_pan_id(self.database.get("nwkPANId"))
+
+            table.update(
+                new_address,
+                device_type=(
+                                ZigbeeDeviceType.ROUTER if
+                                router else
+                                ZigbeeDeviceType.END_DEVICE
+                ),
+                transmit_failure=0,
+                lqi=0,
+                outgoing_cost=0,
+                age=0,
+                extended_pan_id=self.database.get("nwkExtendedPANID"),
+                logical_channel=self.get_layer("phy").get_channel(),
+                depth=len(routers) + 1,
+                potential_parent=False,
+                update_id=self.database.get("nwkUpdateId"),
+                pan_id=self.database.get("nwkPANId"),
+                extended_address=source_address,
+                rx_on_when_idle=bool((capability_information >> 3) & 1),
+
+            )
+            success = self.get_layer('mac').get_service("management").associate_response(
+                source_address,
+                new_address,
+                association_status=MACAssociationStatus.ASSOCIATION_SUCCESSFUL
+            )
+            if success:
+                self.get_service("management").indicate_join(
+                    new_address,
+                    source_address,
+                    capability_information,
+                    rejoin=False,
+                    secure_rejoin=False
+                )
+            return success
+
+    def _address_assignment(self, depth=0, router_node=False):
+
+        table = self.database.get("nwkNeighborTable")
+        pan_id = self.database.get("nwkPANId")
+
+        routers = table.select_routers_by_pan_id(pan_id)
+        end_devices = table.select_end_devices_by_pan_id(pan_id)
+        assigned_addresses = [r.address for r in routers] + [e.address for e in end_devices]
+
+        parent = table.get_parent()
+        if parent is None:
+            parent_address = self.database.get("nwkNetworkAddress")
+        else:
+            parent_address = parent.address
+
+        if self.database.get("nwkAddrAlloc") == 2:
+            # Stochastic address assignment
+            new_address = randint(1, 0xFFFD)
+            while new_address in assigned_addresses:
+                new_address = randint(1, 0xFFFD)
+            return new_address
+
+        elif self.database.get("nwkAddrAlloc") == 0:
+            # Distributed address assignment
+            cm = self.database.get("nwkMaxChildren")
+            lm = self.database.get("nwkMaxDepth")
+            rm = self.database.get("nwkMaxRouters")
+            cskip = (
+                (1 + cm * (lm - depth - 1))
+                if rm == 1 else
+                (1 + cm - rm  - cm * (rm ** (lm - depth - 1)))
+            )
+
+            if cskip == 0:
+                return None
+            else:
+                if router_node:
+                    new_address = parent_address + 1 + len(routers) * cskip
+                else:
+                    new_address = parent_address + cskip * rm + (len(end_devices)) # + 1 or not ?
+            return new_address
 
     @source('mac', 'MLME-BEACON-NOTIFY')
     def on_mlme_beacon_notify(self, beacon_payload, pan_descriptor):

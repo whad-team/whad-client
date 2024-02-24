@@ -31,6 +31,14 @@ class APSKeyAttribute(IntEnum):
     UNVERIFIED_KEY = 1
     VERIFIED_KEY = 2
 
+class APSKeyType(IntEnum):
+    """
+    Enum storing the different possible values for the APS key type attribute.
+    """
+    STANDARD_NETWORK_KEY = 1
+    APPLICATION_LINK_KEY = 3
+    TRUST_CENTER_LINK_KEY = 4
+
 class APSSecurityStatus(IntEnum):
     """
     Enum storing the different possible values for the APS security status.

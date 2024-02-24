@@ -2,6 +2,7 @@ from whad.zigbee.connector import Zigbee
 from whad.dot15d4.stack import Dot15d4Stack
 from whad.dot15d4.stack.mac import MACManager
 from whad.zigbee.stack.nwk import NWKManager
+from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.apl.application import ApplicationObject
 from whad.exceptions import UnsupportedCapability
 
@@ -24,7 +25,7 @@ class EndDevice(Zigbee):
         self.__channel_page = 0
 
         self.enable_reception()
-
+        self.__stack.get_layer('apl').get_application_by_name("zdo").configuration.get("configNodeDescriptor").logical_type = LogicalDeviceType.END_DEVICE
         self.__stack.get_layer('apl').initialize()
         self._init_applications(applications)
 
