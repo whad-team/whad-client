@@ -25,6 +25,7 @@ from whad.scapy.layers.zll import ZigbeeZLLCommissioningCluster, NewZigbeeAppDat
 from random import randint
 from scapy.fields import FlagValueIter
 
+from time import time, sleep
 import logging
 
 logger = logging.getLogger(__name__)
@@ -1085,6 +1086,7 @@ class NWKManager(Dot15d4Manager):
                 new_address,
                 association_status=MACAssociationStatus.ASSOCIATION_SUCCESSFUL
             )
+
             if success:
                 self.get_service("management").indicate_join(
                     new_address,
@@ -1093,6 +1095,7 @@ class NWKManager(Dot15d4Manager):
                     rejoin=False,
                     secure_rejoin=False
                 )
+
             return success
 
     def _address_assignment(self, depth=0, router_node=False):

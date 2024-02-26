@@ -33,9 +33,8 @@ if __name__ == '__main__':
             monitor.start()
             coordinator.attach_callback(show)
             coordinator.start()
-            pan_id = 0x1234
-            channel = 11
-            print("[i] network formation: ", hex(pan_id), "  / channel=", channel)
+
+            print("[i] network formation !")
             coordinator.start_network()
             while True:
                 input()

@@ -94,6 +94,22 @@ class ZigbeeDeviceObjects(ApplicationObject):
         """
         return self.configuration.set(attribute_name, attribute_value)
 
+    def on_join(
+                            self,
+                            network_address,
+                            extended_address,
+                            capability_information,
+                            rejoin=False,
+                            secure_rejoin=False
+    ):
+        """
+        Forwards new device join notification.
+        """
+
+        self.security_manager.send_transport_key(
+            network_address
+        )
+
     def on_transport_key(
                             self,
                             source_address,

@@ -363,13 +363,15 @@ class APSManagementService(APSService):
         elif standard_key_type == APSKeyType.STANDARD_NETWORK_KEY:
             apdu = ZigbeeAppDataPayload(
                 delivery_mode=0,
+                frame_control=0,
+                aps_frametype=1
             ) / ZigbeeAppCommandPayload(
                 cmd_identifier = 5,
                 key_type = standard_key_type,
                 key = transport_key_data.key,
                 key_seqnum = transport_key_data.key_sequence_number,
                 dest_addr = destination_address,
-                src_addr = self.get.database("nwkNetworkAddress")
+                src_addr = self.manager.get_layer('nwk').database.get("nwkNetworkAddress")
             )
             return self.manager.get_layer('nwk').get_service("data").data(
                 apdu,
@@ -381,7 +383,7 @@ class APSManagementService(APSService):
                     destination_address
                 ),
                 discover_route=False,
-                #security_enable=True
+                security_enable=False
             )
         elif standard_key_type == APSKeyType.APPLICATION_LINK_KEY:
             apdu = ZigbeeAppDataPayload(
@@ -393,7 +395,7 @@ class APSManagementService(APSService):
                 partner_addr = transport_key_data.partner_address,
                 dest_addr = destination_address,
                 initiator = 1,
-                src_addr = self.get.database("nwkNetworkAddress")
+                src_addr = self.manager.get_layer('nwk').database.get("nwkNetworkAddress")
             )
             return self.manager.get_layer('nwk').get_service("data").data(
                 apdu,
@@ -405,7 +407,7 @@ class APSManagementService(APSService):
                     destination_address
                 ),
                 discover_route=False,
-                #security_enable=True
+                security_enable=False
             )
 
     def process_transport_key(self, nsdu, source_address, security_status):
@@ -506,6 +508,24 @@ class APSManagementService(APSService):
         if asdu.cmd_identifier == 5: # APS_CMD_TRANSPORT_KEY
             self.process_transport_key(nsdu, source_address, security_status)
         # Some processing for other commands is missing here
+
+    @Dot15d4Service.indication("APSME-JOIN")
+    def indicate_join(
+                        self,
+                        network_address,
+                        extended_address,
+                        capability_information,
+                        rejoin=False,
+                        secure_rejoin=False
+    ):
+        return (network_address,
+            {
+                "extended_address":extended_address,
+                "capability_information":capability_information,
+                "rejoin":rejoin,
+                "secure_rejoin":secure_rejoin
+            }
+        )
 
 class APSInterpanPseudoService(APSService):
     """
@@ -616,7 +636,7 @@ class APSManager(Dot15d4Manager):
         key_identifier = pdu[ZigbeeSecurityHeader].key_type
 
         # Collect short address from network layer
-        nwkAddressMap = self.get_layer('nwk').database.get("nwkAddressMap")
+        nwkAddressMap = self.manager.get_layer('nwk').database.get("nwkAddressMap")
         short_address = None
         if sender_address in nwkAddressMap:
             short_address = nwkAddressMap[sender_address]
@@ -693,6 +713,23 @@ class APSManager(Dot15d4Manager):
                 )
             elif nsdu.aps_frametype == 2: # ack
                 pass
+
+    @source('nwk', 'NLME-JOIN')
+    def on_join(
+                        self,
+                        network_address,
+                        extended_address,
+                        capability_information,
+                        rejoin=False,
+                        secure_rejoin=False
+    ):
+        self.get_service("management").indicate_join(
+            network_address,
+            extended_address,
+            capability_information,
+            rejoin=rejoin,
+            secure_rejoin=secure_rejoin
+        )
 
     @source('nwk', 'INTRP-DATA')
     def on_intrp_data(

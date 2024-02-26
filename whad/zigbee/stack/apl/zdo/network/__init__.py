@@ -82,6 +82,10 @@ class ZDONetworkManager(ZDOObject):
             aps_layer.database.set("apsUseExtendedPANID", randint(0, 0xffffffffffffffff))
             self.configure_extended_pan_id(0x0000000000000000)
             aps_layer.database.set("apsUseInsecureJoin", True)
+            aps_layer.database.set(
+                "apsTrustCenterAddress",
+                self.zdo.nwk_management.get("nwkIeeeAddress")
+            )
 
     def on_authorization(self):
         """

@@ -1,5 +1,8 @@
 from whad.zigbee.stack.apl.zdo.object import ZDOObject
 from whad.zigbee.stack.nwk.security import NetworkSecurityMaterial
+from whad.zigbee.stack.aps.security import APSNetworkKeyData
+
+from whad.exceptions import RequiredImplementation
 
 import logging
 logger = logging.getLogger(__name__)
@@ -41,7 +44,6 @@ class ZDOSecurityManager(ZDOObject):
         """
         Transmit the transport key to a new joining device.
         """
-        # REFACTORING NEEDED HERE
         apsTrustCenterAddress = self.zdo.aps_management.get("apsTrustCenterAddress")
         nwkIeeeAddress = self.zdo.nwk_management.get("nwkIeeeAddress")
         # maybe this test  should be in network manager instead of security manager,
@@ -50,7 +52,31 @@ class ZDOSecurityManager(ZDOObject):
             # Centralized network
             if apsTrustCenterAddress == nwkIeeeAddress:
                 # We are the trust center, implement 4.6.3.2.2 (p431)
-                pass
+                if self.zdo.configuration.get("allowsJoins"):
+                    nwkSecurityMaterialSet = self.zdo.nwk_management.get("nwkSecurityMaterialSet")
+                    if len(nwkSecurityMaterialSet) > 0:
+                        selected_key = nwkSecurityMaterialSet[0]
+                    else:
+                        # inject default key if nothing is provided
+                        self.provision_network_key(
+                            bytes.fromhex("11223344556677881122334455667788"),
+                            key_sequence_number = 0
+                        )
+                        selected_key = nwkSecurityMaterialSet[0]
+                    self.zdo.aps_management.transport_key(
+                        destination_address=destination_address,
+                        standard_key_type=1,
+                        transport_key_data = APSNetworkKeyData(
+                            key=selected_key.key,
+                            key_sequence_number=selected_key.key_sequence_number,
+                            use_parent=False # assume we are the router
+                        )
+                    )
+                else:
+                    # - APSME-REMOVE-DEVICE with:
+                    #   + parentAddress = address of the router
+                    #   + childAddress = address of the joining non authorized device
+                    raise RequiredImplementation("RemoveDeviceFromNetwork")
             else:
                 # Here we should trigger:
                 # - APSME-UPDATE-DEVICE with:

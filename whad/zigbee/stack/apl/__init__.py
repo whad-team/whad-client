@@ -228,6 +228,22 @@ class APLManager(Dot15d4Manager):
         if not success:
             logger.info("[apl] cluster not found (cluster_id=0x{:04x}).".format(cluster_id))
 
+    @source('aps', "APSME-JOIN")
+    def on_join(
+                                self,
+                                network_address,
+                                extended_address,
+                                capability_information,
+                                rejoin=False,
+                                secure_rejoin=False
+    ):
+        self.get_service("zdo").on_join(
+            network_address,
+            extended_address,
+            capability_information,
+            rejoin=False,
+            secure_rejoin=False
+        )
 
     @source('aps', "APSME-TRANSPORT-KEY")
     def on_apsme_transport_key(

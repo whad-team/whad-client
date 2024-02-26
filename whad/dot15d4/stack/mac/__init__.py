@@ -69,6 +69,8 @@ class MACDataService(MACService):
             data.src_addr = self.database.get("macExtendedAddress")
         data = data/msdu
 
+        while not self.manager.all_pending_transactions_processed(destination_address):
+            sleep(0.1)
 
         ack = self.manager.send_data(
                                         data,
@@ -328,20 +330,23 @@ class MACManagementService(MACService):
             short_address = assoc_short_address,
             association_status = int(association_status)
         )
+        '''
         self.manager.add_pending_transaction(
             association_response,
             source_address_mode=MACAddressMode.EXTENDED,
             destination_address_mode=MACAddressMode.EXTENDED
         )
-        return True
         '''
+        # dirty, but async issue when pending transaction in use
+        sleep(2)
         self.manager.send_data(
             association_response,
             source_address_mode=MACAddressMode.EXTENDED,
             destination_address_mode=MACAddressMode.EXTENDED,
-            wait_for_ack=True
         )
-        '''
+
+        return True
+
     @Dot15d4Service.request("MLME-ASSOCIATE")
     def associate(
                     self,
@@ -729,8 +734,7 @@ class MACManagementService(MACService):
             self.manager.send_data(
                 packet,
                 source_address_mode=source_address_mode,
-                destination_address_mode=destination_address_mode,
-                #wait_for_ack=True
+                destination_address_mode=destination_address_mode
             )
 
     def on_beacon_pdu(self, pdu):
@@ -775,6 +779,12 @@ class MACManager(Dot15d4Manager):
         # Move it to connector ?
         #self.set_extended_address(self.database.get("macExtendedAddress"))
 
+
+    def all_pending_transactions_processed(self, address):
+        if address in self.__pending_transactions:
+            return self.__pending_transactions[address].empty()
+        else:
+            return True
 
     def add_pending_transaction(self, packet, source_address_mode=None, destination_address_mode=None):
         """
