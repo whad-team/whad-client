@@ -4,7 +4,9 @@ from whad.zigbee.stack.aps.security import APSNetworkKeyData
 
 from whad.exceptions import RequiredImplementation
 
+from time import sleep
 import logging
+
 logger = logging.getLogger(__name__)
 
 class ZDOSecurityManager(ZDOObject):
@@ -63,6 +65,7 @@ class ZDOSecurityManager(ZDOObject):
                             key_sequence_number = 0
                         )
                         selected_key = nwkSecurityMaterialSet[0]
+                    sleep(0.5)
                     self.zdo.aps_management.transport_key(
                         destination_address=destination_address,
                         standard_key_type=1,

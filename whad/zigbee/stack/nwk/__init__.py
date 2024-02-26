@@ -664,6 +664,8 @@ class NWKManagementService(NWKService):
                 self.manager.get_layer('mac').database.get("macExtendedAddress")
             )
 
+        self.database.set("nwkPANId", selected_pan_id)
+
         # Build ZigBee beacon payload
         beacon_payload = ZigBeeBeacon(
             proto_id = 0,
@@ -1051,6 +1053,7 @@ class NWKManager(Dot15d4Manager):
             depth=0, # we only consider a depth of 0 (coordinator) for now
             router_node=router
         )
+
         if new_address is None:
             self.get_layer('mac').get_service("management").associate_response(
                 source_address,
@@ -1079,8 +1082,12 @@ class NWKManager(Dot15d4Manager):
                 pan_id=self.database.get("nwkPANId"),
                 extended_address=source_address,
                 rx_on_when_idle=bool((capability_information >> 3) & 1),
-
             )
+
+            nwkAddressMap = self.database.get("nwkAddressMap")
+            nwkAddressMap[source_address] = new_address
+            self.database.set("nwkAddressMap", nwkAddressMap)
+
             success = self.get_layer('mac').get_service("management").associate_response(
                 source_address,
                 new_address,

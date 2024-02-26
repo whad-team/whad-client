@@ -361,20 +361,47 @@ class APSManagementService(APSService):
         if standard_key_type == APSKeyType.TRUST_CENTER_LINK_KEY:
             raise RequiredImplementation("TrustCenterLinkKey")
         elif standard_key_type == APSKeyType.STANDARD_NETWORK_KEY:
+            nwkAddressMap = self.manager.get_layer('nwk').database.get("nwkAddressMap")
+            selected_destination_address = None
+            for extended_address, short_address in nwkAddressMap.items():
+                if short_address == destination_address:
+                    selected_destination_address = extended_address
+                    break
+
             apdu = ZigbeeAppDataPayload(
                 delivery_mode=0,
-                frame_control=0,
+                frame_control=['security'],
                 aps_frametype=1
             ) / ZigbeeAppCommandPayload(
                 cmd_identifier = 5,
-                key_type = standard_key_type,
+                key_type = 1,
                 key = transport_key_data.key,
                 key_seqnum = transport_key_data.key_sequence_number,
-                dest_addr = destination_address,
-                src_addr = self.manager.get_layer('nwk').database.get("nwkNetworkAddress")
+                dest_addr = selected_destination_address,
+                src_addr = self.manager.get_layer('nwk').database.get("nwkIeeeAddress")
             )
+
+            apsDeviceKeyPairSet = self.database.get("apsDeviceKeyPairSet")
+            candidate_keys = apsDeviceKeyPairSet.select(destination_address, unverified=False)
+
+            if len(candidate_keys) == 0:
+                return False
+            candidate_key = candidate_keys[0]
+            key_identifier = 0
+
+            asdu = ZigbeeSecurityHeader(
+                key_type=key_identifier,
+                extended_nonce=1,
+                fc=candidate_key.outgoing_frame_counter,
+                data=bytes(apdu)
+            )
+
+            asdu.source=self.manager.get_layer('nwk').database.get("nwkIeeeAddress")
+            crypto_manager = ApplicationSubLayerCryptoManager(candidate_key.key, None)
+            asdu = crypto_manager.encrypt(asdu)
+
             return self.manager.get_layer('nwk').get_service("data").data(
-                apdu,
+                asdu,
                 nsdu_handle=0,
                 destination_address_mode=NWKAddressMode.UNICAST,
                 destination_address=(
