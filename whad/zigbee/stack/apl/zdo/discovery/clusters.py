@@ -96,6 +96,29 @@ class ZDOIEEEAddrRsp(ZDPCluster):
     def __init__(self, zdo_object):
         super().__init__(zdo_object, cluster_id=0x8001)
 
+
+    def send_data(self, nwk_address, ieee_address, status=0, num_assoc_dev=0, start_index=0, associated_devices=[], transaction=0):
+
+        command = ZDPIEEEAddrRsp(
+            ieee_addr=ieee_address,
+            nwk_addr=nwk_address,
+            status=status
+        )
+        if status == 0:
+            command.num_assoc_dev=num_assoc_dev
+            command.start_index = start_index
+            command.associated_devices = associated_devices
+
+        command.show()
+
+        super().send_data(
+            command,
+            transaction,
+            destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT,
+            destination_address=nwk_address,
+            use_network_key=True,
+            destination_endpoint=0
+        )
 class ZDODeviceAnnce(ZDPCluster):
     def __init__(self, zdo_object):
         super().__init__(zdo_object, cluster_id=0x0013)
