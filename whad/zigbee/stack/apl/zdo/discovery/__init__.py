@@ -4,7 +4,7 @@ from whad.zigbee.profile.nodes import CoordinatorNode, EndDeviceNode, RouterNode
 from whad.dot15d4.stack.mac.constants import MACDeviceType, MACPowerSource
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.apl.zdo.discovery.exceptions import ZDODeviceAndServiceDiscoveryTimeoutException
-from whad.scapy.layers.zdp import ZDPSimpleDescRsp, ZDPActiveEPRsp, ZDPNodeDescRsp, ZDPIEEEAddrRsp
+from whad.scapy.layers.zdp import ZDPIEEEAddrReq, ZDPSimpleDescRsp, ZDPActiveEPRsp, ZDPNodeDescRsp, ZDPIEEEAddrRsp
 from queue import Queue, Empty
 from time import time, sleep
 
@@ -294,7 +294,28 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 link_quality
             )
         )
+        if ZDPIEEEAddrReq in asdu:
+            self.on_ieee_addr_req(asdu)
 
+    def on_ieee_addr_req(self, asdu):
+        """
+        Callback called when a IEEE address request is received.
+        """
+        nwk_layer = self.zdo.manager.get_layer("nwk")
+        own_network_address = nwk_layer.database.get("nwkNetworkAddress")
+        if own_network_address == asdu.nwk_addr:
+            pass
+        else:
+            selected_device = None
+            for address, device in nwk_layer.database.get("nwkNeighborTable").table.items():
+                if device.address == asdu.nwk_addr and device.device_type == ZigbeeDeviceType.END_DEVICE:
+                    selected_device = device
+                    break
+
+            if selected_device is not None:
+                pass
+            else:
+                pass
 
     def wait_for_response(self, filter_function=lambda pkt:True, timeout=1):
         """
