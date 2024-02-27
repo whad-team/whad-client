@@ -295,6 +295,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
             )
         )
 
+
     def wait_for_response(self, filter_function=lambda pkt:True, timeout=1):
         """
         Synchronous blocking method for processing data from input ZDP clusters.

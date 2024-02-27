@@ -390,12 +390,12 @@ class APSManagementService(APSService):
             if len(candidate_keys) == 0:
                 return False
             candidate_key = candidate_keys[0]
-            print(candidate_keys[0])
+
             asdu = apdu / ZigbeeSecurityHeader(
                 key_type=2,
                 extended_nonce=1,
                 fc=candidate_key.outgoing_frame_counter,
-                nwk_seclevel=5,                 
+                nwk_seclevel=5,
                 data=bytes(asdu)
             )
 
@@ -404,7 +404,6 @@ class APSManagementService(APSService):
             crypto_manager = ApplicationSubLayerCryptoManager(candidate_key.key, 0x00)
             asdu = crypto_manager.encrypt(asdu)
 
-            asdu.show()
             return self.manager.get_layer('nwk').get_service("data").data(
                 asdu,
                 nsdu_handle=0,

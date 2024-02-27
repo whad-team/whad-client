@@ -330,20 +330,22 @@ class MACManagementService(MACService):
             short_address = assoc_short_address,
             association_status = int(association_status)
         )
-        '''
+
         self.manager.add_pending_transaction(
             association_response,
             source_address_mode=MACAddressMode.EXTENDED,
             destination_address_mode=MACAddressMode.EXTENDED
         )
-        '''
+
         # dirty, but async issue when pending transaction in use
+        '''
         sleep(2)
         self.manager.send_data(
             association_response,
             source_address_mode=MACAddressMode.EXTENDED,
             destination_address_mode=MACAddressMode.EXTENDED,
         )
+        '''
 
         return True
 
@@ -715,12 +717,20 @@ class MACManagementService(MACService):
             self.indicate_associate(pdu)
         elif pdu.cmd_id == 4:
             self.on_data_request(pdu)
+            self.indicate_data_req(pdu)
         elif pdu.cmd_id == 7: # Beacon Request
             if self.database.get("macBeaconAutoRespond"):
                 self.beacon()
             else:
                 self.indicate_beacon_request(pdu)
         self.add_packet_to_queue(pdu)
+
+    @Dot15d4Service.indication("MLME−DATA-REQ")
+    def indicate_data_req(self, pdu):
+        """
+        Pseudo indication for Data Request.
+        """
+        return (pdu, {})
 
     def on_data_request(self, pdu):
         """
@@ -731,11 +741,13 @@ class MACManagementService(MACService):
         pending = self.manager.get_pending_transaction(pdu.src_addr)
         if pending is not None:
             packet, source_address_mode, destination_address_mode = pending
+
             self.manager.send_data(
                 packet,
                 source_address_mode=source_address_mode,
                 destination_address_mode=destination_address_mode
             )
+
 
     def on_beacon_pdu(self, pdu):
         """
