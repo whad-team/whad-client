@@ -1,7 +1,7 @@
 from scapy.packet import Packet, bind_layers, split_layers
 from scapy.fields import ByteEnumField, StrLenField, LEIntField, XShortField, LEShortField, \
     FieldLenField, StrFixedLenField, ConditionalField, PacketField, XLongField, XIntField,  XLEIntField, \
-    XLEShortField, BitEnumField, BitField, ByteField, FieldListField, StrField, XByteField
+    XLEShortField, BitEnumField, BitField, ByteField, FieldListField, StrField, XByteField, LEShortField
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS, Dot15d4Data
 from scapy.all import raw, rdpcap, conf
 
@@ -385,7 +385,7 @@ class RF4CE_Vendor_ZRC_User_Control_Pressed(Packet):
     name = "RF4CE Vendor Data - User Control Pressed - ZRC Profile"
     fields_desc = [
         ByteEnumField("code", None, RC_COMMAND_CODES),
-        StrField("payload", None)
+        StrField("ctrl_payload", None)
     ]
 
 class RF4CE_Vendor_ZRC_User_Control_Released(Packet):
@@ -436,16 +436,67 @@ class RF4CE_Vendor_MSO_Audio(Packet):
             0x03 : "data_notify",
             0x81 : "start_rsp",
             0x82 : "stop_rsp",
-            0x83 : "data_rsp"
-        })
+            0x83 : "data_rsp" # not implemented ?
+        }),
+        ByteField("length", 0),
+    ]
+
+    def post_build(self, p, pay):
+        if self.length is None:
+            self.length = len(pay)
+        return p + pay
+
+class RF4CE_Vendor_MSO_Audio_Start_Request(Packet):
+    name = "RF4CE Vendor Data - Audio Start Request"
+    fields_desc = [
+        LEShortField("sample_rate", None),
+        ByteField("resolution_bits", None),
+        ByteField("mic_channel_number", None),
+        ByteEnumField("codec_type", None, {1 : "ADPCM"}),
+        ByteField("packet_size", None),
+        ByteField("interval", None),
+        ByteField("channel_number", None),
+        ByteField("duration", None),
 
     ]
+
+class RF4CE_Vendor_MSO_Audio_Stop_Request(Packet):
+    name = "RF4CE Vendor Data - Audio Stop Request"
+    fields_desc = []
+
+
+class RF4CE_Vendor_MSO_Audio_Start_Response(Packet):
+    name = "RF4CE Vendor Data - Audio Start Response"
+    fields_desc = [
+        ByteField("best_channel", None)
+    ]
+
+
+class RF4CE_Vendor_MSO_Audio_Stop_Response(Packet):
+    name = "RF4CE Vendor Data - Audio Stop Response"
+    fields_desc = [
+        ByteField("state", None)
+    ]
+
+
+class RF4CE_Vendor_MSO_Audio_Data_Notify(Packet):
+    name = "RF4CE Vendor Data - Audio Data Notify"
+    fields_desc = [
+        LEIntField("header", None),
+        StrFixedLenField("samples", None, length=80)
+
+        #FieldListField("samples_list", None,
+        #    LEShortField("sample", None),
+        #    count_from=lambda _:40),
+
+    ]
+
 
 class RF4CE_Vendor_MSO_User_Control_Pressed(Packet):
     name = "RF4CE Vendor Data - User Control Pressed - MSO Profile"
     fields_desc = [
         ByteEnumField("code", None, RC_COMMAND_CODES),
-        StrField("payload", None)
+        StrField("ctrl_payload", None)
     ]
 
 class RF4CE_Vendor_MSO_User_Control_Released(Packet):
@@ -558,6 +609,16 @@ bind_layers(RF4CE_Vendor_ZRC_Hdr, RF4CE_Vendor_ZRC_User_Control_Repeated, comman
 bind_layers(RF4CE_Vendor_ZRC_Hdr, RF4CE_Vendor_ZRC_User_Control_Released, command_code = 0x03)
 bind_layers(RF4CE_Vendor_ZRC_Hdr, RF4CE_Vendor_ZRC_Command_Discovery_Request, command_code = 0x04)
 bind_layers(RF4CE_Vendor_ZRC_Hdr, RF4CE_Vendor_ZRC_Command_Discovery_Response, command_code = 0x05)
+
+
+bind_layers(RF4CE_Vendor_MSO_Audio, RF4CE_Vendor_MSO_Audio_Start_Request, audio_cmd_id = 0x01)
+bind_layers(RF4CE_Vendor_MSO_Audio, RF4CE_Vendor_MSO_Audio_Stop_Request, audio_cmd_id = 0x02)
+bind_layers(RF4CE_Vendor_MSO_Audio, RF4CE_Vendor_MSO_Audio_Data_Notify, audio_cmd_id = 0x03)
+
+bind_layers(RF4CE_Vendor_MSO_Audio, RF4CE_Vendor_MSO_Audio_Start_Response, audio_cmd_id = 0x81)
+bind_layers(RF4CE_Vendor_MSO_Audio, RF4CE_Vendor_MSO_Audio_Stop_Response, audio_cmd_id = 0x82)
+
+# Monkey patch to add RF4CE support in Dot15d4 layer
 old_guess_payload_class = Dot15d4Data.guess_payload_class
 def guess_payload_class(self, payload):
     if conf.dot15d4_protocol == "rf4ce":
@@ -600,7 +661,19 @@ address1 = bytes.fromhex("c4:19:d1:59:d2:a7:92:c5".replace(":", ""))[::-1]
 
 from Cryptodome.Cipher import AES
 from struct import pack
-for i in rdpcap("./ressources/pcaps/telink_voice_rf4ce.pcapng"):
+state = None
+samples = b""
+import pyaudio
+
+p = pyaudio.PyAudio()
+
+stream = p.open(format=pyaudio.get_format_from_width(2, unsigned=False),
+                    channels=1,
+                    rate=16000,
+                    output=True)
+
+
+for i in rdpcap("./ressources/pcaps/telink_voice3_rf4ce.pcapng"):
     pkt_raw = raw(i)[44:]
     pkt = Dot15d4FCS(pkt_raw)
     if hasattr(pkt, "security_enabled") and pkt.security_enabled == 1:
@@ -608,9 +681,9 @@ for i in rdpcap("./ressources/pcaps/telink_voice_rf4ce.pcapng"):
         pkt.reserved = 1
         ciphertext = raw(pkt[RF4CE_Hdr:][2 if pkt.frame_type in (1,3) else 1:])
         header = raw(pkt[RF4CE_Hdr:])[:-4-len(ciphertext)]
-        print(header)
+        #print(header)
         auth = raw(pkt[RF4CE_Hdr:])[:5]
-        print("ciphertext", ciphertext.hex())
+        #print("ciphertext", ciphertext.hex())
         nonce1 = address2 + pack("<I", pkt.frame_counter) + b"\x05"
         # Perform the decryption and integrity check
         cipher1 = AES.new(key, AES.MODE_CCM, nonce=nonce1, mac_len=4)
@@ -635,19 +708,37 @@ for i in rdpcap("./ressources/pcaps/telink_voice_rf4ce.pcapng"):
                 ok2 = True
             except:
                 ok2 = False
-
+        '''
         if ok:
             print("cipher 1 OK")
         elif ok2:
             print("cipher 2 OK")
         else:
             print("cipher 1 & 2 KO")
-
+        '''
         if ok or ok2:
-            print("plaintext", plaintext.hex())
+            #print("plaintext", plaintext.hex())
 
             pkt_dec = RF4CE_Hdr(header + plaintext + pack('<I', pkt.mic))
-            pkt_dec.show()
+            #pkt_dec.show()
+
+            from audioop import adpcm2lin
+
+            if RF4CE_Vendor_MSO_Audio_Data_Notify in pkt_dec:
+                #print(pkt_dec.samples)
+                sample, new_state = adpcm2lin(pkt_dec.samples, 2, state)
+                samples += sample
+
+                state = new_state
+
+
+for i in range(0, len(samples), 1024):
+    sample = samples[i:i+1024]
+    stream.write(sample)
+
+
+#with open("/tmp/truc.wav", "wb") as f:
+#    f.write(samples)
 
 '''
 pkt1 = bytes.fromhex("2a5ee10000010c4111544c00000000001353522d3030312d550000000000000001c009")
