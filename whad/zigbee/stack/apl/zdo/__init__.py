@@ -43,12 +43,12 @@ class ZigbeeDeviceObjects(ApplicationObject):
             device_version=0,
             input_clusters=[
                 self.clusters["node_desc_req"],
+                self.clusters["ieee_addr_req"],
                 self.clusters["nwk_addr_rsp"],
                 self.clusters["ieee_addr_rsp"],
                 self.clusters["node_desc_rsp"],
                 self.clusters["active_ep_rsp"],
                 self.clusters["simple_desc_rsp"],
-
             ],
             output_clusters=[
                 self.clusters["nwk_addr_req"],

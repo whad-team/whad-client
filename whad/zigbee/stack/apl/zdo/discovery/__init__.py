@@ -4,7 +4,8 @@ from whad.zigbee.profile.nodes import CoordinatorNode, EndDeviceNode, RouterNode
 from whad.dot15d4.stack.mac.constants import MACDeviceType, MACPowerSource
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.apl.zdo.discovery.exceptions import ZDODeviceAndServiceDiscoveryTimeoutException
-from whad.scapy.layers.zdp import ZDPSimpleDescRsp, ZDPActiveEPRsp, ZDPNodeDescRsp, ZDPIEEEAddrRsp
+from whad.scapy.layers.zdp import ZDPIEEEAddrReq, ZDPSimpleDescRsp, ZDPActiveEPRsp, ZDPNodeDescRsp, ZDPIEEEAddrRsp
+from whad.zigbee.stack.nwk.constants import ZigbeeRelationship, ZigbeeDeviceType
 from queue import Queue, Empty
 from time import time, sleep
 
@@ -294,6 +295,77 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 link_quality
             )
         )
+        if ZDPIEEEAddrReq in asdu:
+            self.on_ieee_addr_req(asdu)
+
+    def on_ieee_addr_req(self, asdu):
+        """
+        Callback called when a IEEE address request is received.
+        """
+        nwk_layer = self.zdo.manager.get_layer("nwk")
+        own_network_address = nwk_layer.database.get("nwkNetworkAddress")
+        own_ieee_address = nwk_layer.database.get("nwkIeeeAddress")
+
+        associated_devices_addresses = []
+        for address, device in nwk_layer.database.get("nwkNeighborTable").table.items():
+            if (
+                device.relationship == ZigbeeRelationship.IS_CHILD and
+                device.device_type == ZigbeeDeviceType.END_DEVICE
+            ):
+                associated_devices_addresses.append(device.address)
+
+
+        match = False
+        if own_network_address == asdu.nwk_addr or asdu.nwk_addr in associated_devices_addresses:
+            match = True
+
+
+        if match:
+            if asdu.request_type == 0:
+                self.zdo.clusters["ieee_addr_rsp"].send_data(
+                    own_network_address,
+                    own_ieee_address,
+                    status=0,
+                    num_assoc_dev=0,
+                    start_index=0,
+                    associated_devices=[],
+                    transaction=self.transaction
+                )
+            elif asdu.request_type == 1:
+                self.zdo.clusters["ieee_addr_rsp"].send_data(
+                    own_network_address,
+                    own_ieee_address,
+                    status=0,
+                    num_assoc_dev=len(associated_devices_addresses),
+                    start_index=asdu.start_index,
+                    associated_devices=associated_devices_addresses[asdu.start_index:],
+                    transaction=self.transaction
+                )
+            else:
+                self.zdo.clusters["ieee_addr_rsp"].send_data(
+                    own_network_address,
+                    own_ieee_address,
+                    status=2,
+                    num_assoc_dev=0,
+                    start_index=0,
+                    associated_devices=[],
+                    transaction=self.transaction
+                )
+
+            self.transaction += 1
+
+        else:
+            # no match, send device not found response
+            self.zdo.clusters["ieee_addr_rsp"].send_data(
+                own_network_address,
+                own_ieee_address,
+                status=1,
+                num_assoc_dev=0,
+                start_index=0,
+                associated_devices=[],
+                transaction=self.transaction
+            )
+            self.transaction += 1
 
     def wait_for_response(self, filter_function=lambda pkt:True, timeout=1):
         """

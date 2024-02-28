@@ -372,7 +372,8 @@ class APSManagementService(APSService):
                 delivery_mode=0,
                 frame_control=['security'],
                 aps_frametype=1
-            ) / ZigbeeAppCommandPayload(
+            )
+            asdu = ZigbeeAppCommandPayload(
                 cmd_identifier = 5,
                 key_type = 1,
                 key = transport_key_data.key,
@@ -380,6 +381,8 @@ class APSManagementService(APSService):
                 dest_addr = selected_destination_address,
                 src_addr = self.manager.get_layer('nwk').database.get("nwkIeeeAddress")
             )
+            print(self.manager.get_layer('nwk').database.get("nwkIeeeAddress"))
+            asdu.show()
 
             apsDeviceKeyPairSet = self.database.get("apsDeviceKeyPairSet")
             candidate_keys = apsDeviceKeyPairSet.select(destination_address, unverified=False)
@@ -387,17 +390,18 @@ class APSManagementService(APSService):
             if len(candidate_keys) == 0:
                 return False
             candidate_key = candidate_keys[0]
-            key_identifier = 0
 
-            asdu = ZigbeeSecurityHeader(
-                key_type=key_identifier,
+            asdu = apdu / ZigbeeSecurityHeader(
+                key_type=2,
                 extended_nonce=1,
                 fc=candidate_key.outgoing_frame_counter,
-                data=bytes(apdu)
+                nwk_seclevel=5,
+                data=bytes(asdu)
             )
 
+
             asdu.source=self.manager.get_layer('nwk').database.get("nwkIeeeAddress")
-            crypto_manager = ApplicationSubLayerCryptoManager(candidate_key.key, None)
+            crypto_manager = ApplicationSubLayerCryptoManager(candidate_key.key, 0x00)
             asdu = crypto_manager.encrypt(asdu)
 
             return self.manager.get_layer('nwk').get_service("data").data(
@@ -663,7 +667,7 @@ class APSManager(Dot15d4Manager):
         key_identifier = pdu[ZigbeeSecurityHeader].key_type
 
         # Collect short address from network layer
-        nwkAddressMap = self.manager.get_layer('nwk').database.get("nwkAddressMap")
+        nwkAddressMap = self.get_layer('nwk').database.get("nwkAddressMap")
         short_address = None
         if sender_address in nwkAddressMap:
             short_address = nwkAddressMap[sender_address]

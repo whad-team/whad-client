@@ -519,7 +519,7 @@ class NWKManagementService(NWKService):
 
     @Dot15d4Service.indication("NLME-JOIN")
     def indicate_join(self, network_address, extended_address, capability_information, rejoin=False, secure_rejoin=False):
-        print("[indicate join]")
+
         return (
             network_address,
             {
@@ -872,7 +872,7 @@ class NWKManager(Dot15d4Manager):
         self.add_service("data", NWKDataService(self))
         self.add_service("management", NWKManagementService(self))
         self.add_service("interpan", NWKInterpanService(self))
-
+        self.__pending_join_indication = None
 
     def add_key(self, key, key_sequence_number=None, outgoing_frame_counter=0):
         """
@@ -1038,12 +1038,12 @@ class NWKManager(Dot15d4Manager):
                     association_status=MACAssociationStatus.ASSOCIATION_SUCCESSFUL
                 )
                 if success:
-                    self.get_service("management").indicate_join(
+                    self.__pending_join_indication = (
                         new_address,
                         source_address,
                         capability_information,
-                        rejoin=False,
-                        secure_rejoin=False
+                        False,
+                        False
                     )
                 return success
             else:
@@ -1095,12 +1095,12 @@ class NWKManager(Dot15d4Manager):
             )
 
             if success:
-                self.get_service("management").indicate_join(
+                self.__pending_join_indication = (
                     new_address,
                     source_address,
                     capability_information,
-                    rejoin=False,
-                    secure_rejoin=False
+                    False,
+                    False
                 )
 
             return success
@@ -1146,6 +1146,14 @@ class NWKManager(Dot15d4Manager):
                 else:
                     new_address = parent_address + cskip * rm + (len(end_devices)) # + 1 or not ?
             return new_address
+
+    @source('mac', 'MLME−DATA-REQ')
+    def on_mlme_data_req(self, pdu):
+        if self.__pending_join_indication is not None:
+            self.get_service("management").indicate_join(
+                *self.__pending_join_indication
+            )
+            self.__pending_join_indication = None
 
     @source('mac', 'MLME-BEACON-NOTIFY')
     def on_mlme_beacon_notify(self, beacon_payload, pan_descriptor):
