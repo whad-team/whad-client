@@ -3,7 +3,7 @@ from scapy.fields import ByteEnumField, StrLenField, LEIntField, XShortField, LE
     FieldLenField, StrFixedLenField, ConditionalField, PacketField, XLongField, XIntField,  XLEIntField, \
     XLEShortField, BitEnumField, BitField, ByteField, FieldListField, StrField, XByteField, LEShortField
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS, Dot15d4Data
-from scapy.all import raw, rdpcap, conf
+from scapy.config import conf
 
 RC_COMMAND_CODES = {
  0x40 : "TV POWER",
@@ -484,11 +484,6 @@ class RF4CE_Vendor_MSO_Audio_Data_Notify(Packet):
     fields_desc = [
         LEIntField("header", None),
         StrFixedLenField("samples", None, length=80)
-
-        #FieldListField("samples_list", None,
-        #    LEShortField("sample", None),
-        #    count_from=lambda _:40),
-
     ]
 
 
@@ -627,6 +622,8 @@ def guess_payload_class(self, payload):
         return old_guess_payload_class(self, payload)
 
 Dot15d4Data.guess_payload_class = guess_payload_class
+
+"""
 conf.dot15d4_protocol = "rf4ce"
 
 seedslist = []
@@ -663,6 +660,7 @@ from Cryptodome.Cipher import AES
 from struct import pack
 state = None
 samples = b""
+samples2 = b""
 import pyaudio
 
 p = pyaudio.PyAudio()
@@ -672,6 +670,9 @@ stream = p.open(format=pyaudio.get_format_from_width(2, unsigned=False),
                     rate=16000,
                     output=True)
 
+import adpcm
+decoder = adpcm.ByteAdpcmDecoder(0, 0)
+from audioop import adpcm2lin
 
 for i in rdpcap("./ressources/pcaps/telink_voice3_rf4ce.pcapng"):
     pkt_raw = raw(i)[44:]
@@ -720,23 +721,36 @@ for i in rdpcap("./ressources/pcaps/telink_voice3_rf4ce.pcapng"):
             #print("plaintext", plaintext.hex())
 
             pkt_dec = RF4CE_Hdr(header + plaintext + pack('<I', pkt.mic))
-            #pkt_dec.show()
+            pkt_dec.show()
 
-            from audioop import adpcm2lin
+
+
 
             if RF4CE_Vendor_MSO_Audio_Data_Notify in pkt_dec:
                 #print(pkt_dec.samples)
                 sample, new_state = adpcm2lin(pkt_dec.samples, 2, state)
-                samples += sample
+                samples2 += sample
 
                 state = new_state
 
+                for frame in pkt_dec.samples:
 
+                    low = decoder.decode(frame >> 4)
+                    high = decoder.decode(frame & 0xF)
+                    samples += pack('H', low) + pack('H', high)#bytes([, low])
+
+print(samples)
 for i in range(0, len(samples), 1024):
     sample = samples[i:i+1024]
     stream.write(sample)
 
+for i in range(0, len(samples2), 1024):
+    sample = samples2[i:i+1024]
+    stream.write(sample)
 
+
+stream.close()
+"""
 #with open("/tmp/truc.wav", "wb") as f:
 #    f.write(samples)
 
