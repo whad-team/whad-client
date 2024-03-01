@@ -1,7 +1,9 @@
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
 from whad.scapy.layers.rf4ce import RF4CE_Hdr
 from whad.rf4ce.exceptions import MissingRF4CEHeader, MissingRF4CESecurityFlag
+from Cryptodome.Cipher import AES
 from struct import pack
+from scapy.all import raw
 from scapy.config import conf
 
 conf.dot15d4_protocol = "rf4ce"
@@ -35,8 +37,10 @@ class RF4CECryptoManager:
         if destination is None:
             return None
 
-        # Extract the header
-        header = bytes(packet[RF4CE_Hdr:])[:5]
+        # Extract the header (force a rebuild)
+        packet.reserved = 1
+        packet = packet[RF4CE_Hdr:]
+        header = raw(packet)[:5]
 
         # Build and return the auth
         return header + destination
@@ -46,7 +50,7 @@ class RF4CECryptoManager:
         # into account supplementary fields
         start_of_payload = 2 if packet.frame_type in (1,3) else 1
         ciphertext = bytes(packet[RF4CE_Hdr:][start_of_payload:])
-        return ciphertext
+        return ciphertext, pack("<I", packet.mic)
 
     def decrypt(self, packet, source=None, destination=None):
         # convert source and destination address if provided
@@ -62,14 +66,13 @@ class RF4CECryptoManager:
 
         # don't process FCS if present
         if Dot15d4FCS in packet:
-            packet = Dot15d4(raw(packet)[:-2])
+            # force a rebuild just in case
+            packet.reserved = 1
+            packet = raw(packet)[:-2]
+            packet = Dot15d4(packet)
 
         if RF4CE_Hdr not in packet:
             raise MissingRF4CEHeader()
-
-        # force a rebuild just in case
-        packet.reserved = 1
-        packet.show()
 
         # Check if packet has security enabled
         if (
@@ -86,10 +89,27 @@ class RF4CECryptoManager:
                 # Missing destination address, auth cannot be generated
                 return (packet, False)
 
-            ciphertext = self.extractCiphertextPayload(packet)
-            print("ciphertext", self.nonce.hex())
-            print("ciphertext", self.auth.hex())
-            print("ciphertext", ciphertext.hex())
+            ciphertext, mic = self.extractCiphertextPayload(packet)
+
+            # Perform the decryption and integrity check
+            cipher = AES.new(self.key, AES.MODE_CCM, nonce=self.nonce, mac_len=4)
+            cipher.update(self.auth)
+            print(self.nonce, self.auth, ciphertext)
+            plaintext = cipher.decrypt(ciphertext)
+            print(mic)
+            print(plaintext)
+            try:
+                cipher.verify(mic)
+
+                # Rebuild the decrypted packet
+                header = raw(packet)[:-4-len(ciphertext)]
+                packet = Dot15d4(header + plaintext + mic)
+
+                return (packet, True)
+
+            except ValueError:
+                return (packet, False) # integrity check
+
         else:
             # Security is not enabled, raise an exception
             raise MissingRF4CESecurityFlag()
@@ -101,7 +121,8 @@ key = bytes.fromhex("32d277d18b5744de9da8726d2f88fe05")
 
 address1 = "c4:19:d1:ae:35:0d:70:02"
 address2 = "c4:19:d1:59:d2:a7:92:c5"
-pkt1 = bytes.fromhex("61889c9a26153fbcfe2f85e10000c04111d775960ad77a1dce")
+pkt1 = Dot15d4FCS(bytes.fromhex("61889c9a26153fbcfe2f85e10000c04111d775960ad77a1dce"))
 pkt2 = bytes.fromhex("41c87affffffff02700d35aed119c42a5ee10000010c4111544c00000000001353522d3030312d550000000000000001c00932b1")
-RF4CECryptoManager(key).decrypt(pkt1, address1, address2)
-RF4CECryptoManager(key).decrypt(pkt2)
+decrypted, success = RF4CECryptoManager(key).decrypt(pkt1, address1, address2)
+decrypted.show()
+#RF4CECryptoManager(key).decrypt(pkt2)
