@@ -8,4 +8,7 @@ class MissingRF4CEHeader(Exception):
 class MissingRF4CESecurityFlag(Exception):
     def __init__(self):
         super().__init__()
-        
+
+class MissingCryptographicMaterial(Exception):
+    def __init__(self):
+        super().__init__()
