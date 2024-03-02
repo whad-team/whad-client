@@ -34,6 +34,12 @@ class Sniffer(RF4CE, EventsManager):
     def clear_keys(self):
         self.__configuration.keys = []
 
+    def add_address(self, key):
+        self.__configuration.addresses.append(address)
+
+    def clear_addresses(self):
+        self.__configuration.addresses = []
+
     @property
     def decrypt(self):
         return self.__configuration.decrypt
