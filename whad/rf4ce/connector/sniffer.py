@@ -1,9 +1,14 @@
 from whad.rf4ce.connector import RF4CE
 from whad.rf4ce.sniffing import SnifferConfiguration
-from whad.rf4ce.crypto import RF4CEDecryptor
+from whad.rf4ce.crypto import RF4CEDecryptor, RF4CEKeyDerivation
+from whad.rf4ce.exceptions import MissingCryptographicMaterial
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
+from whad.rf4ce.sniffing import KeyExtractedEvent
 from whad.common.sniffing import EventsManager
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Sniffer(RF4CE, EventsManager):
     """
@@ -16,6 +21,7 @@ class Sniffer(RF4CE, EventsManager):
 
         self.__configuration = SnifferConfiguration()
         self.__decryptor = RF4CEDecryptor()
+        self.__key_derivation = RF4CEKeyDerivation()
 
         # Check if device can perform sniffing
         if not self.can_sniff():
@@ -67,7 +73,6 @@ class Sniffer(RF4CE, EventsManager):
     @configuration.setter
     def configuration(self, new_configuration):
         self.stop()
-        print(new_configuration)
         self.__configuration = new_configuration
         self._enable_sniffing()
 
@@ -83,13 +88,36 @@ class Sniffer(RF4CE, EventsManager):
             self.monitor_packet_rx(packet)
 
 
+            if self.__configuration.pairing:
+                self.__key_derivation.process_packet(packet)
+                if self.__key_derivation.key is not None:
+                    logger.info("[i] New key extracted: ", self.__key_derivation.key.hex())
+                    self.trigger_event(KeyExtractedEvent(self.__key_derivation.key))
+                    self.__decryptor.add_key(self.__key_derivation.key)
+                    self.__key_derivation.reset()
+
+            if (
+                hasattr(packet, "fcf_destaddrmode") and
+                packet.fcf_destaddrmode == 3
+            ):
+                self.__decryptor.add_address(packet.dest_addr)
+
+            if (
+                hasattr(packet, "fcf_srcaddrmode") and
+                packet.fcf_srcaddrmode == 3
+            ):
+                self.__decryptor.add_address(packet.src_addr)
+
             if (
                 hasattr(packet, "security_enabled") and
                 packet.security_enabled == 1 and
                 self.__configuration.decrypt
             ):
-                decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
-                if success:
-                    packet.decrypted = decrypted
-
+                try:
+                    decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
+                    if success:
+                        packet.decrypted = decrypted
+                    else:
+                except MissingCryptographicMaterial:
+                    pass
             yield packet

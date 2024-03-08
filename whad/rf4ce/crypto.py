@@ -1,5 +1,6 @@
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
-from whad.scapy.layers.rf4ce import RF4CE_Hdr
+from whad.scapy.layers.rf4ce import RF4CE_Hdr, \
+    RF4CE_Cmd_Pair_Request, RF4CE_Cmd_Key_Seed
 from whad.rf4ce.exceptions import MissingRF4CEHeader, \
     MissingCryptographicMaterial, MissingRF4CESecurityFlag
 from Cryptodome.Cipher import AES
@@ -154,8 +155,6 @@ class RF4CECryptoManager:
                 # Missing destination address, auth cannot be generated
                 return (packet, False)
 
-            packet.show()
-
             # Perform the decryption and integrity check
             cipher = AES.new(self.key, AES.MODE_CCM, nonce=self.nonce, mac_len=4)
             cipher.update(self.auth)
@@ -179,6 +178,59 @@ class RF4CECryptoManager:
             # Security is not enabled, raise an exception
             raise MissingRF4CESecurityFlag()
 
+def xor(a, b):
+    """
+    Helper function to perform a xor operation between two bytes array.
+    """
+    return bytes(
+        [
+            a[i] ^ b[i] for i in range(min(len(a), len(b)))
+        ]
+    )
+
+class RF4CEKeyDerivation:
+    def __init__(self, seeds_number=None, seeds=[]):
+        self.seeds_number = seeds_number
+        self.seeds = seeds
+
+    def process_packet(self, packet):
+        if RF4CE_Cmd_Pair_Request in packet:
+            self.seeds_number = packet.key_exchange_transfer_count
+        elif RF4CE_Cmd_Key_Seed in packet:
+            self.seeds.append(packet.seed_data)
+
+    @property
+    def key(self):
+        if (
+                self.seeds_number is not None and
+                len(self.seeds) == 1 + self.seeds_number
+        ):
+            return self._generate_key()
+        else:
+            return None
+
+    def reset(self):
+        self.seeds_number = None
+        self.seeds = []
+
+    def _generate_key(self):
+        phase1 = b"\x00" * 80
+        for current_seed in self.seeds:
+            phase1 = xor(phase1, current_seed)
+
+        phase2 = []
+        for i in range(5):
+            start = i*16
+            end = (i+1)*16
+            s = phase1[start:end]
+            phase2.append(s)
+
+        key = b"\x00"*16
+        for current_seed in phase2:
+            key = xor(key, current_seed)
+
+        return key
+
 class RF4CEDecryptor:
     def __init__(self, *keys):
         self.keys = list(keys)
@@ -186,7 +238,10 @@ class RF4CEDecryptor:
 
     def add_address(self, *addresses):
         for address in addresses:
-            self.addresses.append(address)
+            if isinstance(address, int):
+                address = ":".join(["{:02x}".format(i) for i in pack('>Q', address)])
+            if address not in self.addresses:
+                self.addresses.append(address)
 
     def add_key(self, key):
         if isinstance(key, str):
@@ -257,33 +312,3 @@ class RF4CEDecryptor:
                     pass
 
         return (None, False)
-'''
-key = bytes.fromhex("32d277d18b5744de9da8726d2f88fe05")
-
-address1 = "c4:19:d1:ae:35:0d:70:02"
-address2 = "c4:19:d1:59:d2:a7:92:c5"
-pkt1 = Dot15d4FCS(bytes.fromhex("61889c9a26153fbcfe2f85e10000c04111d775 960ad77a 1dce"))
-
-d = RF4CEDecryptor(key)
-d.add_address(address1, address2)
-p, s = d.attempt_to_decrypt(pkt1)
-p.show()
-print(s)
-'''
-'''
-# test key: 32d277d18b5744de9da8726d2f88fe05
-key = bytes.fromhex("32d277d18b5744de9da8726d2f88fe05")
-
-address1 = "c4:19:d1:ae:35:0d:70:02"
-address2 = "c4:19:d1:59:d2:a7:92:c5"
-pkt1 = Dot15d4FCS(bytes.fromhex("61889c9a26153fbcfe2f85e10000c04111d775 960ad77a 1dce"))
-pkt2 = bytes.fromhex("41c87affffffff02700d35aed119c42a5ee10000010c4111544c00000000001353522d3030312d550000000000000001c00932b1")
-decrypted, success = RF4CECryptoManager(key).decrypt(pkt1, address1, address2)
-
-a = RF4CECryptoManager(key).encrypt(decrypted, address1, address2)
-print(bytes(a).hex())
-#decrypted.show()
-#RF4CECryptoManager(key).decrypt(pkt2)
-#61889c9a26153fbcfe2f960ad77a85e10000c04111d775
-#61889c9a26153fbcfe2f85e10000c04111d775960ad77a1dce
-'''

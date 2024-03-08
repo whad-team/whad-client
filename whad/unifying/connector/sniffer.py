@@ -21,6 +21,7 @@ class Sniffer(Unifying, EventsManager):
         self.__decryptor = LogitechUnifyingDecryptor()
         self.__key_derivation = LogitechUnifyingKeyDerivation()
 
+        self.__addresses = []
         # Check if device can perform sniffing
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
@@ -121,6 +122,7 @@ class Sniffer(Unifying, EventsManager):
                 if self.__key_derivation.key is not None:
                     logger.info("[i] New key extracted: ", self.__key_derivation.key.hex())
                     self.trigger_event(KeyExtractedEvent(self.__key_derivation.key))
+                    self.add_key(self.__key_derivation.key)
                     self.__key_derivation.reset()
 
             if Logitech_Encrypted_Keystroke_Payload in packet and self.__configuration.decrypt:

@@ -10,7 +10,7 @@ class SnifferConfiguration:
     :param address: provide address to sniff (f)
     :param scanning: enable scanning mode (s)
     :param acknowledgements: enable acknowledgements sniffing (a)
-    :param pairing: sniff pairing procedure (p)
+    :param pairing: sniff pairing procedure and break key if possible (p)
     :param decrypt: indicate if decryption is enabled (d)
     :param keys: provide decryption keys (k)
 
