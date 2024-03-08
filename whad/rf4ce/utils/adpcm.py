@@ -6,6 +6,7 @@ ADPCM codec implementation.
 from whad.scapy.layers.rf4ce import RF4CE_Vendor_MSO_Audio_Start_Request, \
 		RF4CE_Vendor_MSO_Audio_Data_Notify, RF4CE_Vendor_MSO_Audio_Stop_Request
 from struct import pack
+import wave
 
 resolution = 16
 
@@ -149,30 +150,39 @@ class ByteAdpcmDecoder:
 
 
 class ADPCM:
-	def __init__(self, output_file=None):
-		self.output_file = output_file
+	def __init__(self, live_play=True, output_filename=None):
+		self.output_filename = output_filename
 		self.output_stream = None
+		self.output_file = None
+		self.live_play = live_play
 		self.decoder = ByteAdpcmDecoder(0, 0)
 
+
 	def _open_stream(self, channels=1, rate=16000, sample_size=2, unsigned_sample_size=False):
-		if self.output_file is None:
-			try:
-				import pyaudio
+		try:
+			import pyaudio
 
-				p = pyaudio.PyAudio()
-				stream = p.open(
-									format=pyaudio.get_format_from_width(
-										sample_size,
-										unsigned=unsigned_sample_size
-									),
-				                    channels=channels,
-				                    rate=rate,
-				                    output=True
-				)
-				return stream
+			p = pyaudio.PyAudio()
+			stream = p.open(
+								format=pyaudio.get_format_from_width(
+									sample_size,
+									unsigned=unsigned_sample_size
+								),
+			                    channels=channels,
+			                    rate=rate,
+			                    output=True
+			)
+			return stream
 
-			except ImportError:
-				return None
+		except ImportError:
+			return None
+
+	def _open_file(self, channels=1, rate=16000, sample_size=2, unsigned_sample_size=False):
+		stream = wave.open(self.output_filename, 'wb')
+		stream.setnchannels(channels)
+		stream.setsampwidth(sample_size)
+		stream.setframerate(rate)
+		return stream
 
 	def decode(self, samples):
 		decoded_samples = b""
@@ -187,14 +197,24 @@ class ADPCM:
 
 	def process_packet(self, packet):
 		if RF4CE_Vendor_MSO_Audio_Start_Request in packet:
-			self.output_stream = self._open_stream()
+			if self.live_play:
+				self.output_stream = self._open_stream()
+			if self.output_filename:
+				self.output_file = self._open_file()
 
 		elif RF4CE_Vendor_MSO_Audio_Data_Notify in packet:
+			if self.output_stream is not None or self.output_file is not None:
+				decoded_samples = self.decode(packet.samples)
 			if self.output_stream is not None:
-				self.output_stream.write(
-					self.decode(packet.samples)
-				)
-				
+				if self.live_play:
+					self.output_stream.write(decoded_samples)
+			if self.output_file is not None:
+				self.output_file.writeframes(decoded_samples)
+
 		elif RF4CE_Vendor_MSO_Audio_Stop_Request in packet:
 			if self.output_stream is not None:
-				self.output_stream.close()
+				if self.live_play:
+					self.output_stream.close()
+					self.output_stream = None
+				if self.output_file is not None:
+					self.output_file.close()

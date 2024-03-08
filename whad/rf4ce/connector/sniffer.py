@@ -34,6 +34,12 @@ class Sniffer(RF4CE, EventsManager):
             self.__decryptor.add_key(key)
         for address in self.__configuration.addresses:
             self.__decryptor.add_address(address)
+        if (
+            self.__configuration.audio and
+            self.__configuration.audio_file is not None and
+            self.__configuration.audio_file
+        ):
+            self.__audio_stream.output_filename = self.__configuration.audio_file
         self.sniff_rf4ce(channel=self.__configuration.channel)
 
     def add_key(self, key):

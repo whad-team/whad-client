@@ -18,6 +18,7 @@ class SnifferConfiguration:
     decrypt : bool = False
     pairing : bool = False
     audio : bool = False
+    audio_file : str = ""
     keys : list = field(default_factory=lambda: [])
     addresses : list = field(default_factory=lambda: [])
 
