@@ -1,10 +1,18 @@
+'''
+ADPCM codec implementation.
+
+*All* credits for this code goes to https://github.com/ShowerXu/python-adpcm/.
+'''
+from whad.scapy.layers.rf4ce import RF4CE_Vendor_MSO_Audio_Start_Request, \
+		RF4CE_Vendor_MSO_Audio_Data_Notify, RF4CE_Vendor_MSO_Audio_Stop_Request
+from struct import pack
 
 resolution = 16
 
 # Build geometric lookup table with base as 1.1, as used in IMA and OKI
 STEP_TABLE = [7]
 while STEP_TABLE[-1] <= (2**resolution) / 2:
-	STEP_TABLE.append(1.1 * STEP_TABLE[-1])
+		STEP_TABLE.append(1.1 * STEP_TABLE[-1])
 
 # Trim last one which will be outside the valid range
 STEP_TABLE = [int(round(x)) for x in STEP_TABLE[:-1]]
@@ -52,19 +60,19 @@ class ByteAdpcmEncoder:
 
 		if delta >= step:
 			delta -= step
-			predicted_delta += step
-			encoded |= 0x4
+		predicted_delta += step
+		encoded |= 0x4
 
 		step = step >> 1
 		if delta >= step:
 			delta -= step
-			predicted_delta += step
-			encoded |= 0x2
+		predicted_delta += step
+		encoded |= 0x2
 
 		step >>= 1
 		if delta >= step:
 			predicted_delta += step
-			encoded |= 0x1
+		encoded |= 0x1
 
 		# Is this needed?
 		step >>= 1
@@ -83,8 +91,8 @@ class ByteAdpcmEncoder:
 		else:
 			predicted += predicted_delta
 
-		if predicted > 255:
-			predicted = 255
+		if predicted > 2**resolution:
+			predicted = 2**resolution
 		elif predicted < 0:
 			predicted = 0
 		self.predicted = predicted
@@ -136,5 +144,57 @@ class ByteAdpcmDecoder:
 
 		self.index = index
 		self.predicted = predicted
-		print(self.predicted)
 		return predicted
+
+
+
+class ADPCM:
+	def __init__(self, output_file=None):
+		self.output_file = output_file
+		self.output_stream = None
+		self.decoder = ByteAdpcmDecoder(0, 0)
+
+	def _open_stream(self, channels=1, rate=16000, sample_size=2, unsigned_sample_size=False):
+		if self.output_file is None:
+			try:
+				import pyaudio
+
+				p = pyaudio.PyAudio()
+				stream = p.open(
+									format=pyaudio.get_format_from_width(
+										sample_size,
+										unsigned=unsigned_sample_size
+									),
+				                    channels=channels,
+				                    rate=rate,
+				                    output=True
+				)
+				return stream
+
+			except ImportError:
+				return None
+
+	def decode(self, samples):
+		decoded_samples = b""
+		for frame in samples:
+			low = self.decoder.decode(frame >> 4)
+			high = self.decoder.decode(frame & 0xF)
+			try:
+				decoded_samples += pack('H', low) + pack('H', high)
+			except:
+				pass
+		return decoded_samples
+
+	def process_packet(self, packet):
+		if RF4CE_Vendor_MSO_Audio_Start_Request in packet:
+			self.output_stream = self._open_stream()
+
+		elif RF4CE_Vendor_MSO_Audio_Data_Notify in packet:
+			if self.output_stream is not None:
+				self.output_stream.write(
+					self.decode(packet.samples)
+				)
+				
+		elif RF4CE_Vendor_MSO_Audio_Stop_Request in packet:
+			if self.output_stream is not None:
+				self.output_stream.close()

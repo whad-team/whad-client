@@ -9,6 +9,7 @@ class SnifferConfiguration:
     :param channel: select the channel to sniff (c)
     :param decrypt: indicate if decryption is enabled (d)
     :param keys: provide decryption keys (k)
+    :param audio: decode audio stream (audio)
     :param pairing: sniff pairing procedure and break key if possible(p)
     :param addresses: provide node extended addresses (a)
 
@@ -16,6 +17,7 @@ class SnifferConfiguration:
     channel : int = 15
     decrypt : bool = False
     pairing : bool = False
+    audio : bool = False
     keys : list = field(default_factory=lambda: [])
     addresses : list = field(default_factory=lambda: [])
 

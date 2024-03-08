@@ -1,6 +1,7 @@
 from whad.rf4ce.connector import RF4CE
 from whad.rf4ce.sniffing import SnifferConfiguration
 from whad.rf4ce.crypto import RF4CEDecryptor, RF4CEKeyDerivation
+from whad.rf4ce.utils.adpcm import ADPCM
 from whad.rf4ce.exceptions import MissingCryptographicMaterial
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
@@ -22,6 +23,7 @@ class Sniffer(RF4CE, EventsManager):
         self.__configuration = SnifferConfiguration()
         self.__decryptor = RF4CEDecryptor()
         self.__key_derivation = RF4CEKeyDerivation()
+        self.__audio_stream = ADPCM()
 
         # Check if device can perform sniffing
         if not self.can_sniff():
@@ -117,7 +119,9 @@ class Sniffer(RF4CE, EventsManager):
                     decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
                     if success:
                         packet.decrypted = decrypted
-                    else:
+                        if self.__configuration.audio:
+                            self.__audio_stream.process_packet(packet.decrypted)
+
                 except MissingCryptographicMaterial:
                     pass
             yield packet
