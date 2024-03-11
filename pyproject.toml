@@ -32,6 +32,7 @@ classifiers = [
 whadup = "whad.tools.whadup:main"
 whadsniff = "whad.tools.whadsniff:whadsniff_main"
 whadreplay = "whad.tools.whadreplay:whadreplay_main"
+whadfilter = "whad.tools.whadfilter:whadfilter_main"
 whadserver = "whad.tools.whadserver:whadserver_main"
 phy-inspect = "whad.phy.cli.inspect:phy_inspect_main"
 ble-central = "whad.ble.cli.central:ble_central_main"
