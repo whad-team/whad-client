@@ -29,9 +29,9 @@ if __name__ == '__main__':
 
             dev = WhadDevice.create(interface)
 
-            touchlink = ZCLTouchLinkClient()
-            zll = ApplicationObject("zll_app", 0xc05e, 0x0100, device_version=0, input_clusters=[], output_clusters=[])
-            zll.add_output_cluster(touchlink)
+            #touchlink = ZCLTouchLinkClient()
+            #zll = ApplicationObject("zll_app", 0xc05e, 0x0100, device_version=0, input_clusters=[], output_clusters=[])
+            #zll.add_output_cluster(touchlink)
 
             end_device = EndDevice(dev)
             #end_device = EndDevice(dev, applications=[zll])

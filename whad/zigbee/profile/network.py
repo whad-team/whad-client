@@ -1,6 +1,6 @@
 from whad.zigbee.stack.nwk.constants import ZigbeeDeviceType
 from whad.zigbee.profile.nodes import CoordinatorNode, EndDeviceNode, RouterNode
-
+from whad.dot15d4.address import Dot15d4Address
 from random import randint
 from time import sleep
 
@@ -68,7 +68,7 @@ class Network:
         """
         Returns the network extended Pan ID.
         """
-        return self.__nwk_object.extended_pan_id
+        return Dot15d4Address(self.__nwk_object.extended_pan_id)
 
     @property
     def channel(self):
@@ -132,7 +132,7 @@ class Network:
         """
         Indicates if we are associated with the network.
         """
-        return self.stack.get_layer('nwk').database.get("nwkExtendedPANID") == self.extended_pan_id
+        return self.stack.get_layer('nwk').database.get("nwkExtendedPANID") == self.extended_pan_id.value
 
     def is_authorized(self):
         """
@@ -171,7 +171,7 @@ class Network:
         return (
             "Network(" +
             "pan_id=" + hex(self.pan_id) + ", " +
-            "extended_pan_id=" + hex(self.extended_pan_id) + ", " +
+            "extended_pan_id=" + str(self.extended_pan_id) + ", " +
             "channel="+str(self.channel) + ", " +
             "joining="+ ("allowed" if self.is_joining_permitted() else "forbidden") + ", " +
             "associated="+ ("yes" if self.is_associated() else "no") + ", "
