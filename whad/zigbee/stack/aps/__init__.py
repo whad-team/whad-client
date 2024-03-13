@@ -382,7 +382,7 @@ class APSManagementService(APSService):
                 src_addr = self.manager.get_layer('nwk').database.get("nwkIeeeAddress")
             )
             print(self.manager.get_layer('nwk').database.get("nwkIeeeAddress"))
-            asdu.show()
+            #asdu.show()
 
             apsDeviceKeyPairSet = self.database.get("apsDeviceKeyPairSet")
             candidate_keys = apsDeviceKeyPairSet.select(destination_address, unverified=False)

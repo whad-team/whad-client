@@ -3,6 +3,7 @@ from whad.zigbee.stack.apl.zcl.clusters import *
 """
 This module defines classes and exceptions related to ZigBee node's Endpoints.
 """
+
 class ClusterNotAvailable(Exception):
     """
     Exception raised when a cluster is not available.

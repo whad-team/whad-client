@@ -1,6 +1,14 @@
 from whad.zigbee.stack.nwk.constants import ZigbeeDeviceType
 from whad.zigbee.profile.endpoint import Endpoint
 
+class EndpointsDiscoveryException(Exception):
+    """
+    Default exception raised when an error occured during Endpoints discovery.
+    """
+    def __init__(self):
+        super().__init__()
+
+
 class Node:
     """
     Class representing a Zigbee Node.
@@ -52,8 +60,14 @@ class Node:
             self.__network.is_authorized()
         ):
             self.__active_endpoints = []
-            for endpoint in self.stack.get_layer('apl').get_application_by_name("zdo").device_and_service_discovery.get_active_endpoints(self.__address):
+            endpoints = self.stack.get_layer('apl').get_application_by_name("zdo").device_and_service_discovery.get_active_endpoints(self.__address)
+            if endpoints is None:
+                self.__active_endpoints = None
+                raise EndpointsDiscoveryException()
+
+            for endpoint in endpoints:
                 self.__active_endpoints.append(Endpoint(endpoint, self))
+
         return self.__active_endpoints
 
     @property

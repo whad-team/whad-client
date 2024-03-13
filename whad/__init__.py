@@ -29,6 +29,10 @@ class WhadCapability(object):
     SimulateRole = Capability.SimulateRole
     NoRawData = Capability.NoRawData
 
+# Force scapy to hide warnings
+import logging
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+
 # Import device related classes
 from whad.device import UartDevice, VirtualDevice
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, \

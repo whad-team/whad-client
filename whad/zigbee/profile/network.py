@@ -1,6 +1,6 @@
 from whad.zigbee.stack.nwk.constants import ZigbeeDeviceType
 from whad.zigbee.profile.nodes import CoordinatorNode, EndDeviceNode, RouterNode
-
+from whad.dot15d4.address import Dot15d4Address
 from random import randint
 from time import sleep
 
@@ -171,7 +171,7 @@ class Network:
         return (
             "Network(" +
             "pan_id=" + hex(self.pan_id) + ", " +
-            "extended_pan_id=" + hex(self.extended_pan_id) + ", " +
+            "extended_pan_id=" + str(self.extended_pan_id) + ", " +
             "channel="+str(self.channel) + ", " +
             "joining="+ ("allowed" if self.is_joining_permitted() else "forbidden") + ", " +
             "associated="+ ("yes" if self.is_associated() else "no") + ", "
