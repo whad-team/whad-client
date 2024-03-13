@@ -9,6 +9,7 @@ from whad.cli.app import CommandLineApp
 from importlib import import_module
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
 from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
+from whad.device.unix import UnixSocketProxy
 from dataclasses import fields, is_dataclass
 from pkgutil import iter_modules
 from inspect import getdoc
@@ -113,7 +114,10 @@ def build_configuration_from_args(environment, args):
         base_class = environment[args.domain]["parameters"][parameter][2]
 
         if base_class is None:
-            setattr(configuration,parameter,getattr(args,parameter))
+            try:
+                setattr(configuration,parameter,getattr(args,parameter))
+            except AttributeError:
+                pass
         else:
             main, sub = parameter.split(".")
             if main not in subfields:
@@ -133,6 +137,122 @@ def build_configuration_from_args(environment, args):
             setattr(configuration, subfield, None)
     return configuration
 
+
+def display_packet(pkt, show_metadata, format):
+    """
+    Display an packet according to the selected format.
+
+    Four main types of formats can be used:
+        * repr: scapy packet repr method (default)
+        * show: scapy show method, "field" representation
+        * hexdump: hexdump representation of the packet content
+        * raw: raw received bytes
+
+    :param  pkt:        Received Signal Strength Indicator
+    :type   pkt:        :class:`scapy.packet.packet`
+    """
+    if isinstance(pkt, Packet):
+
+        metadata = ""
+        if hasattr(pkt, "metadata") and show_metadata:
+            metadata = repr(pkt.metadata)
+
+        # Process scapy show method format
+        if format == "show":
+            print_formatted_text(
+                HTML(
+                    '<b><ansipurple>%s</ansipurple></b>' % (
+                        metadata
+                    )
+                )
+            )
+            pkt.show()
+
+            if hasattr(pkt, "decrypted"):
+                print_formatted_text(
+                    HTML(
+                        "<ansicyan>[i] Decrypted payload:</ansicyan>"
+                    )
+                )
+                pkt.decrypted.show()
+
+        # Process raw bytes format
+        elif format == "raw":
+            print_formatted_text(
+                HTML(
+                    '<b><ansipurple>%s</ansipurple></b> %s' % (
+                        metadata,
+                        bytes(pkt).hex()
+                    )
+                )
+            )
+
+            if hasattr(pkt, "decrypted"):
+                print_formatted_text(
+                    HTML(
+                        "<ansicyan>[i] Decrypted payload:</ansicyan> %s" %
+                        bytes(pkt.decrypted).hex()
+                    )
+                )
+
+        # Process hexdump format
+        elif format == "hexdump":
+            print_formatted_text(
+                HTML(
+                    '<b><ansipurple>%s</ansipurple></b>' % (
+                        metadata
+                    )
+                )
+            )
+            print_formatted_text(
+                HTML("<i>%s</i>" %
+                    escape(hexdump(bytes(pkt), result="return"))
+                )
+            )
+            if hasattr(pkt, "decrypted"):
+                print_formatted_text(
+                    HTML(
+                        "<ansicyan>[i] Decrypted payload:</ansicyan>"
+                    )
+                )
+                print_formatted_text(
+                        HTML("<i>%s</i>" %
+                            escape(hexdump(bytes(pkt.decrypted), result="return")
+                        )
+                    )
+                )
+        # Process scapy repr format
+        else:
+            print_formatted_text(
+                HTML(
+                    '<b><ansipurple>%s</ansipurple></b>' % (
+                        metadata
+                    )
+                )
+            )
+            print(repr(pkt))
+            if hasattr(pkt, "decrypted"):
+                print_formatted_text(
+                    HTML("<ansicyan>[i] Decrypted payload:</ansicyan>")
+                )
+                print(repr(pkt.decrypted))
+        print()
+    # If it is not a packet, use repr method
+    else:
+        print(repr(pkt))
+
+def display_event(event):
+    """Display an event generated from a sniffer.
+    """
+    print_formatted_text(
+        HTML(
+            "<ansicyan>[i] event: <b>%s</b></ansicyan> %s" % (
+                event.name,
+                "("+event.message +")" if event.message is not None else ""
+            )
+        )
+    )
+
 class WhadDomainSubParser(ArgumentParser):
     """
     Implements a Whad Domain subparser.
@@ -150,6 +270,7 @@ class WhadDomainSubParser(ArgumentParser):
         print_formatted_text(
             HTML('<ansired>[!] <b>%s</b></ansired>' % message)
         )
+
 
 class WhadSniffApp(CommandLineApp):
 
@@ -204,120 +325,6 @@ class WhadSniffApp(CommandLineApp):
         self.build_subparsers(subparsers)
 
 
-    def display(self, pkt):
-        """
-        Display an packet according to the selected format.
-
-        Four main types of formats can be used:
-            * repr: scapy packet repr method (default)
-            * show: scapy show method, "field" representation
-            * hexdump: hexdump representation of the packet content
-            * raw: raw received bytes
-
-        :param  pkt:        Received Signal Strength Indicator
-        :type   pkt:        :class:`scapy.packet.packet`
-        """
-        if isinstance(pkt, Packet):
-
-            metadata = ""
-            if hasattr(pkt, "metadata") and self.args.metadata:
-                metadata = repr(pkt.metadata)
-
-            # Process scapy show method format
-            if self.args.format == "show":
-                print_formatted_text(
-                    HTML(
-                        '<b><ansipurple>%s</ansipurple></b>' % (
-                            metadata
-                        )
-                    )
-                )
-                pkt.show()
-
-                if hasattr(pkt, "decrypted"):
-                    print_formatted_text(
-                        HTML(
-                            "<ansicyan>[i] Decrypted payload:</ansicyan>"
-                        )
-                    )
-                    pkt.decrypted.show()
-
-            # Process raw bytes format
-            elif self.args.format == "raw":
-                print_formatted_text(
-                    HTML(
-                        '<b><ansipurple>%s</ansipurple></b> %s' % (
-                            metadata,
-                            bytes(pkt).hex()
-                        )
-                    )
-                )
-
-                if hasattr(pkt, "decrypted"):
-                    print_formatted_text(
-                        HTML(
-                            "<ansicyan>[i] Decrypted payload:</ansicyan> %s" %
-                            bytes(pkt.decrypted).hex()
-                        )
-                    )
-
-            # Process hexdump format
-            elif self.args.format == "hexdump":
-                print_formatted_text(
-                    HTML(
-                        '<b><ansipurple>%s</ansipurple></b>' % (
-                            metadata
-                        )
-                    )
-                )
-                print_formatted_text(
-                    HTML("<i>%s</i>" %
-                        escape(hexdump(bytes(pkt), result="return"))
-                    )
-                )
-                if hasattr(pkt, "decrypted"):
-                    print_formatted_text(
-                        HTML(
-                            "<ansicyan>[i] Decrypted payload:</ansicyan>"
-                        )
-                    )
-                    print_formatted_text(
-                            HTML("<i>%s</i>" %
-                                escape(hexdump(bytes(pkt.decrypted), result="return")
-                            )
-                        )
-                    )
-            # Process scapy repr format
-            else:
-                print_formatted_text(
-                    HTML(
-                        '<b><ansipurple>%s</ansipurple></b>' % (
-                            metadata
-                        )
-                    )
-                )
-                print(repr(pkt))
-                if hasattr(pkt, "decrypted"):
-                    print_formatted_text(
-                        HTML("<ansicyan>[i] Decrypted payload:</ansicyan>")
-                    )
-                    print(repr(pkt.decrypted))
-            print()
-        # If it is not a packet, use repr method
-        else:
-            print(repr(pkt))
-
-    def display_event(self, event):
-        """Display an event generated from a sniffer.
-        """
-        print_formatted_text(
-            HTML(
-                "<ansicyan>[i] event: <b>%s</b></ansicyan> %s" % (
-                    event.name,
-                    "("+event.message +")" if event.message is not None else ""
-                )
-            )
-        )
 
     def pre_run(self):
         """Pre-run operations: configure scapy theme.
@@ -345,7 +352,7 @@ class WhadSniffApp(CommandLineApp):
                     sniffer = self.environment[self.args.domain]["sniffer_class"](self.interface)
 
                     # Add an event listener to display incoming events
-                    sniffer.add_event_listener(self.display_event)
+                    sniffer.add_event_listener(display_event)
                     try:
                         sniffer.configuration = configuration
                     except Exception as e:
@@ -368,8 +375,32 @@ class WhadSniffApp(CommandLineApp):
                     # Start the sniffer
                     sniffer.start()
                     # Iterates over the packet stream and display packets
-                    for pkt in sniffer.sniff():
-                        self.display(pkt)
+
+                    # Make sure we are piped to another tool
+                    if self.is_stdout_piped():
+                        piped_arguments = vars(self.args)
+                        for piped_argument in piped_arguments:
+                            piped_arguments[piped_argument] = type(getattr(self.args, piped_argument)).__name__ + ":" + str(piped_arguments[piped_argument])
+
+
+                        piped_arguments.update(
+                            {"domain":self.args.domain}
+                        )
+                        proxy = UnixSocketProxy(self.interface,
+                            piped_arguments
+                        )
+                        proxy.start()
+                        proxy.join()
+                        sniffer.stop()
+
+                    else:
+                        # Iterates over the packet stream and display packets
+                        for pkt in sniffer.sniff():
+                            display_packet(
+                                pkt,
+                                show_metadata = self.args.metadata,
+                                format = self.args.format
+                            )
                 else:
                     self.error("You need to specify a domain.")
             else:

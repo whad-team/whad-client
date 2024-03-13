@@ -15,12 +15,12 @@ class Sniffer(RF4CE, EventsManager):
     """
     RF4CE Sniffer interface for compatible WHAD device.
     """
-    def __init__(self, device):
+    def __init__(self, device, configuration=SnifferConfiguration()):
         RF4CE.__init__(self, device)
         EventsManager.__init__(self)
 
 
-        self.__configuration = SnifferConfiguration()
+        self.__configuration = configuration
         self.__decryptor = RF4CEDecryptor()
         self.__key_derivation = RF4CEKeyDerivation()
         self.__audio_stream = ADPCM()
@@ -80,7 +80,7 @@ class Sniffer(RF4CE, EventsManager):
 
     @configuration.setter
     def configuration(self, new_configuration):
-        self.stop()
+        #self.stop()
         self.__configuration = new_configuration
         self._enable_sniffing()
 
@@ -94,8 +94,7 @@ class Sniffer(RF4CE, EventsManager):
             message = self.wait_for_message(filter=message_filter('dot15d4', message_type))
             packet = self.translator.from_message(message.dot15d4, message_type)
             self.monitor_packet_rx(packet)
-
-
+            print("dec", self.__configuration.decrypt)
             if self.__configuration.pairing:
                 self.__key_derivation.process_packet(packet)
                 if self.__key_derivation.key is not None:

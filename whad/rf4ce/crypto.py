@@ -203,7 +203,7 @@ class RF4CEKeyDerivation:
     def key(self):
         if (
                 self.seeds_number is not None and
-                len(self.seeds) == 1 + self.seeds_number
+                len(self.seeds) == (1 + self.seeds_number)
         ):
             return self._generate_key()
         else:
@@ -307,6 +307,7 @@ class RF4CEDecryptor:
                     )
                     if success:
                         return (decrypted_packet, True)
+                    print(candidate_addresses, key)
 
                 except:
                     pass
