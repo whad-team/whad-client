@@ -6,7 +6,11 @@ from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.shell import InteractiveShell, category
 from whad.dot15d4.exceptions import InvalidDot15d4AddressException
 from whad.dot15d4.address import Dot15d4Address
-
+from whad.zigbee.profile.nodes import CoordinatorNode, RouterNode, EndDeviceNode, \
+    EndpointsDiscoveryException
+from whad.zigbee.stack.apl.constants import ZIGBEE_PROFILE_IDENTIFIERS, \
+    ZIGBEE_DEVICE_IDENTIFIERS, ZIGBEE_CLUSTER_IDENTIFIERS
+from whad.zigbee.profile.network import JoiningForbidden, NotAssociated, NotAuthorized
 from .cache import ZigbeeNetworksCache
 from .helpers import create_enddevice
 
@@ -46,10 +50,14 @@ class ZigbeeEndDeviceShell(InteractiveShell):
     def update_prompt(self, force=False):
         """Update prompt to reflect current state
         """
-        if not self.__target_network_panid:
+        if not self.__target_network:
             self.set_prompt(HTML('<b>zigbee-enddevice></b> '), force)
         else:
-            self.set_prompt(HTML('<b>zigbee-enddevice|<ansicyan>%s</ansicyan>></b> ' % self.__target_network_panid), force)
+            self.set_prompt(HTML('<b>zigbee-enddevice|<ansicyan>%s|%s</ansicyan>></b> ' % (
+                    hex(self.__target_network['info'].pan_id),
+                    str(Dot15d4Address(self.__target_network['info'].extended_pan_id))
+                )
+            ), force)
 
 
     @category('Networks discovery')
@@ -79,7 +87,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                 print(
                         network.channel," "*6,
                         hex(network.pan_id)," ",
-                        network.extended_pan_id,
+                        Dot15d4Address(network.extended_pan_id),
                         "permitted" if network.is_joining_permitted() else "forbidden"
                 )
 
@@ -109,11 +117,27 @@ class ZigbeeEndDeviceShell(InteractiveShell):
             print(
                     network['info'].channel," "*6,
                     hex(network['info'].pan_id)," ",
-                    network['info'].extended_pan_id,
+                    Dot15d4Address(network['info'].extended_pan_id),
                     "permitted" if network['info'].is_joining_permitted() else "forbidden"
             )
 
 
+
+    def get_cache_targets(self):
+        # Keep track of Extended PAN ID
+        targets = [str(Dot15d4Address(network['info'].extended_pan_id)) for network in self.__cache.iterate()]
+        targets.extend(['%s' % hex(network['info'].pan_id) for network in self.__cache.iterate()])
+        return targets
+
+    def complete_join(self):
+        """Autocomplete the 'join' command, providing extended PAN ID of surrounding networks.
+        """
+        # Keep track of Extended PAN ID
+        targets = self.get_cache_targets()
+        completions = self.autocomplete_env()
+        for address in targets:
+            completions[address] = None
+        return completions
 
     @category('Network interaction')
     def do_join(self, args):
@@ -130,18 +154,236 @@ class ZigbeeEndDeviceShell(InteractiveShell):
             self.error('<u>join</u> requires at least one parameter (extended PAN ID or PAN ID).\ntype \'help join\' for more details.')
             return
 
+        #try:
+        target = None
+
         try:
+            target = self.__cache[args[0]]
+            target_pan_id = Dot15d4Address(target['info'].extended_pan_id)
+
+        except IndexError as notfound:
+            # If target not in cache, we are expecting an extended PAN ID or a PAN ID
+            try:
+                target_pan_id = Dot15d4Address(args[0])
+            except InvalidDot15d4AddressException:
+                self.error('You must provide a valid extended PAN ID or PAN ID.')
+                return
+
+        # Look in cache by PAN ID
+        if target is None:
+            for network in self.__cache.iterate():
+                if target_pan_id == network['info'].pan_id:
+                    target = network
+                    break
+
+        if target is None:
+            # Discover surrounding networks if needed
+            for network in self.__connector.discover_networks():
+                # Add network to cache
+                if target_pan_id == network.extended_pan_id or target_pan_id == network.pan_id:
+                    self.__cache.add(network)
+                    target = self.__cache[target_pan_id]
+                    break
+
+            if target is None:
+                self.error('No matching network found.')
+                return
+
+        try:
+            # Attach our wireshark monitor, if any
+            if self.__wireshark is not None:
+                self.__wireshark.attach(self.__connector)
+
+            print("Joining target network (PAN ID = %s / Ext. PAN ID = %s) on channel %d ..." % (
+                hex(target['info'].pan_id),
+                str(Dot15d4Address(target['info'].extended_pan_id)),
+                target['info'].channel
+                )
+            )
+            target['info'].join()
+            print("Successfully joined to target network (PAN ID = %s / Ext. PAN ID = %s)." % (
+                    hex(target['info'].pan_id),
+                    str(Dot15d4Address(target['info'].extended_pan_id))
+                )
+            )
+            if target['info'].network_key is not None:
+                print_formatted_text(HTML('<ansicyan><b>Network key:</b></ansicyan> %s' % target['info'].network_key.hex()))
+
+                self.__target_network = target
+                # Update prompt
+                self.update_prompt()
+
+        except JoiningForbidden:
+            self.error('Joining forbidden.')
+
+
+    @category('Network interaction')
+    def do_nodes(self, args):
+        """discover nodes present within the associated network.
+
+        <ansicyan><b>nodes</b></ansicyan>
+
+        This command performs a nodes discovery, collecting all this information and
+        keeping it in a dedicated <b>cache</b>.
+
+        <aaa fg="orange">Sometimes this discovery process may cause an error and produces
+        incomplete information, in this case try again and cross fingers.</aaa>
+        """
+        if self.__target_network is not None:
+            if not self.__target_network['discovered']:
+                print("Discovering surrounding nodes.")
+                nodes = self.__target_network['info'].discover()
+                self.__target_network['discovered'] = True
+
+                for node in nodes:
+                    if isinstance(node, CoordinatorNode):
+                        print("New Coordinator discovered (addr. = %s, ext. addr. = %s)" % (
+                                str(Dot15d4Address(node.address)),
+                                str(Dot15d4Address(node.extended_address))
+                            )
+                        )
+                    elif isinstance(node, RouterNode):
+                        print("New Router discovered (addr. = %s, ext. addr. = %s)" % (
+                                str(Dot15d4Address(node.address)),
+                                str(Dot15d4Address(node.extended_address))
+                            )
+                        )
+                    else:
+                        print("New End Device discovered (addr. = %s, ext. addr. = %s)" % (
+                                str(Dot15d4Address(node.address)),
+                                str(Dot15d4Address(node.extended_address))
+                            )
+                        )
+
+            print_formatted_text(HTML('<ansigreen>Addr.     Ext. addr.                  Type</ansigreen>'))
+
+            for node in self.__target_network['info'].nodes:
+                if isinstance(node, CoordinatorNode):
+                    print("%s    %s     coordinator" % (
+                            str(Dot15d4Address(node.address)),
+                            str(Dot15d4Address(node.extended_address))
+                        )
+                    )
+                elif isinstance(node, RouterNode):
+                    print("%s    %s     router" % (
+                            str(Dot15d4Address(node.address)),
+                            str(Dot15d4Address(node.extended_address))
+                        )
+                    )
+                else:
+                    print("%s    %s     end device" % (
+                            str(Dot15d4Address(node.address)),
+                            str(Dot15d4Address(node.extended_address))
+                        )
+                    )
+        else:
+            self.error("You must join a network to perform a discovery.")
+            return
+
+
+
+    def get_cache_nodes(self):
+        # Keep track of Nodes
+        if self.__target_network is None:
+            return []
+        nodes = []
+        if self.__target_network['discovered']:
+            nodes = ["0x{:04x}".format(node.address) for node in self.__target_network['info'].nodes]
+            nodes.extend(['%s' % str(Dot15d4Address(node.extended_address)) for node in self.__target_network['info'].nodes])
+        return nodes
+
+    def complete_endpoints(self):
+        """Autocomplete the 'endpoints' command, providing address or extended address of neighbors nodes.
+        """
+        # Keep track of Extended PAN ID
+        nodes = self.get_cache_nodes()
+        completions = self.autocomplete_env()
+        for address in nodes:
+            completions[address] = None
+        return completions
+
+    @category('Node interaction')
+    def do_endpoints(self, args):
+        """discover endpoints related to a given node.
+
+        <ansicyan><b>endpoints</b> <i>[addr. | ext. addr]</i></ansicyan>
+
+        This command performs a endpoints discovery, collecting all this information and
+        keeping it in a dedicated <b>cache</b>.
+
+        <aaa fg="orange">Sometimes this discovery process may cause an error and produces
+        incomplete information, in this case try again and cross fingers.</aaa>
+        """
+        if self.__target_network is not None:
+            if len(args) < 1:
+                self.error('No target node provided. ')
+                return
 
             try:
-                target = self.__cache[args[0]]
-                target_pan_id = target['info'].extended_pan_id
+                target_node = Dot15d4Address(args[0])
+            except InvalidDot15d4AddressException:
+                self.error("Invalid 802.15.4 address.")
+                return
 
-            except IndexError as notfound:
-                # If target not in cache, we are expecting an extended PAN ID or a PAN ID
-                try:
-                    target_pan_id = Dot15d4Address(args[0])
-                except InvalidDot15d4AddressException:
-                    self.error('You must provide a valid extended PAN ID or PAN ID.')
-                    return
-        except:
+            if not self.__target_network['discovered']:
+                print("Discovering surrounding nodes.")
+                nodes = self.__target_network['info'].discover()
+                self.__target_network['discovered'] = True
+
+            selected_node = None
+            for node in self.__target_network['info'].nodes:
+                if (
+                    target_node == Dot15d4Address(node.address) or
+                    target_node == Dot15d4Address(node.extended_address)
+                ):
+                    selected_node = node
+                    break
+
+            if selected_node is None:
+                self.error("No matching node found.")
+                return
+            try:
+                for endpoint in selected_node.endpoints:
+                    try:
+                        profile_name = ZIGBEE_PROFILE_IDENTIFIERS[endpoint.profile_id]
+                    except IndexError:
+                        profile_name = "Unknown"
+
+                    try:
+                        device_name = ZIGBEE_DEVICE_IDENTIFIERS[endpoint.device_id]
+                    except IndexError:
+                        device_name = "Unknown device"
+
+                    print_formatted_text(HTML('<ansigreen><b>Endpoint #%d: %s profile (%s) -> %s device (%s) </b></ansigreen>' %
+                            (
+                                endpoint.number,
+                                profile_name,
+                                hex(endpoint.profile_id),
+                                device_name,
+                                hex(endpoint.device_id)
+                            )
+                        )
+                    )
+                    print_formatted_text(HTML('  | <ansicyan><b>Input clusters:</b></ansicyan>'))
+                    for cluster_id in endpoint.input_clusters:
+                        try:
+                            category, cluster_name = ZIGBEE_CLUSTER_IDENTIFIERS[cluster_id]
+                        except IndexError:
+                            category, cluster_name = ("Unknown category", "Unknown cluster")
+                        print_formatted_text(HTML('    | <b>%s - %s (%s)</b>' % (category, cluster_name, hex(cluster_id))))
+
+                    print_formatted_text(HTML('  | <ansicyan><b>Output clusters:</b></ansicyan>'))
+                    for cluster_id in endpoint.output_clusters:
+                        try:
+                            category, cluster_name = ZIGBEE_CLUSTER_IDENTIFIERS[cluster_id]
+                        except IndexError:
+                            category, cluster_name = ("Unknown category", "Unknown cluster")
+                        print_formatted_text(HTML('    | <b>%s - %s (%s)</b>' % (category, cluster_name, hex(cluster_id))))
+                print()
+
+            except EndpointsDiscoveryException:
+                self.error("An error occured during endpoints discovery.")
+                return
+        else:
+            self.error("You must join a network to perform a discovery.")
             return

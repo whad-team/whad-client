@@ -3,6 +3,7 @@
 
 from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import command
+from whad.dot15d4.address import Dot15d4Address
 from whad.zigbee.connector.enddevice import EndDevice
 
 @command('scan')
@@ -28,7 +29,7 @@ def scan_handler(app, command_args):
                 print(
                         network.channel," "*6,
                         hex(network.pan_id)," ",
-                        network.extended_pan_id,
+                        Dot15d4Address(network.extended_pan_id),
                         "permitted" if network.is_joining_permitted() else "forbidden"
                 )
 

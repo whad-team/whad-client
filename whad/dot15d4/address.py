@@ -20,10 +20,10 @@ class Dot15d4Address(object):
         if isinstance(address, str):
             if re.match('^([0-9a-fA-F]{2}\:){7}[0-9a-fA-F]{2}$', address) is not None:
                 self.__type = Dot15d4Address.EXTENDED
-                self.__value = unhexlify(address.replace(':',''))[::-1]
+                self.__value = unhexlify(address.replace(':',''))
             elif re.match('[0-9a-fA-F]{16}$', address) is not None:
                 self.__type = Dot15d4Address.EXTENDED
-                self.__value = unhexlify(address)[::-1]
+                self.__value = unhexlify(address)
             elif re.match('[0-9a-fA-F]{4}$', address) is not None:
                 self.__type = Dot15d4Address.SHORT
                 self.__value = unhexlify(address)
@@ -43,11 +43,16 @@ class Dot15d4Address(object):
             raise InvalidDot15d4AddressException
 
     def __eq__(self, other):
+
+        if not isinstance(other, Dot15d4Address):
+            other = Dot15d4Address(other)
+
         return (self.value == other.value) and (self.__type == other.type)
+
 
     def __str__(self):
         if self.__type == Dot15d4Address.EXTENDED:
-            return ':'.join(['%02x' % b for b in self.__value[::-1]])
+            return ':'.join(['%02x' % b for b in self.__value])
         else:
             return "0x" + "".join(['%02x' % b for b in self.__value])
 

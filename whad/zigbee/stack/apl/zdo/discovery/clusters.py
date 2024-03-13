@@ -109,7 +109,7 @@ class ZDOIEEEAddrRsp(ZDPCluster):
             command.start_index = start_index
             command.associated_devices = associated_devices
 
-        command.show()
+        
 
         super().send_data(
             command,

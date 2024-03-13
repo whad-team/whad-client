@@ -4,6 +4,7 @@ This module implements a single class, `ZigbeeNetworksCache`, that keeps track
 of discovered devices and their information.
 """
 from whad.zigbee.profile.network import Network
+from whad.dot15d4.address import Dot15d4Address
 
 class ZigbeeNetworksCache(object):
     """ZigBee Networks cache.
@@ -23,27 +24,24 @@ class ZigbeeNetworksCache(object):
 
         @param network Network: Network to add
         """
-        self.__networks[str(network.extended_pan_id).lower()] = {
+        self.__networks[str(Dot15d4Address(network.extended_pan_id)).lower()] = {
             'info':network,
             'discovered': False
         }
 
-    def __getitem__(self, extended_pan_id: str):
+    def __getitem__(self, extended_pan_id: Dot15d4Address):
         """Return an existing network from cache.
 
         @param extended_pan_id str: Network extended PAN ID (i.e. '00:11:22:33:44:55:66:77')
         """
-        if extended_pan_id in self.__networks:
+
+        if str(extended_pan_id).lower() in self.__networks:
             return self.__networks[str(extended_pan_id).lower()]
         else:
             # If not found, look into networks PAN ID
-            try:
-                pan_id = int(extended_pan_id, 16)
-            except:
-                raise IndexError
             for net in self.__networks:
                 network = self.__networks[net]
-                if network['info'].pan_id is not None and dev['info'].pan_id == pan_id:
+                if network['info'].pan_id is not None and network['info'].pan_id == extended_pan_id:
                     return self.__networks[net]
             raise IndexError
     '''

@@ -68,7 +68,7 @@ class Network:
         """
         Returns the network extended Pan ID.
         """
-        return Dot15d4Address(self.__nwk_object.extended_pan_id)
+        return self.__nwk_object.extended_pan_id
 
     @property
     def channel(self):
@@ -132,7 +132,7 @@ class Network:
         """
         Indicates if we are associated with the network.
         """
-        return self.stack.get_layer('nwk').database.get("nwkExtendedPANID") == self.extended_pan_id.value
+        return self.stack.get_layer('nwk').database.get("nwkExtendedPANID") == self.extended_pan_id
 
     def is_authorized(self):
         """
