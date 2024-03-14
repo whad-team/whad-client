@@ -192,6 +192,10 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
         """
         Connect this cluster to a specific destination node endpoint.
         """
+        for existing_destination in self.destinations:
+            if existing_destination["address"] == destination and existing_destination["endpoint"] == endpoint:
+                return
+
         self.destinations.append(
             {
                 "address": destination,

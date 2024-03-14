@@ -10,6 +10,8 @@ from whad.zigbee.profile.nodes import CoordinatorNode, RouterNode, EndDeviceNode
     EndpointsDiscoveryException
 from whad.zigbee.stack.apl.constants import ZIGBEE_PROFILE_IDENTIFIERS, \
     ZIGBEE_DEVICE_IDENTIFIERS, ZIGBEE_CLUSTER_IDENTIFIERS
+
+from whad.zigbee.stack.apl.zcl import ZCLClientCluster
 from whad.zigbee.profile.network import JoiningForbidden, NotAssociated, NotAuthorized
 from .cache import ZigbeeNetworksCache
 from .helpers import create_enddevice
@@ -386,4 +388,163 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                 return
         else:
             self.error("You must join a network to perform a discovery.")
+            return
+
+    def get_cache_endpoints(self, address):
+        input_clusters = {}
+        for node in self.__target_network['info'].nodes:
+            if address == "0x{:04x}".format(node.address) or address == str(Dot15d4Address(node.extended_address)).lower():
+                endpoints = {}
+                for endpoint in node.endpoints:
+                    input_clusters = {}
+                    for input_cluster in endpoint.input_clusters:
+                        commands = {}
+                        for candidate_cluster_class in ZCLClientCluster.child_clusters():
+                            candidate = candidate_cluster_class()
+                            if candidate.cluster_id == input_cluster:
+                                for command_id, command in candidate.CLUSTER_SPECIFIC_COMMANDS.items():
+                                    commands[str(command['name'].replace(' ', '_').lower())] = None
+                                for command_id, command in candidate.PROFILE_WIDE_COMMANDS.items():
+                                    commands[str(command['name'].replace(' ', '_').lower())] = None
+                                break
+                        input_clusters[str(input_cluster)] = commands
+                    endpoints[str(endpoint.number)] = input_clusters
+        return endpoints
+
+    def complete_cluster_cmd(self):
+        """Autocomplete the 'cluster_cmd' command, providing address or extended address of neighbors nodes.
+        """
+        # Keep track of Extended PAN ID
+        nodes = self.get_cache_nodes()
+        completions = self.autocomplete_env()
+        for address in nodes:
+            input_clusters = self.get_cache_endpoints(address)
+            '''
+            for node in self.__target_network['info'].nodes:
+                if address == "0x{:04x}".format(node.address) or address == str(Dot15d4Address(node.extended_address)).lower():
+                    for endpoint in node.endpoints:
+                        for input_cluster in endpoint.input_clusters:
+                            input_clusters[str(input_cluster)] = None
+                            try:
+                                category, cluster_name = ZIGBEE_CLUSTER_IDENTIFIERS[input_cluster]
+                                cluster_name = cluster_name.replace(" ", "_").replace("/","").lower()
+                                input_clusters[cluster_name] = None
+
+                            except IndexError:
+                                pass
+            '''
+            completions[address] = input_clusters
+        return completions
+
+    @category('Node interaction')
+    def do_cluster_cmd(self, args):
+        """Run a cluster command on a given node.
+
+        <ansicyan><b>cluster_cmd</b> <i>[addr. | ext. addr] [cluster id | cluster name] [cmd id | cmd name] [cmd parameters]</i></ansicyan>
+
+        This command performs a cluster command targeted on a given name.
+        """
+        if self.__target_network is not None:
+            if len(args) < 1:
+                self.error('No target node provided. ')
+                return
+
+            if len(args) < 2:
+                self.error('No target endpoint provided. ')
+                return
+
+            if len(args) < 3:
+                self.error('No target cluster provided. ')
+                return
+
+            if len(args) < 4:
+                self.error('No target cluster command provided. ')
+                return
+
+            try:
+                target_node = Dot15d4Address(args[0])
+            except InvalidDot15d4AddressException:
+                self.error("Invalid 802.15.4 address.")
+                return
+
+            try:
+                target_endpoint = int(args[1])
+            except:
+                self.error("Invalid endpoint.")
+                return
+
+            try:
+                target_cluster = int(args[2])
+            except:
+                self.error("Invalid cluster.")
+                return
+
+
+            try:
+                target_cmd = args[3]
+                if len(args) >= 4:
+                    target_cmd_parameters = args[4:]
+                else:
+                    target_cmd_parameters = None
+            except:
+                self.error("Invalid command.")
+                return
+
+
+            if not self.__target_network['discovered']:
+                print("Discovering surrounding nodes.")
+                nodes = self.__target_network['info'].discover()
+                self.__target_network['discovered'] = True
+
+            selected_node = None
+            for node in self.__target_network['info'].nodes:
+                if (
+                    target_node == Dot15d4Address(node.address) or
+                    target_node == Dot15d4Address(node.extended_address)
+                ):
+                    selected_node = node
+                    break
+
+            if selected_node is None:
+                self.error("No matching node found.")
+                return
+            try:
+                selected_endpoint = None
+                for endpoint in selected_node.endpoints:
+                    if endpoint.number == target_endpoint:
+                        selected_endpoint = endpoint
+                        break
+
+                if selected_endpoint is None:
+                    self.error("No matching endpoint found.")
+                    return
+
+                cluster = None
+                if target_cluster in selected_endpoint.input_clusters:
+                    cluster = selected_endpoint.attach_to_input_cluster(target_cluster)
+
+                if cluster is None:
+                    self.error("No matching cluster or cluster not implemented.")
+                    return
+
+                selected_command_name = None
+                for command_id, command in cluster.PROFILE_WIDE_COMMANDS.items():
+                    if target_cmd == command['name'].replace(" ","_").lower():
+                        selected_command_name = command['generate_callback'].__name__
+
+                for command_id, command in cluster.CLUSTER_SPECIFIC_COMMANDS.items():
+                    if target_cmd == command['name'].replace(" ","_").lower():
+                        selected_command_name = command['generate_callback'].__name__
+
+                if selected_command_name is None:
+                    self.error("No matching command found.")
+                    return
+
+                getattr(cluster, selected_command_name)()
+
+            except EndpointsDiscoveryException:
+                self.error("An error occured during cluster command.")
+                return
+        else:
+            self.error("You must join a network to perform a cluster command.")
             return
