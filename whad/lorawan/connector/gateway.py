@@ -65,7 +65,6 @@ class LWGateway(LoRaWAN):
         :param packet: Incoming packet
         :type packet: bytes
         """
-        packet.show()
         # Add packet to our packet queue
         pkt = PHYPayload(bytes(packet))
         pkt.metadata = packet.metadata

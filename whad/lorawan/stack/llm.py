@@ -1,7 +1,7 @@
 """
 LoRaWAN Gateway stack link-layer manager
 """
-from time import sleep
+from time import sleep, time
 from binascii import hexlify
 from random import randint
 from whad.lorawan.stack.mac import LWMacLayer
@@ -193,7 +193,8 @@ class LWGwLinkLayer(Layer):
                     dev_eui,
                     conn_mac.name,
                     dev_appskey,
-                    dev_nwkskey
+                    dev_nwkskey,
+                    time()
                 )
 
                 # Notify connector we got a connection
