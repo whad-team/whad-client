@@ -11,6 +11,7 @@ from whad.ble.profile import read, written, subscribed
 from struct import pack, unpack
 from whad.ble.stack.smp import Pairing, IOCAP_KEYBD_ONLY, IOCAP_NOINPUT_NOOUTPUT, CryptographicDatabase
 from whad.common.converters.hid import HIDConverter
+from whad.unifying import Dongle
 
 import logging
 logging.basicConfig(level=logging.WARNING)
@@ -88,10 +89,36 @@ class HIDOverGATT(GenericProfile):
 
     )
 
+my_profile = HIDOverGATT()
+connector = None
 
+def show_key(key):
+    global my_profile
+    print("We received a new keystroke: ", key)
+    print("Forwarding to BLE...")
+    hid_code, modifiers = HIDConverter.get_hid_code_from_key(key.lower(), locale="us")
+    my_profile.service3.report.value = bytes.fromhex("00") + bytes([modifiers, hid_code])+ bytes.fromhex("0000000000")
+    my_profile.service3.report.value = bytes.fromhex("0000000000000000")
+
+    return False
 
 if __name__ == '__main__':
-    my_profile = HIDOverGATT()
+    dev = WhadDevice.create("uart0")
+
+    connector = Dongle(dev, on_keystroke=show_key)#, on_move_mouse=show_mouse_move)
+    #connector.attach_callback(show, on_reception=True, on_transmission=False)
+
+    #connector.wait_wakeup()
+
+    connector.address = "9b:0a:90:42:b2"
+    connector.key = bytes.fromhex("08f59b42a06fee0e2588fa4d063c4096")
+    #connector.address =  "ca:e9:06:ec:a4"
+    connector.channel = 8
+
+    connector.start()
+
+    connector.wait_synchronization()
+    print("synchronized :)")
     pairing = Pairing(
         lesc=False,
         mitm=False,
@@ -104,12 +131,16 @@ if __name__ == '__main__':
         AdvFlagsField()
     ))
 
+    input()
+    while True:
+        time.sleep(1)
+
     '''
     print('Press a key to trigger a pairing')
     input()
     periph.pairing(pairing=pairing)
     '''
-
+    '''
     input()
     print("Entering input loop")
     while True:
@@ -121,3 +152,4 @@ if __name__ == '__main__':
             my_profile.service3.report.value = bytes.fromhex("0000000000000000")
 
         pass
+    '''

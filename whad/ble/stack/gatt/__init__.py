@@ -271,7 +271,7 @@ class GattLayer(Layer):
         :param data: List of items
         """
         pass
-    
+
     @txlock
     def on_read_request(self, request: GattReadRequest):
         """ATT Read Request callback
@@ -873,7 +873,7 @@ class GattClient(GattLayer):
         is not started while another GATT procedure is in progress.
         """
         return self.write_long_nolock(handle, value)
-    
+
     def write_long_nolock(self, handle, value):
         """Write long data (size > ATT_MTU-2) to a characteristic value.
 
@@ -934,7 +934,7 @@ class GattClient(GattLayer):
             # Required by scapy
             uuid1 = unpack('<Q', uuid.packed[:8])[0]
             uuid2 = unpack('<Q', uuid.packed[8:])[0]
-            
+
             self.lock_tx()
             self.att.read_by_type_request_128bit(start, end, uuid1, uuid2)
             self.unlock_tx()
@@ -1138,7 +1138,7 @@ class GattServer(GattLayer):
                request.start,
                BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
-    
+
     @txlock
     def on_find_by_type_value_request(self, request: GattFindByTypeValueRequest):
         """ATT Find By Type Value Request callback
@@ -1176,7 +1176,7 @@ class GattServer(GattLayer):
                 else:
                     if attr.value == request.value:
                         matching_attrs.append((handle, handle))
-        
+
         # If we have found at least one attribute that matches the request, return a
         # FindByTypeValueResponse PDU
         if len(matching_attrs) > 0:
@@ -1934,7 +1934,7 @@ class GattServer(GattLayer):
             # If client is looking for characteristic declaration,
             # we compute the correct item size and maximum number
             # of items we can put in a response PDU
-            # 
+            #
             # In the case of a characteristic declaration, UUID could
             # be 16-bit or 128-bit long so we shall only put in the same
             # answer characteristics with same size UUIDs.
@@ -1965,6 +1965,9 @@ class GattServer(GattLayer):
 
                 # Create our datalist
                 datalist = GattAttributeDataList(item_size)
+            else:
+                max_nb_items = 0
+                datalist = GattAttributeDataList(0)
 
             # Iterate over items while UUID size matches and data fits in MTU
             for i in range(max_nb_items):
@@ -1992,7 +1995,7 @@ class GattServer(GattLayer):
                                             '<HH',
                                             attr_obj.service_start_handle,
                                             attr_obj.service_end_handle,
-                                        ) + attr_obj.service_uuid.packed                                   
+                                        ) + attr_obj.service_uuid.packed
                                     )
                                 )
                             else:
@@ -2003,9 +2006,9 @@ class GattServer(GattLayer):
                                             '<HH',
                                             attr_obj.service_start_handle,
                                             attr_obj.service_end_handle,
-                                        )                                  
+                                        )
                                     )
-                                )                                
+                                )
                 else:
                     break
 

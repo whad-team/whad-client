@@ -16,11 +16,11 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             connector = Keylogger(dev)
-            connector.address = "9b:0a:90:42:a7"
+            connector.address = "9b:0a:90:42:b2"
             connector.scanning = True
             connector.decrypt = True
 
-            connector.add_key(bytes.fromhex("08f59b42c46f2a139688a44d69ac4066"))
+            connector.add_key(bytes.fromhex("08f59b42a06fee0e2588fa4d063c4096"))
             connector.start()
             out = ""
             for i in connector.stream():
