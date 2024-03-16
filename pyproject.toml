@@ -27,6 +27,17 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10"
 ]
+dependencies = [
+    "protobuf==3.20.*",
+    "scapy==2.4.5",
+    "elementpath==2.4.0",
+    "pyserial==3.5.0",
+    "pycryptodomex==3.11.0",
+    "pyusb==1.2.1",
+    "cryptography==36.0.0",
+    "prompt_toolkit==3.0.43",
+    "hexdump==3.3"
+]
 
 [project.scripts]
 whadup = "whad.tools.whadup:main"
