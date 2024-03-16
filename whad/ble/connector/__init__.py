@@ -610,7 +610,6 @@ class BLE(WhadDeviceConnector):
     def set_encryption(self, conn_handle, enabled=False, ll_key=None, ll_iv=None, key=None, rand=None, ediv=None):
         """Notify WHAD device about encryption status
         """
-        print("set_encryption", enabled, ll_key.hex(), ll_iv.hex(), key.hex(), rand, ediv)
         # Send SetEncryptionCmd to device
         msg = Message()
         msg.ble.encryption.enabled = enabled
@@ -656,7 +655,7 @@ class BLE(WhadDeviceConnector):
 
                     # Forward to advertising PDU callback if synchronous mode is set.
                     if self.is_synchronous():
-                        self.add_pending_pdu(packet)                        
+                        self.add_pending_pdu(packet)
                     else:
                         self.on_adv_pdu(packet)
 

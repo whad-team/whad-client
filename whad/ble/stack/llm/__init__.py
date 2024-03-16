@@ -540,7 +540,7 @@ class LinkLayerState(LayerState):
     def is_encrypted(self, conn_handle):
         if conn_handle in self.connections:
             return self.connections[conn_handle]['encrypted']
-            
+
     def mark_as_authenticated(self, conn_handle):
         if conn_handle in self.connections:
             self.connections[conn_handle]['authenticated'] = True
@@ -1024,7 +1024,7 @@ class LinkLayer(Layer):
                 LL_START_ENC_RSP()
             )
 
-        print("Marked as encrypted")
+        #print("Marked as encrypted")
         self.state.mark_as_encrypted(conn_handle)
 
         # Notify SMP channel is now encrypted

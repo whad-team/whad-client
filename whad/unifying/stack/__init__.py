@@ -308,7 +308,6 @@ class UnifyingApplicativeLayer(Layer):
         if timestamp is None:
             timestamp = time()
         logger.info("Synchronized !")
-        print("sync")
         if self.state.role == UnifyingRole.DONGLE:
             self.enable_timeouts()
         self.state.synchronized = True
@@ -316,7 +315,7 @@ class UnifyingApplicativeLayer(Layer):
     #@dongle_callback
     @source('ll', 'desynchronized')
     def on_desynchronized(self, timestamp=None):
-        print("desync")
+        #print("desync")
         if timestamp is None:
             timestamp = time()
         logger.info("Desynchronized.")

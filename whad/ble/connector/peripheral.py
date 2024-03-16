@@ -196,7 +196,7 @@ class Peripheral(BLE):
         GATT client.
         """
         return self.__connected
-    
+
     def wait_connection(self):
         """Wait for a GATT client to connect to the peripheral. If a connection
         is already active, returns immediately.
@@ -312,10 +312,10 @@ class Peripheral(BLE):
                 crypto_material.ltk.value
             )
             if crypto_material.is_authenticated():
-                print("Marked as authenticated")
+                #print("Marked as authenticated")
                 self.__stack.get_layer('ll').state.mark_as_authenticated(connection.conn_handle)
             else:
-                print("Marked as unauthenticated")
+                pass#print("Marked as unauthenticated")
 
 
         # we indicate that we are a responder
