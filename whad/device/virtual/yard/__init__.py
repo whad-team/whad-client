@@ -278,7 +278,8 @@ class YardStickOneDevice(VirtualDevice):
         except:
             pass
         if timestamp is not None:
-            msg.phy.packet.timestamp = timestamp
+            msg.phy.packet.timestamp.sec = timestamp//1000
+            msg.phy.packet.timestamp.usec = (timestamp%1000)*1000
         msg.phy.packet.packet = packet
         self._send_whad_message(msg)
 

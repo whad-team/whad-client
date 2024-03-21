@@ -132,7 +132,7 @@ if __name__ == '__main__':
         sniffer1.set_physical_layer(somfy)
         sniffer1.set_channel(0)
         '''
-        sniffer1.sniff_phy()
+        #sniffer1.sniff_phy()
         sniffer1.start()
         while True:
             input()
