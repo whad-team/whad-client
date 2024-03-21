@@ -56,6 +56,12 @@ class APLManager(Dot15d4Manager):
         # Add app in the endpoints dictionnary
         self.endpoints[endpoint] = app
 
+    def get_endpoints(self):
+        """
+        This method returns a list of all the local endpoints.
+        """
+        return list(self.endpoints.keys())
+
     def get_application_by_endpoint(self, endpoint):
         """
         This method returns the application linked to the provided endpoint (if any).
@@ -202,7 +208,7 @@ class APLManager(Dot15d4Manager):
         """
         Callback processing data PDU transmitted by the APS layer.
         """
-        #asdu.show()
+        asdu.show()
         # Checks if an endpoint matches
         if destination_endpoint not in self.endpoints:
             logger.info("[apl] destination endpoint not found.")

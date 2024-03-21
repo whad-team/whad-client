@@ -4,7 +4,8 @@ from whad.zigbee.profile.nodes import CoordinatorNode, EndDeviceNode, RouterNode
 from whad.dot15d4.stack.mac.constants import MACDeviceType, MACPowerSource
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.apl.zdo.discovery.exceptions import ZDODeviceAndServiceDiscoveryTimeoutException
-from whad.scapy.layers.zdp import ZDPIEEEAddrReq, ZDPSimpleDescRsp, ZDPActiveEPRsp, ZDPNodeDescRsp, ZDPIEEEAddrRsp
+from whad.scapy.layers.zdp import ZDPIEEEAddrReq, ZDPSimpleDescRsp, ZDPActiveEPReq, ZDPActiveEPRsp, \
+    ZDPNodeDescRsp, ZDPIEEEAddrRsp
 from whad.zigbee.stack.nwk.constants import ZigbeeRelationship, ZigbeeDeviceType
 from queue import Queue, Empty
 from time import time, sleep
@@ -297,6 +298,36 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         )
         if ZDPIEEEAddrReq in asdu:
             self.on_ieee_addr_req(asdu)
+        elif ZDPActiveEPReq in asdu:
+            self.on_active_ep_req(asdu)
+
+    def on_active_ep_req(self, asdu):
+        """
+        Callback called when an active endpoint request is received.
+        """
+        nwk_layer = self.zdo.manager.get_layer("nwk")
+        own_network_address = nwk_layer.database.get("nwkNetworkAddress")
+
+        apl_layer = self.zdo.manager.get_layer("apl")
+
+        if asdu.nwk_addr == own_network_address:
+            endpoints = apl_layer.get_endpoints()
+            self.zdo.clusters["active_ep_rsp"].send_data(
+                status = 0,
+                address = own_network_address,
+                endpoints = endpoints
+            )
+            self.transaction += 1
+
+        # Not implemented: discovery of sub devices in the discovery type
+        else:
+            self.zdo.clusters["active_ep_rsp"].send_data(
+                status = 1, # dev not found
+                address = asdu.nwk_addr,
+                endpoints = []
+            )
+            self.transaction += 1
+
 
     def on_ieee_addr_req(self, asdu):
         """

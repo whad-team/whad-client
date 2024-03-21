@@ -109,7 +109,7 @@ class ZDOIEEEAddrRsp(ZDPCluster):
             command.start_index = start_index
             command.associated_devices = associated_devices
 
-        
+
 
         super().send_data(
             command,
@@ -228,6 +228,23 @@ class ZDOActiveEPReq(ZDPCluster):
 class ZDOActiveEPRsp(ZDPCluster):
     def __init__(self, zdo_object):
         super().__init__(zdo_object, cluster_id=0x8005)
+
+
+    def send_data(self, address, status=0, endpoints=[], transaction=0):
+        command = ZDPActiveEPRsp(
+            status=status,
+            nwk_addr = address,
+            active_endpoints=endpoints
+        )
+
+        super().send_data(
+            command,
+            transaction,
+            destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT,
+            destination_address=address,
+            use_network_key=True,
+            destination_endpoint=0
+        )
 
 class ZDOSimpleDescReq(ZDPCluster):
     def __init__(self, zdo_object):
