@@ -304,7 +304,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         elif ZDPSimpleDescReq in asdu:
             self.on_simple_desc_req(asdu, source_address)
 
-    def on_simple_desc_req(asdu, remote_address):
+    def on_simple_desc_req(self, asdu, remote_address):
         """
         Callback called when a Simple Descriptor Request is received.
         """
@@ -313,8 +313,59 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
 
         apl_layer = self.zdo.manager.get_layer("apl")
 
-        if asdu.nwk_addr == own_network_address:
-            pass
+
+        associated_devices_addresses = []
+        for address, device in nwk_layer.database.get("nwkNeighborTable").table.items():
+            if (
+                device.relationship == ZigbeeRelationship.IS_CHILD and
+                device.device_type == ZigbeeDeviceType.END_DEVICE
+            ):
+                associated_devices_addresses.append(device.address)
+
+
+        match = False
+        if own_network_address == asdu.nwk_addr:
+            # It matches our own address, check if endpoint in active endpoints
+            endpoints = apl_layer.get_endpoints()
+
+            if asdu.endpoint in endpoints and asdu.endpoint != 0:
+                app = apl_layer.get_application_by_endpoint(asdu.endpoint)
+                simple_descriptor = app.simple_descriptor
+                
+                self.zdo.clusters["simple_desc_rsp"].send_data(
+                    status = 0, # success
+                    local_address = own_network_address,
+                    remote_address = remote_address,
+                    descriptor = simple_descriptor,
+                    transaction = self.transaction
+                )
+                self.transaction += 1
+            else:
+                self.zdo.clusters["simple_desc_rsp"].send_data(
+                    status = 3, # no descriptor
+                    local_address = own_network_address,
+                    remote_address = remote_address,
+                    transaction = self.transaction
+                )
+                self.transaction += 1
+        elif asdu.nwk_addr in associated_devices_addresses:
+            # It matches one of our children
+            self.zdo.clusters["simple_desc_rsp"].send_data(
+                status = 3, # no descriptor (we lie for now)
+                local_address = own_network_address,
+                remote_address = remote_address,
+                transaction = self.transaction
+            )
+            self.transaction += 1
+        else:
+            self.zdo.clusters["simple_desc_rsp"].send_data(
+                status = 1, # device not found
+                local_address = own_network_address,
+                remote_address = remote_address,
+                transaction = self.transaction
+            )
+            self.transaction += 1
+
 
     def on_active_ep_req(self, asdu, remote_address):
         """
@@ -327,11 +378,13 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
 
         if asdu.nwk_addr == own_network_address:
             endpoints = apl_layer.get_endpoints()
+            endpoints.remove(0)
             self.zdo.clusters["active_ep_rsp"].send_data(
                 status = 0,
                 local_address = own_network_address,
                 remote_address = remote_address,
-                endpoints = endpoints
+                endpoints = endpoints,
+                transaction = self.transaction
             )
             self.transaction += 1
 
@@ -341,7 +394,8 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 status = 1, # dev not found
                 local_address = asdu.nwk_addr,
                 remote_address = remote_address,
-                endpoints = []
+                endpoints = [],
+                transaction = self.transaction
             )
             self.transaction += 1
 

@@ -236,7 +236,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                 print("Discovering surrounding nodes.")
                 nodes = self.__target_network['info'].discover()
                 self.__target_network['discovered'] = True
-
+                print(node)
                 for node in nodes:
                     if isinstance(node, CoordinatorNode):
                         print("New Coordinator discovered (addr. = %s, ext. addr. = %s)" % (

@@ -108,7 +108,7 @@ class ZDOIEEEAddrRsp(ZDPCluster):
             command.num_assoc_dev=num_assoc_dev
             command.start_index = start_index
             command.associated_devices = associated_devices
- 
+
 
         super().send_data(
             command,
@@ -267,3 +267,37 @@ class ZDOSimpleDescReq(ZDPCluster):
 class ZDOSimpleDescRsp(ZDPCluster):
     def __init__(self, zdo_object):
         super().__init__(zdo_object, cluster_id=0x8004)
+
+    def send_data(self, status, local_address, remote_address, descriptor=None, transaction=0):
+        if descriptor is None:
+            command = ZDPSimpleDescRsp(
+                status = status,
+                nwk_addr = address,
+                descriptor_length = 0
+            )
+        else:
+            command = ZDPSimpleDescRsp(
+                status = status,
+                nwk_addr = local_address,
+                descriptor_length = (
+                    6 +
+                    (1 + 2 * len(descriptor.input_clusters)) +
+                    (1 + 2 * len(descriptor.output_clusters))
+                ),
+                endpoint = descriptor.endpoint,
+                profile_identifier = descriptor.profile_identifier,
+                device_identifier = descriptor.device_identifier,
+                device_version = descriptor.device_version,
+                input_clusters_count = len(descriptor.input_clusters),
+                input_clusters = descriptor.input_clusters,
+                output_clusters_count = len(descriptor.output_clusters),
+                output_clusters = descriptor.output_clusters
+            )
+        super().send_data(
+            command,
+            transaction,
+            destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT,
+            destination_address=remote_address,
+            use_network_key=True,
+            destination_endpoint=0
+        )

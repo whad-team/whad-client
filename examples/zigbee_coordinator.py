@@ -2,6 +2,7 @@ from whad.device import WhadDevice
 from whad.zigbee import Coordinator
 from whad.common.monitors import WiresharkMonitor
 from whad.zigbee.stack.apl.application import ApplicationObject
+from whad.zigbee.stack.apl.zcl.clusters.onoff import OnOffServer
 from whad.exceptions import WhadDeviceNotFound
 from scapy.compat import raw
 from random import randint
@@ -28,7 +29,24 @@ if __name__ == '__main__':
 
             dev = WhadDevice.create(interface)
 
-            coordinator = Coordinator(dev)
+            onoff = OnOffServer()
+            #end_device = EndDevice(dev,
+            #touchlink = ZCLTouchLinkClient()
+            #zll = ApplicationObject("zll_app", 0xc05e, 0x0100, device_version=0, input_clusters=[], output_clusters=[])
+            #zll.add_output_cluster(touchlink)
+
+            basic_app = ApplicationObject(
+                "basic_app",
+                profile_id = 0x0104,
+                device_id = 0x0100,
+                device_version = 0,
+                input_clusters=[],
+                output_clusters=[]
+            )
+            basic_app.add_output_cluster(
+                onoff
+            )
+            coordinator = Coordinator(dev, applications=[basic_app])
             monitor.attach(coordinator)
             monitor.start()
             coordinator.attach_callback(show)

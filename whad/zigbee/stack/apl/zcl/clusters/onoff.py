@@ -37,6 +37,9 @@ class OnOffServer(ZCLServerCluster):
     OnTime: (0x4001, ["read", "write"]) = 0
     OffWaitTime: (0x4002, ["read", "write"]) = 0
 
+    def __init__(self):
+        super().__init__(cluster_id=0x0006)
+
 
     @ZCLCluster.command_receive(0x00, "Off")
     def on_off(self, command):

@@ -1,5 +1,5 @@
 from whad.dot15d4.stack.mac.constants import MACAddressMode
-
+from whad.zigbee.stack.apl.zdo.descriptors import SimpleDescriptor
 class ApplicationObject:
     """
     This class implements an Application Object.
@@ -31,6 +31,30 @@ class ApplicationObject:
         # Link every cluster to the application
         for cluster in self.input_clusters + self.output_clusters:
             cluster.application = self
+
+    @property
+    def simple_descriptor(self):
+        if self.manager is None:
+            return None
+
+        # Look for our own endpoint
+        own_endpoint = None
+        for endpoint, app in self.manager.endpoints.items():
+            if app == self:
+                own_endpoint = endpoint
+                break
+
+        if own_endpoint is None:
+            return None
+
+        return SimpleDescriptor(
+                endpoint=own_endpoint,
+                profile_identifier=self.profile_id,
+                device_identifier=self.device_id,
+                device_version=self.device_version,
+                input_clusters=[cluster.cluster_id for cluster in app.input_clusters],
+                output_clusters=[cluster.cluster_id  for cluster in app.output_clusters]
+        )
 
     def initialize(self):
         """

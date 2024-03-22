@@ -49,6 +49,7 @@ class ZigbeeDeviceObjects(ApplicationObject):
                 self.clusters["node_desc_rsp"],
                 self.clusters["active_ep_req"],
                 self.clusters["active_ep_rsp"],
+                self.clusters["simple_desc_req"],
                 self.clusters["simple_desc_rsp"],
             ],
             output_clusters=[
@@ -59,6 +60,7 @@ class ZigbeeDeviceObjects(ApplicationObject):
                 self.clusters["device_annce"],
                 self.clusters["node_desc_rsp"],
                 self.clusters["simple_desc_req"],
+                self.clusters["simple_desc_rsp"],
             ]
         )
 
