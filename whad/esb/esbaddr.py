@@ -10,7 +10,7 @@ class ESBAddress(object):
         """Initialize ESB address
         """
         if isinstance(address, str):
-            if re.match('^([0-9a-fA-F]{2}\:){4}[0-9a-fA-F]{2}$', address) is not None:
+            if re.match(r'^([0-9a-fA-F]{2}\:){4}[0-9a-fA-F]{2}$', address) is not None:
                 self.__value = unhexlify(address.replace(':',''))
             elif re.match('[0-9a-fA-F]{10}$', address) is not None:
                 self.__value = unhexlify(address)

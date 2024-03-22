@@ -97,7 +97,7 @@ class ZDOIEEEAddrRsp(ZDPCluster):
         super().__init__(zdo_object, cluster_id=0x8001)
 
 
-    def send_data(self, nwk_address, ieee_address, status=0, num_assoc_dev=0, start_index=0, associated_devices=[], transaction=0):
+    def send_data(self, nwk_address, ieee_address,remote_address, status=0, num_assoc_dev=0, start_index=0, associated_devices=[], transaction=0):
 
         command = ZDPIEEEAddrRsp(
             ieee_addr=ieee_address,
@@ -109,13 +109,13 @@ class ZDOIEEEAddrRsp(ZDPCluster):
             command.start_index = start_index
             command.associated_devices = associated_devices
 
-
+        print(remote_address)
 
         super().send_data(
             command,
             transaction,
             destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT,
-            destination_address=nwk_address,
+            destination_address=remote_address,
             use_network_key=True,
             destination_endpoint=0
         )
@@ -230,18 +230,19 @@ class ZDOActiveEPRsp(ZDPCluster):
         super().__init__(zdo_object, cluster_id=0x8005)
 
 
-    def send_data(self, address, status=0, endpoints=[], transaction=0):
+    def send_data(self, local_address, remote_address, status=0, endpoints=[], transaction=0):
         command = ZDPActiveEPRsp(
             status=status,
-            nwk_addr = address,
-            active_endpoints=endpoints
+            nwk_addr = local_address,
+            active_endpoints=endpoints,
+            num_active_endpoints=len(endpoints)
         )
 
         super().send_data(
             command,
             transaction,
             destination_address_mode=APSDestinationAddressMode.SHORT_ADDRESS_DST_ENDPOINT_PRESENT,
-            destination_address=address,
+            destination_address=remote_address,
             use_network_key=True,
             destination_endpoint=0
         )

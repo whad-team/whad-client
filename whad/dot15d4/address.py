@@ -18,7 +18,7 @@ class Dot15d4Address(object):
 
 
         if isinstance(address, str):
-            if re.match('^([0-9a-fA-F]{2}\:){7}[0-9a-fA-F]{2}$', address) is not None:
+            if re.match(r'^([0-9a-fA-F]{2}\:){7}[0-9a-fA-F]{2}$', address) is not None:
                 self.__type = Dot15d4Address.EXTENDED
                 self.__value = unhexlify(address.replace(':',''))
             elif re.match('[0-9a-fA-F]{16}$', address) is not None:

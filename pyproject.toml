@@ -29,7 +29,7 @@ classifiers = [
 ]
 dependencies = [
     "protobuf==3.20.*",
-    "scapy==2.4.5",
+    "scapy==2.5.0rc3",
     "elementpath==2.4.0",
     "pyserial==3.5.0",
     "pycryptodomex==3.11.0",

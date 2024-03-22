@@ -1,5 +1,5 @@
 from scapy.layers.zigbee import ZigbeeDeviceProfile, ZigbeeAppDataPayloadStub, ZigbeeClusterLibrary, \
-    _zcl_profile_identifier, _zcl_attribute_data_types, _zcl_enumerated_status_values, _DiscreteString, \
+    _aps_profile_identifiers, _zcl_attribute_data_types, _zcl_enumerated_status_values, _DiscreteString, \
     _zcl_cluster_identifier, ZigbeeNWKStub
 from scapy.fields import BitEnumField, BitField, ByteEnumField, ByteField, ConditionalField, \
     FlagsField, XBitField, XLEIntField, XLEShortField, EnumField, XShortField, PacketListField, \
@@ -112,12 +112,12 @@ class ZLLScanResponse(Packet):
         ConditionalField(ByteField("endpoint_id", 0x00), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
         # Profile identifier (0/2 octets)
         #ConditionalField(XShortField("profile_id", 0x0000)
-        ConditionalField(EnumField("profile_id", 0, _zcl_profile_identifier, fmt = "<H"), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
+        ConditionalField(EnumField("profile_id", 0, _aps_profile_identifiers, fmt = "<H"), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
         # Device identifier (0/2 octets)
         ConditionalField(XShortField("device_id", 0x0000), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
         # Version (0/1 octets)
         # HiddenField(ConditionalField(BitField("0x0", 0, 4), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1))),
-        ConditionalField(BitField("0x0", 0, 4), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
+        ConditionalField(BitField("unknown", 0, 4), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
         ConditionalField(BitField("application_device_version", 2, 4), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
         # Group identifier count (0/1 octets)
         ConditionalField(ByteField("group_id_count", 0x00), lambda pkt:(pkt.getfieldval("number_of_sub_devices") == 1)),
@@ -334,7 +334,7 @@ class NewZigbeeAppDataPayloadStub(Packet):
         # Cluster identifier
         EnumField("cluster", 0, _zcl_cluster_identifier, fmt = "<H"), # unsigned short (little-endian)
         # Profile identifier
-        EnumField("profile", 0, _zcl_profile_identifier, fmt = "<H"),
+        EnumField("profile", 0, _aps_profile_identifiers, fmt = "<H"),
         # ZigBee Payload
 #        ConditionalField(
 #            ZigbeePayloadField("data", "", length_from=lambda pkt, s:len(s)),

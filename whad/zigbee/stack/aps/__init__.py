@@ -219,11 +219,12 @@ class APSDataService(APSService):
 
         nwkAddressMap = self.manager.get_layer('nwk').database.get("nwkAddressMap")
         selected_extended_address = None
+        '''
         for extended_address, short_address in nwkAddressMap.items():
             if short_address == source_address:
                 selected_extended_address = extended_address
                 break
-
+        '''
         source = None
         source_address_mode = None
 

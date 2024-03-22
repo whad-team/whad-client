@@ -296,12 +296,13 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 link_quality
             )
         )
+        print("RA", source_address, source_address_mode)
         if ZDPIEEEAddrReq in asdu:
-            self.on_ieee_addr_req(asdu)
+            self.on_ieee_addr_req(asdu, source_address)
         elif ZDPActiveEPReq in asdu:
-            self.on_active_ep_req(asdu)
+            self.on_active_ep_req(asdu, source_address)
 
-    def on_active_ep_req(self, asdu):
+    def on_active_ep_req(self, asdu, remote_address):
         """
         Callback called when an active endpoint request is received.
         """
@@ -314,7 +315,8 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
             endpoints = apl_layer.get_endpoints()
             self.zdo.clusters["active_ep_rsp"].send_data(
                 status = 0,
-                address = own_network_address,
+                local_address = own_network_address,
+                remote_address = remote_address,
                 endpoints = endpoints
             )
             self.transaction += 1
@@ -323,19 +325,21 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
         else:
             self.zdo.clusters["active_ep_rsp"].send_data(
                 status = 1, # dev not found
-                address = asdu.nwk_addr,
+                local_address = asdu.nwk_addr,
+                remote_address = remote_address,
                 endpoints = []
             )
             self.transaction += 1
 
 
-    def on_ieee_addr_req(self, asdu):
+    def on_ieee_addr_req(self, asdu, remote_address):
         """
         Callback called when a IEEE address request is received.
         """
         nwk_layer = self.zdo.manager.get_layer("nwk")
         own_network_address = nwk_layer.database.get("nwkNetworkAddress")
         own_ieee_address = nwk_layer.database.get("nwkIeeeAddress")
+
 
         associated_devices_addresses = []
         for address, device in nwk_layer.database.get("nwkNeighborTable").table.items():
@@ -356,6 +360,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 self.zdo.clusters["ieee_addr_rsp"].send_data(
                     own_network_address,
                     own_ieee_address,
+                    remote_address = remote_address,
                     status=0,
                     num_assoc_dev=0,
                     start_index=0,
@@ -366,6 +371,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 self.zdo.clusters["ieee_addr_rsp"].send_data(
                     own_network_address,
                     own_ieee_address,
+                    remote_address = remote_address,
                     status=0,
                     num_assoc_dev=len(associated_devices_addresses),
                     start_index=asdu.start_index,
@@ -376,6 +382,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 self.zdo.clusters["ieee_addr_rsp"].send_data(
                     own_network_address,
                     own_ieee_address,
+                    remote_address = remote_address,
                     status=2,
                     num_assoc_dev=0,
                     start_index=0,
@@ -390,6 +397,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
             self.zdo.clusters["ieee_addr_rsp"].send_data(
                 own_network_address,
                 own_ieee_address,
+                remote_address = remote_address,
                 status=1,
                 num_assoc_dev=0,
                 start_index=0,
