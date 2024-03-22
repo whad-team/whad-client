@@ -5,7 +5,7 @@ from whad.dot15d4.stack.mac.constants import MACDeviceType, MACPowerSource
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.apl.zdo.discovery.exceptions import ZDODeviceAndServiceDiscoveryTimeoutException
 from whad.scapy.layers.zdp import ZDPIEEEAddrReq, ZDPSimpleDescRsp, ZDPActiveEPReq, ZDPActiveEPRsp, \
-    ZDPNodeDescRsp, ZDPIEEEAddrRsp
+    ZDPNodeDescRsp, ZDPIEEEAddrRsp, ZDPSimpleDescReq
 from whad.zigbee.stack.nwk.constants import ZigbeeRelationship, ZigbeeDeviceType
 from queue import Queue, Empty
 from time import time, sleep
@@ -296,11 +296,25 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 link_quality
             )
         )
-        print("RA", source_address, source_address_mode)
+
         if ZDPIEEEAddrReq in asdu:
             self.on_ieee_addr_req(asdu, source_address)
         elif ZDPActiveEPReq in asdu:
             self.on_active_ep_req(asdu, source_address)
+        elif ZDPSimpleDescReq in asdu:
+            self.on_simple_desc_req(asdu, source_address)
+
+    def on_simple_desc_req(asdu, remote_address):
+        """
+        Callback called when a Simple Descriptor Request is received.
+        """
+        nwk_layer = self.zdo.manager.get_layer("nwk")
+        own_network_address = nwk_layer.database.get("nwkNetworkAddress")
+
+        apl_layer = self.zdo.manager.get_layer("apl")
+
+        if asdu.nwk_addr == own_network_address:
+            pass
 
     def on_active_ep_req(self, asdu, remote_address):
         """
