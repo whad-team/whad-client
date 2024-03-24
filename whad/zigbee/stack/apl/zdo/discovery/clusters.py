@@ -166,37 +166,44 @@ class ZDONodeDescRsp(ZDPCluster):
     def __init__(self, zdo_object):
         super().__init__(zdo_object, cluster_id=0x8002)
 
-    def send_data(self, address, transaction=0):
-        node_descriptor = self.zdo_object.zdo.configuration.get("configNodeDescriptor")
-        command =  ZDPNodeDescRsp(
-            logical_type=int(node_descriptor.logical_type),
-            complex_descriptor_available=int(node_descriptor.complex_descriptor_available),
-            user_descriptor_available=int(node_descriptor.user_descriptor_available),
-            aps_flags=node_descriptor.aps_flags,
-            support_868_mhz=int(node_descriptor.support_868_mhz),
-            support_902_mhz=int(node_descriptor.support_902_mhz),
-            support_2400_mhz=int(node_descriptor.support_2400_mhz),
-            alternate_pan_coordinator=int(node_descriptor.alternate_pan_coordinator),
-            device_type=int(node_descriptor.device_type),
-            power_source=int(node_descriptor.power_source),
-            receiver_on_when_idle=int(node_descriptor.receiver_on_when_idle),
-            security_capability=int(node_descriptor.security_capability),
-            allocate_address=int(node_descriptor.allocate_address),
-            manufacturer_code=node_descriptor.manufacturer_code,
-            max_buffer_size=node_descriptor.max_buffer_size,
-            max_incoming_transfer_size=node_descriptor.max_incoming_transfer_size,
-            server_primary_trust_center = int(node_descriptor.server_primary_trust_center),
-            server_backup_trust_center = int(node_descriptor.server_backup_trust_center),
-            server_primary_binding_table_cache = int(node_descriptor.server_primary_binding_table_cache),
-            server_backup_binding_table_cache = int(node_descriptor.server_backup_binding_table_cache),
-            server_primary_discovery_cache = int(node_descriptor.server_primary_discovery_cache),
-            server_backup_discovery_cache = int(node_descriptor.server_backup_discovery_cache),
-            network_manager = int(node_descriptor.network_manager),
-            stack_compliance_revision = node_descriptor.stack_compliance_revision,
-            max_outgoing_transfer_size = node_descriptor.max_outgoing_transfer_size,
-            extended_active_endpoint_list_available = int(node_descriptor.extended_active_endpoint_list_available),
-            extended_simple_descriptors_list_available = int(node_descriptor.extended_simple_descriptors_list_available)
-        )
+    def send_data(self, address, status, node_descriptor=None, transaction=0):
+        if status == 0:
+            command =  ZDPNodeDescRsp(
+                nwk_addr=address,
+                status=status,
+                logical_type=int(node_descriptor.logical_type),
+                complex_descriptor_available=int(node_descriptor.complex_descriptor_available),
+                user_descriptor_available=int(node_descriptor.user_descriptor_available),
+                aps_flags=node_descriptor.aps_flags,
+                support_868_mhz=int(node_descriptor.support_868_mhz),
+                support_902_mhz=int(node_descriptor.support_902_mhz),
+                support_2400_mhz=int(node_descriptor.support_2400_mhz),
+                alternate_pan_coordinator=int(node_descriptor.alternate_pan_coordinator),
+                device_type=int(node_descriptor.device_type),
+                power_source=int(node_descriptor.power_source),
+                receiver_on_when_idle=int(node_descriptor.receiver_on_when_idle),
+                security_capability=int(node_descriptor.security_capability),
+                allocate_address=int(node_descriptor.allocate_address),
+                manufacturer_code=node_descriptor.manufacturer_code,
+                max_buffer_size=node_descriptor.max_buffer_size,
+                max_incoming_transfer_size=node_descriptor.max_incoming_transfer_size,
+                server_primary_trust_center = int(node_descriptor.server_primary_trust_center),
+                server_backup_trust_center = int(node_descriptor.server_backup_trust_center),
+                server_primary_binding_table_cache = int(node_descriptor.server_primary_binding_table_cache),
+                server_backup_binding_table_cache = int(node_descriptor.server_backup_binding_table_cache),
+                server_primary_discovery_cache = int(node_descriptor.server_primary_discovery_cache),
+                server_backup_discovery_cache = int(node_descriptor.server_backup_discovery_cache),
+                network_manager = int(node_descriptor.network_manager),
+                stack_compliance_revision = node_descriptor.stack_compliance_revision,
+                max_outgoing_transfer_size = node_descriptor.max_outgoing_transfer_size,
+                extended_active_endpoint_list_available = int(node_descriptor.extended_active_endpoint_list_available),
+                extended_simple_descriptors_list_available = int(node_descriptor.extended_simple_descriptors_list_available)
+            )
+        else:
+            command =  ZDPNodeDescRsp(
+                nwk_addr=address,
+                status=status
+            )
         super().send_data(
             command,
             transaction,

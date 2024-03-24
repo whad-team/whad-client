@@ -5,7 +5,7 @@ from whad.dot15d4.stack.mac.constants import MACDeviceType, MACPowerSource
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.apl.zdo.discovery.exceptions import ZDODeviceAndServiceDiscoveryTimeoutException
 from whad.scapy.layers.zdp import ZDPIEEEAddrReq, ZDPSimpleDescRsp, ZDPActiveEPReq, ZDPActiveEPRsp, \
-    ZDPNodeDescRsp, ZDPIEEEAddrRsp, ZDPSimpleDescReq
+    ZDPNodeDescRsp, ZDPIEEEAddrRsp, ZDPSimpleDescReq, ZDPNodeDescReq
 from whad.zigbee.stack.nwk.constants import ZigbeeRelationship, ZigbeeDeviceType
 from queue import Queue, Empty
 from time import time, sleep
@@ -241,6 +241,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
 
                 # Get the node descriptor and generate an appropriate node wrapper
                 descriptor = self.get_node_descriptor(address)
+
                 if descriptor is not None:
                     if descriptor.logical_type == LogicalDeviceType.COORDINATOR:
                         new_device = CoordinatorNode(
@@ -303,6 +304,54 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
             self.on_active_ep_req(asdu, source_address)
         elif ZDPSimpleDescReq in asdu:
             self.on_simple_desc_req(asdu, source_address)
+        elif ZDPNodeDescReq in asdu:
+            self.on_node_desc_req(asdu, source_address)
+
+    def on_node_desc_req(self, asdu, source_address):
+        """
+        Callback called when a Node Descriptor Request is received.
+        """
+        nwk_layer = self.zdo.manager.get_layer("nwk")
+        own_network_address = nwk_layer.database.get("nwkNetworkAddress")
+
+        apl_layer = self.zdo.manager.get_layer("apl")
+
+
+        associated_devices_addresses = []
+        for address, device in nwk_layer.database.get("nwkNeighborTable").table.items():
+            if (
+                device.relationship == ZigbeeRelationship.IS_CHILD and
+                device.device_type == ZigbeeDeviceType.END_DEVICE
+            ):
+                associated_devices_addresses.append(device.address)
+
+
+        if own_network_address == asdu.nwk_addr:
+            node_descriptor = self.zdo.configuration.configNodeDescriptor
+            # Send a Node Descriptor Request
+            self.zdo.clusters["node_desc_rsp"].send_data(
+                address,
+                status=0,
+                node_descriptor=node_descriptor,
+                transaction=self.transaction
+            )
+            self.transaction += 1
+        elif asdu.nwk_addr in associated_devices_addresses:
+            self.zdo.clusters["node_desc_rsp"].send_data(
+                address,
+                status=3,
+                node_descriptor=node_descriptor,
+                transaction=self.transaction
+            )
+            self.transaction += 1
+        else:
+            self.zdo.clusters["node_desc_rsp"].send_data(
+                address,
+                status=1,
+                node_descriptor=node_descriptor,
+                transaction=self.transaction
+            )
+            self.transaction += 1
 
     def on_simple_desc_req(self, asdu, remote_address):
         """
@@ -323,7 +372,6 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                 associated_devices_addresses.append(device.address)
 
 
-        match = False
         if own_network_address == asdu.nwk_addr:
             # It matches our own address, check if endpoint in active endpoints
             endpoints = apl_layer.get_endpoints()
@@ -331,7 +379,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
             if asdu.endpoint in endpoints and asdu.endpoint != 0:
                 app = apl_layer.get_application_by_endpoint(asdu.endpoint)
                 simple_descriptor = app.simple_descriptor
-                
+
                 self.zdo.clusters["simple_desc_rsp"].send_data(
                     status = 0, # success
                     local_address = own_network_address,
