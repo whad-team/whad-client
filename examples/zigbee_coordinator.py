@@ -2,7 +2,7 @@ from whad.device import WhadDevice
 from whad.zigbee import Coordinator
 from whad.common.monitors import WiresharkMonitor
 from whad.zigbee.stack.apl.application import ApplicationObject
-from whad.zigbee.stack.apl.zcl.clusters.onoff import OnOffServer
+from whad.zigbee.stack.apl.zcl.clusters.onoff import OnOffServer, ZCLCluster
 from whad.exceptions import WhadDeviceNotFound
 from scapy.compat import raw
 from random import randint
@@ -29,11 +29,14 @@ if __name__ == '__main__':
 
             dev = WhadDevice.create(interface)
 
-            onoff = OnOffServer()
-            #end_device = EndDevice(dev,
-            #touchlink = ZCLTouchLinkClient()
-            #zll = ApplicationObject("zll_app", 0xc05e, 0x0100, device_version=0, input_clusters=[], output_clusters=[])
-            #zll.add_output_cluster(touchlink)
+
+            class CustomOnOffServer(OnOffServer):
+                @ZCLCluster.command_receive(0x00, "Off")
+                def on_off(self, command):
+                    super().on_off(command)
+                    print("-> custom Off")
+
+            onoff = CustomOnOffServer()
 
             basic_app = ApplicationObject(
                 "basic_app",
@@ -43,7 +46,7 @@ if __name__ == '__main__':
                 input_clusters=[],
                 output_clusters=[]
             )
-            basic_app.add_output_cluster(
+            basic_app.add_input_cluster(
                 onoff
             )
             coordinator = Coordinator(dev, applications=[basic_app])

@@ -44,14 +44,17 @@ class OnOffServer(ZCLServerCluster):
     @ZCLCluster.command_receive(0x00, "Off")
     def on_off(self, command):
         self.OnOff = 0
+        print("[i] Off")
         # default response ?
 
     @ZCLCluster.command_receive(0x01, "On")
     def on_on(self, command):
         self.OnOff = 1
+        print("[i] On")
         # default response ?
 
     @ZCLCluster.command_receive(0x02, "Toggle")
     def on_toggle(self, command):
         self.OnOff = 1 - self.OnOff
+        print("[i] Toggle")
         # default response ?
