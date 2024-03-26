@@ -4,6 +4,8 @@ import os
 import sys
 import select
 import fcntl
+import logging
+
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
 from prompt_toolkit.output import create_output
@@ -20,6 +22,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 signal(SIGPIPE,SIG_DFL)
+
+# Python logging level aliases
+LOGLEVEL_ALIASES = {
+    'warning': logging.WARNING,
+    'error': logging.ERROR,
+    'info': logging.INFO,
+    'debug': logging.DEBUG
+}
 
 class command(object):
     """CommandLineApp command decorator.
@@ -212,6 +222,25 @@ class CommandLineApp(ArgumentParser):
             help='disable colors in output'
         )
 
+        # Add our default option --log
+        # (-l option not available, we must keep with the long name)
+        self.add_argument(
+            '--log',
+            dest='loglevel',
+            choices=['error', 'warn', 'info', 'debug'],
+            default=None,
+            help='set the logging level for this application'
+        )
+
+        # Logfile (-f option not available, we must keep with the long name)
+        self.add_argument(
+            '--log-file',
+            dest='logfile',
+            metavar='LOGFILE_PATH',
+            default=None,
+            help='write the log output into LOGFILE_PATH'
+        )
+
         # Save application type
         if self.__has_commands:
             self.add_argument(
@@ -261,6 +290,19 @@ class CommandLineApp(ArgumentParser):
         """
         # First we need to parse the main arguments
         self.__args = self.parse_args()
+
+        # Handle debug options if provided
+        if self.__args.loglevel is not None:
+            # Convert level to corresponding Python logging level
+            desired_level = LOGLEVEL_ALIASES[self.__args.loglevel]
+
+            # Shall we log into a specific file ?
+            if self.__args.logfile is not None:
+                logging.basicConfig(filename=self.__args.logfile,
+                                    level=desired_level)
+            else:
+                # Else we log into stderr
+                logging.basicConfig(level=desired_level)
 
         # If interface is provided, instantiate it and make it available
         if self.__has_interface:
