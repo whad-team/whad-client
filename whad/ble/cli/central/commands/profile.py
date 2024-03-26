@@ -184,8 +184,6 @@ def profile_handler(app, command_args):
         except ConnectionLostException as conn_lost:
             app.error('BLE device disconnected during discovery.')
 
-        central.stop()
-
     elif app.interface is None:
         # If stdin is piped, that means previous program has failed.
         # We display this warning only if the tool has been launched in
