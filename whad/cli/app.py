@@ -298,8 +298,14 @@ class CommandLineApp(ArgumentParser):
 
             # Shall we log into a specific file ?
             if self.__args.logfile is not None:
-                logging.basicConfig(filename=self.__args.logfile,
-                                    level=desired_level)
+                try:
+                    logging.basicConfig(filename=self.__args.logfile,
+                                        level=desired_level)
+                except IOError as err:
+                    self.error(
+                        f'Specified log output file ({self.__args.logfile}) cannot be accessed, falling back to stderr.'
+                    )
+                    logging.basicConfig(level=desired_level)
             else:
                 # Else we log into stderr
                 logging.basicConfig(level=desired_level)
