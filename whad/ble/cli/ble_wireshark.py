@@ -17,7 +17,7 @@ from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCm
     HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
     SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd, BleAddrType, ReactiveJam, \
     JamAdvOnChannel, PrepareSequence, PrepareSequenceCmd, TriggerSequence, DeleteSequence
-from whad.cli.app import CommandLineApp
+from whad.cli.app import CommandLineDevicePipe
 from whad.ble.connector import Central
 from whad.common.monitors import WiresharkMonitor
 from whad.device.unix import UnixSocketProxy, UnixSocketConnector
@@ -89,7 +89,7 @@ class BleUnixSocketConnector(UnixSocketConnector):
         return self.__translator.format(packet)
 
 
-class BleWiresharkApp(CommandLineApp):
+class BleWiresharkApp(CommandLineDevicePipe):
 
     def __init__(self):
         """Application uses an interface and has commands.

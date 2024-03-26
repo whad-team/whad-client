@@ -5,7 +5,7 @@ BLE device, and chain this with another tool.
 
 """
 from whad.ble.bdaddr import BDAddress
-from whad.cli.app import CommandLineApp
+from whad.cli.app import CommandLineDeviceSource
 from whad.ble.connector import Central
 from whad.device.unix import UnixSocketProxy
 from whad.ble.exceptions import PeripheralNotFound
@@ -13,9 +13,7 @@ from whad.ble.exceptions import PeripheralNotFound
 import logging
 logger = logging.getLogger(__name__)
 
-#logging.basicConfig(level=logging.DEBUG)
-
-class BleConnectApp(CommandLineApp):
+class BleConnectApp(CommandLineDeviceSource):
 
     def __init__(self):
         """Application uses an interface and has commands.

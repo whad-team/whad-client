@@ -182,12 +182,23 @@ class CommandLineApp(ArgumentParser):
     Each command is associated to a specific handler that will take care of
     command arguments.
     """
-
+    # WHAD interface related errors
     DEV_NOT_FOUND_ERR = -1
     DEV_NOT_READY_ERR = -2
     DEV_ACCESS_ERR = -3
 
-    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
+    # Application input types (when piped)
+    INPUT_NONE = 0
+    INPUT_STANDARD = 1
+    INPUT_WHAD = 2
+
+    # Application output types (when piped)
+    OUTPUT_NONE = 0
+    OUTPUT_STANDARD = 1
+    OUTPUT_WHAD = 2
+
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, input: int = INPUT_WHAD,
+                 output: int = OUTPUT_WHAD, **kwargs):
         """Instanciate a CommandLineApp
 
         :param str program_name: program (app) name
@@ -195,11 +206,15 @@ class CommandLineApp(ArgumentParser):
         :param str description: program description
         :param bool commands: if enabled, the application will consider first positional argument as a command
         :param bool interface: if enabled, the application will resolve a WHAD interface
+        :param int input: specify the input type when application has its stdin piped
+        :param int output: specify the output type when application has its stdout piped
         """
         super().__init__(description=description, **kwargs)
 
         self.__interface = None
         self.__input_iface = None
+        self.__input_type = input
+        self.__output_type = output
         self.__args = None
         self.__has_interface = interface
         self.__is_interface_piped = False
@@ -213,7 +228,7 @@ class CommandLineApp(ArgumentParser):
                 help='specifies the WHAD interface to use',
             )
 
-        # Add our default option --no-color
+        # Add our default option --no-colorfself
         self.add_argument(
             '--no-color',
             dest='nocolor',
@@ -333,70 +348,87 @@ class CommandLineApp(ArgumentParser):
         # If stdout is piped, then tell prompt-toolkit to fallback to another
         # TTY (normally, stderr).
         if self.is_stdout_piped():
-            get_app_session()._output = create_output(always_prefer_tty=True)
+            # Check if this application is supposed to be chained to another app
+            if self.__output_type != CommandLineApp.OUTPUT_NONE:
+                get_app_session()._output = create_output(always_prefer_tty=True)
+            else:
+                logger.error(f'This application ({self.prog}) cannot be piped with another tool.')
+                sys.exit(2)
 
-        # If stdin is piped, we must wait for a specific URL sent in a single
-        # line that describes the interface to use.
+        # If application stdin is piped, we have two possibilities:
+        # - the application is supposed to handle "normal" data from stdin
+        # - the application is supposed to be chained with another WHAD CLI tool
         if self.is_stdin_piped():
 
-            # Set stdin non-blocking
-            orig_fl = fcntl.fcntl(sys.stdin, fcntl.F_GETFL)
-            fcntl.fcntl(sys.stdin, fcntl.F_SETFL, orig_fl | os.O_NONBLOCK)
+            # If stdin is piped to a WHAD tool, we must wait for a specific URL
+            # sent in a single line that describes the interface to use.
+            if self.__input_type == CommandLineApp.INPUT_WHAD:
 
-            # Wait an url on stdin to continue
-            logger.debug('Stdin is piped, wait for a valid URL describing our interface.')
-            pending_input = ''
-            while True:
-                # Check if something is available
-                readers, _, errors = select.select([sys.stdin], [], [sys.stdin], .01)
+                # Set stdin non-blocking
+                orig_fl = fcntl.fcntl(sys.stdin, fcntl.F_GETFL)
+                fcntl.fcntl(sys.stdin, fcntl.F_SETFL, orig_fl | os.O_NONBLOCK)
 
-                # Check if an error occurred.
-                if len(errors) > 0:
-                    # We're done
-                    break
+                # Wait an url on stdin to continue
+                logger.debug('Stdin is piped, wait for a valid URL describing our interface.')
+                pending_input = ''
+                while True:
+                    # Check if something is available
+                    readers, _, errors = select.select([sys.stdin], [], [sys.stdin], .01)
 
-                # Read input from stdin
-                if len(readers) > 0:
-                    data_read = sys.stdin.read(4096)
-                    if data_read == '' or data_read is None:
+                    # Check if an error occurred.
+                    if len(errors) > 0:
+                        # We're done
                         break
 
-                    pending_input += data_read
-                    # Check if we have a full line
-                    if '\n' in pending_input:
-                        idx = pending_input.index('\n')
-                        line, pending_input = pending_input[:idx], pending_input[idx+1:]
-
-                        # parse URL
-                        url_info = urlparse(line)
-                        if url_info.scheme == 'unix' and url_info.path is not None:
-                            self.__interface_path = line
-                            self.__is_interface_piped = True
-
-                            # Create a Unix socket device and connect it to the
-                            # given Unix socket path
-                            self.__input_iface = UnixSocketDevice(url_info.path)
-                            self.__input_iface.open()
-
-                            # Copy parameters into our app parameters
-                            params = dict(parse_qsl(url_info.query))
-                            for param in params:
-                                if not hasattr(self.args, param):
-                                    setattr(self.args, param, params[param])
-
-                            # We're done
+                    # Read input from stdin
+                    if len(readers) > 0:
+                        data_read = sys.stdin.read(4096)
+                        if data_read == '' or data_read is None:
                             break
-                        else:
-                            print(line)
+
+                        pending_input += data_read
+                        # Check if we have a full line
+                        if '\n' in pending_input:
+                            idx = pending_input.index('\n')
+                            line, pending_input = pending_input[:idx], pending_input[idx+1:]
+
+                            # parse URL
+                            url_info = urlparse(line)
+                            if url_info.scheme == 'unix' and url_info.path is not None:
+                                self.__interface_path = line
+                                self.__is_interface_piped = True
+
+                                # Create a Unix socket device and connect it to the
+                                # given Unix socket path
+                                self.__input_iface = UnixSocketDevice(url_info.path)
+                                self.__input_iface.open()
+
+                                # Copy parameters into our app parameters
+                                params = dict(parse_qsl(url_info.query))
+                                for param in params:
+                                    if not hasattr(self.args, param):
+                                        setattr(self.args, param, params[param])
+
+                                # We're done
+                                break
+                            else:
+                                print(line)
+            else:
+                # Check if this application is supposed to be chained with another
+                # another app and to process its standard input
+                if self.__input_type == CommandLineApp.INPUT_NONE:
+                    logger.error(f'This application ({self.prog}) cannot be piped with another tool.')
+                    sys.exit(2)
 
 
     def post_run(self):
         """Implement post-run tasks.
         """
-        # If stdout is piped, forward socket info to next tool
-        if isinstance(self.__input_iface, UnixSocketDevice) and self.is_stdout_piped():
-            sys.stdout.write('%s\n' % self.__interface_path)
-            sys.stdout.flush()
+        if self.__output_type == CommandLineApp.OUTPUT_WHAD:
+            # If stdout is piped, forward socket info to next tool
+            if isinstance(self.__input_iface, UnixSocketDevice) and self.is_stdout_piped():
+                sys.stdout.write('%s\n' % self.__interface_path)
+                sys.stdout.flush()
 
 
     def run(self, pre=True, post=True):
@@ -443,6 +475,17 @@ class CommandLineApp(ArgumentParser):
         """
         return (not sys.stdin.isatty())
 
+    def readline_from_stdin(self):
+        """Reads a line from stdin when application has its stdin piped
+
+        :return str: line read from stdin
+        """
+        pending_input = ''
+        while True:
+            data_read = sys.stdin.read(4096)
+            if data_read == '' or data_read is None:
+                break
+        return pending_input
 
     def warning(self, message):
         """Display a warning message in orange (if color is enabled)
@@ -454,6 +497,147 @@ class CommandLineApp(ArgumentParser):
         """
         print_formatted_text(HTML('\r<ansired>[!] <b>%s</b></ansired>' % message))
 
+
+class CommandLineSource(CommandLineApp):
+    """
+    Command-line application that can send data to standard output.
+    """
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
+        """Create a command-line application object that supports no standard input processing
+        and is able to send data to standard output for tool chaining.
+
+        :param str description: program description
+        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool interface: if enabled, the application will resolve a WHAD interface
+        """
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_NONE, CommandLineApp.OUTPUT_STANDARD, **kwargs)
+
+
+class CommandLineSink(CommandLineApp):
+    """
+    Command-line application that can read data from standard input.
+    """
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
+        """Create a command-line application object that only supports standard input processing
+        and cannot be chained with another tool.
+
+        :param str description: program description
+        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool interface: if enabled, the application will resolve a WHAD interface
+        """
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_STANDARD, CommandLineApp.OUTPUT_NONE, **kwargs)
+
+class CommandLinePipe(CommandLineApp):
+    """
+    Command-line application that reads data from standard input and send data
+    to standard output.
+    """
+
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
+        """Create a command-line application object that supports standard input processing
+        and is able to send data to standard output for tool chaining.
+
+        :param str description: program description
+        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool interface: if enabled, the application will resolve a WHAD interface
+        """
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_STANDARD, CommandLineApp.OUTPUT_STANDARD, **kwargs)
+
+
+class CommandLineSource(CommandLineApp):
+    """
+    Command-line application that can send data to standard output.
+    """
+
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
+        """Create a command-line application object that supports no standard input processing
+        and is able to send data to standard output for tool chaining.
+
+        :param str description: program description
+        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool interface: if enabled, the application will resolve a WHAD interface
+        """
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_NONE, CommandLineApp.OUTPUT_STANDARD, **kwargs)
+
+
+class CommandLineSink(CommandLineApp):
+    """
+    Command-line application that can read data from standard input.
+    """
+
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
+        """Create a command-line application object that only supports standard input processing
+        and cannot be chained with another tool.
+
+        :param str description: program description
+        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool interface: if enabled, the application will resolve a WHAD interface
+        """
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_STANDARD, CommandLineApp.OUTPUT_NONE, **kwargs)
+
+class CommandLinePipe(CommandLineApp):
+    """
+    Command-line application that reads data from standard input and send data
+    to standard output.
+    """
+
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
+        """Create a command-line application object that supports standard input processing
+        and is able to send data to standard output for tool chaining.
+
+        :param str description: program description
+        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool interface: if enabled, the application will resolve a WHAD interface
+        """
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_STANDARD, CommandLineApp.OUTPUT_STANDARD, **kwargs)
+
+class CommandLineDeviceSource(CommandLineApp):
+    """
+    Command-line application that can be chained with a `CommandLineDeviceSink` or `CommandLineDevicePipe` application,
+    in a timely manner.
+    """
+
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
+        """Create a command-line application object that supports no standard input processing
+        and is able to send data to standard output for tool chaining.
+
+        :param str description: program description
+        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool interface: if enabled, the application will resolve a WHAD interface
+        """
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_NONE, CommandLineApp.OUTPUT_WHAD, **kwargs)
+
+
+class CommandLineDeviceSink(CommandLineApp):
+    """
+    Command-line application that can receive WHAD messages from a chained source/pipe but cannot be
+    chained with another application.
+    """
+
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
+        """Create a command-line application object that only supports standard input processing
+        and cannot be chained with another tool.
+
+        :param str description: program description
+        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool interface: if enabled, the application will resolve a WHAD interface
+        """
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_WHAD, CommandLineApp.OUTPUT_NONE, **kwargs)
+
+class CommandLineDevicePipe(CommandLineApp):
+    """
+    Command-line application that handles/processes WHAD messages between two WHAD command-line applications.
+    """
+
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
+        """Create a command-line application object that supports standard input processing
+        and is able to send data to standard output for tool chaining.
+
+        :param str description: program description
+        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool interface: if enabled, the application will resolve a WHAD interface
+        """
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_WHAD, CommandLineApp.OUTPUT_WHAD, **kwargs)
 
 if __name__ == '__main__':
 

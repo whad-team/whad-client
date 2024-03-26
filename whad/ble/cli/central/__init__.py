@@ -21,9 +21,6 @@ from whad.cli.app import CommandLineApp
 from .shell import BleCentralShell
 from .commands import *
 
-import logging
-#logging.basicConfig(level=logging.DEBUG)
-
 class BleCentralApp(CommandLineApp):
 
     def __init__(self):
@@ -32,7 +29,9 @@ class BleCentralApp(CommandLineApp):
         super().__init__(
             description='WHAD Bluetooth Low Energy central utility',
             interface=True,
-            commands=True
+            commands=True,
+            input=CommandLineApp.INPUT_WHAD,
+            output=CommandLineApp.OUTPUT_STANDARD
         )
         
         self.add_argument(
