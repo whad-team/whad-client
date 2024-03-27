@@ -43,7 +43,11 @@ class Coordinator(Zigbee):
                 endpoint += 1
 
     def start_network(self):
-        return self.__stack.get_layer('apl').get_application_by_name('zdo').network_manager.startup()
+        self.__stack.get_layer('aps').database.set("apsUseExtendedPANID", 0x6055f90000f714e4)
+        self.__stack.get_layer('aps').database.set("apsUseChannel", 23)
+        self.__stack.get_layer('apl').get_application_by_name('zdo').security_manager.provision_network_key(bytes.fromhex("ae197aa680491b06458ba5e3b4e040fe"))
+        if self.__stack.get_layer('apl').get_application_by_name('zdo').network_manager.startup():
+            return self.__stack.get_layer('apl').get_application_by_name('zdo').network_manager.network
 
     def network_formation(self, pan_id=None, channel=None):
         return self.__stack.get_layer('nwk').get_service("management").network_formation(

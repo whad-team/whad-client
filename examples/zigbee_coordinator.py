@@ -43,22 +43,32 @@ if __name__ == '__main__':
                 profile_id = 0x0104,
                 device_id = 0x0100,
                 device_version = 0,
-                input_clusters=[],
-                output_clusters=[]
-            )
-            basic_app.add_input_cluster(
-                onoff
+                input_clusters = [
+                    onoff
+                ]
             )
             coordinator = Coordinator(dev, applications=[basic_app])
             monitor.attach(coordinator)
             monitor.start()
-            coordinator.attach_callback(show)
+            #coordinator.attach_callback(show)
             coordinator.start()
 
             print("[i] network formation !")
-            coordinator.start_network()
+            network = coordinator.start_network()
             while True:
                 input()
+                for device in network.discover():
+                    print("[i] New device discovered:", device)
+
+                for device in network.nodes:
+                    for endpoint in device.endpoints:
+                        if endpoint.profile_id == 0x0104 and 6 in endpoint.input_clusters:
+                            onoff = endpoint.attach_to_input_cluster(6)
+                            while True:
+                                input()
+                                print("[i] lightbulb toggled")
+                                onoff.toggle()
+
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 

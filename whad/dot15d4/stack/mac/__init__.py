@@ -290,6 +290,30 @@ class MACManagementService(MACService):
             self.manager.get_layer('phy').set_channel_page(channel_page)
             self.manager.get_layer('phy').set_channel(channel)
 
+
+            src_panid = self.database.get("macPanId")
+            src_addr = self.database.get("macShortAddress")
+
+            sf_beaconorder = self.database.get("macBeaconOrder")
+            sf_assocpermit = self.database.get("macAssociationPermit")
+            is_coordinator = (
+                self.database.get("macCoordShortAddress") == self.database.get("macShortAddress")
+            )
+            sf_battlifeextend = self.database.get("macBattLifeExt")
+            beacon_payload = self.database.get("macBeaconPayload")
+
+            beacon = Dot15d4Beacon(
+                src_panid=src_panid,
+                src_addr=src_addr,
+                sf_sforder=superframe_order,
+                sf_beaconorder=sf_beaconorder,
+                sf_assocpermit=sf_assocpermit,
+                sf_pancoord=is_coordinator,
+                sf_battlifeextend=sf_battlifeextend
+            ) / beacon_payload
+
+            self.database.set("macLastBeacon", Dot15d4() / beacon)
+
             # if beaconOrder < 15, we start a beacon-enabled network
             if beacon_order < 15:
                 self.database.set("macBattLifeExt", battery_life_extension)

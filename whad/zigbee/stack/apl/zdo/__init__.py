@@ -110,7 +110,6 @@ class ZigbeeDeviceObjects(ApplicationObject):
         """
         Forwards new device join notification.
         """
-
         self.security_manager.send_transport_key(
             network_address
         )

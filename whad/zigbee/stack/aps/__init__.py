@@ -358,7 +358,7 @@ class APSManagementService(APSService):
 
     @Dot15d4Service.request("APSME-TRANSPORT-KEY")
     def transport_key(self, destination_address, standard_key_type, transport_key_data):
-
+        
         if standard_key_type == APSKeyType.TRUST_CENTER_LINK_KEY:
             raise RequiredImplementation("TrustCenterLinkKey")
         elif standard_key_type == APSKeyType.STANDARD_NETWORK_KEY:

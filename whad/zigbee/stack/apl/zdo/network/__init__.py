@@ -215,6 +215,8 @@ class ZDONetworkManager(ZDOObject):
         nwkExtendedPANID = nwk_management.get("nwkExtendedPANID")
         apsDesignatedCoordinator = aps_management.get("apsDesignatedCoordinator")
         apsUseExtendedPANID = aps_management.get("apsUseExtendedPANID")
+        apsUseChannel = aps_management.get("apsUseChannel")
+
         apsUseInsecureJoin = aps_management.get("apsUseInsecureJoin")
         apsChannelMask = aps_management.get("apsChannelMask")
         if nwkExtendedPANID != 0:
@@ -228,10 +230,15 @@ class ZDONetworkManager(ZDOObject):
 
             nwk_management.network_formation(
                 pan_id=None,
-                channel=None,
+                channel=apsUseChannel,
                 scan_channels=apsChannelMask,
             )
 
+            self.network = Network(
+                nwk_management.get("nwkOwnNetwork"), phy_layer
+            )
+            self.authorized = True
+            return True
         else:
             # We are a router or an end device, attempt to join or rejoin a network
             if apsUseExtendedPANID != 0:

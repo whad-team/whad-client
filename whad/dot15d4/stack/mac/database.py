@@ -28,3 +28,5 @@ class MACPIB(Dot15d4Database):
         self.macPromiscuousMode = False
         self.macImplicitBroadcast = False
         self.macResponseWaitTime = 32
+
+        self.macLastBeacon = None

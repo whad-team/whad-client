@@ -2,6 +2,7 @@ from whad.dot15d4.stack.manager import Dot15d4Manager
 from whad.dot15d4.stack.service import Dot15d4Service
 from whad.dot15d4.stack.mac.constants import MACAddressMode, MACScanType, \
     MACDeviceType, MACPowerSource, MACConstants, MACAssociationStatus
+from whad.dot15d4.stack.mac.network import Dot15d4PANNetwork
 
 from whad.zigbee.stack.nwk.exceptions import NWKTimeoutException, NWKInvalidKey
 from whad.zigbee.stack.nwk.database import NWKIB
@@ -658,7 +659,10 @@ class NWKManagementService(NWKService):
 
         self.manager.get_layer('mac').set_short_address(network_address)
         self.database.set("nwkNetworkAddress", network_address)
+
+
         if self.database.get("nwkExtendedPANID") == 0:
+
             self.database.set(
                 "nwkExtendedPANID",
                 self.manager.get_layer('mac').database.get("macExtendedAddress")
@@ -679,7 +683,7 @@ class NWKManagementService(NWKService):
             update_id = self.database.get("nwkUpdateId")
         )
         self.manager.get_layer('mac').database.set("macBeaconPayload", bytes(beacon_payload))
-        return self.manager.get_layer('mac').get_service('management').start(
+        start = self.manager.get_layer('mac').get_service('management').start(
             selected_pan_id,
             pan_coordinator=True,
             beacon_order=beacon_order,
@@ -687,6 +691,18 @@ class NWKManagementService(NWKService):
             battery_life_extension=battery_life_extension,
             coord_realignement=False # for now, should be different if we update an existing PAN
         )
+
+        last_beacon = self.manager.get_layer('mac').database.get("macLastBeacon")
+        channel = self.manager.get_layer('phy').get_channel()
+        channel_page = self.manager.get_layer('phy').get_channel_page()
+        beacon_payload.pan_descriptor = Dot15d4PANNetwork(last_beacon, channel_page, channel)
+        self.database.set(
+            "nwkOwnNetwork",
+            ZigbeeNetwork(
+                beacon_payload
+            )
+        )
+        return start
 
     @Dot15d4Service.request("NLME-SYNC")
     def sync(self,track=False):
@@ -751,8 +767,188 @@ class NWKManagementService(NWKService):
         else:
             nsdu = npdu[ZigbeeNWKCommandPayload]
 
+        if nsdu.cmd_identifier == 6:
+            self.on_rejoin_command(nsdu, npdu.source, npdu.ext_src)
         # Add packet to FIFO
         self.add_packet_to_queue(nsdu)
+
+    def on_rejoin_command(self, nsdu, source_address, extended_source_address):
+        """
+        Callback processing Rejoin Commands NSDU.
+        """
+
+        table = self.database.get("nwkNeighborTable")
+        candidate = table.select_by_extended_address(extended_source_address)
+
+        capability_information = (
+            int(nsdu.alternate_pan_coordinator) |
+            (int(nsdu.device_type) << 1) |
+            (int(nsdu.power_source) << 2) |
+            (int(nsdu.receiver_on_when_idle) << 3) |
+            (0 << 4) |
+            (int(nsdu.security_capability) << 5) |
+            (int(nsdu.allocate_address) << 7)
+        )
+
+        if candidate is None:
+            network_address = source_address
+        else:
+            network_address = candidate.address
+
+        permit_join = self.manager.get_layer("mac").database.get("macAssociationPermit")
+
+        sequence_number = self.database.get("nwkSequenceNumber")
+        self.database.set("nwkSequenceNumber", sequence_number+1)
+        radius = self.database.get("nwkMaxDepth") * 2
+
+        if permit_join:
+            routers = table.select_routers_by_pan_id(self.database.get("nwkPANId"))
+
+            table.update(
+                network_address,
+                device_type=(
+                                ZigbeeDeviceType.ROUTER if
+                                int(nsdu.device_type) == 1 else
+                                ZigbeeDeviceType.END_DEVICE
+                ),
+                transmit_failure=0,
+                lqi=0,
+                outgoing_cost=0,
+                age=0,
+                extended_pan_id=self.database.get("nwkExtendedPANID"),
+                logical_channel=self.manager.get_layer("phy").get_channel(),
+                depth=len(routers) + 1,
+                potential_parent=False,
+                update_id=self.database.get("nwkUpdateId"),
+                pan_id=self.database.get("nwkPANId"),
+                extended_address=extended_source_address,
+                rx_on_when_idle=bool((capability_information >> 3) & 1),
+            )
+
+            nwkAddressMap = self.database.get("nwkAddressMap")
+            nwkAddressMap[extended_source_address] = network_address
+            self.database.set("nwkAddressMap", nwkAddressMap)
+
+
+            # Build rejoin response
+            npdu = ZigbeeNWK(
+                frametype=1,
+                discover_route=0,
+                seqnum=sequence_number,
+                radius=radius,
+                flags=["extended_src"], #, "extended_dst"],
+                destination=network_address,
+                source=self.database.get("nwkNetworkAddress"),
+                #ext_dst=selected_parent.extended_address, # ?
+                ext_src=self.database.get("nwkIeeeAddress")
+            )
+            nsdu = ZigbeeNWKCommandPayload(
+                cmd_identifier=7,
+                network_address=network_address,
+                rejoin_status=0
+            )
+
+
+            if self.database.get("nwkSecurityLevel") != 0:
+                npdu.flags.security = True
+                selected_key_material = None
+
+                security_material_set = self.database.get("nwkSecurityMaterialSet")
+                for key_material in security_material_set:
+                    if key_material.key_sequence_number == self.database.get("nwkActiveKeySeqNumber"):
+                        selected_key_material = key_material
+                        break
+
+                if selected_key_material is None:
+                    return False
+
+                msdu = npdu / ZigbeeSecurityHeader(
+                    nwk_seclevel = self.database.get("nwkSecurityLevel"),
+                    source = self.database.get("nwkIeeeAddress"),
+                    key_type=1,
+                    key_seqnum=self.database.get("nwkActiveKeySeqNumber"),
+                    fc=selected_key_material.outgoing_frame_counter,
+                    data=bytes(nsdu)
+                )
+                crypto_manager = NetworkLayerCryptoManager(selected_key_material.key)
+                msdu = crypto_manager.encrypt(msdu)
+                selected_key_material.outgoing_frame_counter += 1
+            else:
+                msdu = npdu / nsdu
+
+            self.manager.get_layer('mac').get_service("data").data(
+                msdu,
+                destination_address_mode=MACAddressMode.SHORT,
+                source_address_mode=MACAddressMode.SHORT,
+                destination_pan_id=self.database.get("nwkPANId"),
+                destination_address=network_address,
+                wait_for_ack=True
+            )
+
+            self.indicate_join(
+                network_address,
+                extended_source_address,
+                capability_information,
+                rejoin=True,
+                secure_rejoin=False
+            )
+        else:
+
+
+            # Build rejoin request
+            npdu = ZigbeeNWK(
+                frametype=1,
+                discover_route=0,
+                seqnum=sequence_number,
+                radius=radius,
+                flags=["extended_src"], #, "extended_dst"],
+                destination=network_address,
+                source=self.database.get("nwkNetworkAddress"),
+                #ext_dst=selected_parent.extended_address, # ?
+                ext_src=self.database.get("nwkIeeeAddress")
+            )
+            nsdu = ZigbeeNWKCommandPayload(
+                cmd_identifier=7,
+                network_address=network_address,
+                rejoin_status=1
+            )
+
+
+            if self.database.get("nwkSecurityLevel") != 0:
+                npdu.flags.security = True
+                selected_key_material = None
+
+                security_material_set = self.database.get("nwkSecurityMaterialSet")
+                for key_material in security_material_set:
+                    if key_material.key_sequence_number == self.database.get("nwkActiveKeySeqNumber"):
+                        selected_key_material = key_material
+                        break
+
+                if selected_key_material is None:
+                    return False
+
+                msdu = npdu / ZigbeeSecurityHeader(
+                    nwk_seclevel = self.database.get("nwkSecurityLevel"),
+                    source = self.database.get("nwkIeeeAddress"),
+                    key_type=1,
+                    key_seqnum=self.database.get("nwkActiveKeySeqNumber"),
+                    fc=selected_key_material.outgoing_frame_counter,
+                    data=bytes(nsdu)
+                )
+                crypto_manager = NetworkLayerCryptoManager(selected_key_material.key)
+                msdu = crypto_manager.encrypt(msdu)
+                selected_key_material.outgoing_frame_counter += 1
+            else:
+                msdu = npdu / nsdu
+
+            self.manager.get_layer('mac').get_service("data").data(
+                msdu,
+                destination_address_mode=MACAddressMode.SHORT,
+                source_address_mode=MACAddressMode.SHORT,
+                destination_pan_id=self.database.get("nwkPANId"),
+                destination_address=network_address,
+                wait_for_ack=True
+            )
 
 class NWKInterpanService(NWKService):
     """
