@@ -20,3 +20,7 @@ class RF4CE(Dot15d4):
 
     def sniff_rf4ce(self, channel:int = 15) -> bool:
         return super().sniff_dot15d4(channel=channel)
+
+
+from whad.rf4ce.connector.sniffer import Sniffer
+from whad.rf4ce.connector.target import Target
