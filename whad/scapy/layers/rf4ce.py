@@ -212,7 +212,7 @@ class RF4CE_Cmd_Discovery_Request(Packet):
         BitEnumField("power_source", 0,  1,{ 0 : "battery_source", 1 : "alternating_current_source"}),
         BitEnumField("node_type", 0,  1,{0 : "controller", 1 : "target"}),
 
-        LEShortField("vendor_identifier",None),
+        LEShortField("vendor_identifier",0),
         StrFixedLenField("vendor_string", b"", length=7),
 
         BitField("reserved4", 0, 1),
@@ -245,7 +245,7 @@ class RF4CE_Cmd_Discovery_Response(Packet):
         BitEnumField("node_type", 0,  1,{0 : "controller", 1 : "target"}),
 
 
-        LEShortField("vendor_identifier",None),
+        LEShortField("vendor_identifier",0),
         StrFixedLenField("vendor_string", b"", length=7),
 
         BitField("reserved4", 0, 1),

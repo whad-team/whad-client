@@ -27,6 +27,9 @@ if __name__ == '__main__':
             monitor.attach(target)
             monitor.start()
             target.start()
+
+            target.auto_discovery()
+            
             input()
         except (KeyboardInterrupt, SystemExit):
             dev.close()

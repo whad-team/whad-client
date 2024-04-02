@@ -25,3 +25,5 @@ class NWKIB(Dot15d4Database):
         self.nwkResponseWaitTime = 0x00186a
         self.nwkScanDuration = 6
         self.nwkUserString = "WhadRF4CEStack"
+        self.nwkVendorString = "Whad"
+        self.nwkVendorIdentifier = 4417

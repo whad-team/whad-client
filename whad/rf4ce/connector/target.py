@@ -54,6 +54,11 @@ class Target(RF4CE):
         else:
             self.__channel_page = page
 
+
+    def auto_discovery(self):
+        self.__stack.get_layer('nwk').get_service('management').auto_discovery()
+
+
     def get_channel(self):
         return self.__channel
 
