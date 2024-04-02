@@ -128,17 +128,20 @@ class InteractiveShell(object):
     def process(self, input):
         """Process input commands.
         """
-        # Dispatch commands
-        tokens = shlex.split(input)
-        if len(tokens) >= 1:
-            command = tokens[0]
-            if command in self.__commands:
-                resolved_args = [self.resolve(arg) for arg in tokens[1:]]
-                try:
-                    # Command is supported, follow to method
-                    return self.__commands[command](resolved_args)
-                except KeyboardInterrupt as kbd_int:
-                    print('\rInterrupted by user.')
+        try:
+            # Dispatch commands
+            tokens = shlex.split(input)
+            if len(tokens) >= 1:
+                command = tokens[0]
+                if command in self.__commands:
+                    resolved_args = [self.resolve(arg) for arg in tokens[1:]]
+                    try:
+                        # Command is supported, follow to method
+                        return self.__commands[command](resolved_args)
+                    except KeyboardInterrupt as kbd_int:
+                        print('\rInterrupted by user.')
+        except ValueError:
+            self.warning('An error occurred while processing your command.')
 
     def run(self):
         """Run the interactive shell.
