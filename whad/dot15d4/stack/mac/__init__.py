@@ -926,6 +926,7 @@ class MACManager(Dot15d4Manager):
                 destination_address_mode != MACAddressMode.NONE and
                 source_address_mode != MACAddressMode.NONE
             ):
+
                 if (
                     hasattr(packet, "dest_panid") and
                     hasattr(packet, "src_panid") and
@@ -1069,7 +1070,7 @@ class MACManager(Dot15d4Manager):
                     fcf_destaddrmode=fcf_destaddrmode
         )/packet
 
-
+        print(packet)
         # Build PAN ID compression field
         packet = self._choose_pan_id_compression(packet, destination_address_mode, source_address_mode)
 

@@ -1,4 +1,12 @@
+from enum import IntEnum
 
+
+class PairingEntryStatus(IntEnum):
+    """
+    List of possible status for a pairing entry.
+    """
+    PROVISIONAL = 1
+    ACTIVE = 2
 
 class PairingEntry:
     """
@@ -13,3 +21,11 @@ class PairingEntry:
         self.capabilities = capabilities
         self.frame_counter = frame_counter
         self.link_key = link_key
+        self.status = PairingEntryStatus.PROVISIONAL
+
+
+    def mark_as_active(self):
+        """
+        Mark this entry as active.
+        """
+        self.status = PairingEntryStatus.ACTIVE

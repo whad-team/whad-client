@@ -24,6 +24,13 @@ class NWKIB(Dot15d4Database):
         self.nwkMaxReportedNodeDescriptors = 3
         self.nwkResponseWaitTime = 0x00186a
         self.nwkScanDuration = 6
-        self.nwkUserString = "WhadRF4CEStack"
-        self.nwkVendorString = "Whad"
+        self.nwkUserString = "Telink"
+        self.nwkVendorString = "TL"
         self.nwkVendorIdentifier = 4417
+
+        self.nwkcNodeCapabilities = (
+            (0 << 3) | # channel_normalization_capable
+            (1 << 2) | # security_capable
+            (1 << 1) | # power_source
+            (1) # node_type
+        )

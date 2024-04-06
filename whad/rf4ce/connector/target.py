@@ -2,6 +2,7 @@ from whad.rf4ce.connector import RF4CE
 from whad.exceptions import UnsupportedCapability
 from whad.dot15d4.stack import Dot15d4Stack
 from whad.dot15d4.stack.mac import MACManager
+from whad.dot15d4.address import Dot15d4Address
 from whad.rf4ce.stack.nwk import NWKManager
 
 import logging
@@ -58,6 +59,13 @@ class Target(RF4CE):
     def auto_discovery(self):
         self.__stack.get_layer('nwk').get_service('management').auto_discovery()
 
+    def discovery_response(self, status, destination_address):
+        self.__stack.get_layer('nwk').get_service('management').discovery_response(
+            status,
+            Dot15d4Address(destination_address).value
+        )
+
+
 
     def get_channel(self):
         return self.__channel
@@ -67,6 +75,7 @@ class Target(RF4CE):
 
 
     def send(self, packet):
+        packet.show()
         super().send(packet, channel=self.__channel)
 
     def on_pdu(self, pdu):
@@ -76,6 +85,7 @@ class Target(RF4CE):
             not pdu.metadata.is_fcs_valid
         ):
             return
+        pdu.show()
 
         self.__stack.on_pdu(pdu)
 

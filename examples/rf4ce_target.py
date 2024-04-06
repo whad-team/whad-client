@@ -29,8 +29,8 @@ if __name__ == '__main__':
             target.start()
 
             target.auto_discovery()
-            
             input()
+            #target.discovery_response(True, destination_address="C4:19:D1:AE:35:0D:70:02")
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 
