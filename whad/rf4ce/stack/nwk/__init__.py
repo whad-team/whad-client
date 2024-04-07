@@ -9,7 +9,7 @@ from whad.scapy.layers.rf4ce import RF4CE_Command_Hdr, RF4CE_Cmd_Discovery_Reque
 from whad.common.stack import Layer, alias, source, state
 
 from random import randint
-from time import time
+from time import time, sleep
 
 import logging
 
@@ -328,6 +328,7 @@ class NWKManagementService(NWKService):
         )
         return ack
 
+
     @Dot15d4Service.request("NLME-AUTO-DISCOVERY")
     def auto_discovery(self, user_string_specificied=False, list_of_device_types=[9], list_of_profiles=[192], duration=15*50000*(10**6)): # ~ 15s
         """
@@ -410,6 +411,71 @@ class NWKManagementService(NWKService):
                 pass
 
         return (False, None)
+
+    @Dot15d4Service.request("NLME-DISCOVERY")
+    def discovery(self, destination_address=0xFFFF, destination_pan_id=0xFFFF, list_of_device_types=[1], list_of_profiles=[192], search_device_type=0xFF, list_of_discovered_profiles=[], duration=15*50000*(10**6)):
+        """
+        Request allowing NWK layer to start a discovery operation.
+        """
+        node_descriptors = []
+
+        frame_counter = self.database.get("nwkFrameCounter")
+
+        node_capability =  self.database.get("nwkcNodeCapabilities")
+        channel_normalization_capable = (node_capability >> 3) & 1
+        security_capable = (node_capability >> 2) & 1
+        power_source = "battery_source" if ((node_capability >> 1) & 1) == 0 else "alternating_current_source"
+        node_type = "controller" if (node_capability & 1) == 0 else "target"
+
+        # Build a discovery response
+        discovery_request = (
+            RF4CE_Hdr(
+                protocol_version=1,
+                security_enabled=0,
+                frame_counter=frame_counter
+            ) /
+            RF4CE_Command_Hdr() /
+            RF4CE_Cmd_Discovery_Request(
+                channel_normalization_capable = channel_normalization_capable,
+                security_capable = security_capable,
+                power_source = power_source,
+                node_type = node_type,
+                vendor_identifier = self.database.get("nwkVendorIdentifier"),
+                vendor_string = self.database.get("nwkVendorString"),
+                number_of_supported_profiles = len(list_of_profiles),
+                profile_identifier_list = list_of_profiles,
+                number_of_supported_device_types = len(list_of_device_types),
+                device_type_list = list_of_device_types,
+                user_string_specificied = int(self.database.get("nwkUserString") is not None),
+                user_string = self.database.get("nwkUserString"),
+                requested_device_type = search_device_type
+            )
+        )
+        for number_of_repetition in range(self.database.get("nwkMaxDiscoveryRepetitions")):
+            for channel in [15, 20, 25]:
+                frame_counter = self.database.get("nwkFrameCounter")
+                self.database.set("nwkFrameCounter", frame_counter + 1)
+
+                discovery_request.frame_counter = frame_counter
+
+                ack = self.manager.get_layer('mac').get_service("data").data(
+                    discovery_request,
+                    destination_address_mode=MACAddressMode.SHORT,
+                    source_address_mode=MACAddressMode.EXTENDED,
+                    destination_pan_id=destination_pan_id,
+                    destination_address=destination_address,
+                    pan_id_suppressed = False,
+                    wait_for_ack=False
+                )
+                if ack:
+                    try:
+                        discovery = self.wait_for_packet(lambda pkt:RF4CE_Cmd_Discovery_Response in pkt, timeout=duration)
+                        node_descriptors.append(discovery)
+                    except NWKTimeoutException:
+                        pass
+                sleep(self.database.get("nwkDiscoveryRepetitionInterval") / (50000 * (10**6)))
+                print("end...")
+        return node_descriptors
 
     def on_command_npdu(self, pdu, source_address, destination_address, source_pan_id, link_quality=255):
         pdu.link_quality = link_quality

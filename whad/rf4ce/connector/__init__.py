@@ -24,3 +24,4 @@ class RF4CE(Dot15d4):
 
 from whad.rf4ce.connector.sniffer import Sniffer
 from whad.rf4ce.connector.target import Target
+from whad.rf4ce.connector.controller import Controller
