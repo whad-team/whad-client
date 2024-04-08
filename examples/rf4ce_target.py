@@ -1,5 +1,5 @@
 from whad.device import WhadDevice
-from whad.rf4ce import Target
+from whad.rf4ce import Target, Dot15d4Address
 from whad.common.monitors import WiresharkMonitor
 from whad.exceptions import WhadDeviceNotFound
 from scapy.compat import raw
@@ -30,6 +30,16 @@ if __name__ == '__main__':
 
             target.auto_discovery()
             input()
+            # temp: let's start a pairing resp here
+            target.stack.get_layer('nwk').get_service('management').pair_response(
+                pan_id=0x1234,
+                destination_address=Dot15d4Address("C4:19:D1:AE:35:0D:70:02").value,
+                application_capability=0,
+                accept=True,
+                list_of_device_types=[9],
+                list_of_profiles=[192],
+                pairing_reference=pairing_reference
+            )
             #target.discovery_response(True, destination_address="C4:19:D1:AE:35:0D:70:02")
         except (KeyboardInterrupt, SystemExit):
             dev.close()

@@ -29,6 +29,10 @@ class Target(RF4CE):
         self.__channel = 11
         self.__channel_page = 0
 
+        self.__stack.get_layer('mac').set_extended_address(Dot15d4Address("11:22:33:44:55:66:77:88").value)
+        self.__stack.get_layer('mac').set_short_address(Dot15d4Address(0x0384).value)
+        self.__stack.get_layer('mac').database.set("macPanId", 0x1234)
+
         self.enable_reception()
 
 

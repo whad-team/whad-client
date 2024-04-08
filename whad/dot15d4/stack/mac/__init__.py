@@ -1010,18 +1010,21 @@ class MACManager(Dot15d4Manager):
         packet.seqnum = sequence_number
         self.database.set("macDataSequenceNumber", sequence_number + 1)
         self.send('phy', packet, tag='pdu')
+        wait_counter = 5
         if wait_for_ack:
-            try:
-                ack = None
-                while ack is None or ack.seqnum != sequence_number:
+            ack = None
+            while ack is None or ack.seqnum != sequence_number:
+                try:
                     ack = self.wait_for_ack()
-                if return_ack:
-                    return ack
-                return True
-            except MACTimeoutException:
-                if return_ack:
-                    return None
-                return False
+                except MACTimeoutException:
+                    wait_counter = wait_counter - 1
+                    if wait_counter <= 0:
+                        if return_ack:
+                            return None
+                        return False
+            if return_ack:
+                return ack
+            return True
         else:
             return True
 

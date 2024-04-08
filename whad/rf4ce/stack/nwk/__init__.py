@@ -4,8 +4,10 @@ from whad.dot15d4.stack.mac.constants import MACAddressMode
 from whad.rf4ce.stack.nwk.exceptions import NWKTimeoutException
 from whad.rf4ce.stack.nwk.database import NWKIB
 from whad.rf4ce.stack.nwk.pairing import PairingEntry
+from whad.rf4ce.crypto import generate_random_value, xor
 from whad.scapy.layers.rf4ce import RF4CE_Command_Hdr, RF4CE_Cmd_Discovery_Request, \
-    RF4CE_Cmd_Discovery_Response, RF4CE_Hdr
+    RF4CE_Hdr, RF4CE_Cmd_Key_Seed, RF4CE_Cmd_Pair_Request, RF4CE_Cmd_Pair_Response, \
+    RF4CE_Cmd_Discovery_Response
 from whad.common.stack import Layer, alias, source, state
 
 from random import randint
@@ -59,7 +61,7 @@ class NWKManagementService(NWKService):
         super().__init__(manager, name="nwk_management")
 
     @Dot15d4Service.response("NLME-PAIR")
-    def pair_response(self, status, pan_id, destination_address, application_capability, list_of_device_types=[1], list_of_profiles=[192], pairing_reference=None):
+    def pair_response(self, pan_id, destination_address, application_capability, accept=True, list_of_device_types=[9], list_of_profiles=[192], pairing_reference=None):
         """
         Reponse allowing to the NWK layer to transmit a pairing response.
         """
@@ -68,22 +70,6 @@ class NWKManagementService(NWKService):
         security_capable = (node_capability >> 2) & 1
         power_source = "battery_source" if ((node_capability >> 1) & 1) == 0 else "alternating_current_source"
         node_type = "controller" if (node_capability & 1) == 0 else "target"
-
-        # Allocate network address
-        network_address = None
-        if node_type == "controller":
-            already_allocated_addresses = []
-            for node in self.database.get("nwkPairingTable"):
-                already_allocated_addresses.append(node.source_network_address) # theoretically, it's always our own address
-                already_allocated_addresses.append(node.destination_network_address)
-
-            # remove duplicates
-            already_allocated_addresses = list(set(already_allocated_addresses))
-            while network_address is None or network_address in already_allocated_addresses:
-                network_address =  randint(0x0000, 0xFFFD)
-
-        else:
-            network_address = 0xFFFE
 
         # Get entry
         pairing_entry = None
@@ -98,18 +84,43 @@ class NWKManagementService(NWKService):
         if pairing_entry is None:
             return False
 
+
+        # Allocate network address
+        network_address = None
+        if (pairing_entry.capabilities & 1) == 0: #  controller
+            already_allocated_addresses = []
+            for node in self.database.get("nwkPairingTable"):
+                already_allocated_addresses.append(node.source_network_address) # theoretically, it's always our own address
+                already_allocated_addresses.append(node.destination_network_address)
+
+            # remove duplicates
+            already_allocated_addresses = list(set(already_allocated_addresses))
+            while network_address is None or network_address in already_allocated_addresses:
+                network_address =  randint(0x0000, 0xFFFD)
+
+        else:
+            network_address = 0xFFFE
+
+
         # Update network address of the pairing entry
         pairing_entry.destination_network_address = network_address # newly allocated address
 
+        frame_counter = self.database.get("nwkFrameCounter")
+        self.database.set("nwkFrameCounter", frame_counter + 1)
+
         #  Build the pairing response
         pairing_response = (
-            RF4CE_Hdr(security_enabled = 0) /
+            RF4CE_Hdr(
+                protocol_version = 1,
+                security_enabled = 0,
+                frame_counter = frame_counter
+            ) /
             RF4CE_Command_Hdr() /
             RF4CE_Cmd_Pair_Response
             (
-                status = 0, # when can we change the status ?
+                status = (0 if accept else 1),
                 allocated_nwk_addr = network_address,
-                nwk_addr = self.manager.get_layer('mac').database.get('nwkNetworkAddress'),
+                nwk_addr = self.manager.get_layer('mac').database.get('macShortAddress'),
                 channel_normalization_capable = channel_normalization_capable,
                 security_capable = security_capable,
                 power_source = power_source,
@@ -126,19 +137,90 @@ class NWKManagementService(NWKService):
 
             )
         )
+        self.manager.get_layer('mac').database.set("macImplicitBroadcast", True)
+
         ack = self.manager.get_layer('mac').get_service("data").data(
             pairing_response,
             destination_address_mode=MACAddressMode.EXTENDED,
             source_address_mode=MACAddressMode.EXTENDED,
             destination_pan_id=0xFFFF,
-            destination_address=discovery.source_address,
+            destination_address=destination_address,
             pan_id_suppressed = False,
             wait_for_ack=True
         )
-        if ack:
-            return (True, discovery.source_address)
+        if not ack or not accept:
+            print("invalid", ack, accept)
+            pairing_table = self.database.get("nwkPairingTable")
+            del pairing_table[pairing_reference]
+            self.database.set("nwkPairingTable", pairing_table)
+            return False
+        else:
+            if ((pairing_entry.capabilities >> 2) & 1) == 1 and security_capable == 1:
+                print("sec en")
+                # security enabled
+                # Step 1: generate random 128 bit link key
+                link_key = generate_random_value(128)
 
+                # Step 2: generate key seeds
+                key_exchange_transfer_count = pairing_entry.link_key
 
+                seeds = [generate_random_value(640) for _ in range(key_exchange_transfer_count)]
+                seeds_ph2 = [generate_random_value(128) for _ in range(4)]
+
+                value = link_key
+                for seed_ph2 in seeds_ph2:
+                    value = xor(seed_ph2, value)
+
+                seeds_ph2.append(value)
+
+                value = b"".join(seeds_ph2)
+                for seed in seeds:
+                    value = xor(seed, value)
+
+                seeds.append(value)
+                print("SEEDS", seeds)
+                for n in range(key_exchange_transfer_count + 1):
+
+                    frame_counter = self.database.get("nwkFrameCounter")
+                    self.database.set("nwkFrameCounter", frame_counter + 1)
+
+                    key_seed = (
+                        RF4CE_Hdr(
+                            protocol_version = 1,
+                            security_enabled = 0,
+                            frame_counter = frame_counter
+                        ) /
+                        RF4CE_Command_Hdr() /
+                        RF4CE_Cmd_Key_Seed
+                        (
+                            key_sequence_number = n,
+                            seed_data = seeds[n]
+                        )
+                    )
+                    ack = self.manager.get_layer('mac').get_service("data").data(
+                        key_seed,
+                        destination_address_mode=MACAddressMode.EXTENDED,
+                        source_address_mode=MACAddressMode.EXTENDED,
+                        destination_pan_id=0xFFFF,
+                        destination_address=destination_address,
+                        pan_id_suppressed = False,
+                        wait_for_ack=True
+                    )
+                    if not ack:
+                        pairing_table = self.database.get("nwkPairingTable")
+                        del pairing_table[pairing_reference]
+                        self.database.set("nwkPairingTable", pairing_table)
+                        return False
+
+                pairing_entry.link_key = link_key
+                pairing_entry.mark_as_active()
+                print("SUCCESS ! ")
+                return True
+
+            else:
+                # no security
+                pairing_entry.mark_as_active()
+                return True
 
     @Dot15d4Service.indication("NLME-PAIR")
     def indicate_pair(self, pdu):
@@ -146,6 +228,7 @@ class NWKManagementService(NWKService):
         Indication signaling to the upper layer the reception of a pairing request.
         """
         source_pan_id = pdu.source_pan_id
+        destination_pan_id = pdu.destination_pan_id
         source_address = pdu.source_address
         destination_address = pdu.destination_address
 
@@ -193,25 +276,15 @@ class NWKManagementService(NWKService):
                 source_network_address = self.manager.get_layer('mac').database.get("nwkNetworkAddress"),
                 channel = self.manager.get_layer('phy').get_channel(),
                 destination_ieee_address = destination_address,
-                destination_pan_id = pan_id,
+                destination_pan_id = destination_pan_id,
                 destination_network_address = None, # unknown at this point
                 capabilities = node_capability,
                 frame_counter = 0,
-                link_key = None # unknown at this point
+                link_key = key_exchange_transfer_count # unknown for now, use it to transfer key_exchange_transfer_count
             )
             pairing_table.append(pairing_entry)
             pairing_reference = len(pairing_table) - 1
 
-        # temp: let's start a pairing resp here
-        self.pair_response(
-            status=0,
-            pan_id=source_pan_id,
-            destination_address=source_address,
-            application_capability=application_capability,
-            list_of_device_types=[1],
-            list_of_profiles=[192],
-            pairing_reference=pairing_reference
-        )
         return (
             pairing_entry is None,
             {
@@ -278,7 +351,7 @@ class NWKManagementService(NWKService):
         )
 
     @Dot15d4Service.response("NLME-DISCOVERY")
-    def discovery_response(self, status, destination_address, list_of_device_types=[1], list_of_profiles=[192], link_quality=255):
+    def discovery_response(self, status, destination_address, list_of_device_types=[9], list_of_profiles=[192], link_quality=255):
         """
         Response allowing NWK layer to build and transmit a discovery response.
         """
@@ -361,8 +434,6 @@ class NWKManagementService(NWKService):
                 if match == 2:
                     frame_counter = self.database.get("nwkFrameCounter")
                     self.database.set("nwkFrameCounter", frame_counter + 1)
-
-                    self.manager.get_layer('mac').database.set("macPanId", 0x1234)
 
                     node_capability =  self.database.get("nwkcNodeCapabilities")
                     channel_normalization_capable = (node_capability >> 3) & 1
@@ -465,7 +536,7 @@ class NWKManagementService(NWKService):
                     destination_pan_id=destination_pan_id,
                     destination_address=destination_address,
                     pan_id_suppressed = False,
-                    wait_for_ack=False
+                    wait_for_ack=True
                 )
                 if ack:
                     try:
@@ -477,11 +548,12 @@ class NWKManagementService(NWKService):
                 print("end...")
         return node_descriptors
 
-    def on_command_npdu(self, pdu, source_address, destination_address, source_pan_id, link_quality=255):
+    def on_command_npdu(self, pdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality=255):
         pdu.link_quality = link_quality
         pdu.source_address = source_address
         pdu.destination_address = destination_address
         pdu.source_pan_id = source_pan_id
+        pdu.destination_pan_id = destination_pan_id
 
         self.add_packet_to_queue(pdu)
 
@@ -503,8 +575,6 @@ class NWKManager(Dot15d4Manager):
         self.add_service("data", NWKDataService(self))
         self.add_service("management", NWKManagementService(self))
 
-
-
     @source('mac', 'MCPS-DATA')
     def on_mcps_data(self, pdu, destination_pan_id, destination_address, source_pan_id, source_address, link_quality):
         """
@@ -513,6 +583,6 @@ class NWKManager(Dot15d4Manager):
         if pdu.frame_type == 1:
             self.get_service('data').on_data_npdu(pdu, link_quality)
         elif pdu.frame_type == 2:
-            self.get_service('management').on_command_npdu(pdu, source_address, destination_address, source_pan_id,  link_quality)
+            self.get_service('management').on_command_npdu(pdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality)
 
 #NWKManager.add(APSManager)

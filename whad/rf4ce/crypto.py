@@ -4,10 +4,21 @@ from whad.scapy.layers.rf4ce import RF4CE_Hdr, \
 from whad.rf4ce.exceptions import MissingRF4CEHeader, \
     MissingCryptographicMaterial, MissingRF4CESecurityFlag
 from Cryptodome.Cipher import AES
+from Cryptodome.Random import get_random_bytes
+
 from struct import pack
 from scapy.config import conf
 
 conf.dot15d4_protocol = "rf4ce"
+
+def generate_random_value(bits):
+    """Generate a random value of provided bit size.
+
+    :param int bits: Number of bits (8-bit aligned) to generate.
+    :return bytes: Random bytes
+    """
+    return get_random_bytes(int(bits/8))
+
 
 class RF4CECryptoManager:
     def __init__(self, key):
