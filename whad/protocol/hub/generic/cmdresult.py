@@ -3,7 +3,10 @@
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.hub.message import HubMessage
+from whad.protocol.hub import pb_bind
+from whad.protocol.hub.generic import Generic
 
+@pb_bind(Generic, 'cmd_result', 1)
 class CommandResult(HubMessage):
     """CommandResult message class
 

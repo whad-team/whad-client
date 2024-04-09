@@ -3,9 +3,11 @@
 
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.hub.generic import CommandResult, Success, Error, \
-    ParameterError, WrongMode, UnsupportedDomain, Busy, Disconnected, Generic, \
+from whad.protocol.hub.generic import Generic, \
     Progress, Debug, Verbose
+from whad.protocol.hub.generic.cmdresult import Success, Error, ParameterError, \
+    WrongMode, Disconnected, Busy, UnsupportedDomain, CommandResult
+
 
 class TestCommandResultParsing(object):
     """Unit tests for CommandResult parsing
@@ -114,6 +116,7 @@ class TestCommandResultCrafting(object):
         success = Disconnected(1)
         assert success.result_code == ResultCode.DISCONNECTED
 
+
 class TestProgress(object):
     """Test generic progress message parsing and crafting.
     """
@@ -147,15 +150,15 @@ class TestDebug(object):
         msg.generic.debug.data = b"Hello world !"
         parsed_obj = Debug.parse(1, msg)
         assert isinstance(parsed_obj, Debug)
-        assert parsed_obj.data == b"Hello world !"
+        assert parsed_obj.msg == b"Hello world !"
         assert parsed_obj.level == 42
         assert parsed_obj.proto_version == 1
 
     def test_debug_crafting(self):
         """Test generic debug message crafting.
         """
-        msg = Debug(1, debug_level=42, debug_msg=b"Hello world !")
-        assert msg.data == b"Hello world !"
+        msg = Debug(1, level=42, msg=b"Hello world !")
+        assert msg.msg == b"Hello world !"
         assert msg.level == 42
         assert msg.proto_version == 1
 
@@ -171,14 +174,14 @@ class TestVerbose(object):
         parsed_obj = Verbose.parse(1, msg)
         assert isinstance(parsed_obj, Verbose)
         assert parsed_obj.proto_version == 1
-        assert parsed_obj.data == b"Hello world !"
+        assert parsed_obj.msg == b"Hello world !"
 
     def test_verbose_crafting(self):
         """Test generic verbose message crafting.
         """
-        msg = Verbose(1, data=b"This is a test")
+        msg = Verbose(1, msg=b"This is a test")
         assert msg.proto_version == 1
-        assert msg.data == b"This is a test"
+        assert msg.msg == b"This is a test"
 
 
 class TestGeneric(object):
@@ -193,6 +196,7 @@ class TestGeneric(object):
         parsed_obj = Generic.parse(1, msg)
         assert isinstance(parsed_obj, CommandResult)
         assert parsed_obj.proto_version == 1
+
 
     def test_progress_parsing(self):
         """Test Progress message parsing
@@ -218,6 +222,6 @@ class TestGeneric(object):
         """
         msg = Message()
         msg.generic.verbose.data = b"This is a test"
-        parsed_obj = Generic.parse(42, msg)
+        parsed_obj = Generic.parse(1, msg)
         assert isinstance(parsed_obj, Verbose)
-        assert parsed_obj.proto_version == 42
+        assert parsed_obj.proto_version == 1
