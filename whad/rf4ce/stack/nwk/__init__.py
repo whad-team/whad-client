@@ -4,7 +4,7 @@ from whad.dot15d4.stack.mac.constants import MACAddressMode
 from whad.rf4ce.stack.nwk.exceptions import NWKTimeoutException
 from whad.rf4ce.stack.nwk.database import NWKIB
 from whad.rf4ce.stack.nwk.pairing import PairingEntry
-from whad.rf4ce.crypto import generate_random_value, xor
+from whad.rf4ce.crypto import generate_random_value, xor, RF4CEDecryptor
 from whad.scapy.layers.rf4ce import RF4CE_Command_Hdr, RF4CE_Cmd_Discovery_Request, \
     RF4CE_Hdr, RF4CE_Cmd_Key_Seed, RF4CE_Cmd_Pair_Request, RF4CE_Cmd_Pair_Response, \
     RF4CE_Cmd_Discovery_Response
@@ -178,7 +178,9 @@ class NWKManagementService(NWKService):
                     value = xor(seed, value)
 
                 seeds.append(value)
-                print("SEEDS", seeds)
+                print("SEEDS")
+                for seed in seeds:
+                    print(seed.hex())
                 for n in range(key_exchange_transfer_count + 1):
 
                     frame_counter = self.database.get("nwkFrameCounter")
@@ -271,12 +273,13 @@ class NWKManagementService(NWKService):
             pairing_reference = pairing_table.index(pairing_entry)
             # Do we update something here ? specification is unclear
         else:
+            print(">><", hex(destination_address), hex(source_address))
             # Create a new Pairing Entry here
             pairing_entry = PairingEntry(
-                source_network_address = self.manager.get_layer('mac').database.get("nwkNetworkAddress"),
+                source_network_address = self.manager.get_layer('mac').database.get("macShortAddress"),
                 channel = self.manager.get_layer('phy').get_channel(),
-                destination_ieee_address = destination_address,
-                destination_pan_id = destination_pan_id,
+                destination_ieee_address = source_address,
+                destination_pan_id = source_pan_id,
                 destination_network_address = None, # unknown at this point
                 capabilities = node_capability,
                 frame_counter = 0,
@@ -580,6 +583,37 @@ class NWKManager(Dot15d4Manager):
         """
         Callback processing MAC MCPS Data indication.
         """
+        print()
+
+        if pdu.security_enabled == 1:
+            # if security is enable, check if we have enough info in pairing table
+            pairing_table = self.database.get("nwkPairingTable")
+            pairing_entry = None
+            for candidate_pairing_entry in pairing_table:
+                if (
+                    candidate_pairing_entry.destination_ieee_address == source_address and
+                    isinstance(candidate_pairing_entry.link_key, bytes) and
+                    candidate_pairing_entry.is_active()
+                ):
+                    pairing_entry = candidate_pairing_entry
+                    break
+
+            if pairing_entry is not None:
+                success = False
+                source_ieee_address = self.get_layer('mac').database.get("macExtendedAddress")
+                print(pairing_entry.destination_network_address, hex(pairing_entry.destination_ieee_address))
+                print(pairing_entry.source_network_address, hex(source_ieee_address))
+                print(pairing_entry.link_key)
+                decryptor = RF4CEDecryptor(pairing_entry.link_key)
+                decryptor.add_address(pairing_entry.destination_ieee_address, source_ieee_address)
+                from scapy.layers.dot15d4 import  Dot15d4, Dot15d4Data
+                decrypted_packet, success = decryptor.attempt_to_decrypt(Dot15d4()/Dot15d4Data()/pdu)
+                #except MissingCryptographicMaterial:
+                #    print("msissingcrypto")
+                #    success = False
+                print(success)
+                pdu = decrypted_packet
+                pdu.show()
         if pdu.frame_type == 1:
             self.get_service('data').on_data_npdu(pdu, link_quality)
         elif pdu.frame_type == 2:

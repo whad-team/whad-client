@@ -114,7 +114,6 @@ class RF4CECryptoManager:
             plaintext = cipher.decrypt(ciphertext)
             try:
                 cipher.verify(mic)
-
                 # Rebuild the decrypted packet
                 header = bytes(packet)[:-4-len(ciphertext)]
                 packet = Dot15d4(header + plaintext + mic)

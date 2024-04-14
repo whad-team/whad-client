@@ -24,6 +24,12 @@ class PairingEntry:
         self.status = PairingEntryStatus.PROVISIONAL
 
 
+    def is_active(self):
+        """
+        Returns a boolean indicating if entry is active.
+        """
+        return self.status == PairingEntryStatus.ACTIVE
+        
     def mark_as_active(self):
         """
         Mark this entry as active.
