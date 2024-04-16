@@ -6,8 +6,7 @@ class HubMessage(object):
     """Main class from which any ProtocolHub message derives from.
     """
 
-    def __init__(self, version: int, message: Message = None):
-        self.__proto_version = version
+    def __init__(self,  message: Message = None):
         if message is None:
             self.__msg = Message()
         else:
@@ -25,7 +24,12 @@ class HubMessage(object):
             root_node = getattr(root_node, node)
 
         if hasattr(root_node, path_nodes[-1]):
-            setattr(root_node, path_nodes[-1], value)
+            # If we are dealing with a PB array, we cannot set its value but
+            # need to call extend() to add our array items.
+            if isinstance(value, list):
+                getattr(root_node, path_nodes[-1]).extend(value)
+            else:
+                setattr(root_node, path_nodes[-1], value)
         else:
             raise IndexError()
         
@@ -47,11 +51,6 @@ class HubMessage(object):
             return getattr(root_node, path_nodes[-1])
         else:
             raise IndexError()
-
-
-    @property
-    def proto_version(self):
-        return self.__proto_version
     
     @property
     def message(self):

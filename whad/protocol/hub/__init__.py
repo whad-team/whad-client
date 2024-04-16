@@ -93,6 +93,15 @@ class PbFieldBytes(PbField):
         """
         super().__init__(path, bytes)
 
+class PbFieldArray(PbField):
+    """Protocol buffers array field model
+    """
+
+    def __init__(self, path: str):
+        """Create a PB field model for arrays.
+        """
+        super().__init__(path, list)
+
 class PbMessageWrapper(HubMessage):
     """Protocol Buffers message wrapper
 
@@ -101,7 +110,7 @@ class PbMessageWrapper(HubMessage):
     transparently access and updates these fields through simple parameters.
     """
 
-    def __init__(self, *args, message: Message = None, **kwargs):
+    def __init__(self, message: Message = None, **kwargs):
         """Initialize a `PbMessageWrapper` object.
 
         This code goes through all the declared properties and finds out the
@@ -111,7 +120,7 @@ class PbMessageWrapper(HubMessage):
         self.__pb_fields = {}
 
         # Create our HubMessage
-        super().__init__(1, message=message)
+        super().__init__(message=message)
         
         # Browse our properties and list PB fields
         for prop in dir(self):
@@ -154,7 +163,7 @@ class PbMessageWrapper(HubMessage):
     def parse(parent_class, version: int, message: Message):
         """Parse a generic protobuf message message.
         """
-        return parent_class(version, message=message)
+        return parent_class(message=message)
 
 
 class ProtocolHub(Registry):

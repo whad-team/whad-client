@@ -9,4 +9,3 @@ class Debug(PbMessageWrapper):
     """
     level = PbFieldInt('generic.debug.level')
     msg = PbFieldBytes('generic.debug.data')
-

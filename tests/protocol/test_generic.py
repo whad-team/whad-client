@@ -77,43 +77,43 @@ class TestCommandResultCrafting(object):
     def test_cmdresult_success(self):
         """Create a Success() object and check result_code.
         """
-        success = Success(1)
+        success = Success()
         assert success.result_code == ResultCode.SUCCESS
 
     def test_cmdresult_error(self):
         """Create a Error() object and check result_code.
         """
-        success = Error(1)
+        success = Error()
         assert success.result_code == ResultCode.ERROR
 
     def test_cmdresult_param_error(self):
         """Create a ParameterError() object and check result_code.
         """
-        success = ParameterError(1)
+        success = ParameterError()
         assert success.result_code == ResultCode.PARAMETER_ERROR
 
     def test_cmdresult_wrong_mode(self):
         """Create a WrongMode() object and check result_code.
         """
-        success = WrongMode(1)
+        success = WrongMode()
         assert success.result_code == ResultCode.WRONG_MODE
 
     def test_cmdresult_unsupported_domain(self):
         """Create a UnsupportedDomain() object and check result_code.
         """
-        success = UnsupportedDomain(1)
+        success = UnsupportedDomain()
         assert success.result_code == ResultCode.UNSUPPORTED_DOMAIN
 
     def test_cmdresult_busy(self):
         """Create a Busy() object and check result_code.
         """
-        success = Busy(1)
+        success = Busy()
         assert success.result_code == ResultCode.BUSY
 
     def test_cmdresult_disconnected(self):
         """Create a Disconnected() object and check result_code.
         """
-        success = Disconnected(1)
+        success = Disconnected()
         assert success.result_code == ResultCode.DISCONNECTED
 
 
@@ -128,15 +128,13 @@ class TestProgress(object):
         msg.generic.progress.value = 100
         parsed_obj = Progress.parse(1, msg)
         assert isinstance(parsed_obj, Progress)
-        assert parsed_obj.proto_version == 1
         assert parsed_obj.value == 100
 
     def test_progress_crafting(self):
         """Test generic progress message crafting.
         """
-        obj = Progress(1, value=50)
+        obj = Progress(value=50)
         assert obj.value == 50
-        assert obj.proto_version == 1
 
 class TestDebug(object):
     """Test generic debug message parsing and crafting.
@@ -152,15 +150,13 @@ class TestDebug(object):
         assert isinstance(parsed_obj, Debug)
         assert parsed_obj.msg == b"Hello world !"
         assert parsed_obj.level == 42
-        assert parsed_obj.proto_version == 1
 
     def test_debug_crafting(self):
         """Test generic debug message crafting.
         """
-        msg = Debug(1, level=42, msg=b"Hello world !")
+        msg = Debug(level=42, msg=b"Hello world !")
         assert msg.msg == b"Hello world !"
         assert msg.level == 42
-        assert msg.proto_version == 1
 
 class TestVerbose(object):
     """Test generic verbose message parsing and crafting.
@@ -173,14 +169,12 @@ class TestVerbose(object):
         msg.generic.verbose.data = b"Hello world !"
         parsed_obj = Verbose.parse(1, msg)
         assert isinstance(parsed_obj, Verbose)
-        assert parsed_obj.proto_version == 1
         assert parsed_obj.msg == b"Hello world !"
 
     def test_verbose_crafting(self):
         """Test generic verbose message crafting.
         """
-        msg = Verbose(1, msg=b"This is a test")
-        assert msg.proto_version == 1
+        msg = Verbose(msg=b"This is a test")
         assert msg.msg == b"This is a test"
 
 
@@ -195,7 +189,6 @@ class TestGeneric(object):
         msg.generic.cmd_result.result = ResultCode.SUCCESS
         parsed_obj = Generic.parse(1, msg)
         assert isinstance(parsed_obj, CommandResult)
-        assert parsed_obj.proto_version == 1
 
 
     def test_progress_parsing(self):
@@ -205,7 +198,6 @@ class TestGeneric(object):
         msg.generic.progress.value = 150
         parsed_obj = Generic.parse(1, msg)
         assert isinstance(parsed_obj, Progress)
-        assert parsed_obj.proto_version == 1
 
     def test_debug_parsing(self):
         """Test Debug message parsing
@@ -215,7 +207,6 @@ class TestGeneric(object):
         msg.generic.debug.data = b"This is a test"
         parsed_obj = Generic.parse(1, msg)
         assert isinstance(parsed_obj, Debug)
-        assert parsed_obj.proto_version == 1
 
     def test_verbose_parsing(self):
         """Test Verbose message parsing
@@ -224,4 +215,74 @@ class TestGeneric(object):
         msg.generic.verbose.data = b"This is a test"
         parsed_obj = Generic.parse(1, msg)
         assert isinstance(parsed_obj, Verbose)
-        assert parsed_obj.proto_version == 1
+
+    def test_error_factory(self):
+        """Test generic message factory for error message crafting
+        """
+        generic = Generic(1)
+        msg = generic.createError()
+        assert isinstance(msg, Error)
+
+    def test_success_factory(self):
+        """Test generic message factory for success message crafting
+        """
+        generic = Generic(1)
+        msg = generic.createSuccess()
+        assert isinstance(msg, Success)
+
+    def test_param_error_factory(self):
+        """Test generic message factory for parameter error message crafting
+        """
+        generic = Generic(1)
+        msg = generic.createParamError()
+        assert isinstance(msg, ParameterError)
+
+    def test_disconnected_factory(self):
+        """Test generic message factory for disconnected error message crafting
+        """
+        generic = Generic(1)
+        msg = generic.createDisconnected()
+        assert isinstance(msg, Disconnected)
+
+    def test_wrong_mode_factory(self):
+        """Test generic message factory for wrong mode error message crafting
+        """
+        generic = Generic(1)
+        msg = generic.createWrongMode()
+        assert isinstance(msg, WrongMode)
+
+    def test_unsupported_domain_factory(self):
+        """Test generic message factory for unsupported domain error message crafting
+        """
+        generic = Generic(1)
+        msg = generic.createUnsupportedDomain()
+        assert isinstance(msg, UnsupportedDomain)
+
+    def test_busy_factory(self):
+        """Test generic message factory for unsupported busy error message crafting
+        """
+        generic = Generic(1)
+        msg = generic.createBusy()
+        assert isinstance(msg, Busy)
+
+    def test_verbose_factory(self):
+        """Test generic message factory for verbose message crafting
+        """
+        generic = Generic(1)
+        msg = generic.createVerbose(b'TestMessage')
+        assert isinstance(msg, Verbose)
+
+    def test_debug_factory(self):
+        """Test generic message factory for debug message crafting
+        """
+        generic = Generic(1)
+        msg = generic.createDebug(42, b'TestMessage')
+        assert isinstance(msg, Debug)
+
+    def test_progress_factory(self):
+        """Test generic message factory for progress message crafting
+        """
+        generic = Generic(1)
+        msg = generic.createProgress(10)
+        assert isinstance(msg, Progress)
+        
