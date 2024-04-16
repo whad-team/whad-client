@@ -23,6 +23,17 @@ class Disconnect(PbMessageWrapper):
     """
     conn_handle = PbFieldInt('ble.disconnect.conn_handle')
 
+@pb_bind(BleDomain, 'synchronized', 1)
+class Synchronized(PbMessageWrapper):
+    """BLE synchronized notification message class
+    """
+    access_address = PbFieldInt('ble.synchronized.access_address')
+    crc_init = PbFieldInt('ble.synchronized.crc_init')
+    hop_interval = PbFieldInt('ble.synchronized.hop_interval')
+    hop_increment = PbFieldInt('ble.synchronized.hop_increment')
+    channel_map = PbFieldBytes('ble.synchronized.channel_map')
+
+
 @pb_bind(BleDomain, 'connected', 1)
 class Connected(PbMessageWrapper):
     """BLE connected message class
@@ -40,3 +51,9 @@ class Disconnected(PbMessageWrapper):
     """
     reason = PbFieldInt('ble.disconnected.reason')
     conn_handle = PbFieldBytes('ble.disconnected.conn_handle')
+
+@pb_bind(BleDomain, 'desynchronized', 1)
+class Desynchronized(PbMessageWrapper):
+    """BLE connect message class
+    """
+    access_address = PbFieldInt('ble.desynchronized.access_address')

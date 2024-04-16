@@ -37,11 +37,13 @@ class BleDomain(Registry):
 from .address import SetBdAddress
 from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveConn, \
     AccessAddressDiscovered
-from .jamming import JamAdv, JamAdvChan, JamConn
+from .jamming import JamAdv, JamAdvChan, JamConn, ReactiveJam
 from .mode import ScanMode, AdvMode, CentralMode, PeriphMode, Start, Stop
 from .pdu import SetAdvData, SendRawPdu, SendPdu, AdvPduReceived, PduReceived, \
     RawPduReceived
-from .connect import ConnectTo, Disconnect, Connected, Disconnected
+from .connect import ConnectTo, Disconnect, Connected, Disconnected, Synchronized, \
+    Desynchronized
+from .hijack import HijackMaster, HijackSlave, HijackBoth, Hijacked
 
 __all__ = [
     "AdvType",
@@ -57,6 +59,7 @@ __all__ = [
     "JamAdv",
     "JamAdvChan",
     "JamConn",
+    "ReactiveJam",
     "ScanMode",
     "AdvMode",
     "CentralMode",
@@ -72,5 +75,11 @@ __all__ = [
     "Connected",
     "Disconnected",
     "Start",
-    "Stop"
+    "Stop",
+    "HijackMaster",
+    "HijackSlave",
+    "HijackBoth",
+    "Hijacked",
+    "Synchronized",
+    "Desynchronized"
 ]

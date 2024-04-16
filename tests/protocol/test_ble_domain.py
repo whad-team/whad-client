@@ -9,7 +9,8 @@ from whad.protocol.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnRe
     JamAdvChan,JamConn, ScanMode, AdvMode, CentralMode, PeriphMode, SetAdvData, \
     SendRawPdu, Direction, SendPdu, AdvPduReceived, AdvType, Direction, AddressType, \
     PduReceived, RawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
-    Start, Stop
+    Start, Stop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
+    Synchronized, Desynchronized
 
 BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])
 
@@ -282,6 +283,37 @@ class TestJamConn(object):
         """
         msg = JamConn(access_address=0x99887766)
         assert msg.access_address == 0x99887766
+
+@pytest.fixture
+def reactive_jam():
+    """Create a BLE reactive jam protocol buffer message
+    """
+    msg = Message()
+    msg.ble.reactive_jam.channel = 2
+    msg.ble.reactive_jam.pattern = b"PATTERN"
+    msg.ble.reactive_jam.position = 1
+    return msg
+
+class TestReactiveJam(object):
+    """Test ReactiveJam message parsing/crafting
+    """
+
+    def test_parsing(self, reactive_jam):
+        """Check ReactiveJam parsing
+        """
+        parsed_obj = ReactiveJam.parse(1, reactive_jam)
+        assert isinstance(parsed_obj, ReactiveJam)
+        assert parsed_obj.channel == 2
+        assert parsed_obj.pattern == b"PATTERN"
+        assert parsed_obj.position == 1
+
+    def test_crafting(self):
+        """Check ReactiveJam crafting
+        """
+        msg = ReactiveJam(channel=3, pattern=b"FOOBAR", position=2)
+        assert msg.channel == 3
+        assert msg.pattern == b"FOOBAR"
+        assert msg.position == 2
 
 @pytest.fixture
 def scan_mode():
@@ -816,6 +848,49 @@ class TestConnected(object):
         assert msg.init_addr_type == AddressType.PUBLIC
 
 @pytest.fixture
+def synchronized():
+    """Create a BLE synchronized protocol buffer message
+    """
+    msg = Message()
+    msg.ble.synchronized.access_address = 0x11223344
+    msg.ble.synchronized.channel_map = bytes(range(5))
+    msg.ble.synchronized.hop_interval = 6
+    msg.ble.synchronized.hop_increment = 22
+    msg.ble.synchronized.crc_init = 0x112233
+    return msg
+
+class TestSynchronized(object):
+    """Test Synchronized message parsing/crafting
+    """
+
+    def test_parsing(self, synchronized):
+        """Check ConnectTo parsing
+        """
+        parsed_obj = Synchronized.parse(1, synchronized)
+        assert isinstance(parsed_obj, Synchronized)
+        assert parsed_obj.access_address == 0x11223344
+        assert parsed_obj.channel_map == bytes(range(5))
+        assert parsed_obj.hop_interval == 6
+        assert parsed_obj.hop_increment == 22
+        assert parsed_obj.crc_init == 0x112233
+
+    def test_crafting(self):
+        """Check ConnectTo crafting
+        """
+        msg = Synchronized(
+            access_address=0x99887766,
+            channel_map=bytes([1,2,3]),
+            hop_interval=12,
+            hop_increment=8,
+            crc_init=0x424242
+        )
+        assert msg.access_address == 0x99887766
+        assert msg.channel_map == bytes([1,2,3])
+        assert msg.hop_interval == 12
+        assert msg.hop_increment == 8
+        assert msg.crc_init == 0x424242
+
+@pytest.fixture
 def disconnected():
     """Create a BLE disconnected protocol buffer message
     """
@@ -843,3 +918,131 @@ class TestDisconnected(object):
         assert msg.reason == 33
         assert msg.conn_handle == 5
 
+@pytest.fixture
+def desynchronized():
+    """Create a BLE desynchronized protocol buffer message
+    """
+    msg = Message()
+    msg.ble.desynchronized.access_address = 0x11223344
+    return msg    
+
+class TestDesynchronized(object):
+    """Test Desynchronized message parsing/crafting
+    """
+
+    def test_parsing(self, desynchronized):
+        """Check Desynchronized parsing
+        """
+        parsed_obj = Desynchronized.parse(1, desynchronized)
+        assert isinstance(parsed_obj, Desynchronized)
+        assert parsed_obj.access_address == 0x11223344
+
+    def test_crafting(self):
+        """Check Desynchronized crafting
+        """
+        msg = Desynchronized(access_address=0x99887766)
+        assert msg.access_address == 0x99887766
+
+
+@pytest.fixture
+def hijack_master():
+    """Create a BLE hijack_master protocol buffer message
+    """
+    msg = Message()
+    msg.ble.hijack_master.access_address = 0x11223344
+    return msg
+
+class TestHijackMaster(object):
+    """Test HijackMaster message parsing/crafting
+    """
+
+    def test_parsing(self, hijack_master):
+        """Check HijackMaster parsing
+        """
+        parsed_obj = HijackMaster.parse(1, hijack_master)
+        assert isinstance(parsed_obj, HijackMaster)
+        assert parsed_obj.access_address == 0x11223344
+
+    def test_crafting(self):
+        """Check HijackMaster crafting
+        """
+        msg = HijackMaster(access_address=0x99887766)
+        assert msg.access_address == 0x99887766
+
+@pytest.fixture
+def hijack_slave():
+    """Create a BLE hijack_slave protocol buffer message
+    """
+    msg = Message()
+    msg.ble.hijack_slave.access_address = 0x11223344
+    return msg
+
+class TestHijackSlave(object):
+    """Test HijackSlave message parsing/crafting
+    """
+
+    def test_parsing(self, hijack_slave):
+        """Check HijackSlave parsing
+        """
+        parsed_obj = HijackSlave.parse(1, hijack_slave)
+        assert isinstance(parsed_obj, HijackSlave)
+        assert parsed_obj.access_address == 0x11223344
+
+    def test_crafting(self):
+        """Check HijackSlave crafting
+        """
+        msg = HijackSlave(access_address=0x99887766)
+        assert msg.access_address == 0x99887766
+
+@pytest.fixture
+def hijack_both():
+    """Create a BLE hijack_both protocol buffer message
+    """
+    msg = Message()
+    msg.ble.hijack_both.access_address = 0x11223344
+    return msg
+
+class TestHijackBoth(object):
+    """Test HijackBoth message parsing/crafting
+    """
+
+    def test_parsing(self, hijack_both):
+        """Check HijackBoth parsing
+        """
+        parsed_obj = HijackBoth.parse(1, hijack_both)
+        assert isinstance(parsed_obj, HijackBoth)
+        assert parsed_obj.access_address == 0x11223344
+
+    def test_crafting(self):
+        """Check HijackBoth crafting
+        """
+        msg = HijackBoth(access_address=0x99887766)
+        assert msg.access_address == 0x99887766
+
+@pytest.fixture
+def hijacked():
+    """Create a BLE hijacked protocol buffer message
+    """
+    msg = Message()
+    msg.ble.hijacked.success = True
+    msg.ble.hijacked.access_address = 0x11223344
+    return msg
+
+class TestHijacked(object):
+    """Test Hijacked message parsing/crafting
+    """
+
+    def test_parsing(self, hijacked):
+        """Check Hijacked parsing
+        """
+        parsed_obj = Hijacked.parse(1, hijacked)
+        assert isinstance(parsed_obj, Hijacked)
+        assert parsed_obj.access_address == 0x11223344
+        assert parsed_obj.success == True
+
+    def test_crafting(self):
+        """Check Hijacked crafting
+        """
+        msg = Hijacked(success=False, access_address=0x99887766)
+        assert msg.access_address == 0x99887766
+        assert msg.success == False
