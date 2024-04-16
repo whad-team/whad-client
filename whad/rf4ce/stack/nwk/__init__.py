@@ -1,10 +1,11 @@
 from whad.dot15d4.stack.manager import Dot15d4Manager
 from whad.dot15d4.stack.service import Dot15d4Service
+from whad.dot15d4.address import Dot15d4Address
 from whad.dot15d4.stack.mac.constants import MACAddressMode
 from whad.rf4ce.stack.nwk.exceptions import NWKTimeoutException
 from whad.rf4ce.stack.nwk.database import NWKIB
 from whad.rf4ce.stack.nwk.pairing import PairingEntry
-from whad.rf4ce.crypto import generate_random_value, xor, RF4CEDecryptor
+from whad.rf4ce.crypto import generate_random_value, xor, RF4CECryptoManager
 from whad.scapy.layers.rf4ce import RF4CE_Command_Hdr, RF4CE_Cmd_Discovery_Request, \
     RF4CE_Hdr, RF4CE_Cmd_Key_Seed, RF4CE_Cmd_Pair_Request, RF4CE_Cmd_Pair_Response, \
     RF4CE_Cmd_Discovery_Response
@@ -601,16 +602,13 @@ class NWKManager(Dot15d4Manager):
             if pairing_entry is not None:
                 success = False
                 source_ieee_address = self.get_layer('mac').database.get("macExtendedAddress")
-                print(pairing_entry.destination_network_address, hex(pairing_entry.destination_ieee_address))
-                print(pairing_entry.source_network_address, hex(source_ieee_address))
-                print(pairing_entry.link_key)
-                decryptor = RF4CEDecryptor(pairing_entry.link_key)
-                decryptor.add_address(pairing_entry.destination_ieee_address, source_ieee_address)
-                from scapy.layers.dot15d4 import  Dot15d4, Dot15d4Data
-                decrypted_packet, success = decryptor.attempt_to_decrypt(Dot15d4()/Dot15d4Data()/pdu)
-                #except MissingCryptographicMaterial:
-                #    print("msissingcrypto")
-                #    success = False
+
+                decryptor = RF4CECryptoManager(pairing_entry.link_key)
+                from struct import pack
+                source_address = pack('<Q', pairing_entry.destination_ieee_address)
+                destination_address = pack('<Q', source_ieee_address)
+                decrypted_packet, success = decryptor.decrypt(pdu, source=source_address, destination=destination_address, rf4ce_only=True)
+                decrypted_packet.show()
                 print(success)
                 pdu = decrypted_packet
                 pdu.show()

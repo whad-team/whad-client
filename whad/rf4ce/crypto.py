@@ -60,16 +60,20 @@ class RF4CECryptoManager:
     def extractCiphertextPayload(self, packet):
         # If it is a vendor or a data packet, we need to take
         # into account supplementary fields
+        packet.reserved = 1
+        (packet.do_build())
         start_of_payload = 2 if packet.frame_type in (1,3) else 1
         ciphertext = bytes(packet[RF4CE_Hdr:][start_of_payload:])
         return ciphertext, pack("<I", packet.mic)
 
     def extractPlaintextPayload(self, packet):
+        packet.reserved = 1
+        (packet.do_build())
         start_of_payload = 2 if packet.frame_type in (1,3) else 1
         plaintext = bytes(packet[RF4CE_Hdr:][start_of_payload:])
         return plaintext
 
-    def decrypt(self, packet, source=None, destination=None):
+    def decrypt(self, packet, source=None, destination=None, rf4ce_only=False):
         # convert source and destination address if provided
         if isinstance(source, str) and ":" in source:
             source = bytes.fromhex(source.replace(":", ""))[::-1]
@@ -77,16 +81,24 @@ class RF4CECryptoManager:
         if isinstance(destination, str) and ":" in destination:
             destination = bytes.fromhex(destination.replace(":", ""))[::-1]
 
-        # convert into scapy packet if bytes only
-        if isinstance(packet, bytes):
-            packet = Dot15d4(packet)
+        if rf4ce_only:
+            if RF4CE_Hdr in packet:
+                packet.reserved = 1
+                packet = RF4CE_Hdr(packet.do_build())
 
-        # don't process FCS if present
-        if Dot15d4FCS in packet:
-            # force a rebuild just in case
-            packet.reserved = 1
-            packet = bytes(packet)[:-2]
-            packet = Dot15d4(packet)
+            if isinstance(packet, bytes):
+                packet = RF4CE_Hdr(packet)
+        else:
+            # convert into scapy packet if bytes only
+            if isinstance(packet, bytes):
+                packet = Dot15d4(packet)
+
+            # don't process FCS if present
+            if Dot15d4FCS in packet:
+                # force a rebuild just in case
+                packet.reserved = 1
+                packet = packet.do_build()[:-2]
+                packet = Dot15d4(packet)
 
         if RF4CE_Hdr not in packet:
             raise MissingRF4CEHeader()
@@ -116,7 +128,10 @@ class RF4CECryptoManager:
                 cipher.verify(mic)
                 # Rebuild the decrypted packet
                 header = bytes(packet)[:-4-len(ciphertext)]
-                packet = Dot15d4(header + plaintext + mic)
+                if rf4ce_only:
+                    packet = RF4CE_Hdr(header + plaintext + mic)
+                else:
+                    packet = Dot15d4(header + plaintext + mic)
 
                 return (packet, True)
 
@@ -317,7 +332,6 @@ class RF4CEDecryptor:
                     )
                     if success:
                         return (decrypted_packet, True)
-                    print(candidate_addresses, key)
 
                 except:
                     pass

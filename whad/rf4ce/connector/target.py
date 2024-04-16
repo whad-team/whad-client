@@ -89,7 +89,6 @@ class Target(RF4CE):
             not pdu.metadata.is_fcs_valid
         ):
             return
-        pdu.show()
 
         self.__stack.on_pdu(pdu)
 

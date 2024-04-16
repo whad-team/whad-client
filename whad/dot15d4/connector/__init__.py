@@ -287,7 +287,11 @@ class Dot15d4(WhadDeviceConnector):
         """
         Raw PDU processing (Dot15d4FCS).
         """
-        pdu = Dot15d4NoFCS(raw(packet)[:-2])
+        # Ugly hack but we need a forced rebuild in specific cases...
+        if hasattr(packet, "reserved"):
+            packet.reserved = packet.reserved
+
+        pdu = Dot15d4NoFCS(packet.do_build()[:-2])
         pdu.metadata = packet.metadata
         self.on_pdu(pdu)
 

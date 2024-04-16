@@ -162,6 +162,7 @@ class RF4CE_Hdr(Packet):
     ]
 
     def pre_dissect(self,s):
+        print(s.hex())
         if ((s[0] & 0b100) >> 2) == 1:
             return s[:1] + s[-4:] + s[1:-4]
         else:
