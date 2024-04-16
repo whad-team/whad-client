@@ -102,6 +102,15 @@ class PbFieldArray(PbField):
         """
         super().__init__(path, list)
 
+class PbFieldBool(PbField):
+    """Protocol buffers bool field model
+    """
+
+    def __init__(self, path: str):
+        """Create a PB field model for bools.
+        """
+        super().__init__(path, bool)        
+
 class PbMessageWrapper(HubMessage):
     """Protocol Buffers message wrapper
 
