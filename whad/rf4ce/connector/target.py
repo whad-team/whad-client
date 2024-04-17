@@ -80,6 +80,8 @@ class Target(RF4CE):
 
     def send(self, packet):
         packet.show()
+        packet.reserved = 1
+        packet.do_build()
         super().send(packet, channel=self.__channel)
 
     def on_pdu(self, pdu):

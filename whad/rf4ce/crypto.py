@@ -143,27 +143,36 @@ class RF4CECryptoManager:
             raise MissingRF4CESecurityFlag()
 
 
-    def encrypt(self, packet, source=None, destination=None):
+    def encrypt(self, packet, source=None, destination=None, rf4ce_only=False):
         # convert source and destination address if provided
+
         if isinstance(source, str) and ":" in source:
             source = bytes.fromhex(source.replace(":", ""))[::-1]
 
         if isinstance(destination, str) and ":" in destination:
             destination = bytes.fromhex(destination.replace(":", ""))[::-1]
 
-        # convert into scapy packet if bytes only
-        if isinstance(packet, bytes):
-            packet = Dot15d4(packet)
+        if rf4ce_only:
+            if RF4CE_Hdr in packet:
+                packet.reserved = 1
+                packet = RF4CE_Hdr(packet.do_build())
 
-        # don't process FCS if present
-        if Dot15d4FCS in packet:
-            # force a rebuild just in case
-            packet.reserved = 1
-            packet = bytes(packet)[:-2]
-            packet = Dot15d4(packet)
+            if isinstance(packet, bytes):
+                packet = RF4CE_Hdr(packet)
+        else:
+            # convert into scapy packet if bytes only
+            if isinstance(packet, bytes):
+                packet = Dot15d4(packet)
 
-        if RF4CE_Hdr not in packet:
-            raise MissingRF4CEHeader()
+            # don't process FCS if present
+            if Dot15d4FCS in packet:
+                # force a rebuild just in case
+                packet.reserved = 1
+                packet = bytes(packet)[:-2]
+                packet = Dot15d4(packet)
+
+            if RF4CE_Hdr not in packet:
+                raise MissingRF4CEHeader()
 
         # Check if packet has security enabled
         if (
@@ -194,9 +203,15 @@ class RF4CECryptoManager:
                 cropping_length = len(plaintext) + 4
             packet.reserved = 1
             header = bytes(packet)[:-cropping_length]
-            packet = Dot15d4(header + ciphertext +  mic)
+            header = bytes([0b00000100 ^ header[0]]) + header[1:]
+            #packet.security_enabled = 1
+
+            if rf4ce_only:
+                packet = bytes(header + ciphertext + mic)
+            else:
+                packet = Dot15d4(header + ciphertext +  mic)
             # Set the security flag and force a rebuild
-            packet.security_enabled = 1
+
             return packet
 
         else:

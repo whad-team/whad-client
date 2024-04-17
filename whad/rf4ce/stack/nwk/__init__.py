@@ -8,11 +8,12 @@ from whad.rf4ce.stack.nwk.pairing import PairingEntry
 from whad.rf4ce.crypto import generate_random_value, xor, RF4CECryptoManager
 from whad.scapy.layers.rf4ce import RF4CE_Command_Hdr, RF4CE_Cmd_Discovery_Request, \
     RF4CE_Hdr, RF4CE_Cmd_Key_Seed, RF4CE_Cmd_Pair_Request, RF4CE_Cmd_Pair_Response, \
-    RF4CE_Cmd_Discovery_Response
+    RF4CE_Cmd_Discovery_Response, RF4CE_Cmd_Ping_Request, RF4CE_Cmd_Ping_Response
 from whad.common.stack import Layer, alias, source, state
 
 from random import randint
 from time import time, sleep
+from struct import pack
 
 import logging
 
@@ -217,7 +218,63 @@ class NWKManagementService(NWKService):
 
                 pairing_entry.link_key = link_key
                 pairing_entry.mark_as_active()
-                print("SUCCESS ! ")
+
+                ping_req = None
+                start = time()
+                while (time() - start) < 3 and ping_req is None:
+                    try:
+                        ping_req = self.wait_for_packet(lambda pkt:RF4CE_Cmd_Ping_Request in pkt, timeout=0.01)
+                    except NWKTimeoutException:
+                        pass
+
+                if ping_req is None or ping_req.ping_options != 0 or len(ping_req.ping_payload) != 4:
+                    pairing_table = self.database.get("nwkPairingTable")
+                    del pairing_table[pairing_reference]
+                    self.database.set("nwkPairingTable", pairing_table)
+                    return False
+
+                frame_counter = self.database.get("nwkFrameCounter")
+                self.database.set("nwkFrameCounter", frame_counter + 1)
+
+                ping_resp = (
+                    RF4CE_Hdr(
+                        protocol_version = 1,
+                        security_enabled = 1,
+                        frame_counter = frame_counter
+                    ) /
+                    RF4CE_Command_Hdr() /
+                    RF4CE_Cmd_Ping_Response
+                    (
+                        ping_options = 0,
+                        ping_payload = ping_req.ping_payload
+                    )
+                )
+                source_ieee_address = self.manager.get_layer('mac').database.get("macExtendedAddress")
+
+                decryptor = RF4CECryptoManager(pairing_entry.link_key)
+
+                source_address_formatted = pack('<Q', pairing_entry.destination_ieee_address)
+                destination_address_formatted = pack('<Q', source_ieee_address)
+
+
+                enc_ping_resp = RF4CECryptoManager(
+                    key = pairing_entry.link_key
+                ).encrypt(
+                    ping_resp,
+                    destination=destination_address_formatted,
+                    source=source_address_formatted,
+                    rf4ce_only=True
+                )
+
+                ack = self.manager.get_layer('mac').get_service("data").data(
+                    enc_ping_resp,
+                    destination_address_mode=MACAddressMode.EXTENDED,
+                    source_address_mode=MACAddressMode.EXTENDED,
+                    destination_pan_id=0xFFFF,
+                    destination_address=destination_address,
+                    pan_id_suppressed = False,
+                    wait_for_ack=True
+                )
                 return True
 
             else:
@@ -604,14 +661,17 @@ class NWKManager(Dot15d4Manager):
                 source_ieee_address = self.get_layer('mac').database.get("macExtendedAddress")
 
                 decryptor = RF4CECryptoManager(pairing_entry.link_key)
-                from struct import pack
+
                 source_address = pack('<Q', pairing_entry.destination_ieee_address)
                 destination_address = pack('<Q', source_ieee_address)
                 decrypted_packet, success = decryptor.decrypt(pdu, source=source_address, destination=destination_address, rf4ce_only=True)
-                decrypted_packet.show()
-                print(success)
-                pdu = decrypted_packet
-                pdu.show()
+                if success:
+                    pdu = decrypted_packet
+                else:
+                    return
+
+        #pdu.show()
+
         if pdu.frame_type == 1:
             self.get_service('data').on_data_npdu(pdu, link_quality)
         elif pdu.frame_type == 2:
