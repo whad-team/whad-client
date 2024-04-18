@@ -33,6 +33,14 @@ class BleDomain(Registry):
     def __init__(self, version: int):
         self.proto_version = version
 
+    @staticmethod
+    def parse(proto_version: int, message) -> HubMessage:
+        """Parses a WHAD BleDomain message as seen by protobuf
+        """
+        message_type = message.ble.WhichOneof('msg')
+        message_clazz = BleDomain.bound(message_type, proto_version)
+        return message_clazz.parse(proto_version, message)
+
 
 from .address import SetBdAddress
 from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveConn, \
@@ -40,10 +48,12 @@ from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveCon
 from .jamming import JamAdv, JamAdvChan, JamConn, ReactiveJam
 from .mode import ScanMode, AdvMode, CentralMode, PeriphMode, Start, Stop
 from .pdu import SetAdvData, SendRawPdu, SendPdu, AdvPduReceived, PduReceived, \
-    RawPduReceived
+    RawPduReceived, Injected
 from .connect import ConnectTo, Disconnect, Connected, Disconnected, Synchronized, \
     Desynchronized
 from .hijack import HijackMaster, HijackSlave, HijackBoth, Hijacked
+from .triggers import PrepareSequenceManual, PrepareSequenceConnEvt, \
+    PrepareSequencePattern, PrepareSequence
 
 __all__ = [
     "AdvType",
@@ -80,6 +90,11 @@ __all__ = [
     "HijackSlave",
     "HijackBoth",
     "Hijacked",
+    "Injected",
     "Synchronized",
-    "Desynchronized"
+    "Desynchronized",
+    "PrepareSequenceManual",
+    "PrepareSequenceConnEvt",
+    "PrepareSequencePattern",
+    "PrepareSequence"
 ]

@@ -28,10 +28,10 @@ class SendRawPdu(PbMessageWrapper):
 class SendPdu(PbMessageWrapper):
     """BLE send PDU message class
     """
-    direction = PbFieldInt("ble.send_raw_pdu.direction")
-    conn_handle = PbFieldInt("ble.send_raw_pdu.conn_handle")
-    pdu = PbFieldBytes("ble.send_raw_pdu.pdu")
-    encrypt = PbFieldBool("ble.send_raw_pdu.encrypt")
+    direction = PbFieldInt("ble.send_pdu.direction")
+    conn_handle = PbFieldInt("ble.send_pdu.conn_handle")
+    pdu = PbFieldBytes("ble.send_pdu.pdu")
+    encrypt = PbFieldBool("ble.send_pdu.encrypt")
 
 @pb_bind(BleDomain, "adv_pdu", 1)
 class AdvPduReceived(PbMessageWrapper):
@@ -70,3 +70,11 @@ class RawPduReceived(PbMessageWrapper):
     conn_handle = PbFieldInt("ble.raw_pdu.conn_handle")
     processed = PbFieldBool("ble.raw_pdu.processed")
     decrypted = PbFieldBool("ble.raw_pdu.decrypted")
+
+@pb_bind(BleDomain, "injected", 1)
+class Injected(PbMessageWrapper):
+    """BLE PDU injected notification message class
+    """
+    success = PbFieldBool("ble.injected.success")
+    access_address = PbFieldInt("ble.injected.access_address")
+    injection_attempts = PbFieldInt("ble.injected.injection_attempts")

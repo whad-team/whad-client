@@ -7,10 +7,15 @@ from whad.protocol.ble.ble_pb2 import JamAdvCmd, CentralModeCmd, StartCmd, StopC
 from whad.protocol.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     SniffAccessAddress, SniffActiveConn, AccessAddressDiscovered, JamAdv, \
     JamAdvChan,JamConn, ScanMode, AdvMode, CentralMode, PeriphMode, SetAdvData, \
-    SendRawPdu, Direction, SendPdu, AdvPduReceived, AdvType, Direction, AddressType, \
+    SendRawPdu, SendPdu, AdvPduReceived,AddressType, \
     PduReceived, RawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
     Start, Stop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
-    Synchronized, Desynchronized
+    Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
+    PrepareSequencePattern, Injected
+
+from test_hijack import hijack_master, hijack_slave, hijack_both, hijacked
+from test_pdu import send_pdu, send_raw_pdu, raw_pdu, pdu, adv_pdu, set_adv_data
+from test_prepseq import prep_seq_manual, prep_seq_connevt, prep_seq_reception
 
 BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])
 
@@ -449,281 +454,6 @@ class TestStop(object):
         assert isinstance(parsed_obj, Stop)
 
 @pytest.fixture
-def set_adv_data():
-    msg = Message()
-    msg.ble.set_adv_data.scan_data = b'TEST'
-    msg.ble.set_adv_data.scanrsp_data = b'RESPONSE'
-    return msg
-
-class TestSetAdvData(object):
-    """Test SetAdvData message parsing/crafting
-    """
-
-    def test_parsing(self, set_adv_data):
-        """Check SetAdvData parsing
-        """
-        parsed_obj = SetAdvData.parse(1, set_adv_data)
-        assert isinstance(parsed_obj, SetAdvData)
-        assert parsed_obj.scan_data == b'TEST'
-        assert parsed_obj.scanrsp_data == b'RESPONSE'
-
-    def test_crafting(self):
-        """Check SetAdvData crafting
-        """
-        msg = SetAdvData(
-            scan_data=b'HELLOWORLD',
-            scanrsp_data=b'FOOBAR'
-        )
-        assert msg.scan_data == b'HELLOWORLD'
-        assert msg.scanrsp_data == b'FOOBAR'
-
-@pytest.fixture
-def send_raw_pdu():
-    """Create a send_raw_pdu protocol buffer message.
-    """
-    msg = Message()
-    msg.ble.send_raw_pdu.direction = Direction.MASTER_TO_SLAVE
-    msg.ble.send_raw_pdu.conn_handle = 1
-    msg.ble.send_raw_pdu.access_address = 0x11223344
-    msg.ble.send_raw_pdu.pdu = b"HELLOWORLD"
-    msg.ble.send_raw_pdu.crc = 0x112233
-    msg.ble.send_raw_pdu.encrypt = False
-    return msg
-
-class TestSendRawPdu(object):
-    """Test SendRawPdu message parsing/crafting
-    """
-
-    def test_parsing(self, send_raw_pdu):
-        """Check SendRawPdu parsing
-        """
-        parsed_obj = SendRawPdu.parse(1, send_raw_pdu)
-        assert isinstance(parsed_obj, SendRawPdu)
-        assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
-        assert parsed_obj.conn_handle == 1
-        assert parsed_obj.access_address == 0x11223344
-        assert parsed_obj.pdu == b"HELLOWORLD"
-        assert parsed_obj.crc == 0x112233
-        assert parsed_obj.encrypt == False
-
-    def test_crafting(self):
-        """Check SendRawPdu crafting
-        """
-        msg = SendRawPdu(
-            direction=Direction.SLAVE_TO_MASTER,
-            conn_handle=2,
-            access_address=0x99887766,
-            pdu=b"FOOBAR",
-            crc=0xAABBCC,
-            encrypt=True
-        )
-        assert msg.direction == Direction.SLAVE_TO_MASTER
-        assert msg.conn_handle == 2
-        assert msg.access_address == 0x99887766
-        assert msg.pdu == b"FOOBAR"
-        assert msg.crc == 0xAABBCC
-        assert msg.encrypt == True
-
-
-@pytest.fixture
-def send_pdu():
-    """Create a send_pdu protocol buffer message.
-    """
-    msg = Message()
-    msg.ble.send_raw_pdu.direction = Direction.MASTER_TO_SLAVE
-    msg.ble.send_raw_pdu.conn_handle = 1
-    msg.ble.send_raw_pdu.pdu = b"HELLOWORLD"
-    msg.ble.send_raw_pdu.encrypt = False
-    return msg
-
-class TestSendPdu(object):
-    """Test SendPdu message parsing/crafting
-    """
-
-    def test_parsing(self, send_pdu):
-        """Check SendRawPdu parsing
-        """
-        parsed_obj = SendPdu.parse(1, send_pdu)
-        assert isinstance(parsed_obj, SendPdu)
-        assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
-        assert parsed_obj.conn_handle == 1
-        assert parsed_obj.pdu == b"HELLOWORLD"
-        assert parsed_obj.encrypt == False
-
-    def test_crafting(self):
-        """Check SendPdu crafting
-        """
-        msg = SendPdu(
-            direction=Direction.SLAVE_TO_MASTER,
-            conn_handle=2,
-            pdu=b"FOOBAR",
-            encrypt=True
-        )
-        assert msg.direction == Direction.SLAVE_TO_MASTER
-        assert msg.conn_handle == 2
-        assert msg.pdu == b"FOOBAR"
-        assert msg.encrypt == True
-
-
-@pytest.fixture
-def adv_pdu():
-    """Create an adv_pdu protocol buffer message
-    """
-    msg = Message()
-    msg.ble.adv_pdu.adv_type = AdvType.ADV_IND
-    msg.ble.adv_pdu.rssi = -50
-    msg.ble.adv_pdu.bd_address = BD_ADDRESS_DEFAULT
-    msg.ble.adv_pdu.adv_data = b"FOOBAR"
-    msg.ble.adv_pdu.addr_type = AddressType.PUBLIC
-    return msg
-
-class TestAdvPduReceived(object):
-    """Test AdvPduReceived message parsing/crafting
-    """
-
-    def test_parsing(self, adv_pdu):
-        """Check AdvPduReceived parsing
-        """
-        parsed_obj = AdvPduReceived.parse(1, adv_pdu)
-        assert isinstance(parsed_obj, AdvPduReceived)
-        assert parsed_obj.adv_type == AdvType.ADV_IND
-        assert parsed_obj.rssi == -50
-        assert parsed_obj.bd_address == BD_ADDRESS_DEFAULT
-        assert parsed_obj.adv_data == b"FOOBAR"
-        assert parsed_obj.addr_type == AddressType.PUBLIC
-
-    def test_crafting(self):
-        """Check AdvPduReceived crafting
-        """
-        msg = AdvPduReceived(
-            adv_type=AdvType.ADV_NONCONN_IND,
-            rssi=30,
-            bd_address=BD_ADDRESS_DEFAULT,
-            adv_data=b"HELLOWORLD",
-            addr_type=AddressType.RANDOM
-        )
-        assert msg.adv_type == AdvType.ADV_NONCONN_IND
-        assert msg.rssi == 30
-        assert msg.bd_address == BD_ADDRESS_DEFAULT
-        assert msg.adv_data == b"HELLOWORLD"
-        assert msg.addr_type == AddressType.RANDOM
-
- 
-@pytest.fixture
-def pdu():
-    """Create a pdu protocol buffer message
-    """
-    msg = Message()
-    msg.ble.pdu.direction = Direction.MASTER_TO_SLAVE
-    msg.ble.pdu.conn_handle = 1
-    msg.ble.pdu.pdu = b"HELLOWORLD"
-    msg.ble.pdu.processed = False
-    msg.ble.pdu.decrypted = False
-    return msg
-
-class TestPduReceived(object):
-    """Test PduReceived message parsing/crafting
-    """
-    
-    def test_parsing(self, pdu):
-        """Check PduReceived parsing
-        """
-        parsed_obj = PduReceived.parse(1, pdu)
-        assert isinstance(parsed_obj, PduReceived)
-        assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
-        assert parsed_obj.conn_handle == 1
-        assert parsed_obj.pdu == b"HELLOWORLD"
-        assert parsed_obj.processed == False
-        assert parsed_obj.decrypted == False
-
-    def test_crafting(self):
-        """Check PduReceived crafting
-        """
-        msg = PduReceived(
-            direction=Direction.SLAVE_TO_MASTER,
-            conn_handle=3,
-            pdu=b"FOOBAR",
-            processed=True,
-            decrypted=True
-        )
-        assert msg.direction == Direction.SLAVE_TO_MASTER
-        assert msg.conn_handle == 3
-        assert msg.pdu == b"FOOBAR"
-        assert msg.processed == True
-        assert msg.decrypted == True
-
-@pytest.fixture
-def raw_pdu():
-    """Create a raw_pdu protocol buffer message
-    """
-    msg = Message()
-    msg.ble.raw_pdu.direction = Direction.MASTER_TO_SLAVE
-    msg.ble.raw_pdu.channel = 10
-    msg.ble.raw_pdu.rssi = -60
-    msg.ble.raw_pdu.timestamp = 1234
-    msg.ble.raw_pdu.relative_timestamp = 10
-    msg.ble.raw_pdu.crc_validity = True
-    msg.ble.raw_pdu.access_address = 0x11223344
-    msg.ble.raw_pdu.pdu = b"HELLOWORLD"
-    msg.ble.raw_pdu.crc = 0xAABBCC
-    msg.ble.raw_pdu.conn_handle = 42
-    msg.ble.raw_pdu.processed = False
-    msg.ble.raw_pdu.decrypted = False
-    return msg
-
-class TestRawPduReceived(object):
-    """Test RawPduReceived message parsing/crafting
-    """
-
-    def test_parsing(self, raw_pdu):
-        """Check RawPduReceived parsing
-        """
-        parsed_obj = RawPduReceived.parse(1, raw_pdu)
-        assert isinstance(parsed_obj, RawPduReceived)
-        assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
-        assert parsed_obj.channel == 10
-        assert parsed_obj.rssi == -60
-        assert parsed_obj.timestamp == 1234
-        assert parsed_obj.relative_timestamp == 10
-        assert parsed_obj.crc_validity == True
-        assert parsed_obj.access_address == 0x11223344
-        assert parsed_obj.pdu == b"HELLOWORLD"
-        assert parsed_obj.crc == 0xAABBCC
-        assert parsed_obj.conn_handle == 42
-        assert parsed_obj.processed == False
-        assert parsed_obj.decrypted == False
-
-    def test_crafting(self):
-        """Check RawPduReceived crafting
-        """
-        msg = RawPduReceived(
-            direction=Direction.SLAVE_TO_MASTER,
-            channel=22,
-            rssi=-10,
-            timestamp=5555,
-            relative_timestamp=12,
-            crc_validity=False,
-            access_address=0x99887766,
-            pdu=b"FOOBAR",
-            crc=0x112233,
-            conn_handle=8,
-            processed=True,
-            decrypted=False
-        )
-        assert msg.direction == Direction.SLAVE_TO_MASTER
-        assert msg.channel == 22
-        assert msg.rssi == -10
-        assert msg.timestamp == 5555
-        assert msg.relative_timestamp == 12
-        assert msg.crc_validity == False
-        assert msg.access_address == 0x99887766
-        assert msg.pdu == b"FOOBAR"
-        assert msg.crc == 0x112233
-        assert msg.conn_handle == 8
-        assert msg.processed == True
-        assert msg.decrypted == False
-
-@pytest.fixture
 def connect():
     """Create a BLE connect protocol buffer message
     """
@@ -945,104 +675,256 @@ class TestDesynchronized(object):
 
 
 @pytest.fixture
-def hijack_master():
-    """Create a BLE hijack_master protocol buffer message
+def injected():
+    """Create a BLE injected protocol buffer message
     """
     msg = Message()
-    msg.ble.hijack_master.access_address = 0x11223344
+    msg.ble.injected.success = True
+    msg.ble.injected.access_address = 0x11223344
+    msg.ble.injected.injection_attempts = 2
     return msg
 
-class TestHijackMaster(object):
-    """Test HijackMaster message parsing/crafting
+class TestInjected(object):
+    """Test Injected message parsing/crafting
     """
 
-    def test_parsing(self, hijack_master):
-        """Check HijackMaster parsing
+    def test_parsing(self, injected):
+        """Check Injected parsing
         """
-        parsed_obj = HijackMaster.parse(1, hijack_master)
-        assert isinstance(parsed_obj, HijackMaster)
-        assert parsed_obj.access_address == 0x11223344
-
-    def test_crafting(self):
-        """Check HijackMaster crafting
-        """
-        msg = HijackMaster(access_address=0x99887766)
-        assert msg.access_address == 0x99887766
-
-@pytest.fixture
-def hijack_slave():
-    """Create a BLE hijack_slave protocol buffer message
-    """
-    msg = Message()
-    msg.ble.hijack_slave.access_address = 0x11223344
-    return msg
-
-class TestHijackSlave(object):
-    """Test HijackSlave message parsing/crafting
-    """
-
-    def test_parsing(self, hijack_slave):
-        """Check HijackSlave parsing
-        """
-        parsed_obj = HijackSlave.parse(1, hijack_slave)
-        assert isinstance(parsed_obj, HijackSlave)
-        assert parsed_obj.access_address == 0x11223344
-
-    def test_crafting(self):
-        """Check HijackSlave crafting
-        """
-        msg = HijackSlave(access_address=0x99887766)
-        assert msg.access_address == 0x99887766
-
-@pytest.fixture
-def hijack_both():
-    """Create a BLE hijack_both protocol buffer message
-    """
-    msg = Message()
-    msg.ble.hijack_both.access_address = 0x11223344
-    return msg
-
-class TestHijackBoth(object):
-    """Test HijackBoth message parsing/crafting
-    """
-
-    def test_parsing(self, hijack_both):
-        """Check HijackBoth parsing
-        """
-        parsed_obj = HijackBoth.parse(1, hijack_both)
-        assert isinstance(parsed_obj, HijackBoth)
-        assert parsed_obj.access_address == 0x11223344
-
-    def test_crafting(self):
-        """Check HijackBoth crafting
-        """
-        msg = HijackBoth(access_address=0x99887766)
-        assert msg.access_address == 0x99887766
-
-@pytest.fixture
-def hijacked():
-    """Create a BLE hijacked protocol buffer message
-    """
-    msg = Message()
-    msg.ble.hijacked.success = True
-    msg.ble.hijacked.access_address = 0x11223344
-    return msg
-
-class TestHijacked(object):
-    """Test Hijacked message parsing/crafting
-    """
-
-    def test_parsing(self, hijacked):
-        """Check Hijacked parsing
-        """
-        parsed_obj = Hijacked.parse(1, hijacked)
-        assert isinstance(parsed_obj, Hijacked)
-        assert parsed_obj.access_address == 0x11223344
+        parsed_obj = Injected.parse(1, injected)
+        assert isinstance(parsed_obj, Injected)
         assert parsed_obj.success == True
+        assert parsed_obj.access_address == 0x11223344
+        assert parsed_obj.injection_attempts == 2
 
     def test_crafting(self):
-        """Check Hijacked crafting
+        """Check Injected crafting
         """
-        msg = Hijacked(success=False, access_address=0x99887766)
-        assert msg.access_address == 0x99887766
+        msg = Injected(success=False, access_address=0x99887766, injection_attempts=1)
         assert msg.success == False
+        assert msg.access_address == 0x99887766
+        assert msg.injection_attempts == 1
+
+###
+# BLE Domain parsing
+###
+
+class TestBleDomainParsing(object):
+    """Test BLE domain message parsing
+    """
+
+    def test_set_bd_addr_parsing(self, set_bd_addr):
+        """Check SetBdAddress message parsing
+        """
+        msg = BleDomain.parse(1, set_bd_addr)
+        assert isinstance(msg, SetBdAddress)
+
+    def test_sniff_adv_parsing(self, sniff_adv):
+        """Check SniffAdv message parsing
+        """
+        msg = BleDomain.parse(1, sniff_adv)
+        assert isinstance(msg, SniffAdv)
+
+    def test_sniff_connreq_parsing(self, sniff_connreq):
+        """Check SniffConnReq message parsing
+        """
+        msg = BleDomain.parse(1, sniff_connreq)
+        assert isinstance(msg, SniffConnReq)
+
+    def test_sniff_aa_parsing(self, sniff_aa):
+        """Check SniffAccessAddress message parsing
+        """
+        msg = BleDomain.parse(1, sniff_aa)
+        assert isinstance(msg, SniffAccessAddress)
+
+    def test_sniff_conn_parsing(self, sniff_conn):
+        """Check SniffActiveConn message parsing
+        """
+        msg = BleDomain.parse(1, sniff_conn)
+        assert isinstance(msg, SniffActiveConn)
+
+    def test_aa_disc_parsing(self, aa_disc):
+        """Check AccessAddressDiscovered message parsing
+        """
+        msg = BleDomain.parse(1, aa_disc)
+        assert isinstance(msg, AccessAddressDiscovered)
+
+    def test_jam_adv_parsing(self, jam_adv):
+        """Check JamAdv message parsing
+        """
+        msg = BleDomain.parse(1, jam_adv)
+        assert isinstance(msg, JamAdv)
+
+    def test_jam_adv_chan_parsing(self, jam_adv_chan):
+        """Check JamAdvChan message parsing
+        """
+        msg = BleDomain.parse(1, jam_adv_chan)
+        assert isinstance(msg, JamAdvChan)
+
+    def test_jam_conn_parsing(self, jam_conn):
+        """Check JamConn message parsing
+        """
+        msg = BleDomain.parse(1, jam_conn)
+        assert isinstance(msg, JamConn)
+
+    def test_reactive_jam_parsing(self, reactive_jam):
+        """Check ReactiveJam message parsing
+        """
+        msg = BleDomain.parse(1, reactive_jam)
+        assert isinstance(msg, ReactiveJam)
+
+    def test_scan_mode_parsing(self, scan_mode):
+        """Check ScanMode message parsing
+        """
+        msg = BleDomain.parse(1, scan_mode)
+        assert isinstance(msg, ScanMode)
+
+    def test_adv_mode_parsing(self, adv_mode):
+        """Check AdvMode message parsing
+        """
+        msg = BleDomain.parse(1, adv_mode)
+        assert isinstance(msg, AdvMode)
+
+    def test_central_mode_parsing(self, central_mode):
+        """Check CentralMode message parsing
+        """
+        msg = BleDomain.parse(1, central_mode)
+        assert isinstance(msg, CentralMode)
+
+    def test_periph_mode_parsing(self, periph_mode):
+        """Check PeriphMode message parsing
+        """
+        msg = BleDomain.parse(1, periph_mode)
+        assert isinstance(msg, PeriphMode)
+
+    def test_start_parsing(self, start):
+        """Check Start message parsing
+        """
+        msg = BleDomain.parse(1, start)
+        assert isinstance(msg, Start)
+
+    def test_stop_parsing(self, stop):
+        """Check Stop message parsing
+        """
+        msg = BleDomain.parse(1, stop)
+        assert isinstance(msg, Stop)
+
+    def test_set_adv_data_parsing(self, set_adv_data):
+        """Check SetAdvData message parsing
+        """
+        msg = BleDomain.parse(1, set_adv_data)
+        assert isinstance(msg, SetAdvData)
+
+    def test_send_raw_pdu_parsing(self, send_raw_pdu):
+        """Check SendRawPdu message parsing
+        """
+        msg = BleDomain.parse(1, send_raw_pdu)
+        assert isinstance(msg, SendRawPdu)
+
+    def test_send_pdu_parsing(self, send_pdu):
+        """Check SendPdu message parsing
+        """
+        msg = BleDomain.parse(1, send_pdu)
+        assert isinstance(msg, SendPdu)
+
+    def test_adv_pdu_parsing(self, adv_pdu):
+        """Check AdvPduReceived message parsing
+        """
+        msg = BleDomain.parse(1, adv_pdu)
+        assert isinstance(msg, AdvPduReceived)
+
+    def test_pdu_parsing(self, pdu):
+        """Check PduReceived message parsing
+        """
+        msg = BleDomain.parse(1, pdu)
+        assert isinstance(msg, PduReceived)
+
+    def test_raw_pdu_parsing(self, raw_pdu):
+        """Check RawPduReceived message parsing
+        """
+        msg = BleDomain.parse(1, raw_pdu)
+        assert isinstance(msg, RawPduReceived)
+
+    def test_connect_parsing(self, connect):
+        """Check ConnectTo message parsing
+        """
+        msg = BleDomain.parse(1, connect)
+        assert isinstance(msg, ConnectTo)
+
+    def test_disconnect_parsing(self, disconnect):
+        """Check Disconnect message parsing
+        """
+        msg = BleDomain.parse(1, disconnect)
+        assert isinstance(msg, Disconnect)
+
+    def test_connected_parsing(self, connected):
+        """Check Connected message parsing
+        """
+        msg = BleDomain.parse(1, connected)
+        assert isinstance(msg, Connected)
+
+    def test_synchronized_parsing(self, synchronized):
+        """Check Synchronized message parsing
+        """
+        msg = BleDomain.parse(1, synchronized)
+        assert isinstance(msg, Synchronized)
+
+    def test_disconnected_parsing(self, disconnected):
+        """Check Disconnected message parsing
+        """
+        msg = BleDomain.parse(1, disconnected)
+        assert isinstance(msg, Disconnected)
+
+    def test_desynchronized_parsing(self, desynchronized):
+        """Check Desynchronized message parsing
+        """
+        msg = BleDomain.parse(1, desynchronized)
+        assert isinstance(msg, Desynchronized)
+
+    def test_hijack_master_parsing(self, hijack_master):
+        """Check HijackMaster message parsing
+        """
+        msg = BleDomain.parse(1, hijack_master)
+        assert isinstance(msg, HijackMaster)
+
+    def test_hijack_slave_parsing(self, hijack_slave):
+        """Check HijackSlave message parsing
+        """
+        msg = BleDomain.parse(1, hijack_slave)
+        assert isinstance(msg, HijackSlave)
+
+    def test_hijack_both_parsing(self, hijack_both):
+        """Check HijackBoth message parsing
+        """
+        msg = BleDomain.parse(1, hijack_both)
+        assert isinstance(msg, HijackBoth)
+
+    def test_hijacked_parsing(self, hijacked):
+        """Check Hijacked message parsing
+        """
+        msg = BleDomain.parse(1, hijacked)
+        assert isinstance(msg, Hijacked)
+
+    def test_prep_seq_manual_parsing(self, prep_seq_manual):
+        """Check PrepareSequenceManual message parsing
+        """
+        msg = BleDomain.parse(1, prep_seq_manual)
+        assert isinstance(msg, PrepareSequenceManual)
+
+    def test_prep_seq_connevt_parsing(self, prep_seq_connevt):
+        """Check PrepareSequenceConnEvt message parsing
+        """
+        msg = BleDomain.parse(1, prep_seq_connevt)
+        assert isinstance(msg, PrepareSequenceConnEvt)
+
+    def test_prep_seq_pattern_parsing(self, prep_seq_reception):
+        """Check PrepareSequencePattern message parsing
+        """
+        msg = BleDomain.parse(1, prep_seq_reception)
+        assert isinstance(msg, PrepareSequencePattern)
+
+    def test_injected_parsing(self, injected):
+        """Check Injected message parsing
+        """
+        msg = BleDomain.parse(1, injected)
+        assert isinstance(msg, Injected)
