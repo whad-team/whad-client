@@ -4,7 +4,7 @@ import pytest
 
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import JamAdvCmd, CentralModeCmd, StartCmd, StopCmd
-from whad.protocol.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
+from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     SniffAccessAddress, SniffActiveConn, AccessAddressDiscovered, JamAdv, \
     JamAdvChan,JamConn, ScanMode, AdvMode, CentralMode, PeriphMode, SetAdvData, \
     SendRawPdu, SendPdu, AdvPduReceived,AddressType, \

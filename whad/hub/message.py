@@ -1,46 +1,62 @@
-"""WHAD Protocol Hub
+"""WHAD protocol message abstraction
 """
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.hub.message import HubMessage
-from .exceptions import UnsupportedVersionException
+from whad.hub.registry import Registry
 
-class Registry(object):
-    """Protocol message versions registry.
+class HubMessage(object):
+    """Main class from which any ProtocolHub message derives from.
     """
 
-    VERSIONS = {}
+    def __init__(self,  message: Message = None):
+        if message is None:
+            self.__msg = Message()
+        else:
+            self.__msg = message
 
-    @classmethod
-    def add_node_version(parent_class, version: int, name: str, clazz):
-        """Add a specific class `clazz` to our message registry for version
-        `version` with alias `name`.
+    def serialize(self):
+        return self.__msg.SerializeToString()
+
+    def set_field_value(self, path: str, value):
+        """Set a message field value.
         """
-        # If version is unknown, create it
-        if version not in Registry.VERSIONS:
-            parent_class.VERSIONS[version] = {}
+        path_nodes = path.split('.')
+        root_node = self.message
+        for node in path_nodes[:-1]:
+            root_node = getattr(root_node, node)
 
-        # Add clazz based on provided alias for this version
-        parent_class.VERSIONS[version][name] = clazz
-
-    @classmethod
-    def bound(parent_class, name: str = None, version: int = 1):
-        """Retrieve the given node class `name` for version `version`.
-
-        If there is no defined class for version N, look for a corresponding
-        class in version N-1, N-2 until 0.
+        if hasattr(root_node, path_nodes[-1]):
+            # If we are dealing with a PB array, we cannot set its value but
+            # need to call extend() to add our array items.
+            if isinstance(value, list):
+                getattr(root_node, path_nodes[-1]).extend(value)
+            else:
+                setattr(root_node, path_nodes[-1], value)
+        else:
+            raise IndexError()
+        
+    def get_field_value(self, path: str):
+        """Get a message field value.
         """
-        # Look for node class from given name and version
-        if version in parent_class.VERSIONS:
-            if name in parent_class.VERSIONS[version]:
-                return parent_class.VERSIONS[version][name]
+        # Walk to the penultimate field
+        path_nodes = path.split('.')
+        root_node = self.message
 
-        if version > 1:
-            # If not found for version N, look for node class in version N-1
-            return parent_class.bound(name, version - 1)
-            
-        # If not found, raise exception
-        raise UnsupportedVersionException()
-
+        for node in path_nodes[:-1]:
+            if hasattr(root_node, node):
+                root_node = getattr(root_node, node)
+            else:
+                raise IndexError()
+        
+        # Return the final field
+        if hasattr(root_node, path_nodes[-1]):
+            return getattr(root_node, path_nodes[-1])
+        else:
+            raise IndexError()
+    
+    @property
+    def message(self):
+        return self.__msg
+    
 
 class pb_bind(object):
     """Decorator to add a versioned subclass to a registry.
@@ -174,7 +190,7 @@ class PbMessageWrapper(HubMessage):
         """
         return parent_class(message=message)
 
-
+'''
 class ProtocolHub(Registry):
     """WHAD Protocol Hub class
 
@@ -203,4 +219,4 @@ class ProtocolHub(Registry):
         return ProtocolHub.bound(
             msg.WhichOneof('msg'),
             self.__version).parse(self.__version, msg)
-
+'''

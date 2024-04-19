@@ -1,9 +1,8 @@
 """WHAD Protocol BLE jamming messages abstraction layer.
 """
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.hub import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
-    PbFieldBool
-from whad.protocol.hub.ble import BleDomain
+from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper
+from whad.hub.ble import BleDomain
 
 @pb_bind(BleDomain, 'connect', 1)
 class ConnectTo(PbMessageWrapper):

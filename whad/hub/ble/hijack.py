@@ -1,8 +1,8 @@
 """WHAD Protocol BLE hijacking messages abstraction layer.
 """
 
-from whad.protocol.hub import pb_bind, PbFieldInt, PbMessageWrapper, PbFieldBool
-from whad.protocol.hub.ble import BleDomain
+from whad.hub.message import pb_bind, PbFieldInt, PbMessageWrapper, PbFieldBool
+from whad.hub.ble import BleDomain
 
 @pb_bind(BleDomain, "hijack_master", 1)
 class HijackMaster(PbMessageWrapper):

@@ -3,8 +3,8 @@
 
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import DeviceResetQuery, DeviceReadyResp
-from whad.protocol.hub import pb_bind, PbMessageWrapper
-from whad.protocol.hub.discovery import Discovery
+from whad.hub.message import pb_bind, PbMessageWrapper
+from whad.hub.discovery import Discovery
 
 @pb_bind(Discovery, 'reset_query', 1)
 class ResetQuery(PbMessageWrapper):

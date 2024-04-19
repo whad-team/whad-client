@@ -1,7 +1,7 @@
 """WHAD Protocol Generic message abstraction layer.
 """
-from whad.protocol.hub.message import HubMessage
-from whad.protocol.hub import pb_bind, Registry, ProtocolHub
+from whad.hub.message import HubMessage, pb_bind, Registry
+from whad.hub import ProtocolHub
 
 @pb_bind(ProtocolHub, name='generic', version=1)
 class Generic(Registry):

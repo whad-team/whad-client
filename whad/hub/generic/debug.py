@@ -1,7 +1,7 @@
 """WHAD Protocol Generic Debug message abstraction layer.
 """
-from whad.protocol.hub import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper
-from whad.protocol.hub.generic import Generic
+from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper
+from whad.hub.generic import Generic
 
 @pb_bind(Generic, 'debug', 1)
 class Debug(PbMessageWrapper):

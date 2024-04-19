@@ -3,7 +3,7 @@
 import pytest
 
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.hub.ble import HijackMaster, HijackSlave, HijackBoth, Hijacked
+from whad.hub.ble import HijackMaster, HijackSlave, HijackBoth, Hijacked
 
 @pytest.fixture
 def hijack_master():

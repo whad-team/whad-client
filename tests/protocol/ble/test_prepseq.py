@@ -4,7 +4,7 @@ import pytest
 
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import PrepareSequenceCmd
-from whad.protocol.hub.ble import Direction, PrepareSequenceManual, \
+from whad.hub.ble import Direction, PrepareSequenceManual, \
     PrepareSequenceConnEvt, PrepareSequencePattern
 
 @pytest.fixture

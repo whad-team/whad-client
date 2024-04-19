@@ -4,7 +4,7 @@ import pytest
 
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import DeviceResetQuery, DeviceReadyResp
-from whad.protocol.hub.discovery import Discovery, InfoQuery, InfoQueryResp, DomainInfoQuery, \
+from whad.hub.discovery import Discovery, InfoQuery, InfoQueryResp, DomainInfoQuery, \
     DomainInfoQueryResp, SetSpeed, ResetQuery, DeviceReady
 
 

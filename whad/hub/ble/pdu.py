@@ -2,9 +2,9 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import CentralModeCmd
-from whad.protocol.hub import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
+from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool
-from whad.protocol.hub.ble import BleDomain
+from whad.hub.ble import BleDomain
 
 @pb_bind(BleDomain, "set_adv_data", 1)
 class SetAdvData(PbMessageWrapper):

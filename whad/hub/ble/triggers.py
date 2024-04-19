@@ -2,9 +2,9 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import PrepareSequenceCmd
-from whad.protocol.hub import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
-    PbFieldBool, PbFieldArray, Registry, HubMessage
-from whad.protocol.hub.ble import BleDomain
+from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
+    PbFieldArray, Registry, HubMessage
+from whad.hub.ble import BleDomain
 
 class IPacketSequence:
     """Packet Sequence interface class

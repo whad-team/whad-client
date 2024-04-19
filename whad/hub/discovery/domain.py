@@ -1,10 +1,7 @@
 """WHAD Protocol Discovery info messages abstraction layer.
 """
-from whad.protocol.whad_pb2 import Message
-from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.hub.message import HubMessage
-from whad.protocol.hub import pb_bind, PbFieldInt, PbMessageWrapper
-from whad.protocol.hub.discovery import Discovery
+from whad.hub.message import pb_bind, PbFieldInt, PbMessageWrapper
+from whad.hub.discovery import Discovery
 
 @pb_bind(Discovery, 'domain_query', 1)
 class DomainInfoQuery(PbMessageWrapper):

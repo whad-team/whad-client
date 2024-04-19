@@ -3,9 +3,9 @@
 
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.hub.generic import Generic, \
+from whad.hub.generic import Generic, \
     Progress, Debug, Verbose
-from whad.protocol.hub.generic.cmdresult import Success, Error, ParameterError, \
+from whad.hub.generic.cmdresult import Success, Error, ParameterError, \
     WrongMode, Disconnected, Busy, UnsupportedDomain, CommandResult
 
 

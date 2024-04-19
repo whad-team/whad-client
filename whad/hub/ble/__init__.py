@@ -2,11 +2,13 @@
 """
 from typing import List
 
-from whad.protocol.ble.ble_pb2 import BleDirection, BleAdvType, BleAddrType
-from whad.protocol.hub.message import HubMessage
-from whad.protocol.hub import pb_bind, Registry, ProtocolHub
 from whad.ble.bdaddr import BDAddress
 from whad.ble.chanmap import ChannelMap
+
+from whad.protocol.ble.ble_pb2 import BleDirection, BleAdvType, BleAddrType
+from whad.hub.registry import Registry
+from whad.hub.message import HubMessage, pb_bind
+from whad.hub import ProtocolHub
 
 class Direction:
     """BLE PDU direction
@@ -639,7 +641,7 @@ class BleDomain(Registry):
         return BleDomain.bound("injected", self.proto_version)(
             access_address=access_address,
             success=success,
-            attempts=attempts
+            injection_attempts=attempts
         )
 
     def createHijackMaster(self, access_address: int) -> HubMessage:

@@ -3,7 +3,7 @@
 import pytest
 
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.hub.ble import SendRawPdu, Direction, SendPdu, AdvPduReceived, \
+from whad.hub.ble import SendRawPdu, Direction, SendPdu, AdvPduReceived, \
     AdvType, AddressType, PduReceived, RawPduReceived, SetAdvData
 
 BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])

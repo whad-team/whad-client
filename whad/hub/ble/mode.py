@@ -2,9 +2,8 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import CentralModeCmd, StartCmd, StopCmd
-from whad.protocol.hub import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
-    PbFieldBool
-from whad.protocol.hub.ble import BleDomain
+from whad.hub.message import pb_bind, PbFieldBytes, PbMessageWrapper, PbFieldBool
+from whad.hub.ble import BleDomain
 
 @pb_bind(BleDomain, 'scan_mode', 1)
 class ScanMode(PbMessageWrapper):

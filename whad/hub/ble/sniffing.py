@@ -1,9 +1,9 @@
 """WHAD Protocol BLE sniffing messages abstraction layer.
 """
 
-from whad.protocol.hub import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
+from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool
-from whad.protocol.hub.ble import BleDomain
+from whad.hub.ble import BleDomain
 
 @pb_bind(BleDomain, 'sniff_adv', 1)
 class SniffAdv(PbMessageWrapper):
