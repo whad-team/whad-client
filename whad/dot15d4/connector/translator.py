@@ -56,13 +56,17 @@ class Dot15d4MessageTranslator(object):
 
         if Dot15d4FCS in packet:
             msg.dot15d4.send_raw.channel = channel
-            pdu = bytes(packet)[:-2]
+            if hasattr(packet, "reserved"):
+                packet.reserved = packet.reserved
+            pdu = (packet.do_build())[:-2]
             msg.dot15d4.send_raw.pdu = pdu
             msg.dot15d4.send_raw.fcs = packet.fcs
 
         elif Dot15d4 in packet:
             msg.dot15d4.send.channel = channel
-            pdu = bytes(packet)
+            if hasattr(packet, "reserved"):
+                packet.reserved = packet.reserved
+            pdu = (packet.do_build())
             msg.dot15d4.send.pdu = pdu
         else:
             # Raw MAC

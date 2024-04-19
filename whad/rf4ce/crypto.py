@@ -64,6 +64,7 @@ class RF4CECryptoManager:
         (packet.do_build())
         start_of_payload = 2 if packet.frame_type in (1,3) else 1
         ciphertext = bytes(packet[RF4CE_Hdr:][start_of_payload:])
+        #print(ciphertext.hex())
         return ciphertext, pack("<I", packet.mic)
 
     def extractPlaintextPayload(self, packet):
@@ -201,16 +202,17 @@ class RF4CECryptoManager:
                 cropping_length = len(plaintext)
             else:
                 cropping_length = len(plaintext) + 4
+
             packet.reserved = 1
             header = bytes(packet)[:-cropping_length]
-            header = bytes([0b00000100 ^ header[0]]) + header[1:]
-            #packet.security_enabled = 1
 
             if rf4ce_only:
-                packet = bytes(header + ciphertext + mic)
+                packet = RF4CE_Hdr(header + ciphertext + mic)
             else:
                 packet = Dot15d4(header + ciphertext +  mic)
+
             # Set the security flag and force a rebuild
+            packet.security_enabled = 1
 
             return packet
 

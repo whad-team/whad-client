@@ -8,7 +8,9 @@ from whad.rf4ce.stack.nwk.pairing import PairingEntry
 from whad.rf4ce.crypto import generate_random_value, xor, RF4CECryptoManager
 from whad.scapy.layers.rf4ce import RF4CE_Command_Hdr, RF4CE_Cmd_Discovery_Request, \
     RF4CE_Hdr, RF4CE_Cmd_Key_Seed, RF4CE_Cmd_Pair_Request, RF4CE_Cmd_Pair_Response, \
-    RF4CE_Cmd_Discovery_Response, RF4CE_Cmd_Ping_Request, RF4CE_Cmd_Ping_Response
+    RF4CE_Cmd_Discovery_Response, RF4CE_Cmd_Ping_Request, RF4CE_Cmd_Ping_Response, \
+    RF4CE_Data_Hdr, RF4CE_Vendor_Hdr, \
+    RF4CE_Vendor_MSO_Hdr, RF4CE_Vendor_MSO_Check_Validation_Response
 from whad.common.stack import Layer, alias, source, state
 
 from random import randint
@@ -38,21 +40,176 @@ class NWKDataService(NWKService):
         super().__init__(manager, name="nwk_data")
 
 
-    def on_data_npdu(self, npdu, link_quality=255):
+
+    @Dot15d4Service.request("NLDE-DATA")
+    def data(self, nsdu, pairing_reference=None, profile_id=0, vendor_id=0x0000, tx_options=0):
+        """
+        Request transmitting NSDU according to the provided parameters.
+        """
+        broadcast = bool(tx_options & 1)
+        ieee_dest_mode = bool((tx_options & (1 << 1)) >> 1)
+        ack_mode = bool((tx_options & (1 << 2)) >> 2)
+        security_mode = bool((tx_options & (1 << 3)) >> 3)
+        channel_agility = bool((tx_options & (1 << 4)) >> 4)
+        channel_normalization = bool((tx_options & (1 << 5)) >> 5)
+        vendor_mode = bool((tx_options & (1 << 6)) >> 6)
+
+        frame_counter = self.database.get("nwkFrameCounter")
+        if frame_counter == 0xffffffff:
+            # frame counter expired, terminate without further processing
+            return False
+
+        self.database.set("nwkFrameCounter", frame_counter + 1)
+
+        if vendor_mode:
+            npdu = (
+                RF4CE_Hdr(
+                    security_enabled = security_mode,
+                    frame_counter = frame_counter,
+                    reserved = 1,
+                    protocol_version = 1
+                ) /
+                RF4CE_Vendor_Hdr(
+                    profile_id = profile_id,
+                    vendor_id = vendor_id
+                ) /
+                nsdu
+            )
+        else:
+            npdu = (
+                RF4CE_Hdr(
+                    security_enabled = security_mode,
+                    frame_counter = frame_counter,
+                    reserved = 1,
+                    protocol_version = 1
+                ) /
+                RF4CE_Data_Hdr(
+                    profile_id = profile_id,
+                    vendor_id = vendor_id
+                ) /
+                nsdu
+            )
+
+        pairing_table = self.database.get('nwkPairingTable')
+        try:
+            if pairing_reference is not None:
+                pairing_entry = pairing_table[pairing_reference]
+            else:
+                pairing_entry = None
+        except IndexError:
+            pairing_entry = None
+
+        if broadcast:
+            destination_pan_id = 0xFFFF
+            destination_address = 0xFFFF
+
+        else:
+            if pairing_entry is not None:
+                destination_pan_id = pairing_entry.destination_pan_id
+                destination_address = pairing_entry.destination_ieee_address if ieee_dest_mode else pairing_entry.destination_network_address
+                source_address = pairing_entry.source_network_address
+            else:
+                # no entry
+                return False
+
+        if pairing_entry is not None:
+            channel = pairing_entry.channel
+        else:
+            channel = self.manager.get_layer('phy').get_channel()
+
+        if security_mode:
+            if pairing_entry is not None and pairing_entry.link_key is not None:
+                link_key = pairing_entry.link_key
+                npdu.show()
+
+                enc_npdu = RF4CECryptoManager(
+                    key = pairing_entry.link_key
+                ).encrypt(
+                    npdu,
+                    destination=pack('<Q', self.manager.get_layer('mac').database.get('macExtendedAddress')),
+                    source=pack('<Q', pairing_entry.destination_ieee_address),
+                    rf4ce_only=True
+                )
+                npdu = enc_npdu
+                enc_npdu.show()
+            else:
+                return False
+
+        if ack_mode:
+            ack = self.manager.get_layer('mac').get_service("data").data(
+                npdu,
+                destination_address_mode=MACAddressMode.EXTENDED if ieee_dest_mode else MACAddressMode.SHORT,
+                source_address_mode=MACAddressMode.SHORT,
+                destination_pan_id=destination_pan_id,
+                destination_address=destination_address,
+                pan_id_suppressed = False,
+                wait_for_ack=True
+            )
+            return ack
+        else:
+            self.manager.get_layer('mac').get_service("data").data(
+                npdu,
+                destination_address_mode=MACAddressMode.EXTENDED if ieee_dest_mode else MACAddressMode.SHORT,
+                source_address_mode=MACAddressMode.SHORT,
+                destination_pan_id=destination_pan_id,
+                destination_address=destination_address,
+                pan_id_suppressed = False,
+                wait_for_ack=False
+            )
+            return True
+
+    def on_data_npdu(self, npdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality=255):
         """
         Callback processing NPDU from NWK manager.
 
         It forwards the NPDU to indicate_data method.
         """
-        npdu.show()
-        self.indicate_data(npdu, link_quality=link_quality)
+        self.indicate_data(npdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality)
+        # this is just a dirty test, remove that asap
+        print(
+            self.data(
+                RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Check_Validation_Response(
+                    check_validation_status=0
+                ),
+                pairing_reference = npdu.pairing_entry_index,
+                profile_id = 0xc0,
+                vendor_id = 4417,
+                tx_options = (
+                 0 | (0 << 1) | (1 << 2) | (1 << 3) | (0 << 4)| (0 << 5) | (1 << 6)
+                )
+            )
+        )
 
     @Dot15d4Service.indication("NLDE-DATA")
-    def indicate_data(self, npdu, link_quality=255):
+    def indicate_data(self, npdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality=255):
         """
-        Indication transmitting NPDU to upper layer.
+        Indication transmitting NSDU to upper layer.
         """
-        pass
+        npdu.show()
+        if RF4CE_Data_Hdr in npdu:
+            nsdu = npdu[RF4CE_Data_Hdr][1:]
+        elif RF4CE_Vendor_Hdr in npdu:
+            nsdu = npdu[RF4CE_Vendor_Hdr][1:]
+        else:
+            nsdu = npdu
+
+        rx_flags = (
+            int(destination_address == 0xffff) |
+            (int(npdu.security_enabled) << 1) |
+            (int(npdu.frame_type == 3) << 2)
+        )
+
+        return (
+            npdu,
+            {
+                "pairing_reference" : npdu.pairing_entry_index,
+                "profile_id" : npdu.profile_id,
+                "vendor_id" : npdu.vendor_id if hasattr(npdu, "vendor_id") else None,
+                "link_quality" : link_quality,
+                "rx_flags" : rx_flags
+            }
+        )
+
 
 
 class NWKManagementService(NWKService):
@@ -151,14 +308,13 @@ class NWKManagementService(NWKService):
             wait_for_ack=True
         )
         if not ack or not accept:
-            print("invalid", ack, accept)
             pairing_table = self.database.get("nwkPairingTable")
             del pairing_table[pairing_reference]
             self.database.set("nwkPairingTable", pairing_table)
             return False
         else:
             if ((pairing_entry.capabilities >> 2) & 1) == 1 and security_capable == 1:
-                print("sec en")
+
                 # security enabled
                 # Step 1: generate random 128 bit link key
                 link_key = generate_random_value(128)
@@ -180,9 +336,7 @@ class NWKManagementService(NWKService):
                     value = xor(seed, value)
 
                 seeds.append(value)
-                print("SEEDS")
-                for seed in seeds:
-                    print(seed.hex())
+
                 for n in range(key_exchange_transfer_count + 1):
 
                     frame_counter = self.database.get("nwkFrameCounter")
@@ -251,8 +405,6 @@ class NWKManagementService(NWKService):
                 )
                 source_ieee_address = self.manager.get_layer('mac').database.get("macExtendedAddress")
 
-                decryptor = RF4CECryptoManager(pairing_entry.link_key)
-
                 source_address_formatted = pack('<Q', pairing_entry.destination_ieee_address)
                 destination_address_formatted = pack('<Q', source_ieee_address)
 
@@ -261,8 +413,8 @@ class NWKManagementService(NWKService):
                     key = pairing_entry.link_key
                 ).encrypt(
                     ping_resp,
-                    destination=destination_address_formatted,
-                    source=source_address_formatted,
+                    destination=source_address_formatted,
+                    source=destination_address_formatted,
                     rf4ce_only=True
                 )
 
@@ -275,7 +427,9 @@ class NWKManagementService(NWKService):
                     pan_id_suppressed = False,
                     wait_for_ack=True
                 )
-                return True
+                if ack:
+                    pairing_entry.mark_as_active()
+                return ack
 
             else:
                 # no security
@@ -331,7 +485,6 @@ class NWKManagementService(NWKService):
             pairing_reference = pairing_table.index(pairing_entry)
             # Do we update something here ? specification is unclear
         else:
-            print(">><", hex(destination_address), hex(source_address))
             # Create a new Pairing Entry here
             pairing_entry = PairingEntry(
                 source_network_address = self.manager.get_layer('mac').database.get("macShortAddress"),
@@ -642,14 +795,17 @@ class NWKManager(Dot15d4Manager):
         Callback processing MAC MCPS Data indication.
         """
         print()
-
+        pdu.pairing_entry_index = None
         if pdu.security_enabled == 1:
             # if security is enable, check if we have enough info in pairing table
             pairing_table = self.database.get("nwkPairingTable")
             pairing_entry = None
             for candidate_pairing_entry in pairing_table:
                 if (
-                    candidate_pairing_entry.destination_ieee_address == source_address and
+                    (
+                        candidate_pairing_entry.destination_ieee_address == source_address or
+                        candidate_pairing_entry.destination_network_address == source_address
+                    ) and
                     isinstance(candidate_pairing_entry.link_key, bytes) and
                     candidate_pairing_entry.is_active()
                 ):
@@ -667,14 +823,17 @@ class NWKManager(Dot15d4Manager):
                 decrypted_packet, success = decryptor.decrypt(pdu, source=source_address, destination=destination_address, rf4ce_only=True)
                 if success:
                     pdu = decrypted_packet
+                    pdu.pairing_entry_index = pairing_table.index(pairing_entry)
                 else:
                     return
 
-        #pdu.show()
+
 
         if pdu.frame_type == 1:
-            self.get_service('data').on_data_npdu(pdu, link_quality)
+            self.get_service('data').on_data_npdu(pdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality)
         elif pdu.frame_type == 2:
             self.get_service('management').on_command_npdu(pdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality)
+        elif pdu.frame_type == 3:
+            self.get_service('data').on_data_npdu(pdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality)
 
 #NWKManager.add(APSManager)
