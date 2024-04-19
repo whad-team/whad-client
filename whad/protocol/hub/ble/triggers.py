@@ -34,7 +34,6 @@ class PrepareSequenceManual(PbMessageWrapper, IPacketSequence):
 
     sequence_id = PbFieldInt("ble.prepare.id")
     direction = PbFieldInt("ble.prepare.direction")
-    direction = PbFieldInt("ble.prepare.direction")
     packets = PbFieldArray("ble.prepare.sequence")
 
     def __init__(self, **kwargs):
@@ -47,7 +46,6 @@ class PrepareSequenceConnEvt(PbMessageWrapper, IPacketSequence):
     """
     sequence_id = PbFieldInt("ble.prepare.id")
     direction = PbFieldInt("ble.prepare.direction")
-    direction = PbFieldInt("ble.prepare.direction")
     packets = PbFieldArray("ble.prepare.sequence")
     connection_event = PbFieldInt("ble.prepare.trigger.connection_event.connection_event")
 
@@ -57,7 +55,6 @@ class PrepareSequencePattern(PbMessageWrapper, IPacketSequence):
     """BLE prepare sequence with reception pattern trigger message class
     """
     sequence_id = PbFieldInt("ble.prepare.id")
-    direction = PbFieldInt("ble.prepare.direction")
     direction = PbFieldInt("ble.prepare.direction")
     packets = PbFieldArray("ble.prepare.sequence")
     pattern = PbFieldBytes("ble.prepare.trigger.reception.pattern")
