@@ -4,6 +4,9 @@ from whad.dot15d4.address import Dot15d4Address
 from whad.common.monitors import WiresharkMonitor
 from whad.exceptions import WhadDeviceNotFound
 from scapy.compat import raw
+from whad.scapy.layers.rf4ce import RF4CE_Vendor_MSO_Hdr, \
+    RF4CE_Vendor_MSO_Get_Attribute_Response, RF4CE_Vendor_MSO_Check_Validation_Response
+
 from random import randint
 import sys
 import logging
@@ -42,6 +45,26 @@ if __name__ == '__main__':
                 pairing_reference=0
             )
             input()
+            while True:
+                
+                input()
+                '''
+                print('success')
+                while not target.stack.get_layer('nwk').get_service('data').data(
+                    RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Check_Validation_Response(
+                        check_validation_status=0
+                    ),
+                    pairing_reference = 0,
+                    profile_id = 0xc0,
+                    vendor_id = 4417,
+                    tx_options = (
+                     0 | (1 << 1) | (0 << 2) | (1 << 3) | (0 << 4)| (0 << 5) | (1 << 6)
+                    )
+                ):
+                    pass
+
+                input()
+                '''
             #target.discovery_response(True, destination_address="C4:19:D1:AE:35:0D:70:02")
         except (KeyboardInterrupt, SystemExit):
             dev.close()
