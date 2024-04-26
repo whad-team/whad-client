@@ -12,6 +12,7 @@ from whad.scapy.layers.rf4ce import RF4CE_Command_Hdr, RF4CE_Cmd_Discovery_Reque
     RF4CE_Data_Hdr, RF4CE_Vendor_Hdr, RF4CE_Vendor_MSO_Get_Attribute_Response, \
     RF4CE_Vendor_MSO_Hdr, RF4CE_Vendor_MSO_Check_Validation_Response
 from whad.common.stack import Layer, alias, source, state
+from whad.rf4ce.stack.apl import APLManager
 
 from random import randint
 from time import time, sleep
@@ -170,39 +171,35 @@ class NWKDataService(NWKService):
         self.indicate_data(npdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality)
         # this is just a dirty test, remove that asap
         if hasattr(npdu, "value_length"):
-            for _ in range (3):
+            sleep(0.4)
 
-                self.data(
-                    RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Get_Attribute_Response(
-                        attribute_identifier = 0xDC,
-                        index = 0,
-                        value_length = 4,
-                        value = b"\xF0\xF0\xF0\xF0"
-                    ),
-                    pairing_reference = npdu.pairing_entry_index,
-                    profile_id = 0xc0,
-                    vendor_id = 4417,
-                    tx_options = (
-                     0 | (1 << 1) | (0 << 2) | (1 << 3) | (0 << 4)| (0 << 5) | (1 << 6)
-                    )
+            self.data(
+                RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Get_Attribute_Response(
+                    attribute_identifier = 0xDC,
+                    index = 0,
+                    value_length = 4,
+                    value = b"\xF0\xF0\xF0\xF0"
+                ),
+                pairing_reference = npdu.pairing_entry_index,
+                profile_id = 0xc0,
+                vendor_id = 4417,
+                tx_options = (
+                 0 | (1 << 1) | (0 << 2) | (1 << 3) | (0 << 4)| (0 << 5) | (1 << 6)
                 )
+            )
         else:
-            if not hasattr(self, "code"):
-                self.code = 0xc0
-            else:
-                self.code = 0
-            for _ in range (3):
-                self.data(
-                    RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Check_Validation_Response(
-                        check_validation_status=self.code
-                    ),
-                    pairing_reference = npdu.pairing_entry_index,
-                    profile_id = 0xc0,
-                    vendor_id = 4417,
-                    tx_options = (
-                     0 | (1 << 1) | (0 << 2) | (1 << 3) | (0 << 4)| (0 << 5) | (1 << 6)
-                    )
+            sleep(0.4)
+            self.data(
+                RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Check_Validation_Response(
+                    check_validation_status=0
+                ),
+                pairing_reference = npdu.pairing_entry_index,
+                profile_id = 0xc0,
+                vendor_id = 4417,
+                tx_options = (
+                 0 | (1 << 1) | (0 << 2) | (1 << 3) | (0 << 4)| (0 << 5) | (1 << 6)
                 )
+            )
 
     @Dot15d4Service.indication("NLDE-DATA")
     def indicate_data(self, npdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality=255):
@@ -244,7 +241,7 @@ class NWKManagementService(NWKService):
         super().__init__(manager, name="nwk_management")
 
     @Dot15d4Service.response("NLME-PAIR")
-    def pair_response(self, pan_id, destination_address, application_capability, accept=True, list_of_device_types=[9], list_of_profiles=[192], pairing_reference=None):
+    def pair_response(self, destination_address, accept=True, list_of_device_types=[9], list_of_profiles=[192], pairing_reference=None):
         """
         Reponse allowing to the NWK layer to transmit a pairing response.
         """
@@ -558,7 +555,6 @@ class NWKManagementService(NWKService):
         """
         Indication signaling to the upper layer the occurence of a discovery operation.
         """
-
         node_capability = (
             (pdu.channel_normalization_capable << 3) |
             (pdu.security_capable << 2) |
@@ -571,6 +567,7 @@ class NWKManagementService(NWKService):
             ((pdu.number_of_supported_device_types & 0x02) << 1) |
             pdu.user_string_specificied
         )
+
         return (
             True,
             {
@@ -606,6 +603,9 @@ class NWKManagementService(NWKService):
         """
         Response allowing NWK layer to build and transmit a discovery response.
         """
+        frame_counter = self.database.get("nwkFrameCounter")
+        self.database.set("nwkFrameCounter", frame_counter + 1)
+
         node_capability =  self.database.get("nwkcNodeCapabilities")
         channel_normalization_capable = (node_capability >> 3) & 1
         security_capable = (node_capability >> 2) & 1
@@ -615,7 +615,11 @@ class NWKManagementService(NWKService):
 
         # Build a discovery response
         discovery_response = (
-            RF4CE_Hdr(security_enabled = 0) /
+            RF4CE_Hdr(
+                protocol_version=1,
+                security_enabled=0,
+                frame_counter=frame_counter
+            ) /
             RF4CE_Command_Hdr() /
             RF4CE_Cmd_Discovery_Response(
                 status = int(status),
@@ -809,7 +813,12 @@ class NWKManagementService(NWKService):
         self.add_packet_to_queue(pdu)
 
         if pdu.command_identifier == 1:
+            # If filtering is enabled and link quality is bad, drop
+            lqi_threshold = self.manager.database.get("nwkDiscoveryLQIThreshold")
+            if lqi_threshold not in (0, 0xFF) and link_quality < lqi_threshold:
+                return
             self.indicate_discovery(pdu)
+
         elif pdu.command_identifier == 3:
             self.indicate_pair(pdu)
 
@@ -831,7 +840,6 @@ class NWKManager(Dot15d4Manager):
         """
         Callback processing MAC MCPS Data indication.
         """
-        print()
         pdu.pairing_entry_index = None
         if pdu.security_enabled == 1:
             # if security is enable, check if we have enough info in pairing table
@@ -873,4 +881,4 @@ class NWKManager(Dot15d4Manager):
         elif pdu.frame_type == 3:
             self.get_service('data').on_data_npdu(pdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality)
 
-#NWKManager.add(APSManager)
+NWKManager.add(APLManager)

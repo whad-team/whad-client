@@ -906,11 +906,13 @@ class MACManager(Dot15d4Manager):
         return True
 
 
-    def wait_for_ack(self, timeout=0.3):
+    def wait_for_ack(self, timeout=None):
         """Wait for a ACK or error.
 
         :param float timeout: Timeout value (default: 30 seconds)
         """
+        if timeout is None:
+            timeout = self.database.get("macAckTimeout")
         start_time = time()
         while (time() - start_time) < timeout:
             try:

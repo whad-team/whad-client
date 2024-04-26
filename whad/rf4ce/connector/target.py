@@ -13,7 +13,7 @@ class Target(RF4CE):
     """
     RF4CE Target Node interface for compatible WHAD device.
     """
-    def __init__(self, device):
+    def __init__(self, device, profiles=[]):
         RF4CE.__init__(self, device)
 
         # Check if device can act as target node
@@ -26,12 +26,16 @@ class Target(RF4CE):
         self.__stack = Dot15d4Stack(self)
 
         # Channel initialization
-        self.__channel = 11
+        self.__channel = 15
         self.__channel_page = 0
 
         self.__stack.get_layer('mac').set_extended_address(Dot15d4Address("11:22:33:44:55:66:77:88").value)
         self.__stack.get_layer('mac').set_short_address(Dot15d4Address(0x0384).value)
         self.__stack.get_layer('mac').database.set("macPanId", 0x1234)
+        #self.__stack.get_layer('mac').database.set("macAckTimeout", 0.5)
+
+        for profile in profiles:
+            self.__stack.get_layer('apl').add_profile(profile)
 
         self.enable_reception()
 
@@ -58,7 +62,6 @@ class Target(RF4CE):
             raise UnsupportedCapability("ChannelPageSelection")
         else:
             self.__channel_page = page
-
 
     def auto_discovery(self):
         self.__stack.get_layer('nwk').get_service('management').auto_discovery()

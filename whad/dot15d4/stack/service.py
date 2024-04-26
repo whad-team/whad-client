@@ -18,6 +18,12 @@ class Dot15d4Service:
         self._timeout_exception_class = timeout_exception_class
         self._queue = Queue()
 
+    @property
+    def name(self):
+        """
+        Returns the associated name.
+        """
+        return self._name
 
     @property
     def manager(self):
@@ -25,6 +31,13 @@ class Dot15d4Service:
         Returns the associated manager.
         """
         return self._manager
+
+    @manager.setter
+    def manager(self, manager):
+        """
+        Set the associated manager.
+        """
+        self._manager = manager
 
     @property
     def database(self):

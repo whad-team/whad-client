@@ -30,3 +30,5 @@ class MACPIB(Dot15d4Database):
         self.macResponseWaitTime = 32
 
         self.macLastBeacon = None
+
+        self.macAckTimeout = 0.3
