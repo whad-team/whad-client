@@ -169,6 +169,7 @@ class NWKDataService(NWKService):
         It forwards the NPDU to indicate_data method.
         """
         self.indicate_data(npdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality)
+        return
         # this is just a dirty test, remove that asap
         if hasattr(npdu, "value_length"):
             sleep(0.4)
@@ -206,7 +207,7 @@ class NWKDataService(NWKService):
         """
         Indication transmitting NSDU to upper layer.
         """
-        npdu.show()
+        #npdu.show()
         if RF4CE_Data_Hdr in npdu:
             nsdu = npdu[RF4CE_Data_Hdr][1:]
         elif RF4CE_Vendor_Hdr in npdu:
@@ -453,7 +454,7 @@ class NWKManagementService(NWKService):
                 )
 
                 ack = self.manager.get_layer('mac').get_service("data").data(
-                    enc_ping_resp, #unenc_ping_resp,
+                    unenc_ping_resp, #enc_ping_resp, #unenc_ping_resp,
                     destination_address_mode=MACAddressMode.EXTENDED,
                     source_address_mode=MACAddressMode.EXTENDED,
                     destination_pan_id=0xFFFF,
@@ -873,7 +874,7 @@ class NWKManager(Dot15d4Manager):
                     return
 
 
-
+        pdu.show()
         if pdu.frame_type == 1:
             self.get_service('data').on_data_npdu(pdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality)
         elif pdu.frame_type == 2:

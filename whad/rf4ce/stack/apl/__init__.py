@@ -86,7 +86,7 @@ class APLManager(Dot15d4Manager):
                 profile.on_discovery(status, source_address, node_capability, vendor_identifier, vendor_string, application_capability, user_string, device_type_list, profile_identifier_list, requested_device_type, link_quality)
             else:
                 print("[i] No profile found, dropping.")
-
+    
     @source('nwk', 'NLME-PAIR')
     def on_nlme_pair(self, status, source_pan_id, source_address, node_capability, vendor_identifier, vendor_string, application_capability, user_string, device_type_list, profile_identifier_list, key_exchange_transfer_count, pairing_reference):
         print("[i] Incoming pairing -> status  = ", status)

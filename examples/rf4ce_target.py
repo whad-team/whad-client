@@ -35,18 +35,14 @@ if __name__ == '__main__':
             monitor.start()
             target.start()
 
-            mso.wait_for_binding()
+            #target.auto_discovery()
+            reference = mso.wait_for_binding()
+            if reference is None:
+                print("pairing failure...")
+            else:
+                print(reference)
 
             #target.auto_discovery()
-            input()
-            # temp: let's start a pairing resp here
-            target.stack.get_layer('nwk').get_service('management').pair_response(
-                destination_address=Dot15d4Address("02:70:0D:35:AE:D1:19:C4").value,
-                accept=True,
-                list_of_device_types=[9],
-                list_of_profiles=[192],
-                pairing_reference=0
-            )
             input()
             while True:
 
