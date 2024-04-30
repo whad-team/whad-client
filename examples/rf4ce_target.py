@@ -14,7 +14,10 @@ import logging
 
 def show(pkt):
     if hasattr(pkt, "metadata"):
-        print(pkt.metadata, bytes(pkt).hex(), repr(pkt))
+        print("< ", repr(pkt))
+    else:
+        print("> ", repr(pkt))
+
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -30,20 +33,35 @@ if __name__ == '__main__':
             mso = MSOProfile()
 
             target = Target(dev, profiles=[mso])
+
             target.set_channel(15)
+
+            target.attach_callback(show, on_transmission=True, on_reception=True)
             monitor.attach(target)
             monitor.start()
             target.start()
 
             #target.auto_discovery()
             reference = mso.wait_for_binding()
+
             if reference is None:
                 print("pairing failure...")
             else:
                 print(reference)
 
-            #target.auto_discovery()
-            input()
+            success = True
+            print(mso.wait_for_validation_code(1234))
+            if success:
+                print("ACCEPT !")
+                mso.accept_validation()
+
+                #mso.save_audio("/tmp/out.wav")
+                mso.live_audio()
+            else:
+                print("DENY !")
+                mso.deny_validation()
+
+
             while True:
 
                 input()

@@ -511,7 +511,7 @@ class RF4CE_Vendor_MSO_Check_Validation_Request(Packet):
 
 
 class RF4CE_Vendor_MSO_Check_Validation_Response(Packet):
-    name = "RF4CE Vendor Data - Check Validation Request - MSO Profile"
+    name = "RF4CE Vendor Data - Check Validation Response - MSO Profile"
     fields_desc = [
         ByteEnumField("check_validation_status", None, {
             0x0 : "success",

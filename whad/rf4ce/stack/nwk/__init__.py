@@ -124,7 +124,6 @@ class NWKDataService(NWKService):
         if security_mode:
             if pairing_entry is not None and pairing_entry.link_key is not None:
                 link_key = pairing_entry.link_key
-                print("TX:", repr(npdu))
 
                 enc_npdu = RF4CECryptoManager(
                     key = pairing_entry.link_key
@@ -169,38 +168,6 @@ class NWKDataService(NWKService):
         It forwards the NPDU to indicate_data method.
         """
         self.indicate_data(npdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality)
-        return
-        # this is just a dirty test, remove that asap
-        if hasattr(npdu, "value_length"):
-            sleep(0.4)
-
-            self.data(
-                RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Get_Attribute_Response(
-                    attribute_identifier = 0xDC,
-                    index = 0,
-                    value_length = 4,
-                    value = b"\xF0\xF0\xF0\xF0"
-                ),
-                pairing_reference = npdu.pairing_entry_index,
-                profile_id = 0xc0,
-                vendor_id = 4417,
-                tx_options = (
-                 0 | (1 << 1) | (0 << 2) | (1 << 3) | (0 << 4)| (0 << 5) | (1 << 6)
-                )
-            )
-        else:
-            sleep(0.4)
-            self.data(
-                RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Check_Validation_Response(
-                    check_validation_status=0
-                ),
-                pairing_reference = npdu.pairing_entry_index,
-                profile_id = 0xc0,
-                vendor_id = 4417,
-                tx_options = (
-                 0 | (1 << 1) | (0 << 2) | (1 << 3) | (0 << 4)| (0 << 5) | (1 << 6)
-                )
-            )
 
     @Dot15d4Service.indication("NLDE-DATA")
     def indicate_data(self, npdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality=255):
@@ -801,7 +768,7 @@ class NWKManagementService(NWKService):
                     except NWKTimeoutException:
                         pass
                 sleep(self.database.get("nwkDiscoveryRepetitionInterval") / (50000 * (10**6)))
-                print("end...")
+
         return node_descriptors
 
     def on_command_npdu(self, pdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality=255):
@@ -873,8 +840,6 @@ class NWKManager(Dot15d4Manager):
                 else:
                     return
 
-
-        pdu.show()
         if pdu.frame_type == 1:
             self.get_service('data').on_data_npdu(pdu, source_address, destination_address, source_pan_id, destination_pan_id, link_quality)
         elif pdu.frame_type == 2:

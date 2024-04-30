@@ -28,7 +28,7 @@ class APLManager(Dot15d4Manager):
         """
         Add a profile to the APL manager.
         """
-        print("[i] Adding profile (",profile.profile_id ,profile.name ,")")
+        # print("[i] Adding profile (",profile.profile_id ,profile.name ,")")
         self.profiles[profile.profile_id] = profile
         self.add_service(profile.name, profile)
         profile.attach(self)
@@ -51,22 +51,25 @@ class APLManager(Dot15d4Manager):
 
     @source('nwk', 'NLDE-DATA')
     def on_nlde_data(self, npdu, pairing_reference, profile_id, vendor_id, link_quality, rx_flags):
+        '''
         print("[i] Incoming data at APL layer", repr(npdu))
         print("    | -> pairing_reference", pairing_reference)
         print("    | -> profile_id", hex(profile_id))
         print("    | -> vendor_id", hex(vendor_id))
         print("    | -> link_quality", link_quality)
         print("    | -> rx_flags", rx_flags)
-
+        '''
         profile = self.get_profile_by_profile_id(npdu.profile_id)
         if profile is not None:
-            print("[i] Forwarding to profile ", profile.name)
+            #print("[i] Forwarding to profile ", profile.name)
             profile.on_data(npdu, pairing_reference, vendor_id, link_quality, rx_flags)
         else:
-            print("[i] No profile found, dropping.")
+            pass
+            #print("[i] No profile found, dropping.")
 
     @source('nwk', 'NLME-DISCOVERY')
     def on_nlme_discovery(self, status, source_address, node_capability, vendor_identifier, vendor_string, application_capability, user_string, device_type_list, profile_identifier_list, requested_device_type, link_quality):
+        '''
         print("[i] Incoming discovery -> status  = ", status)
         print("    | -> source_address", hex(source_address))
         print("    | -> node_capability", node_capability)
@@ -78,17 +81,19 @@ class APLManager(Dot15d4Manager):
         print("    | -> profile_identifier_list", profile_identifier_list)
         print("    | -> requested_device_type", requested_device_type)
         print("    | -> link_quality", link_quality)
-
+        '''
         for profile_id in profile_identifier_list:
             profile = self.get_profile_by_profile_id(profile_id)
             if profile is not None:
-                print("[i] Forwarding to profile ", profile.name)
+                #print("[i] Forwarding to profile ", profile.name)
                 profile.on_discovery(status, source_address, node_capability, vendor_identifier, vendor_string, application_capability, user_string, device_type_list, profile_identifier_list, requested_device_type, link_quality)
             else:
-                print("[i] No profile found, dropping.")
-    
+                pass
+                #print("[i] No profile found, dropping.")
+
     @source('nwk', 'NLME-PAIR')
     def on_nlme_pair(self, status, source_pan_id, source_address, node_capability, vendor_identifier, vendor_string, application_capability, user_string, device_type_list, profile_identifier_list, key_exchange_transfer_count, pairing_reference):
+        '''
         print("[i] Incoming pairing -> status  = ", status)
         print("    | -> source_address", hex(source_address))
         print("    | -> node_capability", node_capability)
@@ -100,20 +105,24 @@ class APLManager(Dot15d4Manager):
         print("    | -> profile_identifier_list", profile_identifier_list)
         print("    | -> key_exchange_transfer_count", key_exchange_transfer_count)
         print("    | -> pairing_reference", pairing_reference)
-
+        '''
         for profile_id in profile_identifier_list:
             profile = self.get_profile_by_profile_id(profile_id)
             if profile is not None:
-                print("[i] Forwarding to profile ", profile.name)
+                #print("[i] Forwarding to profile ", profile.name)
                 profile.on_pair(status, source_pan_id, source_address, node_capability, vendor_identifier, vendor_string, application_capability, user_string, device_type_list, profile_identifier_list, key_exchange_transfer_count, pairing_reference)
             else:
-                print("[i] No profile found, dropping.")
+                pass
+                #print("[i] No profile found, dropping.")
 
 
     @source('nwk', 'NLME-COMM-STATUS')
     def on_nlme_comm_status(self, status, pairing_reference, pan_id, destination_address_mode, destination_address):
+        '''
         print("[i] Incoming communication status -> status = ", status)
         print("    | -> pairing_reference", pairing_reference)
         print("    | -> pan_id", hex(pan_id))
         print("    | -> destination_address_mode", destination_address_mode)
         print("    | -> destination_address", hex(destination_address))
+        '''
+        pass
