@@ -39,6 +39,14 @@ class ProtocolHub(Registry):
     @property
     def ble(self):
         return self.get('ble')
+    
+    @property
+    def dot15d4(self):
+        return self.get('dot15d4')
+
+    @property
+    def phy(self):
+        return self.get('phy')
 
     def get(self, factory: str):
         return ProtocolHub.bound(factory, self.__version)(self.__version)
@@ -58,3 +66,5 @@ class ProtocolHub(Registry):
 from .generic import Generic
 from .discovery import Discovery
 from .ble import BleDomain
+from .dot15d4 import Dot15d4Domain
+from .phy import PhyDomain
