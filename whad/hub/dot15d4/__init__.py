@@ -208,7 +208,110 @@ class Dot15d4Domain(Registry):
             pdu=pdu,
             fcs=fcs
         )
+    
+    def createJammed(self, timestamp: int) -> HubMessage:
+        """Create a jammed notification.
 
+        :param timestamp: Timestamp when jamming is successful
+        :type timestamp: int
+        :return: instance of `Jammed`
+        """
+        return Dot15d4Domain.bound('jammed', self.proto_version)(
+            timestamp=timestamp
+        )
+
+    def createEnergyDetectionSample(self, timestamp: int, sample: int) -> HubMessage:
+        """Create an energy detection sample notification message.
+
+        :param timestamp: Timestamp at wich the sample has been computed
+        :type timestamp: int
+        :param sample: Computed sample
+        :type sample: int
+        :return: instance of `EnergyDetectionSample`
+        """
+        return Dot15d4Domain.bound('ed_sample', self.proto_version)(
+            timestamp=timestamp,
+            sample=sample
+        )
+    
+    def createRawPduReceived(self, channel: int, pdu: bytes, fcs: int, rssi: int = None, \
+                             timestamp: int = None, fcs_validity: bool = None, \
+                             lqi: int = None):
+        """Create a received PDU notification message.
+
+        :param channel: Channel on which the PDU has been received
+        :type channel: int
+        :param pdu: Received PDU
+        :type pdu: bytes
+        :param fcs: Frame Check Sequence
+        :type fcs: int
+        :param rssi: Received signal strength indicator
+        :type rssi: int, optional
+        :param timestamp: Timestamp at which the PDU has been received
+        :type timestamp: int, optional
+        :param fcs_validity: Specify if the FCS field is valid or not
+        :type fcs_validity: bool, optional
+        :param lqi: Link Quality indicator
+        :type lqi: int, optional
+        :return: instance of `RawPduReceived`
+        """
+        # Create our RawPduReceived message with mandatory fields
+        msg = Dot15d4Domain.bound('raw_pdu', self.proto_version)(
+            channel=channel,
+            pdu=pdu,
+            fcs=fcs
+        )
+
+        # Add optional fields if they are provided
+        if rssi is not None:
+            msg.rssi = rssi
+        if timestamp is not None:
+            msg.timestamp = timestamp
+        if fcs_validity is not None:
+            msg.fcs_validity = fcs_validity
+        if lqi is not None:
+            msg.lqi = lqi
+
+        # Return the generated message
+        return msg
+
+    def createPduReceived(self, channel: int, pdu: bytes, rssi: int = None, \
+                             timestamp: int = None, fcs_validity: bool = None, \
+                             lqi: int = None):
+        """Create a received PDU notification message.
+
+        :param channel: Channel on which the PDU has been received
+        :type channel: int
+        :param pdu: Received PDU
+        :type pdu: bytes
+        :param rssi: Received signal strength indicator
+        :type rssi: int, optional
+        :param timestamp: Timestamp at which the PDU has been received
+        :type timestamp: int, optional
+        :param fcs_validity: Specify if the FCS field is valid or not
+        :type fcs_validity: bool, optional
+        :param lqi: Link Quality indicator
+        :type lqi: int, optional
+        :return: instance of `RawPduReceived`
+        """
+        # Create our PduReceived message with mandatory fields
+        msg = Dot15d4Domain.bound('pdu', self.proto_version)(
+            channel=channel,
+            pdu=pdu,
+        )
+
+        # Add optional fields if they are provided
+        if rssi is not None:
+            msg.rssi = rssi
+        if timestamp is not None:
+            msg.timestamp = timestamp
+        if fcs_validity is not None:
+            msg.fcs_validity = fcs_validity
+        if lqi is not None:
+            msg.lqi = lqi
+
+        # Return the generated message
+        return msg
 
 from .address import SetNodeAddress
 from .mode import SniffMode, RouterMode, EndDeviceMode, CoordMode, EnergyDetectionMode, \

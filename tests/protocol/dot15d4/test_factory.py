@@ -5,7 +5,8 @@ import pytest
 from whad.protocol.whad_pb2 import Message
 from whad.hub.dot15d4 import Dot15d4Domain, SetNodeAddress, NodeAddressShort, NodeAddressExt, \
     NodeAddress, NodeAddressType, SniffMode, JamMode, EnergyDetectionMode, EndDeviceMode, \
-    RouterMode, CoordMode, Start, Stop, MitmRole, MitmMode, SendPdu, SendRawPdu
+    RouterMode, CoordMode, Start, Stop, MitmRole, MitmMode, SendPdu, SendRawPdu, Jammed, \
+    EnergyDetectionSample, RawPduReceived, PduReceived
 
 class TestDot15d4DomainFactory(object):
     """Test Dot15d4 factory
@@ -108,3 +109,45 @@ class TestDot15d4DomainFactory(object):
         assert msg.channel == 15
         assert msg.pdu == b"FOOBAR"
         assert msg.fcs == 0xAABB
+
+    def test_jammed(self, factory: Dot15d4Domain):
+        """Test creation of Jammed notification message
+        """
+        msg = factory.createJammed(1234)
+        assert isinstance(msg, Jammed)
+        assert msg.timestamp == 1234
+
+    def test_energy_detect_sample(self, factory: Dot15d4Domain):
+        """Test creation of EnergyDetectionSample notification message
+        """
+        msg = factory.createEnergyDetectionSample(1234, 9000)
+        assert isinstance(msg, EnergyDetectionSample)
+        assert msg.timestamp == 1234
+        assert msg.sample == 9000
+
+    def test_raw_pdu_received(self, factory: Dot15d4Domain):
+        """Test creation of RawPduReceived notification message
+        """
+        msg = factory.createRawPduReceived(12, b"HELLOWORLD", 0x1234, rssi=-40, \
+                                           fcs_validity=True, lqi=10)
+        assert isinstance(msg, RawPduReceived)
+        assert msg.channel == 12
+        assert msg.pdu == b"HELLOWORLD"
+        assert msg.fcs == 0x1234
+        assert msg.rssi == -40
+        assert msg.timestamp is None
+        assert msg.fcs_validity == True
+        assert msg.lqi == 10
+    
+    def test_pdu_received(self, factory: Dot15d4Domain):
+        """Test creation of RawPduReceived notification message
+        """
+        msg = factory.createPduReceived(12, b"HELLOWORLD", timestamp=1234, rssi=-40, \
+                                           fcs_validity=False, lqi=10)
+        assert isinstance(msg, PduReceived)
+        assert msg.channel == 12
+        assert msg.pdu == b"HELLOWORLD"
+        assert msg.rssi == -40
+        assert msg.timestamp == 1234
+        assert msg.fcs_validity == False
+        assert msg.lqi == 10
