@@ -13,9 +13,9 @@ from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
     PrepareSequencePattern, Injected
 
-from test_hijack import hijack_master, hijack_slave, hijack_both, hijacked
-from test_pdu import send_pdu, send_raw_pdu, raw_pdu, pdu, adv_pdu, set_adv_data
-from test_prepseq import prep_seq_manual, prep_seq_connevt, prep_seq_reception
+from tests.protocol.ble.test_ble_hijack import hijack_master, hijack_slave, hijack_both, hijacked
+from tests.protocol.ble.test_ble_pdu import send_pdu, send_raw_pdu, raw_pdu, pdu, adv_pdu, set_adv_data
+from tests.protocol.ble.test_ble_prepseq import prep_seq_manual, prep_seq_connevt, prep_seq_reception
 
 BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])
 

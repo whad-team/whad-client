@@ -7,13 +7,13 @@ from whad.hub.phy import PhyDomain, SetAskMod, SetBpskMod, SetFskMod, SetGfskMod
     SendPacket, SendRawPacket, PacketReceived, RawPacketReceived, SchedulePacket, SchedulePacketResponse, \
     ScheduledPacketSent
 
-from test_mod import set_ask_mod, set_bpsk_mod, set_fsk_mod, set_gfsk_mod, set_lora_mod, \
+from test_phy_mod import set_ask_mod, set_bpsk_mod, set_fsk_mod, set_gfsk_mod, set_lora_mod, \
     set_msk_mod, set_qpsk_mod, set_4fsk_mod
-from test_freq import set_freq, supp_freq_ranges, get_supp_freqs
-from test_mode import set_sniff_mode, set_jam_mode, set_monitor_mode, start, stop
-from test_packet import set_datarate, set_endianness, set_packet_size, set_sync_word, set_txpower, \
+from test_phy_freq import set_freq, supp_freq_ranges, get_supp_freqs
+from test_phy_mode import set_sniff_mode, set_jam_mode, set_monitor_mode, start, stop
+from test_phy_packet import set_datarate, set_endianness, set_packet_size, set_sync_word, set_txpower, \
     send_packet, send_raw_packet, raw_packet_received, packet_received
-from test_schedule import schedule_packet_send, schedule_packet_sent, schedule_packet_resp
+from test_phy_schedule import schedule_packet_send, schedule_packet_sent, schedule_packet_resp
 
 class TestPhyParsing(object):
     """Test parsing of PHY messages.

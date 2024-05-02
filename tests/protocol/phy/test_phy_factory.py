@@ -8,7 +8,7 @@ from whad.hub.phy import PhyDomain, SetAskMod, SetBpskMod, SetFskMod, SetGfskMod
     SetFreq, GetSupportedFreqs, SupportedFreqRanges, SniffMode, JamMode, Jammed, \
     MonitorMode, MonitoringReport, Jamming, SetDatarate, SetEndianness, SetPacketSize, \
     SetTxPower, SetSyncWord, TxPower, SendPacket, SendRawPacket, PacketReceived, \
-    RawPacketReceived, Timestamp
+    RawPacketReceived, Timestamp, ScheduledPacketSent, SchedulePacket, SchedulePacketResponse
 
 class TestPhyDomainFactory(object):
     """Test PHY factory
@@ -211,3 +211,28 @@ class TestPhyDomainFactory(object):
         assert msg.timestamp.usec == 9876
         assert len(msg.iq) == 4
         assert msg.iq[1] == 2
+
+    def test_sched_send(self, factory: PhyDomain):
+        """Check creation of SchedulePacket message
+        """
+        msg = factory.createSchedulePacket(b"HELLOWORLD", Timestamp(1234, 9876))
+        assert isinstance(msg, SchedulePacket)
+        assert msg.packet == b"HELLOWORLD"
+        assert msg.timestamp.sec == 1234
+        assert msg.timestamp.usec == 9876
+
+    def test_sched_pkt_resp(self, factory: PhyDomain):
+        """Check creation of SchedulePacketResponse message
+        """
+        msg = factory.createSchedulePacketResponse(12, False)
+        assert isinstance(msg, SchedulePacketResponse)
+        assert msg.id == 12
+        assert msg.full == False
+
+    def test_sched_pkt_sent(self, factory: PhyDomain):
+        """Check creation of ScheduledPacketSent message
+        """
+        msg = factory.createSchedulePacketSent(12)
+        assert isinstance(msg, ScheduledPacketSent)
+        assert msg.id == 12
+

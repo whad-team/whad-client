@@ -9,7 +9,7 @@ from whad.hub.dot15d4 import Dot15d4Domain, SetNodeAddress, SniffMode, JamMode, 
     RouterMode, EndDeviceMode, CoordMode, EnergyDetectionMode, MitmMode, Start, \
     Stop, Jammed, EnergyDetectionSample, SendPdu, SendRawPdu, PduReceived, RawPduReceived
 
-from test_pdu import send_pdu, send_raw_pdu, pdu_received, raw_pdu_received
+from test_dot15d4_pdu import send_pdu, send_raw_pdu, pdu_received, raw_pdu_received
 
 EXT_NODE_ADDRESS_DEFAULT = 0x1122334455667788
 SHORT_NODE_ADDRESS_DEFAULT = 0xAABB
