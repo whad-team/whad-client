@@ -1,4 +1,4 @@
-"""WHAD Protocol Bluetooth Low Energy domain message abstraction layer.
+"""WHAD Protocol 802.15.4 domain message abstraction layer.
 """
 from typing import List
 
