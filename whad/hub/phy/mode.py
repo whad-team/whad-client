@@ -5,6 +5,8 @@ from whad.protocol.phy.phy_pb2 import MonitorCmd, StartCmd, StopCmd
 from ..message import pb_bind, PbFieldInt, PbFieldBool, PbFieldMsg, PbFieldArray, PbMessageWrapper
 from . import PhyDomain
 
+from .timestamp import Timestamp
+
 @pb_bind(PhyDomain, 'sniff', 1)
 class SniffMode(PbMessageWrapper):
     """PHY Sniff mode message
@@ -24,7 +26,7 @@ class Jammed(PbMessageWrapper):
     """PHY Jammed notification message
     """
 
-    timestamp = PbFieldMsg('phy.jammed.timestamp')
+    timestamp = PbFieldMsg('phy.jammed.timestamp', Timestamp)
 
 @pb_bind(PhyDomain, 'monitor', 1)
 class MonitorMode(PbMessageWrapper):
