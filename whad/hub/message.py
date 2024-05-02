@@ -60,7 +60,17 @@ class PbFieldBool(PbField):
     def __init__(self, path: str, optional: bool = False):
         """Create a PB field model for bools.
         """
-        super().__init__(path, bool, optional=optional)     
+        super().__init__(path, bool, optional=optional)
+
+class PbFieldMsg(PbField):
+    """Protocol buffers message field model
+    """
+
+    def __init__(self, path: str, optional: bool = False):
+        """Create a PB field model for messages.
+        """
+        super().__init__(path, object, optional=optional)
+
 
 class HubMessage(object):
     """Main class from which any ProtocolHub message derives from.
