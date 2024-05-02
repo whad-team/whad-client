@@ -3,6 +3,65 @@
 from whad.protocol.whad_pb2 import Message
 from whad.hub.registry import Registry
 
+class PbField(object):
+    """Protocol Buffers field model
+    """
+
+    def __init__(self, path: str, field_type, optional=False):
+        self.__path = path
+        self.__type = field_type
+        self.__optional = optional
+
+    @property
+    def path(self):
+        return self.__path
+    
+    def is_optional(self):
+        """Determine if this field is optional
+        """
+        return self.__optional
+    
+    def update(self, message: Message):
+        """Update field in protobuf message
+        """
+        pass
+
+class PbFieldInt(PbField):
+    """Protocol buffers integer field model
+    """
+
+    def __init__(self, path: str, optional: bool = False):
+        """Create a PB field model for integer.
+        """
+        super().__init__(path, int, optional=optional)
+
+class PbFieldBytes(PbField):
+    """Protocol buffers bytes field model
+    """
+    
+    def __init__(self, path:  str, optional: bool = False):
+        """Create a PB field model for bytes
+        """
+        super().__init__(path, bytes, optional=optional)
+
+class PbFieldArray(PbField):
+    """Protocol buffers array field model
+    """
+
+    def __init__(self, path: str, optional: bool = False):
+        """Create a PB field model for arrays.
+        """
+        super().__init__(path, list, optional=optional)
+
+class PbFieldBool(PbField):
+    """Protocol buffers bool field model
+    """
+
+    def __init__(self, path: str, optional: bool = False):
+        """Create a PB field model for bools.
+        """
+        super().__init__(path, bool, optional=optional)     
+
 class HubMessage(object):
     """Main class from which any ProtocolHub message derives from.
     """
@@ -16,10 +75,10 @@ class HubMessage(object):
     def serialize(self):
         return self.__msg.SerializeToString()
 
-    def set_field_value(self, path: str, value):
+    def set_field_value(self, field: PbField, value):
         """Set a message field value.
         """
-        path_nodes = path.split('.')
+        path_nodes = field.path.split('.')
         root_node = self.message
         for node in path_nodes[:-1]:
             root_node = getattr(root_node, node)
@@ -34,11 +93,11 @@ class HubMessage(object):
         else:
             raise IndexError()
         
-    def get_field_value(self, path: str):
+    def get_field_value(self, field: PbField):
         """Get a message field value.
         """
         # Walk to the penultimate field
-        path_nodes = path.split('.')
+        path_nodes = field.path.split('.')
         root_node = self.message
 
         for node in path_nodes[:-1]:
@@ -49,7 +108,10 @@ class HubMessage(object):
         
         # Return the final field
         if hasattr(root_node, path_nodes[-1]):
-            return getattr(root_node, path_nodes[-1])
+            if field.is_optional() and not root_node.HasField(path_nodes[-1]):
+                return None
+            else:
+                return getattr(root_node, path_nodes[-1])
         else:
             raise IndexError()
     
@@ -72,60 +134,7 @@ class pb_bind(object):
         """
         self.__registry.add_node_version(self.__version, self.__name, clazz)
         return clazz
-
-
-class PbField(object):
-    """Protocol Buffers field model
-    """
-
-    def __init__(self, path: str, field_type):
-        self.__path = path
-        self.__type = field_type
-
-    @property
-    def path(self):
-        return self.__path
-    
-    def update(self, message: Message):
-        """Update field in protobuf message
-        """
-        pass
-
-class PbFieldInt(PbField):
-    """Protocol buffers integer field model
-    """
-
-    def __init__(self, path: str):
-        """Create a PB field model for integer.
-        """
-        super().__init__(path, int)
-
-class PbFieldBytes(PbField):
-    """Protocol buffers bytes field model
-    """
-    
-    def __init__(self, path:  str):
-        """Create a PB field model for bytes
-        """
-        super().__init__(path, bytes)
-
-class PbFieldArray(PbField):
-    """Protocol buffers array field model
-    """
-
-    def __init__(self, path: str):
-        """Create a PB field model for arrays.
-        """
-        super().__init__(path, list)
-
-class PbFieldBool(PbField):
-    """Protocol buffers bool field model
-    """
-
-    def __init__(self, path: str):
-        """Create a PB field model for bools.
-        """
-        super().__init__(path, bool)        
+   
 
 class PbMessageWrapper(HubMessage):
     """Protocol Buffers message wrapper
@@ -155,7 +164,7 @@ class PbMessageWrapper(HubMessage):
                     if not callable(prop_obj):
                         # check field type
                         if isinstance(prop_obj, PbField):
-                            self.__pb_fields[prop] = prop_obj.path
+                            self.__pb_fields[prop] = prop_obj
                 except AttributeError:
                     pass
 
