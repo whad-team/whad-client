@@ -388,8 +388,8 @@ class PhyDomain(Registry):
         if rssi is not None:
             msg.rssi = rssi
         if timestamp is not None:
-            msg.ts_sec = timestamp.sec
-            msg.ts_usec = timestamp.usec
+            msg.timestamp.sec = timestamp.sec
+            msg.timestamp.usec = timestamp.usec
         
         # Success
         return msg
@@ -417,14 +417,60 @@ class PhyDomain(Registry):
         if rssi is not None:
             msg.rssi = rssi
         if timestamp is not None:
-            msg.ts_sec = timestamp.sec
-            msg.ts_usec = timestamp.usec
+            msg.timestamp.sec = timestamp.sec
+            msg.timestamp.usec = timestamp.usec
         if iq is not None:
             for sample in iq:
                 msg.iq.append(sample)
         
         # Success
         return msg
+    
+    def createSchedulePacket(self, packet: bytes, timestamp: Timestamp) -> HubMessage:
+        """Create a SchedulePacket message
+
+        :param packet: Packet data
+        :type packet: bytes
+        :param timestamp: Timestamp at which the packet has to be sent
+        :type timestamp: Timestamp
+        :return: instance of `SchedulePacket`
+        """
+        # Create message
+        msg = PhyDomain.bound('sched_send', self.proto_version)(
+            packet=packet,
+        )
+
+        # Set timestamp value
+        msg.timestamp.sec = timestamp.sec
+        msg.timestamp.usec = timestamp.usec
+
+        # Return message
+        return msg
+    
+    def createSchedulePacketResponse(self, packet_id: int, full: bool = False) -> HubMessage:
+        """Create a SchedulePacketResponse message
+
+        :param packet_id: Packet ID
+        :type packet_id: int
+        :param full: Set to True to indicate the schedule packet queue is full
+        :type full: bool, optional
+        :return: instance of `SchedulePacketResponse`
+        """
+        return PhyDomain.bound('sched_pkt_rsp', self.proto_version)(
+            id=packet_id,
+            full=full
+        )
+    
+    def createSchedulePacketSent(self, packet_id: int) -> HubMessage:
+        """Create a SchedulePacketSent notification message
+
+        :param packet_id: Packet id that has been sent
+        :type packet_id: int
+        :return: instance of SchedulePacketSent
+        """
+        return PhyDomain.bound('sched_pkt_sent', self.proto_version)(
+            id=packet_id
+        )
 
 from .mod import SetAskMod, SetBpskMod, SetFskMod, SetGfskMod, SetLoRaMod, \
     SetMskMod, SetQpskMod, Set4FskMod

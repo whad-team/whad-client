@@ -16,6 +16,10 @@ class PbField(object):
     def path(self):
         return self.__path
     
+    @property
+    def type(self):
+        return self.__type
+    
     def is_optional(self):
         """Determine if this field is optional
         """
@@ -66,10 +70,10 @@ class PbFieldMsg(PbField):
     """Protocol buffers message field model
     """
 
-    def __init__(self, path: str, optional: bool = False):
+    def __init__(self, path: str, wrap_class, optional: bool = False):
         """Create a PB field model for messages.
         """
-        super().__init__(path, object, optional=optional)
+        super().__init__(path, wrap_class, optional=optional)
 
 
 class HubMessage(object):
@@ -118,10 +122,13 @@ class HubMessage(object):
         
         # Return the final field
         if hasattr(root_node, path_nodes[-1]):
-            if field.is_optional() and not root_node.HasField(path_nodes[-1]):
-                return None
+            if isinstance(field, PbFieldMsg):
+                return field.type(getattr(root_node, path_nodes[-1]))
             else:
-                return getattr(root_node, path_nodes[-1])
+                if field.is_optional() and not root_node.HasField(path_nodes[-1]):
+                    return None
+                else:
+                    return getattr(root_node, path_nodes[-1])
         else:
             raise IndexError()
     

@@ -5,6 +5,8 @@ from whad.protocol.phy.phy_pb2 import SetBPSKModulationCmd
 from ..message import pb_bind, PbFieldInt, PbFieldBytes,PbFieldArray, PbFieldMsg, PbMessageWrapper
 from . import PhyDomain
 
+from .timestamp import Timestamp
+
 @pb_bind(PhyDomain, 'datarate', 1)
 class SetDatarate(PbMessageWrapper):
     """PHY Datarate setting message
@@ -63,10 +65,7 @@ class PacketReceived(PbMessageWrapper):
     frequency = PbFieldInt('phy.packet.frequency')
     packet = PbFieldBytes('phy.packet.packet')
     rssi = PbFieldInt('phy.packet.rssi', optional=True)
-    timestamp = PbFieldMsg('phy.packet.timestamp', optional=True)
-    # TODO: workaround to allow timestamp to be set even if optional
-    ts_sec = PbFieldInt('phy.packet.timestamp.sec')
-    ts_usec = PbFieldInt('phy.packet.timestamp.usec')
+    timestamp = PbFieldMsg('phy.packet.timestamp', Timestamp, optional=True)
 
 @pb_bind(PhyDomain, 'raw_packet', 1)
 class RawPacketReceived(PbMessageWrapper):
@@ -77,7 +76,4 @@ class RawPacketReceived(PbMessageWrapper):
     packet = PbFieldBytes('phy.raw_packet.packet')
     rssi = PbFieldInt('phy.raw_packet.rssi', optional=True)
     iq = PbFieldArray('phy.raw_packet.iq')
-    timestamp = PbFieldMsg('phy.raw_packet.timestamp', optional=True)
-    # TODO: workaround to allow timestamp to be set even if optional
-    ts_sec = PbFieldInt('phy.raw_packet.timestamp.sec')
-    ts_usec = PbFieldInt('phy.raw_packet.timestamp.usec')
+    timestamp = PbFieldMsg('phy.raw_packet.timestamp', Timestamp, optional=True)
