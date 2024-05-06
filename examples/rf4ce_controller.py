@@ -1,5 +1,6 @@
 from whad.device import WhadDevice
 from whad.rf4ce import Controller
+from whad.dot15d4.address import Dot15d4Address
 from whad.common.monitors import WiresharkMonitor
 from whad.exceptions import WhadDeviceNotFound
 from scapy.compat import raw
@@ -30,7 +31,14 @@ if __name__ == '__main__':
 
             print(controller.discovery())
             input()
+            controller.set_channel(15)
+            print(controller.stack.get_layer('nwk').get_service('management').pair_request(
+                destination_pan_id=0x269a,
+                destination_ieee_address=Dot15d4Address("c4:19:d1:59:d2:a7:92:c5").value
+                )
+            )
             #target.discovery_response(True, destination_address="C4:19:D1:AE:35:0D:70:02")
+            input()
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 

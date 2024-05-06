@@ -31,9 +31,7 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             mso = MSOProfile()
-
             target = Target(dev, profiles=[mso])
-
             target.set_channel(15)
 
             target.attach_callback(show, on_transmission=True, on_reception=True)

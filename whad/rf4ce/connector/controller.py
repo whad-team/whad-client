@@ -26,7 +26,7 @@ class Controller(RF4CE):
         self.__stack = Dot15d4Stack(self)
 
         # Channel initialization
-        self.__channel = 11
+        self.__channel = 15
         self.__channel_page = 0
 
         self.enable_reception()
