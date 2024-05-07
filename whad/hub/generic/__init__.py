@@ -8,6 +8,8 @@ class Generic(Registry):
     """WHAD Generic message parser/factory.
     """
 
+    VERSIONS = {}
+
     def __init__(self, version: int):
         self.proto_version = version
 
@@ -89,4 +91,8 @@ from .progress import Progress
 
 __all__ = [
     'Generic',
+    'CommandResult',
+    'Debug',
+    'Verbose',
+    'Progress'
 ]

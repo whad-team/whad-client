@@ -64,6 +64,8 @@ class Dot15d4Domain(Registry):
     """WHAD Dot15d4 domain messages parser/factory.
     """
 
+    VERSIONS = {}
+
     def __init__(self, version: int):
         """Initializes a Dot15d4 domain instance
         """
@@ -334,5 +336,11 @@ __all__ = [
     'PduReceived',
     'RawPduReceived',
     'Jammed',
-    'EnergyDetectionSample'
+    'EnergyDetectionSample',
+    'Dot15d4Domain',
+    'NodeAddress',
+    'NodeAddressShort',
+    'NodeAddressExt',
+    'NodeAddressType',
+    'MitmRole'
 ]

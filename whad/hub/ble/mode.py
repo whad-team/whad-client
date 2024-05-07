@@ -1,7 +1,7 @@
 """WHAD Protocol BLE mode messages abstraction layer.
 """
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.ble.ble_pb2 import CentralModeCmd, StartCmd, StopCmd
+from whad.protocol.ble.ble_pb2 import CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
 from whad.hub.message import pb_bind, PbFieldBytes, PbMessageWrapper, PbFieldBool
 from whad.hub.ble import BleDomain
 
@@ -36,19 +36,19 @@ class PeriphMode(PbMessageWrapper):
 
 
 @pb_bind(BleDomain, 'start', 1)
-class Start(PbMessageWrapper):
+class BleStart(PbMessageWrapper):
     """BLE start mode message class
     """
     
     def __init__(self, message: Message = None):
         super().__init__(message=message)
-        self.message.ble.start.CopyFrom(StartCmd())
+        self.message.ble.start.CopyFrom(BleStartCmd())
 
 @pb_bind(BleDomain, 'stop', 1)
-class Stop(PbMessageWrapper):
+class BleStop(PbMessageWrapper):
     """BLE stop mode message class
     """
     
     def __init__(self, message: Message = None):
         super().__init__(message=message)
-        self.message.ble.stop.CopyFrom(StopCmd())
+        self.message.ble.stop.CopyFrom(BleStopCmd())

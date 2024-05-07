@@ -60,6 +60,8 @@ class PhyDomain(Registry):
     """WHAD PHY domain messages parser/factory.
     """
 
+    VERSIONS = {}
+
     def __init__(self, version: int):
         """Initializes a Dot15d4 domain instance
         """
@@ -510,5 +512,11 @@ __all__ = [
     'Stop',
     'SchedulePacket',
     'ScheduledPacketSent',
-    'SchedulePacketResponse'
+    'SchedulePacketResponse',
+    'PhyDomain',
+    'Timestamp',
+    'SpreadingFactor',
+    'CodingRate',
+    'Jamming',
+    'TxPower'
 ]

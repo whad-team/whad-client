@@ -36,6 +36,8 @@ class BleDomain(Registry):
     """WHAD BLE domain messages parser/factory.
     """
 
+    VERSIONS = {}
+
     def __init__(self, version: int):
         """Initializes a BLE domain instance
         """
@@ -798,9 +800,9 @@ from .address import SetBdAddress
 from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveConn, \
     AccessAddressDiscovered
 from .jamming import JamAdv, JamAdvChan, JamConn, ReactiveJam
-from .mode import ScanMode, AdvMode, CentralMode, PeriphMode, Start, Stop
-from .pdu import SetAdvData, SendRawPdu, SendPdu, AdvPduReceived, PduReceived, \
-    RawPduReceived, Injected
+from .mode import ScanMode, AdvMode, CentralMode, PeriphMode, BleStart, BleStop
+from .pdu import SetAdvData, SendBleRawPdu, SendBlePdu, BleAdvPduReceived, BlePduReceived, \
+    BleRawPduReceived, Injected
 from .connect import ConnectTo, Disconnect, Connected, Disconnected, Synchronized, \
     Desynchronized
 from .hijack import HijackMaster, HijackSlave, HijackBoth, Hijacked
@@ -827,17 +829,17 @@ __all__ = [
     "CentralMode",
     "PeriphMode",
     "SetAdvData",
-    "SendRawPdu",
-    "SendPdu",
-    "AdvPduReceived",
-    "PduReceived",
-    "RawPduReceived",
+    "SendBleRawPdu",
+    "SendBlePdu",
+    "BleAdvPduReceived",
+    "BlePduReceived",
+    "BleRawPduReceived",
     "ConnectTo",
     "Disconnect",
     "Connected",
     "Disconnected",
-    "Start",
-    "Stop",
+    "BleStart",
+    "BleStop",
     "HijackMaster",
     "HijackSlave",
     "HijackBoth",

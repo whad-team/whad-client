@@ -14,7 +14,7 @@ class SetAdvData(PbMessageWrapper):
     scanrsp_data = PbFieldBytes("ble.set_adv_data.scanrsp_data")
 
 @pb_bind(BleDomain, "send_raw_pdu", 1)
-class SendRawPdu(PbMessageWrapper):
+class SendBleRawPdu(PbMessageWrapper):
     """BLE send raw PDU message class
     """
     direction = PbFieldInt("ble.send_raw_pdu.direction")
@@ -25,7 +25,7 @@ class SendRawPdu(PbMessageWrapper):
     encrypt = PbFieldBool("ble.send_raw_pdu.encrypt")
 
 @pb_bind(BleDomain, "send_pdu", 1)
-class SendPdu(PbMessageWrapper):
+class SendBlePdu(PbMessageWrapper):
     """BLE send PDU message class
     """
     direction = PbFieldInt("ble.send_pdu.direction")
@@ -34,7 +34,7 @@ class SendPdu(PbMessageWrapper):
     encrypt = PbFieldBool("ble.send_pdu.encrypt")
 
 @pb_bind(BleDomain, "adv_pdu", 1)
-class AdvPduReceived(PbMessageWrapper):
+class BleAdvPduReceived(PbMessageWrapper):
     """BLE advertising PDU received message class
     """
     adv_type = PbFieldInt("ble.adv_pdu.adv_type")
@@ -45,7 +45,7 @@ class AdvPduReceived(PbMessageWrapper):
 
 
 @pb_bind(BleDomain, "pdu", 1)
-class PduReceived(PbMessageWrapper):
+class BlePduReceived(PbMessageWrapper):
     """BLE PDU received message class
     """
     direction = PbFieldInt("ble.pdu.direction")
@@ -55,7 +55,7 @@ class PduReceived(PbMessageWrapper):
     decrypted = PbFieldBool("ble.pdu.decrypted")
 
 @pb_bind(BleDomain, "raw_pdu", 1)
-class RawPduReceived(PbMessageWrapper):
+class BleRawPduReceived(PbMessageWrapper):
     """BLE raw PDU received message class
     """
     direction = PbFieldInt("ble.raw_pdu.direction")
