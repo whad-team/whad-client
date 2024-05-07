@@ -26,7 +26,7 @@ from whad.scapy.layers.bluetooth import SM_Security_Request
 from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, c1, s1, f4, g2, \
     f5, f6, generate_public_key_from_coordinates, generate_diffie_hellman_shared_secret, \
     generate_p256_keypair
-from whad.ble.bdaddr import BDAddress
+from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.stack.smp.constants import *
 from whad.ble.stack.smp.parameters import Pairing, PairingCustomFunctions
 from whad.ble.stack.smp.exceptions import SMInvalidParameterFormat, SMInvalidCustomFunction

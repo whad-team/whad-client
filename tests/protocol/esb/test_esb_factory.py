@@ -7,8 +7,8 @@ from whad.hub.esb import EsbDomain, SetNodeAddress, SniffMode, JamMode, Jammed, 
     SendRawPdu, PduReceived, RawPduReceived, PrxMode, PtxMode, EsbStart, EsbStop, \
     EsbNodeAddress, EsbNodeAddressError
 
-from whad.ble.bdaddr import BDAddress
-from whad.ble.chanmap import DefaultChannelMap
+from whad.hub.ble.bdaddr import BDAddress
+from whad.hub.ble.chanmap import DefaultChannelMap
 
 DEFAULT_NODE_ADDRESS = EsbNodeAddress(0x1122334455, 5)
 

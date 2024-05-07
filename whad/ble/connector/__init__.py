@@ -7,6 +7,7 @@ from scapy.compat import raw
 from scapy.packet import Packet
 from queue import Queue, Empty
 
+from whad.hub.ble.bdaddr import BDAddress
 from whad.device import WhadDeviceConnector
 from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCmd, StartCmd, StopCmd, \
     ScanMode, Start, Stop, BleAdvType, ConnectTo, CentralModeCmd, PeripheralMode, \
@@ -282,8 +283,7 @@ class BLE(WhadDeviceConnector):
         if trigger.identifier is None:
             return False
 
-        msg = Message()
-        msg.ble.trigger.id = trigger.identifier
+        msg = self.hub.ble.createTrigger(trigger.identifier)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return resp.generic.cmd_result.result == ResultCode.SUCCESS
 
@@ -352,10 +352,8 @@ class BLE(WhadDeviceConnector):
         if not self.can_reactive_jam():
             raise UnsupportedCapability("ReactiveJam")
 
-        msg = Message()
-        msg.ble.reactive_jam.channel = channel
-        msg.ble.reactive_jam.pattern = pattern
-        msg.ble.reactive_jam.position = position
+        # Create message
+        msg = self.hub.ble.createReactiveJam(channel, pattern, position)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
@@ -460,9 +458,7 @@ class BLE(WhadDeviceConnector):
         if not self.can_sniff_advertisements():
             raise UnsupportedCapability("Sniff")
 
-        msg = Message()
-        msg.ble.sniff_adv.channel = channel
-        msg.ble.sniff_adv.bd_address = bd_addr_to_bytes(bd_address)
+        msg = self.hub.ble.createSniffAdv(channel, BDAddress(bd_address))
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -501,16 +497,14 @@ class BLE(WhadDeviceConnector):
         """
         Enable Bluetooth Low Energy scanning mode.
         """
-        msg = Message()
-        msg.ble.scan_mode.active_scan = active
+        msg = self.hub.ble.createScanMode(active=active)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
     def enable_central_mode(self):
         """
         Enable Bluetooth Low Energy central mode (acts as master).
         """
-        msg = Message()
-        msg.ble.central_mode.CopyFrom(CentralModeCmd())
+        msg = self.hub.ble.createCentralMode()
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
     def enable_adv_mode(self, adv_data=None, scan_data=None):
@@ -573,8 +567,9 @@ class BLE(WhadDeviceConnector):
         Start currently enabled mode.
         """
         logger.info('starting current BLE mode ...')
-        msg = Message()
-        msg.ble.start.CopyFrom(StartCmd())
+        #msg = Message()
+        #msg.ble.start.CopyFrom(StartCmd())
+        msg = self.hub.ble.createStart()
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         if (resp.generic.cmd_result.result == ResultCode.SUCCESS):
             logger.info('current BLE mode successfully started')
@@ -587,8 +582,9 @@ class BLE(WhadDeviceConnector):
 
         :param int conn_handle: Connection handle of the connection to terminate.
         """
-        msg = Message()
-        msg.ble.disconnect.conn_handle = conn_handle
+        #msg = Message()
+        #msg.ble.disconnect.conn_handle = conn_handle
+        msg = self.hub.ble.createDisconnect(conn_handle)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -597,8 +593,9 @@ class BLE(WhadDeviceConnector):
         """
         Stop currently enabled mode.
         """
-        msg = Message()
-        msg.ble.stop.CopyFrom(StopCmd())
+        #msg = Message()
+        #msg.ble.stop.CopyFrom(StopCmd())
+        msg = self.hub.ble.createStop()
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
         # Remove all triggers

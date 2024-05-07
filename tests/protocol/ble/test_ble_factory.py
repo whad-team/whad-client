@@ -11,10 +11,10 @@ from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     BlePduReceived, BleRawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
-    PrepareSequencePattern, Injected, Direction, AdvType, Triggered
+    PrepareSequencePattern, Injected, Direction, AdvType, Triggered, Trigger, DeleteSequence
 
-from whad.ble.bdaddr import BDAddress
-from whad.ble.chanmap import DefaultChannelMap
+from whad.hub.ble.bdaddr import BDAddress
+from whad.hub.ble.chanmap import DefaultChannelMap
 
 class TestBleDomainFactory(object):
     """Test BleDomain factory
@@ -323,3 +323,17 @@ class TestBleDomainFactory(object):
         """
         obj = factory.createTriggered(1)
         assert isinstance(obj, Triggered)
+
+    def test_Trigger(self, factory: BleDomain):
+        """Test creation of Trigger message
+        """
+        obj = factory.createTrigger(1)
+        assert isinstance(obj, Trigger)
+        assert obj.sequence_id == 1
+
+    def test_DeleteSequence(self, factory: BleDomain):
+        """Test creation of DeleteSequence message
+        """
+        obj = factory.createDeleteSequence(10)
+        assert isinstance(obj, DeleteSequence)
+        assert obj.sequence_id == 10

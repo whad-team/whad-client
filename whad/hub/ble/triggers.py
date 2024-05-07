@@ -86,3 +86,16 @@ class Triggered(PbMessageWrapper):
     """BLE prepare sequence triggered message class
     """
     sequence_id = PbFieldInt("ble.triggered.id")
+
+
+@pb_bind(BleDomain, "trigger", 1)
+class Trigger(PbMessageWrapper):
+    """BLE prepare sequence trigger message class
+    """
+    sequence_id = PbFieldInt("ble.trigger.id")
+
+@pb_bind(BleDomain, "delete_seq", 1)
+class DeleteSequence(PbMessageWrapper):
+    """BLE prepare sequence delete message class
+    """
+    sequence_id = PbFieldInt("ble.delete_seq.id")

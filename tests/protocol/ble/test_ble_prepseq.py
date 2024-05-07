@@ -5,7 +5,8 @@ import pytest
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import PrepareSequenceCmd
 from whad.hub.ble import Direction, PrepareSequenceManual, \
-    PrepareSequenceConnEvt, PrepareSequencePattern
+    PrepareSequenceConnEvt, PrepareSequencePattern, Trigger, Triggered, \
+    DeleteSequence
 
 @pytest.fixture
 def prep_seq_manual():
@@ -147,3 +148,73 @@ class TestPrepareSequenceReceptionTrigger(object):
         assert msg.count_packets() == 2
         assert msg.get_packet(0) == b"HELLOWORLD"
         assert msg.get_packet(1) == b"FOOBAR"
+
+@pytest.fixture
+def ble_trigger():
+    msg = Message()
+    msg.ble.trigger.id = 5
+    return msg
+
+
+class TestTriggerSequence(object):
+    """Test BLE Trigger  message parsing/crafting
+    """
+
+    def test_parsing(self, ble_trigger):
+        """Check Trigger parsing
+        """
+        parsed_obj = Trigger.parse(1, ble_trigger)
+        assert isinstance(parsed_obj, Trigger)
+        assert parsed_obj.sequence_id == 5
+
+    def test_crafting(self):
+        """Check Trigger crafting
+        """
+        msg = Trigger(sequence_id=12)
+        assert msg.sequence_id == 12
+
+@pytest.fixture
+def ble_delete_seq():
+    msg = Message()
+    msg.ble.delete_seq.id = 7
+    return msg
+
+class TestDeleteSequence(object):
+    """Test BLE DeleteSequence  message parsing/crafting
+    """
+
+    def test_parsing(self, ble_delete_seq):
+        """Check DeleteSequence parsing
+        """
+        parsed_obj = DeleteSequence.parse(1, ble_delete_seq)
+        assert isinstance(parsed_obj, DeleteSequence)
+        assert parsed_obj.sequence_id == 7
+
+    def test_crafting(self):
+        """Check DeleteSequence crafting
+        """
+        msg = DeleteSequence(sequence_id=12)
+        assert msg.sequence_id == 12
+
+@pytest.fixture
+def ble_triggered():
+    msg = Message()
+    msg.ble.triggered.id = 5
+    return msg
+
+class TestTriggered(object):
+    """Test BLE Triggered  message parsing/crafting
+    """
+
+    def test_parsing(self, ble_triggered):
+        """Check Trigger parsing
+        """
+        parsed_obj = Triggered.parse(1, ble_triggered)
+        assert isinstance(parsed_obj, Triggered)
+        assert parsed_obj.sequence_id == 5
+
+    def test_crafting(self):
+        """Check Trigger crafting
+        """
+        msg = Triggered(sequence_id=12)
+        assert msg.sequence_id == 12

@@ -3,7 +3,7 @@
 
 from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import command
-from whad.ble.bdaddr import BDAddress
+from whad.hub.ble.bdaddr import BDAddress
 from hexdump import hexdump
 from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.exceptions import AttError

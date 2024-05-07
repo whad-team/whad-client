@@ -86,7 +86,7 @@ class HubMessage(object):
         else:
             self.__msg = message
 
-    def serialize(self):
+    def SerializeToString(self):
         return self.__msg.SerializeToString()
 
     def set_field_value(self, field: PbField, value):

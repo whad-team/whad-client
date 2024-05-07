@@ -8,7 +8,7 @@ from scapy.layers.bluetooth4LE import LL_ENC_REQ, LL_ENC_RSP, LL_START_ENC_REQ, 
     BTLE_CTRL, BTLE_DATA, BTLE, BTLE_CONNECT_REQ
 from scapy.layers.bluetooth import SM_Hdr, SM_Pairing_Request, SM_Random, \
     SM_Pairing_Response, SM_Confirm
-from whad.ble.bdaddr import BDAddress
+from whad.hub.ble.bdaddr import BDAddress
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.ble.exceptions import MissingCryptographicMaterial
 from struct import pack

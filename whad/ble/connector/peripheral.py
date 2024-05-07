@@ -13,7 +13,7 @@ react on specific events.
 from time import sleep
 
 from whad.ble.connector import BLE
-from whad.ble.bdaddr import BDAddress
+from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
 from whad.ble.stack.gatt import GattServer, GattClientServer
 from whad.ble.stack.att import ATTLayer

@@ -11,11 +11,12 @@ from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     BlePduReceived, BleRawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
-    PrepareSequencePattern, Injected
+    PrepareSequencePattern, Injected, Trigger, Triggered, DeleteSequence
 
 from tests.protocol.ble.test_ble_hijack import hijack_master, hijack_slave, hijack_both, hijacked
 from tests.protocol.ble.test_ble_pdu import send_ble_pdu, send_ble_raw_pdu, raw_pdu, ble_pdu, ble_adv_pdu, set_adv_data
-from tests.protocol.ble.test_ble_prepseq import prep_seq_manual, prep_seq_connevt, prep_seq_reception
+from tests.protocol.ble.test_ble_prepseq import prep_seq_manual, prep_seq_connevt, prep_seq_reception, ble_trigger, \
+    ble_triggered, ble_delete_seq
 
 BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])
 
@@ -928,3 +929,21 @@ class TestBleDomainParsing(object):
         """
         msg = BleDomain.parse(1, injected)
         assert isinstance(msg, Injected)
+
+    def test_trigger(self, ble_trigger):
+        """Check Trigger message parsing
+        """
+        msg = BleDomain.parse(1, ble_trigger)
+        assert isinstance(msg, Trigger)
+
+    def test_triggered(self, ble_triggered):
+        """Check Triggered message parsing
+        """
+        msg = BleDomain.parse(1, ble_triggered)
+        assert isinstance(msg, Triggered)
+
+    def test_delete_seq(self, ble_delete_seq):
+        """Check DeleteSequence message parsing
+        """
+        msg = BleDomain.parse(1, ble_delete_seq)
+        assert isinstance(msg, DeleteSequence)

@@ -12,6 +12,9 @@ from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery
 from whad.helpers import message_filter, asciiz
+from whad.hub import ProtocolHub
+from whad.hub.discovery import InfoQueryResp
+
 # Logging
 import logging
 
@@ -335,6 +338,10 @@ class WhadDeviceConnector(object):
     @property
     def device(self):
         return self.__device
+    
+    @property
+    def hub(self):
+        return self.__device.hub
 
     def enable_synchronous(self, enabled : bool):
         """Enable or disable synchronous mode
@@ -753,6 +760,15 @@ class WhadDevice(object):
         self.__lock = Lock()
         self.__tx_lock = Lock()
 
+        # Protocol hub
+        self.__hub = ProtocolHub(1)
+
+    @property
+    def hub(self):
+        """Retrieve the device protocol hub (parser/factory)
+        """
+        return self.__hub
+
     def lock(self):
         """Locks the pending output data buffer."""
         self.__lock.acquire()
@@ -812,8 +828,7 @@ class WhadDevice(object):
             self.__io_thread.cancel()
 
         # Send a NOP message to unlock process_messages()
-        msg = Message()
-        msg.generic.verbose.data=b''
+        msg = self.hub.generic.createVerbose(b'')
         self.on_message_received(msg)
 
         # Wait for the thread to terminate nicely.
@@ -1173,8 +1188,7 @@ class WhadDevice(object):
         answer.
         """
         logger.info('preparing a DeviceInfoQuery message')
-        msg = Message()
-        msg.discovery.info_query.proto_ver=proto_version
+        msg = self.__hub.discovery.createInfoQuery(proto_version)
         return self.send_command(
             msg,
             message_filter('discovery', 'info_resp')
@@ -1187,8 +1201,7 @@ class WhadDevice(object):
         answer.
         """
         logger.info('preparing a DeviceDomainInfoQuery message')
-        msg = Message()
-        msg.discovery.domain_query.domain = domain
+        msg = self.__hub.discovery.createDomainQuery(domain)
         return self.send_command(
             msg,
             message_filter('discovery', 'domain_resp')
@@ -1209,10 +1222,18 @@ class WhadDevice(object):
 
             # If we have an answer, process it.
             if resp is not None:
+
                 # Save device information
                 self.__info = WhadDeviceInfo(
                     resp.discovery.info_resp
                 )
+
+                # Parse DeviceInfoResponse
+                device_info = self.hub.parse(resp)
+                assert isinstance(device_info, InfoQueryResp)
+
+                # Update our ProtocolHub version to the device version
+                self.__hub = ProtocolHub(device_info.proto_min_ver)
 
                 # Query device domains
                 logger.info('query supported commands per domain')
@@ -1240,8 +1261,7 @@ class WhadDevice(object):
         """Reset device
         """
         logger.info('preparing a DeviceResetQuery message')
-        msg = Message()
-        msg.discovery.reset_query.CopyFrom(DeviceResetQuery())
+        msg = self.hub.discovery.createResetQuery()
         return self.send_command(
             msg,
             message_filter('discovery', 'ready_resp')

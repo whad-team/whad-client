@@ -7,6 +7,7 @@ pick the correct message wrapper class to parse it. Message wrappers simplifies
 the way protocol buffers messages are created by mapping some of their properties
 to protobuf messages fields.
 """
+from typing import Union
 
 from whad.protocol.whad_pb2 import Message
 from .registry import Registry
@@ -61,12 +62,17 @@ class ProtocolHub(Registry):
     def get(self, factory: str):
         return ProtocolHub.bound(factory, self.__version)(self.__version)
 
-    def parse(self, data: bytes):
+    def parse(self, data: Union[Message, bytes]):
         """Parse a serialized WHAD message into an associated object.
         """
-        # Use protocol buffers to parse our message
-        msg = Message()
-        msg.ParseFromString(bytes(data))
+        if isinstance(data, bytes):
+            # Use protocol buffers to parse our message
+            msg = Message()
+            msg.ParseFromString(bytes(data))
+        elif isinstance(data, Message):
+            msg = data
+        else:
+            return None
 
         # Only process generic messages
         return ProtocolHub.bound(

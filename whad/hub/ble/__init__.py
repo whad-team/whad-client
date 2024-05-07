@@ -2,8 +2,8 @@
 """
 from typing import List
 
-from whad.ble.bdaddr import BDAddress
-from whad.ble.chanmap import ChannelMap
+from .bdaddr import BDAddress
+from .chanmap import ChannelMap
 
 from whad.protocol.ble.ble_pb2 import BleDirection, BleAdvType, BleAddrType
 from whad.hub.registry import Registry
@@ -784,7 +784,7 @@ class BleDomain(Registry):
         # Return message
         return message
 
-    def createTriggered(self, seq_id: int):
+    def createTriggered(self, seq_id: int) -> HubMessage:
         """Create a Triggered message
 
         :param seq_id: Sequence identifier triggered
@@ -795,6 +795,30 @@ class BleDomain(Registry):
         return BleDomain.bound("triggered", self.proto_version)(
             seq_id=seq_id
         )
+    
+    def createTrigger(self, seq_id: int) -> HubMessage:
+        """Create a Trigger message
+
+        :param seq_id: Sequence identifier to trigger
+        :type seq_id: int
+        :return: instance of Trigger
+        :return-type: Trigger
+        """
+        return BleDomain.bound("trigger", self.proto_version)(
+            sequence_id=seq_id
+        )
+    
+    def createDeleteSequence(self, seq_id: int) -> HubMessage:
+        """Create a DeleteSequence message
+
+        :param seq_id: Sequence identifier to delete
+        :type seq_id: int
+        :return: instance of DeleteSequence
+        :return-type: DeleteSequence
+        """
+        return BleDomain.bound("delete_seq", self.proto_version)(
+            sequence_id=seq_id
+        ) 
 
 from .address import SetBdAddress
 from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveConn, \
@@ -807,7 +831,7 @@ from .connect import ConnectTo, Disconnect, Connected, Disconnected, Synchronize
     Desynchronized
 from .hijack import HijackMaster, HijackSlave, HijackBoth, Hijacked
 from .triggers import PrepareSequenceManual, PrepareSequenceConnEvt, \
-    PrepareSequencePattern, PrepareSequence, Triggered
+    PrepareSequencePattern, PrepareSequence, Triggered, Trigger, DeleteSequence
 
 __all__ = [
     "AdvType",
@@ -851,5 +875,7 @@ __all__ = [
     "PrepareSequenceConnEvt",
     "PrepareSequencePattern",
     "PrepareSequence",
-    "Triggered"
+    "Triggered",
+    "Trigger",
+    "DeleteSequence"
 ]

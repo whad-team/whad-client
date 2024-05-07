@@ -12,7 +12,7 @@ from whad.ble.profile.characteristic import CharacteristicProperties
 from whad.cli.app import command
 from whad.ble import Central, Scanner
 from whad.ble.exceptions import ConnectionLostException
-from whad.ble.bdaddr import BDAddress
+from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException

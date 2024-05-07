@@ -1,6 +1,11 @@
 import re
 from binascii import hexlify, unhexlify
-from whad.ble.exceptions import InvalidBDAddressException
+
+class InvalidBDAddressException(Exception):
+    """Invalid BD address used
+    """
+    def __init__(self):
+        super().__init__()
 
 class BDAddress(object):
     """This class represents a Bluetooth Device address.

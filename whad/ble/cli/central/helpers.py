@@ -1,7 +1,7 @@
 import json
 from argparse import Namespace
 from prompt_toolkit import print_formatted_text, HTML
-from whad.ble.bdaddr import BDAddress
+from whad.hub.ble.bdaddr import BDAddress
 from whad.ble import Central
 from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
     InsufficientAuthenticationError, InsufficientAuthorizationError, \

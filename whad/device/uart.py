@@ -240,8 +240,9 @@ class UartDevice(WhadDevice):
         :param int speed: New baudrate to apply to current serial device.
         """
         if not self.__is_acm:
-            msg = Message()
-            msg.discovery.set_speed.speed = speed
+            #msg = Message()
+            #msg.discovery.set_speed.speed = speed
+            msg = self.hub.discovery.createSetSpeed(speed)
             resp = self.send_command(
                 msg,
                 message_filter('generic', 'cmd_result')

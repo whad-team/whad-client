@@ -13,7 +13,7 @@ from whad.ble.stack import BleStack
 from scapy.layers.bluetooth4LE import BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP,\
     BTLE_ADV
-from whad.ble.bdaddr import BDAddress
+from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.profile.device import PeripheralDevice
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvDataField, AdvCompleteLocalName, \

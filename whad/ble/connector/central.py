@@ -6,7 +6,7 @@ Bluetooth Low Energy Central connector
 from time import time, sleep
 from whad.ble import Message, Connected
 from whad.ble.connector import BLE
-from whad.ble.bdaddr import BDAddress
+from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack, BtVersion
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
 from whad.ble.stack.gatt import GattClient
