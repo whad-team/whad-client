@@ -19,6 +19,8 @@ class ProtocolHub(Registry):
     differences that exist between them in a transparent fashion.
     """
 
+    VERSIONS = {}
+
     def __init__(self, proto_version: int):
         """Instanciate a WHAD protocol hub for a specific version.
         """
@@ -47,6 +49,10 @@ class ProtocolHub(Registry):
     @property
     def phy(self):
         return self.get('phy')
+    
+    @property
+    def esb(self):
+        return self.get('esb')
 
     def get(self, factory: str):
         return ProtocolHub.bound(factory, self.__version)(self.__version)
@@ -68,3 +74,4 @@ from .discovery import Discovery
 from .ble import BleDomain
 from .dot15d4 import Dot15d4Domain
 from .phy import PhyDomain
+from .esb import EsbDomain
