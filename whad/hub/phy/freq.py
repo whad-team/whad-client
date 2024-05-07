@@ -1,4 +1,4 @@
-"""WHAD Protocol PHY moidulation messages abstraction layer.
+"""WHAD Protocol PHY modulation messages abstraction layer.
 """
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.phy.phy_pb2 import GetSupportedFrequenciesCmd
