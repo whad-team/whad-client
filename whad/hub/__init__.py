@@ -53,6 +53,10 @@ class ProtocolHub(Registry):
     @property
     def esb(self):
         return self.get('esb')
+    
+    @property
+    def unifying(self):
+        return self.get('unifying')
 
     def get(self, factory: str):
         return ProtocolHub.bound(factory, self.__version)(self.__version)
@@ -75,3 +79,4 @@ from .ble import BleDomain
 from .dot15d4 import Dot15d4Domain
 from .phy import PhyDomain
 from .esb import EsbDomain
+from .unifying import UnifyingDomain
