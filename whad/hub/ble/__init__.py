@@ -144,7 +144,7 @@ class BleDomain(Registry):
         :return: instance of SniffActiveConn message
         :return-type: SniffActiveConn
         """
-        # Create default SniffConnReq message
+        # Create default createSniffActiveConn message
         sniff_connreq = BleDomain.bound('sniff_conn', self.proto_version)(
             access_address=access_address
         )
@@ -269,7 +269,7 @@ class BleDomain(Registry):
         """
         return BleDomain.bound('central_mode', self.proto_version)()
 
-    def createPeriphMode(self, adv_data: bytes, scan_rsp: bytes = None) -> HubMessage:
+    def createPeriphMode(self, adv_data: bytes = None, scan_rsp: bytes = None) -> HubMessage:
         """Create an PeriphMode message.
 
         :param adv_data: Advertisement data (31 bytes max)
@@ -280,8 +280,9 @@ class BleDomain(Registry):
         :return-type: PeriphMode
         """
         message = BleDomain.bound('periph_mode', self.proto_version)(
-            scan_data=adv_data
         )
+        if adv_data is not None:
+            message.scan_data = adv_data
         if scan_rsp is not None:
             message.scanrsp_data = scan_rsp
         return message
@@ -761,7 +762,7 @@ class BleDomain(Registry):
         :param pattern: target pattern
         :type pattern: bytes
         :param mask: target pattern bitmask
-        :type pattern: bytes
+        :type mask: bytes
         :param offset: target pattern offset
         :type offset: int
         :param packets: List of PDUs to send

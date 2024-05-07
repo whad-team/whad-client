@@ -8,9 +8,9 @@ from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
     BTLE_RF, BTLE_CTRL
 
-from whad.protocol.whad_pb2 import Message
-from whad.protocol.ble.ble_pb2 import BleAdvType
 from whad.ble.metadata import generate_ble_metadata
+from whad.hub import ProtocolHub
+from whad.hub.ble import AdvType
 
 logger = logging.getLogger(__name__)
 
@@ -32,15 +32,16 @@ class BleMessageTranslator(object):
 
     # correlation table
     SCAPY_CORR_ADV = {
-        BleAdvType.ADV_IND: BTLE_ADV_IND,
-        BleAdvType.ADV_NONCONN_IND: BTLE_ADV_NONCONN_IND,
-        BleAdvType.ADV_DIRECT_IND: BTLE_ADV_DIRECT_IND,
-        BleAdvType.ADV_SCAN_IND: BTLE_ADV_SCAN_IND,
-        BleAdvType.ADV_SCAN_RSP: BTLE_SCAN_RSP
+        AdvType.ADV_IND: BTLE_ADV_IND,
+        AdvType.ADV_NONCONN_IND: BTLE_ADV_NONCONN_IND,
+        AdvType.ADV_DIRECT_IND: BTLE_ADV_DIRECT_IND,
+        AdvType.ADV_SCAN_IND: BTLE_ADV_SCAN_IND,
+        AdvType.ADV_SCAN_RSP: BTLE_SCAN_RSP
     }
 
-    def __init__(self):
+    def __init__(self, protocol_hub: ProtocolHub):
         self.__access_address = 0x11223344
+        self.__hub = protocol_hub
 
 
     def format(self, packet):
@@ -112,38 +113,48 @@ class BleMessageTranslator(object):
 
 
     def from_packet(self, packet, encrypt=False):
-        msg = Message()
         direction = packet.metadata.direction
         connection_handle = packet.metadata.connection_handle
 
         if BTLE in packet:
-            msg.ble.send_raw_pdu.direction = direction
-            msg.ble.send_raw_pdu.conn_handle = connection_handle
-            msg.ble.send_raw_pdu.crc = BTLE(raw(packet)).crc # force the CRC to be generated if not provided
-            msg.ble.send_raw_pdu.access_address = BTLE(raw(packet)).access_addr
-
-            msg.ble.send_raw_pdu.encrypt = encrypt
-
+            # Extract PDU
             if BTLE_DATA in packet:
-                msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_DATA:])
+                pdu = raw(packet[BTLE_DATA:])
             elif BTLE_CTRL in packet:
-                msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_CTRL:])
+                pdu = raw(packet[BTLE_CTRL:])
             elif BTLE_ADV in packet:
-                msg.ble.send_raw_pdu.pdu = raw(packet[BTLE_ADV:])
+                pdu = raw(packet[BTLE_ADV:])
             else:
                 return None
+            
+            # Create SendRawPdu message
+            msg = self.__hub.ble.createSendRawPdu(
+                direction,
+                pdu,
+                crc=BTLE(raw(packet)).crc, # force the CRC to be generated if not provided
+                access_address=BTLE(raw(packet)).access_addr,
+                conn_handle=connection_handle,
+                encrypt=encrypt
+            )
 
         else:
-            msg.ble.send_pdu.direction = direction
-            msg.ble.send_pdu.conn_handle = connection_handle
-            msg.ble.send_pdu.encrypt = encrypt
+            
+            # Extract PDU
             if BTLE_DATA in packet:
-                msg.ble.send_pdu.pdu = packet_to_bytes(packet[BTLE_DATA:])
+                pdu = packet_to_bytes(packet[BTLE_DATA:])
             elif BTLE_CTRL in packet:
-                msg.ble.send_pdu.pdu = packet_to_bytes(packet[BTLE_CTRL:])
+                pdu = packet_to_bytes(packet[BTLE_CTRL:])
             elif BTLE_ADV in packet:
-                msg.ble.send_pdu.pdu = packet_to_bytes(packet[BTLE_ADV:])
+                pdu = packet_to_bytes(packet[BTLE_ADV:])
             else:
                 return None
+            
+            # Create a SendPdu message
+            msg = self.__hub.ble.createSendPdu(
+                direction,
+                pdu,
+                connection_handle,
+                encrypt=encrypt
+            )
 
         return msg

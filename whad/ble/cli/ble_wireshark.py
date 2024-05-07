@@ -37,7 +37,7 @@ class BleUnixSocketConnector(UnixSocketConnector):
         """Initialize our Unix Socket connector
         """
         super().__init__(device, path)
-        self.__translator = BleMessageTranslator()
+        self.__translator = BleMessageTranslator(device.hub)
 
 
     def on_msg_sent(self, message):

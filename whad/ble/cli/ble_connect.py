@@ -4,7 +4,7 @@ This utility will configure a compatible whad device to connect to a given
 BLE device, and chain this with another tool.
 
 """
-from whad.ble.bdaddr import BDAddress
+from whad.hub.ble.bdaddr import BDAddress
 from whad.cli.app import CommandLineDeviceSource
 from whad.ble.connector import Central
 from whad.device.unix import UnixSocketProxy

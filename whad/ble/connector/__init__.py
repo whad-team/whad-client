@@ -8,6 +8,8 @@ from scapy.packet import Packet
 from queue import Queue, Empty
 
 from whad.hub.ble.bdaddr import BDAddress
+from whad.hub.ble.chanmap import ChannelMap
+
 from whad.device import WhadDeviceConnector
 from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCmd, StartCmd, StopCmd, \
     ScanMode, Start, Stop, BleAdvType, ConnectTo, CentralModeCmd, PeripheralMode, \
@@ -87,7 +89,7 @@ class BLE(WhadDeviceConnector):
                 self.__ready = True
 
             # Initialize translator
-            self.translator = BleMessageTranslator()
+            self.translator = BleMessageTranslator(self.hub)
 
             # Set synchronous mode if provided
             self.enable_synchronous(synchronous)
@@ -304,8 +306,8 @@ class BLE(WhadDeviceConnector):
         if trigger.identifier is None:
             return False
 
-        msg = Message()
-        msg.ble.delete_seq.id = trigger.identifier
+        msg = self.hub.ble.createDeleteSequence(trigger.identifier)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return resp.generic.cmd_result.result == ResultCode.SUCCESS
 
@@ -316,28 +318,42 @@ class BLE(WhadDeviceConnector):
         """
         if not self.can_prepare():
             raise UnsupportedCapability("Prepare")
-        msg = Message()
-        msg.ble.prepare.direction = direction
-        msg.ble.prepare.id = trigger.identifier
-        if isinstance(trigger, ManualTrigger):
-            msg.ble.prepare.trigger.manual.CopyFrom(PrepareSequenceCmd.ManualTrigger())
-        elif isinstance(trigger, ConnectionEventTrigger):
-            msg.ble.prepare.trigger.connection_event.connection_event = trigger.connection_event
-        elif isinstance(trigger, ReceptionTrigger):
-            msg.ble.prepare.trigger.reception.pattern = trigger.pattern
-            msg.ble.prepare.trigger.reception.mask = trigger.mask
-            msg.ble.prepare.trigger.reception.offset = trigger.offset
-        else:
-            return False
-
-        trigger.connector = self
+        
+        prep_packets = []
         for packet in packets:
             if BTLE_DATA in packet:
-                packet = packet[BTLE_DATA:]
-                pkt_msg = msg.ble.prepare.sequence.add()
-                pkt_msg.packet = bytes(packet)
+                prep_packets.append(bytes(packet[BTLE_DATA:]))
             else:
+                # Fail if at least one packet has no BTLE_DATA layer
                 return False
+
+        if isinstance(trigger, ManualTrigger):
+            # Create a prepared sequence with manual trigger
+            msg = self.hub.ble.createPrepareSequenceManual(
+                trigger.identifier,
+                direction,
+                prep_packets
+            )
+        elif isinstance(trigger, ConnectionEventTrigger):
+            # Create a prepared sequence with connection event trigger
+            msg = self.hub.ble.createPrepareSequenceConnEvt(
+                trigger.identifier,
+                direction,
+                trigger.connection_event,
+                prep_packets
+            )
+        elif isinstance(trigger, ReceptionTrigger):
+            # Create a prepared sequence with reception trigger
+            msg = self.hub.ble.createPrepareSequencePattern(
+                trigger.identifier,
+                direction,
+                trigger.pattern,
+                trigger.mask,
+                trigger.offset,
+                prep_packets
+            )
+        else:
+            return False
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = resp.generic.cmd_result.result == ResultCode.SUCCESS
@@ -352,7 +368,7 @@ class BLE(WhadDeviceConnector):
         if not self.can_reactive_jam():
             raise UnsupportedCapability("ReactiveJam")
 
-        # Create message
+        # Create a ReactiveJam message
         msg = self.hub.ble.createReactiveJam(channel, pattern, position)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
@@ -366,9 +382,10 @@ class BLE(WhadDeviceConnector):
         """
         if not self.can_jam_advertisement_on_channel():
             raise UnsupportedCapability("JamAdvOnChannel")
-
-        msg = Message()
-        msg.ble.jam_adv_chan.channel = channel
+        
+        # Create a JamAdvChan message
+        msg = self.hub.ble.createJamAdvChan(channel)
+        
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -381,8 +398,9 @@ class BLE(WhadDeviceConnector):
         if not self.can_hijack_master():
             raise UnsupportedCapability("Hijack")
 
-        msg = Message()
-        msg.ble.hijack_master.access_address = access_address
+        # Create a HijackMaster message
+        msg = self.hub.ble.createHijackMaster(access_address)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -393,34 +411,30 @@ class BLE(WhadDeviceConnector):
         if not self.can_discover_access_addresses():
             raise UnsupportedCapability("AccessAddressesDiscovery")
 
-        msg = Message()
-        msg.ble.sniff_aa.monitored_channels = b"\xFF\xFF\xFF\xFF\x1F"
+        # Create SniffAccessAddress message
+        msg = self.hub.ble.createSniffAccessAddress(b"\xFF\xFF\xFF\xFF\x1F")
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-    def sniff_active_connection(self, access_address, crc_init=None, channel_map=None, hop_interval=None, hop_increment=None):
+    def sniff_active_connection(self, access_address: int , crc_init: int = None,
+                                channel_map: ChannelMap = None, hop_interval: int = None,
+                                hop_increment: int = None):
         """
         Sniff active connection.
         """
         if not self.can_sniff_active_connection():
             raise UnsupportedCapability("ActiveConnectionSniffing")
 
-        msg = Message()
-        msg.ble.sniff_conn.access_address = access_address
-
-        if crc_init is not None:
-            msg.ble.sniff_conn.crc_init = crc_init
-
-        if channel_map is not None:
-            msg.ble.sniff_conn.channel_map = channel_map
-
-        if hop_interval is not None:
-            msg.ble.sniff_conn.hop_interval = hop_interval
-
-        if hop_increment is not None:
-            msg.ble.sniff_conn.hop_increment = hop_increment
-
-        msg.ble.sniff_conn.monitored_channels = b"\xFF\xFF\xFF\xFF\x1F"
+        # Create a SniffActiveConn message
+        msg = self.hub.ble.createSniffActiveConn(
+            access_address,
+            crc_init=crc_init,
+            channel_map=channel_map,
+            interval=hop_interval,
+            increment=hop_increment,
+            channels=b"\xFF\xFF\xFF\xFF\x1F"
+        )
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
@@ -432,9 +446,10 @@ class BLE(WhadDeviceConnector):
         """
         if not self.can_hijack_slave():
             raise UnsupportedCapability("Hijack")
+        
+        # Create an HijackSlave message
+        msg = self.hub.ble.createHijackSlave(access_address)
 
-        msg = Message()
-        msg.ble.hijack_slave.access_address = access_address
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -446,8 +461,9 @@ class BLE(WhadDeviceConnector):
         if not self.can_hijack_both():
             raise UnsupportedCapability("Hijack")
 
-        msg = Message()
-        msg.ble.hijack_both.access_address = access_address
+        # Create an HijackBoth message
+        msg = self.hub.ble.createHijackBoth(access_address)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -458,7 +474,9 @@ class BLE(WhadDeviceConnector):
         if not self.can_sniff_advertisements():
             raise UnsupportedCapability("Sniff")
 
+        # Create a SniffAdv message
         msg = self.hub.ble.createSniffAdv(channel, BDAddress(bd_address))
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -470,11 +488,14 @@ class BLE(WhadDeviceConnector):
         if not self.can_sniff_new_connection():
             raise UnsupportedCapability("Sniff")
 
-        msg = Message()
-        msg.ble.sniff_connreq.show_advertisements = show_advertisements
-        msg.ble.sniff_connreq.show_empty_packets = show_empty_packets
-        msg.ble.sniff_connreq.channel = channel
-        msg.ble.sniff_connreq.bd_address = bd_addr_to_bytes(bd_address)
+        # Create a SniffConnReq message
+        msg = self.hub.ble.createSniffConnReq(
+            channel,
+            bd_address=BDAddress(bd_address),
+            show_empty=show_empty_packets,
+            show_adv=show_advertisements
+        )
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -485,9 +506,13 @@ class BLE(WhadDeviceConnector):
         # Ensure we can spoof BD address
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         if (commands & (1 << SetBdAddress))>0:
-            msg = Message()
-            msg.ble.set_bd_addr.bd_address = bd_addr_to_bytes(bd_address)
-            msg.ble.set_bd_addr.addr_type = BleAddrType.PUBLIC if public else BleAddrType.RANDOM
+
+            # Create a SetBdAddress message
+            msg = self.hub.ble.createSetBdAddress(BDAddress(
+                bd_address,
+                random=(not public)
+            ))
+
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         else:
@@ -497,30 +522,33 @@ class BLE(WhadDeviceConnector):
         """
         Enable Bluetooth Low Energy scanning mode.
         """
+        # Create a ScanMode message
         msg = self.hub.ble.createScanMode(active=active)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
     def enable_central_mode(self):
         """
         Enable Bluetooth Low Energy central mode (acts as master).
         """
+        # Create a CentalMode message
         msg = self.hub.ble.createCentralMode()
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
     def enable_adv_mode(self, adv_data=None, scan_data=None):
         """
         Enable BLE advertising mode (acts as a broadcaster)
         """
-        msg = Message()
-        if adv_data is not None and isinstance(adv_data, bytes):
-            msg.ble.adv_mode.scan_data = adv_data
-        if scan_data is not None and isinstance(scan_data, bytes):
-            msg.ble.adv_mode.scanrsp_data = scan_data
-        if adv_data is None and scan_data is None:
-            msg.ble.adv_mode.CopyFrom(AdvModeCmd())
+        # Create a AdvMode message
+        msg = self.hub.ble.createAdvMode(
+            adv_data,
+            scan_rsp=scan_data
+        )
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
-    def enable_peripheral_mode(self, adv_data=None, scan_data=None):
+    def enable_peripheral_mode(self, adv_data: bytes = None, scan_data: bytes = None):
         """
         Enable Bluetooth Low Energy peripheral mode (acts as slave).
         """
@@ -530,36 +558,30 @@ class BLE(WhadDeviceConnector):
         if isinstance(scan_data, AdvDataFieldList):
             scan_data = scan_data.to_bytes()
 
-        msg = Message()
-        if adv_data is not None and isinstance(adv_data, bytes):
-            msg.ble.periph_mode.scan_data = adv_data
-        if scan_data is not None and isinstance(scan_data, bytes):
-            msg.ble.periph_mode.scanrsp_data = scan_data
-        if adv_data is None and scan_data is None:
-            msg.ble.periph_mode.CopyFrom(PeripheralModeCmd())
+        # Create a PeriphMode message
+        msg = self.hub.ble.createPeriphMode(
+            adv_data=adv_data,
+            scan_resp=scan_data
+        )
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
-    def connect_to(self, bd_addr, random=False, access_address=None, channel_map=None, crc_init=None, hop_interval=None, hop_increment=None):
+    def connect_to(self, bd_addr: BDAddress, random: bool = False, access_address: int = None, \
+                   channel_map: ChannelMap = None, crc_init: int = None, hop_interval: int = None, \
+                   hop_increment: int = None):
         """
         Initiate a Bluetooth Low Energy connection.
         """
-        msg = Message()
-        msg.ble.connect.bd_address = bd_addr_to_bytes(bd_addr)
-        if random:
-            msg.ble.connect.addr_type = BleAddrType.RANDOM
-        else:
-            msg.ble.connect.addr_type = BleAddrType.PUBLIC
+        # Create a ConnectTo message
+        msg = self.hub.ble.createConnectTo(
+            bd_address=BDAddress(bd_addr, random=random),
+            access_address=access_address,
+            channel_map=channel_map,
+            interval=hop_interval,
+            increment=hop_increment,
+            crc_init=crc_init
+        )
 
-        if access_address is not None:
-            msg.ble.connect.access_address = access_address
-        if channel_map is not None and channel_map >= 1 and channel_map <= 0x1fffffffff:
-            msg.ble.connect.channel_map = struct.pack("<Q", channel_map)[:5]
-        if crc_init is not None:
-            msg.ble.connect.crc_init = crc_init
-        if hop_interval is not None:
-            msg.ble.connect.hop_interval = hop_interval
-        if hop_increment is not None:
-            msg.ble.connect.hop_increment = hop_increment
         return self.send_command(msg, message_filter('generic', 'cmd_result'))
 
     def start(self):
@@ -567,9 +589,10 @@ class BLE(WhadDeviceConnector):
         Start currently enabled mode.
         """
         logger.info('starting current BLE mode ...')
-        #msg = Message()
-        #msg.ble.start.CopyFrom(StartCmd())
+        
+        # Create a Start message
         msg = self.hub.ble.createStart()
+        
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         if (resp.generic.cmd_result.result == ResultCode.SUCCESS):
             logger.info('current BLE mode successfully started')
@@ -582,9 +605,10 @@ class BLE(WhadDeviceConnector):
 
         :param int conn_handle: Connection handle of the connection to terminate.
         """
-        #msg = Message()
-        #msg.ble.disconnect.conn_handle = conn_handle
+
+        # Create a Disconnect message
         msg = self.hub.ble.createDisconnect(conn_handle)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -593,9 +617,10 @@ class BLE(WhadDeviceConnector):
         """
         Stop currently enabled mode.
         """
-        #msg = Message()
-        #msg.ble.stop.CopyFrom(StopCmd())
+
+        # Create a Stop message
         msg = self.hub.ble.createStop()
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
         # Remove all triggers
@@ -622,6 +647,7 @@ class BLE(WhadDeviceConnector):
             msg.ble.encryption.rand = struct.pack('<Q', rand)
         if ediv is not None:
             msg.ble.encryption.ediv = struct.pack('<H', ediv)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 
         # Update LL encryption status
