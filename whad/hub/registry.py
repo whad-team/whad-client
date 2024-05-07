@@ -17,7 +17,7 @@ class Registry(object):
         `version` with alias `name`.
         """
         # If version is unknown, create it
-        if version not in Registry.VERSIONS:
+        if version not in parent_class.VERSIONS:
             parent_class.VERSIONS[version] = {}
 
         # Add clazz based on provided alias for this version
