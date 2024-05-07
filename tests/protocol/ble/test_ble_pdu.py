@@ -3,8 +3,8 @@
 import pytest
 
 from whad.protocol.whad_pb2 import Message
-from whad.hub.ble import SendRawPdu, Direction, SendPdu, AdvPduReceived, \
-    AdvType, AddressType, PduReceived, RawPduReceived, SetAdvData
+from whad.hub.ble import SendBleRawPdu, Direction, SendBlePdu, BleAdvPduReceived, \
+    AdvType, AddressType, BlePduReceived, BleRawPduReceived, SetAdvData
 
 BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])
 
@@ -38,8 +38,8 @@ class TestSetAdvData(object):
         assert msg.scanrsp_data == b'FOOBAR'
 
 @pytest.fixture
-def send_raw_pdu():
-    """Create a send_raw_pdu protocol buffer message.
+def send_ble_raw_pdu():
+    """Create a send_ble_raw_pdu protocol buffer message.
     """
     msg = Message()
     msg.ble.send_raw_pdu.direction = Direction.MASTER_TO_SLAVE
@@ -51,14 +51,14 @@ def send_raw_pdu():
     return msg
 
 class TestSendRawPdu(object):
-    """Test SendRawPdu message parsing/crafting
+    """Test SendBleRawPdu message parsing/crafting
     """
 
-    def test_parsing(self, send_raw_pdu):
-        """Check SendRawPdu parsing
+    def test_parsing(self, send_ble_raw_pdu):
+        """Check SendBleRawPdu parsing
         """
-        parsed_obj = SendRawPdu.parse(1, send_raw_pdu)
-        assert isinstance(parsed_obj, SendRawPdu)
+        parsed_obj = SendBleRawPdu.parse(1, send_ble_raw_pdu)
+        assert isinstance(parsed_obj, SendBleRawPdu)
         assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
         assert parsed_obj.conn_handle == 1
         assert parsed_obj.access_address == 0x11223344
@@ -69,7 +69,7 @@ class TestSendRawPdu(object):
     def test_crafting(self):
         """Check SendRawPdu crafting
         """
-        msg = SendRawPdu(
+        msg = SendBleRawPdu(
             direction=Direction.SLAVE_TO_MASTER,
             conn_handle=2,
             access_address=0x99887766,
@@ -86,8 +86,8 @@ class TestSendRawPdu(object):
 
 
 @pytest.fixture
-def send_pdu():
-    """Create a send_pdu protocol buffer message.
+def send_ble_pdu():
+    """Create a send_ble_pdu protocol buffer message.
     """
     msg = Message()
     msg.ble.send_pdu.direction = Direction.MASTER_TO_SLAVE
@@ -100,11 +100,11 @@ class TestSendPdu(object):
     """Test SendPdu message parsing/crafting
     """
 
-    def test_parsing(self, send_pdu):
-        """Check SendRawPdu parsing
+    def test_parsing(self, send_ble_pdu):
+        """Check SendBlePdu parsing
         """
-        parsed_obj = SendPdu.parse(1, send_pdu)
-        assert isinstance(parsed_obj, SendPdu)
+        parsed_obj = SendBlePdu.parse(1, send_ble_pdu)
+        assert isinstance(parsed_obj, SendBlePdu)
         assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
         assert parsed_obj.conn_handle == 1
         assert parsed_obj.pdu == b"HELLOWORLD"
@@ -113,7 +113,7 @@ class TestSendPdu(object):
     def test_crafting(self):
         """Check SendPdu crafting
         """
-        msg = SendPdu(
+        msg = SendBlePdu(
             direction=Direction.SLAVE_TO_MASTER,
             conn_handle=2,
             pdu=b"FOOBAR",
@@ -126,8 +126,8 @@ class TestSendPdu(object):
 
 
 @pytest.fixture
-def adv_pdu():
-    """Create an adv_pdu protocol buffer message
+def ble_adv_pdu():
+    """Create an ble_adv_pdu protocol buffer message
     """
     msg = Message()
     msg.ble.adv_pdu.adv_type = AdvType.ADV_IND
@@ -138,14 +138,14 @@ def adv_pdu():
     return msg
 
 class TestAdvPduReceived(object):
-    """Test AdvPduReceived message parsing/crafting
+    """Test BleAdvPduReceived message parsing/crafting
     """
 
-    def test_parsing(self, adv_pdu):
-        """Check AdvPduReceived parsing
+    def test_parsing(self, ble_adv_pdu):
+        """Check BleAdvPduReceived parsing
         """
-        parsed_obj = AdvPduReceived.parse(1, adv_pdu)
-        assert isinstance(parsed_obj, AdvPduReceived)
+        parsed_obj = BleAdvPduReceived.parse(1, ble_adv_pdu)
+        assert isinstance(parsed_obj, BleAdvPduReceived)
         assert parsed_obj.adv_type == AdvType.ADV_IND
         assert parsed_obj.rssi == -50
         assert parsed_obj.bd_address == BD_ADDRESS_DEFAULT
@@ -155,7 +155,7 @@ class TestAdvPduReceived(object):
     def test_crafting(self):
         """Check AdvPduReceived crafting
         """
-        msg = AdvPduReceived(
+        msg = BleAdvPduReceived(
             adv_type=AdvType.ADV_NONCONN_IND,
             rssi=30,
             bd_address=BD_ADDRESS_DEFAULT,
@@ -170,8 +170,8 @@ class TestAdvPduReceived(object):
 
  
 @pytest.fixture
-def pdu():
-    """Create a pdu protocol buffer message
+def ble_pdu():
+    """Create a ble_pdu protocol buffer message
     """
     msg = Message()
     msg.ble.pdu.direction = Direction.MASTER_TO_SLAVE
@@ -185,11 +185,12 @@ class TestPduReceived(object):
     """Test PduReceived message parsing/crafting
     """
     
-    def test_parsing(self, pdu):
-        """Check PduReceived parsing
+    def test_parsing(self, ble_pdu):
+        """Check BlePduReceived parsing
         """
-        parsed_obj = PduReceived.parse(1, pdu)
-        assert isinstance(parsed_obj, PduReceived)
+        parsed_obj = BlePduReceived.parse(1, ble_pdu)
+        print(parsed_obj)
+        assert isinstance(parsed_obj, BlePduReceived)
         assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
         assert parsed_obj.conn_handle == 1
         assert parsed_obj.pdu == b"HELLOWORLD"
@@ -199,7 +200,7 @@ class TestPduReceived(object):
     def test_crafting(self):
         """Check PduReceived crafting
         """
-        msg = PduReceived(
+        msg = BlePduReceived(
             direction=Direction.SLAVE_TO_MASTER,
             conn_handle=3,
             pdu=b"FOOBAR",
@@ -236,10 +237,10 @@ class TestRawPduReceived(object):
     """
 
     def test_parsing(self, raw_pdu):
-        """Check RawPduReceived parsing
+        """Check BleRawPduReceived parsing
         """
-        parsed_obj = RawPduReceived.parse(1, raw_pdu)
-        assert isinstance(parsed_obj, RawPduReceived)
+        parsed_obj = BleRawPduReceived.parse(1, raw_pdu)
+        assert isinstance(parsed_obj, BleRawPduReceived)
         assert parsed_obj.direction == Direction.MASTER_TO_SLAVE
         assert parsed_obj.channel == 10
         assert parsed_obj.rssi == -60
@@ -254,9 +255,9 @@ class TestRawPduReceived(object):
         assert parsed_obj.decrypted == False
 
     def test_crafting(self):
-        """Check RawPduReceived crafting
+        """Check BleRawPduReceived crafting
         """
-        msg = RawPduReceived(
+        msg = BleRawPduReceived(
             direction=Direction.SLAVE_TO_MASTER,
             channel=22,
             rssi=-10,

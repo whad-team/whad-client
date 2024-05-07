@@ -7,9 +7,9 @@ from whad.protocol.ble.ble_pb2 import JamAdvCmd, CentralModeCmd, StartCmd, StopC
 from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     SniffAccessAddress, SniffActiveConn, AccessAddressDiscovered, JamAdv, \
     JamAdvChan,JamConn, ScanMode, AdvMode, CentralMode, PeriphMode, SetAdvData, \
-    SendRawPdu, SendPdu, AdvPduReceived,AddressType, \
-    PduReceived, RawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
-    Start, Stop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
+    SendBleRawPdu, SendBlePdu, BleAdvPduReceived,AddressType, \
+    BlePduReceived, BleRawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
+    BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
     PrepareSequencePattern, Injected, Direction, AdvType, Triggered
 
@@ -121,16 +121,17 @@ class TestBleDomainFactory(object):
         assert isinstance(obj, PeriphMode)
 
     def test_Start(self, factory: BleDomain):
-        """Test creation of Start message
+        """Test creation of BleStart message
         """
         obj = factory.createStart()
-        assert isinstance(obj, Start)
+        print(BleDomain.VERSIONS)
+        assert isinstance(obj, BleStart)
 
     def test_Stop(self, factory: BleDomain):
-        """Test creation of Stop message
+        """Test creation of BleStop message
         """
         obj = factory.createStop()
-        assert isinstance(obj, Stop)
+        assert isinstance(obj, BleStop)
 
     def test_ConnectTo(self, factory: BleDomain):
         """Test creation of ConnectTo message
@@ -191,47 +192,47 @@ class TestBleDomainFactory(object):
         assert isinstance(obj, SetAdvData)
 
     def test_SendRawPdu(self, factory: BleDomain):
-        """Test creation of SendRawPdu message
+        """Test creation of SendBleRawPdu message
         """
         obj = factory.createSendRawPdu(
             Direction.MASTER_TO_SLAVE,
             b"HELLOWORLD",
             conn_handle=1
         )
-        assert isinstance(obj, SendRawPdu)
+        assert isinstance(obj, SendBleRawPdu)
 
     def test_SendPdu(self, factory: BleDomain):
-        """Test creation of SendPdu message
+        """Test creation of SendBlePdu message
         """
         obj = factory.createSendPdu(
             Direction.MASTER_TO_SLAVE,
             b"HELLOWORLD",
             1
         )
-        assert isinstance(obj, SendPdu)
+        assert isinstance(obj, SendBlePdu)
 
     def test_AdvPduReceived(self, factory: BleDomain):
-        """Test creation of AdvPduReceived message
+        """Test creation of BleAdvPduReceived message
         """
         obj = factory.createAdvPduReceived(
             AdvType.ADV_IND,
             -40, BDAddress("00:11:22:33:44:55"),
             b"FOOBAR"
         )
-        assert isinstance(obj, AdvPduReceived)
+        assert isinstance(obj, BleAdvPduReceived)
 
     def test_PduReceived(self, factory: BleDomain):
-        """Test creation of PduReceived message
+        """Test creation of BlePduReceived message
         """
         obj = factory.createPduReceived(
             Direction.MASTER_TO_SLAVE,
             b"HELLOWORLD",
             1
         )
-        assert isinstance(obj, PduReceived)
+        assert isinstance(obj, BlePduReceived)
 
     def test_RawPduReceived(self, factory: BleDomain):
-        """Test creation of RawPduReceived message
+        """Test creation of BleRawPduReceived message
         """
         obj = factory.createRawPduReceived(
             Direction.SLAVE_TO_MASTER,
@@ -242,7 +243,7 @@ class TestBleDomainFactory(object):
             crc_validity=True,
             channel=12
         )
-        assert isinstance(obj, RawPduReceived)
+        assert isinstance(obj, BleRawPduReceived)
 
     def test_Injected(self, factory: BleDomain):
         """Test creation of Injected message

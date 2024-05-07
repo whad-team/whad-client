@@ -3,18 +3,18 @@
 import pytest
 
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.ble.ble_pb2 import JamAdvCmd, CentralModeCmd, StartCmd, StopCmd
+from whad.protocol.ble.ble_pb2 import JamAdvCmd, CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
 from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     SniffAccessAddress, SniffActiveConn, AccessAddressDiscovered, JamAdv, \
     JamAdvChan,JamConn, ScanMode, AdvMode, CentralMode, PeriphMode, SetAdvData, \
-    SendRawPdu, SendPdu, AdvPduReceived,AddressType, \
-    PduReceived, RawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
-    Start, Stop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
+    SendBleRawPdu, SendBlePdu, BleAdvPduReceived,AddressType, \
+    BlePduReceived, BleRawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
+    BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
     PrepareSequencePattern, Injected
 
 from tests.protocol.ble.test_ble_hijack import hijack_master, hijack_slave, hijack_both, hijacked
-from tests.protocol.ble.test_ble_pdu import send_pdu, send_raw_pdu, raw_pdu, pdu, adv_pdu, set_adv_data
+from tests.protocol.ble.test_ble_pdu import send_ble_pdu, send_ble_raw_pdu, raw_pdu, ble_pdu, ble_adv_pdu, set_adv_data
 from tests.protocol.ble.test_ble_prepseq import prep_seq_manual, prep_seq_connevt, prep_seq_reception
 
 BD_ADDRESS_DEFAULT = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66])
@@ -418,40 +418,40 @@ class TestPeriphMode(object):
         assert msg.scanrsp_data == b'FOOBAR'
 
 @pytest.fixture
-def start():
+def ble_start():
     """Create BLE start protocol buffer message
     """
     msg = Message()
-    msg.ble.start.CopyFrom(StartCmd())
+    msg.ble.start.CopyFrom(BleStartCmd())
     return msg
 
 class TestStart(object):
     """Test Start message parsing/crafting
     """
 
-    def test_parsing(self, start):
+    def test_parsing(self, ble_start):
         """Check Start parsing
         """
-        parsed_obj = Start.parse(1, start)
-        assert isinstance(parsed_obj, Start)
+        parsed_obj = BleStart.parse(1, ble_start)
+        assert isinstance(parsed_obj, BleStart)
 
 @pytest.fixture
-def stop():
+def ble_stop():
     """Create BLE stop protocol buffer message
     """
     msg = Message()
-    msg.ble.stop.CopyFrom(StopCmd())
+    msg.ble.stop.CopyFrom(BleStopCmd())
     return msg   
 
 class TestStop(object):
     """Test Stop message parsing/crafting
     """
 
-    def test_parsing(self, stop):
+    def test_parsing(self, ble_stop):
         """Check Stop parsing
         """
-        parsed_obj = Stop.parse(1, stop)
-        assert isinstance(parsed_obj, Stop)
+        parsed_obj = BleStop.parse(1, ble_stop)
+        assert isinstance(parsed_obj, BleStop)
 
 @pytest.fixture
 def connect():
@@ -797,17 +797,17 @@ class TestBleDomainParsing(object):
         msg = BleDomain.parse(1, periph_mode)
         assert isinstance(msg, PeriphMode)
 
-    def test_start_parsing(self, start):
-        """Check Start message parsing
+    def test_start_parsing(self, ble_start):
+        """Check BleStart message parsing
         """
-        msg = BleDomain.parse(1, start)
-        assert isinstance(msg, Start)
+        msg = BleDomain.parse(1, ble_start)
+        assert isinstance(msg, BleStart)
 
-    def test_stop_parsing(self, stop):
-        """Check Stop message parsing
+    def test_stop_parsing(self, ble_stop):
+        """Check BleStop message parsing
         """
-        msg = BleDomain.parse(1, stop)
-        assert isinstance(msg, Stop)
+        msg = BleDomain.parse(1, ble_stop)
+        assert isinstance(msg, BleStop)
 
     def test_set_adv_data_parsing(self, set_adv_data):
         """Check SetAdvData message parsing
@@ -815,35 +815,35 @@ class TestBleDomainParsing(object):
         msg = BleDomain.parse(1, set_adv_data)
         assert isinstance(msg, SetAdvData)
 
-    def test_send_raw_pdu_parsing(self, send_raw_pdu):
+    def test_send_raw_pdu_parsing(self, send_ble_raw_pdu):
         """Check SendRawPdu message parsing
         """
-        msg = BleDomain.parse(1, send_raw_pdu)
-        assert isinstance(msg, SendRawPdu)
+        msg = BleDomain.parse(1, send_ble_raw_pdu)
+        assert isinstance(msg, SendBleRawPdu)
 
-    def test_send_pdu_parsing(self, send_pdu):
+    def test_send_pdu_parsing(self, send_ble_pdu):
         """Check SendPdu message parsing
         """
-        msg = BleDomain.parse(1, send_pdu)
-        assert isinstance(msg, SendPdu)
+        msg = BleDomain.parse(1, send_ble_pdu)
+        assert isinstance(msg, SendBlePdu)
 
-    def test_adv_pdu_parsing(self, adv_pdu):
+    def test_adv_pdu_parsing(self, ble_adv_pdu):
         """Check AdvPduReceived message parsing
         """
-        msg = BleDomain.parse(1, adv_pdu)
-        assert isinstance(msg, AdvPduReceived)
+        msg = BleDomain.parse(1, ble_adv_pdu)
+        assert isinstance(msg, BleAdvPduReceived)
 
-    def test_pdu_parsing(self, pdu):
+    def test_pdu_parsing(self, ble_pdu):
         """Check PduReceived message parsing
         """
-        msg = BleDomain.parse(1, pdu)
-        assert isinstance(msg, PduReceived)
+        msg = BleDomain.parse(1, ble_pdu)
+        assert isinstance(msg, BlePduReceived)
 
     def test_raw_pdu_parsing(self, raw_pdu):
         """Check RawPduReceived message parsing
         """
         msg = BleDomain.parse(1, raw_pdu)
-        assert isinstance(msg, RawPduReceived)
+        assert isinstance(msg, BleRawPduReceived)
 
     def test_connect_parsing(self, connect):
         """Check ConnectTo message parsing
