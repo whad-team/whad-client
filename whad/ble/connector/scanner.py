@@ -28,6 +28,7 @@ an :class:`UnsupportedCapability` exception.
 """
 from scapy.packet import Packet
 from typing import Iterator
+from whad.hub.ble import BleAdvPduReceived
 from whad.ble.connector import BLE
 from whad.ble.scanning import AdvertisingDevicesDB, AdvertisingDevice
 from whad.ble import UnsupportedCapability, message_filter, BleAdvType,\
@@ -103,9 +104,10 @@ class Scanner(BLE):
 
             message = self.wait_for_message(filter=message_filter('ble', message_type))
             # Convert message from rebuilt PDU
-            packet = self.translator.from_message(message.ble, message_type)
+            packet = self.translator.from_message(message)
             self.monitor_packet_rx(packet)
             # Force TxAdd value to propagate the address type
-            if message.ble.adv_pdu.addr_type > 0:
-                packet.getlayer(BTLE_ADV).TxAdd = 1
+            if isinstance(message, BleAdvPduReceived):
+                if message.addr_type > 0:
+                    packet.getlayer(BTLE_ADV).TxAdd = 1
             yield packet

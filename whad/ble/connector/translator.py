@@ -10,7 +10,8 @@ from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
 
 from whad.ble.metadata import generate_ble_metadata
 from whad.hub import ProtocolHub
-from whad.hub.ble import AdvType
+from whad.hub.ble import AdvType, BleAdvPduReceived, BlePduReceived, BleRawPduReceived, \
+    SendBlePdu, SendBleRawPdu
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +30,6 @@ class BleMessageTranslator(object):
     as well as standard methods to convert WHAD BLE messages into scapy packets
     (if it makes sense) and scapy packets into WHAD BLE messages.
     """
-
-    # correlation table
-    SCAPY_CORR_ADV = {
-        AdvType.ADV_IND: BTLE_ADV_IND,
-        AdvType.ADV_NONCONN_IND: BTLE_ADV_NONCONN_IND,
-        AdvType.ADV_DIRECT_IND: BTLE_ADV_DIRECT_IND,
-        AdvType.ADV_SCAN_IND: BTLE_ADV_SCAN_IND,
-        AdvType.ADV_SCAN_RSP: BTLE_SCAN_RSP
-    }
 
     def __init__(self, protocol_hub: ProtocolHub):
         self.__access_address = 0x11223344
@@ -68,43 +60,43 @@ class BleMessageTranslator(object):
         return formatted_packet, timestamp
 
 
-    def from_message(self, message, msg_type):
+    def from_message(self, message):
         """Convert a WHAD message into a packet, if it makes sense.
         """
         try:
             # Advertising PDU (RX)
-            if msg_type == 'adv_pdu':
-                if message.adv_pdu.adv_type in BleMessageTranslator.SCAPY_CORR_ADV:
-                    data = bytes(message.adv_pdu.adv_data)
+            if isinstance(message, BleAdvPduReceived):
+                if message.adv_type in BleMessageTranslator.SCAPY_CORR_ADV:
+                    data = bytes(message.adv_data)
 
-                    packet = BTLE_ADV()/BleMessageTranslator.SCAPY_CORR_ADV[message.adv_pdu.adv_type](
-                            bytes(message.adv_pdu.bd_address) + data
+                    packet = BTLE_ADV()/BleMessageTranslator.SCAPY_CORR_ADV[message.adv_type](
+                            bytes(message.bd_address) + data
                         )
-                    packet.metadata = generate_ble_metadata(message, msg_type)
+                    packet.metadata = generate_ble_metadata(message)
                     return packet
 
             # Raw PDU (RX)
-            elif msg_type == 'raw_pdu':
-                packet = BTLE(bytes(struct.pack("I", message.raw_pdu.access_address)) + bytes(message.raw_pdu.pdu) + bytes(struct.pack(">I", message.raw_pdu.crc)[1:]))
-                packet.metadata = generate_ble_metadata(message, msg_type)
+            elif isinstance(message, BleRawPduReceived):
+                packet = BTLE(bytes(struct.pack("I", message.access_address)) + bytes(message.pdu) + bytes(struct.pack(">I", message.crc)[1:]))
+                packet.metadata = generate_ble_metadata(message)
                 return packet
 
             # Normal PDU (RX)
-            elif msg_type == 'pdu':
+            elif isinstance(message, BlePduReceived):
                 packet = BTLE_DATA(message.pdu.pdu)
-                packet.metadata = generate_ble_metadata(message, msg_type)
+                packet.metadata = generate_ble_metadata(message)
                 return packet
 
             # Send PDU (TX)
-            elif msg_type == 'send_pdu':
-                packet = BTLE_DATA(message.send_pdu.pdu)
-                packet.metadata = generate_ble_metadata(message, msg_type)
+            elif isinstance(message, SendBlePdu):
+                packet = BTLE_DATA(message.pdu)
+                packet.metadata = generate_ble_metadata(message)
                 return packet
 
             # Send Raw PDU (TX)
-            elif msg_type == 'send_raw_pdu':
-                packet = BTLE(bytes(struct.pack("I", message.send_raw_pdu.access_address)) + bytes(message.send_raw_pdu.pdu) + bytes(struct.pack(">I", message.send_raw_pdu.crc)[1:]))
-                packet.metadata = generate_ble_metadata(message, msg_type)
+            elif isinstance(message, SendBleRawPdu):
+                packet = BTLE(bytes(struct.pack("I", message.access_address)) + bytes(message.pdu) + bytes(struct.pack(">I", message.crc)[1:]))
+                packet.metadata = generate_ble_metadata(message)
                 return packet
 
         except AttributeError as err:

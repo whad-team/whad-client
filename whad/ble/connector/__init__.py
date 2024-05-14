@@ -1,29 +1,39 @@
 import struct
+import logging
 
+from queue import Queue, Empty
+
+# Scapy
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
     BTLE_RF, BTLE_CTRL
 from scapy.compat import raw
 from scapy.packet import Packet
-from queue import Queue, Empty
 
-from whad.hub.ble.bdaddr import BDAddress
-from whad.hub.ble.chanmap import ChannelMap
-
+# Device interface
 from whad.device import WhadDeviceConnector
-from whad.hub.ble import Commands, AdvType, Direction
-from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.ble.metadata import generate_ble_metadata, BLEMetadata
-from whad.ble.connector.translator import BleMessageTranslator
-from whad.helpers import message_filter, bd_addr_to_bytes
-from whad.ble.profile.advdata import AdvDataFieldList
+
+# Old protocol stuff (to remove)
+from whad.protocol.generic_pb2 import ResultCode
+
+# Protocol hub
+from whad.helpers import message_filter
+from whad.hub.generic.cmdresult import Success
+from whad.hub.ble.bdaddr import BDAddress
+from whad.hub.ble.chanmap import ChannelMap
+from whad.hub.ble import Commands, AdvType, Direction, BleAdvPduReceived, BlePduReceived, \
+    BleRawPduReceived, Synchronized, Desynchronized, Connected, Disconnected, Triggered
+
+# Bluetooth Low Energy dependencies
 from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
+from whad.ble.metadata import BLEMetadata
+from whad.ble.connector.translator import BleMessageTranslator
+from whad.ble.profile.advdata import AdvDataFieldList
 from whad.ble.exceptions import ConnectionLostException
 
-# Logging
-import logging
+# Logging
 logger = logging.getLogger(__name__)
 
 class BLE(WhadDeviceConnector):
@@ -281,7 +291,7 @@ class BLE(WhadDeviceConnector):
 
         msg = self.hub.ble.createTrigger(trigger.identifier)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return resp.generic.cmd_result.result == ResultCode.SUCCESS
+        return isinstance(resp, Success)
 
     def can_delete_sequence(self):
         """
@@ -303,7 +313,7 @@ class BLE(WhadDeviceConnector):
         msg = self.hub.ble.createDeleteSequence(trigger.identifier)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return resp.generic.cmd_result.result == ResultCode.SUCCESS
+        return isinstance(resp, Success)
 
 
     def prepare(self, *packets, trigger=ManualTrigger(), direction=Direction.MASTER_TO_SLAVE):
@@ -350,7 +360,7 @@ class BLE(WhadDeviceConnector):
             return False
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        success = resp.generic.cmd_result.result == ResultCode.SUCCESS
+        success = isinstance(resp, Success)
         if success:
             self.__triggers.append(trigger)
         return success
@@ -366,9 +376,7 @@ class BLE(WhadDeviceConnector):
         msg = self.hub.ble.createReactiveJam(channel, pattern, position)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
-
+        return isinstance(resp, Success)
 
     def jam_advertisement_on_channel(self, channel=37):
         """
@@ -381,9 +389,7 @@ class BLE(WhadDeviceConnector):
         msg = self.hub.ble.createJamAdvChan(channel)
         
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
-
+        return isinstance(resp, Success)
 
     def hijack_master(self, access_address):
         """
@@ -396,7 +402,7 @@ class BLE(WhadDeviceConnector):
         msg = self.hub.ble.createHijackMaster(access_address)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def discover_access_addresses(self):
         """
@@ -409,7 +415,7 @@ class BLE(WhadDeviceConnector):
         msg = self.hub.ble.createSniffAccessAddress(b"\xFF\xFF\xFF\xFF\x1F")
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def sniff_active_connection(self, access_address: int , crc_init: int = None,
                                 channel_map: ChannelMap = None, hop_interval: int = None,
@@ -431,8 +437,7 @@ class BLE(WhadDeviceConnector):
         )
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
+        return isinstance(resp, Success)
 
     def hijack_slave(self, access_address):
         """
@@ -445,8 +450,7 @@ class BLE(WhadDeviceConnector):
         msg = self.hub.ble.createHijackSlave(access_address)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
+        return isinstance(resp, Success)
 
     def hijack_both(self, access_address):
         """
@@ -459,7 +463,7 @@ class BLE(WhadDeviceConnector):
         msg = self.hub.ble.createHijackBoth(access_address)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def sniff_advertisements(self, channel=37, bd_address="FF:FF:FF:FF:FF:FF"):
         """
@@ -472,8 +476,7 @@ class BLE(WhadDeviceConnector):
         msg = self.hub.ble.createSniffAdv(channel, BDAddress(bd_address))
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
-
+        return isinstance(resp, Success)
 
     def sniff_new_connection(self, channel=37, show_advertisements=True, show_empty_packets=False, bd_address="FF:FF:FF:FF:FF:FF"):
         """
@@ -491,7 +494,7 @@ class BLE(WhadDeviceConnector):
         )
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def set_bd_address(self, bd_address, public=True):
         """
@@ -508,7 +511,7 @@ class BLE(WhadDeviceConnector):
             ))
 
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+            return isinstance(resp, Success)
         else:
             return False
 
@@ -588,11 +591,11 @@ class BLE(WhadDeviceConnector):
         msg = self.hub.ble.createStart()
         
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        if (resp.generic.cmd_result.result == ResultCode.SUCCESS):
+        if isinstance(resp, Success):
             logger.info('current BLE mode successfully started')
         else:
             logger.info('an error occured while starting !')
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def disconnect(self, conn_handle):
         """Terminate a specific connection.
@@ -604,7 +607,7 @@ class BLE(WhadDeviceConnector):
         msg = self.hub.ble.createDisconnect(conn_handle)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
 
     def stop(self):
@@ -621,7 +624,8 @@ class BLE(WhadDeviceConnector):
         for trigger in self.__triggers:
             trigger.connector = None
         self.__triggers = []
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+
+        return isinstance(resp, Success)
 
     def set_encryption(self, conn_handle, enabled=False, ll_key=None, ll_iv=None, key=None, rand=None, ediv=None):
         """Notify WHAD device about encryption status
@@ -665,9 +669,8 @@ class BLE(WhadDeviceConnector):
             return
 
         if domain == 'ble':
-            msg_type = message.WhichOneof('msg')
-            if msg_type == 'adv_pdu':
-                packet = self.translator.from_message(message, msg_type)
+            if isinstance(message, BleAdvPduReceived):
+                packet = self.translator.from_message(message)
                 if packet is not None:
                     self.monitor_packet_rx(packet)
 
@@ -676,15 +679,14 @@ class BLE(WhadDeviceConnector):
                         self.add_pending_pdu(packet)                        
                     else:
                         self.on_adv_pdu(packet)
-
-            elif msg_type == 'pdu':
-                if message.pdu.processed:
-                    packet = self.translator.from_message(message, msg_type)
+            elif isinstance(message, BlePduReceived):
+                if message.processed:
+                    packet = self.translator.from_message(message)
                     if packet is not None:
                         self.monitor_packet_rx(packet)
                         logger.info('[ble PDU log-only]')
                 else:
-                    packet = self.translator.from_message(message, msg_type)
+                    packet = self.translator.from_message(message)
                     if packet is not None:
                         self.monitor_packet_rx(packet)
 
@@ -693,16 +695,15 @@ class BLE(WhadDeviceConnector):
                             self.add_pending_pdu(packet)
                         else:
                             self.on_pdu(packet)
-
-            elif msg_type == 'raw_pdu':
-                if message.raw_pdu.processed:
-                    packet = self.translator.from_message(message, msg_type)
+            elif isinstance(message, BleRawPduReceived):
+                if message.processed:
+                    packet = self.translator.from_message(message)
                     if packet is not None:
                         self.monitor_packet_rx(packet)
                         logger.info('[ble PDU log-only]')
                 else:
                     # Extract scapy packet
-                    packet = self.translator.from_message(message, msg_type)
+                    packet = self.translator.from_message(message)
                     if packet is not None:
                         self.monitor_packet_rx(packet)
 
@@ -711,27 +712,22 @@ class BLE(WhadDeviceConnector):
                             self.add_pending_pdu(packet)
                         else:
                             self.on_raw_pdu(packet)
-
-            elif msg_type == 'synchronized':
+            elif isinstance(message, Synchronized):
                 self.on_synchronized(
-                    access_address = message.synchronized.access_address,
-                    crc_init = message.synchronized.crc_init,
-                    hop_interval = message.synchronized.hop_interval,
-                    hop_increment = message.synchronized.hop_increment,
-                    channel_map = message.synchronized.channel_map
+                    access_address = message.access_address,
+                    crc_init = message.crc_init,
+                    hop_interval = message.hop_interval,
+                    hop_increment = message.hop_increment,
+                    channel_map = message.channel_map
                 )
-
-            elif msg_type == 'desynchronized':
-                self.on_desynchronized(access_address=message.desynchronized.access_address)
-
-            elif msg_type == 'connected':
-                self.on_connected(message.connected)
-
-            elif msg_type == 'disconnected':
-                self.on_disconnected(message.disconnected)
-
-            elif msg_type == 'triggered':
-                self.on_triggered(message.triggered.id)
+            elif isinstance(message, Desynchronized):
+                self.on_desynchronized(access_address=message.access_address)
+            elif isinstance(message, Connected):
+                self.on_connected(message)
+            elif isinstance(message, Disconnected):
+                self.on_disconnected(message)
+            elif isinstance(message, Triggered):
+                self.on_triggered(message.id)
 
 
     def on_synchronized(self, access_address=None, crc_init=None, hop_increment=None, hop_interval=None, channel_map=None):
@@ -834,7 +830,7 @@ class BLE(WhadDeviceConnector):
             if resp is None:
                 raise ConnectionLostException(None)
             else:
-                return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+                return isinstance(resp, Success)
         else:
             return False
 

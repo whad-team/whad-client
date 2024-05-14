@@ -3,6 +3,8 @@ from scapy.layers.bluetooth4LE import BTLE_RF
 from whad.ble.utils.phy import channel_to_frequency
 from whad.common.metadata import Metadata
 from dataclasses import dataclass
+from whad.hub.ble import BleAdvPduReceived, BlePduReceived, BleRawPduReceived, \
+    SendBlePdu, SendBleRawPdu
 
 @dataclass(repr=False)
 class BLEMetadata(Metadata):
@@ -48,42 +50,37 @@ class BLEMetadata(Metadata):
         )
         return header, timestamp
 
-def generate_ble_metadata(message, msg_type):
+def generate_ble_metadata(message):
     metadata = BLEMetadata()
-    if msg_type == "raw_pdu":
-        message = message.raw_pdu
+    if isinstance(message, BleRawPduReceived):
         metadata.direction = message.direction
-        if message.HasField("rssi"):
+        if message.rssi is not None:
             metadata.rssi = message.rssi
         metadata.channel = message.channel
-        if message.HasField("timestamp"):
+        if message.timestamp is not None:
             metadata.timestamp = message.timestamp
-        if message.HasField("crc_validity"):
+        if message.crc_validity is not None:
             metadata.is_crc_valid = message.crc_validity
-        if message.HasField("relative_timestamp"):
+        if message.relative_timestamp is not None:
             metadata.relative_timestamp = message.relative_timestamp
             metadata.decrypted = message.decrypted
 
         metadata.connection_handle = message.conn_handle
 
-    elif msg_type == "adv_pdu":
-        message = message.adv_pdu
+    elif isinstance(BleAdvPduReceived):
         metadata.direction = BleDirection.UNKNOWN
         metadata.rssi = message.rssi
 
-    elif msg_type == "pdu":
-        message = message.pdu
+    elif isinstance(BlePduReceived):
         metadata.connection_handle = message.conn_handle
         metadata.direction = message.direction
         metadata.decrypted = message.decrypted
 
-    elif msg_type == "send_pdu":
-        message = message.send_pdu
+    elif isinstance(message, SendBlePdu):
         metadata.connection_handle = message.conn_handle
         metadata.direction = message.direction
 
-    elif msg_type == "send_raw_pdu":
-        message = message.send_raw_pdu
+    elif isinstance(message, SendBleRawPdu):
         metadata.direction = message.direction
         metadata.crc = message.crc
         metadata.connection_handle = message.conn_handle
