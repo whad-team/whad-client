@@ -10,11 +10,11 @@ class ConnectTo(PbMessageWrapper):
     """
     bd_address = PbFieldBytes('ble.connect.bd_address')
     addr_type = PbFieldInt('ble.connect.addr_type')
-    access_address = PbFieldInt('ble.connect.access_address')
-    channel_map = PbFieldBytes('ble.connect.channel_map')
-    hop_interval = PbFieldInt('ble.connect.hop_interval')
-    hop_increment = PbFieldInt('ble.connect.hop_increment')
-    crc_init = PbFieldInt('ble.connect.crc_init')
+    access_address = PbFieldInt('ble.connect.access_address', optional=True)
+    channel_map = PbFieldBytes('ble.connect.channel_map', optional=True)
+    hop_interval = PbFieldInt('ble.connect.hop_interval', optional=True)
+    hop_increment = PbFieldInt('ble.connect.hop_increment', optional=True)
+    crc_init = PbFieldInt('ble.connect.crc_init', optional=True)
 
 @pb_bind(BleDomain, 'disconnect', 1)
 class Disconnect(PbMessageWrapper):
