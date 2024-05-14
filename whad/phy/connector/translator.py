@@ -4,6 +4,7 @@ from whad.scapy.layers.phy import Phy_Packet
 from whad.phy.metadata import generate_phy_metadata
 from whad.protocol.whad_pb2 import Message
 from whad.hub import ProtocolHub
+from whad.hub.phy import PacketReceived, RawPacketReceived
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,9 +35,9 @@ class PhyMessageTranslator(object):
         return packet, 0
 
 
-    def from_message(self, message, msg_type):
-        if msg_type == 'raw_packet':
-            bytes_packet = bytes(message.raw_packet.packet)
+    def from_message(self, message):
+        if isinstance(message, RawPacketReceived):
+            bytes_packet = bytes(message.packet)
             if self.pattern_cropped_bytes > 0:
                 bytes_packet = self.pattern[:self.pattern_cropped_bytes] + bytes_packet
 
@@ -47,12 +48,12 @@ class PhyMessageTranslator(object):
                     packet = self.physical_layer.scapy_layer(bytes_packet)
                 else:
                     packet = Phy_Packet(bytes_packet)
-                    packet.metadata = generate_phy_metadata(message, msg_type)
+                    packet.metadata = generate_phy_metadata(message)
 
                 return packet
 
-        elif msg_type == 'packet':
-            bytes_packet = bytes(message.packet.packet)
+        elif isinstance(message, PacketReceived):
+            bytes_packet = bytes(message.packet)
             if self.pattern_cropped_bytes > 0:
 
                 bytes_packet = self.pattern[:self.pattern_cropped_bytes] + bytes_packet
@@ -63,10 +64,7 @@ class PhyMessageTranslator(object):
                     packet = self.physical_layer.scapy_layer(bytes_packet)
                 else:
                     packet = Phy_Packet(bytes_packet)
-                    packet.metadata = generate_phy_metadata(message, msg_type)
-
-
-
+                    packet.metadata = generate_phy_metadata(message)
                 return packet
 
 
