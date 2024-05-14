@@ -3,8 +3,13 @@ from scapy.fields import StrField
 from scapy.packet import Packet_metaclass
 import whad
 
+"""
 def message_filter(category, message):
     return lambda x: x.WhichOneof('msg') == category and getattr(x, category).WhichOneof('msg')==message
+"""
+
+def message_filter(message_class):
+    return lambda x: isinstance(x, message_class)
 
 def is_message_type(message, category, message_type):
     if message.WhichOneof('msg') == category:
