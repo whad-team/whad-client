@@ -40,7 +40,7 @@ class WhadDeviceInfo(object):
         self.__fw_ver_min = info_resp.fw_version_minor
         self.__fw_ver_rev = info_resp.fw_version_rev
         self.__device_type = info_resp.type
-        self.__device_id = asciiz(info_resp.devid)
+        self.__device_id = asciiz(info_resp.device_id)
 
         # Parse domains and capabilities
         self.__domains = {}
@@ -897,7 +897,7 @@ class WhadDevice(object):
                 msg = self.__msg_queue.get(block=True, timeout=timeout)
 
                 # If message does not match, dispatch.
-                if not self.__mq_filter(msg):
+                if not self.__mq_filter(msg.message):
                     self.dispatch_message(msg)
                 else:
                     return msg
@@ -1013,10 +1013,16 @@ class WhadDevice(object):
                     msg_size = self.__inpipe[2] | (self.__inpipe[3] << 8)
                     if len(self.__inpipe) >= (msg_size+4):
                         raw_message = self.__inpipe[4:4+msg_size]
-                        _msg = Message()
-                        _msg.ParseFromString(bytes(raw_message))
+
+                        # Parse our message with our Protocol Hub
+                        #_msg = Message()
+                        #_msg.ParseFromString(bytes(raw_message))
+
+                        # Parse received message with our Protocol Hub
+                        msg = self.__hub.parse(bytes(raw_message))
+
                         logger.debug('WHAD message successfully parsed')
-                        self.on_message_received(_msg)
+                        self.on_message_received(msg)
                         # Chomp
                         self.__inpipe = self.__inpipe[msg_size + 4:]
                     else:
@@ -1044,6 +1050,7 @@ class WhadDevice(object):
         self.on_any_msg(message)
 
         # Forward to dedicated callbacks
+        """
         if message.WhichOneof('msg') == 'discovery':
             logger.info('message is about device discovery, forwarding to discovery handler')
             self.on_discovery_msg(message.discovery)
@@ -1056,6 +1063,19 @@ class WhadDevice(object):
             if domain is not None:
                 logger.info('message concerns domain `%s`, forward to domain-specific handler' % domain)
                 self.on_domain_msg(domain, getattr(message,domain))
+        """
+        if message.message_type == "discovery":
+            logger.info('message is about device discovery, forwarding to discovery handler')
+            self.on_discovery_msg(message)
+        elif message.message_type == "generic":
+            logger.info('message is generic, forwarding to default handler')
+            self.on_generic_msg(message)
+            logger.info('on_generic_message called')
+        else:
+            domain = message.message_type
+            if domain is not None:
+                logger.info('message concerns domain `%s`, forward to domain-specific handler' % domain)
+                self.on_domain_msg(domain, message)
 
     def on_message_received(self, message):
         """
@@ -1070,7 +1090,7 @@ class WhadDevice(object):
         logger.debug(self.__mq_filter)
         # If message queue filter is defined and message matches this filter,
         # move it into our message queue.
-        if self.__mq_filter is not None and self.__mq_filter(message):
+        if self.__mq_filter is not None and self.__mq_filter(message.message):
             logger.info('message does match current filter, save it for processing')
             self.__msg_queue.put(message, block=True)
         else:
@@ -1223,25 +1243,27 @@ class WhadDevice(object):
             # If we have an answer, process it.
             if resp is not None:
 
+                # Ensure response is the one we expect
+                assert isinstance(resp, InfoQueryResp)
+
                 # Save device information
                 self.__info = WhadDeviceInfo(
-                    resp.discovery.info_resp
+                    resp
                 )
 
                 # Parse DeviceInfoResponse
-                device_info = self.hub.parse(resp)
-                assert isinstance(device_info, InfoQueryResp)
+                #device_info = self.hub.parse(resp)
 
                 # Update our ProtocolHub version to the device version
-                self.__hub = ProtocolHub(device_info.proto_min_ver)
+                self.__hub = ProtocolHub(resp.proto_min_ver)
 
                 # Query device domains
                 logger.info('query supported commands per domain')
                 for domain in self.__info.domains:
                     resp = self.send_discover_domain_query(domain)
                     self.__info.add_supported_commands(
-                        resp.discovery.domain_resp.domain,
-                        resp.discovery.domain_resp.supported_commands
+                        resp.domain,
+                        resp.supported_commands
                     )
 
                 # Mark device as discovered
