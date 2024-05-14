@@ -37,6 +37,8 @@ class BDAddress(object):
                 self.__value = unhexlify(address)[::-1]
             else:
                 raise InvalidBDAddressException
+        elif isinstance(address, bytes) and len(address) == 6:
+            self.__value = address
         else:
             raise InvalidBDAddressException
 
