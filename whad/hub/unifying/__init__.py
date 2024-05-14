@@ -27,6 +27,7 @@ class UnifyingDomain(Registry):
     """WHAD Logitech Unifying domain messages parser/factory.
     """
 
+    NAME = 'unifying'
     VERSIONS = {}
 
     def __init__(self, version: int):

@@ -80,6 +80,7 @@ class Dot15d4Domain(Registry):
     """WHAD Dot15d4 domain messages parser/factory.
     """
 
+    NAME = 'dot15d4'
     VERSIONS = {}
 
     def __init__(self, version: int):

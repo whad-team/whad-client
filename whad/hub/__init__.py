@@ -20,6 +20,7 @@ class ProtocolHub(Registry):
     differences that exist between them in a transparent fashion.
     """
 
+    NAME = 'hub'
     VERSIONS = {}
 
     def __init__(self, proto_version: int):

@@ -1,6 +1,7 @@
 """WHAD Protocol Generic message abstraction layer.
 """
-from whad.hub.message import HubMessage, pb_bind, Registry
+from whad.protocol.whad_pb2 import Message
+from whad.hub.message import HubMessage, pb_bind, Registry, PbMessageWrapper
 from whad.hub import ProtocolHub
 
 @pb_bind(ProtocolHub, name='generic', version=1)
@@ -8,6 +9,7 @@ class Generic(Registry):
     """WHAD Generic message parser/factory.
     """
 
+    NAME = 'generic'
     VERSIONS = {}
 
     def __init__(self, version: int):

@@ -68,6 +68,7 @@ class BleDomain(Registry):
     """WHAD BLE domain messages parser/factory.
     """
 
+    NAME = 'ble'
     VERSIONS = {}
 
     def __init__(self, version: int):

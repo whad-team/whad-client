@@ -149,7 +149,11 @@ class pb_bind(object):
     def __call__(self, clazz):
         """Decorate our class
         """
+        # Register our class with the corresponding name
         self.__registry.add_node_version(self.__version, self.__name, clazz)
+
+        # Add to our class a category type corresponding to the registry name
+        clazz.message_type = self.__registry.NAME
         return clazz
    
 

@@ -10,6 +10,7 @@ class Discovery(Registry):
     """WHAD Discovery message parser/factory.
     """
 
+    NAME = 'discovery'
     VERSIONS = {}
 
     def __init__(self, version: int):

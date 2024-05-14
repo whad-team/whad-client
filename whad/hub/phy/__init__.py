@@ -93,6 +93,7 @@ class PhyDomain(Registry):
     """WHAD PHY domain messages parser/factory.
     """
 
+    NAME = 'phy'
     VERSIONS = {}
 
     def __init__(self, version: int):

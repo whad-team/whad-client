@@ -82,6 +82,7 @@ class EsbDomain(Registry):
     """WHAD ESB domain messages parser/factory.
     """
 
+    NAME = 'esb'
     VERSIONS = {}
 
     def __init__(self, version: int):
