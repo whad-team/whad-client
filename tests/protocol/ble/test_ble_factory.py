@@ -11,7 +11,8 @@ from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     BlePduReceived, BleRawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
-    PrepareSequencePattern, Injected, Direction, AdvType, Triggered, Trigger, DeleteSequence
+    PrepareSequencePattern, Injected, Direction, AdvType, Triggered, Trigger, DeleteSequence, \
+    SetEncryption
 
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import DefaultChannelMap
@@ -337,3 +338,23 @@ class TestBleDomainFactory(object):
         obj = factory.createDeleteSequence(10)
         assert isinstance(obj, DeleteSequence)
         assert obj.sequence_id == 10
+
+    def test_SetEncryption(self, factory: BleDomain):
+        """Test creation of SetEncryption message
+        """
+        obj: SetEncryption = factory.createSetEncryption(
+            15,
+            b"LLKEY",
+            b"LLIV",
+            b"KEY",
+            b"RAND",
+            b"EDIV",
+            True
+        )
+        assert isinstance(obj, SetEncryption)
+        assert obj.conn_handle == 15
+        assert obj.ll_key == b"LLKEY"
+        assert obj.ll_iv == b"LLIV"
+        assert obj.key == b"KEY"
+        assert obj.rand == b"RAND"
+        assert obj.ediv == b"EDIV"

@@ -11,7 +11,7 @@ from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     BlePduReceived, BleRawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
-    PrepareSequencePattern, Injected, Trigger, Triggered, DeleteSequence
+    PrepareSequencePattern, Injected, Trigger, Triggered, DeleteSequence, SetEncryption
 
 from tests.protocol.ble.test_ble_hijack import hijack_master, hijack_slave, hijack_both, hijacked
 from tests.protocol.ble.test_ble_pdu import send_ble_pdu, send_ble_raw_pdu, raw_pdu, ble_pdu, ble_adv_pdu, set_adv_data
@@ -706,6 +706,59 @@ class TestInjected(object):
         assert msg.access_address == 0x99887766
         assert msg.injection_attempts == 1
 
+
+@pytest.fixture
+def set_encryption():
+    msg = Message()
+    msg.ble.encryption.ll_key = b"LLKEY"
+    msg.ble.encryption.conn_handle = 42
+    msg.ble.encryption.enabled = True
+    msg.ble.encryption.ll_iv = b"LLIV"
+    msg.ble.encryption.key = b"KEY"
+    msg.ble.encryption.rand = b"RAND"
+    msg.ble.encryption.ediv = b"EDIV"
+    return msg
+
+class TestSetEncryption(object):
+    """Test SetEncryption message parsing/crafting
+    """
+
+    def test_parsing(self, set_encryption):
+        """Check SetEncryption message is correctly parsed.
+        """
+        parsed_obj = SetEncryption.parse(1, set_encryption)
+        assert isinstance(parsed_obj, SetEncryption)
+        assert parsed_obj.conn_handle == 42
+        assert parsed_obj.enabled == True
+        assert parsed_obj.ll_key == b"LLKEY"
+        assert parsed_obj.ll_iv == b"LLIV"
+        assert parsed_obj.key == b"KEY"
+        assert parsed_obj.rand == b"RAND"
+        assert parsed_obj.ediv == b"EDIV"
+
+    def test_crafting(self):
+        """Check SetEncryption message crafting.
+        """
+        msg = SetEncryption(
+            conn_handle=12,
+            enabled=False,
+            ll_key=b"FOO_LLKEY",
+            ll_iv=b"FOO_LLIV",
+            key=b"FOO_KEY",
+            rand=b"FOO_RAND",
+            ediv=b"FOO_EDIV"
+        )
+        assert msg.conn_handle == 12
+        assert msg.enabled == False
+        assert msg.ll_key == b"FOO_LLKEY"
+        assert msg.ll_iv == b"FOO_LLIV"
+        assert msg.key == b"FOO_KEY"
+        assert msg.rand == b"FOO_RAND"
+        assert msg.ediv == b"FOO_EDIV"
+
+
+
+
 ###
 # BLE Domain parsing
 ###
@@ -947,3 +1000,9 @@ class TestBleDomainParsing(object):
         """
         msg = BleDomain.parse(1, ble_delete_seq)
         assert isinstance(msg, DeleteSequence)
+
+    def test_set_encryption(self, set_encryption):
+        """Check SetEncryption message parsing
+        """
+        msg = BleDomain.parse(1, set_encryption)
+        assert isinstance(msg, SetEncryption)

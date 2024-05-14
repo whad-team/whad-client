@@ -631,20 +631,16 @@ class BLE(WhadDeviceConnector):
         """Notify WHAD device about encryption status
         """
         print("set_encryption", enabled, ll_key.hex(), ll_iv.hex(), key.hex(), rand, ediv)
-        # Send SetEncryptionCmd to device
-        msg = Message()
-        msg.ble.encryption.enabled = enabled
-        msg.ble.encryption.conn_handle = conn_handle
-        if ll_key is not None:
-            msg.ble.encryption.ll_key = ll_key
-        if ll_iv is not None:
-            msg.ble.encryption.ll_iv = ll_iv
-        if key is not None:
-            msg.ble.encryption.key = key
-        if rand is not None:
-            msg.ble.encryption.rand = struct.pack('<Q', rand)
-        if ediv is not None:
-            msg.ble.encryption.ediv = struct.pack('<H', ediv)
+
+        # Create a SetEncryption message
+        msg = self.hub.ble.createSetEncryption(
+            conn_handle,
+            ll_key if ll_key is not None else b"",
+            ll_iv if ll_iv is not None else b"",
+            key if key is not None else b"",
+            struct.pack('<Q', rand) if rand is not None else b"",
+            struct.pack('<H', ediv) if ediv is not None else b""
+        )
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
 

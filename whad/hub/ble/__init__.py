@@ -853,12 +853,43 @@ class BleDomain(Registry):
         return BleDomain.bound("delete_seq", self.proto_version)(
             sequence_id=seq_id
         ) 
+    
+    def createSetEncryption(self, conn_handle: int, ll_key: bytes, ll_iv: bytes, \
+                            key: bytes, rand: bytes, ediv: bytes, enabled: bool) -> HubMessage:
+        """Create a SetEncryption message
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param ll_key: Link-layer encryption key
+        :type ll_key: bytes
+        :param ll_iv: Link-layer encryption IV
+        :type ll_iv: bytes
+        :param key: Encryption key
+        :type key: bytes
+        :param rand: Encryption random value
+        :type rand: bytes
+        :param ediv: Encryption diversifier
+        :type ediv: bytes
+        :param enabled: Enable encryption if set to True, disable it otherwise
+        :type enabled: bool
+        :return: instance of `SetEncryption`
+        """
+        return BleDomain.bound("encryption", self.proto_version)(
+            conn_handle=conn_handle,
+            enabled=enabled,
+            ll_key=ll_key,
+            ll_iv=ll_iv,
+            key=key,
+            rand=rand,
+            ediv=ediv
+        ) 
 
 from .address import SetBdAddress
 from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveConn, \
     AccessAddressDiscovered
 from .jamming import JamAdv, JamAdvChan, JamConn, ReactiveJam
-from .mode import ScanMode, AdvMode, CentralMode, PeriphMode, BleStart, BleStop
+from .mode import ScanMode, AdvMode, CentralMode, PeriphMode, BleStart, BleStop, \
+    SetEncryption
 from .pdu import SetAdvData, SendBleRawPdu, SendBlePdu, BleAdvPduReceived, BlePduReceived, \
     BleRawPduReceived, Injected
 from .connect import ConnectTo, Disconnect, Connected, Disconnected, Synchronized, \
@@ -896,6 +927,7 @@ __all__ = [
     "Disconnect",
     "Connected",
     "Disconnected",
+    "SetEncryption",
     "BleStart",
     "BleStop",
     "HijackMaster",

@@ -2,7 +2,7 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
-from whad.hub.message import pb_bind, PbFieldBytes, PbMessageWrapper, PbFieldBool
+from whad.hub.message import pb_bind, PbFieldBytes, PbMessageWrapper, PbFieldBool, PbFieldInt
 from whad.hub.ble import BleDomain
 
 @pb_bind(BleDomain, 'scan_mode', 1)
@@ -52,3 +52,15 @@ class BleStop(PbMessageWrapper):
     def __init__(self, message: Message = None):
         super().__init__(message=message)
         self.message.ble.stop.CopyFrom(BleStopCmd())
+
+@pb_bind(BleDomain, 'encryption', 1)
+class SetEncryption(PbMessageWrapper):
+    """BLE SetEncryption message class
+    """
+    conn_handle = PbFieldInt('ble.encryption.conn_handle')
+    enabled = PbFieldBool('ble.encryption.enabled')
+    ll_key = PbFieldBytes('ble.encryption.ll_key')
+    ll_iv = PbFieldBytes('ble.encryption.ll_iv')
+    key = PbFieldBytes('ble.encryption.key')
+    rand = PbFieldBytes('ble.encryption.rand')
+    ediv = PbFieldBytes('ble.encryption.ediv')
