@@ -1,22 +1,23 @@
 from whad.helpers import list_domains
 from whad.protocol.phy.phy_pb2 import SF7, SF8, SF9, SF10, SF11, SF12, \
     CR45, CR46, CR47, CR48
+from whad.hub.phy import LoRaCodingRate, LoRaSpreadingFactor
 from whad.phy.exceptions import InvalidParameter
 
 LORA_SF_MAP = {
-    7: SF7,
-    8: SF8,
-    9: SF9,
-    10: SF10,
-    11: SF11,
-    12: SF12
+    7: LoRaSpreadingFactor.SF7,
+    8: LoRaSpreadingFactor.SF8,
+    9: LoRaSpreadingFactor.SF9,
+    10: LoRaSpreadingFactor.SF10,
+    11: LoRaSpreadingFactor.SF11,
+    12: LoRaSpreadingFactor.SF12
 }
 
 LORA_CR_MAP = {
-    45: CR45,
-    46: CR46,
-    47: CR47,
-    48: CR48
+    45: LoRaCodingRate.CR45,
+    46: LoRaCodingRate.CR46,
+    47: LoRaCodingRate.CR47,
+    48: LoRaCodingRate.CR48
 }
 
 def get_physical_layers_by_domain(domain):

@@ -6,6 +6,19 @@ from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
 
+class Commands:
+    """ESB Commands
+    """
+    SetNodeAddress = 0x00
+    Sniff = 0x01
+    Jam = 0x02
+    Send = 0x03
+    SendRaw = 0x04
+    PrimaryReceiverMode = 0x05
+    PrimaryTransmitterMode = 0x06
+    Start = 0x07
+    Stop = 0x08
+
 class EsbNodeAddressError(Exception):
     def __init__(self, message=''):
         super().__init__()

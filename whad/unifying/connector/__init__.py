@@ -10,11 +10,8 @@ from whad.esb.connector.translator import ESBMessageTranslator
 from whad.esb.esbaddr import ESBAddress
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
 from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.whad_pb2 import Message
-from whad.protocol.unifying.unifying_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
-    Send, SendCmd, SendRawCmd, SendRaw, LogitechDongleMode, LogitechMouseMode, LogitechKeyboardMode, \
-    SetNodeAddress, SniffPairingCmd, SniffPairing
 from whad.scapy.layers.unifying import bind
+from whad.hub.unifying import EsbNodeAddress, Commands
 
 class Unifying(WhadDeviceConnector):
     """
@@ -63,7 +60,7 @@ class Unifying(WhadDeviceConnector):
             bind()
 
         # Initialize translator
-        self.translator = ESBMessageTranslator("unifying")
+        self.translator = ESBMessageTranslator("unifying", protocol_hub=self.hub)
 
         # Set synchronous mode
         self.enable_synchronous(synchronous)
@@ -78,9 +75,9 @@ class Unifying(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
         return (
-            (commands & (1 << Sniff)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.Sniff)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def can_send(self):
@@ -89,7 +86,7 @@ class Unifying(WhadDeviceConnector):
         """
         if self.__can_send is None:
             commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
-            self.__can_send = ((commands & (1 << Send))>0 or (commands & (1 << SendRaw)))
+            self.__can_send = ((commands & (1 << Commands.Send))>0 or (commands & (1 << Commands.SendRaw)))
         return self.__can_send
 
     def send(self,pdu, address=None, channel=None, retransmission_count=1):
@@ -140,7 +137,7 @@ class Unifying(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
         return (
-            (commands & (1 << SetNodeAddress)) > 0
+            (commands & (1 << Commands.SetNodeAddress)) > 0
         )
 
     def sniff(self, channel=None, address="FF:FF:FF:FF:FF", show_acknowledgements=False):
@@ -150,17 +147,21 @@ class Unifying(WhadDeviceConnector):
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
 
-        msg = Message()
         self.__cached_address = ESBAddress(address)
         if channel is None:
             # Enable scanning mode
-            msg.unifying.sniff.channel = 0xFF
+            channel = 0xFF
         else:
             self.__cached_channel = channel
-            msg.unifying.sniff.channel = self.__cached_channel
 
-        msg.unifying.sniff.address = self.__cached_address.value
-        msg.unifying.sniff.show_acknowledgements = show_acknowledgements
+
+        # Create a SniffMode message.
+        msg = self.hub.unifying.createSniffMode(
+            EsbNodeAddress(self.__cached_address.value),
+            channel,
+            show_acknowledgements
+        )
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -171,9 +172,9 @@ class Unifying(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
         return (
-            (commands & (1 << LogitechDongleMode)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.LogitechDongleMode)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def enable_dongle_mode(self, channel):
@@ -186,9 +187,11 @@ class Unifying(WhadDeviceConnector):
         if channel is None:
             return False
 
-        msg = Message()
+        # Keep track of channel
         self.__cached_channel = channel
-        msg.unifying.dongle.channel = channel
+
+        # Create a DongleMode message
+        msg = self.hub.unifying.createDongleMode(channel)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
@@ -200,9 +203,9 @@ class Unifying(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
         return (
-            (commands & (1 << LogitechKeyboardMode)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.LogitechKeyboardMode)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def enable_keyboard_mode(self, channel):
@@ -212,14 +215,16 @@ class Unifying(WhadDeviceConnector):
         if not self.can_be_keyboard():
             raise UnsupportedCapability("LogitechKeyboardMode")
 
-        msg = Message()
         if channel is None:
             # Enable scanning mode
-            msg.unifying.keyboard.channel = 0xFF
+            channel = 0xFF
         else:
             # Keep channel in cache
             self.__cached_channel = channel
-            msg.unifying.keyboard.channel = self.__cached_channel
+
+        # Create a KeyboardMode message
+        msg = self.hub.unifying.createKeyboardMode(channel)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -229,9 +234,9 @@ class Unifying(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
         return (
-            (commands & (1 << LogitechMouseMode)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.LogitechMouseMode)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def enable_mouse_mode(self, channel):
@@ -241,14 +246,16 @@ class Unifying(WhadDeviceConnector):
         if not self.can_be_mouse():
             raise UnsupportedCapability("LogitechMouseMode")
 
-        msg = Message()
         if channel is None:
             # Enable scanning mode
-            msg.unifying.mouse.channel = 0xFF
+            channel = 0xFF
         else:
             # Keep channel in cache
             self.__cached_channel = channel
-            msg.unifying.mouse.channel = self.__cached_channel
+
+        # Create a MouseMode message
+        msg = self.hub.unifying.createMouseMode(channel)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -259,7 +266,7 @@ class Unifying(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
         return (
-            (commands & (1 << SetNodeAddress)) > 0
+            (commands & (1 << Commands.SetNodeAddress)) > 0
         )
 
     def set_node_address(self, address):
@@ -273,8 +280,11 @@ class Unifying(WhadDeviceConnector):
         # Keep address in cache
         self.__cached_address = node_address
 
-        msg = Message()
-        msg.unifying.set_node_addr.address = node_address.value
+        # Create a SetNodeAddress message.
+        msg = self.hub.unifying.createSetNodeAddress(
+            EsbNodeAddress(node_address.value)
+        )
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -285,7 +295,7 @@ class Unifying(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
         return (
-            (commands & (1 << SniffPairing)) > 0
+            (commands & (1 << Commands.SniffPairing)) > 0
         )
 
 
@@ -296,8 +306,9 @@ class Unifying(WhadDeviceConnector):
         if not self.can_sniff_pairing():
             raise UnsupportedCapability("SniffPairing")
 
-        msg = Message()
-        msg.unifying.sniff_pairing.CopyFrom(SniffPairingCmd())
+        # Create a SniffPairing message.
+        msg = self.hub.unifying.createSniffPairing()
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -306,8 +317,9 @@ class Unifying(WhadDeviceConnector):
         """
         Start currently enabled mode.
         """
-        msg = Message()
-        msg.unifying.start.CopyFrom(StartCmd())
+        # Create a Start message.
+        msg = self.hub.unifying.createStart()
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -315,8 +327,9 @@ class Unifying(WhadDeviceConnector):
         """
         Stop currently enabled mode.
         """
-        msg = Message()
-        msg.unifying.stop.CopyFrom(StopCmd())
+        # Create a Stop message.
+        msg = self.hub.unifying.createStop()
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 

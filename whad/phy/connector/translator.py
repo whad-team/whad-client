@@ -3,6 +3,7 @@
 from whad.scapy.layers.phy import Phy_Packet
 from whad.phy.metadata import generate_phy_metadata
 from whad.protocol.whad_pb2 import Message
+from whad.hub import ProtocolHub
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,13 +16,15 @@ class PhyMessageTranslator(object):
     (if it makes sense) and scapy packets into WHAD Phy messages.
     """
 
-    def __init__(self):
+    def __init__(self, protocol_hub: ProtocolHub):
         # Address cache
         self.address = None
         self.pattern_cropped_bytes = 0
         self.pattern = None
 
         self.physical_layer = None
+
+        self.__hub = protocol_hub
 
     def format(self, packet):
         """
@@ -68,12 +71,10 @@ class PhyMessageTranslator(object):
 
 
     def from_packet(self, packet):
-        msg = Message()
         if Phy_Packet in packet or isinstance(packet, bytes):
-            msg.phy.send.packet = bytes(packet)
-
+            msg = self.__hub.phy.createSendPacket(bytes(packet))
         elif isinstance(packet, list) and len(packet) % 2 == 0:
-            msg.phy.send_raw.iq = bytes(packet)
+            msg = self.__hub.phy.createSendRawPacket(packet)
         else:
             msg = None
         return msg

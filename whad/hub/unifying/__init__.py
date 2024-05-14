@@ -7,6 +7,20 @@ from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
 from whad.hub.esb import EsbNodeAddress
 
+class Commands:
+    """Unifying commands
+    """
+    SetNodeAddress = 0x00
+    Sniff = 0x01
+    Jam = 0x02
+    Send = 0x03
+    SendRaw = 0x04
+    LogitechDongleMode = 0x05
+    LogitechKeyboardMode = 0x06
+    LogitechMouseMode = 0x07
+    Start = 0x08
+    Stop = 0x09
+    SniffPairing = 0x0a
 
 @pb_bind(ProtocolHub, name="unifying", version=1)
 class UnifyingDomain(Registry):

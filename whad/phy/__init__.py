@@ -1,4 +1,4 @@
-from whad.phy.connector import Phy, Endianness, TXPower
+from whad.phy.connector import Phy, Endianness, TxPower
 from whad.phy.utils.definitions import ASKModulationScheme, FSKModulationScheme, GFSKModulationScheme, \
     PSKModulationScheme, BPSKModulationScheme, QPSKModulationScheme, OQPSKModulationScheme, \
     OOKModulationScheme, PhysicalLayer
@@ -6,7 +6,7 @@ from whad.phy.utils.definitions import ASKModulationScheme, FSKModulationScheme,
 __all__ = [
     'Phy',
     'Endianness',
-    'TXPower', 
+    'TxPower', 
     'OOKModulationScheme',
     'ASKModulationScheme',
     'FSKModulationScheme',

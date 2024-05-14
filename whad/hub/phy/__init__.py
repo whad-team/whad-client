@@ -3,10 +3,43 @@
 from typing import List
 
 from whad.protocol.phy.phy_pb2 import LoRaSpreadingFactor, LoRaCodingRate, JammingMode, \
-    Endianness, TXPower, timestamp as whad_timestamp
+    Endianness as PbEndianness, TXPower, timestamp as whad_timestamp
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
+
+class Commands:
+    """PHY Commands
+    """
+    SetASKModulation = 0x00
+    SetFSKModulation = 0x01
+    SetGFSKModulation = 0x02
+    SetBPSKModulation = 0x03
+    SetQPSKModulation = 0x04
+    Set4FSKModulation = 0x05
+    SetMSKModulation  = 0x06
+    GetSupportedFrequencies = 0x07
+    SetFrequency = 0x08
+    SetDataRate = 0x09
+    SetEndianness = 0x0a
+    SetTXPower = 0x0b 
+    SetPacketSize = 0x0c
+    SetSyncWord = 0x0d
+    Sniff = 0x0e
+    Send = 0x0f
+    SendRaw = 0x10
+    Jam = 0x11
+    Monitor = 0x12
+    Start = 0x13
+    Stop = 0x14
+    SetLoRaModulation = 0x15
+    ScheduleSend = 0x16
+
+class Endianness:
+    """PHY Endianness
+    """
+    BIG = PbEndianness.BIG
+    LITTLE = PbEndianness.LITTLE
 
 class SpreadingFactor:
     SF7 = LoRaSpreadingFactor.SF7

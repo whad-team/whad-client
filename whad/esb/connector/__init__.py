@@ -10,10 +10,7 @@ from whad.scapy.layers.esb import ESB_Hdr,ESB_Payload_Hdr,ESB_Ack_Response
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.whad_pb2 import Message
-from whad.protocol.esb.esb_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
-    Send, SendCmd, SendRawCmd, SendRaw, PrimaryReceiverMode, PrimaryTransmitterMode, \
-    SetNodeAddress
+from whad.hub.esb import EsbNodeAddress, Commands
 
 class ESB(WhadDeviceConnector):
     """
@@ -61,7 +58,7 @@ class ESB(WhadDeviceConnector):
             self.__ready = True
 
         # Initialize translator
-        self.translator = ESBMessageTranslator()
+        self.translator = ESBMessageTranslator(protocol_hub=self.hub)
 
         # Set synchronous mode
         self.enable_synchronous(synchronous)
@@ -76,9 +73,9 @@ class ESB(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Esb)
         return (
-            (commands & (1 << Sniff)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.Sniff)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def can_send(self):
@@ -87,7 +84,7 @@ class ESB(WhadDeviceConnector):
         """
         if self.__can_send is None:
             commands = self.device.get_domain_commands(WhadDomain.Esb)
-            self.__can_send = ((commands & (1 << Send))>0 or (commands & (1 << SendRaw)))
+            self.__can_send = ((commands & (1 << Commands.Send))>0 or (commands & (1 << Commands.SendRaw)))
         return self.__can_send
 
     def send(self,pdu, address=None, channel=None, retransmission_count=1):
@@ -140,7 +137,7 @@ class ESB(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Esb)
         return (
-            (commands & (1 << SetNodeAddress)) > 0
+            (commands & (1 << Commands.SetNodeAddress)) > 0
         )
 
     def sniff(self, channel=None, address="FF:FF:FF:FF:FF", show_acknowledgements=False):
@@ -150,18 +147,19 @@ class ESB(WhadDeviceConnector):
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
 
-
-        msg = Message()
         self.__cached_address = ESBAddress(address)
         if channel is None:
             # Enable scanning mode
-            msg.esb.sniff.channel = 0xFF
+            channel = 0xFF
         else:
             self.__cached_channel = channel
-            msg.esb.sniff.channel = self.__cached_channel
 
-        msg.esb.sniff.address = self.__cached_address.value
-        msg.esb.sniff.show_acknowledgements = show_acknowledgements
+        msg = self.hub.esb.createSniffMode(
+            EsbNodeAddress(self.__cached_address.value),
+            channel,
+            show_acknowledgements
+        )
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -172,9 +170,9 @@ class ESB(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Esb)
         return (
-            (commands & (1 << PrimaryReceiverMode)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.PrimaryReceiverMode)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def enable_prx_mode(self, channel):
@@ -191,8 +189,9 @@ class ESB(WhadDeviceConnector):
         # Keep provided channel in cache
         self.__cached_channel = channel
 
-        msg = Message()
-        msg.esb.prx.channel = channel
+        # Create a PrxMode message.
+        msg = self.hub.esb.createPrxMode(channel)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -203,9 +202,9 @@ class ESB(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Esb)
         return (
-            (commands & (1 << PrimaryTransmitterMode)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.PrimaryTransmitterMode)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def enable_ptx_mode(self, channel):
@@ -215,14 +214,17 @@ class ESB(WhadDeviceConnector):
         if not self.can_be_ptx():
             raise UnsupportedCapability("PrimaryTransmitterMode")
 
-        msg = Message()
+
         if channel is None:
             # Enable scanning mode
-            msg.esb.ptx.channel = 0xFF
+            channel = 0xFF
         else:
             # Keep channel in cache
             self.__cached_channel = channel
-            msg.esb.ptx.channel = self.__cached_channel
+
+        # Create a PtxMode message.
+        msg = self.hub.esb.createPtxMode(channel)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -233,7 +235,7 @@ class ESB(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Esb)
         return (
-            (commands & (1 << SetNodeAddress)) > 0
+            (commands & (1 << Commands.SetNodeAddress)) > 0
         )
 
     def set_node_address(self, address):
@@ -247,8 +249,11 @@ class ESB(WhadDeviceConnector):
         # Keep address in cache
         self.__cached_address = node_address
 
-        msg = Message()
-        msg.esb.set_node_addr.address = node_address.value
+        # Create a SetNodeAddress message
+        msg = self.hub.esb.createSetNodeAddress(
+            EsbNodeAddress(node_address.value)
+        )
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -256,8 +261,9 @@ class ESB(WhadDeviceConnector):
         """
         Start currently enabled mode.
         """
-        msg = Message()
-        msg.esb.start.CopyFrom(StartCmd())
+        # Create a Start message.
+        msg = self.hub.esb.createStart()
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -265,8 +271,9 @@ class ESB(WhadDeviceConnector):
         """
         Stop currently enabled mode.
         """
-        msg = Message()
-        msg.esb.stop.CopyFrom(StopCmd())
+        # Create a Stop message.
+        msg = self.hub.esb.createStop()
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 

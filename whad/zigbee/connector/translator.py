@@ -4,6 +4,7 @@ from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr, Dot15d4TAP_FCS_Type
 from whad.zigbee.metadata import generate_zigbee_metadata
 from whad.protocol.whad_pb2 import Message
+from whad.hub import ProtocolHub
 from struct import pack
 import logging
 
@@ -16,6 +17,9 @@ class ZigbeeMessageTranslator(object):
     as well as standard methods to convert WHAD Zigbee messages into scapy packets
     (if it makes sense) and scapy packets into WHAD Zigbee messages.
     """
+
+    def __init__(self, protocol_hub: ProtocolHub):
+        self.__hub = protocol_hub
 
     def format(self, packet):
         """
@@ -54,18 +58,21 @@ class ZigbeeMessageTranslator(object):
         msg = Message()
 
         if Dot15d4FCS in packet:
-            msg.zigbee.send_raw.channel = channel
-            pdu = bytes(packet)[:-2]
-            msg.zigbee.send_raw.pdu = pdu
-            msg.zigbee.send_raw.fcs = packet.fcs
-
+            # Create a SendPdu
+            msg = self.__hub.dot15d4.createSendRawPdu(
+                channel,
+                bytes(packet)[:-2],
+                packet.fcs
+            )
         elif Dot15d4 in packet:
-            msg.zigbee.send.channel = channel
-            pdu = bytes(packet)
-            msg.zigbee.send.pdu = pdu
+            msg = self.__hub.dot15d4.createSendPdu(
+                channel,
+                bytes(packet)
+            )
         else:
             # Raw MAC
-            msg.zigbee.send.channel = channel
-            pdu = bytes(packet)
-            msg.zigbee.send.pdu = pdu
+            msg = self.__hub.dot15d4.createSendPdu(
+                channel,
+                bytes(packet)
+            )
         return msg

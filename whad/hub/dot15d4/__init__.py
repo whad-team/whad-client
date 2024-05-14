@@ -7,6 +7,22 @@ from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
 
+class Commands:
+    """Dot15d4 commands
+    """
+    SetNodeAddress = 0x00
+    Sniff = 0x01
+    Jam = 0x02
+    EnergyDetection = 0x03
+    Send = 0x04
+    SendRaw = 0x05
+    EndDeviceMode = 0x06
+    CoordinatorMode = 0x07
+    RouterMode = 0x08
+    Start = 0x09
+    Stop = 0x0a
+    ManInTheMiddle = 0x0b
+
 class MitmRole:
     """Dot15d4 Mitm role
     """

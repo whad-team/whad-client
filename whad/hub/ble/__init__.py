@@ -10,6 +10,38 @@ from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
 
+class Commands:
+    """BLE Commands
+    """
+    SetBdAddress = 0x00
+    SniffAdv = 0x01
+    JamAdv = 0x02
+    JamAdvOnChannel = 0x03
+    ReactiveJam = 0x04
+    SniffConnReq = 0x05
+    SniffAccessAddress = 0x06
+    SniffActiveConn = 0x07
+    JamConn = 0x08
+    ScanMode = 0x09
+    AdvMode = 0x0a
+    SetAdvData = 0x0b
+    CentralMode = 0x0c
+    ConnectTo = 0x0d
+    SendRawPDU = 0x0e
+    SendPDU = 0x0f
+    Disconnect = 0x10
+    PeripheralMode = 0x11
+    Start = 0x12
+    Stop = 0x13
+    SetEncryption = 0x14
+    HijackMaster = 0x15
+    HijackSlave = 0x16
+    HijackBoth = 0x17
+    PrepareSequence = 0x18
+    TriggerSequence = 0x19
+    DeleteSequence = 0x1a
+    
+
 class Direction:
     """BLE PDU direction
     """

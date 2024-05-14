@@ -11,13 +11,7 @@ from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import ChannelMap
 
 from whad.device import WhadDeviceConnector
-from whad.protocol.ble.ble_pb2 import BleDirection, CentralMode, SetEncryptionCmd, StartCmd, StopCmd, \
-    ScanMode, Start, Stop, BleAdvType, ConnectTo, CentralModeCmd, PeripheralMode, \
-    PeripheralModeCmd, SetBdAddress, SendPDU, SniffAdv, SniffConnReq, HijackMaster, \
-    HijackSlave, HijackBoth, SendRawPDU, AdvModeCmd, BleAdvType, SniffAccessAddress, \
-    SniffAccessAddressCmd, SniffActiveConn, SniffActiveConnCmd, BleAddrType, ReactiveJam, \
-    JamAdvOnChannel, PrepareSequence, PrepareSequenceCmd, TriggerSequence, DeleteSequence
-from whad.protocol.whad_pb2 import Message
+from whad.hub.ble import Commands, AdvType, Direction
 from whad.protocol.generic_pb2 import ResultCode
 from whad import WhadDomain, WhadCapability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
@@ -42,11 +36,11 @@ class BLE(WhadDeviceConnector):
     """
     # correlation table
     SCAPY_CORR_ADV = {
-        BleAdvType.ADV_IND: BTLE_ADV_IND,
-        BleAdvType.ADV_NONCONN_IND: BTLE_ADV_NONCONN_IND,
-        BleAdvType.ADV_DIRECT_IND: BTLE_ADV_DIRECT_IND,
-        BleAdvType.ADV_SCAN_IND: BTLE_ADV_SCAN_IND,
-        BleAdvType.ADV_SCAN_RSP: BTLE_SCAN_RSP
+        AdvType.ADV_IND: BTLE_ADV_IND,
+        AdvType.ADV_NONCONN_IND: BTLE_ADV_NONCONN_IND,
+        AdvType.ADV_DIRECT_IND: BTLE_ADV_DIRECT_IND,
+        AdvType.ADV_SCAN_IND: BTLE_ADV_SCAN_IND,
+        AdvType.ADV_SCAN_RSP: BTLE_SCAN_RSP
     }
 
     def format(self, packet):
@@ -120,7 +114,7 @@ class BLE(WhadDeviceConnector):
         if self.__can_send is None:
             # Retrieve supported commands
             commands = self.device.get_domain_commands(WhadDomain.BtLE)
-            self.__can_send = ((commands & (1 << SendPDU))>0 or (commands & (1 << SendRawPDU)))
+            self.__can_send = ((commands & (1 << Commands.SendPDU))>0 or (commands & (1 << Commands.SendRawPDU)))
         return self.__can_send
 
     def can_scan(self):
@@ -130,9 +124,9 @@ class BLE(WhadDeviceConnector):
         # Retrieve supported commands
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (
-            (commands & (1 << ScanMode))>0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.ScanMode))>0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def can_connect(self):
@@ -141,7 +135,7 @@ class BLE(WhadDeviceConnector):
         """
         # Retrieve supported commands
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
-        return (commands & (1 << ConnectTo))>0
+        return (commands & (1 << Commands.ConnectTo))>0
 
     def can_jam_advertisement_on_channel(self):
         """
@@ -149,7 +143,7 @@ class BLE(WhadDeviceConnector):
         """
         # Retrieve supported commands
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
-        return (commands & (1 << JamAdvOnChannel))>0
+        return (commands & (1 << Commands.JamAdvOnChannel))>0
 
     def can_be_central(self):
         """
@@ -158,9 +152,9 @@ class BLE(WhadDeviceConnector):
         # Retrieve supported commands
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (
-            (commands & (1 << CentralMode))>0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.CentralMode))>0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def can_be_peripheral(self):
@@ -170,9 +164,9 @@ class BLE(WhadDeviceConnector):
         # Retrieve supported commands
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (
-            (commands & (1 << PeripheralMode))>0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.PeripheralMode))>0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def can_discover_access_addresses(self):
@@ -181,9 +175,9 @@ class BLE(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (
-            (commands & (1 << SniffAccessAddress)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.SniffAccessAddress)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def can_sniff_active_connection(self):
@@ -192,9 +186,9 @@ class BLE(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (
-            (commands & (1 << SniffActiveConn)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.SniffActiveConn)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def can_sniff_advertisements(self):
@@ -203,9 +197,9 @@ class BLE(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (
-            (commands & (1 << SniffAdv)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.SniffAdv)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
 
@@ -215,9 +209,9 @@ class BLE(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (
-            (commands & (1 << SniffConnReq)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.SniffConnReq)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
     def can_inject(self):
@@ -233,21 +227,21 @@ class BLE(WhadDeviceConnector):
         Determine if the device implements a master hijacking mode.
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
-        return (commands & (1 << HijackMaster)) > 0
+        return (commands & (1 << Commands.HijackMaster)) > 0
 
     def can_hijack_slave(self):
         """
         Determine if the device implements a slave hijacking mode.
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
-        return (commands & (1 << HijackSlave)) > 0
+        return (commands & (1 << Commands.HijackSlave)) > 0
 
     def can_hijack_both(self):
         """
         Determine if the device implements a slave and master hijacking mode.
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
-        return (commands & (1 << HijackBoth)) > 0
+        return (commands & (1 << Commands.HijackBoth)) > 0
 
 
     def can_reactive_jam(self):
@@ -255,7 +249,7 @@ class BLE(WhadDeviceConnector):
         Determine if the device implements a reactive jamming mode.
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
-        return (commands & (1 << ReactiveJam)) > 0
+        return (commands & (1 << Commands.ReactiveJam)) > 0
 
 
     def can_prepare(self):
@@ -263,14 +257,14 @@ class BLE(WhadDeviceConnector):
         Determine if the device can prepare a sequence of packets associated with a trigger.
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
-        return (commands & (1 << PrepareSequence)) > 0
+        return (commands & (1 << Commands.PrepareSequence)) > 0
 
     def can_trigger(self):
         """
         Determine if the device can manually trigger a sequence of packets.
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
-        return (commands & (1 << TriggerSequence)) > 0
+        return (commands & (1 << Commands.TriggerSequence)) > 0
 
     def trigger(self, trigger):
         '''
@@ -294,7 +288,7 @@ class BLE(WhadDeviceConnector):
         Determine if the device can delete a sequence of packets.
         """
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
-        return (commands & (1 << DeleteSequence)) > 0
+        return (commands & (1 << Commands.DeleteSequence)) > 0
 
     def delete_sequence(self, trigger):
         '''
@@ -312,7 +306,7 @@ class BLE(WhadDeviceConnector):
         return resp.generic.cmd_result.result == ResultCode.SUCCESS
 
 
-    def prepare(self, *packets, trigger=ManualTrigger(), direction=BleDirection.MASTER_TO_SLAVE):
+    def prepare(self, *packets, trigger=ManualTrigger(), direction=Direction.MASTER_TO_SLAVE):
         """
         Prepare a sequence of packets and associate a trigger to it.
         """
@@ -505,7 +499,7 @@ class BLE(WhadDeviceConnector):
         """
         # Ensure we can spoof BD address
         commands = self.device.get_domain_commands(WhadDomain.BtLE)
-        if (commands & (1 << SetBdAddress))>0:
+        if (commands & (1 << Commands.SetBdAddress))>0:
 
             # Create a SetBdAddress message
             msg = self.hub.ble.createSetBdAddress(BDAddress(
@@ -561,7 +555,7 @@ class BLE(WhadDeviceConnector):
         # Create a PeriphMode message
         msg = self.hub.ble.createPeriphMode(
             adv_data=adv_data,
-            scan_resp=scan_data
+            scan_rsp=scan_data
         )
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
@@ -796,21 +790,21 @@ class BLE(WhadDeviceConnector):
     def on_error_pdu(self, pdu):
         pass
 
-    def send_ctrl_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
+    def send_ctrl_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
         """
         Send CTRL PDU
         """
         logger.info('send control PDU to connection (handle:%d)' % conn_handle)
         return self.send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
 
-    def send_data_pdu(self, data, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
+    def send_data_pdu(self, data, conn_handle=0, direction=Direction.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
         """
         Send data (L2CAP) PDU.
         """
         logger.info('send data PDU to connection (handle:%d)' % conn_handle)
         return self.send_pdu(data, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
 
-    def send_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
+    def send_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
         """
         Send generic PDU.
         """

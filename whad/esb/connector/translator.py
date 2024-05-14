@@ -3,6 +3,7 @@
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
 from whad.esb.metadata import generate_esb_metadata
 from whad.protocol.whad_pb2 import Message
+from whad.hub import ProtocolHub
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,10 +16,11 @@ class ESBMessageTranslator(object):
     (if it makes sense) and scapy packets into WHAD ESB messages.
     """
 
-    def __init__(self, domain="esb"):
+    def __init__(self, domain="esb", protocol_hub: ProtocolHub=None):
         self.__cached_address = None
         self.__cached_channel = None
         self.__domain = domain
+        self.__hub = protocol_hub
 
     def format(self, packet):
         """
@@ -58,17 +60,23 @@ class ESBMessageTranslator(object):
             return None
 
     def from_packet(self, packet, channel=None, retransmission_count=1):
-        msg = Message()
         if ESB_Hdr in packet:
-            getattr(msg, self.__domain).send_raw.channel = channel if channel is not None else 0xFF
+            # Force packet preamble to 0xAA
             packet.preamble = 0xAA
-            getattr(msg, self.__domain).send_raw.pdu = bytes(packet)
-            getattr(msg, self.__domain).send_raw.retransmission_count = retransmission_count
-        elif ESB_Payload_Hdr in packet:
-            getattr(msg, self.__domain).send.channel = channel if channel is not None else 0xFF
-            getattr(msg, self.__domain).send.pdu = bytes(packet)
-            getattr(msg, self.__domain).send.retransmission_count = retransmission_count
 
+            # Create a SendRawPdu message
+            msg = self.hub.get(self.__domain).createSendRawPdu(
+                channel if channel is not None else 0xFF,
+                bytes(packet),
+                retransmission_count
+            )
+        elif ESB_Payload_Hdr in packet:
+            # Create a SendPdu message
+            msg = self.hub.get(self.__domain).createSendPdu(
+                channel if channel is not None else 0xFF,
+                bytes(packet),
+                retransmission_count
+            )
         else:
             msg = None
         return msg

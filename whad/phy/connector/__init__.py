@@ -4,23 +4,17 @@ from whad.helpers import message_filter, is_message_type
 from whad.phy.metadata import generate_phy_metadata, PhyMetadata
 from whad.phy.utils.definitions import OOKModulationScheme, ASKModulationScheme, \
     OQPSKModulationScheme, QPSKModulationScheme, BPSKModulationScheme, \
-    FSKModulationScheme, GFSKModulationScheme
+    FSKModulationScheme, GFSKModulationScheme, QFSKModulationScheme
 from whad.phy.utils.helpers import lora_sf, lora_cr
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.protocol.phy.phy_pb2 import SetASKModulation, SetFSKModulation, \
-    SetGFSKModulation, SetBPSKModulation, SetQPSKModulation, Start, Stop, \
-    SetBPSKModulationCmd, SetQPSKModulationCmd, GetSupportedFrequenciesCmd, \
-    GetSupportedFrequencies, SetFrequency, SetDataRate, SetEndianness, \
-    Endianness, SetTXPower, TXPower, SetPacketSize, SetSyncWord, StartCmd, \
-    StopCmd, Send, Sniff, SendRaw, Set4FSKModulation, Set4FSKModulationCmd, \
-    SetLoRaModulation, SetLoRaModulationCmd, ScheduleSend
 from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.phy import Phy_Packet
 from whad.exceptions import RequiredImplementation, UnsupportedCapability, UnsupportedDomain
 from whad.phy.exceptions import UnsupportedFrequency, NoModulation, NoDatarate, NoFrequency, \
-    NoSyncWord, NoEndianess, NoPacketSize, InvalidParameter, ScheduleFifoFull
+    NoSyncWord, NoEndianess, NoPacketSize, InvalidParameter, ScheduleFifoFull, \
+    UnknownPhysicalLayer, UnknownPhysicalLayerFunction
 from whad.phy.connector.translator import PhyMessageTranslator
+from whad.hub.phy import Timestamp, Commands, TxPower, Endianness
 
 class Phy(WhadDeviceConnector):
     """
@@ -66,7 +60,7 @@ class Phy(WhadDeviceConnector):
         self.device.discover()
 
         # Initialize translator
-        self.translator = PhyMessageTranslator()
+        self.translator = PhyMessageTranslator(self.hub)
 
         # Check if device supports Logitech Unifying
         if not self.device.has_domain(WhadDomain.Phy):
@@ -84,7 +78,7 @@ class Phy(WhadDeviceConnector):
         Determine if the device can be configured to use Amplitude Shift Keying modulation scheme.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetASKModulation)) > 0
+        return (commands & (1 << Commands.SetASKModulation)) > 0
 
 
     def can_use_fsk(self):
@@ -92,7 +86,7 @@ class Phy(WhadDeviceConnector):
         Determine if the device can be configured to use Frequency Shift Keying modulation scheme.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetFSKModulation)) > 0
+        return (commands & (1 << Commands.SetFSKModulation)) > 0
 
 
     def can_get_supported_frequencies(self):
@@ -100,56 +94,56 @@ class Phy(WhadDeviceConnector):
         Determine if the device can get a list of supported frequencies.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << GetSupportedFrequencies)) > 0
+        return (commands & (1 << Commands.GetSupportedFrequencies)) > 0
 
     def can_set_frequency(self):
         """
         Determine if the device can select a specific frequency.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetFrequency)) > 0
+        return (commands & (1 << Commands.SetFrequency)) > 0
 
     def can_use_gfsk(self):
         """
         Determine if the device can be configured to use Gaussian Frequency Shift Keying modulation scheme.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetGFSKModulation)) > 0
+        return (commands & (1 << Commands.SetGFSKModulation)) > 0
 
     def can_use_4fsk(self):
         """
         Determine if the device can be configured to use 4-Frequency Shift Keying modulation scheme.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << Set4FSKModulation)) > 0
+        return (commands & (1 << Commands.Set4FSKModulation)) > 0
 
     def can_use_bpsk(self):
         """
         Determine if the device can be configured to use Binary Phase Shift Keying modulation scheme.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetBPSKModulation)) > 0
+        return (commands & (1 << Commands.SetBPSKModulation)) > 0
 
     def can_use_qpsk(self):
         """
         Determine if the device can be configured to use Quadrature Phase Shift Keying modulation scheme.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetQPSKModulation)) > 0
+        return (commands & (1 << Commands.SetQPSKModulation)) > 0
     
     def can_use_lora(self):
         """
         Determine if the device can be configured to use LoRa modulation scheme.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetLoRaModulation)) > 0
+        return (commands & (1 << Commands.SetLoRaModulation)) > 0
     
     def can_schedule_packets(self):
         """
         Determine if the device can send scheduled packets.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << ScheduleSend)) > 0
+        return (commands & (1 << Commands.ScheduleSend)) > 0
 
     def set_ask(self, on_off_keying=True):
         """
@@ -158,8 +152,9 @@ class Phy(WhadDeviceConnector):
         if not self.can_use_ask():
             raise UnsupportedCapability("ASKModulation")
 
-        msg = Message()
-        msg.phy.mod_ask.ook = on_off_keying
+        # Create a SetAskMod message.
+        msg = self.hub.phy.createSetAskMod(on_off_keying)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -179,8 +174,9 @@ class Phy(WhadDeviceConnector):
         if not self.can_use_fsk():
             raise UnsupportedCapability("FSKModulation")
 
-        msg = Message()
-        msg.phy.mod_fsk.deviation = deviation
+        # Create a SetFskMod message.
+        msg = self.hub.phy.createSetFskMod(deviation)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -194,8 +190,9 @@ class Phy(WhadDeviceConnector):
         if not self.can_use_4fsk():
             raise UnsupportedCapability("4FSKModulation")
 
-        msg = Message()
-        msg.phy.mod_4fsk.deviation = deviation
+        # Create a Set4fskMod message.
+        msg = self.hub.phy.createSet4FskMod(deviation)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -216,8 +213,9 @@ class Phy(WhadDeviceConnector):
         if not self.can_use_gfsk():
             raise UnsupportedCapability("GFSKModulation")
 
-        msg = Message()
-        msg.phy.mod_gfsk.deviation = deviation
+        # Create a SetGfskMod message.
+        msg = self.hub.phy.createSetGfskMod(deviation)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -232,8 +230,9 @@ class Phy(WhadDeviceConnector):
         if not self.can_use_bpsk():
             raise UnsupportedCapability("BPSKModulation")
 
-        msg = Message()
-        msg.phy.mod_bpsk.CopyFrom(SetBPSKModulationCmd())
+        # Create a SetBpskMod message.
+        msg = self.hub.phy.createSetBpskMod()
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -248,8 +247,10 @@ class Phy(WhadDeviceConnector):
         if not self.can_use_qpsk():
             raise UnsupportedCapability("QPSKModulation")
 
-        msg = Message()
-        msg.phy.mod_qpsk.CopyFrom(SetQPSKModulationCmd())
+
+        # Create a SetQpskMod message (offset set to False by default).
+        msg = self.hub.phy.createSetQpskMod(False)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -281,18 +282,17 @@ class Phy(WhadDeviceConnector):
         if bw not in [125000, 250000, 500000]:
             raise InvalidParameter('bandwidth')
 
-        # Build message
-        msg = Message()
-        msg.phy.mod_lora.CopyFrom(SetLoRaModulationCmd())
-        
-        msg.phy.mod_lora.coding_rate = lora_cr(cr)
-        msg.phy.mod_lora.spreading_factor = lora_sf(sf)
-        msg.phy.mod_lora.bandwidth = bw
-        msg.phy.mod_lora.preamble_length = preamble
-        msg.phy.mod_lora.enable_crc = crc
-        msg.phy.mod_lora.explicit_mode = explicit
-        msg.phy.mod_lora.invert_iq = invert_iq
-        print(msg)
+        # Create a SetLoRaMod message.
+        msg = self.hub.phy.createSetLoRaMod(
+            bw,
+            lora_sf(sf),
+            lora_cr(cr),
+            preamble,
+            enable_crc=crc,
+            explicit_mode=explicit,
+            invert_iq=invert_iq
+        )
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -307,8 +307,9 @@ class Phy(WhadDeviceConnector):
         if not self.can_get_supported_frequencies():
             raise UnsupportedCapability("GetSupportedFrequencies")
 
-        msg = Message()
-        msg.phy.get_supported_freq.CopyFrom(GetSupportedFrequenciesCmd())
+        # Create a GetSupportedFreqs message.
+        msg = self.hub.phy.createGetSupportedFreqs()
+
         resp = self.send_command(msg, message_filter('phy', 'supported_freq'))
         return [(i.start, i.end) for i in resp.phy.supported_freq.frequency_ranges]
 
@@ -325,11 +326,13 @@ class Phy(WhadDeviceConnector):
 
         if self.__cached_supported_frequencies is None:
             self.__cached_supported_frequencies = self.get_supported_frequencies()
-            print(self.__cached_supported_frequencies)
+            #print(self.__cached_supported_frequencies)
         if all([frequency < freq_range[0] or frequency > freq_range[1] for freq_range in self.__cached_supported_frequencies]):
             raise UnsupportedFrequency(frequency)
-        msg = Message()
-        msg.phy.set_freq.frequency = frequency
+        
+        # Create a SetFreq message.
+        msg = self.hub.phy.createSetFreq(frequency)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -342,7 +345,7 @@ class Phy(WhadDeviceConnector):
         Checks if the device supports datarate configuration.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetDataRate)) > 0
+        return (commands & (1 << Commands.SetDataRate)) > 0
 
     def set_datarate(self, rate=1000000):
         """
@@ -352,9 +355,9 @@ class Phy(WhadDeviceConnector):
         if not self.can_set_datarate():
             raise UnsupportedCapability("DataRate")
 
+        # Create a SetDatarate message.
+        msg = self.hub.phy.createSetDatarate(rate)
 
-        msg = Message()
-        msg.phy.datarate.rate = rate
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -366,7 +369,7 @@ class Phy(WhadDeviceConnector):
         Checks if the device supports Endianness configuration.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetEndianness)) > 0
+        return (commands & (1 << Commands.SetEndianness)) > 0
 
     def set_endianness(self, endianness=Endianness.BIG):
         """
@@ -375,8 +378,9 @@ class Phy(WhadDeviceConnector):
         if not self.can_set_endianness():
             raise UnsupportedCapability("Endianness")
 
-        msg = Message()
-        msg.phy.endianness.endianness = endianness
+        # Create a SetEndianness message.
+        msg = self.hub.phy.createSetEndianness(endianness==Endianness.LITTLE)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -389,7 +393,7 @@ class Phy(WhadDeviceConnector):
         """
         if self.__can_send is None:
             commands = self.device.get_domain_commands(WhadDomain.Phy)
-            self.__can_send = ((commands & (1 << Send))>0 or (commands & (1 << SendRaw)))
+            self.__can_send = ((commands & (1 << Commands.Send))>0 or (commands & (1 << Commands.SendRaw)))
         return self.__can_send
 
     def can_set_tx_power(self):
@@ -397,18 +401,19 @@ class Phy(WhadDeviceConnector):
         Checks if the device supports TX Power level configuration.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetTXPower)) > 0
+        return (commands & (1 << Commands.SetTXPower)) > 0
 
 
-    def set_tx_power(self, tx_power = TXPower.MEDIUM):
+    def set_tx_power(self, tx_power = TxPower.MEDIUM):
         """
         Configure TX Power level.
         """
         if not self.can_set_tx_power():
             raise UnsupportedCapability("TXPower")
 
-        msg = Message()
-        msg.phy.tx_power.tx_power = tx_power
+        # Create a SetTxPower message.
+        msg = self.hub.phy.createSetTxPower(tx_power)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -418,7 +423,7 @@ class Phy(WhadDeviceConnector):
         Checks if the device can configure packet size.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetPacketSize)) > 0
+        return (commands & (1 << Commands.SetPacketSize)) > 0
 
 
     def set_packet_size(self, size=32):
@@ -428,8 +433,9 @@ class Phy(WhadDeviceConnector):
         if not self.can_set_packet_size():
             raise UnsupportedCapability("PacketSize")
 
-        msg = Message()
-        msg.phy.packet_size.packet_size = size
+        # Create a SetPacketSize message
+        msg = self.hub.phy.createSetPacketSize(size)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -441,7 +447,7 @@ class Phy(WhadDeviceConnector):
         Checks if the device can configure a synchronization word.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
-        return (commands & (1 << SetSyncWord)) > 0
+        return (commands & (1 << Commands.SetSyncWord)) > 0
 
 
     def set_sync_word(self, sync_word = b"\xAA\xAA"):
@@ -451,8 +457,9 @@ class Phy(WhadDeviceConnector):
         if not self.can_set_sync_word():
             raise UnsupportedCapability("SyncWord")
 
-        msg = Message()
-        msg.phy.sync_word.sync_word = sync_word
+        # Create a SetSyncWord message
+        msg = self.hub.phy.createSetPacketSize(sync_word)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         success = (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         if success:
@@ -465,9 +472,9 @@ class Phy(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
         return (
-            (commands & (1 << Sniff)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.Sniff)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
 
@@ -502,8 +509,9 @@ class Phy(WhadDeviceConnector):
             raise NoEndianess()
         """
 
-        msg = Message()
-        msg.phy.sniff.iq_stream = iq_stream
+        # Create a SniffMode message
+        msg = self.hub.phy.createSniffMode(iq_stream)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -511,8 +519,9 @@ class Phy(WhadDeviceConnector):
         """
         Start currently enabled mode.
         """
-        msg = Message()
-        msg.phy.start.CopyFrom(StartCmd())
+        # Create a Start message
+        msg = self.hub.phy.createStart()
+        
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -520,8 +529,9 @@ class Phy(WhadDeviceConnector):
         """
         Stop currently enabled mode.
         """
-        msg = Message()
-        msg.phy.stop.CopyFrom(StopCmd())
+        # Create a Stop message
+        msg = self.hub.phy.createStop()
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -677,15 +687,15 @@ class Phy(WhadDeviceConnector):
         # Generate TX metadata
         packet.metadata = PhyMetadata()
         packet.metadata.frequency = self.__cached_frequency
-
-        msg = self.translator.from_packet(packet)
         
         # Set timestamp
         ts_sec = int(timestamp)
         ts_usec = int((timestamp - ts_sec)*1000000)
-        msg.phy.sched_send.timestamp.sec = ts_sec
-        msg.phy.sched_send.timestamp.usec = ts_usec
-        msg.phy.sched_send.packet = bytes(packet)
+
+        msg = self.hub.phy.createSchedulePacket(
+            bytes(packet),
+            Timestamp(ts_sec, ts_usec)
+        )
 
         # Schedule a packet
         resp = self.send_command(msg, message_filter('phy', 'sched_pkt_rsp'))

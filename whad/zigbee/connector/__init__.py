@@ -10,10 +10,7 @@ from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.zigbee.metadata import generate_zigbee_metadata, ZigbeeMetadata
 from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.whad_pb2 import Message
-from whad.protocol.zigbee.zigbee_pb2 import Sniff, Start, Stop, StartCmd, StopCmd, \
-    Send, SendCmd, EnergyDetection, EnergyDetectionCmd, EndDeviceMode, SetNodeAddress, \
-    AddressType, SendRawCmd, SendRaw
+from whad.hub.dot15d4 import NodeAddress, Commands, NodeAddressType
 
 class Zigbee(WhadDeviceConnector):
     """
@@ -46,7 +43,7 @@ class Zigbee(WhadDeviceConnector):
         else:
             self.__ready = True
             conf.dot15d4_protocol = 'zigbee'
-            self.translator = ZigbeeMessageTranslator()
+            self.translator = ZigbeeMessageTranslator(self.hub)
 
         self.enable_synchronous(synchronous)
 
@@ -63,9 +60,9 @@ class Zigbee(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Zigbee)
         return (
-            (commands & (1 << Sniff)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.Sniff)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
 
 
@@ -75,7 +72,7 @@ class Zigbee(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Zigbee)
         return (
-            (commands & (1 << SetNodeAddress)) > 0
+            (commands & (1 << Commands.SetNodeAddress)) > 0
         )
 
     def can_be_end_device(self):
@@ -84,12 +81,10 @@ class Zigbee(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Zigbee)
         return (
-            (commands & (1 << EndDeviceMode)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.EndDeviceMode)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
-
-
 
     def can_send(self):
         """
@@ -97,9 +92,8 @@ class Zigbee(WhadDeviceConnector):
         """
         if self.__can_send is None:
             commands = self.device.get_domain_commands(WhadDomain.Zigbee)
-            self.__can_send = ((commands & (1 << Send))>0 or (commands & (1 << SendRaw)))
+            self.__can_send = ((commands & (1 << Commands.Send))>0 or (commands & (1 << Commands.SendRaw)))
         return self.__can_send
-
 
     def can_perform_ed_scan(self):
         """
@@ -107,11 +101,10 @@ class Zigbee(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Zigbee)
         return (
-            (commands & (1 << EnergyDetection)) > 0 and
-            (commands & (1 << Start))>0 and
-            (commands & (1 << Stop))>0
+            (commands & (1 << Commands.EnergyDetection)) > 0 and
+            (commands & (1 << Commands.Start))>0 and
+            (commands & (1 << Commands.Stop))>0
         )
-
 
     def support_raw_pdu(self):
         """
@@ -129,21 +122,25 @@ class Zigbee(WhadDeviceConnector):
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
 
-        msg = Message()
-        msg.zigbee.sniff.channel = channel
+        # Create a SniffMode message
+        msg = self.hub.dot15d4.createSniffMode(channel)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
-    def set_node_address(self, address, mode=AddressType.SHORT):
+    def set_node_address(self, address, mode=NodeAddressType.SHORT):
         """
         Modify Zigbee node address.
         """
         if not self.can_set_node_address():
             raise UnsupportedCapability("SetNodeAddress")
 
-        msg = Message()
-        msg.zigbee.set_node_addr.address = address
-        msg.zigbee.set_node_addr.address_type = mode
+        # Create node address from parameters
+        node_addr = NodeAddress(address, mode)
+
+        # Create a SetNodAddress message
+        msg = self.hub.dot15d4.createSetNodeAddress(node_addr)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -154,8 +151,9 @@ class Zigbee(WhadDeviceConnector):
         if not self.can_be_end_device():
             raise UnsupportedCapability("EndDevice")
 
-        msg = Message()
-        msg.zigbee.end_device.channel = channel
+        # Create EndDeviceMode message
+        msg = self.hub.dot15d4.createEndDeviceMode(channel)
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -209,8 +207,9 @@ class Zigbee(WhadDeviceConnector):
         Perform an Energy Detection scan.
         """
         if self.can_perform_ed_scan():
-            msg = Message()
-            msg.zigbee.ed.channel = channel
+            # Create an EnergyDetectionMode message
+            msg = self.hub.dot15d4.createEnergyDetectionMode(channel)
+
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
             return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
         else:
@@ -220,8 +219,9 @@ class Zigbee(WhadDeviceConnector):
         """
         Start currently enabled mode.
         """
-        msg = Message()
-        msg.zigbee.start.CopyFrom(StartCmd())
+        # Create a Start message
+        msg = self.hub.dot15d4.createStart()
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
@@ -229,8 +229,9 @@ class Zigbee(WhadDeviceConnector):
         """
         Stop currently enabled mode.
         """
-        msg = Message()
-        msg.zigbee.stop.CopyFrom(StopCmd())
+        # Create a Stop message
+        msg = self.hub.dot15d4.createStop()
+
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
         return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
 
