@@ -1,12 +1,12 @@
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceUnsupportedOperation
 from whad.device.virtual import VirtualDevice
-from whad.protocol.device_pb2 import Capability
-from whad.protocol.ble.ble_pb2 import BleDirection, SetBdAddress, ScanMode, CentralMode, \
-    ConnectTo, BleAddrType, PeripheralMode
-from whad.protocol.whad_pb2 import Message
 from whad import WhadDomain
-from whad.protocol.generic_pb2 import ResultCode
+
+from whad.hub.generic.cmdresult import CommandResult
+from whad.hub.discovery import Capability
+from whad.hub.ble import Direction as BleDirection, Commands, AddressType
+
 from whad.scapy.layers.bluetooth import BluetoothUserSocketFixed
 from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Hdr, HCI_Command_Hdr, HCI_Cmd_Reset, HCI_Cmd_Set_Event_Filter, \
@@ -87,7 +87,7 @@ class HCIDevice(VirtualDevice):
         self.__hci_responses = Queue()
         self._dev_capabilities = None
         self._bd_address = None
-        self._bd_address_type = BleAddrType.PUBLIC
+        self._bd_address_type = AddressType.PUBLIC
         self._fw_version = None
         self._fw_url = None
         self._fw_author = None
@@ -271,7 +271,7 @@ class HCIDevice(VirtualDevice):
             capabilities = capabilities | cap
             supported_commands += commands
 
-        supported_commands += [SetBdAddress]
+        supported_commands += [Commands.SetBdAddress]
 
         supported_commands = list(set(supported_commands))
         capabilities = {
@@ -376,11 +376,11 @@ class HCIDevice(VirtualDevice):
         else:
             return None
 
-    def _set_BD_address(self, bd_address="11:22:33:44:55:66", bd_address_type=BleAddrType.PUBLIC):
+    def _set_BD_address(self, bd_address="11:22:33:44:55:66", bd_address_type=AddressType.PUBLIC):
         """
         Modify the BD address (if supported by the HCI device).
         """
-        if bd_address_type == BleAddrType.PUBLIC:
+        if bd_address_type == AddressType.PUBLIC:
             _, self._manufacturer = self._read_local_version_information()
             if self._manufacturer in ADDRESS_MODIFICATION_VENDORS:
                 logger.info("[i] Address modification supported !")
@@ -431,7 +431,7 @@ class HCIDevice(VirtualDevice):
                 # Check the modification success and re-generate device ID
                 self._bd_address = self._read_BD_address()
                 self._dev_id = self._generate_dev_id()
-                self._bd_address_type = BleAddrType.PUBLIC
+                self._bd_address_type = AddressType.PUBLIC
                 return self._bd_address == bd_address
 
             else:
@@ -440,7 +440,7 @@ class HCIDevice(VirtualDevice):
         else:
             self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
             self._bd_address = self._read_BD_address()
-            self._bd_address_type = BleAddrType.RANDOM
+            self._bd_address_type = AddressType.RANDOM
             return True
 
     def _set_scan_parameters(self, active=True):
@@ -457,11 +457,11 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_LE_Set_Scan_Enable(enable=int(enable), filter_dups=False))
         return response is not None and response.status == 0x00
 
-    def _connect(self, bd_address, bd_address_type=BleAddrType.PUBLIC, hop_interval=96, channel_map=None):
+    def _connect(self, bd_address, bd_address_type=AddressType.PUBLIC, hop_interval=96, channel_map=None):
         """
         Establish a connection using HCI device.
         """
-        patype = 0 if bd_address_type == BleAddrType.PUBLIC else 1
+        patype = 0 if bd_address_type == AddressType.PUBLIC else 1
         if channel_map is not None:
             formatted_channel_map = unpack("<Q",channel_map+ b"\x00\x00\x00")[0]
             response = self._write_command(HCI_Cmd_LE_Set_Host_Channel_Classification(chM=formatted_channel_map))
@@ -571,14 +571,14 @@ class HCIDevice(VirtualDevice):
             message.ediv
         )
         if success:
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
             return
-        self._send_whad_command_result(ResultCode.ERROR)
+        self._send_whad_command_result(CommandResult.ERROR)
 
 
     def _on_whad_ble_periph_mode(self, message):
         logger.debug('whad ble periph mode message')
-        if PeripheralMode in self._dev_capabilities[WhadDomain.BtLE][1]:
+        if Commands.PeripheralMode in self._dev_capabilities[WhadDomain.BtLE][1]:
             success = True
             if len(message.scan_data) > 0:
                 success = success and self._set_advertising_data(message.scan_data)
@@ -589,78 +589,78 @@ class HCIDevice(VirtualDevice):
             success = success and self._set_advertising_mode(True)
             if success:
                 self.__internal_state = HCIInternalState.PERIPHERAL
-                self._send_whad_command_result(ResultCode.SUCCESS)
+                self._send_whad_command_result(CommandResult.SUCCESS)
                 return
-        self._send_whad_command_result(ResultCode.ERROR)
+        self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_disconnect(self, message):
         success = self._disconnect(message.conn_handle)
         if success:
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
             return
-        self._send_whad_command_result(ResultCode.ERROR)
+        self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_connect(self, message):
-        if ConnectTo in self._dev_capabilities[WhadDomain.BtLE][1]:
+        if Commands.ConnectTo in self._dev_capabilities[WhadDomain.BtLE][1]:
             bd_address = message.bd_address
             bd_address_type = message.addr_type
-            channel_map = message.channel_map if message.HasField("channel_map") else None
-            hop_interval = message.hop_interval if message.HasField("hop_interval") else 96
+            channel_map = message.channel_map if message.channel_map is not None else None
+            hop_interval = message.hop_interval if message.hop_interval is not None else 96
             if self._connect(bd_address, bd_address_type, hop_interval=hop_interval, channel_map=channel_map):
-                self._send_whad_command_result(ResultCode.SUCCESS)
+                self._send_whad_command_result(CommandResult.SUCCESS)
                 return
-        self._send_whad_command_result(ResultCode.ERROR)
+        self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_central_mode(self, message):
-        if CentralMode in self._dev_capabilities[WhadDomain.BtLE][1]:
+        if Commands.CentralMode in self._dev_capabilities[WhadDomain.BtLE][1]:
             self.__internal_state = HCIInternalState.CENTRAL
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
             return
-        self._send_whad_command_result(ResultCode.ERROR)
+        self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_scan_mode(self, message):
-        if ScanMode in self._dev_capabilities[WhadDomain.BtLE][1]:
-            active_scan = message.active_scan
+        if Commands.ScanMode in self._dev_capabilities[WhadDomain.BtLE][1]:
+            active_scan = message.active
             if self._set_scan_parameters(active_scan):
                 self.__internal_state = HCIInternalState.SCANNING
-                self._send_whad_command_result(ResultCode.SUCCESS)
+                self._send_whad_command_result(CommandResult.SUCCESS)
                 return
-        self._send_whad_command_result(ResultCode.ERROR)
+        self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_start(self, message):
         logger.info('whad internal state: %d' % self.__internal_state)
         if self.__internal_state == HCIInternalState.SCANNING:
             self._set_scan_mode(True)
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         elif self.__internal_state == HCIInternalState.PERIPHERAL:
             if not self._advertising:
                 if self._set_advertising_mode(True):
                     self._advertising = True
-                    self._send_whad_command_result(ResultCode.SUCCESS)
+                    self._send_whad_command_result(CommandResult.SUCCESS)
                 else:
-                    self._send_whad_command_result(ResultCode.ERROR)
+                    self._send_whad_command_result(CommandResult.ERROR)
             else:
-                self._send_whad_command_result(ResultCode.SUCCESS)
+                self._send_whad_command_result(CommandResult.SUCCESS)
 
         elif self.__internal_state == HCIInternalState.CENTRAL:
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.ERROR)
+            self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_stop(self, message):
         if self.__internal_state == HCIInternalState.SCANNING:
             self._set_scan_mode(False)
             self.__internal_state = HCIInternalState.NONE
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         elif self.__internal_state == HCIInternalState.CENTRAL:
             self.__internal_state = HCIInternalState.NONE
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         elif self.__internal_state == HCIInternalState.PERIPHERAL:
             # We are not advertising anymore
             self._advertising = False
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.ERROR)
+            self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_send_pdu(self, message):
         logger.debug('Received WHAD BLE send_pdu message')
@@ -677,27 +677,27 @@ class HCIDevice(VirtualDevice):
                     logger.debug('HCI packet sending result: %s' % success)
                     if success:
                         logger.debug('send_pdu command succeeded.')
-                        self._send_whad_command_result(ResultCode.SUCCESS)
+                        self._send_whad_command_result(CommandResult.SUCCESS)
                     else:
                         logger.debug('send_pdu command failed.')
-                        self._send_whad_command_result(ResultCode.ERROR)
+                        self._send_whad_command_result(CommandResult.ERROR)
                 pending_messages = self.__converter.get_pending_messages()
                 for pending_message in pending_messages:
                     self._send_whad_message(pending_message)
 
             except WhadDeviceUnsupportedOperation as err:
                 logger.debug('Parameter error')
-                self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+                self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
         else:
             # Wrong state, cannot send PDU
             logger.debug('wrong state or packet direction.')
-            self._send_whad_command_result(ResultCode.ERROR)
+            self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_set_bd_addr(self, message):
         logger.debug('Received WHAD BLE set_bd_addr message')
         if self._set_BD_address(message.bd_address, message.addr_type):
             logger.debug('HCI adapter BD address set to %s' % str(message.bd_address))
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
             logger.debug('HCI adapter does not support BD address spoofing')
-            self._send_whad_command_result(ResultCode.ERROR)
+            self._send_whad_command_result(CommandResult.ERROR)

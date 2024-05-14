@@ -8,6 +8,7 @@ from scapy.compat import raw
 from whad.exceptions import WhadDeviceUnsupportedOperation
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import BleAdvType, BleAddrType, BleDirection
+from whad.hub.ble import BDAddress, AdvType
 from struct import pack, unpack
 from queue import Queue
 from enum import IntEnum
@@ -62,7 +63,6 @@ class HCIConverter:
             return [hci_packet]
         elif ll_packet.LLID == 3:
             if LL_ENC_REQ in ll_packet:
-                msg = Message()
                 pdu = BTLE_DATA() / BTLE_CTRL() / LL_ENC_RSP(skds=0, ivs=0)
 
                 direction = (BleDirection.SLAVE_TO_MASTER if
@@ -72,10 +72,12 @@ class HCIConverter:
                 processed = False
                 conn_handle = message.conn_handle
 
-                msg.ble.pdu.direction = direction
-                msg.ble.pdu.conn_handle = conn_handle
-                msg.ble.pdu.pdu = raw(pdu)
-                msg.ble.pdu.processed = processed
+                msg = self.__device.hub.ble.createPduReceived(
+                    direction,
+                    raw(pdu),
+                    conn_handle,
+                    processed
+                )
 
                 self.add_pending_message(msg)
 
@@ -89,10 +91,12 @@ class HCIConverter:
                 processed = False
                 conn_handle = message.conn_handle
 
-                msg.ble.pdu.direction = direction
-                msg.ble.pdu.conn_handle = conn_handle
-                msg.ble.pdu.pdu = raw(pdu)
-                msg.ble.pdu.processed = processed
+                msg = self.__device.hub.ble.createPduReceived(
+                    direction,
+                    raw(pdu),
+                    conn_handle,
+                    processed
+                )
 
                 self.add_pending_message(msg)
 
@@ -131,7 +135,6 @@ class HCIConverter:
             return self.process_disconnection_complete(event[HCI_Event_Disconnection_Complete:])
 
     def process_encryption_change_event(self, event):
-        msg = Message()
         pdu = BTLE_DATA()/BTLE_CTRL()/LL_START_ENC_RSP()
 
         direction = (BleDirection.SLAVE_TO_MASTER if
@@ -141,10 +144,12 @@ class HCIConverter:
         processed = False
         conn_handle = event.handle
 
-        msg.ble.pdu.direction = direction
-        msg.ble.pdu.conn_handle = conn_handle
-        msg.ble.pdu.pdu = raw(pdu)
-        msg.ble.pdu.processed = processed
+        msg = self.__device.hub.ble.createPduReceived(
+            direction,
+            raw(pdu),
+            conn_handle,
+            processed
+        )
 
         return [msg]
 
@@ -169,10 +174,12 @@ class HCIConverter:
         processed = False
         conn_handle = event.handle
 
-        msg.ble.pdu.direction = direction
-        msg.ble.pdu.conn_handle = conn_handle
-        msg.ble.pdu.pdu = raw(pdu)
-        msg.ble.pdu.processed = processed
+        msg = self.__device.hub.ble.createPduReceived(
+            direction,
+            raw(pdu),
+            conn_handle,
+            processed
+        )
 
         self.pending_key_request = True
         return [msg]
@@ -195,10 +202,13 @@ class HCIConverter:
             processed = False
             conn_handle = event.handle
 
-            msg.ble.pdu.direction = direction
-            msg.ble.pdu.conn_handle = conn_handle
-            msg.ble.pdu.pdu = raw(pdu)
-            msg.ble.pdu.processed = processed
+            msg = self.__device.hub.ble.createPduReceived(
+                direction,
+                raw(pdu),
+                conn_handle,
+                processed
+            )
+
             return [msg]
 
         elif event.PB == 1:
@@ -217,10 +227,13 @@ class HCIConverter:
             processed = False
             conn_handle = event.handle
 
-            msg.ble.pdu.direction = direction
-            msg.ble.pdu.conn_handle = conn_handle
-            msg.ble.pdu.pdu = raw(pdu)
-            msg.ble.pdu.processed = processed
+            msg = self.__device.hub.ble.createPduReceived(
+                direction,
+                raw(pdu),
+                conn_handle,
+                processed
+            )
+
             return [msg]
 
     def process_connection_complete(self, event):
@@ -229,8 +242,8 @@ class HCIConverter:
             # Mark device as connected and register handle.
             self.__device._connected = True
             self.__device._active_handles.append(event.handle)
+
             # Send BLE connected message to consumer.
-            msg = Message()
             handle = event.handle
             if event.role == 0: # master role
                 self.role = HCIRole.CENTRAL
@@ -244,11 +257,14 @@ class HCIConverter:
                 initiator_address_type = BleAddrType.PUBLIC if event.patype == 0 else BleAddrType.RANDOM
                 responder_address = bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
                 responder_address_type = self.__device._bd_address_type
-            msg.ble.connected.initiator = initiator_address
-            msg.ble.connected.init_addr_type = initiator_address_type
-            msg.ble.connected.advertiser = responder_address
-            msg.ble.connected.adv_addr_type = responder_address_type
-            msg.ble.connected.conn_handle = handle
+            
+            msg = self.__device.hub.ble.createConnected(
+                BDAddress(initiator_address, addr_type=initiator_address_type),
+                BDAddress(responder_address, addr_type=responder_address_type),
+                0, # No access address
+                handle
+            )
+
             return [msg]
 
     def process_disconnection_complete(self, event):
@@ -258,40 +274,40 @@ class HCIConverter:
             self.__device._active_handles.remove(event.handle)
 
             # Send disconnection message to consumer.
-            msg = Message()
-            handle = event.handle
-            reason = event.reason
-            msg.ble.disconnected.conn_handle = handle
-            msg.ble.disconnected.reason = reason
+            msg = self.__device.hub.ble.createDisconnected(
+                event.reason,
+                event.handle
+            )
+
             return [msg]
 
     def process_advertising_reports(self, reports):
         messages = []
         for report in reports.reports:
 
-            msg = Message()
-            adv_type = BleAdvType.ADV_UNKNOWN
+            adv_type = AdvType.ADV_UNKNOWN
             if report.type == 0:
-                adv_type = BleAdvType.ADV_IND
+                adv_type = AdvType.ADV_IND
             elif report.type == 1:
-                adv_type = BleAdvType.ADV_DIRECT_IND
+                adv_type = AdvType.ADV_DIRECT_IND
             elif report.type == 2:
-                adv_type = BleAdvType.ADV_SCAN_IND
+                adv_type = AdvType.ADV_SCAN_IND
             elif report.type == 3:
-                adv_type = BleAdvType.ADV_NONCONN_IND
+                adv_type = AdvType.ADV_NONCONN_IND
             elif report.type == 4:
-                adv_type = BleAdvType.ADV_SCAN_RSP
-            msg.ble.adv_pdu.adv_type = adv_type
-            if hasattr(report, "rssi"):
-                msg.ble.adv_pdu.rssi = report.rssi
-            msg.ble.adv_pdu.bd_address = bytes.fromhex(report.addr.replace(":",""))[::-1]
-            msg.ble.adv_pdu.addr_type = BleAddrType.PUBLIC if report.atype == 0 else BleAddrType.RANDOM
+                adv_type = AdvType.ADV_SCAN_RSP
+
             # Flatten EIR data
             eir_data = b""
-
             for data in report.data:
                 eir_data += raw(data)
 
-            msg.ble.adv_pdu.adv_data = eir_data
+            msg = self.__device.hub.ble.createAdvPduReceived(
+                adv_type,
+                report.rssi if hasattr(report, "rssi") else 0,
+                BDAddress(report.addr, random = not (report.atype == 0)),
+                bytes(eir_data)
+            )
+
             messages.append(msg)
         return messages

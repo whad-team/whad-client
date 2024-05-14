@@ -45,39 +45,44 @@ class VirtualDevice(WhadDevice):
         self.__lock.release()
 
     def _on_whad_message(self, message):
-        category = message.WhichOneof('msg')
-        message_type = getattr(message,category).WhichOneof('msg')
+        """TODO: associate callbacks with classes ?
+        """
+        category = message.message_type
+        message_type = message.message_name
 
         callback_name = "_on_whad_"+category+"_"+message_type
         if hasattr(self, callback_name) and callable(getattr(self, callback_name)):
-            inner_message = getattr(getattr(message,category), message_type)
-            getattr(self, callback_name)(inner_message)
+            getattr(self, callback_name)(message)
         else:
             logger.info("unhandled message: %s" % message)
             self._send_whad_command_result(ResultCode.ERROR)
 
     def _on_whad_discovery_info_query(self, message):
-        msg = Message()
-        msg.discovery.info_resp.type = DeviceType.VirtualDevice
-        msg.discovery.info_resp.devid = self._dev_id
-        msg.discovery.info_resp.proto_min_ver = 0x0100
-        msg.discovery.info_resp.fw_author = self._fw_author
-        msg.discovery.info_resp.fw_url = self._fw_url
         major, minor, revision = self._fw_version
-        msg.discovery.info_resp.fw_version_major = major
-        msg.discovery.info_resp.fw_version_minor = minor
-        msg.discovery.info_resp.fw_version_rev = revision
-        for domain, capabilities in self._dev_capabilities.items():
-            msg.discovery.info_resp.capabilities.extend([domain | (capabilities[0] & 0xFFFFFF)])
+        msg = self.hub.discovery.createInfoResp(
+            DeviceType.VirtualDevice,
+            self._dev_id,
+            0x0100,
+            0,
+            self._fw_author,
+            self._fw_url,
+            major, minor, revision,
+            [domain | (capabilities[0] & 0xFFFFFF) for domain, capabilities in self._dev_capabilities.items()]
+        )
         self._send_whad_message(msg)
 
     def _on_whad_discovery_domain_query(self, message):
+        # Compute supported commands for domain
+        commands = 0
         supported_commands = self._dev_capabilities[message.domain][1]
-        msg = Message()
-        msg.discovery.domain_resp.domain = message.domain
-        msg.discovery.domain_resp.supported_commands = 0
         for command in supported_commands:
-            msg.discovery.domain_resp.supported_commands |= (1 << command)
+            commands |= (1 << command)
+
+        # Create a DomainResp message and send it
+        msg = self.hub.discovery.createDomainResp(
+            message.domain,
+            commands
+        )
         self._send_whad_message(msg)
 
 
@@ -85,8 +90,7 @@ class VirtualDevice(WhadDevice):
         self.on_message_received(message)
 
     def _send_whad_command_result(self, code):
-        msg = Message()
-        msg.generic.cmd_result.result = code
+        msg = self.hub.generic.createCommandResult(code)
         self._send_whad_message(msg)
 
 from .ubertooth import UbertoothDevice
