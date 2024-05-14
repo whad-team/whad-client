@@ -2,7 +2,7 @@
 """
 
 import pytest
-from whad.ble.chanmap import ChannelMap
+from whad.hub.ble.chanmap import ChannelMap
 
 class TestChannelMap(object):
     """Test BLE channel map

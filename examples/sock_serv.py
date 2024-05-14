@@ -1,4 +1,4 @@
-from whad.phy import Phy, Endianness, OOKModulationScheme, PhysicalLayer, TXPower
+from whad.phy import Phy, Endianness, OOKModulationScheme, PhysicalLayer, TxPower
 from whad.device import WhadDevice
 from whad.device.tcp import TCPSocketConnector
 from whad.exceptions import WhadDeviceNotFound

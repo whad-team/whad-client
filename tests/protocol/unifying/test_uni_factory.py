@@ -8,8 +8,8 @@ from whad.hub.unifying import UnifyingDomain, SetNodeAddress, SniffMode, JamMode
     SendRawPdu, PduReceived, RawPduReceived, UnifyingStart, UnifyingStop, DongleMode, \
     KeyboardMode, MouseMode, SniffPairing
 
-from whad.ble.bdaddr import BDAddress
-from whad.ble.chanmap import DefaultChannelMap
+from whad.hub.ble.bdaddr import BDAddress
+from whad.hub.ble.chanmap import DefaultChannelMap
 
 DEFAULT_NODE_ADDRESS = EsbNodeAddress(0x1122334455, 5)
 

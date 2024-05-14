@@ -1,4 +1,4 @@
-from whad.phy import Phy, Endianness, OOKModulationScheme, PhysicalLayer, TXPower
+from whad.phy import Phy, Endianness, OOKModulationScheme, PhysicalLayer, TxPower
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from whad.phy.utils.helpers import get_physical_layers_by_domain
@@ -127,7 +127,7 @@ if __name__ == '__main__':
         #sniffer1.set_4fsk(1950)
         sniffer1.set_endianness(Endianness.BIG)
         sniffer1.set_sync_word(b"")
-        sniffer1.set_tx_power(TXPower.HIGH)
+        sniffer1.set_tx_power(TxPower.HIGH)
         '''
         sniffer1.set_physical_layer(somfy)
         sniffer1.set_channel(0)
