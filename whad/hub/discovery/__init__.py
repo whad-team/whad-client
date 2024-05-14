@@ -5,6 +5,20 @@ from whad.hub.message import HubMessage
 from whad.hub.message import pb_bind, Registry
 from whad.hub import ProtocolHub
 
+class Capability:
+    """Device capability
+    """
+    CapNone = 0x00
+    Scan = 0x01
+    Sniff = 0x02
+    Inject = 0x04
+    Jam = 0x08
+    Hijack = 0x10
+    Hook = 0x20
+    SimulateRole = 0x40
+    NoRawData = 0x80
+
+
 @pb_bind(ProtocolHub, name='discovery', version=1)
 class Discovery(Registry):
     """WHAD Discovery message parser/factory.
