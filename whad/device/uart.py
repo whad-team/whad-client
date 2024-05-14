@@ -22,6 +22,9 @@ from whad.protocol.device_pb2 import DeviceResetQuery
 from whad.protocol.generic_pb2 import ResultCode
 from whad.exceptions import WhadDeviceNotFound
 
+from whad.hub.generic.cmdresult import CommandResult, Success
+from whad.hub.discovery import DeviceReady
+
 def get_port_info(port):
     """Find information about a serial port
 
@@ -145,24 +148,22 @@ class UartDevice(WhadDevice):
                 # Wait for a ready message for 1 second
                 msg = self.wait_for_single_message(
                     1.0,
-                    message_filter('discovery', 'ready_resp')
+                    message_filter(DeviceReady)
                 )
                 self.dispatch_message(msg)
             except Empty:
                 # Use the classic way to reset device (RTS-based reset failed)
-                msg = Message()
-                msg.discovery.reset_query.CopyFrom(DeviceResetQuery())
+                msg = self.hub.discovery.createResetQuery()
                 self.send_command(
                     msg,
-                    message_filter('discovery', 'ready_resp')
+                    message_filter(DeviceReady)
                 )
         else:
             # Device is ACM, send a classic reset message to device
-            msg = Message()
-            msg.discovery.reset_query.CopyFrom(DeviceResetQuery())
+            msg = self.hub.discovery.createResetQuery()
             self.send_command(
                 msg,
-                message_filter('discovery', 'ready_resp')
+                message_filter(DeviceReady)
             )
 
 
@@ -245,10 +246,10 @@ class UartDevice(WhadDevice):
             msg = self.hub.discovery.createSetSpeed(speed)
             resp = self.send_command(
                 msg,
-                message_filter('generic', 'cmd_result')
+                message_filter(CommandResult)
             )
 
-            if (resp.generic.cmd_result.result == ResultCode.SUCCESS):
+            if isinstance(resp, Success):
                 # Change baudrate
                 self.__uart.baudrate = speed
 

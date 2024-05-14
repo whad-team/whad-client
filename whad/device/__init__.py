@@ -13,7 +13,8 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery
 from whad.helpers import message_filter, asciiz
 from whad.hub import ProtocolHub
-from whad.hub.discovery import InfoQueryResp
+from whad.hub.generic.cmdresult import CommandResult
+from whad.hub.discovery import InfoQueryResp, DomainInfoQueryResp, DeviceReady
 
 # Logging
 import logging
@@ -897,7 +898,7 @@ class WhadDevice(object):
                 msg = self.__msg_queue.get(block=True, timeout=timeout)
 
                 # If message does not match, dispatch.
-                if not self.__mq_filter(msg.message):
+                if not self.__mq_filter(msg):
                     self.dispatch_message(msg)
                 else:
                     return msg
@@ -962,10 +963,7 @@ class WhadDevice(object):
         # If a queue filter is not provided, expect a default CmdResult
         try:
             if keep is None:
-                self.send_message(command, message_filter(
-                    'generic',
-                    'cmd_result'
-                ))
+                self.send_message(command, message_filter(CommandResult))
             else:
                 self.send_message(command, keep)
         except WhadDeviceError as error:
@@ -1090,7 +1088,7 @@ class WhadDevice(object):
         logger.debug(self.__mq_filter)
         # If message queue filter is defined and message matches this filter,
         # move it into our message queue.
-        if self.__mq_filter is not None and self.__mq_filter(message.message):
+        if self.__mq_filter is not None and self.__mq_filter(message):
             logger.info('message does match current filter, save it for processing')
             self.__msg_queue.put(message, block=True)
         else:
@@ -1211,7 +1209,7 @@ class WhadDevice(object):
         msg = self.__hub.discovery.createInfoQuery(proto_version)
         return self.send_command(
             msg,
-            message_filter('discovery', 'info_resp')
+            message_filter(InfoQueryResp)
         )
 
 
@@ -1224,7 +1222,7 @@ class WhadDevice(object):
         msg = self.__hub.discovery.createDomainQuery(domain)
         return self.send_command(
             msg,
-            message_filter('discovery', 'domain_resp')
+            message_filter(DomainInfoQueryResp)
         )
 
     def discover(self):
@@ -1286,7 +1284,7 @@ class WhadDevice(object):
         msg = self.hub.discovery.createResetQuery()
         return self.send_command(
             msg,
-            message_filter('discovery', 'ready_resp')
+            message_filter(DeviceReady)
         )
 
     def change_transport_speed(self, speed):
