@@ -1,16 +1,20 @@
-from queue import Queue, Empty
-from binascii import hexlify
 from scapy.compat import raw
 from scapy.config import conf
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
-from whad.zigbee.connector.translator import ZigbeeMessageTranslator
+
+# Main whad imports
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.zigbee.metadata import generate_zigbee_metadata, ZigbeeMetadata
-from whad.protocol.generic_pb2 import ResultCode
-from whad.hub.dot15d4 import NodeAddress, Commands, NodeAddressType
+
+# Dot15d4 message translator
+from whad.zigbee.connector.translator import ZigbeeMessageTranslator
+
+# WHAD Protocol hub
+from whad.hub.generic.cmdresult import Success
+from whad.hub.dot15d4 import NodeAddress, Commands, NodeAddressType, PduReceived, \
+    RawPduReceived, EnergyDetectionSample
 
 class Zigbee(WhadDeviceConnector):
     """
@@ -126,7 +130,7 @@ class Zigbee(WhadDeviceConnector):
         msg = self.hub.dot15d4.createSniffMode(channel)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def set_node_address(self, address, mode=NodeAddressType.SHORT):
         """
@@ -142,7 +146,7 @@ class Zigbee(WhadDeviceConnector):
         msg = self.hub.dot15d4.createSetNodeAddress(node_addr)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def set_end_device_mode(self, channel=11):
         """
@@ -155,7 +159,7 @@ class Zigbee(WhadDeviceConnector):
         msg = self.hub.dot15d4.createEndDeviceMode(channel)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def send(self, pdu, channel:int = 11) -> bool:
         """
@@ -183,7 +187,7 @@ class Zigbee(WhadDeviceConnector):
 
             msg = self.translator.from_packet(packet, channel)
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+            return isinstance(resp, Success)
 
         else:
             return False
@@ -198,7 +202,7 @@ class Zigbee(WhadDeviceConnector):
 
             msg = self.translator.from_packet(packet, channel)
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+            return isinstance(resp, Success)
         else:
             return False            
 
@@ -211,7 +215,7 @@ class Zigbee(WhadDeviceConnector):
             msg = self.hub.dot15d4.createEnergyDetectionMode(channel)
 
             resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-            return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+            return isinstance(resp, Success)
         else:
             return False
 
@@ -223,7 +227,7 @@ class Zigbee(WhadDeviceConnector):
         msg = self.hub.dot15d4.createStart()
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def stop(self):
         """
@@ -233,7 +237,7 @@ class Zigbee(WhadDeviceConnector):
         msg = self.hub.dot15d4.createStop()
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def on_generic_msg(self, message):
         pass
@@ -245,20 +249,19 @@ class Zigbee(WhadDeviceConnector):
         if not self.__ready:
             return
 
-        if domain == 'zigbee':
+        assert domain == "zigbee"
 
-            msg_type = message.WhichOneof('msg')
-            if msg_type == 'pdu':
-                packet = self.translator.from_message(message, msg_type)
-                self.monitor_packet_rx(packet)
-                self.on_pdu(packet)
+        if isinstance(message, PduReceived):
+            packet = self.translator.from_message(message)
+            self.monitor_packet_rx(packet)
+            self.on_pdu(packet)
 
-            elif msg_type == 'raw_pdu':
-                packet = self.translator.from_message(message, msg_type)
-                self.monitor_packet_rx(packet)
-                self.on_raw_pdu(packet)
-            elif msg_type == "ed_sample":
-                self.on_ed_sample(message.ed_sample.timestamp, message.ed_sample.sample)
+        elif isinstance(message, RawPduReceived):
+            packet = self.translator.from_message(message)
+            self.monitor_packet_rx(packet)
+            self.on_raw_pdu(packet)
+        elif isinstance(message, EnergyDetectionSample):
+            self.on_ed_sample(message.timestamp, message.sample)
 
     def on_raw_pdu(self, packet):
         pdu = Dot15d4(raw(packet)[:-2])

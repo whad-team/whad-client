@@ -9,6 +9,7 @@ from dataclasses import dataclass
 class ZigbeeMetadata(Metadata):
     is_fcs_valid : bool = None
     lqi : int = None
+    timestamp : int = None
 
     def convert_to_header(self):
         timestamp = None
@@ -25,22 +26,17 @@ class ZigbeeMetadata(Metadata):
             tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Channel_Center_Frequency(channel_frequency=channel_frequency))
         return Dot15d4TAP_Hdr(data=tlv), timestamp
 
-def generate_zigbee_metadata(message, msg_type):
+def generate_zigbee_metadata(message):
     metadata = ZigbeeMetadata()
 
-    if msg_type == "raw_pdu":
-        message = message.raw_pdu
-    elif msg_type == "pdu":
-        message = message.pdu
-
-    if message.HasField("lqi"):
+    if message.lqi is not None:
         metadata.lqi = message.lqi
-    if message.HasField("rssi"):
+    if message.rssi is not None:
         metadata.rssi = message.rssi
     metadata.channel = message.channel
-    if message.HasField("timestamp"):
+    if message.timestamp is not None:
         metadata.timestamp = message.timestamp
-    if message.HasField("fcs_validity"):
+    if message.fcs_validity is not None:
         metadata.is_fcs_valid = message.fcs_validity
 
     return metadata

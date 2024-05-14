@@ -5,6 +5,7 @@ from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr, Dot
 from whad.zigbee.metadata import generate_zigbee_metadata
 from whad.protocol.whad_pb2 import Message
 from whad.hub import ProtocolHub
+from whad.hub.dot15d4 import RawPduReceived, PduReceived
 from struct import pack
 import logging
 
@@ -39,16 +40,16 @@ class ZigbeeMessageTranslator(object):
         formatted_packet = header/packet
         return formatted_packet, timestamp
 
-    def from_message(self, message, msg_type):
+    def from_message(self, message):
         try:
-            if msg_type == 'raw_pdu':
-                packet = Dot15d4FCS(bytes(message.raw_pdu.pdu) + bytes(pack(">H", message.raw_pdu.fcs)))
-                packet.metadata = generate_zigbee_metadata(message, msg_type)
+            if isinstance(message, RawPduReceived):
+                packet = Dot15d4FCS(bytes(message.pdu) + bytes(pack(">H", message.fcs)))
+                packet.metadata = generate_zigbee_metadata(message)
                 return packet
 
-            elif msg_type == 'pdu':
-                packet = Dot15d4(bytes(message.pdu.pdu))
-                packet.metadata = generate_zigbee_metadata(message, msg_type)
+            elif isinstance(message, PduReceived):
+                packet = Dot15d4(bytes(message.pdu))
+                packet.metadata = generate_zigbee_metadata(message)
                 return packet
         except AttributeError:
             return None
