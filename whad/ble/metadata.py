@@ -67,11 +67,11 @@ def generate_ble_metadata(message):
 
         metadata.connection_handle = message.conn_handle
 
-    elif isinstance(BleAdvPduReceived):
+    elif isinstance(message, BleAdvPduReceived):
         metadata.direction = BleDirection.UNKNOWN
         metadata.rssi = message.rssi
 
-    elif isinstance(BlePduReceived):
+    elif isinstance(message, BlePduReceived):
         metadata.connection_handle = message.conn_handle
         metadata.direction = message.direction
         metadata.decrypted = message.decrypted
