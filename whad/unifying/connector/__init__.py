@@ -1,17 +1,15 @@
-from queue import Queue, Empty
-from scapy.packet import Packet
-
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
-from whad.helpers import message_filter, is_message_type
+from whad.helpers import message_filter
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.esb.metadata import ESBMetadata, generate_esb_metadata
+from whad.esb.metadata import ESBMetadata
 from whad.esb.connector.translator import ESBMessageTranslator
 from whad.esb.esbaddr import ESBAddress
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
-from whad.protocol.generic_pb2 import ResultCode
 from whad.scapy.layers.unifying import bind
-from whad.hub.unifying import EsbNodeAddress, Commands
+
+from whad.hub.generic.cmdresult import Success
+from whad.hub.unifying import EsbNodeAddress, Commands, RawPduReceived, PduReceived
 
 class Unifying(WhadDeviceConnector):
     """
@@ -119,7 +117,7 @@ class Unifying(WhadDeviceConnector):
         self.monitor_packet_tx(packet)
         msg = self.translator.from_packet(packet, channel, retransmission_count)
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def support_raw_pdu(self):
         """
@@ -163,7 +161,7 @@ class Unifying(WhadDeviceConnector):
         )
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
 
     def can_be_dongle(self):
@@ -194,7 +192,7 @@ class Unifying(WhadDeviceConnector):
         msg = self.hub.unifying.createDongleMode(channel)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
 
     def can_be_keyboard(self):
@@ -226,7 +224,7 @@ class Unifying(WhadDeviceConnector):
         msg = self.hub.unifying.createKeyboardMode(channel)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def can_be_mouse(self):
         """
@@ -257,7 +255,7 @@ class Unifying(WhadDeviceConnector):
         msg = self.hub.unifying.createMouseMode(channel)
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
 
     def can_set_node_address(self):
@@ -286,7 +284,7 @@ class Unifying(WhadDeviceConnector):
         )
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
 
     def can_sniff_pairing(self):
@@ -310,7 +308,7 @@ class Unifying(WhadDeviceConnector):
         msg = self.hub.unifying.createSniffPairing()
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
 
     def start(self):
@@ -321,7 +319,7 @@ class Unifying(WhadDeviceConnector):
         msg = self.hub.unifying.createStart()
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def stop(self):
         """
@@ -331,7 +329,7 @@ class Unifying(WhadDeviceConnector):
         msg = self.hub.unifying.createStop()
 
         resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-        return (resp.generic.cmd_result.result == ResultCode.SUCCESS)
+        return isinstance(resp, Success)
 
     def on_discovery_msg(self, message):
         pass
@@ -342,19 +340,19 @@ class Unifying(WhadDeviceConnector):
     def on_domain_msg(self, domain, message):
         if not self.__ready:
             return
+        
+        # Ensure our callback is called for the correct domain
+        assert domain == 'unifying'
 
-        if domain == 'unifying':
-            msg_type = message.WhichOneof('msg')
-            if msg_type == 'pdu':
-                packet = self.translator.from_message(message, msg_type)
-                self.monitor_packet_rx(packet)
-                self.on_pdu(packet)
-
-            elif msg_type == 'raw_pdu':
-                packet = self.translator.from_message(message, msg_type)
-                self.monitor_packet_rx(packet)
-                self.on_raw_pdu(packet)
-
+        # Dispatch message to the correct callbacks
+        if isinstance(message, PduReceived):
+            packet = self.translator.from_message(message)
+            self.monitor_packet_rx(packet)
+            self.on_pdu(packet)
+        elif isinstance(message, RawPduReceived):
+            packet = self.translator.from_message(message)
+            self.monitor_packet_rx(packet)
+            self.on_raw_pdu(packet)
 
     def on_raw_pdu(self, packet):
         # Extract the PDU from raw packet
@@ -366,7 +364,6 @@ class Unifying(WhadDeviceConnector):
         # Propagate metadata to PDU
         pdu.metadata = packet.metadata
         self.on_pdu(pdu)
-
 
     def on_pdu(self, packet):
         pass

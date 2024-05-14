@@ -4,7 +4,8 @@ from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ES
 from whad.esb.metadata import generate_esb_metadata
 from whad.protocol.whad_pb2 import Message
 from whad.hub import ProtocolHub
-from whad.hub.esb import RawPduReceived, PduReceived
+from whad.hub.esb import RawPduReceived as EsbRawPduReceived, PduReceived as EsbPduReceived
+from whad.hub.unifying import RawPduReceived as UniRawPduReceived, PduReceived as UniPduReceived
 import logging
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class ESBMessageTranslator(object):
 
     def from_message(self, message):
         try:
-            if isinstance(message, RawPduReceived):
+            if isinstance(message, EsbRawPduReceived) or isinstance(message, UniRawPduReceived):
                 packet = ESB_Hdr(bytes(message.pdu))
                 packet.preamble = 0xAA # force a rebuild
 
@@ -53,7 +54,7 @@ class ESBMessageTranslator(object):
                 packet.metadata = generate_esb_metadata(message)
                 return packet
 
-            elif isinstance(message, PduReceived):
+            elif isinstance(message, EsbPduReceived) or isinstance(message, UniPduReceived):
                 packet = ESB_Payload_Hdr(bytes(message.pdu))
                 packet.metadata = generate_esb_metadata(message)
                 return packet
