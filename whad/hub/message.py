@@ -154,6 +154,7 @@ class pb_bind(object):
 
         # Add to our class a category type corresponding to the registry name
         clazz.message_type = self.__registry.NAME
+        clazz.message_name = self.__name
         return clazz
    
 
@@ -213,6 +214,19 @@ class PbMessageWrapper(HubMessage):
             self.__dict__[name] = value
         elif name in self.__pb_fields:
             self.set_field_value(self.__pb_fields[name], value)
+
+    def __repr__(self):
+        """Generate a string representation of our message
+        """
+        fields = []
+        for prop_name in self.__pb_fields:
+            value = self.get_field_value(self.__pb_fields[prop_name])
+            if value is not None:
+                fields.append((prop_name, value))
+
+        return f"<{self.__class__.__name__} " + ', '.join(
+            [f'{name}={value}' for name, value in fields]
+        ) + ">"
 
     @classmethod
     def parse(parent_class, version: int, message: Message):
