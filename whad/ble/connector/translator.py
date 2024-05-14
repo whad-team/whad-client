@@ -31,6 +31,15 @@ class BleMessageTranslator(object):
     (if it makes sense) and scapy packets into WHAD BLE messages.
     """
 
+    # correlation table
+    SCAPY_CORR_ADV = {
+        AdvType.ADV_IND: BTLE_ADV_IND,
+        AdvType.ADV_NONCONN_IND: BTLE_ADV_NONCONN_IND,
+        AdvType.ADV_DIRECT_IND: BTLE_ADV_DIRECT_IND,
+        AdvType.ADV_SCAN_IND: BTLE_ADV_SCAN_IND,
+        AdvType.ADV_SCAN_RSP: BTLE_SCAN_RSP
+    }
+
     def __init__(self, protocol_hub: ProtocolHub):
         self.__access_address = 0x11223344
         self.__hub = protocol_hub
@@ -83,7 +92,7 @@ class BleMessageTranslator(object):
 
             # Normal PDU (RX)
             elif isinstance(message, BlePduReceived):
-                packet = BTLE_DATA(message.pdu.pdu)
+                packet = BTLE_DATA(message.pdu)
                 packet.metadata = generate_ble_metadata(message)
                 return packet
 
