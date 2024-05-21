@@ -5,7 +5,7 @@ ADPCM codec implementation.
 '''
 from whad.scapy.layers.rf4ce import RF4CE_Vendor_MSO_Audio_Start_Request, \
 		RF4CE_Vendor_MSO_Audio_Data_Notify, RF4CE_Vendor_MSO_Audio_Stop_Request
-from struct import pack
+from struct import pack, unpack
 import wave
 
 resolution = 16
@@ -156,7 +156,7 @@ class ADPCM:
 		self.output_file = None
 		self.live_play = live_play
 		self.decoder = ByteAdpcmDecoder(0, 0)
-
+		self.encoder = None
 
 	def _open_stream(self, channels=1, rate=16000, sample_size=2, unsigned_sample_size=False):
 		try:
@@ -182,6 +182,7 @@ class ADPCM:
 		stream.setnchannels(channels)
 		stream.setsampwidth(sample_size)
 		stream.setframerate(rate)
+
 		return stream
 
 	def decode(self, samples):
@@ -194,6 +195,39 @@ class ADPCM:
 			except:
 				pass
 		return decoded_samples
+
+	def convert_input_file(self, filename="/tmp/trololo.wav"):
+		# buggy
+		stream = wave.open(filename, "rb")
+		nchannels = stream.getnchannels()
+		sampwidth = stream.getsampwidth()
+		rate = stream.getframerate()
+		frames = stream.readframes(stream.getnframes())
+		out = b""
+		import audioop
+		s = None
+		(frag, ns) = audioop.lin2adpcm(frames,2,s)
+		out += frag
+
+		return ([
+		RF4CE_Vendor_MSO_Audio_Start_Request(
+			sample_rate = rate,
+			#sample_rate=16000,
+			resolution_bits=16,
+			mic_channel_number=1,
+			packet_size=84,
+			interval=10,
+			channel_number=3,
+			duration=10
+			)]
+			+
+			[
+				RF4CE_Vendor_MSO_Audio_Data_Notify(
+				samples=out[s:s+80]
+				)
+				for s in range(0, len(out), 80)
+			]
+		)
 
 	def process_packet(self, packet):
 		if RF4CE_Vendor_MSO_Audio_Start_Request in packet:

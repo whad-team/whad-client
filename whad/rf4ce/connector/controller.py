@@ -13,7 +13,7 @@ class Controller(RF4CE):
     """
     RF4CE Controller Node interface for compatible WHAD device.
     """
-    def __init__(self, device):
+    def __init__(self, device, profiles=[]):
         RF4CE.__init__(self, device)
 
         # Check if device can act as target node
@@ -25,10 +25,23 @@ class Controller(RF4CE):
         MACManager.add(NWKManager)
         self.__stack = Dot15d4Stack(self)
 
+        self.__stack.set_short_address(0x1234)
+        self.__stack.get_layer('mac').database.set('macShortAddress', 0x1234)
+        self.__stack.get_layer('nwk').database.set("nwkcNodeCapabilities",
+            (1 << 3) | # channel_normalization_capable
+            (1 << 2) | # security_capable
+            (0 << 1) | # power_source
+            (0) # node_type
+            #self.__stack.get_layer('nwk').database.get("nwkcNodeCapabilities") & 0xFE
+        )
+
         # Channel initialization
         self.__channel = 15
         self.__channel_page = 0
 
+        for profile in profiles:
+            self.__stack.get_layer('apl').add_profile(profile)
+            
         self.enable_reception()
 
 
@@ -68,7 +81,6 @@ class Controller(RF4CE):
 
 
     def send(self, packet):
-        packet.show()
         super().send(packet, channel=self.__channel)
 
     def on_pdu(self, pdu):
@@ -78,7 +90,6 @@ class Controller(RF4CE):
             not pdu.metadata.is_fcs_valid
         ):
             return
-        pdu.show()
 
         self.__stack.on_pdu(pdu)
 

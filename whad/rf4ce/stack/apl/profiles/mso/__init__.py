@@ -30,6 +30,7 @@ class MSOEvent(IntEnum):
     AUDIO_START_REQ     = 8
     AUDIO_STOP_REQ      = 9
     AUDIO_DATA          = 10
+    VALIDATION_RSP      = 11
 
 class MSOProfile(APLProfile):
     """
@@ -54,6 +55,67 @@ class MSOProfile(APLProfile):
         nwk_layer.database.set("nwkMaxDiscoveryRepetitions", 2)
         nwk_layer.database.set("nwkMaxReportedNodeDescriptors", 16)
 
+
+    def send_audio(self, audio_filename="/tmp/trololo.wav"):
+        """
+        Transmit audio packets.
+        """
+        nwk_layer = self.manager.get_layer('nwk')
+
+        for p in ADPCM.convert_input_file(audio_filename):
+            pkt = RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Audio()/p
+
+            nwk_layer.get_service('data').data(
+                pkt,
+                pairing_reference = self.pairing_reference,
+                profile_id = self.profile_id,
+                vendor_id = self.manager.get_layer('nwk').database.get("nwkVendorIdentifier"),
+                tx_options = (
+                    TXOptionsValue.pack(
+                        broadcast_transmission = False,
+                        extended_address_mode = False,
+                        acknowledgement_mode = False,
+                        security_enabled = True,
+                        channel_agility_mode = False,
+                        channel_normalization_mode = False,
+                        vendor_specific = True
+                    )[0]
+                )
+            )
+
+
+
+    def send_key(self, keystroke):
+        """
+        Transmit a key to target.
+        """
+        nwk_layer = self.manager.get_layer('nwk')
+        code = None
+        for key, value in RC_COMMAND_CODES.items():
+            if value == keystroke:
+                code = key
+                break
+        pkt = RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_User_Control_Pressed(
+            code= code
+        )
+
+        nwk_layer.get_service('data').data(
+            pkt,
+            pairing_reference = self.pairing_reference,
+            profile_id = self.profile_id,
+            vendor_id = self.manager.get_layer('nwk').database.get("nwkVendorIdentifier"),
+            tx_options = (
+                TXOptionsValue.pack(
+                    broadcast_transmission = False,
+                    extended_address_mode = False,
+                    acknowledgement_mode = False,
+                    security_enabled = True,
+                    channel_agility_mode = False,
+                    channel_normalization_mode = False,
+                    vendor_specific = True
+                )[0]
+            )
+        )
 
     def process_discovery(self, discovery):
         """
@@ -97,6 +159,89 @@ class MSOProfile(APLProfile):
             list_of_profiles=list_of_supported_profiles,
             link_quality=link_quality
         )
+
+    def pairing(self, address, pan_id):
+        """
+        Establish pairing.
+        """
+        nwk_layer = self.manager.get_layer('nwk')
+        pairing_reference = nwk_layer.get_service('management').pair_request(
+            destination_ieee_address=address,
+            destination_pan_id=pan_id
+        )
+        return pairing_reference
+
+
+    def bind(self, address, pan_id, timeout=30, validation_code_callback = input):
+
+        self.pairing_reference = self.pairing(address, pan_id)
+
+        nwk_layer = self.manager.get_layer('nwk')
+
+        pkt = RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Get_Attribute_Request(
+            attribute_identifier = 0xDC,
+            index = 0,
+            value_length = 4
+        )
+
+        nwk_layer.get_service('data').data(
+            pkt,
+            pairing_reference = self.pairing_reference,
+            profile_id = self.profile_id,
+            vendor_id = self.manager.get_layer('nwk').database.get("nwkVendorIdentifier"),
+            tx_options = (
+                TXOptionsValue.pack(
+                    broadcast_transmission = False,
+                    extended_address_mode = False,
+                    acknowledgement_mode = False,
+                    security_enabled = True,
+                    channel_agility_mode = False,
+                    channel_normalization_mode = False,
+                    vendor_specific = True
+                )[0]
+            )
+        )
+
+        self.validation = True
+
+        while True:
+            pkt = RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Check_Validation_Request(
+                request_automatic_validation = "yes"
+            )
+
+            nwk_layer.get_service('data').data(
+                pkt,
+                pairing_reference = self.pairing_reference,
+                profile_id = self.profile_id,
+                vendor_id = self.manager.get_layer('nwk').database.get("nwkVendorIdentifier"),
+                tx_options = (
+                    TXOptionsValue.pack(
+                        broadcast_transmission = False,
+                        extended_address_mode = False,
+                        acknowledgement_mode = False,
+                        security_enabled = True,
+                        channel_agility_mode = False,
+                        channel_normalization_mode = False,
+                        vendor_specific = True
+                    )[0]
+                )
+            )
+            start_time = time()
+            while (time() - start_time) < 1:
+
+                try:
+                    event = self.wait_for_packet(lambda _ : True)
+                    if event[0] == MSOEvent.VALIDATION_RSP:
+                        if event[1].check_validation_status == 0:
+                            return True
+                        elif event[1].check_validation_status > 0xc0:
+                            return False
+                except APLTimeoutException:
+                    pass
+
+                if validation_code_callback is not None:
+                    for i in str(validation_code_callback()):
+                        self.send_key(i)
 
     def process_pairing(self, pairing):
         '''
@@ -451,6 +596,27 @@ class MSOProfile(APLProfile):
         return
 
 
+    def on_check_validation_response_payload(self, payload):
+        """
+        Callback processing check validation response payload.
+        """
+        if self.validation:
+            self.add_packet_to_queue(
+                (
+                    MSOEvent.VALIDATION_RSP,
+                    payload
+                )
+            )
+        return
+
+
+
+    def on_get_attribute_response_payload(self, payload):
+        """
+        Callback processing Get Attribute Response payload.
+        """
+        print("[i] Get attribute response:", payload.value.hex())
+
     def on_get_attribute_request_payload(self, payload):
         """
         Callback processing Get Attribute Request payload.
@@ -507,9 +673,13 @@ class MSOProfile(APLProfile):
         elif RF4CE_Vendor_MSO_Get_Attribute_Request in npdu:
             self.on_get_attribute_request_payload(npdu[RF4CE_Vendor_MSO_Get_Attribute_Request])
 
+        elif RF4CE_Vendor_MSO_Get_Attribute_Response in npdu:
+            self.on_get_attribute_response_payload(npdu[RF4CE_Vendor_MSO_Get_Attribute_Response])
+
         elif RF4CE_Vendor_MSO_Check_Validation_Request in npdu:
             self.on_check_validation_request_payload(npdu[RF4CE_Vendor_MSO_Check_Validation_Request])
-
+        elif RF4CE_Vendor_MSO_Check_Validation_Response in npdu:
+            self.on_check_validation_response_payload(npdu[RF4CE_Vendor_MSO_Check_Validation_Response])
         elif RF4CE_Vendor_MSO_Audio in npdu:
             self.on_audio_payload(npdu[RF4CE_Vendor_MSO_Audio])
 

@@ -5,7 +5,7 @@ from whad.dot15d4.stack.mac.constants import MACAddressMode
 from whad.rf4ce.stack.nwk.exceptions import NWKTimeoutException
 from whad.rf4ce.stack.nwk.database import NWKIB
 from whad.rf4ce.stack.nwk.pairing import PairingEntry
-from whad.rf4ce.crypto import generate_random_value, xor, RF4CECryptoManager
+from whad.rf4ce.crypto import generate_random_value, xor, RF4CECryptoManager, RF4CEKeyDerivation
 from whad.scapy.layers.rf4ce import RF4CE_Command_Hdr, RF4CE_Cmd_Discovery_Request, \
     RF4CE_Hdr, RF4CE_Cmd_Key_Seed, RF4CE_Cmd_Pair_Request, RF4CE_Cmd_Pair_Response, \
     RF4CE_Cmd_Discovery_Response, RF4CE_Cmd_Ping_Request, RF4CE_Cmd_Ping_Response, \
@@ -219,6 +219,7 @@ class NWKManagementService(NWKService):
         power_source = "battery_source" if ((node_capability >> 1) & 1) == 0 else "alternating_current_source"
         node_type = "controller" if (node_capability & 1) == 0 else "target"
 
+        pairing_reference = None
         # Get entry
         pairing_entry = None
         pairing_table = self.database.get("nwkPairingTable")
@@ -248,17 +249,16 @@ class NWKManagementService(NWKService):
         frame_counter = self.database.get("nwkFrameCounter")
         self.database.set("nwkFrameCounter", frame_counter + 1)
 
-        #  Build the pairing response
-        pairing_request = (
+
+        # Build a discovery request
+        discovery_request = (
             RF4CE_Hdr(
-                protocol_version = 1,
-                security_enabled = 0,
-                frame_counter = frame_counter
+                protocol_version=1,
+                security_enabled=0,
+                frame_counter=frame_counter
             ) /
             RF4CE_Command_Hdr() /
-            RF4CE_Cmd_Pair_Request
-            (
-                nwk_addr = self.manager.get_layer('mac').database.get('macShortAddress'),
+            RF4CE_Cmd_Discovery_Request(
                 channel_normalization_capable = channel_normalization_capable,
                 security_capable = security_capable,
                 power_source = power_source,
@@ -271,11 +271,137 @@ class NWKManagementService(NWKService):
                 device_type_list = list_of_device_types,
                 user_string_specificied = int(self.database.get("nwkUserString") is not None),
                 user_string = self.database.get("nwkUserString"),
+                requested_device_type = 0xFF
+            )
+        )
+
+        for _ in range(2):
+            discovery_request.frame_counter = frame_counter
+            #self.manager.get_layer('phy').set_channel(channel)
+            ack = self.manager.get_layer('mac').get_service("data").data(
+                discovery_request,
+                destination_address_mode=MACAddressMode.SHORT,
+                source_address_mode=MACAddressMode.EXTENDED,
+                destination_pan_id=0xFFFF,
+                destination_address=0xFFFF,
+                pan_id_suppressed = False,
+                wait_for_ack=True
+            )
+            frame_counter = self.database.get("nwkFrameCounter")
+            self.database.set("nwkFrameCounter", frame_counter + 1)
+
+
+        frame_counter = self.database.get("nwkFrameCounter")
+        self.database.set("nwkFrameCounter", frame_counter + 1)
+
+        #  Build the pairing response
+        pairing_request = (
+            RF4CE_Hdr(
+                reserved = 1,
+                protocol_version = 1,
+                security_enabled = 0,
+                frame_counter = frame_counter
+            ) /
+            RF4CE_Command_Hdr() /
+            RF4CE_Cmd_Pair_Request
+            (
+                nwk_addr = 0xFFFE,# self.manager.get_layer('mac').database.get('macShortAddress'),
+                channel_normalization_capable = channel_normalization_capable,
+                security_capable = security_capable,
+                power_source = power_source,
+                node_type = node_type,
+                vendor_identifier = self.database.get("nwkVendorIdentifier"),
+                vendor_string = self.database.get("nwkVendorString"),
+                number_of_supported_profiles = len(list_of_profiles),
+                profile_identifier_list = list_of_profiles,
+                number_of_supported_device_types = len(list_of_device_types),
+                device_type_list = list_of_device_types,
+                user_string_specificied = int(self.database.get("nwkUserString") is not None),
+                user_string = self.database.get("nwkUserString"),
+                key_exchange_transfer_count = key_exchange_transfer_count
             )
         )
 
         ack = self.manager.get_layer('mac').get_service("data").data(
             pairing_request,
+            destination_address_mode=MACAddressMode.EXTENDED,
+            source_address_mode=MACAddressMode.EXTENDED,
+            destination_pan_id=destination_pan_id,
+            destination_address=destination_ieee_address,
+            pan_id_suppressed = False,
+            wait_for_ack=True
+        )
+
+        if not ack:
+            return None
+
+        pair_response = None
+        start = time()
+        while (time() - start) < 3 and pair_response is None:
+            try:
+                pair_response = self.wait_for_packet(lambda pkt:RF4CE_Cmd_Pair_Response in pkt, timeout=0.01)
+            except NWKTimeoutException:
+                pass
+
+        if pair_response is None:
+            return None
+
+        self.manager.get_layer('mac').set_short_address(pair_response.allocated_nwk_addr)
+        self.manager.get_layer('mac').database.set("macPanId", destination_pan_id)
+        pair_response.show()
+
+        key_seeds = []
+        while len(key_seeds) != key_exchange_transfer_count+1:
+            key_seed = None
+            start = time()
+            while (time() - start) < 3 and key_seed is None:
+                try:
+                    key_seed = self.wait_for_packet(lambda pkt:RF4CE_Cmd_Key_Seed in pkt, timeout=0.01)
+                    key_seeds.append(key_seed.seed_data)
+
+                except NWKTimeoutException:
+                    pass
+
+        derivation = RF4CEKeyDerivation(seeds = key_seeds, seeds_number = key_exchange_transfer_count)
+        key = derivation.key
+
+        pairing_entry.link_key = key
+        pairing_entry.destination_network_address = pair_response.nwk_addr
+        pairing_entry.mark_as_active()
+
+        frame_counter = self.database.get("nwkFrameCounter")
+        self.database.set("nwkFrameCounter", frame_counter + 1)
+        unenc_ping_req = (
+            RF4CE_Hdr(
+                protocol_version = 1,
+                security_enabled = 1, # !!
+                frame_counter = frame_counter
+            ) /
+            RF4CE_Command_Hdr() /
+            RF4CE_Cmd_Ping_Request
+            (
+                ping_options = 0,
+                ping_payload = generate_random_value(32)
+            )
+        )
+
+        source_ieee_address = self.manager.get_layer('mac').database.get("macExtendedAddress")
+
+        source_address_formatted = pack('<Q', pairing_entry.destination_ieee_address)
+        destination_address_formatted = pack('<Q', source_ieee_address)
+
+
+        enc_ping_req = RF4CECryptoManager(
+            key = key
+        ).encrypt(
+            unenc_ping_req,
+            destination=source_address_formatted,
+            source=destination_address_formatted,
+            rf4ce_only=True
+        )
+
+        ack = self.manager.get_layer('mac').get_service("data").data(
+            enc_ping_req, #enc_ping_resp, #unenc_ping_resp,
             destination_address_mode=MACAddressMode.EXTENDED,
             source_address_mode=MACAddressMode.EXTENDED,
             destination_pan_id=0xFFFF,
@@ -284,6 +410,9 @@ class NWKManagementService(NWKService):
             wait_for_ack=True
         )
 
+        ping_resp = self.wait_for_packet(lambda pkt:RF4CE_Cmd_Ping_Response in pkt, timeout=3)
+        ping_resp.show()
+        return pairing_reference
 
     @Dot15d4Service.response("NLME-PAIR")
     def pair_response(self, destination_address, accept=True, list_of_device_types=[9], list_of_profiles=[192], pairing_reference=None):
@@ -784,7 +913,7 @@ class NWKManagementService(NWKService):
         return (False, None)
 
     @Dot15d4Service.request("NLME-DISCOVERY")
-    def discovery(self, destination_address=0xFFFF, destination_pan_id=0xFFFF, list_of_device_types=[9], list_of_profiles=[192], search_device_type=0xFF, list_of_discovered_profiles=[], duration=60*50000*(10**6)):
+    def discovery(self, destination_address=0xFFFF, destination_pan_id=0xFFFF, list_of_device_types=[1], list_of_profiles=[192], search_device_type=0xFF, list_of_discovered_profiles=[], duration=60*50000*(10**6)):
         """
         Request allowing NWK layer to start a discovery operation.
         """
@@ -845,6 +974,7 @@ class NWKManagementService(NWKService):
                     except NWKTimeoutException:
                         pass
                 sleep(self.database.get("nwkDiscoveryRepetitionInterval") / (50000 * (10**6)))
+
 
         return node_descriptors
 
