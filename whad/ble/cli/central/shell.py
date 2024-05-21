@@ -162,26 +162,34 @@ class BleCentralShell(InteractiveShell):
         You can stop a scan by hitting <b>CTL-c</b> at any time, the discovered devices are kept in
         memory and would be available in autocompletion.
         """
-        # Switch role to scanner
-        self.switch_role(Scanner)
-
-        # Start scanning
-        print_formatted_text(HTML('<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>'))
-        self.__connector.start()
         try:
-            for device in self.__connector.discover_devices():
-                # Show device
-                print(device)
+            # Switch role to scanner
+            self.switch_role(Scanner)
 
-                # Add device to cache
-                self.__cache.add(device)
-        except KeyboardInterrupt as keybd_int:
-            print('\rScan terminated by user')
+            # Start scanning
+            print_formatted_text(HTML('<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>'))
+            self.__connector.start()
+            try:
+                for device in self.__connector.discover_devices():
+                    # Show device
+                    print(device)
 
-        if self.__wireshark is not None:
-            self.__wireshark.detach()
+                    # Add device to cache
+                    self.__cache.add(device)
+            except KeyboardInterrupt as keybd_int:
+                print('\rScan terminated by user')
 
-        self.__connector.stop()
+            # Detach wireshark if needed
+            if self.__wireshark is not None:
+                self.__wireshark.detach()
+
+            # Stop connector
+            self.__connector.stop()
+        
+        # Permission error
+        except PermissionError as perm_err:
+            interface = self.__interface.interface
+            self.error(f"No permission to access the required interface &lt;{interface}&gt; !")
 
     @category('Devices discovery')
     def do_devices(self, arg):
@@ -349,6 +357,9 @@ class BleCentralShell(InteractiveShell):
                 self.__target_bd = None
         except IndexError as notfound:
             print('Device %s not found' % args[0])
+        except PermissionError as perm_error:
+            interface = self.__interface.interface
+            self.error(f"No permission to access the required interface &lt;{interface}&gt; !")
 
 
     def on_disconnect(self, packet=None):
