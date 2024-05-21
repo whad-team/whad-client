@@ -543,7 +543,8 @@ class GattClient(GattLayer):
         self.__notification_callbacks[handle] = cb
 
     def unregister_notification_callback(self, handle):
-        del self.__notification_callbacks[handle]
+        if handle in self.__notification_callbacks:
+            del self.__notification_callbacks[handle]
 
     def clear_notification_callbacks(self):
         """Clear all notification callbacks.

@@ -30,9 +30,6 @@ from whad.device.unix import UnixSocketDevice
 
 from whad.cli.shell import InteractiveShell, category
 
-#import logging
-#logging.basicConfig(level=logging.DEBUG)
-
 INTRO='''
 ble-central, the WHAD Bluetooth Low Energy central utility
 '''
@@ -626,7 +623,7 @@ class BleCentralShell(InteractiveShell):
                     handle = int(args[0])
                 except ValueError as badval:
                     try:
-                        handle = UUID(args[0].replace('-',''))
+                        handle = UUID(args[0])
                     except:
                         self.error('Wrong UUID: %s' % args[0])
                         return
@@ -972,14 +969,14 @@ class BleCentralShell(InteractiveShell):
                     handle = int(args[0].lower(), 16)
                 except ValueError as badval:
                     self.error('Wrong handle: %s' % args[0])
-                    return
+                    return 
             else:
                 try:
                     handle = int(args[0])
                 except ValueError as err:
                     try:
-                        handle = UUID(args[0].replace('-',''))
-                    except:
+                        handle = UUID(args[0])
+                    except Exception as err:
                         self.error('Wrong UUID: %s' % args[0])
                         return
 
@@ -1005,7 +1002,7 @@ class BleCentralShell(InteractiveShell):
                     hexdump(value)
                 else:
                     print_formatted_text(HTML(
-                        '<ansimagenta>Notification</ansimagenta> received from characteristic with handle %d' % (
+                        "<ansimagenta>Notification</ansimagenta> received from characteristic with handle %d" % (
                             charac.handle
                         )
                     ))
@@ -1019,12 +1016,18 @@ class BleCentralShell(InteractiveShell):
                                 indication=True,
                                 callback=on_charac_notified
                             )
+                            print_formatted_text(HTML(
+                             f"Successfully subscribed to notification for characteristic {target_charac.uuid}"
+                            ))
                         else:
-                            self.error('Characteristic does not send notification nor indication.')
+                            self.error("Characteristic does not send notification nor indication.")
                     else:
                         target_charac.subscribe(
                             callback=on_charac_notified
                         )
+                        print_formatted_text(HTML(
+                             f"Successfully subscribed to notification for characteristic {target_charac.uuid}"
+                        ))
                 except AttError as att_err:
                     self.show_att_error(att_err)
                 except GattTimeoutException as timeout:
@@ -1065,8 +1068,8 @@ class BleCentralShell(InteractiveShell):
                     handle = int(args[0])
                 except ValueError as badval:
                     try:
-                        handle = UUID(args[0].replace('-',''))
-                    except:
+                        handle = UUID(args[0])
+                    except Exception as err:
                         self.error('Wrong UUID: %s' % args[0])
                         return
 
@@ -1085,6 +1088,7 @@ class BleCentralShell(InteractiveShell):
             if target_charac is not None:
                 try:
                     target_charac.unsubscribe()
+                    print_formatted_text(HTML(f"Successfully unsubscribed from characteristic {target_charac.uuid}"))
                 except AttError as att_err:
                     self.show_att_error(att_err)
                 except GattTimeoutException as timeout:
