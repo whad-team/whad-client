@@ -887,6 +887,7 @@ class WhadDevice(object):
         :param int timeout: Timeout
         :param filter: Message queue filtering function (optional)
         """
+        logger.debug('entering wait_for_message ...')
         if filter is not None:
             self.set_queue_filter(filter)
 
@@ -900,7 +901,9 @@ class WhadDevice(object):
                 # If message does not match, dispatch.
                 if not self.__mq_filter(msg):
                     self.dispatch_message(msg)
+                    logger.debug('exiting wait_for_message ...')
                 else:
+                    logger.debug('exiting wait_for_message ...')
                     return msg
             except Empty as err:
                 """
@@ -910,9 +913,12 @@ class WhadDevice(object):
                     if command:
                         raise WhadDeviceTimeout('WHAD device did not answer to a command')
                     else:
+                        logger.debug('exiting wait_for_message ...')
                         return None
 
                 sleep(0.001)
+
+        logger.debug('exiting wait_for_message ...')
 
 
     def send_message(self, message, keep=None):
@@ -1091,10 +1097,12 @@ class WhadDevice(object):
         if self.__mq_filter is not None and self.__mq_filter(message):
             logger.info('message does match current filter, save it for processing')
             self.__msg_queue.put(message, block=True)
+            logger.info('message added to message queue')
         else:
             # Save message for background dispatch
             logger.info('message does not match filter or no filter set, save in default message queue')
             self.__messages.put(message, block=True)
+            logger.info('message added to default message queue')
 
     def process_messages(self, timeout=1.0):
         """Process pending messages
@@ -1105,6 +1113,7 @@ class WhadDevice(object):
         try:
             message = self.__messages.get(block=True, timeout=timeout)
             if message is not None:
+                logger.debug('[process_messages] retrieved message %s' % message)
                 self.dispatch_message(message)
         except Empty:
             return None
@@ -1118,8 +1127,10 @@ class WhadDevice(object):
 
         :param Message message: WHAD message received
         """
+        logger.debug('on_any_msg')
         # Forward message to the connector, if any
         if self.__connector is not None:
+            logger.debug('Forward message %s to connector %s' % (message, self.__connector))
             self.__connector.on_any_msg(message)
 
 
