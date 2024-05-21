@@ -420,6 +420,9 @@ class UnixSocketProxy(Thread):
         self.__params = params
         self.__canceled = False
 
+        # Remove any previously set interface message filter
+        self.__interface.set_queue_filter(None)
+
         # Connected, switch to a unix socket server
         self.__connector = connector(self.__interface)
         for param in self.__params:
