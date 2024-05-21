@@ -274,8 +274,13 @@ class TCPSocketConnector(WhadDeviceConnector):
                     msg_size = self.__inpipe[2] | (self.__inpipe[3] << 8)
                     if len(self.__inpipe) >= (msg_size+4):
                         raw_message = self.__inpipe[4:4+msg_size]
-                        _msg = Message()
-                        _msg.ParseFromString(bytes(raw_message))
+
+                        # Old parsing code
+                        #_msg = Message()
+                        #_msg.ParseFromString(bytes(raw_message))
+
+                        # Parse our message with our Protocol Hub
+                        _msg = self.hub.parse(bytes(raw_message))
 
                         # Send to device
                         logger.debug('WHAD message successfully parsed, forward to underlying device')
