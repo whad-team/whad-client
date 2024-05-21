@@ -26,6 +26,7 @@ from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.central.cache import BleDevicesCache
 from whad.ble.scanning import AdvertisingDevice
 from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
+from whad.device.unix import UnixSocketDevice
 
 from whad.cli.shell import InteractiveShell, category
 
@@ -105,6 +106,11 @@ class BleCentralShell(InteractiveShell):
         self.intro = INTRO
 
         self.update_prompt()
+
+    def is_stdin_piped(self) -> bool:
+        """Check if we are using a Unix socket as our main device interface.
+        """
+        return isinstance(self.__interface, UnixSocketDevice)
 
     def update_prompt(self, force=False):
         """Update prompt to reflect current state
@@ -282,8 +288,14 @@ class BleCentralShell(InteractiveShell):
         You can indicate a specific connection type using a second parameter and
         indicating "random" or "public".
         """
+        # Check arguments
         if len(args) < 1:
             self.error('<u>connect</u> requires at least one parameter (device name or BD address).\ntype \'help connect\' for more details.')
+            return
+
+        # Ensure we are not using a unix socket interface (we cannot connect if this is the case)
+        if self.is_stdin_piped():
+            self.error("<u>connect</u> cannot be used when ble-central is chained with another tool.")
             return
 
         try:
