@@ -97,7 +97,7 @@ class BleCentralApp(CommandLineApp):
                         )
                         myshell.run_script(self.args.script)
                     else:
-                        self.error('Failed to open piped interface.')
+                        self.error("Failed to open piped interface.")
 
             # We need to have an interface specified
             elif self.interface is not None:

@@ -349,8 +349,11 @@ class InteractiveShell(object):
             message = "Press ENTER to continue..."
 
         # Show message and wait for a keypress
-        print_formatted_text(HTML('<i>%s</i>' % message))
-        input()
+        try:
+            print_formatted_text(HTML('<i>%s</i>' % message))
+            input()
+        except EOFError:
+            self.warning("Cannot wait for keyboard input, is your stdin piped to another app ?")
 
     def do_echo(self, args):
         """Display a text in the standard output.
