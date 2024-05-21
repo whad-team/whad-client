@@ -229,7 +229,7 @@ class PhyDomain(Registry):
         """
         return PhyDomain.bound('get_supported_freq', self.proto_version)()
     
-    def createSupportedFreqRanges(self, ranges: list[tuple]) -> HubMessage:
+    def createSupportedFreqRanges(self, ranges: List[tuple]) -> HubMessage:
         """Create a SupportedFreqRanges message
 
         :param ranges: List of tuples containing range start and end frequencies
