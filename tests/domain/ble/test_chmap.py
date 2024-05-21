@@ -38,3 +38,11 @@ class TestChannelMap(object):
         chanmap = ChannelMap(channels=[12, 13, 14])
         with pytest.raises(ValueError) as e_info:
             chanmap.remove(55)
+
+    def test_chanmap_from_bytes(self):
+        chanmap = ChannelMap.from_bytes(b"\xff\xff\xff\xff\x1f")
+        assert chanmap.value == b"\xff\xff\xff\xff\x1f"
+
+    def test_chanmap_from_int(self):
+        chanmap = ChannelMap.from_int(0x1faabbccdd)
+        assert chanmap.value == b"\xdd\xcc\xbb\xaa\x1f"
