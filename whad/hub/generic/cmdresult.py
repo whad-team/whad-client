@@ -46,10 +46,11 @@ class CommandResult(HubMessage):
     def result_code(self, result_code: int):
         self.__result_code = result_code
 
-    def serialize(self) -> bytes:
+    def SerializeToString(self) -> bytes:
         """Serialize this message using Protobuf serialization routines.
         """
         self.message.generic.cmd_result.result = self.__result_code
+        return super().SerializeToString()
 
     @staticmethod
     def parse(version: int, msg):

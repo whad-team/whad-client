@@ -259,9 +259,10 @@ class UnixSocketConnector(WhadDeviceConnector):
                     msg_size = self.__inpipe[2] | (self.__inpipe[3] << 8)
                     if len(self.__inpipe) >= (msg_size+4):
                         raw_message = self.__inpipe[4:4+msg_size]
-                        _msg = Message()
-                        _msg.ParseFromString(bytes(raw_message))
-                                                
+
+                        # Parse message using our Protocol Hub
+                        _msg = self.hub.parse(bytes(raw_message))
+
                         # Send to device
                         logger.debug('WHAD message successfully parsed, forward to underlying device')
                         self.device.send_message(_msg)
@@ -343,7 +344,7 @@ class UnixSocketConnector(WhadDeviceConnector):
         :param message: Discovery message
         """
         try:
-            logger.debug('Received a message from device, forward to client if any')
+            logger.debug('Received a message (%s) from device, forward to client if any' % message)
             if self.__client is not None:
                 # Convert message into bytes
                 raw_message = message.SerializeToString()

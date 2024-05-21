@@ -1134,14 +1134,17 @@ class WhadDevice(object):
         :param Message message: Generic message received
         """
         # Handle generic result message
-        if message.WhichOneof('msg') == 'result':
-            if message.result == ResultCode.UNSUPPORTED_DOMAIN:
+        if isinstance(message, CommandResult):
+            if message.result_code == CommandResult.UNSUPPORTED_DOMAIN:
                 logger.error('domain not supported by this device')
                 raise UnsupportedDomain()
 
         # Forward everything to the connector, if any
         if self.__connector is not None:
+            logger.debug('Forward generic message %s to connector %s' % (message, self.__connector))
             self.__connector.on_generic_msg(message)
+        else:
+            logger.debug('No connector registered, message lost')
 
 
     ######################################
