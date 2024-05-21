@@ -1,10 +1,9 @@
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device.virtual import VirtualDevice
-from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad import WhadDomain, WhadCapability
-from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.zigbee.zigbee_pb2 import Sniff, Send, Start, Stop
+from whad.hub.generic.cmdresult import CommandResult
+from whad.hub.dot15d4 import Commands
 from whad.device.virtual.rzusbstick.constants import RZUSBStickInternalStates, \
     RZUSBStickId, RZUSBStickModes, RZUSBStickEndPoints, RZUSBStickCommands, \
     RZUSBStickResponses
@@ -128,24 +127,31 @@ class RZUSBStickDevice(VirtualDevice):
     def _send_whad_zigbee_raw_pdu(self, packet, rssi=None, is_fcs_valid=None, timestamp=None):
         pdu = packet[:-2]
         fcs = unpack("H",packet[-2:])[0]
-        msg = Message()
-        msg.zigbee.raw_pdu.channel = self.__channel
+        
+        # Create a RawPduReceived message
+        msg = self.hub.dot15d4.createRawPduReceived(
+            self.__channel,
+            pdu,
+            fcs,
+            fcs_validity=is_fcs_valid
+        )
+
+        # Set timestamp and RSSI if provided
         if rssi is not None:
-            msg.zigbee.raw_pdu.rssi = rssi
+            msg.rssi = rssi
         if timestamp is not None:
-            msg.zigbee.raw_pdu.timestamp = timestamp
-        msg.zigbee.raw_pdu.fcs_validity = is_fcs_valid
-        msg.zigbee.raw_pdu.pdu = pdu
-        msg.zigbee.raw_pdu.fcs = fcs
+            msg.timestamp = timestamp
+
+        # Send message
         self._send_whad_message(msg)
 
 
     # Virtual device whad message callbacks
     def _on_whad_zigbee_stop(self, message):
         if self._stop():
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.ERROR)
+            self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_zigbee_send_raw(self, message):
         channel = message.channel
@@ -155,13 +161,13 @@ class RZUSBStickDevice(VirtualDevice):
             success = self._send_packet(packet)
         else:
             success = False
-        self._send_whad_command_result(ResultCode.SUCCESS if success else ResultCode.ERROR)
+        self._send_whad_command_result(CommandResult.SUCCESS if success else CommandResult.ERROR)
 
     def _on_whad_zigbee_sniff(self, message):
         channel = message.channel
         self.__future_channel = channel
         self.__internal_state = RZUSBStickInternalStates.SNIFFING
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_zigbee_start(self, message):
         self.__input_buffer = b""
@@ -170,9 +176,9 @@ class RZUSBStickDevice(VirtualDevice):
         if self._start():
             if self.__future_channel != self.__channel:
                 self._set_channel(self.__future_channel)
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.ERROR)
+            self._send_whad_command_result(CommandResult.ERROR)
 
     # RZUSBStick low level communication primitives
 
@@ -193,14 +199,14 @@ class RZUSBStickDevice(VirtualDevice):
             capabilities = {
                 WhadDomain.Zigbee : (
                                     (WhadCapability.Sniff | WhadCapability.Inject),
-                                    [Sniff, Send, Start, Stop]
+                                    [Commands.Sniff, Commands.Send, Commands.Start, Commands.Stop]
                 )
             }
         else:
             capabilities = {
                 WhadDomain.Zigbee : (
                                     (WhadCapability.Sniff),
-                                    [Sniff, Start, Stop]
+                                    [Commands.Sniff, Commands.Start, Commands.Stop]
                 )
             }
 

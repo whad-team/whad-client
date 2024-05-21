@@ -222,16 +222,19 @@ class APIMoteDevice(VirtualDevice):
         fcs = unpack("H",packet[-2:])[0]
         is_fcs_valid = Dot15d4FCS().compute_fcs(pdu) == packet[-2:]
         timestamp = None
-        msg = Message()
-        msg.zigbee.raw_pdu.channel = self._get_channel()
-        if rssi is not None:
-            msg.zigbee.raw_pdu.rssi = rssi
-        if timestamp is not None:
-            msg.zigbee.raw_pdu.timestamp = timestamp
 
-        msg.zigbee.raw_pdu.fcs_validity = is_fcs_valid
-        msg.zigbee.raw_pdu.pdu = pdu
-        msg.zigbee.raw_pdu.fcs = fcs
+        msg = self.hub.dot15d4.createRawPduReceived(
+            self._get_channel(),
+            pdu,
+            fcs,
+            fcs_validity=is_fcs_valid
+        )
+
+        if rssi is not None:
+            msg.rssi = rssi
+        if timestamp is not None:
+            msg.timestamp = timestamp
+
         self._send_whad_message(msg)
 
     def _polling(self):

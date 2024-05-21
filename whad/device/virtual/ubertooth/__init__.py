@@ -4,6 +4,8 @@ from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad import WhadDomain, WhadCapability
 from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, FieldsSize, is_access_address_valid
+from whad.hub.ble import Direction, ChannelMap
+from whad.hub.generic.cmdresult import CommandResult
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.ble.ble_pb2 import SniffAdv,SniffConnReq, SniffAccessAddress, Start, Stop, SniffActiveConn
 from whad.device.virtual.ubertooth.constants import UbertoothId, \
@@ -18,6 +20,9 @@ from usb.core import find, USBError
 from usb.util import get_string
 from struct import unpack, pack
 from time import sleep
+
+import logging
+logger = logging.getLogger(__name__)
 
 # Helpers functions
 def get_ubertooth(id=0,serial=None):
@@ -47,8 +52,11 @@ class UbertoothDevice(VirtualDevice):
         Returns a list of available Ubertooth devices.
         '''
         available_devices = []
-        for ubertooth in find(idVendor=UbertoothId.UBERTOOTH_ID_VENDOR, idProduct=UbertoothId.UBERTOOTH_ID_PRODUCT,find_all=True):
-            available_devices.append(UbertoothDevice(serial=get_string(ubertooth, ubertooth.iSerialNumber)))
+        try:
+            for ubertooth in find(idVendor=UbertoothId.UBERTOOTH_ID_VENDOR, idProduct=UbertoothId.UBERTOOTH_ID_PRODUCT,find_all=True):
+                available_devices.append(UbertoothDevice(serial=get_string(ubertooth, ubertooth.iSerialNumber)))
+        except ValueError as err:
+            logger.warning("Cannot access Ubertooth, root privileges may be required.")
         return available_devices
 
     @property
@@ -179,47 +187,62 @@ class UbertoothDevice(VirtualDevice):
         calculated_crc = crc(pdu,init=self.__crc_init)
         is_crc_valid = calculated_crc == sniffed_crc
 
-        msg = Message()
-        msg.ble.raw_pdu.channel = self.__channel
+        # Create a RawPduReceived message
+        msg = self.hub.ble.createRawPduReceived(
+            Direction.UNKNOWN,
+            pdu,
+            access_address,
+            0,
+            crc_validity=is_crc_valid,
+            crc=packet.crc,
+            channel=self.__channel
+        )
+
+        # Set RSSI and timestamp if provided
         if rssi is not None:
-            msg.ble.raw_pdu.rssi = rssi
+            msg.rssi = rssi
         if timestamp is not None:
-            msg.ble.raw_pdu.timestamp = timestamp
-        msg.ble.raw_pdu.crc_validity = is_crc_valid
-        msg.ble.raw_pdu.access_address = access_address
-        msg.ble.raw_pdu.pdu = pdu
-        msg.ble.raw_pdu.crc = packet.crc
-        msg.ble.raw_pdu.conn_handle = 0 # pseudo connection handle
+            msg.timestamp = timestamp
+       
+        # Send message
         self._send_whad_message(msg)
 
 
     def _send_whad_ble_synchronized(self):
-        msg = Message()
-        msg.ble.synchronized.access_address = self.__access_address
-        msg.ble.synchronized.crc_init = self.__crc_init
-        msg.ble.synchronized.hop_interval = self.__hop_interval
-        msg.ble.synchronized.hop_increment = self.__hop_increment
-        msg.ble.synchronized.channel_map = bytes.fromhex("{:010x}".format(self.__channel_map))
+        # Create a Synchronized message
+        msg = self.hub.ble.createSynchronized(
+            self.__access_address,
+            self.__hop_interval,
+            self.__hop_increment,
+            ChannelMap.from_int(self.__channel_map),
+            self.__crc_init
+        )
+       
+        # Send message
         self._send_whad_message(msg)
 
 
     def _send_whad_ble_aa_disc(self, access_address, timestamp, rssi):
-        msg = Message()
-        msg.ble.aa_disc.access_address = access_address
-        msg.ble.aa_disc.timestamp = timestamp
-        msg.ble.aa_disc.rssi = rssi
+        # Create an AccessAddressDiscovered
+        msg = self.hub.ble.createAccessAddressDiscovered(
+            access_address,
+            rssi,
+            timestamp
+        )
+
+        # Send message
         self._send_whad_message(msg)
 
     # Virtual device whad message callbacks
     def _on_whad_ble_stop(self, message):
         self._stop()
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_ble_sniff_conn(self, message):
         self.__access_address = message.access_address
         self._set_access_address(self.__access_address)
         self.__internal_state = UbertoothInternalState.EXISTING_CONNECTION_SNIFFING
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_ble_sniff_adv(self, message):
         channel = message.channel
@@ -232,9 +255,9 @@ class UbertoothDevice(VirtualDevice):
 
         if self._set_channel(channel):
             self.__internal_state = UbertoothInternalState.ADVERTISEMENT_SNIFFING
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
     def _on_whad_ble_sniff_connreq(self, message):
         channel = message.channel
@@ -243,31 +266,31 @@ class UbertoothDevice(VirtualDevice):
         self.__show_advertisements = message.show_advertisements
         if self._set_channel(channel):
             self.__internal_state = UbertoothInternalState.NEW_CONNECTION_SNIFFING
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
     def _on_whad_ble_sniff_aa(self, message):
         self.__show_empty_packets = False
         self.__show_advertisements = False
         self.__internal_state = UbertoothInternalState.ACCESS_ADDRESS_SNIFFING
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_ble_start(self, message):
         if self.__internal_state == UbertoothInternalState.ADVERTISEMENT_SNIFFING:
             self._enable_advertisements_sniffing()
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         elif self.__internal_state == UbertoothInternalState.NEW_CONNECTION_SNIFFING:
             self._enable_connection_sniffing()
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         elif (
                 self.__internal_state == UbertoothInternalState.ACCESS_ADDRESS_SNIFFING or
                 self.__internal_state == UbertoothInternalState.EXISTING_CONNECTION_SNIFFING
             ):
             self._enable_promiscuous_mode()
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.ERROR)
+            self._send_whad_command_result(CommandResult.ERROR)
 
     # Software implementation features
     def _filter(self, packet):

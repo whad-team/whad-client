@@ -1,16 +1,14 @@
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device.virtual import VirtualDevice
-from whad.protocol.whad_pb2 import Message
-from whad.protocol.phy.phy_pb2 import SupportedFrequencyRanges
 from whad.device.virtual.yard.constants import YardStickOneId, YardStickOneEndPoints, \
     YardApplications, YardSystemCommands, YardRadioStructure, YardRFStates, \
     YardMemoryRegisters, YardMARCStates, YardCCA, YardFrequencyTransitionPoints, \
     YardNICCommands, YardVCOType, YardRegistersMasks, YardModulations, YardEncodings, \
     POSSIBLE_CHANNEL_BANDWIDTHS, NUM_PREAMBLE_LOOKUP_TABLE, YardUSBProperties, \
     YardInternalStates
-from whad.helpers import message_filter,is_message_type
 from whad import WhadDomain, WhadCapability
-from whad.protocol.generic_pb2 import ResultCode
+from whad.hub.generic.cmdresult import CommandResult
+from whad.hub.phy import Commands, TxPower
 from usb.core import find, USBError, USBTimeoutError
 from usb.util import get_string
 from whad.phy import Endianness
@@ -18,10 +16,7 @@ from struct import unpack, pack
 from time import sleep,time
 from whad.helpers import swap_bits
 from queue import Queue, Empty
-from whad.protocol.phy.phy_pb2 import GetSupportedFrequencies, SetFrequency, \
-    SetDataRate, SetPacketSize, SetEndianness, SetTXPower, TXPower, SetSyncWord, \
-    SetASKModulation, Sniff, Start, Stop, Set4FSKModulation, SetFSKModulation, \
-    SetGFSKModulation, Send
+
 
 
 # Helpers functions
@@ -104,18 +99,17 @@ class YardStickOneDevice(VirtualDevice):
             self._strobe_tx_mode()
 
     def _on_whad_phy_get_supported_freq(self, message):
-        msg = Message()
-        for supported_range in self.__supported_frequency_range:
-            range = SupportedFrequencyRanges.FrequencyRange()
-            range.start, range.end = supported_range[0], supported_range[1]
-            msg.phy.supported_freq.frequency_ranges.extend([range])
+        # Create a SupportedFreqRanges
+        msg = self.hub.phy.createSupportedFreqRanges(
+            self.__supported_frequency_range
+        )
+        
+        # Send message
         self._send_whad_message(msg)
-
-
 
     def _on_whad_phy_send(self, message):
         self._send_packet(message.packet)
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
 
     def _on_whad_phy_set_freq(self, message):
@@ -131,54 +125,54 @@ class YardStickOneDevice(VirtualDevice):
             self._set_frequency(message.frequency)
             self.__frequency = message.frequency
             self._restore_previous_mode()
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
     def _on_whad_phy_datarate(self, message):
         self._enter_configuration_mode()
         self._set_data_rate(message.rate)
         self._restore_previous_mode()
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_phy_packet_size(self, message):
         if message.packet_size < 255:
             self._enter_configuration_mode()
             self._set_packet_length(message.packet_size)
             self._restore_previous_mode()
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
     def _on_whad_phy_endianness(self, message):
         if message.endianness in (Endianness.BIG, Endianness.LITTLE):
             self.__endianness = message.endianness
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
     def _on_whad_phy_tx_power(self, message):
         tx_powers = {
-            TXPower.LOW : 0x20,
-            TXPower.MEDIUM : 0x80,
-            TXPower.HIGH : 0xC0
+            TxPower.LOW : 0x20,
+            TxPower.MEDIUM : 0x80,
+            TxPower.HIGH : 0xC0
         }
         if message.tx_power in list(tx_powers.keys()):
             self._enter_configuration_mode()
             self._set_power(
-                tx_powers[message.tx_power]
+                tx_powers[message.power]
             )
             self._restore_previous_mode()
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
-            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
     def _on_whad_phy_mod_ask(self, message):
         self._enter_configuration_mode()
         self._set_modulation(YardModulations.MODULATION_ASK)
         self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
         self._restore_previous_mode()
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_phy_mod_4fsk(self, message):
         self._enter_configuration_mode()
@@ -186,7 +180,7 @@ class YardStickOneDevice(VirtualDevice):
         self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
         self._set_deviation(message.deviation)
         self._restore_previous_mode()
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
 
     def _on_whad_phy_mod_fsk(self, message):
@@ -195,7 +189,7 @@ class YardStickOneDevice(VirtualDevice):
         self._set_encoding(YardEncodings.NON_RETURN_TO_ZERO)
         self._set_deviation(message.deviation)
         self._restore_previous_mode()
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_phy_mod_gfsk(self, message):
         self._enter_configuration_mode()
@@ -204,7 +198,7 @@ class YardStickOneDevice(VirtualDevice):
         self._set_deviation(message.deviation)
         # message.gaussian_filter can't be processed
         self._restore_previous_mode()
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_phy_sync_word(self, message):
         if len(message.sync_word) == 0:
@@ -217,7 +211,7 @@ class YardStickOneDevice(VirtualDevice):
             self._set_sync_word(b"")
             self._set_preamble_quality_threshold(0)
             self._restore_previous_mode()
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         elif len(message.sync_word) <= 2:
             self._enter_configuration_mode()
             self._set_crc(enable=False)
@@ -232,7 +226,7 @@ class YardStickOneDevice(VirtualDevice):
             self._set_sync_word(sync)
             self._set_preamble_quality_threshold(0)
             self._restore_previous_mode()
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         elif len(message.sync_word) == 4 and message.sync_word[:2] == message.sync_word[2:]:
             self._enter_configuration_mode()
             self._set_crc(enable=False)
@@ -247,39 +241,42 @@ class YardStickOneDevice(VirtualDevice):
             self._set_sync_word(sync)
             self._set_preamble_quality_threshold(0)
             self._restore_previous_mode()
-            self._send_whad_command_result(ResultCode.SUCCESS)
+            self._send_whad_command_result(CommandResult.SUCCESS)
 
         else:
-            self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
+            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
 
     def _on_whad_phy_sniff(self, message):
         self.__internal_state = YardInternalStates.YardModeRx
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_phy_start(self, message):
         if self.__internal_state == YardInternalStates.YardModeRx:
             self._set_rx_mode()
             self._strobe_rx_mode()
             self.__opened_stream = True
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_phy_stop(self, message):
         #self._set_idle_mode()
         #self._strobe_idle_mode()
         self.__opened_stream = False
-        self._send_whad_command_result(ResultCode.SUCCESS)
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
 
     def _send_whad_phy_pdu(self, packet, timestamp=None):
-        msg = Message()
-        try:
-            msg.phy.packet.frequency = self._get_frequency()
-        except:
-            pass
+        # Create a PacketReceived message
+        msg = self.hub.phy.createPacketReceived(
+            self._get_frequency(),
+            packet
+        )
+
+        # Set packet timestamp if available
         if timestamp is not None:
-            msg.phy.packet.timestamp = timestamp
-        msg.phy.packet.packet = packet
+            msg.timestamp = timestamp
+
+        # Send message
         self._send_whad_message(msg)
 
 
@@ -440,22 +437,22 @@ class YardStickOneDevice(VirtualDevice):
             WhadDomain.Phy : (
                                 (WhadCapability.Sniff | WhadCapability.NoRawData),
                                 [
-                                    GetSupportedFrequencies,
-                                    SetASKModulation,
-                                    SetFSKModulation,
-                                    Set4FSKModulation,
-                                    GetSupportedFrequencies,
-                                    SetFrequency,
-                                    SetDataRate,
-                                    SetEndianness,
-                                    SetTXPower,
-                                    SetPacketSize,
-                                    SetSyncWord,
-                                    Sniff,
-                                    Send,
-                                    Start,
-                                    Stop,
-                                    Set4FSKModulation
+                                    Commands.GetSupportedFrequencies,
+                                    Commands.SetASKModulation,
+                                    Commands.SetFSKModulation,
+                                    Commands.Set4FSKModulation,
+                                    Commands.GetSupportedFrequencies,
+                                    Commands.SetFrequency,
+                                    Commands.SetDataRate,
+                                    Commands.SetEndianness,
+                                    Commands.SetTXPower,
+                                    Commands.SetPacketSize,
+                                    Commands.SetSyncWord,
+                                    Commands.Sniff,
+                                    Commands.Send,
+                                    Commands.Start,
+                                    Commands.Stop,
+                                    Commands.Set4FSKModulation
                                 ]
             )
         }
