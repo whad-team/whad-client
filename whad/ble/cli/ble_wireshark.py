@@ -22,8 +22,11 @@ from whad.ble.connector import Central
 from whad.common.monitors import WiresharkMonitor
 from whad.device.unix import UnixSocketProxy, UnixSocketConnector
 from whad.ble.metadata import generate_ble_metadata, BLEMetadata
+from whad.hub.ble import SendBlePdu, SendBleRawPdu, BleAdvPduReceived, BlePduReceived, \
+    BleRawPduReceived
 
 from whad.ble.connector.translator import BleMessageTranslator
+
 
 logger = logging.getLogger(__name__)
 
@@ -41,41 +44,28 @@ class BleUnixSocketConnector(UnixSocketConnector):
 
 
     def on_msg_sent(self, message):
-        if message.WhichOneof('msg') == 'discovery':
-            return
-        elif message.WhichOneof('msg') == 'generic':
-            return
-        else:
-            """Sent a domain message, process only BLE messages.
-            """
-            domain = message.WhichOneof('msg')
-            if domain is not None:
-                logger.info('message concerns domain `%s`, forward to domain-specific handler' % domain)
-                if domain == 'ble':
-                    # Convert message to packet, if any
-                    message = getattr(message,domain)
-                    msg_type = message.WhichOneof('msg')
-                    if msg_type == 'send_pdu':
-                        packet = self.__translator.from_message(message, msg_type)
-                    elif msg_type == 'send_raw_pdu':
-                        packet = self.__translator.from_message(message, msg_type)
+        """Incoming message processing.
 
-                    if packet is not None:
-                        self.monitor_packet_tx(packet)
-
+        We only process BLE-related messages and especially PDU and raw PDU sending
+        messages. If such a message is sent, we extract the encapsulated PDU and
+        convert it to a raw packet that can be monitored in Wireshark.
+        """
+        if message.message_type == 'ble':
+            # Convert message to packet
+            if isinstance(message, SendBlePdu) or isinstance(message, SendBleRawPdu):
+                packet = self.__translator.from_message(message)
+                if packet is not None:
+                    self.monitor_packet_tx(packet)
 
     def on_domain_msg(self, domain, message):
         """Received a domain message, process only BLE messages.
         """
         packet = None
         if domain == 'ble':
-            msg_type = message.WhichOneof('msg')
-            if msg_type == 'adv_pdu':
-                packet = self.__translator.from_message(message, msg_type)
-            elif msg_type == 'pdu':
-                packet = self.__translator.from_message(message, msg_type)
-            elif msg_type == 'raw_pdu':
-                packet = self.__translator.from_message(message, msg_type)
+            if isinstance(message, BleAdvPduReceived) or \
+                isinstance(message, BlePduReceived) or \
+                isinstance(message, BleRawPduReceived):
+                packet = self.__translator.from_message(message)
 
             if packet is not None:
                 self.monitor_packet_rx(packet)
