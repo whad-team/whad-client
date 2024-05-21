@@ -829,7 +829,7 @@ class BLE(WhadDeviceConnector):
                 msg = self.translator.from_packet(packet, self.__encrypted)
 
             resp = self.send_command(msg, message_filter(CommandResult))
-            logger.info('[ble connector] Commant sent, result: %s' % resp)
+            logger.info('[ble connector] Command sent, result: %s' % resp)
             if resp is None:
                 raise ConnectionLostException(None)
             else:
