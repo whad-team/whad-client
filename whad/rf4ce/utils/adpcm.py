@@ -196,28 +196,20 @@ class ADPCM:
 				pass
 		return decoded_samples
 
-	def convert_input_file(self, filename="/tmp/trololo.wav"):
+	def convert_input_file(self, filename):
 		# buggy
-		stream = wave.open(filename, "rb")
-		nchannels = stream.getnchannels()
-		sampwidth = stream.getsampwidth()
-		rate = stream.getframerate()
-		frames = stream.readframes(stream.getnframes())
-		out = b""
-		import audioop
-		s = None
-		(frag, ns) = audioop.lin2adpcm(frames,2,s)
-		out += frag
+
+		with open(filename, "rb") as f:
+			out = f.read()
 
 		return ([
 		RF4CE_Vendor_MSO_Audio_Start_Request(
-			sample_rate = rate,
-			#sample_rate=16000,
-			resolution_bits=16,
-			mic_channel_number=1,
+			sample_rate=8000,
+			resolution_bits=8,
+			mic_channel_number=0,
 			packet_size=84,
 			interval=10,
-			channel_number=3,
+			channel_number=0,
 			duration=10
 			)]
 			+
@@ -226,7 +218,8 @@ class ADPCM:
 				samples=out[s:s+80]
 				)
 				for s in range(0, len(out), 80)
-			]
+			] +
+			[RF4CE_Vendor_MSO_Audio_Stop_Request()]
 		)
 
 	def process_packet(self, packet):

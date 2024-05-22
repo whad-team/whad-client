@@ -56,15 +56,15 @@ class MSOProfile(APLProfile):
         nwk_layer.database.set("nwkMaxReportedNodeDescriptors", 16)
 
 
-    def send_audio(self, audio_filename="/tmp/trololo.wav"):
+    def send_audio(self, audio_filename="/home/rcayre/trololo.wav"):
         """
         Transmit audio packets.
         """
         nwk_layer = self.manager.get_layer('nwk')
-
-        for p in ADPCM.convert_input_file(audio_filename):
-            pkt = RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Audio()/p
-
+        seq = 0
+        for p in ADPCM().convert_input_file(audio_filename):
+            pkt = RF4CE_Vendor_MSO_Hdr()/RF4CE_Vendor_MSO_Audio(sequence_number = seq & 0xFF)/p
+            seq += 1
             nwk_layer.get_service('data').data(
                 pkt,
                 pairing_reference = self.pairing_reference,

@@ -1010,7 +1010,7 @@ class MACManager(Dot15d4Manager):
 
         sequence_number = self.database.get("macDataSequenceNumber")
         packet.seqnum = sequence_number
-        self.database.set("macDataSequenceNumber", sequence_number + 1)
+        self.database.set("macDataSequenceNumber", (sequence_number+1) & 0xFF)
         self.send('phy', packet, tag='pdu')
         wait_counter = 5
         if wait_for_ack:
@@ -1081,5 +1081,5 @@ class MACManager(Dot15d4Manager):
 
         sequence_number = self.database.get("macBeaconSequenceNumber")
         packet.seqnum = sequence_number
-        self.database.set("macBeaconSequenceNumber", sequence_number + 1)
+        self.database.set("macBeaconSequenceNumber", (sequence_number+1) & 0xFF)
         self.send('phy', packet, tag='pdu')

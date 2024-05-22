@@ -36,26 +36,19 @@ if __name__ == '__main__':
             print(controller.discovery())
             input()
             controller.set_channel(15)
-            '''
-            print(controller.stack.get_layer('nwk').get_service('management').pair_request(
-                    destination_pan_id=0x269a,
-                    destination_ieee_address=Dot15d4Address("c5:92:a7:d2:59:d1:19:c4").value
-                )
-            )
-            '''
+
             mso.bind(Dot15d4Address("c5:92:a7:d2:59:d1:19:c4").value, 0x269a)
-            #target.discovery_response(True, destination_address="C4:19:D1:AE:35:0D:70:02")
             input()
 
-            while True:
-                mso.send_audio("/tmp/trololo.wav")
-                input()
+            mso.send_audio("/home/rcayre/Projets/whad-client/ressources/adpcm/trololo.raw")
+            input()
 
             while True:
                 print("> ", end="")
                 string = input()
                 for s in string:
                     mso.send_key(s)
+
         except (KeyboardInterrupt, SystemExit):
             dev.close()
 
