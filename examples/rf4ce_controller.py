@@ -33,11 +33,17 @@ if __name__ == '__main__':
             monitor.start()
             controller.start()
 
-            print(controller.discovery())
+            selected_device = None
+            for device in controller.discovery():
+                print(device)
+                selected_device = device
+            if selected_device is None:
+                exit()
+
             input()
             controller.set_channel(15)
 
-            mso.bind(Dot15d4Address("c5:92:a7:d2:59:d1:19:c4").value, 0x269a)
+            mso.bind(selected_device.address, selected_device.pan_id)#Dot15d4Address("c5:92:a7:d2:59:d1:19:c4").value, 0x269a)
             input()
 
             mso.send_audio("/home/rcayre/Projets/whad-client/ressources/adpcm/trololo.raw")

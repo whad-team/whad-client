@@ -5,6 +5,7 @@ from whad.dot15d4.stack.mac.constants import MACAddressMode
 from whad.rf4ce.stack.nwk.exceptions import NWKTimeoutException
 from whad.rf4ce.stack.nwk.database import NWKIB
 from whad.rf4ce.stack.nwk.pairing import PairingEntry
+from whad.rf4ce.stack.nwk.descriptor import NodeDescriptor
 from whad.rf4ce.crypto import generate_random_value, xor, RF4CECryptoManager, RF4CEKeyDerivation
 from whad.scapy.layers.rf4ce import RF4CE_Command_Hdr, RF4CE_Cmd_Discovery_Request, \
     RF4CE_Hdr, RF4CE_Cmd_Key_Seed, RF4CE_Cmd_Pair_Request, RF4CE_Cmd_Pair_Response, \
@@ -970,7 +971,19 @@ class NWKManagementService(NWKService):
                 if ack:
                     try:
                         discovery = self.wait_for_packet(lambda pkt:RF4CE_Cmd_Discovery_Response in pkt, timeout=duration)
-                        node_descriptors.append(discovery)
+                        
+                        if discovery.source_address not in [d.address for d in node_descriptors]:
+                            node_descriptors.append(
+                                NodeDescriptor(
+                                    address = discovery.source_address,
+                                    pan_id = discovery.source_pan_id,
+                                    vendor_id = discovery.vendor_identifier,
+                                    vendor_string = discovery.vendor_string,
+                                    user_string = discovery.user_string if hasattr(discovery, "user_string") else None,
+                                    device_type_list = discovery.device_type_list,
+                                    profile_identifier_list = discovery.profile_identifier_list
+                                )
+                            )
                     except NWKTimeoutException:
                         pass
                 sleep(self.database.get("nwkDiscoveryRepetitionInterval") / (50000 * (10**6)))
