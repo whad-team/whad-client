@@ -1,7 +1,7 @@
 from scapy.layers.zigbee import ZigbeeSecurityHeader
 from whad.zigbee.connector import Zigbee
-from whad.zigbee.sniffing import SnifferConfiguration
-from whad.zigbee.crypto import ZigbeeDecryptor
+from whad.zigbee.sniffing import SnifferConfiguration, KeyExtractedEvent
+from whad.zigbee.crypto import ZigbeeDecryptor, TouchlinkKeyManager
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 from whad.common.sniffing import EventsManager
@@ -17,6 +17,7 @@ class Sniffer(Zigbee, EventsManager):
 
         self.__configuration = SnifferConfiguration()
         self.__decryptor = ZigbeeDecryptor()
+        self.__touchlink_key_derivation = TouchlinkKeyManager()
 
         # Check if device can perform sniffing
         if not self.can_sniff():
@@ -41,15 +42,6 @@ class Sniffer(Zigbee, EventsManager):
     def decrypt(self, decrypt):
         self.__configuration.decrypt = decrypt
 
-    @property
-    def configuration(self):
-        return self.__configuration
-
-    @configuration.setter
-    def configuration(self, new_configuration):
-        self.stop()
-        self.__configuration = new_configuration
-        self._enable_sniffing()
 
     @property
     def channel(self):
@@ -62,9 +54,15 @@ class Sniffer(Zigbee, EventsManager):
         self._enable_sniffing()
 
 
-    def available_actions(self, filter=None):
-        actions = []
-        return [action for action in actions if filter is None or isinstance(action, filter)]
+    @property
+    def configuration(self):
+        return self.__configuration
+
+    @configuration.setter
+    def configuration(self, new_configuration):
+        self.stop()
+        self.__configuration = new_configuration
+        self._enable_sniffing()
 
     def sniff(self):
         while True:
@@ -73,9 +71,17 @@ class Sniffer(Zigbee, EventsManager):
             else:
                 message_type = "pdu"
 
-            message = self.wait_for_message(filter=message_filter('zigbee', message_type))
-            packet = self.translator.from_message(message.zigbee, message_type)
+            message = self.wait_for_message(filter=message_filter('dot15d4', message_type))
+            packet = self.translator.from_message(message.dot15d4, message_type)
             self.monitor_packet_rx(packet)
+            if self.__touchlink_key_derivation.unencrypted_key is not None:
+                logger.info("[i] New key extracted: ", self.__touchlink_key_derivation.unencrypted_key.hex())
+                self.trigger_event(KeyExtractedEvent(self.__touchlink_key_derivation.unencrypted_key))
+                self.add_key(self.__touchlink_key_derivation.unencrypted_key)
+                self.__touchlink_key_derivation.reset()
+
+            if self.__configuration.pairing:
+                self.__touchlink_key_derivation.process_packet(packet)
 
             if ZigbeeSecurityHeader in packet and self.__configuration.decrypt:
                 decrypted, success = self.__decryptor.attempt_to_decrypt(packet)

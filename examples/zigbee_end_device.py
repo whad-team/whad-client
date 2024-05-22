@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.WARNING)
 #logging.getLogger('whad.zigbee.stack.mac').setLevel(logging.INFO)
 #logging.getLogger('whad.zigbee.stack.nwk').setLevel(logging.INFO)
 #logging.getLogger('whad.zigbee.stack.aps').setLevel(logging.INFO)
-#logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
+logging.getLogger('whad.zigbee.stack.apl').setLevel(logging.INFO)
 logging.getLogger('whad.zigbee.stack.apl.zcl').setLevel(logging.INFO)
 
 if __name__ == '__main__':
@@ -51,7 +51,7 @@ if __name__ == '__main__':
                 for device in devices:
                     print("[i] New device discovered:", device)
 
-                for device in selected_network.devices:
+                for device in selected_network.nodes:
                     for endpoint in device.endpoints:
                         if endpoint.profile_id == 0x0104 and 6 in endpoint.input_clusters:
                             onoff = endpoint.attach_to_input_cluster(6)
@@ -59,9 +59,10 @@ if __name__ == '__main__':
                                 input()
                                 print("[i] lightbulb toggled")
                                 onoff.toggle()
+                '''
             except KeyboardInterrupt:
                 selected_network.leave()
-            
+
             #discover()
             #print(selected_network.devices)
 

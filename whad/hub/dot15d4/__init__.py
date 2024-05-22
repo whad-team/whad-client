@@ -2,7 +2,7 @@
 """
 from typing import List
 
-from whad.protocol.zigbee.zigbee_pb2 import ZigbeeMitmRole, AddressType
+from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4MitmRole, AddressType
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
@@ -26,8 +26,8 @@ class Commands:
 class MitmRole:
     """Dot15d4 Mitm role
     """
-    REACTIVE=ZigbeeMitmRole.REACTIVE_JAMMER
-    CORRECTOR=ZigbeeMitmRole.CORRECTOR
+    REACTIVE=Dot15d4MitmRole.REACTIVE_JAMMER
+    CORRECTOR=Dot15d4MitmRole.CORRECTOR
 
 class NodeAddressType:
     SHORT=AddressType.SHORT
@@ -42,11 +42,11 @@ class NodeAddress(object):
     @property
     def address(self):
         return self.__address
-    
+
     @property
     def address_type(self):
         return self.__address_type
-    
+
 class NodeAddressShort(NodeAddress):
     """Dot15d4 short node address
 
@@ -63,7 +63,7 @@ class NodeAddressShort(NodeAddress):
 class NodeAddressExt(NodeAddress):
     """Dot15d4 extended node address
 
-    This class represents an extended 802.15.4 node address (64 bits). 
+    This class represents an extended 802.15.4 node address (64 bits).
     """
 
     def __init__(self, address: int):
@@ -75,7 +75,7 @@ class NodeAddressExt(NodeAddress):
         assert address <= 0x10000000000000000
         super().__init__(address, NodeAddressType.EXTENDED)
 
-@pb_bind(ProtocolHub, name="zigbee", version=1)
+@pb_bind(ProtocolHub, name="dot15d4", version=1)
 class Dot15d4Domain(Registry):
     """WHAD Dot15d4 domain messages parser/factory.
     """
@@ -92,10 +92,10 @@ class Dot15d4Domain(Registry):
     def parse(proto_version: int, message) -> HubMessage:
         """Parses a WHAD Dot15d4 Domain message as seen by protobuf
         """
-        message_type = message.zigbee.WhichOneof('msg')
+        message_type = message.dot15d4.WhichOneof('msg')
         message_clazz = Dot15d4Domain.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
-    
+
     def createSetNodeAddress(self, address: NodeAddress) -> HubMessage:
         """Create a SetNodeAddress message.
 
@@ -107,7 +107,7 @@ class Dot15d4Domain(Registry):
             address=address.address,
             addr_type=address.address_type
         )
-    
+
     def createSniffMode(self, channel: int) -> HubMessage:
         """Create a SniffMode message
 
@@ -118,7 +118,7 @@ class Dot15d4Domain(Registry):
         return Dot15d4Domain.bound('sniff', self.proto_version)(
             channel=channel
         )
-    
+
     def createJamMode(self, channel: int) -> HubMessage:
         """Create a JamMode message
 
@@ -129,7 +129,7 @@ class Dot15d4Domain(Registry):
         return Dot15d4Domain.bound('jam', self.proto_version)(
             channel=channel
         )
-    
+
     def createEnergyDetectionMode(self, channel: int) -> HubMessage:
         """Create a EnergyDetectionMode message
 
@@ -140,7 +140,7 @@ class Dot15d4Domain(Registry):
         return Dot15d4Domain.bound('ed', self.proto_version)(
             channel=channel
         )
-    
+
     def createEndDeviceMode(self, channel: int) -> HubMessage:
         """Create a EndDeviceMode message
 
@@ -151,7 +151,7 @@ class Dot15d4Domain(Registry):
         return Dot15d4Domain.bound('end_device', self.proto_version)(
             channel=channel
         )
-    
+
     def createRouterMode(self, channel: int) -> HubMessage:
         """Create a RouterMode message
 
@@ -162,7 +162,7 @@ class Dot15d4Domain(Registry):
         return Dot15d4Domain.bound('router', self.proto_version)(
             channel=channel
         )
-    
+
     def createCoordMode(self, channel: int) -> HubMessage:
         """Create a CoordMode message
 
@@ -173,7 +173,7 @@ class Dot15d4Domain(Registry):
         return Dot15d4Domain.bound('coordinator', self.proto_version)(
             channel=channel
         )
-    
+
     def createMitmMode(self, role: int) -> HubMessage:
         """Create a MitmMode message
 
@@ -189,14 +189,14 @@ class Dot15d4Domain(Registry):
         :return: instance of `Start`
         """
         return Dot15d4Domain.bound('start', self.proto_version)()
-    
+
     def createStop(self) -> HubMessage:
         """Create a Stop message
 
         :return: instance of `Stop`
         """
         return Dot15d4Domain.bound('stop', self.proto_version)()
-    
+
     def createSendPdu(self, channel: int, pdu: bytes) -> HubMessage:
         """Create a SendPdu message
 
@@ -210,7 +210,7 @@ class Dot15d4Domain(Registry):
             channel=channel,
             pdu=pdu
         )
-    
+
     def createSendRawPdu(self, channel: int, pdu: bytes, fcs: int) -> HubMessage:
         """Create a SendPdu message
 
@@ -227,7 +227,7 @@ class Dot15d4Domain(Registry):
             pdu=pdu,
             fcs=fcs
         )
-    
+
     def createJammed(self, timestamp: int) -> HubMessage:
         """Create a jammed notification.
 
@@ -252,7 +252,7 @@ class Dot15d4Domain(Registry):
             timestamp=timestamp,
             sample=sample
         )
-    
+
     def createRawPduReceived(self, channel: int, pdu: bytes, fcs: int, rssi: int = None, \
                              timestamp: int = None, fcs_validity: bool = None, \
                              lqi: int = None):

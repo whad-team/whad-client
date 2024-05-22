@@ -7,7 +7,7 @@ class WhadDomain(object):
     Phy = Domain.Phy
     BtClassic = Domain.BtClassic
     BtLE = Domain.BtLE
-    Zigbee = Domain.Zigbee
+    Dot15d4 = Domain.Dot15d4
     SixLowPan = Domain.SixLowPan
     Esb = Domain.Esb
     LogitechUnifying = Domain.LogitechUnifying
@@ -28,6 +28,10 @@ class WhadCapability(object):
     Hook = Capability.Hook
     SimulateRole = Capability.SimulateRole
     NoRawData = Capability.NoRawData
+
+# Force scapy to hide warnings
+import logging
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
 # Import device related classes
 from whad.device import UartDevice, VirtualDevice

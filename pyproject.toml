@@ -27,13 +27,26 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10"
 ]
+dependencies = [
+    "protobuf==3.20.*",
+    "scapy==2.5.0rc3",
+    "elementpath==2.4.0",
+    "pyserial==3.5.0",
+    "pycryptodomex==3.11.0",
+    "pyusb==1.2.1",
+    "cryptography==36.0.0",
+    "prompt_toolkit==3.0.43",
+    "hexdump==3.3"
+]
 
 [project.scripts]
 whadup = "whad.tools.whadup:main"
 whadsniff = "whad.tools.whadsniff:whadsniff_main"
 whadreplay = "whad.tools.whadreplay:whadreplay_main"
+whadfilter = "whad.tools.whadfilter:whadfilter_main"
 whadserver = "whad.tools.whadserver:whadserver_main"
 phy-inspect = "whad.phy.cli.inspect:phy_inspect_main"
+zigbee-enddevice = "whad.zigbee.cli.enddevice:zigbee_enddevice_main"
 ble-central = "whad.ble.cli.central:ble_central_main"
 ble-interpret = "whad.ble.cli.interpret:ble_interpret_main"
 ble-clone = "whad.ble.cli.clone:ble_clone_main"

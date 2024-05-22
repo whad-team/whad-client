@@ -1089,7 +1089,7 @@ class WhadDevice(object):
         """
         if self.__closing:
             return
-        
+
         logger.debug(message)
         logger.debug(self.__mq_filter)
         # If message queue filter is defined and message matches this filter,

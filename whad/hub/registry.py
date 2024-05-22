@@ -38,6 +38,6 @@ class Registry(object):
         if version > 1:
             # If not found for version N, look for node class in version N-1
             return parent_class.bound(name, version - 1)
-            
+
         # If not found, raise exception
-        raise UnsupportedVersionException()
+        raise UnsupportedVersionException(name, version)

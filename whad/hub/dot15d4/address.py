@@ -9,5 +9,5 @@ class SetNodeAddress(PbMessageWrapper):
     """Device info query message class
     """
 
-    address = PbFieldBytes('zigbee.set_node_addr.address')
-    addr_type = PbFieldInt('zigbee.set_node_addr.address_type')
+    address = PbFieldBytes('dot15d4.set_node_addr.address')
+    addr_type = PbFieldInt('dot15d4.set_node_addr.address_type')

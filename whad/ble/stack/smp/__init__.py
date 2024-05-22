@@ -2531,7 +2531,7 @@ class SMPLayer(Layer):
         return self.state.last_failure is not None
 
     def pairing_done(self):
-        print(self.state.database)
+        #print(self.state.database)
 
         logger.info("Pairing done.")
         if self.is_initiator():
@@ -2690,7 +2690,7 @@ class SMPLayer(Layer):
                         )
                 )
 
-        print(self.state.database)
+        #print(self.state.database)
         self.state.state = SecurityManagerState.STATE_PAIRING_DONE
 
     def send_data(self, packet):

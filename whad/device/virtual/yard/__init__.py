@@ -103,7 +103,7 @@ class YardStickOneDevice(VirtualDevice):
         msg = self.hub.phy.createSupportedFreqRanges(
             self.__supported_frequency_range
         )
-        
+
         # Send message
         self._send_whad_message(msg)
 
@@ -274,9 +274,9 @@ class YardStickOneDevice(VirtualDevice):
 
         # Set packet timestamp if available
         if timestamp is not None:
+
             msg.timestamp = timestamp
 
-        # Send message
         self._send_whad_message(msg)
 
 

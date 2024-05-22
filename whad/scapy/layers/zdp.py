@@ -60,40 +60,142 @@ class ZDPNodeDescRsp(Packet):
         ByteEnumField("status", 0, {0:"success", 1:"device_not_found", 2:"inv_requesttype", 3:"no_descriptor"}),
         # NWK Address (2 octets)
         XLEShortField("nwk_addr", 0),
-        BitField("reserved0", 0, 3),
-        BitField("user_descriptor_available", 0, 1),
-        BitField("complex_descriptor_available", 0, 1),
-        BitField("logical_type", 0, 3),
-        BitField("reserved1bis", 0, 1),
-        BitField("support_2400_mhz", 0, 1),
-        BitField("support_902_mhz", 0, 1),
-        BitField("reserved1", 0, 1),
-        BitField("support_868_mhz", 0, 1),
-        BitField("aps_flags", 0, 3),
-        BitField("allocate_address", 0, 1),
-        BitField("security_capability", 0, 1),
-        BitField("reserved2", 0, 1),
-        BitField("reserved3", 0, 1),
-        BitField("receiver_on_when_idle", 0, 1),
-        BitField("power_source", 0, 1),
-        BitField("device_type", 0, 1),
-        BitField("alternate_pan_coordinator", 0, 1),
-        XLEShortField("manufacturer_code", None),
-        ByteField("max_buffer_size", None),
-        XLEShortField("max_incoming_transfer_size", None),
-        BitField("server_primary_trust_center", 0, 1),
-        BitField("server_backup_trust_center", 0, 1),
-        BitField("server_primary_binding_table_cache", 0, 1),
-        BitField("server_backup_binding_table_cache", 0, 1),
-        BitField("server_primary_discovery_cache", 0, 1),
-        BitField("server_backup_discovery_cache", 0, 1),
-        BitField("network_manager", 0, 1),
-        BitField("reserved4", 0, 2),
-        BitField("stack_compliance_revision", 0, 7),
-        XLEShortField("max_outgoing_transfer_size", None),
-        BitField("extended_active_endpoint_list_available", 0, 1),
-        BitField("extended_simple_descriptors_list_available", 0, 1),
-        BitField("reserved5", 0, 6),
+        ConditionalField(
+            BitField("reserved0", 0, 3),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("user_descriptor_available", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("complex_descriptor_available", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("logical_type", 0, 3),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("reserved1bis", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("support_2400_mhz", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("support_902_mhz", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("reserved1", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("support_868_mhz", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("aps_flags", 0, 3),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("allocate_address", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("security_capability", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("reserved2", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("reserved3", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("receiver_on_when_idle", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("power_source", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("device_type", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("alternate_pan_coordinator", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            XLEShortField("manufacturer_code", None),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            ByteField("max_buffer_size", None),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            XLEShortField("max_incoming_transfer_size", None),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("server_primary_trust_center", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("server_backup_trust_center", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("server_primary_binding_table_cache", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("server_backup_binding_table_cache", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("server_primary_discovery_cache", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("server_backup_discovery_cache", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("network_manager", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("reserved4", 0, 2),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("stack_compliance_revision", 0, 7),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            XLEShortField("max_outgoing_transfer_size", None),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("extended_active_endpoint_list_available", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("extended_simple_descriptors_list_available", 0, 1),
+            lambda pkt:pkt.getfieldval("status") == 0
+        ),
+        ConditionalField(
+            BitField("reserved5", 0, 6),
+            lambda pkt:pkt.getfieldval("status") == 0
+        )
     ]
 
 class ZDPNWKAddrReq(Packet):
@@ -111,7 +213,8 @@ class ZDPNWKAddrRsp(Packet):
         ByteEnumField("status", 0, {0:"success", 1:"device_not_found", 2:"inv_requesttype", 3:"no_descriptor"}),
         dot15d4AddressField("ieee_addr", 0, adjust=lambda pkt, x: 8),
         XLEShortField("nwk_addr", 0),
-        ConditionalField(FieldLenField("num_assoc_dev", None, length_of="associated_devices"),
+        ConditionalField(
+            FieldLenField("num_assoc_dev", None, length_of="associated_devices"),
             lambda pkt:pkt.getfieldval("status") == 0
         ),
         ConditionalField(ByteField("start_index", 0x0),

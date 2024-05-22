@@ -79,7 +79,7 @@ from whad.common.stack import Layer, alias, source
 
 @alias('eth')
 class EthLayer(Layer):
-    
+
     @source('phy')
     def on_phy_packet_received(self, packet):
         '''Process received packet'''
@@ -99,7 +99,7 @@ class EthLayer(Layer):
 
 @alias('ip')
 class IpLayer(Layer):
-    
+
     @source('eth')
     def on_ip_packet_received(self, packet):
         '''Process incoming IP packet'''
@@ -111,13 +111,13 @@ class IpLayer(Layer):
 
 @alias('phy')
 class PhyLayer(Layer):
-    
+
     @source('eth')
     def on_transmit_eth_packet(self, packet):
         '''Transmit packet on the network'''
         # Some code here to effectively send the packet on the physical link
         pass
-        
+
     def on_receive_phy_packet(self, packet):
         '''Received packet from the network'''
         # Send packet to our Ethernet layer
@@ -130,7 +130,7 @@ routed and the method `on_phy_packet_received()` of the `EthLayer` is called
 with the specified data.
 
 Of course, it is possible for a layer to send data to any layer, the dataflow is
-totally flexible. 
+totally flexible.
 
 
 Contextual layers
@@ -185,9 +185,9 @@ def generate_links(structure):
     # Add emitters for all sublayers
     for sublayer in structure['sublayers']:
         links.extend(generate_links(sublayer))
-    
+
     return links
-    
+
 
 
 class source(object):
@@ -270,16 +270,16 @@ class LayerState(object):
             return self.__db[property]
         else:
             raise AttributeError
-        
+
     def __setattr__(self, property, value):
         if property.startswith('_'):
             super(LayerState, self).__setattr__(property, value)
         else:
             self.__db[property] = value
-            
+
     def to_dict(self):
         return self.__db
-    
+
     def from_dict(self, values):
         for prop in values:
             self.__db[prop] = values[prop]
@@ -303,7 +303,7 @@ class Layer(object):
         if hasattr(cls, 'LAYERS'):
             if alias in cls.LAYERS:
                 return cls.LAYERS[alias]
-        
+
             # If not found, propagate to our sub-layer classes
             for layer in cls.LAYERS:
                 result = cls.LAYERS[layer].find(alias)
@@ -370,7 +370,7 @@ class Layer(object):
                     for tag in tags:
                         handler_key = '%s:%s'%(source,tag)
                     self.__handlers[handler_key] = method
-        
+
         # Call configure to set up options
         self.configure(options)
 
@@ -417,7 +417,7 @@ class Layer(object):
         layer_options = self.options[layer_class.alias] if layer_class.alias in self.options else {}
         self.__layers[inst_name] = layer_class(self, inst_name, options=layer_options)
         return self.__layers[inst_name]
-    
+
     def destroy(self, layer_instance):
         '''Remove an instantiated layer from our known layers.
         '''
@@ -457,14 +457,14 @@ class Layer(object):
         """Check if this layer has a registered method to process messages coming from a specific source/tag.
         """
         return (self.get_handler(source, tag=tag) is not None)
-    
+
     def get_handler(self, source, tag='default'):
         """Retrieve the registered handler for a given source and tag (if any).
         """
         handler_key = '%s:%s'%(source, tag)
         if handler_key in self.__handlers:
             return self.__handlers[handler_key]
-            
+
         # If not found, fall back on 'default' tag
         handler_key = '%s:%s'%(source, 'default')
         if handler_key in self.__handlers:
@@ -480,7 +480,7 @@ class Layer(object):
         if name == self.alias:
             # Return ourself :)
             return self
-        
+
         # Do we have this layer in cache ?
         if name in self.__layer_cache:
             return self.__layer_cache[name]
@@ -497,21 +497,21 @@ class Layer(object):
                             # Found the layer, save in cache and return it
                             self.__layer_cache[name] = result
                             return result
-                
+
                 # If not, we ask our parent to get it
                 if not children_only and self.__parent is not None:
                     layer = self.__parent.get_layer(name)
-                    
+
                     # Save layer in cache
                     if layer is not None:
                         self.__layer_cache[name] = layer
-                    
+
                     # Return layer
                     return layer
-            
+
             # If anyone has this layer, it does not exist
             return None
-        
+
     def get_entry_layer(self):
         """Return the group entry layer.
         """
@@ -527,7 +527,7 @@ class Layer(object):
     @property
     def parent(self):
         return self.__parent
-    
+
     @property
     def state(self):
         return self.__state
@@ -535,7 +535,7 @@ class Layer(object):
     @property
     def layers(self):
         return self.__layers
-    
+
     @property
     def options(self):
         return self.__options
@@ -545,7 +545,7 @@ class Layer(object):
         """Find sublayers that send messages to the specified layer.
         """
         emitters = []
-        
+
         # First, loop on our own methods to find the sources we are using.
         methods = [getattr(cls, prop) for prop in dir(cls) if callable(getattr(cls, prop))]
         for method in methods:
@@ -554,7 +554,7 @@ class Layer(object):
                 for _source in match_sources:
                     if _source not in emitters:
                         emitters.append(_source)
-        
+
         return emitters
 
     def get_message_handler(self, source):
@@ -582,7 +582,7 @@ class Layer(object):
                     if source in match_sources:
                         if tag in match_sources[source]:
                             return method
-        
+
         # if tag is not default, try again with 'default'
         for method in methods:
             if hasattr(method, 'match_sources') and isinstance(getattr(method, 'match_sources'), dict):
@@ -654,7 +654,7 @@ class Layer(object):
         }
 
         return layer_state
-    
+
     def load(self, state):
         """Set this layer properties dictionnary (used to load state).
         """
@@ -689,7 +689,7 @@ class Layer(object):
             # Loop on all sublayers
             for sublayer in cls.LAYERS:
                 sublayers_structure.append(cls.LAYERS[sublayer].get_structure())
-        
+
         # Return our structure
         structure = {
             'name': cls.alias,
@@ -701,7 +701,7 @@ class Layer(object):
         return structure
 
     @classmethod
-    def export(cls, output_file):
+    def export(cls, output_file=None):
         """Export to graphviz file.
         """
         structure = cls.get_structure()
@@ -720,9 +720,10 @@ class Layer(object):
 
         output += '}'
 
-        # Write to file
-        with open(output_file, 'w') as f:
-            f.write(output)
+        if output_file is not None:
+            # Write to file
+            with open(output_file, 'w') as f:
+                f.write(output)
 
         return output
 
@@ -735,5 +736,3 @@ class ContextualLayer(Layer):
     @classmethod
     def instantiable(cls):
         return True
-    
-    

@@ -1,2 +1,1 @@
-from .touchlink import ZCLTouchLinkClient
-from .onoff import OnOffClient, OnOffServer
+from whad.zigbee.stack.apl.zcl.clusters.onoff import OnOffClient, OnOffServer

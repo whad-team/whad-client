@@ -102,7 +102,7 @@ class HCIConverter:
 
                 return []
             else:
-                logger.warning("HCI devices cannot send control PDU.")
+                #logger.warning("HCI devices cannot send control PDU.")
                 raise WhadDeviceUnsupportedOperation("send_pdu", "Device cannot send control PDU, only data PDU.")
 
     def add_pending_message(self, event):

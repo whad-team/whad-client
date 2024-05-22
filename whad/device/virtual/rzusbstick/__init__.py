@@ -2,8 +2,10 @@ from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAc
 from whad.device.virtual import VirtualDevice
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad import WhadDomain, WhadCapability
+
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.dot15d4 import Commands
+
 from whad.device.virtual.rzusbstick.constants import RZUSBStickInternalStates, \
     RZUSBStickId, RZUSBStickModes, RZUSBStickEndPoints, RZUSBStickCommands, \
     RZUSBStickResponses
@@ -127,7 +129,7 @@ class RZUSBStickDevice(VirtualDevice):
     def _send_whad_zigbee_raw_pdu(self, packet, rssi=None, is_fcs_valid=None, timestamp=None):
         pdu = packet[:-2]
         fcs = unpack("H",packet[-2:])[0]
-        
+
         # Create a RawPduReceived message
         msg = self.hub.dot15d4.createRawPduReceived(
             self.__channel,
@@ -143,17 +145,18 @@ class RZUSBStickDevice(VirtualDevice):
             msg.timestamp = timestamp
 
         # Send message
+
         self._send_whad_message(msg)
 
 
     # Virtual device whad message callbacks
-    def _on_whad_zigbee_stop(self, message):
+    def _on_whad_dot15d4_stop(self, message):
         if self._stop():
             self._send_whad_command_result(CommandResult.SUCCESS)
         else:
             self._send_whad_command_result(CommandResult.ERROR)
 
-    def _on_whad_zigbee_send_raw(self, message):
+    def _on_whad_dot15d4_send_raw(self, message):
         channel = message.channel
 
         if self._set_channel(channel):
@@ -163,13 +166,13 @@ class RZUSBStickDevice(VirtualDevice):
             success = False
         self._send_whad_command_result(CommandResult.SUCCESS if success else CommandResult.ERROR)
 
-    def _on_whad_zigbee_sniff(self, message):
+    def _on_whad_dot15d4_sniff(self, message):
         channel = message.channel
         self.__future_channel = channel
         self.__internal_state = RZUSBStickInternalStates.SNIFFING
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_zigbee_start(self, message):
+    def _on_whad_dot15d4_start(self, message):
         self.__input_buffer = b""
         self.__input_buffer_length = 0
         self.__input_header = b""
@@ -197,14 +200,14 @@ class RZUSBStickDevice(VirtualDevice):
     def _get_capabilities(self):
         if "KILLERB" in self.__rzusbstick.product:
             capabilities = {
-                WhadDomain.Zigbee : (
+                WhadDomain.Dot15d4 : (
                                     (WhadCapability.Sniff | WhadCapability.Inject),
                                     [Commands.Sniff, Commands.Send, Commands.Start, Commands.Stop]
                 )
             }
         else:
             capabilities = {
-                WhadDomain.Zigbee : (
+                WhadDomain.Dot15d4 : (
                                     (WhadCapability.Sniff),
                                     [Commands.Sniff, Commands.Start, Commands.Stop]
                 )

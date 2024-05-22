@@ -159,7 +159,6 @@ class CryptoManager:
 
         # Extract plaintext
         plaintext = packet.data[:-self.M] if len(packet.mic) == 0 and self.patched else packet.data
-
         # Encrypt and generate MIC
         cipher = AES.new(self.key, AES.MODE_CCM, nonce=self.nonce, mac_len=self.M)
         cipher.update(self.auth)

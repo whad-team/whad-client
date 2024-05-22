@@ -12,7 +12,7 @@ class Pairing:
         keypress=False,
         ct2=False,
         max_key_size=16,
-        iocap=IOCAP_DISPLAY_ONLY,
+        iocap=IOCAP_NOINPUT_NOOUTPUT,
         enc_key=True,
         id_key=True,
         sign_key=True,

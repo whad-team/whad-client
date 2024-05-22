@@ -322,7 +322,7 @@ class BLE(WhadDeviceConnector):
         """
         if not self.can_prepare():
             raise UnsupportedCapability("Prepare")
-        
+
         prep_packets = []
         for packet in packets:
             if BTLE_DATA in packet:
@@ -384,10 +384,10 @@ class BLE(WhadDeviceConnector):
         """
         if not self.can_jam_advertisement_on_channel():
             raise UnsupportedCapability("JamAdvOnChannel")
-        
+
         # Create a JamAdvChan message
         msg = self.hub.ble.createJamAdvChan(channel)
-        
+
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
@@ -445,7 +445,7 @@ class BLE(WhadDeviceConnector):
         """
         if not self.can_hijack_slave():
             raise UnsupportedCapability("Hijack")
-        
+
         # Create an HijackSlave message
         msg = self.hub.ble.createHijackSlave(access_address)
 
@@ -591,10 +591,10 @@ class BLE(WhadDeviceConnector):
         Start currently enabled mode.
         """
         logger.info('starting current BLE mode ...')
-        
+
         # Create a Start message
         msg = self.hub.ble.createStart()
-        
+
         resp = self.send_command(msg, message_filter(CommandResult))
         if isinstance(resp, Success):
             logger.info('current BLE mode successfully started')
@@ -635,6 +635,7 @@ class BLE(WhadDeviceConnector):
     def set_encryption(self, conn_handle, enabled=False, ll_key=None, ll_iv=None, key=None, rand=None, ediv=None):
         """Notify WHAD device about encryption status
         """
+
         print("set_encryption", enabled, ll_key.hex(), ll_iv.hex(), key.hex(), rand, ediv)
 
         # Create a SetEncryption message
@@ -644,7 +645,8 @@ class BLE(WhadDeviceConnector):
             ll_iv if ll_iv is not None else b"",
             key if key is not None else b"",
             struct.pack('<Q', rand) if rand is not None else b"",
-            struct.pack('<H', ediv) if ediv is not None else b""
+            struct.pack('<H', ediv) if ediv is not None else b"",
+            enabled
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))
@@ -679,7 +681,7 @@ class BLE(WhadDeviceConnector):
 
                 # Forward to advertising PDU callback if synchronous mode is set.
                 if self.is_synchronous():
-                    self.add_pending_pdu(packet)                        
+                    self.add_pending_pdu(packet)
                 else:
                     self.on_adv_pdu(packet)
         elif isinstance(message, BlePduReceived):

@@ -1,36 +1,39 @@
+from whad.dot15d4.stack.mac.constants import MACDeviceType, MACPowerSource
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
-from whad.zigbee.stack.mac.constants import MACDeviceType, MACPowerSource
 
 class NodeDescriptor:
+    """
+    This class is a descriptor for a ZigBee Node.
+    """
     def __init__(
-            self,
-            logical_type=LogicalDeviceType.END_DEVICE,
-            complex_descriptor_available=False,
-            user_descriptor_available=False,
-            aps_flags=0,
-            support_868_mhz=False,
-            support_902_mhz=False,
-            support_2400_mhz=True,
-            alternate_pan_coordinator=False,
-            device_type=MACDeviceType.FFD,
-            power_source=MACPowerSource.ALTERNATING_CURRENT_SOURCE,
-            receiver_on_when_idle=True,
-            security_capability=True,
-            allocate_address=False,
-            manufacturer_code=0x1234,
-            max_buffer_size=128,
-            max_incoming_transfer_size=128,
-            server_primary_trust_center = False,
-            server_backup_trust_center = False,
-            server_primary_binding_table_cache = False,
-            server_backup_binding_table_cache = False,
-            server_primary_discovery_cache = False,
-            server_backup_discovery_cache = False,
-            network_manager = False,
-            stack_compliance_revision = 21,
-            max_outgoing_transfer_size = 128,
-            extended_active_endpoint_list_available = False,
-            extended_simple_descriptors_list_available = False
+                    self,
+                    logical_type=LogicalDeviceType.END_DEVICE,
+                    complex_descriptor_available=False,
+                    user_descriptor_available=False,
+                    aps_flags=0,
+                    support_868_mhz=False,
+                    support_902_mhz=False,
+                    support_2400_mhz=True,
+                    alternate_pan_coordinator=False,
+                    device_type=MACDeviceType.FFD,
+                    power_source=MACPowerSource.ALTERNATING_CURRENT_SOURCE,
+                    receiver_on_when_idle=True,
+                    security_capability=True,
+                    allocate_address=False,
+                    manufacturer_code=0x1234,
+                    max_buffer_size=128,
+                    max_incoming_transfer_size=128,
+                    server_primary_trust_center = False,
+                    server_backup_trust_center = False,
+                    server_primary_binding_table_cache = False,
+                    server_backup_binding_table_cache = False,
+                    server_primary_discovery_cache = False,
+                    server_backup_discovery_cache = False,
+                    network_manager = False,
+                    stack_compliance_revision = 21,
+                    max_outgoing_transfer_size = 128,
+                    extended_active_endpoint_list_available = False,
+                    extended_simple_descriptors_list_available = False
         ):
         self.logical_type = logical_type
         self.complex_descriptor_available = complex_descriptor_available
@@ -92,7 +95,18 @@ class NodeDescriptor:
         ")")
 
 class SimpleDescriptor:
-    def __init__(self, endpoint, profile_identifier, device_identifier, device_version, input_clusters, output_clusters):
+    """
+    This class is a descriptor for an application.
+    """
+    def __init__(
+                    self,
+                    endpoint,
+                    profile_identifier,
+                    device_identifier,
+                    device_version,
+                    input_clusters,
+                    output_clusters
+    ):
         self.endpoint = endpoint
         self.profile_identifier = profile_identifier
         self.device_identifier = device_identifier

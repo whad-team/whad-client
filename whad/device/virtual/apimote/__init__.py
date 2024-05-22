@@ -6,7 +6,7 @@ from whad.protocol.whad_pb2 import Message
 from whad import WhadDomain, WhadCapability
 from whad.zigbee.utils.phy import channel_to_frequency, frequency_to_channel
 from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.zigbee.zigbee_pb2 import Sniff, Send, Start, Stop
+from whad.protocol.dot15d4.dot15d4_pb2 import Sniff, Send, Start, Stop
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from serial import Serial,PARITY_NONE
 from serial.tools.list_ports import comports
@@ -86,7 +86,7 @@ class APIMoteDevice(VirtualDevice):
     # Discovery related functions
     def _get_capabilities(self):
         capabilities = {
-            WhadDomain.Zigbee : (
+            WhadDomain.Dot15d4 : (
                                 (WhadCapability.Sniff | WhadCapability.Inject),
                                 [Sniff, Send, Start, Stop]
             )
@@ -217,7 +217,7 @@ class APIMoteDevice(VirtualDevice):
         self.__uart = None
         self.__fileno = None
 
-    def _send_whad_zigbee_raw_pdu(self, packet, rssi=None):
+    def _send_whad_dot15d4_raw_pdu(self, packet, rssi=None):
         pdu = packet[:-2]
         fcs = unpack("H",packet[-2:])[0]
         is_fcs_valid = Dot15d4FCS().compute_fcs(pdu) == packet[-2:]
@@ -248,16 +248,16 @@ class APIMoteDevice(VirtualDevice):
                         # size of packet + 1-byte long length field
                         if packet_size + 1 < len(packet):
                             packet, self._packet_queue = packet[1:packet_size+1], (packet[packet_size+2:], rssi)
-                            self._send_whad_zigbee_raw_pdu(packet, rssi)
+                            self._send_whad_dot15d4_raw_pdu(packet, rssi)
                         else:
-                            self._send_whad_zigbee_raw_pdu(packet[1:], rssi)
+                            self._send_whad_dot15d4_raw_pdu(packet[1:], rssi)
                 else:
                     packet, rssi = (self._packet_queue,rssi)
                     self._packet_queue = None
-                    self._send_whad_zigbee_raw_pdu(packet, rssi)
+                    self._send_whad_dot15d4_raw_pdu(packet, rssi)
 
     # Virtual device whad message callbacks
-    def _on_whad_zigbee_stop(self, message):
+    def _on_whad_dot15d4_stop(self, message):
         if self._switch_rf_to_idle():
             self.__internal_state = APIMoteInternalStates.NONE
             self.__packet_polling = False
@@ -266,7 +266,7 @@ class APIMoteDevice(VirtualDevice):
             self._send_whad_command_result(ResultCode.ERROR)
 
 
-    def _on_whad_zigbee_send_raw(self, message):
+    def _on_whad_dot15d4_send_raw(self, message):
         #print("here")
         channel = message.channel
         if self._set_channel(channel):
@@ -291,7 +291,7 @@ class APIMoteDevice(VirtualDevice):
         self._send_whad_command_result(ResultCode.SUCCESS if success else ResultCode.ERROR)
 
 
-    def _on_whad_zigbee_sniff(self, message):
+    def _on_whad_dot15d4_sniff(self, message):
         channel = message.channel
         if self._set_channel(channel):
             self.__internal_state = APIMoteInternalStates.SNIFFING
@@ -299,7 +299,7 @@ class APIMoteDevice(VirtualDevice):
         else:
             self._send_whad_command_result(ResultCode.PARAMETER_ERROR)
 
-    def _on_whad_zigbee_start(self, message):
+    def _on_whad_dot15d4_start(self, message):
         if self.__internal_state == APIMoteInternalStates.SNIFFING:
             if self._switch_rf_to_rx():
                 self._packet_queue = None

@@ -29,9 +29,9 @@ if __name__ == '__main__':
             connector = Dongle(dev, on_keystroke=show_key, on_move_mouse=show_mouse_move)
             #connector.attach_callback(show, on_reception=True, on_transmission=False)
 
-            #connector.address = "9b:0a:90:42:99"
-            #connector.key = bytes.fromhex("08f59b42156fa86c4288b64d02ca4006")
-            connector.address =  "ca:e9:06:ec:a4"
+            connector.address = "9b:0a:90:42:b2"
+            connector.key = bytes.fromhex("08f59b42a06fee0e2588fa4d063c4096")
+            #connector.address =  "ca:e9:06:ec:a4"
             connector.channel = 8
 
             connector.start()

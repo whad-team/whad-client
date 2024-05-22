@@ -1,8 +1,10 @@
 from whad.zigbee.connector import Zigbee
-from whad.zigbee.stack import ZigbeeStack
-from whad.exceptions import UnsupportedCapability
-from whad.zigbee.profile.network import Network
+from whad.dot15d4.stack import Dot15d4Stack
+from whad.dot15d4.stack.mac import MACManager
+from whad.zigbee.stack.nwk import NWKManager
+from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.apl.application import ApplicationObject
+from whad.exceptions import UnsupportedCapability
 
 class EndDevice(Zigbee):
     """
@@ -14,45 +16,33 @@ class EndDevice(Zigbee):
         if not self.can_be_end_device():
             raise UnsupportedCapability("EndDevice")
 
-        self.__stack = ZigbeeStack(self)
+        # Stack initialization
+        MACManager.add(NWKManager)
+        self.__stack = Dot15d4Stack(self)
+
+        # Channel initialization
         self.__channel = 11
         self.__channel_page = 0
-        self.__network = None
-        self.enable_reception()
 
-        self.__stack.apl.initialize()
+        self.enable_reception()
+        self.__stack.get_layer('apl').get_application_by_name("zdo").configuration.get("configNodeDescriptor").logical_type = LogicalDeviceType.END_DEVICE
+        self.__stack.get_layer('apl').initialize()
         self._init_applications(applications)
 
     def _init_applications(self, applications):
         if applications == []:
             # If no application provided, attach a default ZCL application on endpoint 1
             app = ApplicationObject("zcl_app", 0x0104, 0x0100, device_version=0, input_clusters=[], output_clusters=[])
-            self.stack.apl.attach_application(app, endpoint=1)
+            self.__stack.get_layer('apl').attach_application(app, endpoint=1)
 
         else:
             for app in applications:
                 endpoint = 1
-                self.stack.apl.attach_application(app, endpoint=endpoint)
+                self.__stack.get_layer('apl').attach_application(app, endpoint=endpoint)
                 endpoint += 1
 
-
     def discover_networks(self):
-        return self.__stack.apl.get_application_by_name("zdo").network_manager.discover_networks()
-
-    def join(self, network=None):
-        if isinstance(network, int):
-            for candidate_network in self.discover_networks():
-                if candidate_network.extended_pan_id == network or candidate_network.pan_id == network:
-                    if candidate_network.join():
-                        self.__network = candidate_network
-                        return self.__network
-            return None
-        elif isinstance(network, Network):
-            if network.join():
-                self.__network = candidate_network
-                return self.__network
-            return None
-        return None
+        return self.__stack.get_layer('apl').get_application_by_name("zdo").network_manager.discover_networks()
 
     @property
     def stack(self):
@@ -76,6 +66,13 @@ class EndDevice(Zigbee):
             raise UnsupportedCapability("ChannelPageSelection")
         else:
             self.__channel_page = page
+
+    def get_channel(self):
+        return self.__channel
+
+    def get_channel_page(self):
+        return self.__channel_page
+
 
     def send(self, packet):
         super().send(packet, channel=self.__channel)

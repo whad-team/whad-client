@@ -93,8 +93,8 @@ class HIDOverGATT(GenericProfile):
 if __name__ == '__main__':
     my_profile = HIDOverGATT()
     pairing = Pairing(
-        lesc=True,
-        mitm=True,
+        lesc=False,
+        mitm=False,
         bonding=True,
     )
     periph = Peripheral(WhadDevice.create('hci0'), profile=my_profile, pairing=pairing)

@@ -2,7 +2,7 @@
 """
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr, Dot15d4TAP_FCS_Type
-from whad.zigbee.metadata import generate_zigbee_metadata
+from whad.dot15d4.metadata import generate_dot15d4_metadata
 from whad.protocol.whad_pb2 import Message
 from whad.hub import ProtocolHub
 from whad.hub.dot15d4 import RawPduReceived, PduReceived
@@ -44,12 +44,12 @@ class ZigbeeMessageTranslator(object):
         try:
             if isinstance(message, RawPduReceived):
                 packet = Dot15d4FCS(bytes(message.pdu) + bytes(pack(">H", message.fcs)))
-                packet.metadata = generate_zigbee_metadata(message)
+                packet.metadata = generate_dot15d4_metadata(message)
                 return packet
 
             elif isinstance(message, PduReceived):
                 packet = Dot15d4(bytes(message.pdu))
-                packet.metadata = generate_zigbee_metadata(message)
+                packet.metadata = generate_dot15d4_metadata(message)
                 return packet
         except AttributeError:
             return None
