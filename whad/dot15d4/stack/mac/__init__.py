@@ -1075,7 +1075,6 @@ class MACManager(Dot15d4Manager):
                     fcf_destaddrmode=fcf_destaddrmode
         )/packet
 
-        print(packet)
         # Build PAN ID compression field
         packet = self._choose_pan_id_compression(packet, destination_address_mode, source_address_mode)
 

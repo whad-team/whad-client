@@ -5,7 +5,7 @@ This utility implements a generic sniffer module, automatically adapted to every
 import logging
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
-from whad.cli.app import CommandLineApp
+from whad.cli.app import CommandLineSource
 from importlib import import_module
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
 from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
@@ -18,6 +18,7 @@ from html import escape
 from hexdump import hexdump
 from scapy.all import BrightTheme, Packet
 import whad
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -272,7 +273,7 @@ class WhadDomainSubParser(ArgumentParser):
         )
 
 
-class WhadSniffApp(CommandLineApp):
+class WhadSniffApp(CommandLineSource):
 
     def __init__(self):
         """Application uses an interface and has commands.
@@ -378,6 +379,7 @@ class WhadSniffApp(CommandLineApp):
 
                     # Make sure we are piped to another tool
                     if self.is_stdout_piped():
+                        '''
                         piped_arguments = vars(self.args)
                         for piped_argument in piped_arguments:
                             piped_arguments[piped_argument] = type(getattr(self.args, piped_argument)).__name__ + ":" + str(piped_arguments[piped_argument])
@@ -392,6 +394,16 @@ class WhadSniffApp(CommandLineApp):
                         proxy.start()
                         proxy.join()
                         sniffer.stop()
+                        '''
+                        from whad.common.ipc import IPCPacket
+                        # Iterates over the packet stream and display packets
+                        for pkt in sniffer.sniff():
+                            sys.stdout.write(
+                                IPCPacket(pkt).to_dump() + "\n"
+                            )
+                            sys.stdout.flush()
+
+
 
                     else:
                         # Iterates over the packet stream and display packets

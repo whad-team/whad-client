@@ -7,7 +7,7 @@ a compatible WHAD device.
 import logging
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
-from whad.cli.app import CommandLineApp
+from whad.cli.app import CommandLineSink
 from importlib import import_module
 from whad.common.replay import ReplayRole
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
@@ -164,7 +164,7 @@ class WhadReplayApp(CommandLineApp):
         def __init__(self, replay_app):
             super().__init__()
             self.__replay_app = replay_app
-        
+
         def process_packet(self, packet):
             self.__replay_app.display(packet)
 
@@ -285,10 +285,10 @@ class WhadReplayApp(CommandLineApp):
 
 
     def build_monitor(self) -> WhadReplayMonitor:
-        """Create our own wrapper to monitor packets in the terminal. 
+        """Create our own wrapper to monitor packets in the terminal.
         """
         return WhadReplayApp.WhadReplayMonitor(self)
-            
+
 
     def display(self, pkt):
         """
@@ -430,19 +430,19 @@ class WhadReplayApp(CommandLineApp):
             if role == 0:
                 self.error("You need to specify a role with --emitter and/or --receiver.")
                 return
-            
+
             # We also must have an input pcap file selected
             if self.args.pcapfile is None:
                 self.error("No input PCAP file specified !")
                 return
-            
+
             # We need to have an interface specified
             if self.interface is not None:
                 # We need to have a domain specified
                 if self.args.domain is not None:
                     # Parse the arguments to populate a replay configuration
                     configuration = build_configuration_from_args(self.environment, self.args)
-                    
+
                     # Make sure we have a target set
                     if configuration.target is not None:
                         # Generate a replay based on the selected domain
@@ -479,7 +479,7 @@ class WhadReplayApp(CommandLineApp):
                                 count = self.args.stop_pos - self.args.start_pos + 1
                             else:
                                 count = None
-                            
+
                             # PCAPReader will send back packets in a timely manner, according to PCAP timestamps.
                             reader = PCAPReader(self.args.pcapfile)
                             for packet in reader.packets(start=self.args.start_pos, count=count,
