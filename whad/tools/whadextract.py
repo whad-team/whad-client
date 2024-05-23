@@ -26,40 +26,15 @@ class WhadExtractApp(CommandLinePipe):
         )
 
         self.add_argument(
-            'filter',
-            help='filter to evaluate',
-            nargs = "*"
+            '-f',
+            '--field',
+            dest="fields",
+            help='field to extract',
+            action="append"
         )
 
 
-        self.add_argument(
-            '-o',
-            '--or',
-            dest='any',
-            action="store_true",
-            default=False,
-            help='xor between filters'
-        )
-        self.add_argument(
-            '-e',
-            '--invert',
-            dest='invert',
-            action="store_true",
-            default=False,
-            help='invert filter'
-        )
-
-        self.add_argument(
-            '-d',
-            '--debug',
-            dest='debug',
-            action="store_true",
-            default=False,
-            help='debug filter'
-        )
-
-
-    filter_template = "lambda p : {}"
+    extractor_template = "lambda p : {}"
 
 
     def run(self):
@@ -69,35 +44,26 @@ class WhadExtractApp(CommandLinePipe):
             while True:
                 dump = sys.stdin.readline()
                 data = IPCPacket.from_dump(dump.replace("\n", ""))
+                fields_value = {}
+                #print(self.args.fields)
+                for field in self.args.fields:
+                    nested_fields = field.split(".")
+                    #print(nested_fields)
+                    field_value = data
+                    for nested_field in nested_fields:
+                        #print('>>>>', data, nested_field)
+                        if hasattr(field_value, nested_field):
+                            field_value = getattr(field_value, nested_field)
+                            #print(field_value)
+                    fields_value[field] = field_value
 
-                accept_list = []
-                for filter in self.args.filter:
-                    filter_func = self.filter_template.format(filter)
+                sys.stdout.write(" ".join(str(i) for i in fields_value.values()))
 
-                    try:
-                        if eval(filter_func)(data):
-                            accept = True
-                        else:
-                            accept = False
-                    except:
-                        accept = False
-
-                    accept_list.append(accept)
-
-                aggregation_func = any if self.args.any else all
-
-
-                result = aggregation_func(accept_list)
-                if self.args.invert:
-                    result = not result
-
-                if self.args.debug:
-                    print("[i] evaluate {} -> {}".format(("or" if self.args.any else "and".join(self.args.filter)) + ("(inverted)" if self.args.invert else ""), result))
-                if result or self.args.debug:
-                    display_packet(data, show_metadata=True, format="repr")
-        except:
+                sys.stdout.write("\n")
+                sys.stdout.flush()#self.extractor_template, self.args.field, dump)
+                    #display_packet(data, show_metadata=True, format="repr")
+        except KeyboardInterrupt:
             pass
-
         # Launch post-run tasks
         self.post_run()
 

@@ -65,6 +65,10 @@ class WhadFilterApp(CommandLinePipe):
     def run(self):
         # Launch pre-run tasks
         self.pre_run()
+        if self.is_stdout_piped():
+            stdout_piped = True
+        else:
+            stdout_piped = False
         try:
             while True:
                 dump = sys.stdin.readline()
@@ -93,11 +97,13 @@ class WhadFilterApp(CommandLinePipe):
 
                 if self.args.debug:
                     print("[i] evaluate {} -> {}".format(("or" if self.args.any else "and".join(self.args.filter)) + ("(inverted)" if self.args.invert else ""), result))
-                if result or self.args.debug:
-                    display_packet(data, show_metadata=True, format="repr")
-        except:
-            pass
 
+                if result or self.args.debug:
+                    sys.stdout.write(IPCPacket(data).to_dump()+"\n")
+                    sys.stdout.flush()
+                    #display_packet(data, show_metadata=True, format="repr")
+        except KeyboardInterrupt:
+            pass
         # Launch post-run tasks
         self.post_run()
 

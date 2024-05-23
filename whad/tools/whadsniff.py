@@ -17,6 +17,8 @@ from scapy.config import conf
 from html import escape
 from hexdump import hexdump
 from scapy.all import BrightTheme, Packet
+from whad.common.ipc import IPCPacket
+
 import whad
 import sys
 
@@ -379,31 +381,12 @@ class WhadSniffApp(CommandLineSource):
 
                     # Make sure we are piped to another tool
                     if self.is_stdout_piped():
-                        '''
-                        piped_arguments = vars(self.args)
-                        for piped_argument in piped_arguments:
-                            piped_arguments[piped_argument] = type(getattr(self.args, piped_argument)).__name__ + ":" + str(piped_arguments[piped_argument])
-
-
-                        piped_arguments.update(
-                            {"domain":self.args.domain}
-                        )
-                        proxy = UnixSocketProxy(self.interface,
-                            piped_arguments
-                        )
-                        proxy.start()
-                        proxy.join()
-                        sniffer.stop()
-                        '''
-                        from whad.common.ipc import IPCPacket
                         # Iterates over the packet stream and display packets
                         for pkt in sniffer.sniff():
                             sys.stdout.write(
                                 IPCPacket(pkt).to_dump() + "\n"
                             )
                             sys.stdout.flush()
-
-
 
                     else:
                         # Iterates over the packet stream and display packets
@@ -431,6 +414,7 @@ class WhadSniffApp(CommandLineSource):
             sniffer.close()
             for monitor in monitors:
                 monitor.close()
+            exit()
 
     def build_subparsers(self, subparsers):
         """
