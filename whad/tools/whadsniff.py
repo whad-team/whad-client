@@ -21,6 +21,8 @@ from whad.common.ipc import IPCPacket
 
 import whad
 import sys
+from whad.common.ipc import IPCConverter
+import os, stat
 
 logger = logging.getLogger(__name__)
 
@@ -342,6 +344,7 @@ class WhadSniffApp(CommandLineSource):
         sniffer = None
         # Launch pre-run tasks
         self.pre_run()
+
         try:
 
             # We need to have an interface specified
@@ -379,15 +382,34 @@ class WhadSniffApp(CommandLineSource):
                     sniffer.start()
                     # Iterates over the packet stream and display packets
 
+                    mode = os.fstat(1).st_mode
+
                     # Make sure we are piped to another tool
                     if self.is_stdout_piped():
-                        # Iterates over the packet stream and display packets
-                        for pkt in sniffer.sniff():
+                        if not stat.S_ISREG(mode):
                             sys.stdout.write(
-                                IPCPacket(pkt).to_dump() + "\n"
+                                IPCConverter(self.args.format, self.args.nocolor).to_dump() + "\n"
                             )
                             sys.stdout.flush()
 
+                            # Iterates over the packet stream and display packets
+                            for pkt in sniffer.sniff():
+                                #print(IPCConverter(pkt).to_dump())
+                                sys.stdout.write(
+                                    IPCConverter(pkt).to_dump() + "\n"
+                                )
+                                sys.stdout.flush()
+                        else: # output redirected to file
+                            for pkt in sniffer.sniff():
+                                #print(IPCConverter(pkt).to_dump())
+                                from scapy.all import wrpcap
+                                wrpcap("/dev/stdout", pkt, append=True)
+                                '''
+                                sys.stdout.write(
+                                    IPCConverter(pkt).to_dump() + "\n"
+                                )
+                                sys.stdout.flush()
+                                '''
                     else:
                         # Iterates over the packet stream and display packets
                         for pkt in sniffer.sniff():

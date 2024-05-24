@@ -1,5 +1,24 @@
 import json
+from scapy.all import Packet_metaclass
 from importlib import import_module
+
+class IPCConverter:
+    def __init__(self, *args):
+        self.data = args
+
+    def to_dump(self):
+        if len(self.data) == 1:
+            return IPCPacket(self.data[0]).to_dump()
+        elif len(self.data) == 2:
+            return IPCDisplayFormat(*self.data).to_dump()
+
+    @classmethod
+    def from_dump(cls, dump):
+        data = json.loads(dump)
+        if data["type"] == "packet":
+            return IPCPacket.from_dump(dump)
+        elif data["type"] == "formatter":
+            return IPCDisplayFormat.from_dump(dump)
 
 class IPCPacket:
     def __init__(self, packet):
@@ -7,6 +26,7 @@ class IPCPacket:
 
     def to_dump(self):
         packet = {
+            "type":"packet",
             "packet":bytes(self.packet).hex(),
             "packet_class": (self.packet.__class__.__module__, self.packet.__class__.__name__),
             "metadata":self.packet.metadata.__dict__,
@@ -24,3 +44,22 @@ class IPCPacket:
         pkt = packet_class(bytes.fromhex(data["packet"]))
         pkt.metadata = metadata_class(**data["metadata"])
         return pkt
+
+
+class IPCDisplayFormat:
+    def __init__(self, format, color):
+        self.format = format
+        self.color = color
+
+    def to_dump(self):
+        formatter = {
+            "type":"formatter",
+            "format" : self.format,
+            "color" : self.color
+        }
+        return json.dumps(formatter, default=lambda o : o.__dict__)
+
+    @classmethod
+    def from_dump(cls, dump):
+        data = json.loads(dump)
+        return (data["format"], data["color"])

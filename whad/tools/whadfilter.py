@@ -9,7 +9,7 @@ import time
 from whad.tools.whadsniff import display_packet
 from whad.cli.app import CommandLinePipe
 from scapy.all import *
-from whad.common.ipc import IPCPacket
+from whad.common.ipc import IPCConverter
 import sys
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 logger = logging.getLogger(__name__)
@@ -72,7 +72,8 @@ class WhadFilterApp(CommandLinePipe):
         try:
             while True:
                 dump = sys.stdin.readline()
-                data = IPCPacket.from_dump(dump.replace("\n", ""))
+                print(dump)
+                data = IPCConverter.from_dump(dump.replace("\n", ""))
 
                 accept_list = []
                 for filter in self.args.filter:
@@ -99,7 +100,7 @@ class WhadFilterApp(CommandLinePipe):
                     print("[i] evaluate {} -> {}".format(("or" if self.args.any else "and".join(self.args.filter)) + ("(inverted)" if self.args.invert else ""), result))
 
                 if result or self.args.debug:
-                    sys.stdout.write(IPCPacket(data).to_dump()+"\n")
+                    sys.stdout.write(IPCConverter(data).to_dump()+"\n")
                     sys.stdout.flush()
                     #display_packet(data, show_metadata=True, format="repr")
         except KeyboardInterrupt:
