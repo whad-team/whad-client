@@ -388,7 +388,7 @@ class WhadSniffApp(CommandLineSource):
                     if self.is_stdout_piped():
                         if not stat.S_ISREG(mode):
                             sys.stdout.write(
-                                IPCConverter(self.args.format, self.args.nocolor).to_dump() + "\n"
+                                IPCConverter(self.args.format, self.args.metadata, self.args.nocolor).to_dump() + "\n"
                             )
                             sys.stdout.flush()
 

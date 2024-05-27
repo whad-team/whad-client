@@ -22,13 +22,14 @@ security_database.add(
     ediv=0x87e9
 )
 '''
-central = Central(WhadDevice.create('hci0'), security_database=security_database)
+central = Central(WhadDevice.create('uart0'), security_database=security_database)
 central.attach_callback(show)
 
 
 print("New connection")
 
-device = central.connect('43:1B:16:A6:E6:D6', random=True)
+device = central.connect('F4:9E:F2:6D:37:85',  random=True, hop_interval=9)
+
 # Discover
 device.discover()
 for service in device.services():

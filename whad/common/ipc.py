@@ -9,7 +9,7 @@ class IPCConverter:
     def to_dump(self):
         if len(self.data) == 1:
             return IPCPacket(self.data[0]).to_dump()
-        elif len(self.data) == 2:
+        elif len(self.data) == 3:
             return IPCDisplayFormat(*self.data).to_dump()
 
     @classmethod
@@ -47,14 +47,16 @@ class IPCPacket:
 
 
 class IPCDisplayFormat:
-    def __init__(self, format, color):
+    def __init__(self, format, metadata, color):
         self.format = format
+        self.metadata = metadata
         self.color = color
 
     def to_dump(self):
         formatter = {
             "type":"formatter",
             "format" : self.format,
+            "metadata" : self.metadata,
             "color" : self.color
         }
         return json.dumps(formatter, default=lambda o : o.__dict__)
@@ -62,4 +64,4 @@ class IPCDisplayFormat:
     @classmethod
     def from_dump(cls, dump):
         data = json.loads(dump)
-        return (data["format"], data["color"])
+        return (data["format"], data["metadata"], data["color"])

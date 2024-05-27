@@ -9,7 +9,8 @@ import time
 from whad.tools.whadsniff import display_packet
 from whad.cli.app import CommandLinePipe
 from scapy.all import *
-from whad.common.ipc import IPCPacket
+from scapy.config import conf
+from whad.common.ipc import IPCConverter
 import sys
 from json import JSONDecodeError
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
@@ -59,7 +60,14 @@ class WhadExtractApp(CommandLinePipe):
                 while True:
                     dump = sys.stdin.readline()
                     try:
-                        data = IPCPacket.from_dump(dump.replace("\n", ""))
+                        data = IPCConverter.from_dump(dump.replace("\n", ""))
+                        if isinstance(data, tuple) and isinstance(data[0], str) and isinstance(data[1], bool) and isinstance(data[2], bool):
+                            format, show_metadata, nocolor = data
+                            if not nocolor:
+                                conf.color_theme = BrightTheme()
+
+                            continue
+
                         display_values = {}
                         for layer in self.args.layers:
                             try:
@@ -97,10 +105,39 @@ class WhadExtractApp(CommandLinePipe):
                             if arg.startswith("-"):
                                 arglist.remove(arg)
 
+                        output = ""
                         if len(display_values.values()) > 0:
-                            sys.stdout.write(" ".join(repr(display_values[i]) for i in arglist if i in display_values)) # preserve order
-                            sys.stdout.write("\n")
+                            for name in arglist:
+                                if name in display_values:
+                                    if format == "repr":
+                                        output += " " + (repr(display_values[name]) if not isinstance(display_values[name],str) else str(display_values[name]))
+                                    elif format == "raw":
+                                        try:
+                                            if isinstance(display_values[name], str):
+                                                output += " " + (bytes(display_values[name], 'utf-8').hex())
+                                            else:
+                                                output += " " + (bytes(display_values[name]).hex())
+                                        except ValueError:
+                                            output += " " + (repr(display_values[name]) if not isinstance(display_values[name],str) else str(display_values[name]))
+                                    elif format == "hexdump":
+                                        try:
+                                            if isinstance(display_values[name], str):
+                                                hexdump(bytes(display_values[name], 'utf-8'))
+                                            else:
+                                                hexdump(bytes(display_values[name]))
+                                        except ValueError:
+                                            output += " " + (repr(display_values[name]) if not isinstance(display_values[name],str) else str(display_values[name]))
+                                    elif format == "show":
+                                        try:
+                                            display_values[name].show()
+                                            #output += " " + display_values[name].show(dump=True)
+                                        except:
+                                            output += " " + (repr(display_values[name]) if not isinstance(display_values[name],str) else str(display_values[name]))
+                            output = output[1:]
+                            #sys.stdout.write(" ".join(repr(display_values[i]) for i in arglist if i in display_values)) # preserve order
+                            print(output + "\n")
                             sys.stdout.flush()
+
                     except JSONDecodeError:
                         self.error("A decoding error occured, terminating.")
                         exit()

@@ -9,6 +9,8 @@ import time
 from whad.tools.whadsniff import display_packet
 from whad.cli.app import CommandLinePipe
 from scapy.all import *
+from scapy.config import conf
+
 from whad.common.ipc import IPCConverter
 import sys
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
@@ -72,8 +74,14 @@ class WhadFilterApp(CommandLinePipe):
         try:
             while True:
                 dump = sys.stdin.readline()
-                print(dump)
                 data = IPCConverter.from_dump(dump.replace("\n", ""))
+                if isinstance(data, tuple) and isinstance(data[0], str) and isinstance(data[1], bool) and isinstance(data[2], bool):
+                    format, show_metadata, nocolor = data
+                    if not nocolor:
+                        conf.color_theme = BrightTheme()
+                    if stdout_piped:
+                        sys.stdout.write(dump)
+                        sys.stdout.flush()
 
                 accept_list = []
                 for filter in self.args.filter:
@@ -100,9 +108,11 @@ class WhadFilterApp(CommandLinePipe):
                     print("[i] evaluate {} -> {}".format(("or" if self.args.any else "and".join(self.args.filter)) + ("(inverted)" if self.args.invert else ""), result))
 
                 if result or self.args.debug:
-                    sys.stdout.write(IPCConverter(data).to_dump()+"\n")
-                    sys.stdout.flush()
-                    #display_packet(data, show_metadata=True, format="repr")
+                    if stdout_piped:
+                        sys.stdout.write(IPCConverter(data).to_dump()+"\n")
+                        sys.stdout.flush()
+                    else:
+                        display_packet(data, show_metadata=show_metadata, format=format)
         except KeyboardInterrupt:
             pass
         # Launch post-run tasks
