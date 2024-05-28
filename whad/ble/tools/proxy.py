@@ -122,7 +122,7 @@ class LowLevelPeripheral(Peripheral):
         if len(self.__pending_data_pdus) > 0:
             for _pdu in self.__pending_data_pdus:
                 if self.__proxy is not None:
-                    pdu = self.__proxy.on_data_pdu(_pdu)
+                    pdu = self.__proxy.on_data_pdu(_pdu, BleDirection.MASTER_TO_SLAVE)
                     if pdu is not None:
                         self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
                 else:
@@ -154,7 +154,7 @@ class LowLevelPeripheral(Peripheral):
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
             if self.__other_half is not None and self.__connected:
                 if self.__proxy is not None:
-                    pdu = self.__proxy.on_ctl_pdu(pdu)
+                    pdu = self.__proxy.on_ctl_pdu(pdu, BleDirection.MASTER_TO_SLAVE)
                     if pdu is not None:
                         self.__other_half.forward_ctrl_pdu(pdu)
                 else:
@@ -170,7 +170,7 @@ class LowLevelPeripheral(Peripheral):
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
             if self.__other_half is not None and self.__connected:
                 if self.__proxy is not None:
-                    pdu = self.__proxy.on_data_pdu(pdu)
+                    pdu = self.__proxy.on_data_pdu(pdu, BleDirection.MASTER_TO_SLAVE)
                     if pdu is not None:
                         self.__other_half.forward_data_pdu(pdu)
                 else:
@@ -185,7 +185,6 @@ class LowLevelPeripheral(Peripheral):
         :param Packet pdu: Control PDU to forward
         """
         logger.info('Forwarding control PDU to central (%s)' % str(self.__conn_handle))
-        pdu.show()
         if self.__conn_handle is not None:
             return self.send_pdu(
                 reshape_pdu(pdu),
@@ -202,7 +201,6 @@ class LowLevelPeripheral(Peripheral):
         :param Packet pdu: Data PDU to forward
         """
         logger.info('Forwarding data PDU to central (%s)' % str(self.__conn_handle))
-        pdu.show()
         if self.__conn_handle is not None:
             return self.send_pdu(
                 reshape_pdu(pdu),
@@ -224,7 +222,7 @@ class LowLevelCentral(Central):
     device or received from the associated peripheral.
     """
 
-    def __init__(self, device, connection_data=None):
+    def __init__(self, proxy, device, connection_data=None):
         """Instanciate a LowLevelCentral object
 
         :param WhadDevice device: Underlying WHAD device to use.
@@ -232,6 +230,7 @@ class LowLevelCentral(Central):
         super().__init__(device, existing_connection=connection_data)
         self.__connected = False
         self.__other_half = None
+        self.__proxy = proxy
 
 
     def set_other_half(self, other_half):
@@ -290,7 +289,12 @@ class LowLevelCentral(Central):
         """
         if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
             if self.__other_half is not None and self.__connected:
-                self.__other_half.forward_ctrl_pdu(pdu)
+                if self.__proxy is not None:
+                    pdu = self.__proxy.on_ctl_pdu(pdu, BleDirection.SLAVE_TO_MASTER)
+                    if pdu is not None:
+                        self.__other_half.forward_ctrl_pdu(pdu)
+                else:
+                    self.__other_half.forward_ctrl_pdu(pdu)
 
 
     def on_data_pdu(self, pdu):
@@ -303,7 +307,12 @@ class LowLevelCentral(Central):
         """
         if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
             if self.__other_half is not None and self.__connected:
-                self.__other_half.forward_data_pdu(pdu)
+                if self.__proxy is not None:
+                    pdu = self.__proxy.on_data_pdu(pdu, BleDirection.SLAVE_TO_MASTER)
+                    if pdu is not None:
+                        self.__other_half.forward_data_pdu(pdu)
+                else:
+                    self.__other_half.forward_data_pdu(pdu)
 
 
     def forward_ctrl_pdu(self, pdu):
@@ -405,7 +414,8 @@ class LinkLayerProxy(object):
 
         # First, connect our central device to our target device
         logger.info('create low-level central device ...')
-        self.__central = LowLevelCentral(self.__target)
+        print(self.__proxy)
+        self.__central = LowLevelCentral(self, self.__target)
         logger.info('connecting to target device ...')
         if self.__central.connect(self.__target_bd_addr) is not None:
             logger.info('proxy is connected to target device, create our own device ...')
@@ -443,7 +453,7 @@ class LinkLayerProxy(object):
         logger.info('Client has just disconnected from our proxy')
 
 
-    def on_ctl_pdu(self, pdu):
+    def on_ctl_pdu(self, pdu, direction):
         """Control PDU callback
 
         This method is called whenever a BLE control PDU is received. The returned
@@ -457,7 +467,7 @@ class LinkLayerProxy(object):
         return pdu
 
 
-    def on_data_pdu(self, pdu):
+    def on_data_pdu(self, pdu, direction):
         """Data PDU callback
 
         This method is called whenever a BLE data PDU is received. The returned

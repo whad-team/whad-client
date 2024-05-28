@@ -9,11 +9,53 @@ from prompt_toolkit import print_formatted_text, HTML
 
 from whad.ble import Scanner
 from whad.device import WhadDevice
-from whad.ble.tools.proxy import GattProxy
+from whad.ble.tools.proxy import GattProxy, LinkLayerProxy
 from whad.cli.app import CommandLineDeviceSource
+from whad.hub.ble import Direction
 
 import logging
 logger = logging.getLogger(__name__)
+
+class VerboseLLProxy(LinkLayerProxy):
+    """Verbose link-layer proxy
+    """
+
+    def __init__(self, app, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None, spoof=False):
+        """Initialize our parent class instance.
+        """
+        super().__init__(proxy=proxy, target=target, adv_data=adv_data, scan_data=scan_data, \
+                         bd_address=bd_address, spoof=spoof)
+        self.__app = app
+
+    def on_connect(self):
+        print_formatted_text(HTML(
+            f"<ansimagenta>Remote device connected</ansimagenta>"
+        ))
+
+    def on_disconnect(self):
+        print_formatted_text(HTML(
+            f"<ansimagenta>Remote device disconnected</ansimagenta>"
+        ))
+
+    def on_ctl_pdu(self, pdu, direction):
+        """Display captured Control PDU"""
+        if direction == Direction.MASTER_TO_SLAVE:
+            print_formatted_text(HTML("<<< <ansicyan>Control PDU</ansicyan>"))      
+        else:
+            print_formatted_text(HTML(">>> <ansicyan>Control PDU</ansicyan>"))
+        hexdump(bytes(pdu))
+        return super().on_ctl_pdu(pdu, direction)
+
+
+    
+    def on_data_pdu(self, pdu, direction):
+        """Display captured data PDU"""
+        if direction == Direction.MASTER_TO_SLAVE:
+            print_formatted_text(HTML("&lt;&lt;&lt; <ansimagenta>Data PDU</ansimagenta>"))      
+        else:
+            print_formatted_text(HTML("&gt;&gt;&gt; <ansimagenta>Data PDU</ansimagenta>"))
+        hexdump(bytes(pdu))
+        return super().on_data_pdu(pdu, direction)
 
 class VerboseProxy(GattProxy):
 
@@ -123,11 +165,28 @@ class BleProxyApp(CommandLineDeviceSource):
         self.add_argument(
             "-w",
             "--wireshark",
+            dest="wireshark",
             action="store_true",
             default=False,
             help="Enable real-time wireshark monitoring"
         )
 
+        self.add_argument(
+            "-s",
+            "--spoof",
+            dest="spoof",
+            action="store_true",
+            default=False,
+            help="Enable BD address spoofing (if available)"
+        )
+
+        self.add_argument(
+            "--link-layer",
+            dest="linklayer",
+            action="store_true",
+            default=False,
+            help="Enable link-layer mode"
+        )
 
     def run(self):
         """Override App's run() method to handle scripting feature.
@@ -172,7 +231,26 @@ class BleProxyApp(CommandLineDeviceSource):
                 return
 
         if adv_data is not None and scan_rsp is not None:
-            proxy = VerboseProxy(self, proxy_iface, self.interface, adv_data=adv_data, scan_data=scan_rsp, bd_address=self.args.bdaddr)
+            if not self.args.linklayer:
+                proxy = VerboseProxy(
+                    self,
+                    proxy_iface,
+                    self.interface,
+                    adv_data=adv_data,
+                    scan_data=scan_rsp,
+                    bd_address=self.args.bdaddr,
+                    spoof=self.args.spoof
+                )
+            else:
+                proxy = VerboseLLProxy(
+                    self,
+                    proxy=proxy_iface,
+                    target=self.interface,
+                    adv_data=adv_data,
+                    scan_data=scan_rsp,
+                    bd_address=self.args.bdaddr,
+                    spoof=self.args.spoof
+                )
             proxy.start()
             if self.args.wireshark:
                 ws_mon = proxy.get_wireshark_monitor()
