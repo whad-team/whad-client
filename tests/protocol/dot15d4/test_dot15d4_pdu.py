@@ -3,7 +3,7 @@
 import pytest
 
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.zigbee.zigbee_pb2 import SetNodeAddressCmd, AddressType, \
+from whad.protocol.dot15d4.dot15d4_pb2 import SetNodeAddressCmd, AddressType, \
     StartCmd, StopCmd
 from whad.hub.dot15d4 import Dot15d4Domain, SendPdu, SendRawPdu, PduReceived, RawPduReceived
 
@@ -13,8 +13,8 @@ def send_pdu():
     """Create Dot15d4 send PDU protocol buffer message
     """
     msg = Message()
-    msg.zigbee.send.channel = 26
-    msg.zigbee.send.pdu = b"FOOBAR"
+    msg.dot15d4.send.channel = 26
+    msg.dot15d4.send.pdu = b"FOOBAR"
     return msg
 
 @pytest.fixture
@@ -22,9 +22,9 @@ def send_raw_pdu():
     """Create Dot15d4 send raw PDU protocol buffer message
     """
     msg = Message()
-    msg.zigbee.send_raw.channel = 26
-    msg.zigbee.send_raw.pdu = b"FOOBAR"
-    msg.zigbee.send_raw.fcs = 0x4242
+    msg.dot15d4.send_raw.channel = 26
+    msg.dot15d4.send_raw.pdu = b"FOOBAR"
+    msg.dot15d4.send_raw.fcs = 0x4242
     return msg
 
 @pytest.fixture
@@ -32,11 +32,11 @@ def pdu_received():
     """Create Dot15d4 received PDU protocol buffer message
     """
     msg = Message()
-    msg.zigbee.pdu.channel = 26
-    msg.zigbee.pdu.pdu = b"FOOBAR"
-    msg.zigbee.pdu.fcs_validity = True
-    msg.zigbee.pdu.rssi = -40
-    msg.zigbee.pdu.timestamp = 1234
+    msg.dot15d4.pdu.channel = 26
+    msg.dot15d4.pdu.pdu = b"FOOBAR"
+    msg.dot15d4.pdu.fcs_validity = True
+    msg.dot15d4.pdu.rssi = -40
+    msg.dot15d4.pdu.timestamp = 1234
     return msg
 
 @pytest.fixture
@@ -44,12 +44,12 @@ def raw_pdu_received():
     """Create Dot15d4 received raw PDU protocol buffer message
     """
     msg = Message()
-    msg.zigbee.raw_pdu.channel = 26
-    msg.zigbee.raw_pdu.pdu = b"FOOBAR"
-    msg.zigbee.raw_pdu.fcs_validity = True
-    msg.zigbee.raw_pdu.rssi = -40
-    msg.zigbee.raw_pdu.timestamp = 1234
-    msg.zigbee.raw_pdu.fcs = 0xAABB
+    msg.dot15d4.raw_pdu.channel = 26
+    msg.dot15d4.raw_pdu.pdu = b"FOOBAR"
+    msg.dot15d4.raw_pdu.fcs_validity = True
+    msg.dot15d4.raw_pdu.rssi = -40
+    msg.dot15d4.raw_pdu.timestamp = 1234
+    msg.dot15d4.raw_pdu.fcs = 0xAABB
     return msg
 
 class TestPdu(object):

@@ -3,6 +3,7 @@ from whad.zigbee.sniffing import SnifferConfiguration
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 from whad.common.sniffing import EventsManager
+from whad.hub.dot15d4 import RawPduReceived, PduReceived
 
 
 class Sniffer(Dot15d4, EventsManager):
@@ -50,11 +51,11 @@ class Sniffer(Dot15d4, EventsManager):
     def sniff(self):
         while True:
             if self.support_raw_pdu():
-                message_type = "raw_pdu"
+                message_type = RawPduReceived
             else:
-                message_type = "pdu"
+                message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter('dot15d4', message_type))
-            packet = self.translator.from_message(message.dot15d4, message_type)
+            message = self.wait_for_message(filter=message_filter(message_type))
+            packet = self.translator.from_message(message)
             self.monitor_packet_rx(packet)
             yield packet

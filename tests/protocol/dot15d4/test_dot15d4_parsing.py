@@ -3,7 +3,7 @@
 import pytest
 
 from whad.protocol.whad_pb2 import Message
-from whad.protocol.zigbee.zigbee_pb2 import SetNodeAddressCmd, AddressType, \
+from whad.protocol.dot15d4.dot15d4_pb2 import SetNodeAddressCmd, AddressType, \
     StartCmd, StopCmd
 from whad.hub.dot15d4 import Dot15d4Domain, SetNodeAddress, SniffMode, JamMode, \
     RouterMode, EndDeviceMode, CoordMode, EnergyDetectionMode, MitmMode, Start, \
@@ -19,8 +19,8 @@ def set_node_addr_ext():
     """Create a SetNodeAddress protobuf message
     """
     msg = Message()
-    msg.zigbee.set_node_addr.address_type = AddressType.EXTENDED
-    msg.zigbee.set_node_addr.address = EXT_NODE_ADDRESS_DEFAULT
+    msg.dot15d4.set_node_addr.address_type = AddressType.EXTENDED
+    msg.dot15d4.set_node_addr.address = EXT_NODE_ADDRESS_DEFAULT
     return msg
 
 @pytest.fixture
@@ -28,8 +28,8 @@ def set_node_addr_short():
     """Create a SetNodeAddress protobuf message
     """
     msg = Message()
-    msg.zigbee.set_node_addr.address_type = AddressType.SHORT
-    msg.zigbee.set_node_addr.address = SHORT_NODE_ADDRESS_DEFAULT
+    msg.dot15d4.set_node_addr.address_type = AddressType.SHORT
+    msg.dot15d4.set_node_addr.address = SHORT_NODE_ADDRESS_DEFAULT
     return msg
 
 class TestSetNodeAddress(object):
@@ -57,7 +57,7 @@ def sniff_mode():
     """Create a SniffCmd protobuf message
     """
     msg = Message()
-    msg.zigbee.sniff.channel = 42
+    msg.dot15d4.sniff.channel = 42
     return msg
 
 @pytest.fixture
@@ -65,7 +65,7 @@ def jam_mode():
     """Create a JamCmd protobuf message
     """
     msg = Message()
-    msg.zigbee.jam.channel = 42
+    msg.dot15d4.jam.channel = 42
     return msg
 
 @pytest.fixture
@@ -73,7 +73,7 @@ def router_mode():
     """Create a RouterCmd protobuf message
     """
     msg = Message()
-    msg.zigbee.router.channel = 42
+    msg.dot15d4.router.channel = 42
     return msg
 
 @pytest.fixture
@@ -81,7 +81,7 @@ def end_device_mode():
     """Create a EndDeviceCmd protobuf message
     """
     msg = Message()
-    msg.zigbee.end_device.channel = 42
+    msg.dot15d4.end_device.channel = 42
     return msg
 
 @pytest.fixture
@@ -89,7 +89,7 @@ def coord_mode():
     """Create a CoordinatorCmd protobuf message
     """
     msg = Message()
-    msg.zigbee.coordinator.channel = 42
+    msg.dot15d4.coordinator.channel = 42
     return msg
 
 @pytest.fixture
@@ -97,7 +97,7 @@ def energy_detect_mode():
     """Create a EnergyDetectionCmd protobuf message
     """
     msg = Message()
-    msg.zigbee.ed.channel = 42
+    msg.dot15d4.ed.channel = 42
     return msg
 
 @pytest.fixture
@@ -105,7 +105,7 @@ def mitm_mode():
     """Create a ManInTheMiddleCmd protobuf message
     """
     msg = Message()
-    msg.zigbee.mitm.role = 1
+    msg.dot15d4.mitm.role = 1
     return msg
 
 @pytest.fixture
@@ -113,7 +113,7 @@ def start():
     """Create Dot15d4 start protocol buffer message
     """
     msg = Message()
-    msg.zigbee.start.CopyFrom(StartCmd())
+    msg.dot15d4.start.CopyFrom(StartCmd())
     return msg
 
 @pytest.fixture
@@ -121,7 +121,7 @@ def stop():
     """Create Dot15d4 stop protocol buffer message
     """
     msg = Message()
-    msg.zigbee.stop.CopyFrom(StopCmd())
+    msg.dot15d4.stop.CopyFrom(StopCmd())
     return msg
 
 @pytest.fixture
@@ -129,7 +129,7 @@ def jammed():
     """Create Dot15d4 jammed notification protocol buffer message
     """
     msg = Message()
-    msg.zigbee.jammed.timestamp = 1234
+    msg.dot15d4.jammed.timestamp = 1234
     return msg
 
 @pytest.fixture
@@ -137,8 +137,8 @@ def energy_detection_sample():
     """Create Dot15d4 energy detection sample notification protocol buffer message
     """
     msg = Message()
-    msg.zigbee.ed_sample.timestamp = 1234
-    msg.zigbee.ed_sample.sample = 9876
+    msg.dot15d4.ed_sample.timestamp = 1234
+    msg.dot15d4.ed_sample.sample = 9876
     return msg
 
 class TestModes(object):
