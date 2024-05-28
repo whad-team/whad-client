@@ -12,13 +12,14 @@ device.
 
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL
 from scapy.layers.bluetooth import L2CAP_Hdr
-from whad.ble.connector import BLE, Central, Peripheral, Scanner, BleDirection
+from whad.ble.connector import BLE, Central, Peripheral, Scanner
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvCompleteLocalName
 from whad.ble.profile import GenericProfile
 from whad.ble.exceptions import HookReturnValue, HookDontForward
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.exceptions import WhadDeviceNotFound
 from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
+from whad.hub.ble import Direction as BleDirection
 from binascii import hexlify
 from time import time
 # Logging
