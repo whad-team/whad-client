@@ -110,11 +110,11 @@ class UnixSocketDevice(WhadDevice):
         # Close underlying device.
         if self.__socket is not None:
             self.__socket.close()
-        
+
         # Unlink socket path
         if os.path.exists(self.__path):
             os.unlink(self.__path)
-        
+
         # Clear fileno and status
         self.__fileno = None
         self.__opened = False
@@ -202,7 +202,7 @@ class UnixSocketConnector(WhadDeviceConnector):
         """
         # No client connected
         self.__client = None
-        
+
         # Input pipes
         self.__inpipe = bytearray()
 
@@ -223,9 +223,9 @@ class UnixSocketConnector(WhadDeviceConnector):
             # Generate socket path if not provided
             inst = randint(0x100000, 0x1000000)
             self.__path = '/tmp/whad_%x.sock' % inst
-    
+
         logger.debug('Unix socket path: %s' % self.__path)
-            
+
         # Make sure this path is available
         try:
             if os.path.exists(self.__path) and os.path.isfile(self.__path):
@@ -246,6 +246,18 @@ class UnixSocketConnector(WhadDeviceConnector):
         """
         self.__parameters[key] = value
 
+    def get_parameter(self, key : str):
+        """Get value from a parameter.
+
+        :param str key: parameter key
+        """
+        try:
+            return self.__parameters[key]
+        except KeyError:
+            return None
+
+    def send_message(self, msg):
+        self.device.send_message(msg)
 
     def on_data_received(self, data):
         logger.debug('received raw data from socket: %s' % hexlify(data))
@@ -265,7 +277,7 @@ class UnixSocketConnector(WhadDeviceConnector):
 
                         # Send to device
                         logger.debug('WHAD message successfully parsed, forward to underlying device')
-                        self.device.send_message(_msg)
+                        self.send_message(_msg)
 
                         # Notify message
                         self.on_msg_sent(_msg)
@@ -311,7 +323,7 @@ class UnixSocketConnector(WhadDeviceConnector):
                     while not self.__shutdown_required:
                         rlist = [self.__client.fileno()]
                         readers,writers,errors = select.select(rlist, [], rlist, timeout)
-                        
+
                         # Do we have pending data ?
                         if len(readers) > 0:
                             data = self.__client.recv(4096)
@@ -323,12 +335,12 @@ class UnixSocketConnector(WhadDeviceConnector):
                                 self.on_data_received(data)
                         elif len(errors) > 0:
                             logger.debug('Error detected on server socket, exiting.')
-                            break               
+                            break
                 except ConnectionResetError as err:
                     pass
-                
+
                 self.__client = None
-                
+
         except BrokenPipeError as err:
             logger.error('Broken pipe.')
             self.__client = None
@@ -391,7 +403,7 @@ class UnixSocketConnector(WhadDeviceConnector):
         """Return socket URL
         """
         if len(self.__parameters.keys()) == 0:
-            return 'unix://%s' % (
+            return 'unix://%s\n' % (
                 self.__path
             )
         else:

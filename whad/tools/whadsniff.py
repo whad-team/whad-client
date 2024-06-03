@@ -5,7 +5,7 @@ This utility implements a generic sniffer module, automatically adapted to every
 import logging
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
-from whad.cli.app import CommandLineSource
+from whad.cli.app import CommandLineDeviceSource, CommandLineApp
 from importlib import import_module
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
 from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
@@ -277,7 +277,7 @@ class WhadDomainSubParser(ArgumentParser):
         )
 
 
-class WhadSniffApp(CommandLineSource):
+class WhadSniffApp(CommandLineApp):
 
     def __init__(self):
         """Application uses an interface and has commands.
@@ -380,6 +380,21 @@ class WhadSniffApp(CommandLineSource):
 
                     # Start the sniffer
                     sniffer.start()
+
+                    if self.is_stdout_piped():
+                        proxy = UnixSocketProxy(self.interface, params={"domain":self.args.domain})
+                        proxy.start()
+                        proxy.join()
+                    else:
+                        # Iterates over the packet stream and display packets
+                        for pkt in sniffer.sniff():
+                            display_packet(
+                                pkt,
+                                show_metadata = self.args.metadata,
+                                format = self.args.format
+                            )
+
+                    '''
                     # Iterates over the packet stream and display packets
 
                     mode = os.fstat(1).st_mode
@@ -404,12 +419,12 @@ class WhadSniffApp(CommandLineSource):
                                 #print(IPCConverter(pkt).to_dump())
                                 from scapy.all import wrpcap
                                 wrpcap("/dev/stdout", pkt, append=True)
-                                '''
+                                """
                                 sys.stdout.write(
                                     IPCConverter(pkt).to_dump() + "\n"
                                 )
                                 sys.stdout.flush()
-                                '''
+                                """
                     else:
                         # Iterates over the packet stream and display packets
                         for pkt in sniffer.sniff():
@@ -418,11 +433,11 @@ class WhadSniffApp(CommandLineSource):
                                 show_metadata = self.args.metadata,
                                 format = self.args.format
                             )
+                '''
                 else:
                     self.error("You need to specify a domain.")
             else:
                 self.error('You need to specify an interface with option --interface.')
-
 
         except UnsupportedDomain as unsupported_domain:
             self.error('WHAD device doesn\'t support selected domain ({})'.format(self.args.domain))
