@@ -36,7 +36,10 @@ dependencies = [
     "pyusb==1.2.1",
     "cryptography==36.0.0",
     "prompt_toolkit==3.0.43",
-    "hexdump==3.3"
+    "hexdump==3.3",
+    "sphinx==7.3.6",
+    "sphinx-rtd-theme==2.0.0",
+    "sphinxcontrib-mermaid==0.9.2",
 ]
 
 [project.scripts]
