@@ -46,7 +46,6 @@ class VerboseLLProxy(LinkLayerProxy):
         hexdump(bytes(pdu))
         return super().on_ctl_pdu(pdu, direction)
 
-
     
     def on_data_pdu(self, pdu, direction):
         """Display captured data PDU"""
@@ -188,6 +187,13 @@ class BleProxyApp(CommandLineDeviceSource):
             help="Enable link-layer mode"
         )
 
+        self.add_argument(
+            "--output",
+            dest="output",
+            default=None,
+            help="Output PCAP file path"
+        )
+
     def run(self):
         """Override App's run() method to handle scripting feature.
         """
@@ -251,12 +257,37 @@ class BleProxyApp(CommandLineDeviceSource):
                     bd_address=self.args.bdaddr,
                     spoof=self.args.spoof
                 )
+            
+            # Start our proxy
             proxy.start()
+
+            # Set output PCAP file if provided\
+            if self.args.output is not None:
+                print("Setting a pcap monitor")
+                pcap_mon = proxy.get_pcap_monitor(self.args.output)
+                pcap_mon.start()
+            else:
+                pcap_mon = None
+
+            # Create a Wireshark monitor
             if self.args.wireshark:
                 ws_mon = proxy.get_wireshark_monitor()
                 ws_mon.start()
+            else:
+                ws_mon = None
+            
             print('Proxy is ready, press a key to stop.')
             input()
+
+            # Stop Wireshark monitor
+            if ws_mon is not None:
+                ws_mon.stop()
+                ws_mon.detach()
+            
+            # Stop PCAP monitor
+            if pcap_mon is not None:
+                pcap_mon.stop()
+                pcap_mon.detach()
 
 
 def ble_proxy_main():

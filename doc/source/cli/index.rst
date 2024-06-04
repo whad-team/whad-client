@@ -51,4 +51,5 @@ Bluetooth Low Energy
     ble/ble-central
     ble/ble-periph
     ble/ble-wireshark
+    ble/ble-proxy
     ble/ble-spawn
