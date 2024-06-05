@@ -10,9 +10,11 @@ from whad.protocol.esb.esb_pb2 import ESBCommand
 from whad.protocol.unifying.unifying_pb2 import UnifyingCommand
 from whad.protocol.phy.phy_pb2 import PhyCommand
 from whad import WhadDomain, WhadCapability
+from prompt_toolkit import print_formatted_text, HTML
+from html import escape
 
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.ERROR)
 
 DOMAINS = {
     WhadDomain.Phy: 'Physical Layer',
@@ -155,6 +157,12 @@ def get_domain_supported_commands(domain, commands):
                 supp_commands.append(COMMANDS[domain][i])
     return supp_commands
 
+def info(message):
+    print_formatted_text(HTML('<ansicyan>[i]</ansicyan> ' + escape(message)))
+
+def error(message):
+    print_formatted_text(HTML('<ansired>[e]</ansired> ' + escape(message)))
+
 def main():
     if len(sys.argv) >= 2:
         # Retrieve target interface
@@ -165,59 +173,80 @@ def main():
         try:
             dev = WhadDevice.create(interface)
 
-            print('[i] Connecting to device ...')
+            info('Connecting to device ...')
             dev.open()
             dev.discover()
 
-            print('[i] Device details')
+            info('Device details')
             print('')
-            print(' Device ID: %s' % ":".join(["{:02x}".format(i) for i in dev.device_id.encode()]))
-            print(' Firmware info: ')
+            print_formatted_text(
+                HTML('<b> Device ID:</b> %s' % ":".join(["{:02x}".format(i) for i in dev.device_id.encode()]))
+            )
+            print_formatted_text(
+                HTML('<b> Firmware info:</b> ')
+            )
             if len(dev.info.fw_author) > 0:
-                print(' - Author : %s' % dev.info.fw_author)
+                print_formatted_text(
+                    HTML('<b> - Author :</b> %s' % escape(dev.info.fw_author))
+                )
             if len(dev.info.fw_url) > 0:
-                print(' - URL    : %s' % dev.info.fw_url)
-            print(' - Version: %s' % dev.info.version_str)
+                print_formatted_text(
+                    HTML('<b> - URL :</b> %s' % escape(dev.info.fw_url))
+                )
+            print_formatted_text(
+                HTML('<b> - Version :</b> %s' % escape(dev.info.version_str))
+            )
             print('')
             try:
-                print('[i] Discovering domains ...')
+                info('Discovering domains ...')
                 domains = {}
                 for domain in dev.get_domains():
                     if domain in DOMAINS:
                         caps_val = dev.get_domain_capability(domain)
                         domains[domain] = get_readable_capabilities(caps_val)
-                print('[i] Domains discovered.')
+                info('Domains discovered.')
                 print('')
 
                 for domain in domains:
-                    print('This device supports %s:' % DOMAINS[domain])
+                    print_formatted_text(HTML(' <b>This device supports %s:</b>' % DOMAINS[domain]))
                     for cap in domains[domain]:
                         print(' - %s' % cap)
                     print('')
-                    print(' List of supported commands:')
+                    print_formatted_text(HTML(' <b>List of supported commands:</b>'))
                     for cmd in get_domain_supported_commands(domain, dev.get_domain_commands(domain)):
-                        print('  - %s' % cmd)
+                        try:
+                            command_name, command_desc = cmd.split(":")
+                            print_formatted_text(
+                                HTML('  - <b>%s</b>: %s' % (
+                                    command_name,
+                                    command_desc[1:]
+                                    )
+                                )
+                            )
+                        except:
+                            pass
+
                     print('')
             except Exception as err:
-                print('[e] An error occured while requesting this device.' +
+                error('[e] An error occured while requesting this device.' +
                       'We were not able to retrieve the supported domains.')
 
             dev.close()
         except WhadDeviceNotFound:
-            print('[e] Device not found')
+            error('Device not found')
             exit(1)
         except WhadDeviceNotReady:
-            print('[e] Cannot communicate with the device. Make sure it is a ' +
+            error('Cannot communicate with the device. Make sure it is a ' +
                   'WHAD compatible device and reset it.')
         except PermissionError:
-            print('[e] Cannot access the requested device (permission error).')
+            error('Cannot access the requested device (permission error).')
     else:
-        print("[i] Available devices")
+        info("Available devices")
         for device in WhadDevice.list(): #print('Usage: %s [device]' % sys.argv[0])
-            print("-",device.interface)
-            print("  Type:",device.type)
-            print("  Index:", device.index)
-            print("  Identifier:", device.identifier)
+            print_formatted_text(HTML("- <b>%s</b>" % device.interface))
+            print_formatted_text(HTML("  <b>Type</b>: %s" % device.type))
+            print_formatted_text(HTML("  <b>Index</b>: %s" % device.index))
+            print_formatted_text(HTML("  <b>Identifier</b>: %s" % device.identifier))
             print()
 
 if __name__ == '__main__':
