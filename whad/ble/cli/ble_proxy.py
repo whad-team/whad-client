@@ -40,9 +40,9 @@ class VerboseLLProxy(LinkLayerProxy):
     def on_ctl_pdu(self, pdu, direction):
         """Display captured Control PDU"""
         if direction == Direction.MASTER_TO_SLAVE:
-            print_formatted_text(HTML("<<< <ansicyan>Control PDU</ansicyan>"))      
+            print_formatted_text(HTML("&lt;&lt;&lt; <ansicyan>Control PDU</ansicyan>"))      
         else:
-            print_formatted_text(HTML(">>> <ansicyan>Control PDU</ansicyan>"))
+            print_formatted_text(HTML("&gt;&gt;&gt; <ansicyan>Control PDU</ansicyan>"))
         hexdump(bytes(pdu))
         return super().on_ctl_pdu(pdu, direction)
 
@@ -68,22 +68,22 @@ class VerboseProxy(GattProxy):
     def on_characteristic_read(self, service, characteristic, value, offset=0, length=0):
         if offset > 0:
             print_formatted_text(HTML(
-                f"<<< <ansicyan>Characteristic {characteristic.uuid} read (offset: {offset})</ansicyan>"
+                f"&lt;&lt;&lt; <ansicyan>Characteristic {characteristic.uuid} read (offset: {offset})</ansicyan>"
             ))
         else:
             print_formatted_text(HTML(
-                f">>> <ansicyan>Characteristic {characteristic.uuid} written</ansicyan>"
+                f"&gt;&gt;&gt; <ansicyan>Characteristic {characteristic.uuid} written</ansicyan>"
             ))            
         hexdump(value)
 
     def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
         if offset > 0:
             print_formatted_text(HTML(
-                f"<<< <ansicyan>Characteristic {characteristic.uuid} read (offset: {offset})</ansicyan>"
+                f"&lt;&lt;&lt; <ansicyan>Characteristic {characteristic.uuid} read (offset: {offset})</ansicyan>"
             ))
         else:
             print_formatted_text(HTML(
-                f">>> <ansicyan>Characteristic {characteristic.uuid} written</ansicyan>"
+                f"&gt;&gt;&gt; <ansicyan>Characteristic {characteristic.uuid} written</ansicyan>"
             ))  
         hexdump(value)
 
@@ -104,13 +104,13 @@ class VerboseProxy(GattProxy):
 
     def on_notification(self, service, characteristic, value):
         print_formatted_text(HTML(
-            f"<<< <ansicyan>[!] Notification for charac. {characteristic.uuid}:</ansicyan>"
+            f"&lt;&lt;&lt; <ansicyan>[!] Notification for charac. {characteristic.uuid}:</ansicyan>"
         ))
         hexdump(value)
 
     def on_indication(self, service, characteristic, value):
         print_formatted_text(HTML(
-            f"<<< <ansicyan>[!] Indication for charac. {characteristic.uuid}:</ansicyan>"
+            f"&lt;&lt;&lt; <ansicyan>[!] Indication for charac. {characteristic.uuid}:</ansicyan>"
         ))
         hexdump(value)
 
