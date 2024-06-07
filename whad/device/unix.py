@@ -21,6 +21,8 @@ from binascii import hexlify
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.exceptions import WhadDeviceNotReady, WhadDeviceDisconnected
 from whad.protocol.whad_pb2 import Message
+from whad.hub.message import PbPacketMessageWrapper
+from scapy.config import conf
 
 import logging
 logger = logging.getLogger(__name__)
@@ -412,6 +414,47 @@ class UnixSocketConnector(WhadDeviceConnector):
                 self.__path,
                 params
             )
+
+class UnixSocketCallbacksConnector(UnixSocketConnector):
+    """
+    Unix Socket Callbacks Connector.
+
+    Allows to configure callbacks to extract & alter the packet stream on the fly.
+    """
+    def __init__(self, device, path=None):
+        super().__init__(device, path)
+        conf.dot15d4_protocol = self.get_parameter('domain')
+
+    def send_message(self, msg):
+        on_tx_packet = self.get_parameter('on_tx_packet_cb')
+        if on_tx_packet is not None:
+            if isinstance(msg, PbPacketMessageWrapper):
+                pkt = msg.to_scapy()
+                pkt = on_tx_packet(pkt)
+                if pkt is None:
+                    msg = None
+                else:
+                    msg = msg.from_scapy(pkt)
+
+        if msg is not None:
+            return super().send_message(msg)
+
+
+    def on_any_msg(self, msg):
+        on_rx_packet = self.get_parameter('on_rx_packet_cb')
+        if on_rx_packet is not None:
+
+            if isinstance(msg, PbPacketMessageWrapper):
+                pkt = msg.to_scapy()
+                pkt = on_rx_packet(pkt)
+                if pkt is None:
+                    msg = None
+                else:
+                    msg = msg.from_scapy(pkt)
+
+        if msg is not None:
+            return super().on_any_msg(msg)
+
 
 class UnixSocketProxy(Thread):
     """Unix socket proxy thread.

@@ -5,6 +5,7 @@ from whad.zigbee.crypto import ZigbeeDecryptor, TouchlinkKeyManager
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 from whad.common.sniffing import EventsManager
+from whad.hub.dot15d4 import RawPduReceived, PduReceived
 
 class Sniffer(Zigbee, EventsManager):
     """
@@ -67,12 +68,12 @@ class Sniffer(Zigbee, EventsManager):
     def sniff(self):
         while True:
             if self.support_raw_pdu():
-                message_type = "raw_pdu"
+                message_type = RawPduReceived
             else:
-                message_type = "pdu"
+                message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter('dot15d4', message_type))
-            packet = self.translator.from_message(message.dot15d4, message_type)
+            message = self.wait_for_message(filter=message_filter(message_type))
+            packet = self.translator.from_message(message)
             self.monitor_packet_rx(packet)
             if self.__touchlink_key_derivation.unencrypted_key is not None:
                 logger.info("[i] New key extracted: ", self.__touchlink_key_derivation.unencrypted_key.hex())

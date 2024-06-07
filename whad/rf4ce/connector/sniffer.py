@@ -7,6 +7,8 @@ from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 from whad.rf4ce.sniffing import KeyExtractedEvent
 from whad.common.sniffing import EventsManager
+from whad.hub.dot15d4 import RawPduReceived, PduReceived
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -87,14 +89,13 @@ class Sniffer(RF4CE, EventsManager):
     def sniff(self):
         while True:
             if self.support_raw_pdu():
-                message_type = "raw_pdu"
+                message_type = RawPduReceived
             else:
-                message_type = "pdu"
+                message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter('dot15d4', message_type))
-            packet = self.translator.from_message(message.dot15d4, message_type)
+            message = self.wait_for_message(filter=message_filter(message_type))
+            packet = self.translator.from_message(message)
             self.monitor_packet_rx(packet)
-            print("dec", self.__configuration.decrypt)
             if self.__configuration.pairing:
                 self.__key_derivation.process_packet(packet)
                 if self.__key_derivation.key is not None:

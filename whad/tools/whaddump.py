@@ -7,15 +7,16 @@ import logging
 from prompt_toolkit import print_formatted_text, HTML
 import time
 from whad.tools.whadsniff import display_packet
-from whad.ble.connector import BLE
 from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.cli.app import CommandLineDevicePipe, CommandLineApp
 from scapy.all import *
 from whad.common.ipc import IPCPacket
 import sys
 from importlib import import_module
-from whad.device.unix import UnixSocketProxy, UnixSocketConnector
+from whad.device.unix import UnixSocketProxy, UnixSocketCallbacksConnector
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
+from whad.cli.ui import error, warning, success, info, display_event, display_packet
+
 logger = logging.getLogger(__name__)
 
 class WhadDumpApp(CommandLineApp):
@@ -32,77 +33,101 @@ class WhadDumpApp(CommandLineApp):
         )
 
         self.add_argument(
-            '-p',
-            '--pcap',
-            dest="pcap",
-            help='PCAP file'
+            'filter',
+            help='filter to evaluate',
+            default='True'
         )
 
-    def show(self, p):
-        print(repr(p))
+        self.add_argument(
+            '-t',
+            '--transform',
+            dest='transform',
+            type=str,
+            default=None,
+            help='apply a transformation'
+        )
+
+        self.add_argument(
+            '-e',
+            '--invert',
+            dest='invert',
+            action="store_true",
+            default=False,
+            help='invert filter'
+        )
+
+    def build_filter(self):
+        filter_template = "lambda p : not %s" if self.args.invert else "lambda p : %s"
+
+        if "packet." in self.args.filter:
+            self.args.filter.replace("packet.", "p.")
+        elif "pkt." in self.args.filter:
+            self.args.filter.replace("pkt.", "p.")
+
+        return eval(filter_template % (self.args.filter))
+
+    def on_rx_packet(self, pkt):
+        filter = self.build_filter()
+        try:
+            if filter(pkt):
+                if self.args.transform is not None:
+                    p = packet = pkt
+                    exec(self.args.transform)
+                if not self.is_stdout_piped():
+                    display_packet(pkt)
+                return pkt
+            else:
+                return None
+        except Exception as e:
+            error("An error occured during filter evaluation: %s" % e)
+            return None
+
+    def on_tx_packet(self, pkt):
+        filter = self.build_filter()
+        try:
+            if filter(pkt):
+                if self.args.transform is not None:
+                    p = packet = pkt
+                    exec(self.args.transform)
+                if not self.is_stdout_piped():
+                    display_packet(pkt)
+                return pkt
+            else:
+                return None
+        except:
+            error("An error occured during filter evaluation: %s" % e)
+            return None
+
+
+
     def run(self):
         # Launch pre-run tasks
         self.pre_run()
         try:
-            class UnixSocketModifyConnector(UnixSocketConnector):
-                def send_message(self, msg):
-                    # up
-                    sys.stderr.write("<< " + repr(msg) + "\n")
-                    sys.stderr.flush()
-                    return super().send_message(msg)
-
-                def on_any_msg(self, msg):
-                    # down
-                    if hasattr(msg, "fw_author"):
-                        msg.fw_author = b"Roro"
-                    sys.stderr.write(">> " + repr(msg) + "\n")
-                    m = import_module("whad." + str(self.get_parameter("domain"))+".connector.translator")
-                    sys.stderr.write(">> " + repr(m) + "\n")
-                    sys.stderr.flush()
-                    return super().on_any_msg(msg)
-
-
             if self.is_piped_interface():
+                if not self.args.nocolor:
+                    conf.color_theme = BrightTheme()
 
-                if self.args.pcap:
-                    c = BLE(self.input_interface)
+                parameters = self.args.__dict__
 
-                    while True:
-                        c.stop()
-                        time.sleep(1)
-                        c.start()
-                        time.sleep(1)
+                parameters.update({
+                    "on_tx_packet_cb" : self.on_tx_packet,
+                    "on_rx_packet_cb" : self.on_rx_packet,
+                })
+                proxy = UnixSocketProxy(
+                    self.input_interface,
+                    params=parameters,
+                    connector=UnixSocketCallbacksConnector
+                )
+                proxy.start()
+                proxy.join()
 
-                else:
-                    failed = False
-                    for param in ["domain"]:
-                        if not hasattr(self.args, param):
-                            self.error("No domain provided.")
-                            failed = True
-                            break
-
-                    if not failed:
-                        proxy = UnixSocketProxy(
-                            self.input_interface,
-                            params=self.args.__dict__,
-                            connector=UnixSocketModifyConnector
-                        )
-                        proxy.start()
-                        proxy.join()
-
-                    while True:
-                        time.sleep(1)
-            else:
-                print(":()")
+                while True:
+                    time.sleep(1)
 
         except KeyboardInterrupt:
-            '''
-            if pcap is not None:
-                pcap.stop()
-                pcap.close()
-            '''
-        # Launch post-run tasks
-        self.post_run()
+            # Launch post-run tasks
+            self.post_run()
 
 
 def whaddump_main():

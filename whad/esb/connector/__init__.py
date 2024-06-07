@@ -8,8 +8,8 @@ from whad.esb.metadata import ESBMetadata
 from whad.scapy.layers.esb import ESB_Hdr,ESB_Payload_Hdr,ESB_Ack_Response
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.hub.generic.cmdresult import Success
 from whad.hub.esb import EsbNodeAddress, Commands, PduReceived, RawPduReceived
+from whad.hub.generic.cmdresult import Success, CommandResult
 
 class ESB(WhadDeviceConnector):
     """
@@ -114,7 +114,8 @@ class ESB(WhadDeviceConnector):
 
             self.monitor_packet_tx(packet)
             msg = self.translator.from_packet(packet, channel, retransmission_count)
-            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+
+            resp = self.send_command(msg, message_filter(CommandResult))
             return isinstance(resp, Success)
         else:
             return False
@@ -157,9 +158,9 @@ class ESB(WhadDeviceConnector):
             channel,
             show_acknowledgements
         )
-
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
+
 
 
     def can_be_prx(self):
@@ -190,7 +191,7 @@ class ESB(WhadDeviceConnector):
         # Create a PrxMode message.
         msg = self.hub.esb.createPrxMode(channel)
 
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
 
@@ -223,7 +224,7 @@ class ESB(WhadDeviceConnector):
         # Create a PtxMode message.
         msg = self.hub.esb.createPtxMode(channel)
 
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
 
@@ -252,7 +253,7 @@ class ESB(WhadDeviceConnector):
             EsbNodeAddress(node_address.value)
         )
 
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
     def start(self):
@@ -262,7 +263,7 @@ class ESB(WhadDeviceConnector):
         # Create a Start message.
         msg = self.hub.esb.createStart()
 
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
     def stop(self):
@@ -272,7 +273,7 @@ class ESB(WhadDeviceConnector):
         # Create a Stop message.
         msg = self.hub.esb.createStop()
 
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
     def on_discovery_msg(self, message):
