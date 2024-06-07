@@ -414,6 +414,6 @@ class WhadSniffApp(CommandLineApp):
                     )
 
 
-def whadsniff_main():
+def wsniff_main():
     app = WhadSniffApp()
     app.run()

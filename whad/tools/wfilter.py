@@ -3,29 +3,28 @@
 This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
-import logging
 from prompt_toolkit import print_formatted_text, HTML
-import time
-from whad.tools.whadsniff import display_packet
+
 from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.cli.app import CommandLineDevicePipe, CommandLineApp
 from scapy.all import *
-from whad.common.ipc import IPCPacket
-import sys
-from importlib import import_module
+#from whad.common.ipc import IPCPacket
 from whad.device.unix import UnixSocketProxy, UnixSocketCallbacksConnector
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
 
+import logging
+import time
+
 logger = logging.getLogger(__name__)
 
-class WhadDumpApp(CommandLineApp):
+class WhadFilterApp(CommandLineApp):
 
     def __init__(self):
         """Application uses an interface and has commands.
         """
         super().__init__(
-            description='WHAD dump tool',
+            description='WHAD filter tool',
             interface=True,
             commands=False,
             input=CommandLineApp.INPUT_WHAD,
@@ -56,6 +55,14 @@ class WhadDumpApp(CommandLineApp):
             help='invert filter'
         )
 
+        self.add_argument(
+            '-f',
+            '--forward',
+            dest='forward',
+            action="store_true",
+            default=False,
+            help='forward packets not matched by the filter (dropped by default)'
+        )
     def build_filter(self):
         filter_template = "lambda p : not %s" if self.args.invert else "lambda p : %s"
 
@@ -73,13 +80,22 @@ class WhadDumpApp(CommandLineApp):
                 if self.args.transform is not None:
                     p = packet = pkt
                     exec(self.args.transform)
+                print(self.args.forward)
                 if not self.is_stdout_piped():
                     display_packet(pkt)
                 return pkt
             else:
+
+                if self.args.forward:
+                    display_packet(pkt)
+                    return pkt
                 return None
-        except Exception as e:
-            error("An error occured during filter evaluation: %s" % e)
+        except:
+            print(self.args.forward)
+
+            if self.args.forward:
+                display_packet(pkt)
+                return pkt
             return None
 
     def on_tx_packet(self, pkt):
@@ -93,9 +109,15 @@ class WhadDumpApp(CommandLineApp):
                     display_packet(pkt)
                 return pkt
             else:
+                if self.args.forward:
+                    display_packet(pkt)
+                    return pkt
                 return None
         except:
-            error("An error occured during filter evaluation: %s" % e)
+            print(self.args.forward)
+            if self.args.forward:
+                display_packet(pkt)
+                return pkt
             return None
 
 
@@ -130,6 +152,6 @@ class WhadDumpApp(CommandLineApp):
             self.post_run()
 
 
-def whaddump_main():
-    app = WhadDumpApp()
+def wfilter_main():
+    app = WhadFilterApp()
     app.run()
