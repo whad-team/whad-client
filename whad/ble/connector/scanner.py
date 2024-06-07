@@ -111,3 +111,9 @@ class Scanner(BLE):
                 if message.addr_type > 0:
                     packet.getlayer(BTLE_ADV).TxAdd = 1
             yield packet
+
+    def clear(self):
+        """
+        Clear device database.
+        """
+        self.__db.reset()

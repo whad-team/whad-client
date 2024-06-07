@@ -149,10 +149,24 @@ class BleCentralShell(InteractiveShell):
             self.error('ATT error: insufficient encryption')
 
     @category('Devices discovery')
+    def do_clear(self, _):
+        """clear cached devices
+
+        <ansicyan><b>clear</b></ansicyan>
+
+        Clear all discovered devices from cache.
+        """
+        print('Clearing device cache ...')
+        if isinstance(self.__connector, Scanner):
+            self.__connector.clear()
+        self.__cache.clear()
+
+
+    @category('Devices discovery')
     def do_scan(self, args):
         """scan surrounding devices and show a small summary
 
-        <ansicyan><b>scan</b></ansicyan>
+        <ansicyan><b>scan</b> <i>[min RSSI (dBm)]</i></ansicyan>
 
         Scan devices and report them in this console in real-time.
 
@@ -166,6 +180,14 @@ class BleCentralShell(InteractiveShell):
         memory and would be available in autocompletion.
         """
         try:
+            # Parse min RSSI level
+            rssi_min = -200
+            try:
+                if len(args) >= 1:
+                    rssi_min = int(args[0])
+            except ValueError:
+                pass
+
             # Switch role to scanner
             self.switch_role(Scanner)
 
@@ -174,8 +196,9 @@ class BleCentralShell(InteractiveShell):
             self.__connector.start()
             try:
                 for device in self.__connector.discover_devices():
-                    # Show device
-                    print(device)
+                    if device.rssi >= rssi_min:
+                        # Show device if RSSI is above minimal level
+                        print(device)
 
                     # Add device to cache
                     self.__cache.add(device)
@@ -203,9 +226,12 @@ class BleCentralShell(InteractiveShell):
         List every discovered device so far, through the <ansicyan>scan</ansicyan> command.
         This command displays the content of the console device cache.
         """
-        print_formatted_text(HTML('<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>'))
-        for device in self.__cache.iterate():
-            print(device['info'])
+        if len(self.__cache) > 0:
+            print_formatted_text(HTML('<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>'))
+            for device in self.__cache.iterate():
+                print(device['info'])
+        else:
+            print('No discovered device in cache.')
 
     @category('Devices discovery')
     def do_info(self, args):

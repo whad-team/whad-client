@@ -15,7 +15,19 @@ class BleDevicesCache(object):
         """
         self.__devices = {}
 
+    def __len__(self):
+        """Retrieve cache length
+        """
+        return len(self.__devices.keys())
+
+    def clear(self):
+        """Remove device entry from cache.
+        """
+        self.__devices = {}
+
     def iterate(self):
+        """Iterate over cached devices.
+        """
         for address in self.__devices:
             yield self.__devices[address]
 
