@@ -1,6 +1,7 @@
 import re
 import json
-import traceback
+
+from typing import List
 
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
@@ -25,7 +26,7 @@ from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.central.cache import BleDevicesCache
 from whad.ble.scanning import AdvertisingDevice
-from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
+from whad.common.monitors import WiresharkMonitor
 from whad.device.unix import UnixSocketDevice
 
 from whad.cli.shell import InteractiveShell, category
@@ -34,7 +35,7 @@ INTRO='''
 ble-central, the WHAD Bluetooth Low Energy central utility
 '''
 
-BDADDR_REGEXP = '^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$'
+BDADDR_REGEXP = "^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$"
 
 def show_adv_record(offset, raw_record):
     """Display advertising record as hexdump.
@@ -46,7 +47,7 @@ def show_adv_record(offset, raw_record):
     if nlines*16 < len(raw_record):
         nlines += 1
 
-    print(' AD Record #%d:' % offset)
+    print(" AD Record #%d:" % offset)
     for line in range(0, nlines):
         line_str = ' '.join(['%02x' % c for c in raw_record[line*16:(line+1)*16]])
         print('  ' + line_str)
@@ -58,7 +59,7 @@ class BleCentralShell(InteractiveShell):
     """
 
     def __init__(self, interface: WhadDevice = None, connector=None, bd_address=None):
-        super().__init__(HTML('<b>ble-central></b> '))
+        super().__init__(HTML("<b>ble-central></b>"))
 
         # If interface is None, pick the first matching our needs
         self.__interface = interface
@@ -81,7 +82,8 @@ class BleCentralShell(InteractiveShell):
             self.__target.set_disconnect_cb(self.on_disconnect)
 
             # Detach any previous callback
-            self.__connector.detach_callback(self.on_disconnect, on_reception=True, on_transmission=False)
+            self.__connector.detach_callback(self.on_disconnect, on_reception=True,\
+                on_transmission=False)
 
             # Attach our packet monitor callback (to detect disconnection)
             self.__connector.attach_callback(
@@ -113,9 +115,11 @@ class BleCentralShell(InteractiveShell):
         """Update prompt to reflect current state
         """
         if not self.__target_bd:
-            self.set_prompt(HTML('<b>ble-central></b> '), force)
+            self.set_prompt(HTML("<b>ble-central></b>"), force)
         else:
-            self.set_prompt(HTML('<b>ble-central|<ansicyan>%s</ansicyan>></b> ' % self.__target_bd), force)
+            self.set_prompt(HTML(
+                "<b>ble-central|<ansicyan>%s</ansicyan>></b>" % self.__target_bd
+            ), force)
 
 
     def switch_role(self, new_role):
@@ -134,19 +138,19 @@ class BleCentralShell(InteractiveShell):
         """Parse ATT error and show exception.
         """
         if isinstance(error, InvalidHandleValueException):
-            self.error('ATT Error: wrong value handle')
+            self.error("ATT Error: wrong value handle")
         elif isinstance(error, ReadNotPermittedError):
-            self.error('ATT error: read operation not allowed')
+            self.error("ATT error: read operation not allowed")
         elif isinstance(error, WriteNotPermittedError):
-            self.error('ATT error: write operation not allowed')
+            self.error("ATT error: write operation not allowed")
         elif isinstance(error, InsufficientAuthenticationError):
-            self.error('ATT error: insufficient authentication')
+            self.error("ATT error: insufficient authentication")
         elif isinstance(error, InsufficientAuthorizationError):
-            self.error('ATT error: insufficient authorization')
+            self.error("ATT error: insufficient authorization")
         elif isinstance(error, AttributeNotFoundError):
-            self.error('ATT error: attribute not found')
+            self.error("ATT error: attribute not found")
         elif isinstance(error, InsufficientEncryptionKeySize):
-            self.error('ATT error: insufficient encryption')
+            self.error("ATT error: insufficient encryption")
 
     @category('Devices discovery')
     def do_clear(self, _):
@@ -156,13 +160,17 @@ class BleCentralShell(InteractiveShell):
 
         Clear all discovered devices from cache.
         """
-        print('Clearing device cache ...')
+        print("Clearing device cache ...")
+
+        # Clear scanner cache as well, if current connector is a scanner.
         if isinstance(self.__connector, Scanner):
             self.__connector.clear()
+
+        # Clear device cache
         self.__cache.clear()
 
 
-    @category('Devices discovery')
+    @category("Devices discovery")
     def do_scan(self, args):
         """scan surrounding devices and show a small summary
 
@@ -192,7 +200,7 @@ class BleCentralShell(InteractiveShell):
             self.switch_role(Scanner)
 
             # Start scanning
-            print_formatted_text(HTML('<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>'))
+            print_formatted_text(HTML("<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>"))
             self.__connector.start()
             try:
                 for device in self.__connector.discover_devices():
@@ -202,8 +210,8 @@ class BleCentralShell(InteractiveShell):
 
                     # Add device to cache
                     self.__cache.add(device)
-            except KeyboardInterrupt as keybd_int:
-                print('\rScan terminated by user')
+            except KeyboardInterrupt:
+                print("\rScan terminated by user")
 
             # Detach wireshark if needed
             if self.__wireshark is not None:
@@ -211,9 +219,9 @@ class BleCentralShell(InteractiveShell):
 
             # Stop connector
             self.__connector.stop()
-        
+
         # Permission error
-        except PermissionError as perm_err:
+        except PermissionError:
             interface = self.__interface.interface
             self.error(f"No permission to access the required interface &lt;{interface}&gt; !")
 
@@ -227,11 +235,13 @@ class BleCentralShell(InteractiveShell):
         This command displays the content of the console device cache.
         """
         if len(self.__cache) > 0:
-            print_formatted_text(HTML('<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>'))
+            print_formatted_text(HTML(
+                "<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>"
+            ))
             for device in self.__cache.iterate():
                 print(device['info'])
         else:
-            print('No discovered device in cache.')
+            print("No discovered device in cache.")
 
     @category('Devices discovery')
     def do_info(self, args):
@@ -253,24 +263,29 @@ class BleCentralShell(InteractiveShell):
 
                 # Show detailed information about the selected device
                 dev_info = device['info']
+                address_type = 'public' if dev_info.address_type == 0 else 'random'
 
-                print_formatted_text(HTML('<ansigreen><b>Device %s</b></ansigreen>' % dev_info.address))
+                print_formatted_text(HTML(
+                    f"<ansigreen><b>Device {dev_info.address}</b></ansigreen>"
+                ))
 
-                print_formatted_text(HTML('<b>RSSI:</b>\t\t\t%4d dBm' % dev_info.rssi))
-                print_formatted_text(HTML('<b>Address type:</b>\t\t%s' % 'public' if dev_info.address_type == 0 else 'random'))
+                print_formatted_text(HTML("<b>RSSI:</b>\t\t\t%4d dBm" % dev_info.rssi))
+                print_formatted_text(HTML(f"<b>Address type:</b>\t\t{address_type}"))
                 print('')
-                print_formatted_text(HTML('<ansicyan><u>Raw advertising records</u></ansicyan>\n'))
+                print_formatted_text(HTML("<ansicyan><u>Raw advertising records</u></ansicyan>\n"))
                 offset = 0
                 for adv_record in dev_info.adv_records:
                     show_adv_record(offset, adv_record.to_bytes())
                     offset += 1
                     print('')
-            except IndexError as notfound:
-                print('!!! Specified BD address has not been discovered')
+            except IndexError:
+                print("!!! Specified BD address has not been discovered")
         else:
-            self.error('<u>info</u> requires a single parameter (device name or BD address).')
+            self.error("<u>info</u> requires a single parameter (device name or BD address).")
 
-    def get_cache_targets(self):
+    def get_cache_targets(self) -> List:
+        """Retrieve targets from cache
+        """
         # Keep track of BD addresses and names
         targets = [dev['info'].address for dev in self.__cache.iterate()]
         targets.extend(['"%s"' % dev['info'].name for dev in self.__cache.iterate() if dev['info'].name is not None])
@@ -313,7 +328,7 @@ class BleCentralShell(InteractiveShell):
         """
         # Check arguments
         if len(args) < 1:
-            self.error('<u>connect</u> requires at least one parameter (device name or BD address).\ntype \'help connect\' for more details.')
+            self.error("<u>connect</u> requires at least one parameter (device name or BD address).\ntype \'help connect\' for more details.")
             return
 
         # Ensure we are not using a unix socket interface (we cannot connect if this is the case)
@@ -327,12 +342,12 @@ class BleCentralShell(InteractiveShell):
                 target = self.__cache[args[0]]
                 target_bd_addr = target['info'].address
                 target_random_address_type = (target['info'].address_type == 1)
-            except IndexError as notfound:
+            except IndexError:
                 # If target not in cache, we are expecting a BD address
                 if re.match(BDADDR_REGEXP, args[0]):
                     target_bd_addr = args[0]
                 else:
-                    self.error('You must provide a valid BD address.')
+                    self.error("You must provide a valid BD address.")
                     return
 
             if len(args) == 2:
@@ -341,7 +356,7 @@ class BleCentralShell(InteractiveShell):
                 elif args[1].lower() in ("pub", "public"):
                     target_random_address_type = False
                 else:
-                    self.error('You must indicate a valid connection type ("public" or "random").')
+                    self.error("You must indicate a valid connection type ('public' or 'random').")
                     return
 
             # Switch role to Central
@@ -353,7 +368,7 @@ class BleCentralShell(InteractiveShell):
 
                 # Check connection is OK
                 if self.__target is not None:
-                    print('Successfully connected to target %s' % target_bd_addr)
+                    print(f"Successfully connected to target {target_bd_addr}")
 
                     # Attach our disconnection callback
                     self.__target.set_disconnect_cb(self.on_disconnect)
@@ -385,14 +400,14 @@ class BleCentralShell(InteractiveShell):
                     # Update prompt
                     self.update_prompt()
                 else:
-                    print('Unable to connect to device %s' % target_bd_addr)
+                    print(f"Unable to connect to device {target_bd_addr}")
                     self.__target_bd = None
-            except PeripheralNotFound as not_found:
-                print('Unable to connect to device %s' % target_bd_addr)
+            except PeripheralNotFound:
+                print(f"Unable to connect to device {target_bd_addr}")
                 self.__target_bd = None
-        except IndexError as notfound:
-            print('Device %s not found' % args[0])
-        except PermissionError as perm_error:
+        except IndexError:
+            print(f"Device {args[0]} not found")
+        except PermissionError:
             interface = self.__interface.interface
             self.error(f"No permission to access the required interface &lt;{interface}&gt; !")
 
@@ -416,10 +431,10 @@ class BleCentralShell(InteractiveShell):
         self.update_prompt(force=True)
 
         # Show disconnection
-        print_formatted_text(HTML('<ansired>Peripheral has just disconnected</ansired>'))
+        print_formatted_text(HTML("<ansired>Peripheral has just disconnected</ansired>"))
 
 
-    @category('GATT client')
+    @category("GATT client")
     def do_disconnect(self, arg):
         """disconnect from device
 
@@ -435,13 +450,13 @@ class BleCentralShell(InteractiveShell):
             if self.__wireshark is not None:
                 self.__wireshark.detach()
         else:
-            self.warning('not connected to a device, aborted.')
+            self.warning("not connected to a device, aborted.")
 
         # Update prompt
         self.update_prompt()
 
 
-    @category('GATT client')
+    @category("GATT client")
     def do_profile(self, args):
         """discover device services and characteristics
 
@@ -477,18 +492,18 @@ class BleCentralShell(InteractiveShell):
                         from_json=profile_json
                     )
                     
-                except IOError as err:
-                    self.error('Cannot load profile json file `%s`' % args[1])
+                except IOError:
+                    self.error(f"Cannot load profile json file `{args[0]}`")
 
             # If not provided, discover services and characteristics
             else:
                 try:
                     self.__target.discover()
-                except GattTimeoutException as timeout:
-                    self.error('GATT timeout occured')
+                except GattTimeoutException:
+                    self.error("GATT timeout occured")
                     return
-                except ConnectionLostException as disconnected:
-                    self.error('Services discovery failed (peripheral disconnected)')
+                except ConnectionLostException:
+                    self.error("Services discovery failed (peripheral disconnected)")
                     return
 
             # Cache our target with its discovered services/characteristics
@@ -497,7 +512,7 @@ class BleCentralShell(InteractiveShell):
 
             # Show services and characteristics
             for service in self.__target.services():
-                print_formatted_text(HTML('<ansigreen><b>Service %s</b></ansigreen>\n' % service.name))
+                print_formatted_text(HTML(f"<ansigreen><b>Service {service.name}</b></ansigreen>\n"))
                 for charac in service.characteristics():
                     properties = charac.properties
                     charac_rights = []
@@ -511,22 +526,22 @@ class BleCentralShell(InteractiveShell):
                         charac_rights.append('indicate')
                     if properties & CharacteristicProperties.NOTIFY != 0:
                         charac_rights.append('notify')
-                    print_formatted_text(HTML(' <b>%s</b> handle: <b>%d</b>, value handle: <b>%d</b>' % (
+                    print_formatted_text(HTML(" <b>%s</b> handle: <b>%d</b>, value handle: <b>%d</b>" % (
                         charac.name, charac.handle, charac.value_handle
                     )))
-                    print_formatted_text(HTML('  | <ansicyan>access rights:</ansicyan> <b>%s</b>' % ', '.join(charac_rights)))
+                    print_formatted_text(HTML("  | <ansicyan>access rights:</ansicyan> <b>%s</b>" % ', '.join(charac_rights)))
 
                     for desc in charac.descriptors():
                         print_formatted_text(HTML(
-                            '  | <ansiblue><b>Descriptor type %s</b></ansiblue> handle: <b>%d</b>' % (
+                            "  | <ansiblue><b>Descriptor type %s</b></ansiblue> handle: <b>%d</b>" % (
                                 desc.name,
                                 desc.handle
-                            ) 
+                            )
                         ))
                 print('')
 
 
-    @category('GATT client')
+    @category("GATT client")
     def do_services(self, args):
         """discover/show current device services
 
@@ -542,21 +557,25 @@ class BleCentralShell(InteractiveShell):
                 try:
                     self.__target.discover()
                     self.__cache.mark_as_discovered(self.__target_bd)
-                except GattTimeoutException as timeout:
-                    self.error('GATT timeout occured')
+                except GattTimeoutException:
+                    self.error("GATT timeout occured")
                     return
-                except ConnectionLostException as disconnected:
-                    self.error('Services/characteristics discovery failed (peripheral disconnected)')
+                except ConnectionLostException:
+                    self.error("Services/characteristics discovery failed (peripheral disconnected)")
                     return
 
             # We are connected to a device, list cached services
             for service in self.__target.services():
-                print_formatted_text(HTML('<ansicyan><b>%s</b></ansicyan> start handle: <b>%d</b>, end handle: <b>%d</b>' % (service.uuid, service.handle, service.end_handle)))
+                print_formatted_text(HTML(
+                    "<ansicyan><b>%s</b></ansicyan> start handle: <b>%d</b>, end handle: <b>%d</b>" % (
+                        service.uuid, service.handle, service.end_handle
+                    )
+                ))
         else:
-            self.error('No device connected.')
+            self.error("No device connected.")
 
 
-    @category('GATT client')
+    @category("GATT client")
     def do_characteristics(self, args):
         """discover/show current device characteristics
 
@@ -572,11 +591,11 @@ class BleCentralShell(InteractiveShell):
                 try:
                     self.__target.discover()
                     self.__cache.mark_as_discovered(self.__target_bd)
-                except GattTimeoutException as timeout:
-                    self.error('GATT timeout occured')
+                except GattTimeoutException:
+                    self.error("GATT timeout occured")
                     return
-                except ConnectionLostException as disconnected:
-                    self.error('Services/characteristics discovery failed (peripheral disconnected)')
+                except ConnectionLostException:
+                    self.error("Services/characteristics discovery failed (peripheral disconnected)")
                     return
 
 
@@ -595,22 +614,22 @@ class BleCentralShell(InteractiveShell):
                         charac_rights.append('indicate')
                     if properties & CharacteristicProperties.NOTIFY != 0:
                         charac_rights.append('notify')
-                    print_formatted_text(HTML(' <b>%s</b> handle: <b>%d</b>, value handle: <b>%d</b>' % (
+                    print_formatted_text(HTML(" <b>%s</b> handle: <b>%d</b>, value handle: <b>%d</b>" % (
                         charac.uuid, charac.handle, charac.value_handle
                     )))
-                    print_formatted_text(HTML('  | <ansicyan>access rights:</ansicyan> <b>%s</b>' % ', '.join(charac_rights)))
+                    print_formatted_text(HTML("  | <ansicyan>access rights:</ansicyan> <b>%s</b>" % ', '.join(charac_rights)))
                     
                     for desc in charac.descriptors():
                         print_formatted_text(HTML(
-                            '  | <ansiblue><b>Descriptor type %s</b></ansiblue> handle: <b>%d</b>' % (
+                            "  | <ansiblue><b>Descriptor type %s</b></ansiblue> handle: <b>%d</b>" % (
                                 desc.name,
                                 desc.handle
                             ) 
                         ))
         else:
-            self.error('No device connected.')
+            self.error("No device connected.")
 
-    @category('GATT client')
+    @category("GATT client")
     def do_read(self, args):
         """read a GATT attribute
 
@@ -630,7 +649,7 @@ class BleCentralShell(InteractiveShell):
         if self.__target_bd:
             # parse target arguments
             if len(args) == 0:
-                self.error('You must provide at least a characteristic value handle or characteristic UUID.')
+                self.error("You must provide at least a characteristic value handle or characteristic UUID.")
                 return
             else:
                 handle = None
@@ -641,25 +660,25 @@ class BleCentralShell(InteractiveShell):
             if args[0].lower().startswith('0x'):
                 try:
                     handle = int(args[0].lower(), 16)
-                except ValueError as badval:
-                    self.error('Wrong handle: %s' % args[0])
+                except ValueError:
+                    self.error(f"Wrong handle: {args[0]}")
                     return
             else:
                 try:
                     handle = int(args[0])
-                except ValueError as badval:
+                except ValueError:
                     try:
                         handle = UUID(args[0])
-                    except:
-                        self.error('Wrong UUID: %s' % args[0])
+                    except ValueError:
+                        self.error(f"Wrong UUID: {args[0]}")
                         return
 
             # Check offset and length
             if len(args) >= 2:
                 try:
                     offset = int(args[1])
-                except ValueError as badval:
-                    self.error('Wrong offset value, will use 0 instead.')
+                except ValueError:
+                    self.error("Wrong offset value, will use 0 instead.")
                     offset = None
 
             # Perform characteristic read by handle
@@ -671,10 +690,10 @@ class BleCentralShell(InteractiveShell):
                     hexdump(value)
                 except AttError as att_err:
                     self.show_att_error(att_err)
-                except GattTimeoutException as timeout:
-                    self.error('GATT timeout while reading.')
-                except ConnectionLostException as conn_lost:
-                    self.error('Characteristic read failed (peripheral disconnected)')
+                except GattTimeoutException:
+                    self.error("GATT timeout while reading.")
+                except ConnectionLostException:
+                    self.error("Characteristic read failed (peripheral disconnected)")
 
             else:
                 # Perform discovery if required
@@ -697,21 +716,21 @@ class BleCentralShell(InteractiveShell):
 
                     except AttError as att_err:
                         self.show_att_error(att_err)
-                    except GattTimeoutException as timeout:
-                        self.error('GATT timeout while reading.')
-                    except ConnectionLostException as conn_lost:
-                        self.error('Characteristic read failed (peripheral disconnected)')
+                    except GattTimeoutException:
+                        self.error("GATT timeout while reading.")
+                    except ConnectionLostException:
+                        self.error("Characteristic read failed (peripheral disconnected)")
                 else:
-                    self.error('No characteristic found with UUID %s' % handle)
+                    self.error(f"No characteristic found with UUID {handle}")
         else:
-            self.error('No device connected.')
+            self.error("No device connected.")
 
     def perform_write(self, args, without_response=False):
         """Perform attribute/handle characteristic
         """
         # parse target arguments
         if len(args) <2:
-            self.error('You must provide at least a characteristic value handle or characteristic UUID, and a value to write.')
+            self.error("You must provide at least a characteristic value handle or characteristic UUID, and a value to write.")
             return
         else:
             handle = None
@@ -722,17 +741,17 @@ class BleCentralShell(InteractiveShell):
         if args[0].lower().startswith('0x'):
             try:
                 handle = int(args[0].lower(), 16)
-            except ValueError as badval:
-                self.error('Wrong handle: %s' % args[0])
+            except ValueError:
+                self.error(f"Wrong handle: {args[0]}")
                 return
         else:
             try:
                 handle = int(args[0])
-            except ValueError as badval:
+            except ValueError:
                 try:
                     handle = UUID(args[0].replace('-',''))
-                except:
-                    self.error('Wrong UUID: %s' % args[0])
+                except ValueError:
+                    self.error(f"Wrong UUID: {args[0]}")
                     return
 
         # Do we have hex data ?
@@ -741,8 +760,8 @@ class BleCentralShell(InteractiveShell):
             hex_data = ''.join(args[2:])
             try:
                 char_value = unhexlify(hex_data.replace('\t',''))
-            except BinasciiError as err:
-                self.error('Provided hex value contains non-hex characters.')
+            except BinasciiError:
+                self.error("Provided hex value contains non-hex characters.")
                 return
         else:
             char_value = args[1]
@@ -759,10 +778,10 @@ class BleCentralShell(InteractiveShell):
                     self.__target.write(handle, char_value)
             except AttError as att_err:
                 self.show_att_error(att_err)
-            except GattTimeoutException as timeout:
-                self.error('GATT timeout while writing.')
-            except ConnectionLostException as conn_lost:
-                self.error('Characteristic write failed (peripheral disconnected)')
+            except GattTimeoutException:
+                self.error("GATT timeout while writing.")
+            except ConnectionLostException:
+                self.error("Characteristic write failed (peripheral disconnected)")
 
         else:
             # Perform discovery if required
@@ -780,15 +799,15 @@ class BleCentralShell(InteractiveShell):
                         target_charac.value = char_value
                 except AttError as att_err:
                     self.show_att_error(att_err)
-                except GattTimeoutException as timeout:
-                    self.error('GATT timeout while writing.')
-                except ConnectionLostException as conn_lost:
-                    self.error('Characteristic write failed (peripheral disconnected)')
+                except GattTimeoutException:
+                    self.error("GATT timeout while writing.")
+                except ConnectionLostException:
+                    self.error("Characteristic write failed (peripheral disconnected)")
             else:
-                self.error('No characteristic found with UUID %s' % handle)
+                self.error(f"No characteristic found with UUID {handle}")
 
 
-    @category('GATT client')
+    @category("GATT client")
     def do_writecmd(self, args):
         """write data to a GATT attribute without waiting for a response.
 
@@ -811,10 +830,10 @@ class BleCentralShell(InteractiveShell):
         if self.__target_bd:
             self.perform_write(args, without_response=True)
         else:
-            self.error('No device connected.')
+            self.error("No device connected.")
 
 
-    @category('GATT client')
+    @category("GATT client")
     def do_write(self, args):
         """write data to a a GATT attribute.
 
@@ -837,10 +856,10 @@ class BleCentralShell(InteractiveShell):
         if self.__target_bd:
             self.perform_write(args, without_response=False)
         else:
-            self.error('No device connected.')
+            self.error("No device connected.")
 
 
-    @category('GATT client')
+    @category("GATT client")
     def do_pdu(self, args):
         """Send raw PDU to a connected device
 
@@ -864,18 +883,18 @@ class BleCentralShell(InteractiveShell):
                         conn_handle=self.__target.conn_handle
                     )
                     if not res:
-                        self.error('An error occured while sending PDU.')
+                        self.error("An error occured while sending PDU.")
                 else:
                     self.error('Invalid hex value.')
-            except BinasciiError as err:
-                self.error('Invalid hex value.')
-            except ConnectionLostException as conn_lost:
-                self.error('Sending PDU failed (peripheral disconnected)')
+            except BinasciiError:
+                self.error("Invalid hex value.")
+            except ConnectionLostException:
+                self.error("Sending PDU failed (peripheral disconnected)")
 
         else:
-            self.error('No device connected.')
+            self.error("No device connected.")
 
-    @category('GATT client')
+    @category("GATT client")
     def do_spdu(self, args):
         """Send a raw PDU built with scapy to a connected device
 
@@ -961,20 +980,20 @@ class BleCentralShell(InteractiveShell):
                         conn_handle=self.__target.conn_handle
                     )
                     if not res:
-                        self.error('An error occured while sending PDU.')
+                        self.error("An error occured while sending PDU.")
                 else:
-                    self.error('Invalid hex value.')
+                    self.error("Invalid hex value.")
 
-            except ConnectionLostException as conn_lost:
-                self.error('Sending PDU failed (peripheral disconnected)')
+            except ConnectionLostException:
+                self.error("Sending PDU failed (peripheral disconnected)")
 
-            except Exception as err:
-                self.error('An error occured while assembling packet')
+            except Exception:
+                self.error("An error occured while assembling packet")
         else:
-            self.error('No device connected.')
+            self.error("No device connected.")
 
 
-    @category('GATT client')
+    @category("GATT client")
     def do_sub(self, args):
         """subscribe to a characteristic
 
@@ -993,17 +1012,17 @@ class BleCentralShell(InteractiveShell):
             if args[0].lower().startswith('0x'):
                 try:
                     handle = int(args[0].lower(), 16)
-                except ValueError as badval:
-                    self.error('Wrong handle: %s' % args[0])
+                except ValueError:
+                    self.error(f"Wrong handle: {args[0]}")
                     return 
             else:
                 try:
                     handle = int(args[0])
-                except ValueError as err:
+                except ValueError:
                     try:
                         handle = UUID(args[0])
-                    except Exception as err:
-                        self.error('Wrong UUID: %s' % args[0])
+                    except Exception:
+                        self.error(f"Wrong UUID: {args[0]}")
                         return
 
             # If UUID is provided
@@ -1012,25 +1031,21 @@ class BleCentralShell(InteractiveShell):
             elif isinstance(handle, int):
                 try:
                     target_charac = self.__target.find_object_by_handle(handle)
-                except IndexError as notfound:
+                except IndexError:
                     target_charac = None
                 if not isinstance(target_charac, PeripheralCharacteristic) or target_charac is None:
-                    self.error('No characteristic found with handle %d' % handle)
+                    self.error(f"No characteristic found with handle {handle}")
                     return
 
             def on_charac_notified(charac, value, indication):
                 if indication:
                     print_formatted_text(HTML(
-                        '<ansimagenta>Indication</ansimagenta> received from characteristic with handle %d' % (
-                            charac.handle
-                        )
+                        f"<ansimagenta>Indication</ansimagenta> received from characteristic with handle {handle}"
                     ))
                     hexdump(value)
                 else:
                     print_formatted_text(HTML(
-                        "<ansimagenta>Notification</ansimagenta> received from characteristic with handle %d" % (
-                            charac.handle
-                        )
+                        f"<ansimagenta>Notification</ansimagenta> received from characteristic with handle {handle}"
                     ))
                     hexdump(value)
 
@@ -1056,16 +1071,16 @@ class BleCentralShell(InteractiveShell):
                         ))
                 except AttError as att_err:
                     self.show_att_error(att_err)
-                except GattTimeoutException as timeout:
-                    self.error('GATT timeout while writing.')
-                except ConnectionLostException as conn_lost:
-                    self.error('Characteristic subscribe failed (peripheral disconnected)')
+                except GattTimeoutException:
+                    self.error("GATT timeout while writing.")
+                except ConnectionLostException:
+                    self.error("Characteristic subscribe failed (peripheral disconnected)")
             else:
-                self.error('No characteristic found with UUID %s' % handle)
+                self.error(f"No characteristic found with UUID {handle}")
         else:
             self.error('No device connected.')
 
-    @category('GATT client')
+    @category("GATT client")
     def do_unsub(self, args):
         """unsubscribe from a characteristic
 
@@ -1086,17 +1101,17 @@ class BleCentralShell(InteractiveShell):
             if args[0].lower().startswith('0x'):
                 try:
                     handle = int(args[0].lower(), 16)
-                except ValueError as badval:
-                    self.error('Wrong handle: %s' % args[0])
+                except ValueError:
+                    self.error(f"Wrong handle: {args[0]}")
                     return
             else:
                 try:
                     handle = int(args[0])
-                except ValueError as badval:
+                except ValueError:
                     try:
                         handle = UUID(args[0])
-                    except Exception as err:
-                        self.error('Wrong UUID: %s' % args[0])
+                    except Exception:
+                        self.error(f"Wrong handle: {args[0]}")
                         return
 
             # If UUID is provided
@@ -1105,10 +1120,10 @@ class BleCentralShell(InteractiveShell):
             elif isinstance(handle, int):
                 try:
                     target_charac = self.__target.find_object_by_handle(handle)
-                except IndexError as notfound:
+                except IndexError:
                     target_charac = None
                 if not isinstance(target_charac, PeripheralCharacteristic) or target_charac is None:
-                    self.error('No characteristic found with handle %d' % handle)
+                    self.error(f"No characteristic found with handle {handle}")
                     return
 
             if target_charac is not None:
@@ -1117,12 +1132,12 @@ class BleCentralShell(InteractiveShell):
                     print_formatted_text(HTML(f"Successfully unsubscribed from characteristic {target_charac.uuid}"))
                 except AttError as att_err:
                     self.show_att_error(att_err)
-                except GattTimeoutException as timeout:
-                    self.error('GATT timeout.')
-                except ConnectionLostException as conn_lost:
-                    self.error('Characteristic unscribe failed (peripheral disconnected)')
+                except GattTimeoutException:
+                    self.error("GATT timeout.")
+                except ConnectionLostException:
+                    self.error("Characteristic unscribe failed (peripheral disconnected)")
             else:
-                self.error('No characteristic found with UUID %s' % handle)
+                self.error(f"No characteristic found with UUID {handle}")
 
         else:
             self.error('No device connected.')
@@ -1138,7 +1153,7 @@ class BleCentralShell(InteractiveShell):
         return completions
 
 
-    @category('Monitoring')
+    @category("Monitoring")
     def do_wireshark(self, arg):
         """launch wireshark to monitor packets
 
@@ -1156,10 +1171,10 @@ class BleCentralShell(InteractiveShell):
                         if self.__connector is not None:
                             self.__wireshark.attach(self.__connector)
                             self.__wireshark.start()
-                    except ExternalToolNotFound as notfound:
-                        self.error('Cannot launch Wireshark, please make sure it is installed.')
+                    except ExternalToolNotFound:
+                        self.error("Cannot launch Wireshark, please make sure it is installed.")
                 else:
-                    self.error('Wireshark is already launched, see <ansicyan>wireshark off</ansicyan>')
+                    self.error("Wireshark is already launched, see <ansicyan>wireshark off</ansicyan>")
             else:
                 # Detach monitor if any
                 if self.__wireshark is not None:
@@ -1167,10 +1182,10 @@ class BleCentralShell(InteractiveShell):
                     self.__wireshark.close()
                     self.__wireshark = None
         else:
-            self.error('Missing arguments, see <ansicyan>help wireshark</ansicyan>.')
+            self.error("Missing arguments, see <ansicyan>help wireshark</ansicyan>.")
 
 
-    @category('GATT client')
+    @category("GATT client")
     def do_mtu(self, arg):
         """set ATT MTU
 
@@ -1188,17 +1203,17 @@ class BleCentralShell(InteractiveShell):
                         self.__target.set_mtu(mtu)
                     except AttError as att_err:
                         self.show_att_error(att_err)
-                    except GattTimeoutException as timeout:
-                        self.error('GATT timeout while exchanging new MTU.')
-                except ValueError as err:
-                    self.error('Provided MTU is not a valid decimal integer.')
+                    except GattTimeoutException:
+                        self.error("GATT timeout while exchanging new MTU.")
+                except ValueError:
+                    self.error("Provided MTU is not a valid decimal integer.")
             else:
-                self.error('You must provide the MTU parameter (integer value).')
+                self.error("You must provide the MTU parameter (integer value).")
         else:
-            self.error('Not connected to a remote device.')
+            self.error("Not connected to a remote device.")
 
 
-    def do_quit(self, arg):
+    def do_quit(self, args):
         """close ble-central
         """
         if self.__target_bd is not None:
