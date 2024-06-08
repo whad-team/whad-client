@@ -28,13 +28,30 @@ class WhadFilterApp(CommandLineApp):
             interface=True,
             commands=False,
             input=CommandLineApp.INPUT_WHAD,
-            output=CommandLineApp.OUTPUT_STANDARD
+            output=CommandLineApp.OUTPUT_WHAD
         )
 
         self.add_argument(
             'filter',
             help='filter to evaluate',
             default='True'
+        )
+
+        self.add_argument(
+            '--down',
+            dest='down',
+            action="store_true",
+            default=None,
+            help='process down stream'
+        )
+
+
+        self.add_argument(
+            '--up',
+            dest='up',
+            action="store_true",
+            default=None,
+            help='process up stream'
         )
 
         self.add_argument(
@@ -74,13 +91,17 @@ class WhadFilterApp(CommandLineApp):
         return eval(filter_template % (self.args.filter))
 
     def on_rx_packet(self, pkt):
+        if not self.args.down:
+            if not self.is_stdout_piped():
+                display_packet(pkt)
+            return pkt
+
         filter = self.build_filter()
         try:
             if filter(pkt):
                 if self.args.transform is not None:
                     p = packet = pkt
                     exec(self.args.transform)
-                print(self.args.forward)
                 if not self.is_stdout_piped():
                     display_packet(pkt)
                 return pkt
@@ -91,14 +112,17 @@ class WhadFilterApp(CommandLineApp):
                     return pkt
                 return None
         except:
-            print(self.args.forward)
-
             if self.args.forward:
                 display_packet(pkt)
                 return pkt
             return None
 
     def on_tx_packet(self, pkt):
+        if not self.args.up:
+            if not self.is_stdout_piped():
+                display_packet(pkt)
+            return pkt
+
         filter = self.build_filter()
         try:
             if filter(pkt):
@@ -114,7 +138,6 @@ class WhadFilterApp(CommandLineApp):
                     return pkt
                 return None
         except:
-            print(self.args.forward)
             if self.args.forward:
                 display_packet(pkt)
                 return pkt
@@ -125,6 +148,10 @@ class WhadFilterApp(CommandLineApp):
     def run(self):
         # Launch pre-run tasks
         self.pre_run()
+        if self.args.down is None and self.args.up is None:
+            self.args.up   = True
+            self.args.down = True
+
         try:
             if self.is_piped_interface():
                 if not self.args.nocolor:
