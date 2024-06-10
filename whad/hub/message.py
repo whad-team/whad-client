@@ -234,33 +234,21 @@ class PbMessageWrapper(HubMessage):
         """
         return parent_class(message=message)
 
-'''
-class ProtocolHub(Registry):
-    """WHAD Protocol Hub class
-
-    This class is an interface between all our Python code and the devices, that
-    support all the existing versions of the WHAD protocol and handles every
-    differences that exist between them in a transparent fashion.
+class AbstractEvent(type):
+    """Hub event metaclass
     """
+    pass
 
-    def __init__(self, proto_version: int):
-        """Instanciate a WHAD protocol hub for a specific version.
-        """
-        self.__version = proto_version
+class AbstractPacketMeta(type):
+    """Hub packet metaclass"""
+    def __instancecheck__(cls, instance):
+        return cls.__subclasscheck__(type(instance))
 
-    @property
-    def version(self) -> int:
-        return self.__version
+    def __subclasscheck__(cls, subclass):
+        return (hasattr(subclass, 'to_packet') and 
+                callable(subclass.to_packet) and 
+                hasattr(subclass, 'from_packet') and 
+                callable(subclass.from_packet))
     
-    def parse(self, data: bytes):
-        """Parse a serialized WHAD message into an associated object.
-        """
-        # Use protocol buffers to parse our message
-        msg = Message()
-        msg.ParseFromString(bytes(data))
-
-        # Only process generic messages
-        return ProtocolHub.bound(
-            msg.WhichOneof('msg'),
-            self.__version).parse(self.__version, msg)
-'''
+class AbstractPacket(metaclass=AbstractPacketMeta):
+    pass

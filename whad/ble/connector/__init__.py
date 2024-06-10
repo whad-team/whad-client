@@ -686,12 +686,12 @@ class BLE(WhadDeviceConnector):
                     self.on_adv_pdu(packet)
         elif isinstance(message, BlePduReceived):
             if message.processed:
-                packet = self.translator.from_message(message)
+                packet = message.to_packet()
                 if packet is not None:
                     self.monitor_packet_rx(packet)
                     logger.info('[ble PDU log-only]')
             else:
-                packet = self.translator.from_message(message)
+                packet = message.to_packet()
                 if packet is not None:
                     self.monitor_packet_rx(packet)
 

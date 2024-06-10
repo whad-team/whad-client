@@ -13,6 +13,7 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery
 from whad.helpers import message_filter, asciiz
 from whad.hub import ProtocolHub
+from whad.hub.message import AbstractPacket
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.discovery import InfoQueryResp, DomainInfoQueryResp, DeviceReady
 

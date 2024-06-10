@@ -1,5 +1,11 @@
 """WHAD Protocol BLE pdu messages abstraction layer.
 """
+import struct
+from scapy.compat import raw
+from scapy.layers.bluetooth4LE import BTLE, BTLE_DATA, BTLE_CTRL, BTLE_ADV
+from whad.hub.metadata import BLEMetadata
+from whad.hub.message import AbstractPacket
+
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import CentralModeCmd
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
@@ -54,6 +60,29 @@ class BlePduReceived(PbMessageWrapper):
     processed = PbFieldBool("ble.pdu.processed")
     decrypted = PbFieldBool("ble.pdu.decrypted")
 
+    def to_packet(self):
+        """Convert message into its corresponding Scapy packet
+        """
+        packet = BTLE_DATA(self.pdu)
+        packet.metadata = BLEMetadata()
+        packet.metadata.connection_handle = self.conn_handle
+        packet.metadata.direction = self.direction
+        packet.metadata.decrypted = self.decrypted
+        return packet
+
+    @staticmethod
+    def from_packet(packet):
+        """Convert packet into BlePduReceived message
+        """
+        return BlePduReceived(
+            pdu=bytes(packet),
+            direction=packet.metadata.direction,
+            conn_handle=packet.metadata.connection_handle,
+            processed=False,
+            decrypted=packet.metadata.decrypted
+        )
+
+
 @pb_bind(BleDomain, "raw_pdu", 1)
 class BleRawPduReceived(PbMessageWrapper):
     """BLE raw PDU received message class
@@ -70,6 +99,62 @@ class BleRawPduReceived(PbMessageWrapper):
     conn_handle = PbFieldInt("ble.raw_pdu.conn_handle")
     processed = PbFieldBool("ble.raw_pdu.processed")
     decrypted = PbFieldBool("ble.raw_pdu.decrypted")
+
+    def to_packet(self):
+        """Convert message into its corresponding Scapy packet
+        """
+        packet = BTLE(bytes(struct.pack("I", self.access_address)) + bytes(self.pdu) + bytes(struct.pack(">I", self.crc)[1:]))
+        
+        # Populate metadata
+        packet.metadata = BLEMetadata()
+        packet.metadata.direction = self.direction
+        packet.metadata.connection_handle = self.conn_handle
+        packet.metadata.channel = self.channel
+        if self.rssi is not None:
+            packet.metadata.rssi = self.rssi
+        if self.timestamp is not None:
+            packet.metadata.timestamp = self.timestamp
+        if self.crc_validity is not None:
+            packet.metadata.is_crc_valid = self.crc_validity
+        if self.relative_timestamp is not None:
+            packet.metadata.relative_timestamp = self.relative_timestamp
+        packet.metadata.decrypted = self.decrypted
+        return packet
+    
+    @staticmethod
+    def from_packet(packet):
+        """Create message from Scapy packet
+        """
+
+        if BTLE in packet:
+            # Extract PDU
+            if BTLE_DATA in packet:
+                pdu = raw(packet[BTLE_DATA:])
+            elif BTLE_CTRL in packet:
+                pdu = raw(packet[BTLE_CTRL:])
+            elif BTLE_ADV in packet:
+                pdu = raw(packet[BTLE_ADV:])
+            else:
+                return None
+            
+            return BleRawPduReceived(
+                pdu=pdu,
+                access_address=BTLE(raw(packet)).access_addr,
+                crc=BTLE(raw(packet)).crc,
+                direction=packet.metadata.direction,
+                conn_handle=packet.metadata.connection_handle,
+                channel=packet.metadata.channel,
+                rssi=packet.metadata.rssi,
+                timestamp=packet.metadata.timestamp,
+                crc_validity=packet.metadata.is_crc_valid,
+                relative_timestamp=packet.metadata.relative_timestamp,
+                decrypted=packet.metadata.decrypted
+            )
+        
+        return None
+
+
+
 
 @pb_bind(BleDomain, "injected", 1)
 class Injected(PbMessageWrapper):
