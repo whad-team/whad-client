@@ -50,7 +50,6 @@ def test_raw_pdu_recv(factory):
         crc_validity=True,
         address=EsbNodeAddress(b'\x11\x22\x33\x44\x55')
     )
-    print(pdu_recv)
 
     # Convert message to packet
     packet = pdu_recv.to_packet()
