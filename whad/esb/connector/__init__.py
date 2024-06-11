@@ -293,7 +293,7 @@ class ESB(WhadDeviceConnector):
                 # Forward to PDU callback if synchronous mode is not set,
                 # add to pending PDUs otherwise
                 if self.is_synchronous():
-                    self.add_pending_pdu(packet)
+                    self.add_pending_packet(packet)
                 else:
                     self.on_pdu(packet)
 
@@ -304,7 +304,7 @@ class ESB(WhadDeviceConnector):
                 # Forward to PDU callback if synchronous mode is not set,
                 # add to pending PDUs otherwise
                 if self.is_synchronous():
-                    self.add_pending_pdu(packet)
+                    self.add_pending_packet(packet)
                 else:
                     self.on_raw_pdu(packet)
 

@@ -15,11 +15,9 @@ from whad.device import WhadDeviceConnector
 from whad import WhadDomain, WhadCapability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
-# Old protocol stuff (to remove)
-from whad.protocol.generic_pb2 import ResultCode
-
 # Protocol hub
 from whad.helpers import message_filter
+from whad.hub.message import AbstractPacket
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import ChannelMap
@@ -674,49 +672,28 @@ class BLE(WhadDeviceConnector):
         # Ensure forwarded message is BLE related
         assert domain == 'ble'
 
-        if isinstance(message, BleAdvPduReceived):
-            packet = self.translator.from_message(message)
+        # Check if message is a received packet
+        if issubclass(message, AbstractPacket):
+            # Convert message into packet
+            packet = message.to_packet()
             if packet is not None:
+
+                # Report packet to monitors
                 self.monitor_packet_rx(packet)
 
-                # Forward to advertising PDU callback if synchronous mode is set.
+                # If message is BlePduReceived or BleRawPduReceived, we must
+                # take into account the `processed` property.
+                if packet.metadata.processed is not None:
+                    # If packet has already been processed, no other processing is required
+                    if packet.metadata.processed:
+                        return
+
+                # Forward to our connector
                 if self.is_synchronous():
-                    self.add_pending_pdu(packet)
+                    self.add_pending_packet(packet)
                 else:
-                    self.on_adv_pdu(packet)
-        elif isinstance(message, BlePduReceived):
-            if message.processed:
-                packet = message.to_packet()
-                if packet is not None:
-                    self.monitor_packet_rx(packet)
-                    logger.info('[ble PDU log-only]')
-            else:
-                packet = message.to_packet()
-                if packet is not None:
-                    self.monitor_packet_rx(packet)
+                    self.on_packet(packet)
 
-                    # Forward to generic PDU callback if auto mode is set.
-                    if self.is_synchronous():
-                        self.add_pending_pdu(packet)
-                    else:
-                        self.on_pdu(packet)
-        elif isinstance(message, BleRawPduReceived):
-            if message.processed:
-                packet = self.translator.from_message(message)
-                if packet is not None:
-                    self.monitor_packet_rx(packet)
-                    logger.info('[ble PDU log-only]')
-            else:
-                # Extract scapy packet
-                packet = self.translator.from_message(message)
-                if packet is not None:
-                    self.monitor_packet_rx(packet)
-
-                    # Forward to raw pdu callback if auto mode is set.
-                    if self.is_synchronous():
-                        self.add_pending_pdu(packet)
-                    else:
-                        self.on_raw_pdu(packet)
         elif isinstance(message, Synchronized):
             self.on_synchronized(
                 access_address = message.access_address,
@@ -741,6 +718,18 @@ class BLE(WhadDeviceConnector):
     def on_desynchronized(self, access_address=None):
         pass
 
+    def on_packet(self, packet):
+        """Dispatch incoming packet
+        """
+        if BTLE_ADV in packet:
+            adv_pdu = packet[BTLE_ADV:]
+            adv_pdu.metadata = packet.metadata
+            self.on_adv_pdu(adv_pdu)
+        elif BTLE_DATA in packet:
+            conn_pdu = packet[BTLE_DATA:]
+            conn_pdu.metadata = packet.metadata
+            self.on_data_pdu(conn_pdu)
+
     def on_adv_pdu(self, packet):
         logger.info('received an advertisement PDU')
 
@@ -759,18 +748,6 @@ class BLE(WhadDeviceConnector):
         logger.info('a connection has been terminated')
         for trigger in self.__triggers:
             self.delete_sequence(trigger)
-
-    def on_raw_pdu(self, packet):
-
-        if BTLE_ADV in packet:
-            adv_pdu = packet[BTLE_ADV:]
-            adv_pdu.metadata = packet.metadata
-            self.on_adv_pdu(adv_pdu)
-
-        elif BTLE_DATA in packet:
-            conn_pdu = packet[BTLE_DATA:]
-            conn_pdu.metadata = packet.metadata
-            self.on_pdu(conn_pdu)
 
     def on_pdu(self, packet):
         if packet.LLID == 3:
@@ -823,21 +800,33 @@ class BLE(WhadDeviceConnector):
             # otherwise consider using the internal link-layer encryption status
             if encrypt is not None and isinstance(encrypt, bool):
                 logger.info('[ble connector] encrypt is specified (%s)' % encrypt)
-                #msg = self._build_message_from_scapy_packet(packet, encrypt)
-                msg = self.translator.from_packet(packet, encrypt)
+                encrypt = True
             else:
                 logger.info('[ble connector] link-layer encryption: %s' % self.__encrypted)
-                #msg = self._build_message_from_scapy_packet(packet, self.__encrypted)
-                msg = self.translator.from_packet(packet, self.__encrypted)
+                encrypt = False
 
-            resp = self.send_command(msg, message_filter(CommandResult))
-            logger.info('[ble connector] Command sent, result: %s' % resp)
-            if resp is None:
-                raise ConnectionLostException(None)
-            else:
-                return isinstance(resp, Success)
+            # Send BLE packet
+            return self.send_packet(packet, encrypt=encrypt)
         else:
             return False
+
+    def send_packet(self, packet, encrypt=False):
+        """Send packet to our device.
+        """
+        # Convert packet into the corresponding message
+        if BTLE in packet:
+            msg = self.hub.ble.createSendRawPduFromPacket(packet, encrypt=encrypt)
+        else:
+            msg = self.hub.ble.createSendPduFromPacket(packet, encrypt=encrypt)
+
+        resp = self.send_command(msg, message_filter(CommandResult))
+        logger.info('[ble connector] Command sent, result: %s' % resp)
+        if resp is None:
+            raise ConnectionLostException(None)
+        else:
+            return isinstance(resp, Success)
+
+
 
 from whad.ble.connector.peripheral import Peripheral, PeripheralClient
 from whad.ble.connector.central import Central

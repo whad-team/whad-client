@@ -328,7 +328,7 @@ class Dot15d4(WhadDeviceConnector):
         """
         # Enqueue PDU if in synchronous mode
         if self.is_synchronous():
-            self.add_pending_pdu(packet)
+            self.add_pending_packet(packet)
         else:
             pass
 

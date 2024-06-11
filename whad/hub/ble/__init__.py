@@ -532,10 +532,22 @@ class BleDomain(Registry):
         
         # Return message
         return message
-    
+
+    def createSendRawPduFromPacket(self, packet, encrypt=False) -> HubMessage:
+        """Create a SendRawBlePdu message from a BLE packet
+
+        :param packet: Scapy BTLE packet
+        :type packet: scapy.layers.bluetooth4LE.BTLE
+        :param encrypt: Enable/disable packet encryption
+        :type encrypt: bool
+        :return: instance of SendBleRawPdu message
+        :return-type: SendBleRawPdu
+        """
+        return BleDomain.bound("send_raw_pdu", self.proto_version).from_packet(packet, encrypt)
+
     def createSendPdu(self, direction: int, pdu: bytes, conn_handle: int, \
                       encrypt: bool = False) -> HubMessage:
-        """Create a SendPdu message.
+        """Create a SendBlePdu message.
 
         :param direction: PDU direction
         :type direction: int
@@ -546,7 +558,7 @@ class BleDomain(Registry):
         :param encrypt: Encrypt PDU before sending
         :type encrypt: bool, optional
         :return: instance of SendRawPdu message
-        :return-type: SendRawPdu        
+        :return-type: SendBleRawPdu
         """
         return BleDomain.bound("send_pdu", self.proto_version)(
             direction=direction,
@@ -555,6 +567,18 @@ class BleDomain(Registry):
             encrypt=encrypt
         )
     
+    def createSendPduFromPacket(self, packet, encrypt=False) -> HubMessage:
+        """Create a SendBlePdu message from a BLE packet
+
+        :param packet: Scapy BTLE_DATA packet
+        :type packet: scapy.layers.bluetooth4LE.BTLE_DATA
+        :param encrypt: Enable/disable packet encryption
+        :type encrypt: bool
+        :return: instance of SendBlePdu message
+        :return-type: SendBlePdu
+        """
+        return BleDomain.bound("send_pdu", self.proto_version).from_packet(packet, encrypt)
+
     def createAdvPduReceived(self, adv_type: AdvType, rssi: int, bd_address: BDAddress, \
                              adv_data: bytes):
         """Create an AdvPduReceived message

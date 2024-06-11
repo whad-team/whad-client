@@ -370,7 +370,7 @@ class WhadDeviceConnector(object):
         """
         return self.__synchronous
 
-    def add_pending_pdu(self, pdu):
+    def add_pending_packet(self, pdu):
         """Add a pending protocol data unit (PDU) if in synchronous mode.
 
         :param pdu: Pending PDU to add to our queue of pending PDUs
@@ -379,8 +379,8 @@ class WhadDeviceConnector(object):
         if self.__synchronous:
             self.__pending_pdus.put(pdu)
 
-    def wait_pdu(self, timeout:float = None):
-        '''Wait for a protocol data unit (PDU) when in synchronous mode.
+    def wait_packet(self, timeout:float = None):
+        '''Wait for a packet when in synchronous mode.
 
         :param timeout: If specified, defines a timeout when querying the PDU queue
         :type timeout: float, optional

@@ -2,15 +2,42 @@
 """
 import struct
 from scapy.compat import raw
-from scapy.layers.bluetooth4LE import BTLE, BTLE_DATA, BTLE_CTRL, BTLE_ADV
+from scapy.layers.bluetooth4LE import BTLE, BTLE_DATA, BTLE_CTRL, BTLE_ADV, BTLE_ADV_IND, \
+    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
 from whad.hub.metadata import BLEMetadata
 from whad.hub.message import AbstractPacket
+from whad.hub.ble import Direction, AdvType, AddressType, BDAddress
 
-from whad.protocol.whad_pb2 import Message
-from whad.protocol.ble.ble_pb2 import CentralModeCmd
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool
 from whad.hub.ble import BleDomain
+
+
+def packet_to_bytes(packet):
+    """Convert packet to bytes
+    """
+    try:
+        return raw(packet)
+    except TypeError as type_err:
+        return bytes(packet.__bytes__())
+
+# correlation table
+SCAPY_CORR_ADV = {
+    AdvType.ADV_IND: BTLE_ADV_IND,
+    AdvType.ADV_NONCONN_IND: BTLE_ADV_NONCONN_IND,
+    AdvType.ADV_DIRECT_IND: BTLE_ADV_DIRECT_IND,
+    AdvType.ADV_SCAN_IND: BTLE_ADV_SCAN_IND,
+    AdvType.ADV_SCAN_RSP: BTLE_SCAN_RSP
+}
+
+# correlation table
+SCAPY_CORR_ADV_INV = {
+    BTLE_ADV_IND: AdvType.ADV_IND,
+    BTLE_ADV_NONCONN_IND: AdvType.ADV_NONCONN_IND,
+    BTLE_ADV_DIRECT_IND: AdvType.ADV_DIRECT_IND,
+    BTLE_ADV_SCAN_IND: AdvType.ADV_SCAN_IND,
+    BTLE_SCAN_RSP: AdvType.ADV_SCAN_RSP
+}
 
 @pb_bind(BleDomain, "set_adv_data", 1)
 class SetAdvData(PbMessageWrapper):
@@ -30,6 +57,37 @@ class SendBleRawPdu(PbMessageWrapper):
     crc = PbFieldInt("ble.send_raw_pdu.crc")
     encrypt = PbFieldBool("ble.send_raw_pdu.encrypt")
 
+    def to_packet(self):
+        """Convert message to the corresponding Scapy packet
+        """
+        return BTLE(self.pdu)
+
+    @staticmethod
+    def from_packet(packet, encrypt=False):
+        """Convert packet to SendBlePdu message.
+        """
+        direction = packet.metadata.direction
+        connection_handle = packet.metadata.connection_handle
+
+        # Extract PDU
+        if BTLE_DATA in packet:
+            pdu = raw(packet[BTLE_DATA:])
+        elif BTLE_CTRL in packet:
+            pdu = raw(packet[BTLE_CTRL:])
+        elif BTLE_ADV in packet:
+            pdu = raw(packet[BTLE_ADV:])
+        else:
+            return None
+        
+        return SendBleRawPdu(
+            direction=direction,
+            pdu=pdu,
+            conn_handle=connection_handle,
+            access_address=BTLE(raw(packet)).access_addr,
+            crc=BTLE(raw(packet)).crc,
+            encrypt=encrypt
+        )
+
 @pb_bind(BleDomain, "send_pdu", 1)
 class SendBlePdu(PbMessageWrapper):
     """BLE send PDU message class
@@ -38,6 +96,38 @@ class SendBlePdu(PbMessageWrapper):
     conn_handle = PbFieldInt("ble.send_pdu.conn_handle")
     pdu = PbFieldBytes("ble.send_pdu.pdu")
     encrypt = PbFieldBool("ble.send_pdu.encrypt")
+
+    def to_packet(self):
+        """Convert message to the corresponding Scapy packet
+        """
+        return BTLE_DATA(self.pdu)
+    
+    @staticmethod
+    def from_packet(packet, encrypt=False):
+        """Convert packet to SendBlePdu message.
+        """
+        direction = packet.metadata.direction
+        connection_handle = packet.metadata.connection_handle
+
+        # Extract PDU
+        if BTLE_DATA in packet:
+            pdu = packet_to_bytes(packet[BTLE_DATA:])
+        elif BTLE_CTRL in packet:
+            pdu = packet_to_bytes(packet[BTLE_CTRL:])
+        elif BTLE_ADV in packet:
+            pdu = packet_to_bytes(packet[BTLE_ADV:])
+        else:
+            return None
+        
+        # Create a SendPdu message
+        return SendBlePdu(
+            direction=direction,
+            conn_handle=connection_handle,
+            pdu=pdu,
+            encrypt=encrypt
+        )
+            
+
 
 @pb_bind(BleDomain, "adv_pdu", 1)
 class BleAdvPduReceived(PbMessageWrapper):
@@ -48,6 +138,53 @@ class BleAdvPduReceived(PbMessageWrapper):
     bd_address = PbFieldBytes("ble.adv_pdu.bd_address")
     adv_data = PbFieldBytes("ble.adv_pdu.adv_data")
     addr_type = PbFieldInt("ble.adv_pdu.addr_type")
+
+
+    def to_packet(self):
+        """Convert message into its corresponding Scapy packet
+        """
+        if self.adv_type in SCAPY_CORR_ADV:
+            data = bytes(self.adv_data)
+
+            packet = BTLE_ADV()/SCAPY_CORR_ADV[self.adv_type](
+                    bytes(self.bd_address) + data
+                )
+            
+            # Set TxAdd to 1 if address is random
+            if self.addr_type == AddressType.RANDOM:
+                packet.TxAdd = 1
+            
+            # Set packet metadata
+            packet.metadata = BLEMetadata()
+            packet.metadata.direction = Direction.UNKNOWN
+            packet.metadata.rssi = self.rssi
+
+            # Success, return Scapy packet
+            return packet
+        else:
+            # Unkown advertisement type
+            return None
+        
+    @staticmethod
+    def from_packet(packet):
+        """Convert packet into BleAdvPduReceived message
+        """
+        if BTLE_ADV in packet:
+            # Search advertisement type
+            for adv_class in SCAPY_CORR_ADV_INV:
+                print(adv_class)
+                if  packet.haslayer(adv_class):
+                    adv_data = b''.join([bytes(x) for x in packet.getlayer(adv_class).data])
+                    return BleAdvPduReceived(
+                        adv_type=SCAPY_CORR_ADV_INV[adv_class],
+                        rssi=packet.metadata.rssi if packet.metadata is not None else 0,
+                        bd_address=BDAddress(packet.AdvA).value,
+                        adv_data=adv_data,
+                        addr_type=AddressType.RANDOM if packet.getlayer(BTLE_ADV).TxAdd == 1 else AddressType.PUBLIC
+                    )
+        else:
+            # Error
+            return None
 
 
 @pb_bind(BleDomain, "pdu", 1)
@@ -68,6 +205,7 @@ class BlePduReceived(PbMessageWrapper):
         packet.metadata.connection_handle = self.conn_handle
         packet.metadata.direction = self.direction
         packet.metadata.decrypted = self.decrypted
+        packet.metadata.processed = self.processed
         return packet
 
     @staticmethod
@@ -78,7 +216,7 @@ class BlePduReceived(PbMessageWrapper):
             pdu=bytes(packet),
             direction=packet.metadata.direction,
             conn_handle=packet.metadata.connection_handle,
-            processed=False,
+            processed=packet.metadata.processed,
             decrypted=packet.metadata.decrypted
         )
 
@@ -110,6 +248,7 @@ class BleRawPduReceived(PbMessageWrapper):
         packet.metadata.direction = self.direction
         packet.metadata.connection_handle = self.conn_handle
         packet.metadata.channel = self.channel
+        packet.metadata.processed = self.processed
         if self.rssi is not None:
             packet.metadata.rssi = self.rssi
         if self.timestamp is not None:
@@ -148,13 +287,11 @@ class BleRawPduReceived(PbMessageWrapper):
                 timestamp=packet.metadata.timestamp,
                 crc_validity=packet.metadata.is_crc_valid,
                 relative_timestamp=packet.metadata.relative_timestamp,
-                decrypted=packet.metadata.decrypted
+                decrypted=packet.metadata.decrypted,
+                processed=packet.metadata.processed
             )
         
         return None
-
-
-
 
 @pb_bind(BleDomain, "injected", 1)
 class Injected(PbMessageWrapper):
