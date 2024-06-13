@@ -1,8 +1,8 @@
 from dataclasses import dataclass,fields
 
-
 @dataclass(repr=False)
 class Metadata:
+    raw : bool = None
     timestamp : int = None
     channel : int = None
     rssi : int = None

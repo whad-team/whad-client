@@ -387,6 +387,11 @@ class UnixSocketConnector(WhadDeviceConnector):
         """
         pass
 
+    def on_packet(self, packet):
+        """Callback function to process incoming packets.
+        """
+        pass
+
     def get_url(self):
         """Return socket URL
         """

@@ -13,8 +13,8 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery
 from whad.helpers import message_filter, asciiz
 from whad.hub import ProtocolHub
-from whad.hub.message import AbstractPacket
-from whad.hub.generic.cmdresult import CommandResult
+from whad.hub.message import AbstractPacket, AbstractEvent
+from whad.hub.generic.cmdresult import CommandResult, Success
 from whad.hub.discovery import InfoQueryResp, DomainInfoQueryResp, DeviceReady
 
 # Logging
@@ -424,6 +424,28 @@ class WhadDeviceConnector(object):
         except WhadDeviceError as device_error:
             logger.debug('an error occured while communicating with the WHAD device !')
             self.on_error(device_error)
+
+    ######################################
+    # Packet flow handling
+    ######################################
+
+    def send_packet(self, packet):
+        """Send packet to our device.
+        """
+        # Convert packet into the corresponding message
+        msg = self.hub.convertPacket(packet)
+
+        if msg is not None:
+            resp = self.send_command(msg, message_filter(CommandResult))
+            logger.info('[ble connector] Command sent, result: %s' % resp)
+            if resp is None:
+                print('resp is none')
+                raise WhadDeviceDisconnected(None)
+            else:
+                return isinstance(resp, Success)
+        else:
+            logger.error('[ble connector] Packet cannot be converted into the corresponding WHAD message')
+            return False
 
 
     def wait_for_message(self, timeout=None, filter=None, command=False):
@@ -1055,20 +1077,6 @@ class WhadDevice(object):
         self.on_any_msg(message)
 
         # Forward to dedicated callbacks
-        """
-        if message.WhichOneof('msg') == 'discovery':
-            logger.info('message is about device discovery, forwarding to discovery handler')
-            self.on_discovery_msg(message.discovery)
-        elif message.WhichOneof('msg') == 'generic':
-            logger.info('message is generic, forwarding to default handler')
-            self.on_generic_msg(message.generic)
-            logger.info('on_generic_message called')
-        else:
-            domain = message.WhichOneof('msg')
-            if domain is not None:
-                logger.info('message concerns domain `%s`, forward to domain-specific handler' % domain)
-                self.on_domain_msg(domain, getattr(message,domain))
-        """
         if message.message_type == "discovery":
             logger.info('message is about device discovery, forwarding to discovery handler')
             self.on_discovery_msg(message)
@@ -1133,7 +1141,6 @@ class WhadDevice(object):
         if self.__connector is not None:
             logger.debug('Forward message %s to connector %s' % (message, self.__connector))
             self.__connector.on_any_msg(message)
-
 
     ######################################
     # Generic messages handling
@@ -1335,7 +1342,30 @@ class WhadDevice(object):
 
         # Forward everything to the connector, if any
         if self.__connector is not None:
-            self.__connector.on_domain_msg(domain, message)
+
+            # Check if message is a received packet
+            if issubclass(message, AbstractPacket):
+                # Convert message into packet
+                packet = message.to_packet()
+                if packet is not None:
+
+                    # Report packet to monitors
+                    self.__connector.monitor_packet_rx(packet)
+
+                    # Forward to our connector
+                    if self.__connector.is_synchronous():
+                        self.__connector.add_pending_packet(packet)
+                    else:
+                        self.__connector.on_packet(packet)
+            elif issubclass(message, AbstractEvent):
+                # Convert message into event
+                event = message.to_event()
+                if event is not None:
+                    # Forward to our connector
+                    self.__connector.on_event(event)
+            else:
+                # Forward other messages to on_domain_msg() callback
+                self.__connector.on_domain_msg(domain, message)
         return False
 
 

@@ -17,19 +17,17 @@ from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
 # Protocol hub
 from whad.helpers import message_filter
-from whad.hub.message import AbstractPacket
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import ChannelMap
-from whad.hub.ble import Commands, AdvType, Direction, BleAdvPduReceived, BlePduReceived, \
-    BleRawPduReceived, Synchronized, Desynchronized, Connected, Disconnected, Triggered
+from whad.hub.ble import Commands, AdvType, Direction, Synchronized, Desynchronized, \
+    Connected, Disconnected, Triggered, BLEMetadata
+from whad.hub.events import ConnectionEvt, DisconnectionEvt, SyncEvt, DesyncEvt, TriggeredEvt
 
 # Bluetooth Low Energy dependencies
 from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
-from whad.ble.metadata import BLEMetadata
 from whad.ble.connector.translator import BleMessageTranslator
 from whad.ble.profile.advdata import AdvDataFieldList
-from whad.ble.exceptions import ConnectionLostException
 
 # Logging
 logger = logging.getLogger(__name__)
@@ -666,51 +664,7 @@ class BLE(WhadDeviceConnector):
         pass
 
     def on_domain_msg(self, domain, message):
-        if not self.__ready:
-            return
-
-        # Ensure forwarded message is BLE related
-        assert domain == 'ble'
-
-        # Check if message is a received packet
-        if issubclass(message, AbstractPacket):
-            # Convert message into packet
-            packet = message.to_packet()
-            if packet is not None:
-
-                # Report packet to monitors
-                self.monitor_packet_rx(packet)
-
-                # If message is BlePduReceived or BleRawPduReceived, we must
-                # take into account the `processed` property.
-                if packet.metadata.processed is not None:
-                    # If packet has already been processed, no other processing is required
-                    if packet.metadata.processed:
-                        return
-
-                # Forward to our connector
-                if self.is_synchronous():
-                    self.add_pending_packet(packet)
-                else:
-                    self.on_packet(packet)
-
-        elif isinstance(message, Synchronized):
-            self.on_synchronized(
-                access_address = message.access_address,
-                crc_init = message.crc_init,
-                hop_interval = message.hop_interval,
-                hop_increment = message.hop_increment,
-                channel_map = message.channel_map
-            )
-        elif isinstance(message, Desynchronized):
-            self.on_desynchronized(access_address=message.access_address)
-        elif isinstance(message, Connected):
-            self.on_connected(message)
-        elif isinstance(message, Disconnected):
-            self.on_disconnected(message)
-        elif isinstance(message, Triggered):
-            self.on_triggered(message.id)
-
+        pass
 
     def on_synchronized(self, access_address=None, crc_init=None, hop_increment=None, hop_interval=None, channel_map=None):
         pass
@@ -718,9 +672,35 @@ class BLE(WhadDeviceConnector):
     def on_desynchronized(self, access_address=None):
         pass
 
+    def on_event(self, event):
+        # Don't process if connector is not ready
+        if not self.__ready:
+            return
+
+        if isinstance(event, ConnectionEvt):
+            self.on_connected(event)
+        elif isinstance(event, DisconnectionEvt):
+            self.on_disconnected(event)
+        elif isinstance(event, SyncEvt):
+            self.on_synchronized(
+                access_address = event.access_address,
+                crc_init = event.crc_init,
+                hop_interval = event.hop_interval,
+                hop_increment = event.hop_increment,
+                channel_map = event.channel_map
+            )
+        elif isinstance(event, DesyncEvt):
+            self.on_desynchronized(access_address=event.access_address)
+        elif isinstance(event, TriggeredEvt):
+            self.on_triggered(event.id)
+
     def on_packet(self, packet):
         """Dispatch incoming packet
         """
+        # discard processed packets or if we're not ready
+        if packet.metadata.processed or not self.__ready:
+            return
+        
         if BTLE_ADV in packet:
             adv_pdu = packet[BTLE_ADV:]
             adv_pdu.metadata = packet.metadata
@@ -728,7 +708,12 @@ class BLE(WhadDeviceConnector):
         elif BTLE_DATA in packet:
             conn_pdu = packet[BTLE_DATA:]
             conn_pdu.metadata = packet.metadata
-            self.on_data_pdu(conn_pdu)
+            if packet.LLID == 3:
+                self.on_ctl_pdu(conn_pdu)
+            elif packet.LLID in (1,2):
+                self.on_data_pdu(conn_pdu)
+            else:
+                self.on_error_pdu(conn_pdu)
 
     def on_adv_pdu(self, packet):
         logger.info('received an advertisement PDU')
@@ -748,14 +733,6 @@ class BLE(WhadDeviceConnector):
         logger.info('a connection has been terminated')
         for trigger in self.__triggers:
             self.delete_sequence(trigger)
-
-    def on_pdu(self, packet):
-        if packet.LLID == 3:
-            self.on_ctl_pdu(packet)
-        elif packet.LLID in (1,2):
-            self.on_data_pdu(packet)
-        else:
-            self.on_error_pdu(packet)
 
     def on_data_pdu(self, pdu):
         logger.info('received a data PDU')
@@ -784,48 +761,39 @@ class BLE(WhadDeviceConnector):
 
     def send_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
         """
-        Send generic PDU.
+        Send a generic BLE PDU.
         """
         if self.can_send():
             if self.support_raw_pdu():
                 packet = BTLE(access_addr=access_address)/pdu
+                send_raw = True
             else:
                 packet = pdu
+                send_raw = False
+
+            # Build packet metadata in order to get this packet correctly
+            # translated into the corresponding WHAD message.
             packet.metadata = BLEMetadata()
             packet.metadata.direction = direction
             packet.metadata.connection_handle = conn_handle
+            packet.metadata.raw = send_raw
+            
+            # Monitor this outgoing packet
             self.monitor_packet_tx(packet)
 
             # If encrypt is provided, take it into account
             # otherwise consider using the internal link-layer encryption status
             if encrypt is not None and isinstance(encrypt, bool):
                 logger.info('[ble connector] encrypt is specified (%s)' % encrypt)
-                encrypt = True
+                packet.metadata.encrypt = True
             else:
                 logger.info('[ble connector] link-layer encryption: %s' % self.__encrypted)
-                encrypt = False
+                packet.metadata.encrypt = False
 
             # Send BLE packet
-            return self.send_packet(packet, encrypt=encrypt)
+            return super().send_packet(packet)
         else:
             return False
-
-    def send_packet(self, packet, encrypt=False):
-        """Send packet to our device.
-        """
-        # Convert packet into the corresponding message
-        if BTLE in packet:
-            msg = self.hub.ble.createSendRawPduFromPacket(packet, encrypt=encrypt)
-        else:
-            msg = self.hub.ble.createSendPduFromPacket(packet, encrypt=encrypt)
-
-        resp = self.send_command(msg, message_filter(CommandResult))
-        logger.info('[ble connector] Command sent, result: %s' % resp)
-        if resp is None:
-            raise ConnectionLostException(None)
-        else:
-            return isinstance(resp, Success)
-
 
 
 from whad.ble.connector.peripheral import Peripheral, PeripheralClient
