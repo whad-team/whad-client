@@ -24,7 +24,7 @@ class HijackBoth(PbMessageWrapper):
 
 @pb_bind(BleDomain, "hijacked", 1)
 class Hijacked(PbMessageWrapper):
-    """BLE hijack both message class
+    """BLE hijack both message class.
     """
     success = PbFieldBool("ble.hijacked.success")
     access_address = PbFieldInt("ble.hijacked.access_address")

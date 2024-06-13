@@ -1,5 +1,6 @@
 """WHAD protocol message abstraction
 """
+from typing import Any
 from whad.protocol.whad_pb2 import Message
 from whad.hub.registry import Registry
 
@@ -234,11 +235,6 @@ class PbMessageWrapper(HubMessage):
         """
         return parent_class(message=message)
 
-class AbstractEvent(type):
-    """Hub event metaclass
-    """
-    pass
-
 class AbstractPacketMeta(type):
     """Hub packet metaclass"""
     def __instancecheck__(cls, instance):
@@ -251,4 +247,19 @@ class AbstractPacketMeta(type):
                 callable(subclass.from_packet))
     
 class AbstractPacket(metaclass=AbstractPacketMeta):
+    pass
+
+class AbstractEventMeta(type):
+    """Hub event metaclass
+    """
+    def __instancecheck__(cls, instance: Any) -> bool:
+        return cls.__instancecheck__(type(instance))
+    
+    def __subclasscheck__(cls, subclass):
+        return (hasattr(subclass, 'to_event') and 
+                callable(subclass.to_event) and 
+                hasattr(subclass, 'from_event') and 
+                callable(subclass.from_event))
+    
+class AbstractEvent(metaclass=AbstractEventMeta):
     pass

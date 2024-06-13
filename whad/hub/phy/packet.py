@@ -1,6 +1,8 @@
 """WHAD Protocol PHY packet messages abstraction layer.
 """
 from whad.protocol.whad_pb2 import Message
+from whad.scapy.layers.phy import Phy_Packet
+from whad.hub.metadata import PhyMetadata
 from whad.protocol.phy.phy_pb2 import SetBPSKModulationCmd
 from ..message import pb_bind, PbFieldInt, PbFieldBytes,PbFieldArray, PbFieldMsg, PbMessageWrapper
 from . import PhyDomain
@@ -50,12 +52,40 @@ class SendPacket(PbMessageWrapper):
 
     packet = PbFieldBytes('phy.send.packet')
 
+    def to_packet(self):
+        """Convert message to packet
+        """
+        return Phy_Packet(self.packet)
+
+
+    @staticmethod
+    def from_packet(packet):
+        """Convert packet to message
+        """
+        return SendPacket(
+            packet=bytes(packet)
+        )
+
 @pb_bind(PhyDomain, 'send_raw', 1)
 class SendRawPacket(PbMessageWrapper):
     """PHY packet send message
     """
 
     iq = PbFieldArray('phy.send_raw.iq')
+
+    def to_packet(self):
+        """Convert message to packet
+        """
+        return Phy_Packet(self.packet)
+
+
+    @staticmethod
+    def from_packet(packet):
+        """Convert packet to message
+        """
+        return SendRawPacket(
+            iq=[]
+        )
 
 @pb_bind(PhyDomain, 'packet', 1)
 class PacketReceived(PbMessageWrapper):
@@ -66,6 +96,33 @@ class PacketReceived(PbMessageWrapper):
     packet = PbFieldBytes('phy.packet.packet')
     rssi = PbFieldInt('phy.packet.rssi', optional=True)
     timestamp = PbFieldMsg('phy.packet.timestamp', Timestamp, optional=True)
+
+    def to_packet(self):
+        """Convert message to packet
+        """
+        packet = Phy_Packet(self.packet)
+        packet.metadata = PhyMetadata()
+        packet.metadata.frequency = self.frequency
+        if self.rssi is not None:
+            packet.metadata.rssi = self.rssi
+        if self.timestamp is not None:
+            packet.metadata.timestamp = self.timestamp
+
+
+    @staticmethod
+    def from_packet(packet):
+        """Convert packet to message
+        """
+        msg = PacketReceived(
+            frequency=packet.metadata.frequency,
+            packet=bytes(packet)
+        )
+        if packet.metadata.rssi is not None:
+            msg.rssi = packet.metadata.rssi
+        if packet.metadata.timestamp is not None:
+            msg.timstamp = packet.metadata.timestamp
+
+        return msg
 
 @pb_bind(PhyDomain, 'raw_packet', 1)
 class RawPacketReceived(PbMessageWrapper):

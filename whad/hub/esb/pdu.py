@@ -3,8 +3,6 @@
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
 from whad.hub.metadata import ESBMetadata
-
-#from whad.protocol.esb.esb_pb2 import StartCmd, StopCmd
 from ..message import pb_bind, PbFieldBytes, PbFieldBool, PbFieldInt, PbMessageWrapper
 from . import EsbDomain
 

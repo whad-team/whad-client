@@ -6,6 +6,7 @@ from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4MitmRole, AddressType
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
+from whad.hub.metadata import Dot15d4Metadata
 
 class Commands:
     """Dot15d4 commands
@@ -87,6 +88,27 @@ class Dot15d4Domain(Registry):
         """Initializes a Dot15d4 domain instance
         """
         self.proto_version = version
+
+    def isPacketCompat(self, packet) -> bool:
+        """Determine if a packet is a Dot15d4 packet.
+        """
+        return isinstance(packet.metadata, Dot15d4Metadata)
+    
+    def convertPacket(self, packet) -> HubMessage:
+        """Convert a Dot15d4 packet to SendPdu or SendBlePdu message.
+        """
+        if isinstance(packet.metadata, Dot15d4Metadata):
+            if packet.metadata.raw:
+                return Dot15d4Domain.bound('send_raw', self.proto_version).from_packet(
+                    packet, encrypt=packet.metadata.encrypt
+                )
+            else:
+                return Dot15d4Domain.bound('send', self.proto_version).from_packet(
+                    packet, encrypt=packet.metadata.encrypt
+                )
+        else:
+            # Error
+            return None
 
     @staticmethod
     def parse(proto_version: int, message) -> HubMessage:

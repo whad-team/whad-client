@@ -4,9 +4,8 @@ import struct
 from scapy.compat import raw
 from scapy.layers.bluetooth4LE import BTLE, BTLE_DATA, BTLE_CTRL, BTLE_ADV, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
-from whad.hub.metadata import BLEMetadata
 from whad.hub.message import AbstractPacket
-from whad.hub.ble import Direction, AdvType, AddressType, BDAddress
+from whad.hub.ble import Direction, AdvType, AddressType, BDAddress, BLEMetadata
 
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool
@@ -158,6 +157,7 @@ class BleAdvPduReceived(PbMessageWrapper):
             packet.metadata = BLEMetadata()
             packet.metadata.direction = Direction.UNKNOWN
             packet.metadata.rssi = self.rssi
+            packet.metadata.raw = False
 
             # Success, return Scapy packet
             return packet
@@ -172,7 +172,6 @@ class BleAdvPduReceived(PbMessageWrapper):
         if BTLE_ADV in packet:
             # Search advertisement type
             for adv_class in SCAPY_CORR_ADV_INV:
-                print(adv_class)
                 if  packet.haslayer(adv_class):
                     adv_data = b''.join([bytes(x) for x in packet.getlayer(adv_class).data])
                     return BleAdvPduReceived(
@@ -206,6 +205,7 @@ class BlePduReceived(PbMessageWrapper):
         packet.metadata.direction = self.direction
         packet.metadata.decrypted = self.decrypted
         packet.metadata.processed = self.processed
+        packet.metadata.raw = False
         return packet
 
     @staticmethod
@@ -249,6 +249,8 @@ class BleRawPduReceived(PbMessageWrapper):
         packet.metadata.connection_handle = self.conn_handle
         packet.metadata.channel = self.channel
         packet.metadata.processed = self.processed
+        packet.metadata.raw = True
+        
         if self.rssi is not None:
             packet.metadata.rssi = self.rssi
         if self.timestamp is not None:

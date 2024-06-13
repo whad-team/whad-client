@@ -5,6 +5,7 @@ from whad.protocol.ble.ble_pb2 import PrepareSequenceCmd
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldArray, Registry, HubMessage
 from whad.hub.ble import BleDomain
+from whad.hub.events import TriggeredEvt
 
 class IPacketSequence:
     """Packet Sequence interface class
@@ -83,10 +84,26 @@ class PrepareSequence(Registry):
 
 @pb_bind(BleDomain, "triggered", 1)
 class Triggered(PbMessageWrapper):
-    """BLE prepare sequence triggered message class
+    """BLE prepare sequence triggered message class.
+
+    This class implements WHAD's AbstractEvent interface and can be converted
+    into a `TriggeredEvt` object.    
     """
     sequence_id = PbFieldInt("ble.triggered.id")
 
+
+    def to_event(self):
+        """Convert this message to an event.
+        """
+        return TriggeredEvt(
+            sequence_id=self.sequence_id,
+        )
+    
+    @staticmethod
+    def from_event(event):
+        return Triggered(
+            sequence_id=event.sequence_id,
+        )
 
 @pb_bind(BleDomain, "trigger", 1)
 class Trigger(PbMessageWrapper):

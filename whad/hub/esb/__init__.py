@@ -5,6 +5,7 @@ from typing import List, Union
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
+from whad.hub.metadata import ESBMetadata
 
 class Commands:
     """ESB Commands
@@ -89,6 +90,27 @@ class EsbDomain(Registry):
         """Initializes a ESB domain instance
         """
         self.proto_version = version
+
+    def isPacketCompat(self, packet) -> bool:
+        """Determine if a packet is an ESB packet.
+        """
+        return isinstance(packet.metadata, ESBMetadata)
+    
+    def convertPacket(self, packet) -> HubMessage:
+        """Convert an ESB packet to SendPdu or SendBlePdu message.
+        """
+        if isinstance(packet.metadata, ESBMetadata):
+            if packet.metadata.raw:
+                return EsbDomain.bound('send_raw', self.proto_version).from_packet(
+                    packet
+                )
+            else:
+                return EsbDomain.bound('send', self.proto_version).from_packet(
+                    packet
+                )
+        else:
+            # Error
+            return None
 
     @staticmethod
     def parse(proto_version: int, message) -> HubMessage:

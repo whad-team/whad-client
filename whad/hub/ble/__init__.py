@@ -1,14 +1,18 @@
 """WHAD Protocol Bluetooth Low Energy domain message abstraction layer.
 """
 from typing import List
+from dataclasses import dataclass, field, fields
 
 from .bdaddr import BDAddress
 from .chanmap import ChannelMap
+
+from scapy.layers.bluetooth4LE import BTLE_RF
 
 from whad.protocol.ble.ble_pb2 import BleDirection, BleAdvType, BleAddrType
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
+from whad.hub.metadata import Metadata
 
 class Commands:
     """BLE Commands
@@ -63,6 +67,53 @@ class AddressType:
     PUBLIC = BleAddrType.PUBLIC
     RANDOM = BleAddrType.RANDOM
 
+@dataclass(repr=False)
+class BLEMetadata(Metadata):
+    direction : BleDirection = None
+    connection_handle : int = None
+    is_crc_valid : bool = None
+    relative_timestamp : int = None
+    decrypted : bool = None
+    processed : bool = None
+    encrypt : bool = False
+
+    def convert_to_header(self):
+        timestamp = None
+        packet_type = 0 # ADV_OR_DATA_UNKNOWN_DIR
+        signal = -128
+        crc_checked = 0
+        crc_valid = 0
+        sig_power_valid = 0
+        dewhitened = 1
+        rf_channel = 0
+        if self.direction is not None:
+            if self.direction == Direction.MASTER_TO_SLAVE:
+                packet_type = 2
+            elif self.direction == Direction.SLAVE_TO_MASTER:
+                packet_type = 3
+        if self.timestamp is not None:
+            timestamp = self.timestamp
+        if self.rssi is not None:
+            sig_power_valid = 1
+            signal = self.rssi
+        if self.is_crc_valid is not None:
+            crc_checked = 1
+            crc_valid = self.is_crc_valid
+        if self.channel is not None:
+            rf_channel = self.channel
+
+        header = BTLE_RF(
+            rf_channel = rf_channel,
+            type = packet_type,
+            signal = signal,
+            crc_checked = crc_checked,
+            crc_valid = crc_valid,
+            sig_power_valid = sig_power_valid,
+            dewhitened = dewhitened
+        )
+        return header, timestamp
+
+
 @pb_bind(ProtocolHub, name="ble", version=1)
 class BleDomain(Registry):
     """WHAD BLE domain messages parser/factory.
@@ -83,6 +134,27 @@ class BleDomain(Registry):
         message_type = message.ble.WhichOneof('msg')
         message_clazz = BleDomain.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
+
+    def isPacketCompat(self, packet) -> bool:
+        """Determine if a packet is a compatible BLE packet
+        """
+        return isinstance(packet.metadata, BLEMetadata)
+
+    def convertPacket(self, packet) -> HubMessage:
+        """Convert a BLE packet to SendPdu or SendBlePdu message.
+        """
+        if isinstance(packet.metadata, BLEMetadata):
+            if packet.metadata.raw:
+                return BleDomain.bound('send_raw_pdu', self.proto_version).from_packet(
+                    packet, encrypt=packet.metadata.encrypt
+                )
+            else:
+                return BleDomain.bound('send_pdu', self.proto_version).from_packet(
+                    packet, encrypt=packet.metadata.encrypt
+                )
+        else:
+            # Error
+            return None
 
     def createSetBdAddress(self, bd_address: BDAddress) -> HubMessage:
         """Create a SetBdAddress message.
@@ -533,18 +605,6 @@ class BleDomain(Registry):
         # Return message
         return message
 
-    def createSendRawPduFromPacket(self, packet, encrypt=False) -> HubMessage:
-        """Create a SendRawBlePdu message from a BLE packet
-
-        :param packet: Scapy BTLE packet
-        :type packet: scapy.layers.bluetooth4LE.BTLE
-        :param encrypt: Enable/disable packet encryption
-        :type encrypt: bool
-        :return: instance of SendBleRawPdu message
-        :return-type: SendBleRawPdu
-        """
-        return BleDomain.bound("send_raw_pdu", self.proto_version).from_packet(packet, encrypt)
-
     def createSendPdu(self, direction: int, pdu: bytes, conn_handle: int, \
                       encrypt: bool = False) -> HubMessage:
         """Create a SendBlePdu message.
@@ -566,18 +626,6 @@ class BleDomain(Registry):
             pdu=pdu,
             encrypt=encrypt
         )
-    
-    def createSendPduFromPacket(self, packet, encrypt=False) -> HubMessage:
-        """Create a SendBlePdu message from a BLE packet
-
-        :param packet: Scapy BTLE_DATA packet
-        :type packet: scapy.layers.bluetooth4LE.BTLE_DATA
-        :param encrypt: Enable/disable packet encryption
-        :type encrypt: bool
-        :return: instance of SendBlePdu message
-        :return-type: SendBlePdu
-        """
-        return BleDomain.bound("send_pdu", self.proto_version).from_packet(packet, encrypt)
 
     def createAdvPduReceived(self, adv_type: AdvType, rssi: int, bd_address: BDAddress, \
                              adv_data: bytes):
