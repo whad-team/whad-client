@@ -1001,6 +1001,12 @@ class GattServer(GattLayer):
         # Subscribed characteristics
         self.__subscribed_characs = []
 
+    @property
+    def server_model(self):
+        """Retrieve the current server model
+        """
+        return self.__server_model
+
     def set_model(self, model):
         '''Set the GATT server underlying profile.
         '''
@@ -1037,8 +1043,8 @@ class GattServer(GattLayer):
             local_mtu = self.get_layer('l2cap').get_local_mtu()
 
             # Call model callback
-            service = self.__server_model.find_service_by_characteristic_handle(characteristic.handle)
-            self.__server_model.on_notification(
+            service = self.server_model.find_service_by_characteristic_handle(characteristic.handle)
+            self.server_model.on_notification(
                 service,
                 characteristic,
                 characteristic.value[:local_mtu-3]
@@ -1066,8 +1072,8 @@ class GattServer(GattLayer):
             local_mtu = self.get_layer('l2cap').get_local_mtu()
 
             # Call model callback
-            service = self.__server_model.find_service_by_characteristic_handle(characteristic.handle)
-            self.__server_model.on_indication(
+            service = self.server_model.find_service_by_characteristic_handle(characteristic.handle)
+            self.server_model.on_indication(
                 service,
                 characteristic,
                 characteristic.value[:local_mtu-3]
@@ -1092,7 +1098,7 @@ class GattServer(GattLayer):
         # List attributes by type UUID, sorted by handles
         attrs = {}
         attrs_handles = []
-        for attribute in self.__server_model.find_objects_by_range(request.start, request.end):
+        for attribute in self.server_model.find_objects_by_range(request.start, request.end):
             attrs[attribute.handle] = attribute
             attrs_handles.append(attribute.handle)
         attrs_handles.sort()
@@ -1149,7 +1155,7 @@ class GattServer(GattLayer):
         # List attributes by type UUID, sorted by handles
         attrs = {}
         attrs_handles = []
-        for attribute in self.__server_model.find_objects_by_range(request.start, request.end):
+        for attribute in self.server_model.find_objects_by_range(request.start, request.end):
             attrs[attribute.handle] = attribute
             attrs_handles.append(attribute.handle)
         attrs_handles.sort()
@@ -1223,13 +1229,13 @@ class GattServer(GattLayer):
             local_mtu = self.get_layer('l2cap').get_local_mtu()
 
             # Search attribute by handle and send respons
-            attr = self.__server_model.find_object_by_handle(request.handle)
+            attr = self.server_model.find_object_by_handle(request.handle)
 
             # Ensure attribute is a readable characteristic value or a descriptor
             if isinstance(attr, CharacteristicValue):
 
                 # Check characteristic is readable
-                charac = self.__server_model.find_object_by_handle(request.handle - 1)
+                charac = self.server_model.find_object_by_handle(request.handle - 1)
 
                 conn_handle = self.get_layer('l2cap').get_conn_handle()
                 if charac.check_security_property(ReadAccess, Authentication):
@@ -1261,8 +1267,8 @@ class GattServer(GattLayer):
                     return
                 if charac.readable():
                     try:
-                        service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
-                        self.__server_model.on_characteristic_read(
+                        service = self.server_model.find_service_by_characteristic_handle(charac.handle)
+                        self.server_model.on_characteristic_read(
                             service,
                             charac,
                             0,
@@ -1350,7 +1356,7 @@ class GattServer(GattLayer):
             local_mtu = self.get_layer('l2cap').get_local_mtu()
 
             # Search attribute by handle and send response
-            attr = self.__server_model.find_object_by_handle(request.handle)
+            attr = self.server_model.find_object_by_handle(request.handle)
 
             if request.offset < len(attr.value):
 
@@ -1358,8 +1364,8 @@ class GattServer(GattLayer):
                 # before returning a value.
                 if isinstance(attr, CharacteristicValue):
                     try:
-                        charac = self.__server_model.find_object_by_handle(request.handle - 1)
-                        service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
+                        charac = self.server_model.find_object_by_handle(request.handle - 1)
+                        service = self.server_model.find_service_by_characteristic_handle(charac.handle)
 
                         conn_handle = self.get_layer('l2cap').get_conn_handle()
                         if charac.check_security_property(ReadAccess, Authentication):
@@ -1398,7 +1404,7 @@ class GattServer(GattLayer):
                             return
 
                         # Call our characteristic read hook
-                        self.__server_model.on_characteristic_read(
+                        self.server_model.on_characteristic_read(
                             service,
                             charac,
                             request.offset,
@@ -1478,10 +1484,10 @@ class GattServer(GattLayer):
         """
         try:
             # Retrieve attribute from model
-            attr = self.__server_model.find_object_by_handle(request.handle)
+            attr = self.server_model.find_object_by_handle(request.handle)
             if isinstance(attr, CharacteristicValue):
                 # Check the corresponding characteristic is writeable
-                charac = self.__server_model.find_object_by_handle(request.handle - 1)
+                charac = self.server_model.find_object_by_handle(request.handle - 1)
 
                 conn_handle = self.get_layer('l2cap').get_conn_handle()
                 if charac.check_security_property(WriteAccess, Authentication):
@@ -1513,11 +1519,11 @@ class GattServer(GattLayer):
                     return
                 if charac.writeable():
                     # Retrieve corresponding service info
-                    service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
+                    service = self.server_model.find_service_by_characteristic_handle(charac.handle)
 
                     try:
                         # Trigger our write hook
-                        self.__server_model.on_characteristic_write(
+                        self.server_model.on_characteristic_write(
                             service,
                             charac,
                             0,
@@ -1530,7 +1536,7 @@ class GattServer(GattLayer):
                         self.att.write_response()
 
                         # Trigger our written hook (after charac has been written)
-                        value =  self.__server_model.on_characteristic_written(
+                        value =  self.server_model.on_characteristic_written(
                             service,
                             charac,
                             0,
@@ -1544,7 +1550,7 @@ class GattServer(GattLayer):
                         self.att.write_response()
 
                         # Trigger our written hook (after charac has been written)
-                        value =  self.__server_model.on_characteristic_written(
+                        value =  self.server_model.on_characteristic_written(
                             service,
                             charac,
                             0,
@@ -1597,38 +1603,38 @@ class GattServer(GattLayer):
                     # Notify our model
                     if attr.config == 0x0001:
                         charac = attr.characteristic
-                        service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
+                        service = self.server_model.find_service_by_characteristic_handle(charac.handle)
 
                         # Set characteristic notification callback
                         charac.set_notification_callback(self.notify)
 
-                        self.__server_model.on_characteristic_subscribed(
+                        self.server_model.on_characteristic_subscribed(
                             service,
                             charac,
                             notification=True
                         )
                     elif attr.config == 0x0002:
                         charac = attr.characteristic
-                        service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
+                        service = self.server_model.find_service_by_characteristic_handle(charac.handle)
 
                         # Set characteristic indication callback
                         charac.set_indication_callback(self.indicate)
 
-                        self.__server_model.on_characteristic_subscribed(
+                        self.server_model.on_characteristic_subscribed(
                             service,
                             charac,
                             indication=True
                         )
                     elif attr.config == 0x0000:
                         charac = attr.characteristic
-                        service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
+                        service = self.server_model.find_service_by_characteristic_handle(charac.handle)
 
                         # Unset characteristic indication and notification callbacks
                         charac.set_notification_callback(None)
                         charac.set_indication_callback(None)
 
                         # Notify model
-                        self.__server_model.on_characteristic_unsubscribed(
+                        self.server_model.on_characteristic_unsubscribed(
                             service,
                             charac
                         )
@@ -1652,10 +1658,10 @@ class GattServer(GattLayer):
         """
         try:
             # Retrieve attribute from model
-            attr = self.__server_model.find_object_by_handle(request.handle)
+            attr = self.server_model.find_object_by_handle(request.handle)
             if isinstance(attr, CharacteristicValue):
                 # Check the corresponding characteristic is writeable
-                charac = self.__server_model.find_object_by_handle(request.handle - 1)
+                charac = self.server_model.find_object_by_handle(request.handle - 1)
 
                 conn_handle = self.get_layer('l2cap').get_conn_handle()
                 if charac.check_security_property(WriteAccess, Authentication):
@@ -1687,11 +1693,11 @@ class GattServer(GattLayer):
                     return
                 if charac.writeable():
                     # Retrieve corresponding service info
-                    service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
+                    service = self.server_model.find_service_by_characteristic_handle(charac.handle)
 
                     try:
                         # Trigger our write hook
-                        value =  self.__server_model.on_characteristic_write(
+                        value =  self.server_model.on_characteristic_write(
                             service,
                             charac,
                             0,
@@ -1703,7 +1709,7 @@ class GattServer(GattLayer):
                         attr.value = request.value
 
                         # Trigger our written hook (after charac has been written)
-                        value =  self.__server_model.on_characteristic_written(
+                        value =  self.server_model.on_characteristic_written(
                             service,
                             charac,
                             0,
@@ -1716,7 +1722,7 @@ class GattServer(GattLayer):
                         attr.value = force_value.value
 
                         # Trigger our written hook (after charac has been written)
-                        value =  self.__server_model.on_characteristic_written(
+                        value =  self.server_model.on_characteristic_written(
                             service,
                             charac,
                             0,
@@ -1769,35 +1775,35 @@ class GattServer(GattLayer):
                     # Notify our model
                     if attr.config == 0x0001:
                         charac = attr.characteristic
-                        service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
+                        service = self.server_model.find_service_by_characteristic_handle(charac.handle)
 
                         # Set characteristic notification callback
                         charac.set_notification_callback(self.notify)
                         if charac not in self.__subscribed_characs:
                             self.__subscribed_characs.append(charac)
 
-                        self.__server_model.on_characteristic_subscribed(
+                        self.server_model.on_characteristic_subscribed(
                             service,
                             charac,
                             notification=True
                         )
                     elif attr.config == 0x0002:
                         charac = attr.characteristic
-                        service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
+                        service = self.server_model.find_service_by_characteristic_handle(charac.handle)
 
                         # Set characteristic indication callback
                         charac.set_indication_callback(self.indicate)
                         if charac not in self.__subscribed_characs:
                             self.__subscribed_characs.append(charac)
 
-                        self.__server_model.on_characteristic_subscribed(
+                        self.server_model.on_characteristic_subscribed(
                             service,
                             charac,
                             indication=True
                         )
                     elif attr.config == 0x0000:
                         charac = attr.characteristic
-                        service = self.__server_model.find_service_by_characteristic_handle(charac.handle)
+                        service = self.server_model.find_service_by_characteristic_handle(charac.handle)
 
                         # Unset characteristic indication and notification callbacks
                         charac.set_notification_callback(None)
@@ -1807,7 +1813,7 @@ class GattServer(GattLayer):
                             self.__subscribed_characs.remove(charac)
 
                         # Notify model
-                        self.__server_model.on_characteristic_unsubscribed(
+                        self.server_model.on_characteristic_unsubscribed(
                             service,
                             charac
                         )
@@ -1831,7 +1837,7 @@ class GattServer(GattLayer):
         """
         try:
             # Retrieve attribute from model
-            attr = self.__server_model.find_object_by_handle(request.handle)
+            attr = self.server_model.find_object_by_handle(request.handle)
 
             # Queue request
             if request.handle not in self.__write_queues:
@@ -1865,7 +1871,7 @@ class GattServer(GattLayer):
             for handle in self.__write_queues:
                 try:
                     # Retrieve attribute from model
-                    attr = self.__server_model.find_object_by_handle(handle)
+                    attr = self.server_model.find_object_by_handle(handle)
 
                     if isinstance(attr, CharacteristicValue):
                         # apply each update
@@ -1921,7 +1927,7 @@ class GattServer(GattLayer):
         # List attributes by type UUID, sorted by handles
         attrs = {}
         attrs_handles = []
-        for attribute in self.__server_model.attr_by_type_uuid(UUID(request.type), request.start, request.end):
+        for attribute in self.server_model.attr_by_type_uuid(UUID(request.type), request.start, request.end):
             attrs[attribute.handle] = attribute
             attrs_handles.append(attribute.handle)
         attrs_handles.sort()
@@ -2041,7 +2047,7 @@ class GattServer(GattLayer):
         # List attributes by type UUID, sorted by handles
         attrs = {}
         attrs_handles = []
-        for attribute in self.__server_model.attr_by_type_uuid(UUID(request.type), request.start, request.end):
+        for attribute in self.server_model.attr_by_type_uuid(UUID(request.type), request.start, request.end):
             attrs[attribute.handle] = attribute
             attrs_handles.append(attribute.handle)
         attrs_handles.sort()
@@ -2095,7 +2101,7 @@ class GattServer(GattLayer):
     def pairing(self, pairing=None):
         pairing_parameters = Pairing()
         if pairing is None:
-            pairing_parameters = self.__server_model.get_pairing_parameters()
+            pairing_parameters = self.server_model.get_pairing_parameters()
         elif isinstance(pairing, Pairing):
             pairing_parameters = pairing
 
