@@ -2,9 +2,8 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
-from whad.hub.metadata import ESBMetadata
 from ..message import pb_bind, PbFieldBytes, PbFieldBool, PbFieldInt, PbMessageWrapper
-from . import UnifyingDomain
+from . import UnifyingDomain, UnifyingMetadata
 
 @pb_bind(UnifyingDomain, 'send', 1)
 class SendPdu(PbMessageWrapper):
@@ -75,6 +74,7 @@ class PduReceived(PbMessageWrapper):
         packet = ESB_Payload_Hdr(bytes(self.pdu))
         packet.metadata = ESBMetadata()
         packet.metadata.channel = self.channel
+        packet.metadata.raw = False
         if self.rssi is not None:
             packet.metadata.rssi = self.rssi
         if self.timestamp is not None:
@@ -124,6 +124,7 @@ class RawPduReceived(PbMessageWrapper):
         packet = ESB_Hdr(bytes(self.pdu))
         packet.metadata = ESBMetadata()
         packet.metadata.channel = self.channel
+        packet.metadata.raw = True
         if self.rssi is not None:
             packet.metadata.rssi = self.rssi
         if self.timestamp is not None:

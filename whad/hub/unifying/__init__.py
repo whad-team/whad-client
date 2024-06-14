@@ -1,11 +1,13 @@
 """WHAD Protocol Logitech Unifying domain message abstraction layer.
 """
 from typing import List, Union
+from dataclasses import dataclass, field, fields
 
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
 from whad.hub.esb import EsbNodeAddress
+from whad.hub.metadata import Metadata
 
 class Commands:
     """Unifying commands
@@ -21,6 +23,14 @@ class Commands:
     Start = 0x08
     Stop = 0x09
     SniffPairing = 0x0a
+
+@dataclass(repr=False)
+class UnifyingMetadata(Metadata):
+    is_crc_valid : bool = None
+    address : str = None
+
+    def convert_to_header(self):
+        return None, self.timestamp
 
 @pb_bind(ProtocolHub, name="unifying", version=1)
 class UnifyingDomain(Registry):
@@ -42,7 +52,27 @@ class UnifyingDomain(Registry):
         message_type = message.unifying.WhichOneof('msg')
         message_clazz = UnifyingDomain.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
+
+    def isPacketCompat(self, packet) -> bool:
+        """Determine if a packet is an ESB packet.
+        """
+        return isinstance(packet.metadata, UnifyingMetadata)
     
+    def convertPacket(self, packet) -> HubMessage:
+        """Convert an ESB packet to SendPdu or SendBlePdu message.
+        """
+        if isinstance(packet.metadata, UnifyingMetadata):
+            if packet.metadata.raw:
+                return UnifyingDomain.bound('send_raw', self.proto_version).from_packet(
+                    packet
+                )
+            else:
+                return UnifyingDomain.bound('send', self.proto_version).from_packet(
+                    packet
+                )
+        else:
+            # Error
+            return None  
 
     def createSetNodeAddress(self, node_address: EsbNodeAddress) -> HubMessage:
         """Create a SetNodeAddress message
