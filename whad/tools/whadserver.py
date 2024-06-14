@@ -57,13 +57,13 @@ class WhadServerApp(CommandLineApp):
 
             # We need to have an interface specified
             if interface is not None:
-                    self.serve(interface)
+                self.serve(interface)
             else:
                 self.error('You have to provide an interface to proxify.')
 
         except KeyboardInterrupt as keybd:
             self.warning('Server stopped (CTRL-C)')
-            
+
         if self.server is not None:
             self.server.shutdown()
 

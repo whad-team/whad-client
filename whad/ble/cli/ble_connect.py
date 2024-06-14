@@ -106,13 +106,14 @@ class BleConnectApp(CommandLineDeviceSource):
             # Connect to our target device
             try:
                 periph = central.connect(bdaddr, random_connection_type)
-                
+
                 # Get peers
                 logger.info('local_peer: %s' % central.local_peer)
 
                 # Connected, starts a Unix socket proxy that will relay the underlying
                 # device WHAD messages to the next tool.
                 proxy = UnixSocketProxy(self.interface, {
+                    'domain':'ble',
                     'conn_handle':periph.conn_handle,
                     'initiator_bdaddr':str(central.local_peer),
                     'initiator_addrtype':str(central.local_peer.type),

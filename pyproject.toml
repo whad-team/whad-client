@@ -41,6 +41,7 @@ dependencies = [
 
 [project.scripts]
 whadup = "whad.tools.whadup:main"
+wup = "whad.tools.whadup:main"
 wsniff = "whad.tools.wsniff:wsniff_main"
 wshark = "whad.tools.wshark:wshark_main"
 wextract = "whad.tools.wextract:wextract_main"

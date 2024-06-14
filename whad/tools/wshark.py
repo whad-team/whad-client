@@ -58,7 +58,7 @@ class WhadWiresharkApp(CommandLineApp):
                     conf.color_theme = BrightTheme()
 
                 parameters = self.args.__dict__
-
+                print(parameters)
                 parameters.update({
                     "on_tx_packet_cb" : self.on_tx_packet,
                     "on_rx_packet_cb" : self.on_rx_packet,
@@ -72,6 +72,7 @@ class WhadWiresharkApp(CommandLineApp):
                     params=parameters,
                     connector=UnixSocketCallbacksConnector
                 )
+
                 self.connector = proxy.connector
                 self.connector.domain = self.args.domain
                 monitor = WiresharkMonitor()

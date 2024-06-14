@@ -33,7 +33,8 @@ class WhadFilterApp(CommandLineApp):
 
         self.add_argument(
             'filter',
-            help='filter to evaluate'
+            help='filter to evaluate',
+            nargs='?'
         )
 
         self.add_argument(
@@ -80,8 +81,9 @@ class WhadFilterApp(CommandLineApp):
             help='forward packets not matched by the filter (dropped by default)'
         )
     def build_filter(self):
+        if self.args.filter is None:
+            self.args.filter = "True"
         filter_template = "lambda p : not %s" if self.args.invert else "lambda p : %s"
-
         if "packet." in self.args.filter:
             self.args.filter.replace("packet.", "p.")
         elif "pkt." in self.args.filter:
@@ -153,26 +155,33 @@ class WhadFilterApp(CommandLineApp):
 
         try:
             if self.is_piped_interface():
-                if not self.args.nocolor:
-                    conf.color_theme = BrightTheme()
+                interface = self.input_interface
+            else:
+                interface = self.interface
 
-                parameters = self.args.__dict__
+            if not self.args.nocolor:
+                conf.color_theme = BrightTheme()
 
-                parameters.update({
-                    "on_tx_packet_cb" : self.on_tx_packet,
-                    "on_rx_packet_cb" : self.on_rx_packet,
-                })
-                proxy = UnixSocketProxy(
-                    self.input_interface,
-                    params=parameters,
-                    connector=UnixSocketCallbacksConnector
-                )
-                if self.is_stdout_piped():
-                    proxy.start()
-                    proxy.join()
+            parameters = self.args.__dict__
 
-                while True:
-                    time.sleep(1)
+            parameters.update({
+                "on_tx_packet_cb" : self.on_tx_packet,
+                "on_rx_packet_cb" : self.on_rx_packet,
+            })
+            proxy = UnixSocketProxy(
+                interface,
+                params=parameters,
+                connector=UnixSocketCallbacksConnector
+            )
+            interface.open()
+
+            if self.is_stdout_piped():
+                proxy.start()
+                proxy.join()
+
+
+            while True:
+                time.sleep(1)
 
         except KeyboardInterrupt:
             # Launch post-run tasks
