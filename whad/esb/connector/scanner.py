@@ -26,8 +26,9 @@ an :class:`UnsupportedCapability` exception.
 """
 from scapy.packet import Packet
 from typing import Iterator
-from whad.esb.connector import ESB, message_filter, is_message_type, UnsupportedCapability
+from whad.esb.connector import ESB, message_filter, UnsupportedCapability
 from whad.esb.scanning import CommunicatingDevicesDB, CommunicatingDevice
+from whad.hub.esb import PduReceived, RawPduReceived
 
 class Scanner(ESB):
     """
@@ -65,11 +66,11 @@ class Scanner(ESB):
         """
         while True:
             if self.support_raw_pdu():
-                message_type = "raw_pdu"
+                message_type = RawPduReceived
             else:
-                message_type = "pdu"
+                message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter('esb', message_type))
+            message = self.wait_for_message(filter=message_filter(message_type))
             packet = self.translator.from_message(message.esb, message_type)
             yield packet
 

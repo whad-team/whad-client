@@ -8,6 +8,9 @@ from whad.common.sniffing import EventsManager
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 
+from whad.hub.phy import PacketReceived, RawPacketReceived
+from whad.hub.message import AbstractPacket
+
 # TODO: every sniffer is broken (sniff() method does not catch packets, we
 #       have to catch them in on_packet() and put them in a queue)
 
@@ -30,7 +33,6 @@ class Sniffer(Phy, EventsManager):
 
     def _enable_sniffing(self):
         self.set_frequency(self.__configuration.frequency)
-
         self.set_packet_size(self.__configuration.packet_size)
 
         # Set data rate for all modulations but LoRa
@@ -91,7 +93,6 @@ class Sniffer(Phy, EventsManager):
         self.__configuration.frequency = frequency
         self._enable_sniffing()
 
-
     def available_actions(self, filter=None):
         actions = []
         return [action for action in actions if filter is None or isinstance(action, filter)]
@@ -104,14 +105,12 @@ class Sniffer(Phy, EventsManager):
     def sniff(self):
         while True:
             if self.support_raw_iq_stream():
-                message_type = "raw_packet"
+                message_type = RawPacketReceived
             else:
-                message_type = "packet"
+                message_type = PacketReceived
 
-            """
-            message = self.wait_for_message(filter=message_filter('phy', message_type))
-            packet = self.translator.from_message(message.phy, message_type)
-            self.monitor_packet_rx(packet)
-            """
-            packet = self.__packet_queue.get()
-            yield packet
+            message = self.wait_for_message(filter=message_filter(message_type))
+            if issubclass(message, AbstractPacket):
+                packet = message.to_packet()
+                self.monitor_packet_rx(packet)
+                yield packet

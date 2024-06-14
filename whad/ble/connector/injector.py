@@ -1,6 +1,7 @@
 from whad.ble.connector import BLE
 from whad.ble.exceptions import ConnectionLostException
 from whad.ble import UnsupportedCapability, message_filter, BleDirection
+from whad.hub.ble import Injected
 
 class Injector(BLE):
 
@@ -15,16 +16,16 @@ class Injector(BLE):
     def inject_to_slave(self, packet):
         if self.__connection is not None:
             self.send_pdu(packet, access_address=self.__connection.access_address, direction=BleDirection.INJECTION_TO_SLAVE)
-            message = self.wait_for_message(filter=message_filter('ble', 'injected'))
-            return (message.ble.injected.success, message.ble.injected.injection_attempts)
+            message = self.wait_for_message(filter=message_filter(Injected))
+            return (message.ble.injected.success, message.injection_attempts)
         else:
             raise self.__exception
 
     def inject_to_master(self, packet):
         if self.__connection is not None:
             self.send_pdu(packet, access_address=self.__connection.access_address, direction=BleDirection.INJECTION_TO_MASTER)
-            message = self.wait_for_message(filter=message_filter('ble', 'injected'))
-            return (message.ble.injected.success, message.ble.injected.injection_attempts)
+            message = self.wait_for_message(filter=message_filter(Injected))
+            return (message.ble.injected.success, message.injection_attempts)
         else:
             raise self.__exception
 

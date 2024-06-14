@@ -6,6 +6,7 @@ from whad.ble.exceptions import ConnectionLostException
 from whad.ble import UnsupportedCapability, message_filter
 
 from whad.hub.events import ConnectionEvt
+from whad.hub.ble import Hijacked
 
 
 class Hijacker(BLE):
@@ -70,9 +71,9 @@ class Hijacker(BLE):
                 self.__hijack_slave = slave
                 self.hijack_slave(self.__connection.access_address)
 
-            message = self.wait_for_message(filter=message_filter('ble', 'hijacked'))
-            self.__status = message.ble.hijacked.success
-            return (message.ble.hijacked.success)
+            message = self.wait_for_message(filter=message_filter(Hijacked))
+            self.__status = message.success
+            return (message.success)
         else:
             raise self.__exception
 
