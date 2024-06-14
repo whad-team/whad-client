@@ -10,7 +10,7 @@ from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr,\
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
-from whad.hub.metadata import Metadata
+from whad.hub.metadata import Metadata, channel_to_frequency
 
 class Commands:
     """Dot15d4 commands
