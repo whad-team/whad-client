@@ -1,12 +1,14 @@
 """WHAD Protocol PHY domain message abstraction layer.
 """
 from typing import List
+from dataclasses import dataclass, field, fields
 
 from whad.protocol.phy.phy_pb2 import LoRaSpreadingFactor, LoRaCodingRate, JammingMode, \
     Endianness as PbEndianness, TXPower, timestamp as whad_timestamp
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
+from whad.hub.metadata import Metadata
 
 class Commands:
     """PHY Commands
@@ -88,6 +90,14 @@ class Timestamp(object):
     def usec(self):
         return self.__usec
 
+@dataclass(repr=False)
+class PhyMetadata(Metadata):
+    frequency : int = None
+    iq : list = field(default_factory=lambda: [])
+
+    def convert_to_header(self):
+        return None, self.timestamp
+
 @pb_bind(ProtocolHub, name="phy", version=1)
 class PhyDomain(Registry):
     """WHAD PHY domain messages parser/factory.
@@ -108,7 +118,28 @@ class PhyDomain(Registry):
         message_type = message.phy.WhichOneof('msg')
         message_clazz = PhyDomain.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
-    
+
+    def isPacketCompat(self, packet) -> bool:
+        """Determine if a packet is a compatible BLE packet
+        """
+        return isinstance(packet.metadata, PhyMetadata)
+
+    def convertPacket(self, packet) -> HubMessage:
+        """Convert a BLE packet to SendPdu or SendBlePdu message.
+        """
+        if isinstance(packet.metadata, PhyMetadata):
+            if packet.metadata.raw:
+                return PhyDomain.bound('send_raw', self.proto_version).from_packet(
+                    packet
+                )
+            else:
+                return PhyDomain.bound('send', self.proto_version).from_packet(
+                    packet
+                )
+        else:
+            # Error
+            return None
+
     def createSetAskMod(self, ook: bool = False) -> HubMessage:
         """Create a SetAskMod message
 

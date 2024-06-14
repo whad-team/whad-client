@@ -2,8 +2,7 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.phy import Phy_Packet
-from whad.hub.metadata import PhyMetadata
-from whad.protocol.phy.phy_pb2 import SetBPSKModulationCmd
+from whad.hub.phy import PhyMetadata
 from ..message import pb_bind, PbFieldInt, PbFieldBytes,PbFieldArray, PbFieldMsg, PbMessageWrapper
 from . import PhyDomain
 
@@ -68,7 +67,7 @@ class SendPacket(PbMessageWrapper):
 
 @pb_bind(PhyDomain, 'send_raw', 1)
 class SendRawPacket(PbMessageWrapper):
-    """PHY packet send message
+    """PHY raw packet send message
     """
 
     iq = PbFieldArray('phy.send_raw.iq')
@@ -103,11 +102,13 @@ class PacketReceived(PbMessageWrapper):
         packet = Phy_Packet(self.packet)
         packet.metadata = PhyMetadata()
         packet.metadata.frequency = self.frequency
+        packet.metadata.raw = False
         if self.rssi is not None:
             packet.metadata.rssi = self.rssi
         if self.timestamp is not None:
             packet.metadata.timestamp = self.timestamp
 
+        return packet
 
     @staticmethod
     def from_packet(packet):
@@ -127,6 +128,8 @@ class PacketReceived(PbMessageWrapper):
 @pb_bind(PhyDomain, 'raw_packet', 1)
 class RawPacketReceived(PbMessageWrapper):
     """PHY packet received notification message
+
+    IQ not supported yet.
     """
 
     frequency = PbFieldInt('phy.raw_packet.frequency')
@@ -134,3 +137,32 @@ class RawPacketReceived(PbMessageWrapper):
     rssi = PbFieldInt('phy.raw_packet.rssi', optional=True)
     iq = PbFieldArray('phy.raw_packet.iq')
     timestamp = PbFieldMsg('phy.raw_packet.timestamp', Timestamp, optional=True)
+
+    def to_packet(self):
+        """Convert message to packet
+        """
+        packet = Phy_Packet(self.packet)
+        packet.metadata = PhyMetadata()
+        packet.metadata.frequency = self.frequency
+        packet.metadata.raw = True
+        if self.rssi is not None:
+            packet.metadata.rssi = self.rssi
+        if self.timestamp is not None:
+            packet.metadata.timestamp = self.timestamp
+
+        return packet
+
+    @staticmethod
+    def from_packet(packet):
+        """Convert packet to message
+        """
+        msg = PacketReceived(
+            frequency=packet.metadata.frequency,
+            packet=bytes(packet)
+        )
+        if packet.metadata.rssi is not None:
+            msg.rssi = packet.metadata.rssi
+        if packet.metadata.timestamp is not None:
+            msg.timestamp = packet.metadata.timestamp
+
+        return msg
