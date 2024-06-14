@@ -1,11 +1,12 @@
 """WHAD Protocol ESB domain message abstraction layer.
 """
 from typing import List, Union
+from dataclasses import dataclass, field, fields
 
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
-from whad.hub.metadata import ESBMetadata
+from whad.hub.metadata import Metadata
 
 class Commands:
     """ESB Commands
@@ -75,7 +76,13 @@ class EsbNodeAddress(object):
 
 
 
+@dataclass(repr=False)
+class ESBMetadata(Metadata):
+    is_crc_valid : bool = None
+    address : str = None
 
+    def convert_to_header(self):
+        return None, self.timestamp
 
 
 @pb_bind(ProtocolHub, name="esb", version=1)
