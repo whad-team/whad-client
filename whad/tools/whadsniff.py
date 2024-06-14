@@ -166,10 +166,8 @@ def display_packet(pkt, show_metadata, format):
         if format == "show":
             print_formatted_text(
                 HTML(
-                    '<b><ansipurple>%s</ansipurple></b>' % (
-                        metadata
-                    )
-                )
+                    '<b><ansipurple>{}</ansipurple></b>'
+                ).format(metadata)
             )
             pkt.show()
 
@@ -185,11 +183,8 @@ def display_packet(pkt, show_metadata, format):
         elif format == "raw":
             print_formatted_text(
                 HTML(
-                    '<b><ansipurple>%s</ansipurple></b> %s' % (
-                        metadata,
-                        bytes(pkt).hex()
-                    )
-                )
+                    '<b><ansipurple>{metadata}</ansipurple></b> {pkthex}'
+                ).format(metadata=metadata, pkthex=bytes(pkt).hex())
             )
 
             if hasattr(pkt, "decrypted"):
@@ -204,13 +199,11 @@ def display_packet(pkt, show_metadata, format):
         elif format == "hexdump":
             print_formatted_text(
                 HTML(
-                    '<b><ansipurple>%s</ansipurple></b>' % (
-                        metadata
-                    )
-                )
+                    '<b><ansipurple>{}</ansipurple></b>'
+                ).format(metadata)
             )
             print_formatted_text(
-                HTML("<i>%s</i>" %
+                HTML("<i>{}</i>").format(
                     escape(hexdump(bytes(pkt), result="return"))
                 )
             )
@@ -221,7 +214,7 @@ def display_packet(pkt, show_metadata, format):
                     )
                 )
                 print_formatted_text(
-                        HTML("<i>%s</i>" %
+                        HTML("<i>{}</i>").format(
                             escape(hexdump(bytes(pkt.decrypted), result="return")
                         )
                     )
@@ -230,10 +223,8 @@ def display_packet(pkt, show_metadata, format):
         else:
             print_formatted_text(
                 HTML(
-                    '<b><ansipurple>%s</ansipurple></b>' % (
-                        metadata
-                    )
-                )
+                    '<b><ansipurple>{}</ansipurple></b>'
+                ).format(metadata)
             )
             print(repr(pkt))
             if hasattr(pkt, "decrypted"):
@@ -251,11 +242,8 @@ def display_event(event):
     """
     print_formatted_text(
         HTML(
-            "<ansicyan>[i] event: <b>%s</b></ansicyan> %s" % (
-                event.name,
-                "("+event.message +")" if event.message is not None else ""
-            )
-        )
+            "<ansicyan>[i] event: <b>{name}</b></ansicyan> {message}"
+        ).format(name=event.name, message="("+event.message +")" if event.message is not None else "")
     )
 
 class WhadDomainSubParser(ArgumentParser):
