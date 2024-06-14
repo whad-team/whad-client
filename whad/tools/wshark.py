@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 #logging.basicConfig(level=logging.DEBUG)
 
 class WhadWiresharkApp(CommandLineApp):
-
+    connector = None
     def __init__(self):
         """Application uses an interface and has commands.
         """
@@ -34,9 +34,13 @@ class WhadWiresharkApp(CommandLineApp):
         )
 
     def on_rx_packet(self, pkt):
+        if self.connector is not None:
+            self.connector.monitor_packet_rx(pkt)
         return pkt
 
     def on_tx_packet(self, pkt):
+        if self.connector is not None:
+            self.connector.monitor_packet_tx(pkt)
         return pkt
 
     def run(self):
@@ -59,20 +63,24 @@ class WhadWiresharkApp(CommandLineApp):
                     "on_tx_packet_cb" : self.on_tx_packet,
                     "on_rx_packet_cb" : self.on_rx_packet,
                 })
-                monitor = WiresharkMonitor()
-                monitor.attach(interface)
-                monitor.start()
+
 
                 interface.open()
-
 
                 proxy = UnixSocketProxy(
                     interface,
                     params=parameters,
                     connector=UnixSocketCallbacksConnector
                 )
-                proxy.start()
-                proxy.join()
+                self.connector = proxy.connector
+                self.connector.domain = self.args.domain
+                monitor = WiresharkMonitor()
+                monitor.attach(self.connector)
+
+                monitor.start()
+                if self.is_stdout_piped():
+                    proxy.start()
+                    proxy.join()
 
                 while True:
                     time.sleep(1)

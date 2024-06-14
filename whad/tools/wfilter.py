@@ -33,8 +33,7 @@ class WhadFilterApp(CommandLineApp):
 
         self.add_argument(
             'filter',
-            help='filter to evaluate',
-            default='True'
+            help='filter to evaluate'
         )
 
         self.add_argument(
@@ -168,8 +167,9 @@ class WhadFilterApp(CommandLineApp):
                     params=parameters,
                     connector=UnixSocketCallbacksConnector
                 )
-                proxy.start()
-                proxy.join()
+                if self.is_stdout_piped():
+                    proxy.start()
+                    proxy.join()
 
                 while True:
                     time.sleep(1)

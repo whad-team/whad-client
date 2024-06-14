@@ -75,7 +75,7 @@ class PcapWriterMonitor(WhadMonitor):
                                     sync=sync
         )
         self._writer_lock.release()
-        
+
         # Checks if there is a scapy packet formatter associated with the connector.
         # A formatter allows to describe manually how to build the packet, it is mainly
         # useful to populate a relevant header for PCAP export.
@@ -122,7 +122,7 @@ class PcapWriterMonitor(WhadMonitor):
     def process_packet(self, packet):
         # Acquire lock on writer lock acquire multithread error
         self._writer_lock.acquire()
-        
+
         if self._processing:
             # Note the current local clock timestamp in us
             now = time() * 1000000

@@ -339,7 +339,7 @@ class WhadDeviceConnector(object):
     @property
     def device(self):
         return self.__device
-    
+
     @property
     def hub(self):
         return self.__device.hub

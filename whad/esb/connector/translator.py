@@ -33,7 +33,7 @@ class ESBMessageTranslator(object):
             packet = ESB_Hdr(address=self.__cached_address)/packet
 
         packet.preamble = 0xAA # force a rebuild
-        formatted_packet = ESB_Pseudo_Packet(bytes(packet)[1:])
+        formatted_packet = ESB_Pseudo_Packet(bytes(packet))
 
         timestamp = None
         if hasattr(packet, "metadata"):

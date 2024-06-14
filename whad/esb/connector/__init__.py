@@ -20,6 +20,8 @@ class ESB(WhadDeviceConnector):
     domain-specific messages.
     """
 
+    domain = "esb"
+
     def format(self, packet):
         """
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with

@@ -13,6 +13,8 @@ class LoRa(Phy):
     SYNCWORD_M2M = b'\x24\x14'
     SYNCWORD_LORAWAN = b'\x44\x34'
 
+    domain = "lora"
+
     def __init__(self, device=None):
         '''
         '''
@@ -22,7 +24,7 @@ class LoRa(Phy):
         # Make sure LoRa is supported by the device
         if not self.can_use_lora():
             raise UnsupportedCapability('SetLoRaModulation')
-        
+
         # Set LoRa default parameters
         self.__spreading_factor = 7             # SF7
         self.__coding_rate = 45                 # Coding rate 4/5
@@ -136,7 +138,7 @@ class LoRa(Phy):
     @property
     def invert_iq(self):
         return self.__invert_iq
-    
+
     @invert_iq.setter
     def invert_iq(self, enabled : bool):
         self.__invert_iq = enabled
@@ -147,7 +149,7 @@ class LoRa(Phy):
         '''Retrieve the current configured synchronization word.
         '''
         return self.__syncword
-    
+
     @syncword.setter
     def syncword(self, syncword: bytes):
         '''Set synchronization word.

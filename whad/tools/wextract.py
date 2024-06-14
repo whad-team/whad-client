@@ -55,7 +55,6 @@ class WhadExtractApp(CommandLineApp):
                 extractor.replace("packet.", "p.")
             elif "pkt." in extractor:
                 extractor.replace("pkt.", "p.")
-
             extractors.append(eval(extractor_template % extractor))
 
         return extractors
@@ -63,12 +62,9 @@ class WhadExtractApp(CommandLineApp):
     def on_rx_packet(self, pkt):
         extractors = self.build_extractors()
         output = []
-
         try:
             for extractor in extractors:
-
                 output.append(str(extractor(pkt)))
-
             print(self.args.delimiter.join(output))
             sys.stdout.flush()
             return pkt
@@ -114,8 +110,9 @@ class WhadExtractApp(CommandLineApp):
                     params=parameters,
                     connector=UnixSocketCallbacksConnector
                 )
-                #proxy.start()
-                #proxy.join()
+                if self.is_stdout_piped():
+                    proxy.start()
+                    proxy.join()
 
                 while True:
                     time.sleep(1)

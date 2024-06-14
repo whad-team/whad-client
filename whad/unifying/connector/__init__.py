@@ -19,6 +19,7 @@ class Unifying(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+    domain = "unifying"
 
     def format(self, packet):
         """
