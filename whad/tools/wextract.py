@@ -18,6 +18,7 @@ import time
 import sys
 
 logger = logging.getLogger(__name__)
+#logging.basicConfig(level=logging.DEBUG)
 
 class WhadExtractApp(CommandLineApp):
 
@@ -92,25 +93,30 @@ class WhadExtractApp(CommandLineApp):
         self.pre_run()
         try:
             if self.is_piped_interface():
-                if not self.args.nocolor:
-                    conf.color_theme = BrightTheme()
+                interface = self.input_interface
+            else:
+                interface = self.interface
 
-                parameters = self.args.__dict__
+            if not self.args.nocolor:
+                conf.color_theme = BrightTheme()
 
-                parameters.update({
-                    "on_tx_packet_cb" : self.on_tx_packet,
-                    "on_rx_packet_cb" : self.on_rx_packet,
-                })
-                proxy = UnixSocketProxy(
-                    self.input_interface,
-                    params=parameters,
-                    connector=UnixSocketCallbacksConnector
-                )
-                #proxy.start()
-                #proxy.join()
+            parameters = self.args.__dict__
 
-                while True:
-                    time.sleep(1)
+            parameters.update({
+                "on_tx_packet_cb" : self.on_tx_packet,
+                "on_rx_packet_cb" : self.on_rx_packet,
+            })
+            interface.open()
+            proxy = UnixSocketProxy(
+                interface,
+                params=parameters,
+                connector=UnixSocketCallbacksConnector
+            )
+            #proxy.start()
+            #proxy.join()
+
+            while True:
+                time.sleep(1)
 
         except KeyboardInterrupt:
             # Launch post-run tasks

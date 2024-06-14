@@ -53,7 +53,7 @@ class UnixSocketDevice(WhadDevice):
             p = re.compile('^[0-9a-f]+: [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ (.*)$', re.I | re.M)
             for socket in p.findall(proc_net_unix):
                 _, filename = os.path.split(socket)
-                if re.match('whad_[0-9a-f]+\.sock', filename):
+                if re.match('whad_[0-9a-f]+\\.sock', filename):
                     dev = UnixSocketDevice(socket)
                     devices.append(dev)
             return devices

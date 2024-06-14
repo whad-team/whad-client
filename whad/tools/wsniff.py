@@ -22,7 +22,6 @@ from whad.common.ipc import IPCPacket
 
 import whad
 import sys
-from whad.common.ipc import IPCConverter
 import os, stat
 
 logger = logging.getLogger(__name__)

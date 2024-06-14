@@ -10,6 +10,7 @@ from whad.cli.app import CommandLineApp
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.device.tcp import TCPSocketConnector
 logger = logging.getLogger(__name__)
+#logging.basicConfig(level=logging.DEBUG)
 
 class WhadServerApp(CommandLineApp):
 
@@ -45,20 +46,26 @@ class WhadServerApp(CommandLineApp):
             # Launch pre-run tasks
             self.pre_run()
 
+            if self.is_piped_interface():
+                interface = self.input_interface
+            else:
+                interface = self.interface
+
             # Format address and port
             self.address = self.args.address
             self.port = int(self.args.port)
 
             # We need to have an interface specified
-            if self.interface is not None:
-                    self.serve(self.interface)
+            if interface is not None:
+                    self.serve(interface)
             else:
                 self.error('You have to provide an interface to proxify.')
 
         except KeyboardInterrupt as keybd:
             self.warning('Server stopped (CTRL-C)')
-            if self.server is not None:
-                self.server.shutdown()
+            
+        if self.server is not None:
+            self.server.shutdown()
 
         # Launch post-run tasks
         self.post_run()
