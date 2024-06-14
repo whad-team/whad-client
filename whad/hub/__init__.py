@@ -91,6 +91,10 @@ class ProtocolHub(Registry):
             msg = self.dot15d4.convertPacket(packet)
         elif self.esb.isPacketCompat(packet):
             msg = self.esb.convertPacket(packet)
+        elif self.phy.isPacketCompat(packet):
+            msg = self.phy.convertPacket(packet)
+        elif self.unifying.isPacketCompat(packet):
+            msg = self.unifying.convertPacket(packet)
 
         return msg
         
