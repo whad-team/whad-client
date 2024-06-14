@@ -1,12 +1,16 @@
 """WHAD Protocol 802.15.4 domain message abstraction layer.
 """
 from typing import List
+from dataclasses import dataclass, field, fields
 
 from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4MitmRole, AddressType
+from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr,\
+    Dot15d4TAP_Received_Signal_Strength, Dot15d4TAP_Channel_Assignment, \
+    Dot15d4TAP_Channel_Center_Frequency, Dot15d4TAP_Link_Quality_Indicator
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
-from whad.hub.metadata import Dot15d4Metadata
+from whad.hub.metadata import Metadata
 
 class Commands:
     """Dot15d4 commands
@@ -75,6 +79,26 @@ class NodeAddressExt(NodeAddress):
         assert address >= 0
         assert address <= 0x10000000000000000
         super().__init__(address, NodeAddressType.EXTENDED)
+
+@dataclass(repr=False)
+class Dot15d4Metadata(Metadata):
+    is_fcs_valid : bool = None
+    lqi : int = None
+
+    def convert_to_header(self):
+        timestamp = None
+        tlv = []
+        if self.timestamp is not None:
+            timestamp = self.timestamp
+        if self.rssi is not None:
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Received_Signal_Strength(rss = self.rssi))
+        if self.lqi is not None:
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Link_Quality_Indicator(lqi = self.lqi))
+        if self.channel is not None:
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Channel_Assignment(channel_number=self.channel, channel_page=0))
+            channel_frequency = channel_to_frequency(self.channel) * 1000
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Channel_Center_Frequency(channel_frequency=channel_frequency))
+        return Dot15d4TAP_Hdr(data=tlv), timestamp
 
 @pb_bind(ProtocolHub, name="dot15d4", version=1)
 class Dot15d4Domain(Registry):

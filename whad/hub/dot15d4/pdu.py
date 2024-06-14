@@ -5,8 +5,7 @@ from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
 from whad.protocol.whad_pb2 import Message
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool
-from whad.hub.metadata import Dot15d4Metadata
-from whad.hub.dot15d4 import Dot15d4Domain
+from whad.hub.dot15d4 import Dot15d4Domain, Dot15d4Metadata
 
 @pb_bind(Dot15d4Domain, 'send', 1)
 class SendPdu(PbMessageWrapper):
