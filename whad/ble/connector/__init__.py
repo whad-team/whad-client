@@ -44,7 +44,7 @@ class BLE(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
-    domain = "ble"
+    translator = BleMessageTranslator
 
     # correlation table
     SCAPY_CORR_ADV = {

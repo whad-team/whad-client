@@ -27,7 +27,8 @@ class Phy(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
-    domain = "phy"
+    translator = PhyMessageTranslator
+
     def __init__(self, device=None):
         """
         Initialize the connector, open the device (if not already opened), discover

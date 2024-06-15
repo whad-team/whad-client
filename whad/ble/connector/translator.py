@@ -2,7 +2,7 @@
 """
 import struct
 import logging
-
+from whad.helpers import swap_bits
 from scapy.compat import raw
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
@@ -51,6 +51,7 @@ class BleMessageTranslator(object):
         the appropriate header and the timestamp in microseconds.
         """
         formatted_packet = packet
+
         if BTLE not in packet:
             if BTLE_ADV in packet:
                 formatted_packet = BTLE(access_addr=0x8e89bed6)/packet
@@ -61,6 +62,7 @@ class BleMessageTranslator(object):
         timestamp = None
         if hasattr(packet, "metadata"):
             header, timestamp = packet.metadata.convert_to_header()
+            
             formatted_packet = header / formatted_packet
         else:
             header = BTLE_RF()
@@ -127,7 +129,7 @@ class BleMessageTranslator(object):
                 pdu = raw(packet[BTLE_ADV:])
             else:
                 return None
-            
+
             # Create SendRawPdu message
             msg = self.__hub.ble.createSendRawPdu(
                 direction,
@@ -139,7 +141,7 @@ class BleMessageTranslator(object):
             )
 
         else:
-            
+
             # Extract PDU
             if BTLE_DATA in packet:
                 pdu = packet_to_bytes(packet[BTLE_DATA:])
@@ -149,7 +151,7 @@ class BleMessageTranslator(object):
                 pdu = packet_to_bytes(packet[BTLE_ADV:])
             else:
                 return None
-            
+
             # Create a SendPdu message
             msg = self.__hub.ble.createSendPdu(
                 direction,

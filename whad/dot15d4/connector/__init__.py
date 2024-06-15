@@ -30,7 +30,7 @@ class Dot15d4(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
-    domain = "dot15d4"
+    translator = Dot15d4MessageTranslator
 
     def __init__(self, device=None, synchronous=False, scapy_config='zigbee'):
         """

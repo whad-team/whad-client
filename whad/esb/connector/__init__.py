@@ -20,7 +20,7 @@ class ESB(WhadDeviceConnector):
     domain-specific messages.
     """
 
-    domain = "esb"
+    translator = ESBMessageTranslator
 
     def format(self, packet):
         """

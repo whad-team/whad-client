@@ -16,9 +16,30 @@ from whad.common.monitors import WiresharkMonitor
 import logging
 import time
 import sys
-
+from pkgutil import iter_modules
+from importlib import import_module
+import whad
 logger = logging.getLogger(__name__)
 #logging.basicConfig(level=logging.DEBUG)
+
+def get_translator(protocol):
+    """Get a translator according to a specific domain.
+    """
+    translator = None
+
+    # Iterate over modules
+    for _, candidate_protocol,_ in iter_modules(whad.__path__):
+        # If the module contains a sniffer connector,
+        # store the associated translator in translator variable
+        try:
+            module = import_module("whad.{}.connector.sniffer".format(candidate_protocol))
+            if candidate_protocol == protocol:
+                translator = module.Sniffer.translator
+                break
+        except ModuleNotFoundError:
+            pass
+    # return the environment dictionary
+    return translator
 
 class WhadWiresharkApp(CommandLineApp):
     connector = None
@@ -58,7 +79,7 @@ class WhadWiresharkApp(CommandLineApp):
                     conf.color_theme = BrightTheme()
 
                 parameters = self.args.__dict__
-                print(parameters)
+
                 parameters.update({
                     "on_tx_packet_cb" : self.on_tx_packet,
                     "on_rx_packet_cb" : self.on_rx_packet,
@@ -75,6 +96,8 @@ class WhadWiresharkApp(CommandLineApp):
 
                 self.connector = proxy.connector
                 self.connector.domain = self.args.domain
+                self.connector.translator = get_translator(self.args.domain)(self.connector.hub)
+                self.connector.format = self.connector.translator.format
                 monitor = WiresharkMonitor()
                 monitor.attach(self.connector)
 
