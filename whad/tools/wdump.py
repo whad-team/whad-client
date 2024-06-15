@@ -8,10 +8,11 @@ from prompt_toolkit import print_formatted_text, HTML
 from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.cli.app import CommandLineDevicePipe, CommandLineApp
 from scapy.all import *
+#from whad.common.ipc import IPCPacket
 from whad.device.unix import UnixSocketProxy, UnixSocketCallbacksConnector
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
-from whad.common.monitors import WiresharkMonitor
+from whad.common.monitors import PcapWriterMonitor
 import logging
 import time
 import sys
@@ -19,7 +20,7 @@ from pkgutil import iter_modules
 from importlib import import_module
 import whad
 logger = logging.getLogger(__name__)
-#logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 def get_translator(protocol):
     """Get a translator according to a specific domain.
@@ -40,17 +41,21 @@ def get_translator(protocol):
     # return the environment dictionary
     return translator
 
-class WhadWiresharkApp(CommandLineApp):
+class WhadDumpApp(CommandLineApp):
     connector = None
     def __init__(self):
         """Application uses an interface and has commands.
         """
         super().__init__(
-            description='WHAD wireshark',
+            description='WHAD PCAP export',
             interface=True,
             commands=False,
             input=CommandLineApp.INPUT_WHAD,
             output=CommandLineApp.OUTPUT_WHAD
+        )
+        self.add_argument(
+            'pcap',
+            help='Pcap file to export'
         )
 
     def on_rx_packet(self, pkt):
@@ -67,47 +72,51 @@ class WhadWiresharkApp(CommandLineApp):
         # Launch pre-run tasks
         monitor = None
         self.pre_run()
+
         try:
-            if self.is_piped_interface():
-                interface = self.input_interface
+            if self.args.pcap is not None:
+                if self.is_piped_interface():
+                    interface = self.input_interface
+                else:
+                    interface = self.interface
+
+                if interface is not None:
+                    if not self.args.nocolor:
+                        conf.color_theme = BrightTheme()
+
+                    parameters = self.args.__dict__
+
+                    parameters.update({
+                        "on_tx_packet_cb" : self.on_tx_packet,
+                        "on_rx_packet_cb" : self.on_rx_packet,
+                    })
+
+
+                    interface.open()
+
+                    proxy = UnixSocketProxy(
+                        interface,
+                        params=parameters,
+                        connector=UnixSocketCallbacksConnector
+                    )
+
+                    self.connector = proxy.connector
+                    self.connector.domain = self.args.domain
+                    self.connector.translator = get_translator(self.args.domain)(self.connector.hub)
+                    self.connector.format = self.connector.translator.format
+
+                    monitor = PcapWriterMonitor(self.args.pcap)
+                    monitor.attach(self.connector)
+                    monitor.start()
+
+                    if self.is_stdout_piped():
+                        proxy.start()
+                        proxy.join()
+
+                    while True:
+                        time.sleep(1)
             else:
-                interface = self.interface
-
-            if interface is not None:
-                if not self.args.nocolor:
-                    conf.color_theme = BrightTheme()
-
-                parameters = self.args.__dict__
-
-                parameters.update({
-                    "on_tx_packet_cb" : self.on_tx_packet,
-                    "on_rx_packet_cb" : self.on_rx_packet,
-                })
-
-
-                interface.open()
-
-                proxy = UnixSocketProxy(
-                    interface,
-                    params=parameters,
-                    connector=UnixSocketCallbacksConnector
-                )
-
-                self.connector = proxy.connector
-                self.connector.domain = self.args.domain
-                self.connector.translator = get_translator(self.args.domain)(self.connector.hub)
-                self.connector.format = self.connector.translator.format
-                monitor = WiresharkMonitor()
-                monitor.attach(self.connector)
-
-                monitor.start()
-                if self.is_stdout_piped():
-                    proxy.start()
-                    proxy.join()
-
-                while True:
-                    time.sleep(1)
-
+                pass
         except KeyboardInterrupt:
             # Launch post-run tasks
             if monitor is not None:
@@ -116,6 +125,6 @@ class WhadWiresharkApp(CommandLineApp):
             self.post_run()
 
 
-def wshark_main():
-    app = WhadWiresharkApp()
+def wdump_main():
+    app = WhadDumpApp()
     app.run()

@@ -103,6 +103,7 @@ class WhadFilterApp(CommandLineApp):
                 if self.args.transform is not None:
                     p = packet = pkt
                     exec(self.args.transform)
+                    # recompute CRC ? 
                 if not self.is_stdout_piped():
                     display_packet(pkt)
                 return pkt
