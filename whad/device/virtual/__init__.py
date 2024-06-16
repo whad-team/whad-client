@@ -99,3 +99,4 @@ from .apimote import APIMoteDevice
 from .hci import HCIDevice
 from .rfstorm import RFStormDevice
 from .yard import YardStickOneDevice
+from .pcap import PCAPDevice
