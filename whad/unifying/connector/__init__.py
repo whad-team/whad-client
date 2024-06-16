@@ -348,6 +348,11 @@ class Unifying(WhadDeviceConnector):
         else:
             self.on_pdu(packet)
 
+    def on_event(self, event):
+        """Incoming event handler.
+        """
+        pass
+
     def on_raw_pdu(self, packet):
         """Process incoming packet.
         """

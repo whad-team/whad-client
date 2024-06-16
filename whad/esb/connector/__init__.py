@@ -10,7 +10,8 @@ from whad.helpers import message_filter
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.hub.generic.cmdresult import Success
-from whad.hub.esb import EsbNodeAddress, Commands, PduReceived, RawPduReceived
+from whad.hub.esb import EsbNodeAddress, Commands
+from whad.hub.events import JammedEvt
 
 class ESB(WhadDeviceConnector):
     """
@@ -295,6 +296,15 @@ class ESB(WhadDeviceConnector):
         else:
             self.on_pdu(packet)
 
+    def on_event(self, event):
+        """Process incoming events.
+        """
+        if not self.__ready:
+            return
+        
+        if isinstance(event, JammedEvt):
+            self.on_jammed(event.timestamp)
+
     def on_raw_pdu(self, packet):
         # Extract the PDU from raw packet
         if ESB_Payload_Hdr in packet:
@@ -307,6 +317,11 @@ class ESB(WhadDeviceConnector):
         self.on_pdu(pdu)
 
     def on_pdu(self, packet):
+        pass
+
+    def on_jammed(self, timestamp: int):
+        """Jammed event handler.
+        """
         pass
 
 from whad.esb.connector.scanner import Scanner

@@ -677,6 +677,7 @@ class BLE(WhadDeviceConnector):
         if not self.__ready:
             return
 
+        # Dispatch event
         if isinstance(event, ConnectionEvt):
             self.on_connected(event)
         elif isinstance(event, DisconnectionEvt):

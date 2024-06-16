@@ -21,6 +21,7 @@ from whad.dot15d4.connector.translator import Dot15d4MessageTranslator
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.dot15d4 import NodeAddress, Commands, NodeAddressType, PduReceived, \
     RawPduReceived, EnergyDetectionSample
+from whad.hub.events import JammedEvt
 
 
 class Dot15d4(WhadDeviceConnector):
@@ -321,6 +322,15 @@ class Dot15d4(WhadDeviceConnector):
         else:
             self.on_pdu(packet)
 
+    def on_event(self, event):
+        """Dot15d4 event dispatch.
+        """
+        if not self.__ready:
+            return
+
+        if isinstance(event, JammedEvt):
+            self.on_jammed(event.timestamp)
+
     def on_raw_pdu(self, packet):
         """
         Raw PDU processing (Dot15d4FCS).
@@ -346,6 +356,11 @@ class Dot15d4(WhadDeviceConnector):
     def on_ed_sample(self, timestamp, sample):
         """
         Energy Detection sample processing.
+        """
+        pass
+
+    def on_jammed(self, timestamp: int):
+        """Jammed event handler.
         """
         pass
 

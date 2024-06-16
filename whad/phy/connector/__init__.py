@@ -718,3 +718,8 @@ class Phy(WhadDeviceConnector):
         """Incoming packet handler.
         """
         pass
+
+    def on_event(self, event):
+        """Incoming event handler.
+        """
+        pass
