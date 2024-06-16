@@ -9,7 +9,7 @@ from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ES
 from whad.scapy.layers.unifying import bind
 
 from whad.hub.generic.cmdresult import Success, CommandResult
-from whad.hub.unifying import EsbNodeAddress, Commands, RawPduReceived, PduReceived
+from whad.hub.unifying import EsbNodeAddress, Commands, RawPduReceived, PduReceived, UnifyingMetadata
 
 class Unifying(WhadDeviceConnector):
     """
@@ -110,14 +110,11 @@ class Unifying(WhadDeviceConnector):
             packet = pdu
 
         # Generate TX metadata
-        packet.metadata = ESBMetadata()
+        packet.metadata = UnifyingMetadata()
         packet.metadata.channel = tx_channel
         packet.metadata.address = tx_address
 
-        self.monitor_packet_tx(packet)
-        msg = self.translator.from_packet(packet, channel, retransmission_count)
-        resp = self.send_command(msg, message_filter(CommandResult))
-        return isinstance(resp, Success)
+        return super().send_packet(packet)
 
     def support_raw_pdu(self):
         """
@@ -338,23 +335,22 @@ class Unifying(WhadDeviceConnector):
         pass
 
     def on_domain_msg(self, domain, message):
+        pass
+
+    def on_packet(self, packet):
+        """Incoming packet handler.
+        """
         if not self.__ready:
             return
-        
-        # Ensure our callback is called for the correct domain
-        assert domain == 'unifying'
 
-        # Dispatch message to the correct callbacks
-        if isinstance(message, PduReceived):
-            packet = self.translator.from_message(message)
-            self.monitor_packet_rx(packet)
-            self.on_pdu(packet)
-        elif isinstance(message, RawPduReceived):
-            packet = self.translator.from_message(message)
-            self.monitor_packet_rx(packet)
+        if packet.metadata.raw:
             self.on_raw_pdu(packet)
+        else:
+            self.on_pdu(packet)
 
     def on_raw_pdu(self, packet):
+        """Process incoming packet.
+        """
         # Extract the PDU from raw packet
         if ESB_Payload_Hdr in packet:
             pdu = packet[ESB_Payload_Hdr:]

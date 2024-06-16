@@ -666,16 +666,12 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("Send")
         if isinstance(packet, bytes):
             packet = Phy_Packet(packet)
+
         # Generate TX metadata
         packet.metadata = PhyMetadata()
         packet.metadata.frequency = self.__cached_frequency
 
-        self.monitor_packet_tx(packet)
-        msg = self.translator.from_packet(packet)
-
-        # Send packet
-        resp = self.send_command(msg, message_filter(CommandResult))
-        return isinstance(resp, Success)
+        return super().send_packet(packet)
 
     def schedule_send(self, packet, timestamp: float = 0.0) -> int:
         """Schedule a packet to be sent at a given time.
@@ -716,26 +712,9 @@ class Phy(WhadDeviceConnector):
         pass
 
     def on_domain_msg(self, domain, message):
-        if not self.__ready:
-            return
-
-        if domain == 'phy':
-            if isinstance(message, PacketReceived):
-                packet = self.translator.from_message(message)
-                if packet is not None:
-                    self.monitor_packet_rx(packet)
-                    self.on_packet(packet)
-
-            elif isinstance(message, RawPacketReceived):
-                packet = self.translator.from_message(message)
-
-                if packet is not None:
-                    self.monitor_packet_rx(packet)
-                    self.on_raw_packet(packet)
-
-
-    def on_raw_packet(self, packet):
-        self.on_packet(packet)
+        pass
 
     def on_packet(self, packet):
+        """Incoming packet handler.
+        """
         pass
