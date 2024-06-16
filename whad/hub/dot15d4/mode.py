@@ -2,6 +2,7 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.dot15d4.dot15d4_pb2 import StartCmd, StopCmd
+from whad.hub.events import JammedEvt
 from ..message import pb_bind, PbFieldInt, PbMessageWrapper
 from . import Dot15d4Domain
 
@@ -78,6 +79,21 @@ class Jammed(PbMessageWrapper):
     """
 
     timestamp = PbFieldInt('dot15d4.jammed.timestamp')
+
+    def to_event(self) -> JammedEvt:
+        """Convert this message into a WHAD event.
+        """
+        return JammedEvt(
+            timestamp=self.timestamp
+        )
+    
+    @staticmethod
+    def from_event(event):
+        """Convert an event into a message.
+        """
+        return Jammed(
+            timestamp=event.timestamp
+        )
 
 @pb_bind(Dot15d4Domain, 'ed_sample', 1)
 class EnergyDetectionSample(PbMessageWrapper):
