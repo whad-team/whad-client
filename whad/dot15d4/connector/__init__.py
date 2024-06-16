@@ -69,7 +69,7 @@ class Dot15d4(WhadDeviceConnector):
         """
         Format a packet using the underlying translator.
         """
-        return self.translator.format(packet)
+        return self.hub.dot15d4.format(packet)
 
     def can_sniff(self) -> bool:
         """
@@ -227,9 +227,6 @@ class Dot15d4(WhadDeviceConnector):
             # Set metadata
             packet.metadata = metadata
 
-            # Monitor packet
-            self.monitor_packet_tx(packet)
-
             # Send packet
             return super().send_packet(packet)
 
@@ -315,11 +312,13 @@ class Dot15d4(WhadDeviceConnector):
     def on_packet(self, packet):
         """Dot15d4 packet dispatch.
         """
+        if not self.__ready:
+            return
+        
+        # Dispatch packet.
         if packet.metadata.raw:
-            self.monitor_packet_rx(packet)
             self.on_raw_pdu(packet)
         else:
-            self.monitor_packet_rx(packet)
             self.on_pdu(packet)
 
     def on_raw_pdu(self, packet):
