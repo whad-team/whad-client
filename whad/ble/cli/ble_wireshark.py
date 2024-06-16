@@ -76,7 +76,7 @@ class BleUnixSocketConnector(UnixSocketConnector):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
-        return self.__translator.format(packet)
+        return self.hub.ble.format(packet)
 
 
 class BleWiresharkApp(CommandLineDevicePipe):

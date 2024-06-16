@@ -17,6 +17,7 @@ from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
 # Protocol hub
 from whad.helpers import message_filter
+from whad.hub.message import AbstractPacket
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import ChannelMap
@@ -54,8 +55,7 @@ class BLE(WhadDeviceConnector):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
-        return self.translator.format(packet)
-
+        return self.hub.ble.format(packet)
 
     def __init__(self, device=None, synchronous=False):
             """
@@ -777,9 +777,6 @@ class BLE(WhadDeviceConnector):
             packet.metadata.direction = direction
             packet.metadata.connection_handle = conn_handle
             packet.metadata.raw = send_raw
-            
-            # Monitor this outgoing packet
-            self.monitor_packet_tx(packet)
 
             # If encrypt is provided, take it into account
             # otherwise consider using the internal link-layer encryption status
