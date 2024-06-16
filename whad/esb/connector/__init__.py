@@ -26,7 +26,7 @@ class ESB(WhadDeviceConnector):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
-        return self.translator.format(packet)
+        return self.hub.esb.format(packet)
 
     def __init__(self, device=None, synchronous=False):
         """
@@ -113,10 +113,8 @@ class ESB(WhadDeviceConnector):
             packet.metadata.channel = tx_channel
             packet.metadata.address = tx_address
 
-            self.monitor_packet_tx(packet)
-            msg = self.translator.from_packet(packet, channel, retransmission_count)
-            resp = self.send_command(msg, message_filter(CommandResult))
-            return isinstance(resp, Success)
+            # Send packet
+            return super().send_packet(packet)
         else:
             return False
 
@@ -283,31 +281,19 @@ class ESB(WhadDeviceConnector):
         pass
 
     def on_domain_msg(self, domain, message):
+        pass
+
+    def on_packet(self, packet):
+        """Incoming packet callback.
+        """
         if not self.__ready:
             return
 
-        if domain == 'esb':
-            if isinstance(message, PduReceived):
-                packet = self.translator.from_message(message)
-                self.monitor_packet_rx(packet)
-
-                # Forward to PDU callback if synchronous mode is not set,
-                # add to pending PDUs otherwise
-                if self.is_synchronous():
-                    self.add_pending_packet(packet)
-                else:
-                    self.on_pdu(packet)
-
-            elif isinstance(message, RawPduReceived):
-                packet = self.translator.from_message(message)
-                self.monitor_packet_rx(packet)
-
-                # Forward to PDU callback if synchronous mode is not set,
-                # add to pending PDUs otherwise
-                if self.is_synchronous():
-                    self.add_pending_packet(packet)
-                else:
-                    self.on_raw_pdu(packet)
+        # Dispatch packet
+        if packet.metadata.raw:
+            self.on_raw_pdu(packet)
+        else:
+            self.on_pdu(packet)
 
     def on_raw_pdu(self, packet):
         # Extract the PDU from raw packet
