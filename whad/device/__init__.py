@@ -500,6 +500,29 @@ class WhadDeviceConnector(object):
         """
         logger.error('method `on_domain_msg` must be implemented in inherited classes')
         raise RequiredImplementation()
+    
+
+    def on_packet(self, packet):
+        """Callback function to process incoming packets.
+
+        This method MUST be overriden by inherited classes.
+
+        :param packet: Packet
+        :type packet: :class:`scapy.packet.Packet`
+        """
+        logger.error('method `on_packet` must be implemented in inherited classes')
+        raise RequiredImplementation()
+    
+    def on_event(self, event):
+        """Callback function to process incoming events.
+
+        This method MUST be overriden by inherited classes.
+
+        :param event: Event to process
+        :type event: :class:`whad.hub.events.AbstractEvent`
+        """
+        logger.error('method `on_event` must be implemented in inherited classes')
+        raise RequiredImplementation()        
 
 
 class WhadDeviceInputThread(Thread):
