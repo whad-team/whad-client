@@ -140,6 +140,13 @@ class PhyDomain(Registry):
             # Error
             return None
 
+    def format(self, packet):
+        """
+        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
+        the appropriate header and the timestamp in microseconds.
+        """
+        return packet, 0
+
     def createSetAskMod(self, ook: bool = False) -> HubMessage:
         """Create a SetAskMod message
 

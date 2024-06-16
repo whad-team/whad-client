@@ -3,6 +3,9 @@
 from typing import List, Union
 from dataclasses import dataclass, field, fields
 
+from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, \
+    ESB_Pseudo_Packet
+
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
@@ -118,6 +121,23 @@ class EsbDomain(Registry):
         else:
             # Error
             return None
+
+    def format(self, packet):
+        """
+        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
+        the appropriate header and the timestamp in microseconds.
+        """
+        if ESB_Hdr not in packet:
+            packet = ESB_Hdr(address=None)/packet
+
+        packet.preamble = 0xAA # force a rebuild
+        formatted_packet = ESB_Pseudo_Packet(bytes(packet)[1:])
+
+        timestamp = None
+        if hasattr(packet, "metadata"):
+            timestamp = packet.metadata.timestamp
+
+        return formatted_packet, timestamp
 
     @staticmethod
     def parse(proto_version: int, message) -> HubMessage:

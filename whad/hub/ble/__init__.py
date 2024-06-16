@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, fields
 from .bdaddr import BDAddress
 from .chanmap import ChannelMap
 
-from scapy.layers.bluetooth4LE import BTLE_RF
+from scapy.layers.bluetooth4LE import BTLE_RF, BTLE, BTLE_ADV, BTLE_DATA
 
 from whad.protocol.ble.ble_pb2 import BleDirection, BleAdvType, BleAddrType
 from whad.hub.registry import Registry
@@ -155,6 +155,28 @@ class BleDomain(Registry):
         else:
             # Error
             return None
+        
+    def format(self, packet):
+        """Convert this message to its scapy representation with the
+        appropriate header and timestamp in microseconds.
+        """
+        formatted_packet = packet
+        if BTLE not in packet:
+            if BTLE_ADV in packet:
+                formatted_packet = BTLE(access_addr=0x8e89bed6)/packet
+            elif BTLE_DATA in packet:
+                # We are forced to use a pseudo access address for connections in this case.
+                formatted_packet = BTLE(access_addr=0x11223344) / packet
+
+        timestamp = None
+        if hasattr(packet, "metadata"):
+            header, timestamp = packet.metadata.convert_to_header()
+            formatted_packet = header / formatted_packet
+        else:
+            header = BTLE_RF()
+            formatted_packet = header / formatted_packet
+
+        return formatted_packet, timestamp
 
     def createSetBdAddress(self, bd_address: BDAddress) -> HubMessage:
         """Create a SetBdAddress message.

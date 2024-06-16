@@ -3,10 +3,13 @@
 from typing import List
 from dataclasses import dataclass, field, fields
 
+from scapy.layers.dot15d4 import Dot15d4FCS
+
 from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4MitmRole, AddressType
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr,\
     Dot15d4TAP_Received_Signal_Strength, Dot15d4TAP_Channel_Assignment, \
-    Dot15d4TAP_Channel_Center_Frequency, Dot15d4TAP_Link_Quality_Indicator
+    Dot15d4TAP_Channel_Center_Frequency, Dot15d4TAP_Link_Quality_Indicator, \
+    Dot15d4TAP_FCS_Type
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
@@ -133,6 +136,24 @@ class Dot15d4Domain(Registry):
         else:
             # Error
             return None
+
+    def format(self, packet):
+        """
+        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
+        the appropriate header and the timestamp in microseconds.
+        """
+        if hasattr(packet, "metadata"):
+            header, timestamp = packet.metadata.convert_to_header()
+        else:
+            header = Dot15d4TAP_Hdr()
+            timestamp = None
+
+        header.data.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_FCS_Type(
+            fcs_type=int(Dot15d4FCS in packet)
+            )
+        )
+        formatted_packet = header/packet
+        return formatted_packet, timestamp
 
     @staticmethod
     def parse(proto_version: int, message) -> HubMessage:
