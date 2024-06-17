@@ -46,13 +46,32 @@ class PCAPDevice(VirtualDevice):
         """
         self.__opened = False
         self.__filename = filename
+        self.__pcap_reader = None
+        self.__pcap_writer = None
         super().__init__()
 
+    def _is_reader(self):
+        """
+        Returns True if the PCAP is in reading mode.
+        """
+        return self.__pcap_reader is not None
+
+    def _get_dlt(self):
+        if self._is_reader():
+            if hasattr(self.__pcap_reader, "linktype"):
+                dlt = self.__pcap_reader.linktype
+            else:
+                # PCAP-ng
+                _ = self.__pcap_reader.read_packet()
+                dlt = self.__pcap_reader.interfaces[0][0]
+                self.__pcap_reader = PcapReader(self.__filename)
+            return dlt
     def open(self):
         try:
             print("Opening:", self.__filename)
             if exists(self.__filename):
                 logger.info("Existing PCAP file")
+
             else:
                 logger.info("No PCAP file")
         except:
