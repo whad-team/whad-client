@@ -12,7 +12,7 @@ from whad.protocol.phy.phy_pb2 import PhyCommand
 from whad import WhadDomain, WhadCapability
 
 import logging
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 DOMAINS = {
     WhadDomain.Phy: 'Physical Layer',

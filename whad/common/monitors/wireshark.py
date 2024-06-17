@@ -24,6 +24,11 @@ class WiresharkMonitor(PcapWriterMonitor):
     def get_dissector(cls, dissector_name):
         return realpath("{}/../ressources/wireshark/{}.lua".format(dirname(whad.__file__), dissector_name))
 
+    @classmethod
+    def get_dlt(cls, domain):
+        dlt = None
+        return dlt
+
     def __init__(self, monitor_reception=True, monitor_transmission=True):
         self._wireshark_process = None
         # Checks the presence of wireshark

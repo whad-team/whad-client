@@ -4,6 +4,7 @@ from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad import WhadDomain, WhadCapability
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.dot15d4 import Commands
+from scapy.utils import PcapReader, PcapWriter
 from struct import unpack, pack
 from time import sleep
 from os.path import exists
@@ -71,7 +72,9 @@ class PCAPDevice(VirtualDevice):
             print("Opening:", self.__filename)
             if exists(self.__filename):
                 logger.info("Existing PCAP file")
-
+                self.__pcap_reader = PcapReader(self.__filename)
+                self.__dlt = self._get_dlt()
+                print(self.__dlt)
             else:
                 logger.info("No PCAP file")
         except:
