@@ -4,7 +4,7 @@ from typing import List
 from dataclasses import dataclass, field, fields
 
 from whad.protocol.phy.phy_pb2 import LoRaSpreadingFactor, LoRaCodingRate, JammingMode, \
-    Endianness as PbEndianness, TXPower, timestamp as whad_timestamp
+    Endianness as PbEndianness, TXPower
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
@@ -66,29 +66,6 @@ class TxPower:
     LOW = TXPower.LOW
     MEDIUM = TXPower.MEDIUM
     HIGH = TXPower.HIGH
-
-class Timestamp(object):
-    """PHY Timestamp class
-    """
-
-    def __init__(self, sec: int, usec: int):
-        """Initialize a timestamp
-
-        :param sec: number of seconds
-        :type sec: int
-        :param usec: number of microseconds
-        :type usec: int
-        """
-        self.__sec = sec
-        self.__usec = usec
-
-    @property
-    def sec(self):
-        return self.__sec
-    
-    @property
-    def usec(self):
-        return self.__usec
 
 @dataclass(repr=False)
 class PhyMetadata(Metadata):
@@ -326,7 +303,7 @@ class PhyDomain(Registry):
     def createJammed(self, timestamp: int) -> HubMessage:
         """Create a Jammed notification
 
-        :param timestamp: Timestamp at which the jamming has succeeded
+        :param timestamp: Timestamp at which the jamming has succeeded, in microseconds
         :type timestamp: int
         :return: instance of `Jammed`
         """
@@ -440,7 +417,7 @@ class PhyDomain(Registry):
 
 
     def createPacketReceived(self, frequency: int, packet: bytes, rssi: int = None, \
-                             timestamp: Timestamp = None) -> HubMessage:
+                             timestamp: int = None) -> HubMessage:
         """Create a PacketReceived notification message
 
         :param frequency: Frequency on which the packet has been received
@@ -449,8 +426,8 @@ class PhyDomain(Registry):
         :type packet: bytes
         :param rssi: Received signal strength indicator
         :type rssi: int, optional
-        :param timestamp: Timestamp at which the packet has been received
-        :type timestamp: Timestamp, optional
+        :param timestamp: Timestamp at which the packet has been received, in microseconds
+        :type timestamp: int, optional
         :return: instance of `PacketReceived`
         """
         msg = PhyDomain.bound('packet', self.proto_version)(
@@ -462,14 +439,13 @@ class PhyDomain(Registry):
         if rssi is not None:
             msg.rssi = rssi
         if timestamp is not None:
-            msg.timestamp.sec = timestamp.sec
-            msg.timestamp.usec = timestamp.usec
+            msg.timestamp = timestamp
         
         # Success
         return msg
     
     def createRawPacketReceived(self, frequency: int, packet: bytes, rssi: int = None, \
-                             timestamp: Timestamp = None, iq: List[int] = None) -> HubMessage:
+                             timestamp: int = None, iq: List[int] = None) -> HubMessage:
         """Create a RawPacketReceived notification message
 
         :param frequency: Frequency on which the packet has been received
@@ -478,8 +454,8 @@ class PhyDomain(Registry):
         :type packet: bytes
         :param rssi: Received signal strength indicator
         :type rssi: int, optional
-        :param timestamp: Timestamp at which the packet has been received
-        :type timestamp: Timestamp, optional
+        :param timestamp: Timestamp at which the packet has been received, in microseconds
+        :type timestamp: int, optional
         :return: instance of `PacketReceived`
         """
         msg = PhyDomain.bound('raw_packet', self.proto_version)(
@@ -491,8 +467,7 @@ class PhyDomain(Registry):
         if rssi is not None:
             msg.rssi = rssi
         if timestamp is not None:
-            msg.timestamp.sec = timestamp.sec
-            msg.timestamp.usec = timestamp.usec
+            msg.timestamp = timestamp
         if iq is not None:
             for sample in iq:
                 msg.iq.append(sample)
@@ -500,13 +475,13 @@ class PhyDomain(Registry):
         # Success
         return msg
     
-    def createSchedulePacket(self, packet: bytes, timestamp: Timestamp) -> HubMessage:
+    def createSchedulePacket(self, packet: bytes, timestamp: int) -> HubMessage:
         """Create a SchedulePacket message
 
         :param packet: Packet data
         :type packet: bytes
-        :param timestamp: Timestamp at which the packet has to be sent
-        :type timestamp: Timestamp
+        :param timestamp: Timestamp at which the packet has to be sent, in microseconds
+        :type timestamp: int
         :return: instance of `SchedulePacket`
         """
         # Create message
@@ -515,8 +490,7 @@ class PhyDomain(Registry):
         )
 
         # Set timestamp value
-        msg.timestamp.sec = timestamp.sec
-        msg.timestamp.usec = timestamp.usec
+        msg.timestamp = timestamp
 
         # Return message
         return msg
@@ -586,7 +560,6 @@ __all__ = [
     'ScheduledPacketSent',
     'SchedulePacketResponse',
     'PhyDomain',
-    'Timestamp',
     'SpreadingFactor',
     'CodingRate',
     'Jamming',

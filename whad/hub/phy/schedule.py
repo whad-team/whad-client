@@ -1,7 +1,7 @@
 """WHAD Protocol PHY schedule packet messages abstraction layer.
 """
 from whad.protocol.whad_pb2 import Message
-from ..message import pb_bind, PbFieldInt, PbFieldBytes, PbFieldBool, PbFieldMsg, PbMessageWrapper
+from ..message import pb_bind, PbFieldInt, PbFieldBytes, PbFieldBool, PbMessageWrapper
 from . import PhyDomain
 
 from .timestamp import Timestamp
@@ -12,7 +12,7 @@ class SchedulePacket(PbMessageWrapper):
     """
 
     packet = PbFieldBytes('phy.sched_send.packet')
-    timestamp = PbFieldMsg('phy.sched_send.timestamp', Timestamp)
+    timestamp = PbFieldInt('phy.sched_send.timestamp')
 
 @pb_bind(PhyDomain, 'sched_pkt_rsp', 1)
 class SchedulePacketResponse(PbMessageWrapper):

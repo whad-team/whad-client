@@ -3,7 +3,7 @@
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.phy import Phy_Packet
 from whad.hub.phy import PhyMetadata
-from ..message import pb_bind, PbFieldInt, PbFieldBytes,PbFieldArray, PbFieldMsg, PbMessageWrapper
+from ..message import pb_bind, PbFieldInt, PbFieldBytes,PbFieldArray, PbMessageWrapper
 from . import PhyDomain
 
 from .timestamp import Timestamp
@@ -94,7 +94,7 @@ class PacketReceived(PbMessageWrapper):
     frequency = PbFieldInt('phy.packet.frequency')
     packet = PbFieldBytes('phy.packet.packet')
     rssi = PbFieldInt('phy.packet.rssi', optional=True)
-    timestamp = PbFieldMsg('phy.packet.timestamp', Timestamp, optional=True)
+    timestamp = PbFieldInt('phy.packet.timestamp', optional=True)
 
     def to_packet(self):
         """Convert message to packet
@@ -136,7 +136,7 @@ class RawPacketReceived(PbMessageWrapper):
     packet = PbFieldBytes('phy.raw_packet.packet')
     rssi = PbFieldInt('phy.raw_packet.rssi', optional=True)
     iq = PbFieldArray('phy.raw_packet.iq')
-    timestamp = PbFieldMsg('phy.raw_packet.timestamp', Timestamp, optional=True)
+    timestamp = PbFieldInt('phy.raw_packet.timestamp', optional=True)
 
     def to_packet(self):
         """Convert message to packet

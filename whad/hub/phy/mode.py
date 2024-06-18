@@ -2,7 +2,7 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.phy.phy_pb2 import MonitorCmd, StartCmd, StopCmd
-from ..message import pb_bind, PbFieldInt, PbFieldBool, PbFieldMsg, PbFieldArray, PbMessageWrapper
+from ..message import pb_bind, PbFieldInt, PbFieldBool, PbFieldArray, PbMessageWrapper
 from . import PhyDomain
 
 from .timestamp import Timestamp
@@ -26,7 +26,7 @@ class Jammed(PbMessageWrapper):
     """PHY Jammed notification message
     """
 
-    timestamp = PbFieldMsg('phy.jammed.timestamp', Timestamp)
+    timestamp = PbFieldInt('phy.jammed.timestamp')
 
 @pb_bind(PhyDomain, 'monitor', 1)
 class MonitorMode(PbMessageWrapper):

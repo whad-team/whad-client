@@ -16,7 +16,7 @@ from whad.phy.exceptions import UnsupportedFrequency, NoModulation, NoDatarate, 
 from whad.phy.connector.translator import PhyMessageTranslator
 
 from whad.hub.generic.cmdresult import Success, CommandResult
-from whad.hub.phy import Timestamp, Commands, TxPower, Endianness, SupportedFreqRanges, \
+from whad.hub.phy import Commands, TxPower, Endianness, SupportedFreqRanges, \
     SchedulePacketResponse, PacketReceived, RawPacketReceived
 
 class Phy(WhadDeviceConnector):
@@ -689,12 +689,9 @@ class Phy(WhadDeviceConnector):
         packet.metadata.frequency = self.__cached_frequency
         
         # Set timestamp
-        ts_sec = int(timestamp)
-        ts_usec = int((timestamp - ts_sec)*1000000)
-
         msg = self.hub.phy.createSchedulePacket(
             bytes(packet),
-            Timestamp(ts_sec, ts_usec)
+            int(timestamp*1000000)
         )
 
         # Schedule a packet
