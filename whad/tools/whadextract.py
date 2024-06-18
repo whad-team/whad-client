@@ -135,7 +135,7 @@ class WhadExtractApp(CommandLinePipe):
                                             output += " " + (repr(display_values[name]) if not isinstance(display_values[name],str) else str(display_values[name]))
                             output = output[1:]
                             #sys.stdout.write(" ".join(repr(display_values[i]) for i in arglist if i in display_values)) # preserve order
-                            print(output + "\n")
+                            print(output)
                             sys.stdout.flush()
 
                     except JSONDecodeError:

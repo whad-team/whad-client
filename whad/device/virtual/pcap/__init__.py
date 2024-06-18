@@ -4,9 +4,14 @@ from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad.device.virtual.pcap.capabilities import CAPABILITIES
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.dot15d4 import Commands
+from scapy.layers.dot15d4 import Dot15d4
+from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, FieldsSize, is_access_address_valid
 from scapy.utils import PcapReader, PcapWriter
 from struct import unpack, pack
+from scapy.layers.bluetooth4LE import BTLE
 from whad.dot15d4.metadata import Dot15d4Metadata
+from whad.ble.metadata import BLEMetadata
+
 from time import sleep
 from whad import WhadDomain
 from os.path import exists
@@ -48,6 +53,7 @@ class PCAPDevice(VirtualDevice):
         """
         Create device connection
         """
+        print(filename)
         self.__opened = False
         self.__started = False
         self.__filename = filename
@@ -55,6 +61,7 @@ class PCAPDevice(VirtualDevice):
         self.__pcap_writer = None
         self.__dlt = None
         self.__domain = None
+        self.__start_timestamp, self.__last_timestamp = None, None
         super().__init__()
 
     def _is_reader(self):
@@ -79,7 +86,7 @@ class PCAPDevice(VirtualDevice):
 
     def open(self):
         try:
-            print("Opening:", self.__filename)
+            #print("Opening:", self.__filename)
             if exists(self.__filename):
                 logger.info("Existing PCAP file")
                 self.__pcap_reader = PcapReader(self.__filename)
@@ -95,7 +102,7 @@ class PCAPDevice(VirtualDevice):
         self._fw_url = self._get_url()
         self._fw_version = self._get_firmware_version()
         self._dev_capabilities = self._get_capabilities()
-
+        self.__flush = False
         self.__opened = True
         # Ask parent class to run a background I/O thread
         super().open()
@@ -121,22 +128,73 @@ class PCAPDevice(VirtualDevice):
     def close(self):
         super().close()
 
-    def _send_packet(self, pkt):
+    def _generate_metadata(self, pkt):
         if self.__domain == WhadDomain.Dot15d4:
             metadata = Dot15d4Metadata.convert_from_header(pkt)
-            print(metadata)
+        elif self.__domain == WhadDomain.BtLE:
+            metadata = BLEMetadata.convert_from_header(pkt)
+        else:
+            return None
+        if self.__start_timestamp is None:
+            self.__start_timestamp = metadata.timestamp
+        metadata.timestamp = metadata.timestamp - self.__start_timestamp
+        return metadata
+
+    def _interframe_delay(self, timestamp):
+        if not self.__flush:
+            if self.__last_timestamp is None:
+                self.__last_timestamp = 0
+            sleep((timestamp - self.__last_timestamp)/100000)
+
+    def _send_packet(self, pkt):
+        if self.__domain == WhadDomain.Dot15d4:
+            metadata = self._generate_metadata(pkt)
+            self._interframe_delay(metadata.timestamp)
+            self.__last_timestamp = metadata.timestamp
+
+            #print(metadata)
+            self._send_whad_zigbee_raw_pdu(bytes(pkt[Dot15d4:]), channel=metadata.channel, lqi=metadata.lqi, rssi=metadata.rssi, timestamp=metadata.timestamp)
+        elif self.__domain == WhadDomain.BtLE:
+            metadata = self._generate_metadata(pkt)
+            self._interframe_delay(metadata.timestamp)
+            self.__last_timestamp = metadata.timestamp
+            self._send_whad_ble_raw_pdu(pkt, metadata)
+
+    def _send_whad_ble_raw_pdu(self, packet, metadata):
+        packet = packet[BTLE:]
+        access_address = packet.access_addr
+        pdu = bytes(packet)[FieldsSize.ACCESS_ADDRESS_SIZE:-FieldsSize.CRC_SIZE]
+
+        # Create a RawPduReceived message
+        msg = self.hub.ble.createRawPduReceived(
+            metadata.direction,
+            pdu,
+            access_address,
+            0,
+            crc_validity=metadata.is_crc_valid,
+            crc=packet.crc,
+            channel=metadata.channel,
+            timestamp=metadata.timestamp,
+            rssi=metadata.rssi
+        )
+
+        # Send message
+        self._send_whad_message(msg)
+
+
 
     # Virtual device whad message builder
-    def _send_whad_zigbee_raw_pdu(self, packet, rssi=None, is_fcs_valid=None, timestamp=None):
-        '''
+    def _send_whad_zigbee_raw_pdu(self, packet, channel=None, rssi=None, lqi=None, is_fcs_valid=True, timestamp=None):
+
         pdu = packet[:-2]
         fcs = unpack("H",packet[-2:])[0]
 
         # Create a RawPduReceived message
         msg = self.hub.dot15d4.createRawPduReceived(
-            self.__channel,
+            channel,
             pdu,
             fcs,
+            lqi = lqi,
             fcs_validity=is_fcs_valid
         )
 
@@ -147,11 +205,24 @@ class PCAPDevice(VirtualDevice):
             msg.timestamp = timestamp
 
         # Send message
-        '''
         self._send_whad_message(msg)
 
 
     # Virtual device whad message callbacks
+    def _on_whad_ble_stop(self, message):
+        self.__started = False
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_ble_start(self, message):
+        self.__started = True
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_ble_sniff_adv(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_ble_sniff_conn(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
     def _on_whad_dot15d4_stop(self, message):
         self.__started = False
         self._send_whad_command_result(CommandResult.SUCCESS)

@@ -18,6 +18,7 @@ import sys
 from pkgutil import iter_modules
 from importlib import import_module
 import whad
+from scapy.config import conf
 logger = logging.getLogger(__name__)
 #logging.basicConfig(level=logging.DEBUG)
 
@@ -25,7 +26,6 @@ def get_translator(protocol):
     """Get a translator according to a specific domain.
     """
     translator = None
-
     # Iterate over modules
     for _, candidate_protocol,_ in iter_modules(whad.__path__):
         # If the module contains a sniffer connector,
@@ -38,6 +38,8 @@ def get_translator(protocol):
         except ModuleNotFoundError:
             pass
     # return the environment dictionary
+    conf.dot15d4_protocol = protocol
+    
     return translator
 
 class WhadWiresharkApp(CommandLineApp):

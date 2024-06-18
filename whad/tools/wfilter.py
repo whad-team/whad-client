@@ -12,11 +12,34 @@ from scapy.all import *
 from whad.device.unix import UnixSocketProxy, UnixSocketCallbacksConnector
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
-
+from pkgutil import iter_modules
+from importlib import import_module
+import whad
 import logging
 import time
+from scapy.config import conf
 
 logger = logging.getLogger(__name__)
+#logging.basicConfig(level=logging.DEBUG)
+
+def get_translator(protocol):
+    """Get a translator according to a specific domain.
+    """
+    translator = None
+    # Iterate over modules
+    for _, candidate_protocol,_ in iter_modules(whad.__path__):
+        # If the module contains a sniffer connector,
+        # store the associated translator in translator variable
+        try:
+            module = import_module("whad.{}.connector.sniffer".format(candidate_protocol))
+            if candidate_protocol == protocol:
+                translator = module.Sniffer.translator
+                break
+        except ModuleNotFoundError:
+            pass
+    # return the environment dictionary
+    conf.dot15d4_protocol = protocol
+    return translator
 
 class WhadFilterApp(CommandLineApp):
 
@@ -103,7 +126,7 @@ class WhadFilterApp(CommandLineApp):
                 if self.args.transform is not None:
                     p = packet = pkt
                     exec(self.args.transform)
-                    # recompute CRC ? 
+                    # recompute CRC ?
                 if not self.is_stdout_piped():
                     display_packet(pkt)
                 return pkt
@@ -175,6 +198,10 @@ class WhadFilterApp(CommandLineApp):
                 connector=UnixSocketCallbacksConnector
             )
             interface.open()
+            self.connector = proxy.connector
+            self.connector.domain = self.args.domain
+            self.connector.translator = get_translator(self.args.domain)(self.connector.hub)
+            self.connector.format = self.connector.translator.format
 
             if self.is_stdout_piped():
                 proxy.start()

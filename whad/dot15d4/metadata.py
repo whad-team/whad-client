@@ -28,8 +28,24 @@ class Dot15d4Metadata(Metadata):
 
     @classmethod
     def convert_from_header(cls, pkt):
-        pkt[Dot15d4TAP_Hdr].show()
-
+        rssi = None
+        lqi = None
+        channel = None
+        for layer in pkt[Dot15d4TAP_Hdr].data:
+            if Dot15d4TAP_Received_Signal_Strength in layer:
+                rssi = layer.rss
+            elif Dot15d4TAP_Link_Quality_Indicator in layer:
+                lqi = layer.lqi
+            elif Dot15d4TAP_Channel_Assignment in layer:
+                channel = layer.channel_number
+            else:
+                pass
+        return Dot15d4Metadata(
+            rssi = int(rssi),
+            lqi = lqi,
+            channel = channel,
+            timestamp = int(100000 * pkt.time)
+        )
 
 def generate_dot15d4_metadata(message):
     metadata = Dot15d4Metadata()
