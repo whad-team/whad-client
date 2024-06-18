@@ -72,7 +72,7 @@ class PduReceived(PbMessageWrapper):
         """Convert message to the corresponding scapy packet
         """
         packet = ESB_Payload_Hdr(bytes(self.pdu))
-        packet.metadata = ESBMetadata()
+        packet.metadata = UnifyingMetadata()
         packet.metadata.channel = self.channel
         packet.metadata.raw = False
         if self.rssi is not None:
@@ -122,7 +122,7 @@ class RawPduReceived(PbMessageWrapper):
         """Convert message to the corresponding scapy packet
         """
         packet = ESB_Hdr(bytes(self.pdu))
-        packet.metadata = ESBMetadata()
+        packet.metadata = UnifyingMetadata()
         packet.metadata.channel = self.channel
         packet.metadata.raw = True
         if self.rssi is not None:
