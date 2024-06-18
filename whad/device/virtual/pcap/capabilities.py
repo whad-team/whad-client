@@ -13,7 +13,7 @@ CAPABILITIES = {
         {
             WhadDomain.BtLE : (
                 (WhadCapability.Sniff),
-                [BleCommands.Sniff, BleCommands.Start, BleCommands.Stop]
+                [BleCommands.SniffConnReq, BleCommands.SniffAdv, BleCommands.Start, BleCommands.Stop]
             )
         },
         {

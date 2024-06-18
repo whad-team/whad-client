@@ -26,6 +26,10 @@ class Dot15d4Metadata(Metadata):
             tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Channel_Center_Frequency(channel_frequency=channel_frequency))
         return Dot15d4TAP_Hdr(data=tlv), timestamp
 
+    @classmethod
+    def convert_from_header(cls, pkt):
+        pkt[Dot15d4TAP_Hdr].show()
+
 
 def generate_dot15d4_metadata(message):
     metadata = Dot15d4Metadata()

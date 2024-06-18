@@ -2,9 +2,9 @@ from scapy.packet import Packet, bind_layers
 from scapy.config import conf
 from scapy.fields import ByteField, ByteEnumField, LEShortEnumField, \
     FieldLenField, PacketListField, LenField, LEThreeBytesField, \
-    IEEEFloatField, LEIntField, LEShortField, IEEEDoubleField, Field
+    IEEEFloatField, LEIntField, LEShortField, IEEEDoubleField, StrFixedLenField, Field
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
-
+import struct
 
 class LEIEEEFloatField(Field[int, int]):
     def __init__(self, name, default):
@@ -39,20 +39,38 @@ class Dot15d4TAP_TLV_Hdr(Packet):
     name = "Dot15d4 TAP Type-Length-Value Header"
     fields_desc = [
         LEShortEnumField("type", None, DOT15D4TAP_TYPES),
-        LenField("len", None, fmt="<H"),
+        LEShortField("len", None)
     ]
 
-    def post_build(self,p,pay):
-        padding_length = (4 - (len(pay) % 4)) % 4
-        return p + pay + b"\x00" * padding_length
 
+    '''
+        pl_length = self.len
+        # Needed to end each EIR_Element packet and make PacketListField work.
+
+        padding = (((pl_length) % 4) % 4)
+        return b"\x00"*padding,s
+
+    def guess_payload_class(self, payload):
+        return super(Dot15d4TAP_TLV_Element, self).guess_payload_class(payload)
+    '''
 class Dot15d4TAP_TLV_Element(Packet):
     name = "Dot15d4 TAP Type-Length-Value Element"
-
+    def extract_padding(self, s):
+        return b"",s
+    '''
+    @staticmethod
+    def length_from(pkt):
+        if not pkt.underlayer:
+            return 0
+        # 'type' byte is included in the length, so subtract 1:
+        return pkt.underlayer.len
+    '''
 class  Dot15d4TAP_FCS_Type(Dot15d4TAP_TLV_Element):
     name = "Dot15d4 FCS Type"
     fields_desc = [
         ByteEnumField("fcs_type", 1, {0 : "none", 1: "16-bit CRC", 2: "32-bit CRC"}),
+        StrFixedLenField("padding", b"\x00"*3, 3)
+
     ]
 
 class  Dot15d4TAP_Received_Signal_Strength(Dot15d4TAP_TLV_Element):
@@ -64,14 +82,15 @@ class  Dot15d4TAP_Received_Signal_Strength(Dot15d4TAP_TLV_Element):
 class  Dot15d4TAP_Bit_Rate(Dot15d4TAP_TLV_Element):
     name = "Dot15d4 Bit Rate"
     fields_desc = [
-        LEIntField("bit_rate",None),
+        LEIntField("bit_rate",None)
     ]
 
 class  Dot15d4TAP_Channel_Assignment(Dot15d4TAP_TLV_Element):
     name = "Dot15d4 Channel Assignment"
     fields_desc = [
         LEShortField("channel_number",None),
-        ByteField("channel_page", None)
+        ByteField("channel_page", None),
+        StrFixedLenField("padding", "\x00", 1),
     ]
 
 class  Dot15d4TAP_SUN_PHY_Information(Dot15d4TAP_TLV_Element):
@@ -79,7 +98,8 @@ class  Dot15d4TAP_SUN_PHY_Information(Dot15d4TAP_TLV_Element):
     fields_desc = [
         ByteField("phy_band", None),
         ByteField("phy_type", None),
-        ByteField("phy_mode", None)
+        ByteField("phy_mode", None),
+        StrFixedLenField("padding", b"\x00"*1, 1)
     ]
 
 
@@ -120,6 +140,7 @@ class  Dot15d4TAP_Link_Quality_Indicator(Dot15d4TAP_TLV_Element):
     name = "Dot15d4 Link Quality Indicator"
     fields_desc = [
         ByteField("lqi", None),
+        StrFixedLenField("padding", b"\x00"*3, 3)
     ]
 
 
@@ -135,7 +156,8 @@ class  Dot15d4TAP_Channel_Plan(Dot15d4TAP_TLV_Element):
     fields_desc = [
         LEIEEEFloatField("base_channel_frequency", None),
         LEIEEEFloatField("channel_spacing", None),
-        LEShortField("number_of_channels", None)
+        LEShortField("number_of_channels", None),
+        StrFixedLenField("padding", b"\x00"*2, 2)
     ]
 
 
@@ -144,8 +166,8 @@ class Dot15d4TAP_Hdr(Packet):
     fields_desc = [
         ByteEnumField("version", 0, DOT15D4TAP_VERSIONS),
         ByteField("reserved", 0),
-        FieldLenField("length", None, length_of="data", fmt="<H", adjust=lambda pkt, x:x+4),
-        PacketListField("data", [], Dot15d4TAP_TLV_Hdr, length_from=lambda pkt:pkt.length),
+        FieldLenField("length", None, length_of="data", fmt="<H"),#, adjust=lambda pkt, x:x-4),
+        PacketListField("data", [], Dot15d4TAP_TLV_Hdr, length_from=lambda x:x.length-4),
     ]
 
 

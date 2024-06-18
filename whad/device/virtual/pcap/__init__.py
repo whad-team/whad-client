@@ -1,14 +1,17 @@
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device.virtual import VirtualDevice
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
-from whad import WhadDomain, WhadCapability
+from whad.device.virtual.pcap.capabilities import CAPABILITIES
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.dot15d4 import Commands
 from scapy.utils import PcapReader, PcapWriter
 from struct import unpack, pack
+from whad.dot15d4.metadata import Dot15d4Metadata
 from time import sleep
+from whad import WhadDomain
 from os.path import exists
 import logging
+
 logger = logging.getLogger(__name__)
 
 class PCAPDevice(VirtualDevice):
@@ -46,9 +49,12 @@ class PCAPDevice(VirtualDevice):
         Create device connection
         """
         self.__opened = False
+        self.__started = False
         self.__filename = filename
         self.__pcap_reader = None
         self.__pcap_writer = None
+        self.__dlt = None
+        self.__domain = None
         super().__init__()
 
     def _is_reader(self):
@@ -67,6 +73,10 @@ class PCAPDevice(VirtualDevice):
                 dlt = self.__pcap_reader.interfaces[0][0]
                 self.__pcap_reader = PcapReader(self.__filename)
             return dlt
+
+    def _get_domain(self):
+        return list(CAPABILITIES[self.__dlt][0].keys())[0]
+
     def open(self):
         try:
             print("Opening:", self.__filename)
@@ -74,7 +84,7 @@ class PCAPDevice(VirtualDevice):
                 logger.info("Existing PCAP file")
                 self.__pcap_reader = PcapReader(self.__filename)
                 self.__dlt = self._get_dlt()
-                print(self.__dlt)
+                self.__domain = self._get_domain()
             else:
                 logger.info("No PCAP file")
         except:
@@ -97,13 +107,24 @@ class PCAPDevice(VirtualDevice):
     def read(self):
         if not self.__opened:
             raise WhadDeviceNotReady()
-        #self._send_whad_zigbee_raw_pdu(packet, rssi=rssi, is_fcs_valid=valid_fcs)
+        while self.__started:
+            try:
+                if self._is_reader():
+                    pkt = self.__pcap_reader.read_packet()
+                    self._send_packet(pkt)
+            except EOFError:
+                sleep(0.5)
 
     def reset(self):
         pass
 
     def close(self):
         super().close()
+
+    def _send_packet(self, pkt):
+        if self.__domain == WhadDomain.Dot15d4:
+            metadata = Dot15d4Metadata.convert_from_header(pkt)
+            print(metadata)
 
     # Virtual device whad message builder
     def _send_whad_zigbee_raw_pdu(self, packet, rssi=None, is_fcs_valid=None, timestamp=None):
@@ -132,6 +153,7 @@ class PCAPDevice(VirtualDevice):
 
     # Virtual device whad message callbacks
     def _on_whad_dot15d4_stop(self, message):
+        self.__started = False
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_dot15d4_send_raw(self, message):
@@ -141,17 +163,13 @@ class PCAPDevice(VirtualDevice):
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_dot15d4_start(self, message):
+        self.__started = True
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     # Discovery related functions
     def _get_capabilities(self):
-        capabilities = {
-            WhadDomain.Dot15d4 : (
-                                (WhadCapability.Sniff | WhadCapability.Inject),
-                                [Commands.Sniff, Commands.Send, Commands.Start, Commands.Stop]
-            )
-        }
-
+        index = 0 if self._is_reader() else 1
+        capabilities = CAPABILITIES[self.__dlt][index]
         return capabilities
 
     def _get_manufacturer(self):
