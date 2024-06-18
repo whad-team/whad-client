@@ -71,8 +71,7 @@ def packet_received():
     msg = Message()
     msg.phy.packet.frequency=2404000000
     msg.phy.packet.rssi = -40
-    msg.phy.packet.timestamp.sec=1234
-    msg.phy.packet.timestamp.usec=9876
+    msg.phy.packet.timestamp = 12349876
     msg.phy.packet.packet = b"HELLOWORLD"
     return msg
 
@@ -83,8 +82,7 @@ def raw_packet_received():
     msg = Message()
     msg.phy.raw_packet.frequency=2404000000
     msg.phy.raw_packet.rssi = -40
-    msg.phy.raw_packet.timestamp.sec=1234
-    msg.phy.raw_packet.timestamp.usec=9876
+    msg.phy.raw_packet.timestamp = 12349876
     msg.phy.raw_packet.packet = b"HELLOWORLD"
     return msg
 
@@ -148,8 +146,7 @@ class TestPacketConfig(object):
         assert isinstance(parsed_obj, PacketReceived)
         assert parsed_obj.frequency == 2404000000
         assert parsed_obj.rssi == -40
-        assert parsed_obj.timestamp.sec == 1234
-        assert parsed_obj.timestamp.usec == 9876
+        assert parsed_obj.timestamp == 12349876
         assert parsed_obj.packet == b"HELLOWORLD"
 
     def test_raw_packet_recvd_parsing(self, raw_packet_received):
@@ -159,6 +156,5 @@ class TestPacketConfig(object):
         assert isinstance(parsed_obj, RawPacketReceived)
         assert parsed_obj.frequency == 2404000000
         assert parsed_obj.rssi == -40
-        assert parsed_obj.timestamp.sec == 1234
-        assert parsed_obj.timestamp.usec == 9876
+        assert parsed_obj.timestamp == 12349876
         assert parsed_obj.packet == b"HELLOWORLD"

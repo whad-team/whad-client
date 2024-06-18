@@ -8,7 +8,7 @@ from whad.hub.phy import PhyDomain, SetAskMod, SetBpskMod, SetFskMod, SetGfskMod
     SetFreq, GetSupportedFreqs, SupportedFreqRanges, SniffMode, JamMode, Jammed, \
     MonitorMode, MonitoringReport, Jamming, SetDatarate, SetEndianness, SetPacketSize, \
     SetTxPower, SetSyncWord, TxPower, SendPacket, SendRawPacket, PacketReceived, \
-    RawPacketReceived, Timestamp, ScheduledPacketSent, SchedulePacket, SchedulePacketResponse
+    RawPacketReceived, ScheduledPacketSent, SchedulePacket, SchedulePacketResponse
 
 class TestPhyDomainFactory(object):
     """Test PHY factory
@@ -190,36 +190,33 @@ class TestPhyDomainFactory(object):
     def test_pkt_recvd(self, factory: PhyDomain):
         """Check creation of PacketReceived message
         """
-        msg = factory.createPacketReceived(2400000000, b"FOOBAR", timestamp=Timestamp(1234, 9876))
+        msg = factory.createPacketReceived(2400000000, b"FOOBAR", timestamp=12349876)
         assert isinstance(msg, PacketReceived)
         assert msg.frequency == 2400000000
         assert msg.packet == b"FOOBAR"
         assert msg.rssi is None
-        assert msg.timestamp.sec == 1234
-        assert msg.timestamp.usec == 9876
+        assert msg.timestamp == 12349876
 
     def test_raw_pkt_recvd(self, factory: PhyDomain):
         """Check creation of SetTxPower message
         """
-        msg = factory.createRawPacketReceived(2400000000, b"", timestamp=Timestamp(1234, 9876), \
+        msg = factory.createRawPacketReceived(2400000000, b"", timestamp=12349876, \
                                               iq=[1,2,3,4], rssi=-58)
         assert isinstance(msg, RawPacketReceived)
         assert msg.frequency == 2400000000
         assert msg.packet == b""
         assert msg.rssi == -58
-        assert msg.timestamp.sec == 1234
-        assert msg.timestamp.usec == 9876
+        assert msg.timestamp == 12349876
         assert len(msg.iq) == 4
         assert msg.iq[1] == 2
 
     def test_sched_send(self, factory: PhyDomain):
         """Check creation of SchedulePacket message
         """
-        msg = factory.createSchedulePacket(b"HELLOWORLD", Timestamp(1234, 9876))
+        msg = factory.createSchedulePacket(b"HELLOWORLD", 12349876)
         assert isinstance(msg, SchedulePacket)
         assert msg.packet == b"HELLOWORLD"
-        assert msg.timestamp.sec == 1234
-        assert msg.timestamp.usec == 9876
+        assert msg.timestamp == 12349876
 
     def test_sched_pkt_resp(self, factory: PhyDomain):
         """Check creation of SchedulePacketResponse message

@@ -11,8 +11,7 @@ def schedule_packet_send():
     """
     msg = Message()
     msg.phy.sched_send.packet = b"HELLOWORLD"
-    msg.phy.sched_send.timestamp.sec = 1234
-    msg.phy.sched_send.timestamp.usec = 9876
+    msg.phy.sched_send.timestamp = 12349876
     return msg
 
 @pytest.fixture
@@ -42,8 +41,7 @@ class TestScheduledPackets(object):
         parsed_obj = SchedulePacket.parse(1, schedule_packet_send)
         assert isinstance(parsed_obj, SchedulePacket)
         assert parsed_obj.packet == b"HELLOWORLD"
-        assert parsed_obj.timestamp.sec == 1234
-        assert parsed_obj.timestamp.usec == 9876
+        assert parsed_obj.timestamp == 12349876
 
     def test_sched_packet_resp_parsing(self, schedule_packet_resp):
         """Check parsing of ScheduleSendCmd

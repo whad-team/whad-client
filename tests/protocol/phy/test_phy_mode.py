@@ -28,8 +28,7 @@ def jammed():
     """Create a Jammed protobuf message
     """
     msg = Message()
-    msg.phy.jammed.timestamp.sec = 1234
-    msg.phy.jammed.timestamp.usec = 9876
+    msg.phy.jammed.timestamp = 12349876
     return msg
 
 @pytest.fixture
@@ -90,8 +89,7 @@ class TestModes(object):
         """
         parsed_obj = Jammed.parse(1, jammed)
         assert isinstance(parsed_obj, Jammed)
-        assert parsed_obj.timestamp.sec == 1234
-        assert parsed_obj.timestamp.usec == 9876
+        assert parsed_obj.timestamp == 12349876
 
     def test_monitor_mode_parsing(self, set_monitor_mode):
         """Check parsing of MonitorCmd
