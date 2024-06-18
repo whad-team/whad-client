@@ -1,8 +1,14 @@
+import json
+
 from whad.ble.connector import BLE, Central, Peripheral
 from whad.ble.profile import GenericProfile
 from whad.ble.exceptions import ConnectionLostException
-from whad.ble import UnsupportedCapability, message_filter, BleDirection, Message, Connected
-import json
+from whad.ble import UnsupportedCapability, message_filter
+
+from whad.hub.events import ConnectionEvt
+from whad.hub.ble import Hijacked
+
+
 class Hijacker(BLE):
 
     def __init__(self, device, connection=None):
@@ -21,29 +27,27 @@ class Hijacker(BLE):
         if self.__status:
             # It should be replaced by arguments in function calls, building a pseudo packet seems dirty
             if self.__hijack_master:
-                pseudo_connection = Message()
-                pseudo_connection.ble.connected.CopyFrom(Connected())
-                pseudo_connection.ble.connected.conn_handle = 0
-                pseudo_connection.ble.connected.initiator = b"\x00\x00\x00\x00\x00\x00"
-                pseudo_connection.ble.connected.init_addr_type = 0
-                pseudo_connection.ble.connected.advertiser = b"\x00\x00\x00\x00\x00\x00"
-                pseudo_connection.ble.connected.adv_addr_type = 0
-                actions.append(Central(self.device, existing_connection=pseudo_connection.ble.connected))
+                pseudo_connection = ConnectionEvt()
+                pseudo_connection.conn_handle = 0
+                pseudo_connection.initiator = b"\x00\x00\x00\x00\x00\x00"
+                pseudo_connection.init_addr_type = 0
+                pseudo_connection.advertiser = b"\x00\x00\x00\x00\x00\x00"
+                pseudo_connection.adv_addr_type = 0
+                actions.append(Central(self.device, existing_connection=pseudo_connection))
             if self.__hijack_slave:
-                pseudo_connection = Message()
-                pseudo_connection.ble.connected.CopyFrom(Connected())
-                pseudo_connection.ble.connected.conn_handle = 1
-                pseudo_connection.ble.connected.initiator = b"\x00\x00\x00\x00\x00\x00"
-                pseudo_connection.ble.connected.init_addr_type = 0
-                pseudo_connection.ble.connected.advertiser = b"\x00\x00\x00\x00\x00\x00"
-                pseudo_connection.ble.connected.adv_addr_type = 0
+                pseudo_connection = ConnectionEvt()
+                pseudo_connection.conn_handle = 1
+                pseudo_connection.initiator = b"\x00\x00\x00\x00\x00\x00"
+                pseudo_connection.init_addr_type = 0
+                pseudo_connection.advertiser = b"\x00\x00\x00\x00\x00\x00"
+                pseudo_connection.adv_addr_type = 0
                 with open("lightbulb2.json", "r") as f:
                     data = f.read()
 
                 actions.append(
                     Peripheral(
                         self.device,
-                        existing_connection = pseudo_connection.ble.connected,
+                        existing_connection = pseudo_connection,
                         profile = GenericProfile(from_json=data)
                     )
                 )
@@ -67,9 +71,9 @@ class Hijacker(BLE):
                 self.__hijack_slave = slave
                 self.hijack_slave(self.__connection.access_address)
 
-            message = self.wait_for_message(filter=message_filter('ble', 'hijacked'))
-            self.__status = message.ble.hijacked.success
-            return (message.ble.hijacked.success)
+            message = self.wait_for_message(filter=message_filter(Hijacked))
+            self.__status = message.success
+            return (message.success)
         else:
             raise self.__exception
 

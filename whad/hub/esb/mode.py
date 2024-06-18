@@ -2,6 +2,7 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.esb.esb_pb2 import StartCmd, StopCmd
+from whad.hub.events import JammedEvt
 from ..message import pb_bind, PbFieldBytes, PbFieldBool, PbFieldInt, PbMessageWrapper
 from . import EsbDomain
 
@@ -27,6 +28,19 @@ class Jammed(PbMessageWrapper):
     """
 
     timestamp = PbFieldInt('esb.jammed.timestamp')
+
+    def to_event(self):
+        """Convert this message into a WHAD event.
+        """
+        return JammedEvt(
+            timestamp=self.timestamp
+        )
+    
+    @staticmethod
+    def from_event(event):
+        """Create a Jammed message from event.
+        """
+        return Jammed(timestamp=event.timestamp)
 
 @pb_bind(EsbDomain, 'start', 1)
 class EsbStart(PbMessageWrapper):

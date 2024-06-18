@@ -4,8 +4,8 @@ Bluetooth Low Energy Central connector
 """
 
 from time import time, sleep
-from whad.ble import Message, Connected
 from whad.ble.connector import BLE
+from whad.hub.ble import Direction
 from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack, BtVersion
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
@@ -144,7 +144,7 @@ class Central(BLE):
         return self.__peripheral
 
 
-    def send_pdu(self, pdu, conn_handle=0, direction=BleDirection.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None) -> bool:
+    def send_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None) -> bool:
         """Send a PDU to the connected peripheral device or to the central device.
 
         :param  pdu:            BLE PDU to send.
@@ -233,7 +233,7 @@ class Central(BLE):
         :type   pdu: :class:`scapy.layers.bluetooth4LE.BTLE`
         """
         logger.info('received control PDU')
-        if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
+        if pdu.metadata.direction == Direction.SLAVE_TO_MASTER:
             self.__stack.on_ctl_pdu(pdu.metadata.connection_handle, pdu)
 
     def on_data_pdu(self, pdu):
@@ -247,7 +247,7 @@ class Central(BLE):
         :type   pdu: :class:`scapy.layers.bluetooth4LE.BTLE_DATA`
         """
         logger.info('received data PDU')
-        if pdu.metadata.direction == BleDirection.SLAVE_TO_MASTER:
+        if pdu.metadata.direction == Direction.SLAVE_TO_MASTER:
             self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
 
 

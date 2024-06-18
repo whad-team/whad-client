@@ -8,7 +8,6 @@ the way protocol buffers messages are created by mapping some of their propertie
 to protobuf messages fields.
 """
 from typing import Union
-
 from whad.protocol.whad_pb2 import Message
 from .registry import Registry
 
@@ -79,6 +78,27 @@ class ProtocolHub(Registry):
         return ProtocolHub.bound(
             msg.WhichOneof('msg'),
             self.__version).parse(self.__version, msg)
+    
+    def convertPacket(self, packet):
+        """Convert packet to the corresponding message.
+        """
+        msg = None
+
+        # We dispatch packets based on their layers
+        if self.ble.isPacketCompat(packet):
+            msg = self.ble.convertPacket(packet)
+        elif self.dot15d4.isPacketCompat(packet):
+            msg = self.dot15d4.convertPacket(packet)
+        elif self.esb.isPacketCompat(packet):
+            msg = self.esb.convertPacket(packet)
+        elif self.phy.isPacketCompat(packet):
+            msg = self.phy.convertPacket(packet)
+        elif self.unifying.isPacketCompat(packet):
+            msg = self.unifying.convertPacket(packet)
+
+        return msg
+        
+
 
 from .generic import Generic
 from .discovery import Discovery

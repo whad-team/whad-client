@@ -1,9 +1,17 @@
-from dataclasses import dataclass,fields
+from typing import Union
+from dataclasses import dataclass, field, fields
+
+
+def channel_to_frequency(channel):
+    '''
+    Converts 802.15.4 channel to frequency (in Hz).
+    '''
+    return 1000000 * (2405 + 5 * (channel - 11))
 
 @dataclass(repr=False)
 class Metadata:
     raw : bool = None
-    timestamp : int = None
+    timestamp : Union[int, float] = None
     channel : int = None
     rssi : int = None
 
@@ -20,3 +28,5 @@ class Metadata:
             return ""
         else:
             return "[ " + ", ".join(metadatas) + " ]"
+
+

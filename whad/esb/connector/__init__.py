@@ -6,10 +6,12 @@ from whad.esb.connector.translator import ESBMessageTranslator
 from whad.esb.esbaddr import ESBAddress
 from whad.esb.metadata import ESBMetadata
 from whad.scapy.layers.esb import ESB_Hdr,ESB_Payload_Hdr,ESB_Ack_Response
-from whad.helpers import message_filter, is_message_type
+from whad.helpers import message_filter
+from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.hub.generic.cmdresult import Success
-from whad.hub.esb import EsbNodeAddress, Commands, PduReceived, RawPduReceived
+from whad.hub.esb import EsbNodeAddress, Commands
+from whad.hub.events import JammedEvt
 
 class ESB(WhadDeviceConnector):
     """
@@ -25,7 +27,7 @@ class ESB(WhadDeviceConnector):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
-        return self.translator.format(packet)
+        return self.hub.esb.format(packet)
 
     def __init__(self, device=None, synchronous=False):
         """
@@ -112,10 +114,8 @@ class ESB(WhadDeviceConnector):
             packet.metadata.channel = tx_channel
             packet.metadata.address = tx_address
 
-            self.monitor_packet_tx(packet)
-            msg = self.translator.from_packet(packet, channel, retransmission_count)
-            resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
-            return isinstance(resp, Success)
+            # Send packet
+            return super().send_packet(packet)
         else:
             return False
 
@@ -158,7 +158,7 @@ class ESB(WhadDeviceConnector):
             show_acknowledgements
         )
 
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
 
@@ -190,7 +190,7 @@ class ESB(WhadDeviceConnector):
         # Create a PrxMode message.
         msg = self.hub.esb.createPrxMode(channel)
 
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
 
@@ -223,7 +223,7 @@ class ESB(WhadDeviceConnector):
         # Create a PtxMode message.
         msg = self.hub.esb.createPtxMode(channel)
 
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
 
@@ -252,7 +252,7 @@ class ESB(WhadDeviceConnector):
             EsbNodeAddress(node_address.value)
         )
 
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
     def start(self):
@@ -262,7 +262,7 @@ class ESB(WhadDeviceConnector):
         # Create a Start message.
         msg = self.hub.esb.createStart()
 
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
     def stop(self):
@@ -272,7 +272,7 @@ class ESB(WhadDeviceConnector):
         # Create a Stop message.
         msg = self.hub.esb.createStop()
 
-        resp = self.send_command(msg, message_filter('generic', 'cmd_result'))
+        resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
     def on_discovery_msg(self, message):
@@ -282,31 +282,28 @@ class ESB(WhadDeviceConnector):
         pass
 
     def on_domain_msg(self, domain, message):
+        pass
+
+    def on_packet(self, packet):
+        """Incoming packet callback.
+        """
         if not self.__ready:
             return
 
-        if domain == 'esb':
-            if isinstance(message, PduReceived):
-                packet = self.translator.from_message(message)
-                self.monitor_packet_rx(packet)
+        # Dispatch packet
+        if packet.metadata.raw:
+            self.on_raw_pdu(packet)
+        else:
+            self.on_pdu(packet)
 
-                # Forward to PDU callback if synchronous mode is not set,
-                # add to pending PDUs otherwise
-                if self.is_synchronous():
-                    self.add_pending_pdu(packet)
-                else:
-                    self.on_pdu(packet)
-
-            elif isinstance(message, RawPduReceived):
-                packet = self.translator.from_message(message)
-                self.monitor_packet_rx(packet)
-
-                # Forward to PDU callback if synchronous mode is not set,
-                # add to pending PDUs otherwise
-                if self.is_synchronous():
-                    self.add_pending_pdu(packet)
-                else:
-                    self.on_raw_pdu(packet)
+    def on_event(self, event):
+        """Process incoming events.
+        """
+        if not self.__ready:
+            return
+        
+        if isinstance(event, JammedEvt):
+            self.on_jammed(event.timestamp)
 
     def on_raw_pdu(self, packet):
         # Extract the PDU from raw packet
@@ -320,6 +317,11 @@ class ESB(WhadDeviceConnector):
         self.on_pdu(pdu)
 
     def on_pdu(self, packet):
+        pass
+
+    def on_jammed(self, timestamp: int):
+        """Jammed event handler.
+        """
         pass
 
 from whad.esb.connector.scanner import Scanner

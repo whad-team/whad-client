@@ -1,11 +1,19 @@
 """WHAD Protocol 802.15.4 domain message abstraction layer.
 """
 from typing import List
+from dataclasses import dataclass, field, fields
+
+from scapy.layers.dot15d4 import Dot15d4FCS
 
 from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4MitmRole, AddressType
+from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr,\
+    Dot15d4TAP_Received_Signal_Strength, Dot15d4TAP_Channel_Assignment, \
+    Dot15d4TAP_Channel_Center_Frequency, Dot15d4TAP_Link_Quality_Indicator, \
+    Dot15d4TAP_FCS_Type
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
+from whad.hub.metadata import Metadata, channel_to_frequency
 
 class Commands:
     """Dot15d4 commands
@@ -75,6 +83,26 @@ class NodeAddressExt(NodeAddress):
         assert address <= 0x10000000000000000
         super().__init__(address, NodeAddressType.EXTENDED)
 
+@dataclass(repr=False)
+class Dot15d4Metadata(Metadata):
+    is_fcs_valid : bool = None
+    lqi : int = None
+
+    def convert_to_header(self):
+        timestamp = None
+        tlv = []
+        if self.timestamp is not None:
+            timestamp = self.timestamp
+        if self.rssi is not None:
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Received_Signal_Strength(rss = self.rssi))
+        if self.lqi is not None:
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Link_Quality_Indicator(lqi = self.lqi))
+        if self.channel is not None:
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Channel_Assignment(channel_number=self.channel, channel_page=0))
+            channel_frequency = channel_to_frequency(self.channel) * 1000
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Channel_Center_Frequency(channel_frequency=channel_frequency))
+        return Dot15d4TAP_Hdr(data=tlv), timestamp
+
 @pb_bind(ProtocolHub, name="dot15d4", version=1)
 class Dot15d4Domain(Registry):
     """WHAD Dot15d4 domain messages parser/factory.
@@ -87,6 +115,45 @@ class Dot15d4Domain(Registry):
         """Initializes a Dot15d4 domain instance
         """
         self.proto_version = version
+
+    def isPacketCompat(self, packet) -> bool:
+        """Determine if a packet is a Dot15d4 packet.
+        """
+        return isinstance(packet.metadata, Dot15d4Metadata)
+    
+    def convertPacket(self, packet) -> HubMessage:
+        """Convert a Dot15d4 packet to SendPdu or SendBlePdu message.
+        """
+        if isinstance(packet.metadata, Dot15d4Metadata):
+            if packet.metadata.raw:
+                return Dot15d4Domain.bound('send_raw', self.proto_version).from_packet(
+                    packet, encrypt=packet.metadata.encrypt
+                )
+            else:
+                return Dot15d4Domain.bound('send', self.proto_version).from_packet(
+                    packet, encrypt=packet.metadata.encrypt
+                )
+        else:
+            # Error
+            return None
+
+    def format(self, packet):
+        """
+        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
+        the appropriate header and the timestamp in microseconds.
+        """
+        if hasattr(packet, "metadata"):
+            header, timestamp = packet.metadata.convert_to_header()
+        else:
+            header = Dot15d4TAP_Hdr()
+            timestamp = None
+
+        header.data.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_FCS_Type(
+            fcs_type=int(Dot15d4FCS in packet)
+            )
+        )
+        formatted_packet = header/packet
+        return formatted_packet, timestamp
 
     @staticmethod
     def parse(proto_version: int, message) -> HubMessage:

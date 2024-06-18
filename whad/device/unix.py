@@ -51,7 +51,7 @@ class UnixSocketDevice(WhadDevice):
             p = re.compile('^[0-9a-f]+: [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ (.*)$', re.I | re.M)
             for socket in p.findall(proc_net_unix):
                 _, filename = os.path.split(socket)
-                if re.match('whad_[0-9a-f]+\.sock', filename):
+                if re.match('whad_[0-9a-f]+\\.sock', filename):
                     dev = UnixSocketDevice(socket)
                     devices.append(dev)
             return devices
@@ -384,6 +384,11 @@ class UnixSocketConnector(WhadDeviceConnector):
         This method MUST be overriden by inherited classes.
 
         :param message: Domain message
+        """
+        pass
+
+    def on_packet(self, packet):
+        """Callback function to process incoming packets.
         """
         pass
 

@@ -1,10 +1,15 @@
 """WHAD Protocol ESB domain message abstraction layer.
 """
 from typing import List, Union
+from dataclasses import dataclass, field, fields
+
+from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, \
+    ESB_Pseudo_Packet
 
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
+from whad.hub.metadata import Metadata
 
 class Commands:
     """ESB Commands
@@ -74,7 +79,13 @@ class EsbNodeAddress(object):
 
 
 
+@dataclass(repr=False)
+class ESBMetadata(Metadata):
+    is_crc_valid : bool = None
+    address : str = None
 
+    def convert_to_header(self):
+        return None, self.timestamp
 
 
 @pb_bind(ProtocolHub, name="esb", version=1)
@@ -89,6 +100,44 @@ class EsbDomain(Registry):
         """Initializes a ESB domain instance
         """
         self.proto_version = version
+
+    def isPacketCompat(self, packet) -> bool:
+        """Determine if a packet is an ESB packet.
+        """
+        return isinstance(packet.metadata, ESBMetadata)
+    
+    def convertPacket(self, packet) -> HubMessage:
+        """Convert an ESB packet to SendPdu or SendBlePdu message.
+        """
+        if isinstance(packet.metadata, ESBMetadata):
+            if packet.metadata.raw:
+                return EsbDomain.bound('send_raw', self.proto_version).from_packet(
+                    packet
+                )
+            else:
+                return EsbDomain.bound('send', self.proto_version).from_packet(
+                    packet
+                )
+        else:
+            # Error
+            return None
+
+    def format(self, packet):
+        """
+        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
+        the appropriate header and the timestamp in microseconds.
+        """
+        if ESB_Hdr not in packet:
+            packet = ESB_Hdr(address=None)/packet
+
+        packet.preamble = 0xAA # force a rebuild
+        formatted_packet = ESB_Pseudo_Packet(bytes(packet)[1:])
+
+        timestamp = None
+        if hasattr(packet, "metadata"):
+            timestamp = packet.metadata.timestamp
+
+        return formatted_packet, timestamp
 
     @staticmethod
     def parse(proto_version: int, message) -> HubMessage:

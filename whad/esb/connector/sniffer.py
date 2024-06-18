@@ -3,6 +3,7 @@ from whad.esb.sniffing import SnifferConfiguration
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 from whad.common.sniffing import EventsManager
+from whad.hub.esb import PduReceived, RawPduReceived
 
 class Sniffer(ESB, EventsManager):
     """
@@ -57,11 +58,11 @@ class Sniffer(ESB, EventsManager):
     def sniff(self):
         while True:
             if self.support_raw_pdu():
-                message_type = "raw_pdu"
+                message_type = RawPduReceived
             else:
-                message_type = "pdu"
+                message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter('esb', message_type))
+            message = self.wait_for_message(filter=message_filter(message_type))
             packet = self.translator.from_message(message.esb, message_type)
             self.monitor_packet_rx(packet)
             yield packet

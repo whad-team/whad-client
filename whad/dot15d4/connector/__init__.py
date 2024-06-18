@@ -6,6 +6,7 @@ from scapy.config import conf
 from scapy.layers.dot15d4 import Dot15d4 as Dot15d4NoFCS
 from scapy.layers.dot15d4 import Dot15d4FCS
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr
+from whad.hub.dot15d4 import Dot15d4Metadata
 
 # Main whad imports
 from whad import WhadDomain, WhadCapability
@@ -20,6 +21,7 @@ from whad.dot15d4.connector.translator import Dot15d4MessageTranslator
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.dot15d4 import NodeAddress, Commands, NodeAddressType, PduReceived, \
     RawPduReceived, EnergyDetectionSample
+from whad.hub.events import JammedEvt
 
 
 class Dot15d4(WhadDeviceConnector):
@@ -68,7 +70,7 @@ class Dot15d4(WhadDeviceConnector):
         """
         Format a packet using the underlying translator.
         """
-        return self.translator.format(packet)
+        return self.hub.dot15d4.format(packet)
 
     def can_sniff(self) -> bool:
         """
@@ -210,7 +212,10 @@ class Dot15d4(WhadDeviceConnector):
         :rtype: bool
         """
         if self.can_send():
+            metadata = Dot15d4Metadata()
+            metadata.raw = False
             if self.support_raw_pdu():
+                metadata.raw = True
                 if Dot15d4FCS not in pdu:
                     packet = Dot15d4FCS(raw(pdu)+Dot15d4FCS().compute_fcs(raw(pdu)))
                 else:
@@ -220,11 +225,11 @@ class Dot15d4(WhadDeviceConnector):
             else:
                 packet = pdu
 
-            self.monitor_packet_tx(packet)
+            # Set metadata
+            packet.metadata = metadata
 
-            msg = self.translator.from_packet(packet, channel)
-            resp = self.send_command(msg, message_filter(CommandResult))
-            return isinstance(resp, Success)
+            # Send packet
+            return super().send_packet(packet)
 
         else:
             return False
@@ -235,12 +240,17 @@ class Dot15d4(WhadDeviceConnector):
             if add_fcs:
                 fcs = Dot15d4FCS().compute_fcs(bytes(pdu))
                 pdu += fcs
+                raw_mode = True
             else:
                 packet = pdu / raw(b'\x00\x00')
+                raw_mode = False
 
-            msg = self.translator.from_packet(packet, channel)
-            resp = self.send_command(msg, message_filter(CommandResult))
-            return isinstance(resp, Success)
+            # Add Dot15d4 metadata
+            packet.metadata = Dot15d4Metadata()
+            packet.metadata.raw = raw_mode
+
+            # Send packet
+            return super().send_packet(packet)
         else:
             return False
 
@@ -297,18 +307,29 @@ class Dot15d4(WhadDeviceConnector):
             return
 
         assert domain == "dot15d4"
-        if isinstance(message, PduReceived):
-            packet = self.translator.from_message(message)
-            self.monitor_packet_rx(packet)
-            self.on_pdu(packet)
-
-        elif isinstance(message, RawPduReceived):
-            packet = self.translator.from_message(message)
-            self.monitor_packet_rx(packet)
-            self.on_raw_pdu(packet)
-        elif isinstance(message, EnergyDetectionSample):
+        if isinstance(message, EnergyDetectionSample):
             self.on_ed_sample(message.timestamp, message.sample)
 
+    def on_packet(self, packet):
+        """Dot15d4 packet dispatch.
+        """
+        if not self.__ready:
+            return
+        
+        # Dispatch packet.
+        if packet.metadata.raw:
+            self.on_raw_pdu(packet)
+        else:
+            self.on_pdu(packet)
+
+    def on_event(self, event):
+        """Dot15d4 event dispatch.
+        """
+        if not self.__ready:
+            return
+
+        if isinstance(event, JammedEvt):
+            self.on_jammed(event.timestamp)
 
     def on_raw_pdu(self, packet):
         """
@@ -328,13 +349,18 @@ class Dot15d4(WhadDeviceConnector):
         """
         # Enqueue PDU if in synchronous mode
         if self.is_synchronous():
-            self.add_pending_pdu(packet)
+            self.add_pending_packet(packet)
         else:
             pass
 
     def on_ed_sample(self, timestamp, sample):
         """
         Energy Detection sample processing.
+        """
+        pass
+
+    def on_jammed(self, timestamp: int):
+        """Jammed event handler.
         """
         pass
 

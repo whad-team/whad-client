@@ -7,7 +7,7 @@ from whad.ble.stack.gatt import GattClient, GattServer
 from whad.helpers import message_filter
 from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.protocol.whad_pb2 import Message
+
 from whad.protocol.ble.ble_pb2 import BleDirection, BleAdvType, Connected
 from whad.ble.stack import BleStack
 from scapy.layers.bluetooth4LE import BTLE_ADV_IND, \
