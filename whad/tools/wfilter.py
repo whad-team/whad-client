@@ -38,7 +38,6 @@ def get_translator(protocol):
         except ModuleNotFoundError:
             pass
     # return the environment dictionary
-    conf.dot15d4_protocol = protocol
     return translator
 
 class WhadFilterApp(CommandLineApp):

@@ -160,12 +160,12 @@ class WhadDomainSubParser(ArgumentParser):
 
 class WhadSniffApp(CommandLineApp):
 
-    def __init__(self):
+    def __init__(self, interface=True, description='WHAD generic sniffing tool'):
         """Application uses an interface and has commands.
         """
         super().__init__(
-            description='WHAD generic sniffing tool',
-            interface=True,
+            description=description,
+            interface=interface,
             commands=False
         )
 
@@ -275,47 +275,6 @@ class WhadSniffApp(CommandLineApp):
                                 show_metadata = self.args.metadata,
                                 format = self.args.format
                             )
-
-                    '''
-                    # Iterates over the packet stream and display packets
-
-                    mode = os.fstat(1).st_mode
-
-                    # Make sure we are piped to another tool
-                    if self.is_stdout_piped():
-                        if not stat.S_ISREG(mode):
-                            sys.stdout.write(
-                                IPCConverter(self.args.format, self.args.metadata, self.args.nocolor).to_dump() + "\n"
-                            )
-                            sys.stdout.flush()
-
-                            # Iterates over the packet stream and display packets
-                            for pkt in sniffer.sniff():
-                                #print(IPCConverter(pkt).to_dump())
-                                sys.stdout.write(
-                                    IPCConverter(pkt).to_dump() + "\n"
-                                )
-                                sys.stdout.flush()
-                        else: # output redirected to file
-                            for pkt in sniffer.sniff():
-                                #print(IPCConverter(pkt).to_dump())
-                                from scapy.all import wrpcap
-                                wrpcap("/dev/stdout", pkt, append=True)
-                                """
-                                sys.stdout.write(
-                                    IPCConverter(pkt).to_dump() + "\n"
-                                )
-                                sys.stdout.flush()
-                                """
-                    else:
-                        # Iterates over the packet stream and display packets
-                        for pkt in sniffer.sniff():
-                            display_packet(
-                                pkt,
-                                show_metadata = self.args.metadata,
-                                format = self.args.format
-                            )
-                '''
                 else:
                     self.error("You need to specify a domain.")
             else:

@@ -280,6 +280,12 @@ class CommandLineApp(ArgumentParser):
         return self.__interface
 
 
+    @interface.setter
+    def interface(self, iface):
+        """Sets the selected WHAD interface.
+        """
+        self.__interface = iface
+
     @property
     def input_interface(self):
         """Input interface
