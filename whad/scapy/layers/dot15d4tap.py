@@ -166,8 +166,8 @@ class Dot15d4TAP_Hdr(Packet):
     fields_desc = [
         ByteEnumField("version", 0, DOT15D4TAP_VERSIONS),
         ByteField("reserved", 0),
-        FieldLenField("length", None, length_of="data", fmt="<H"),#, adjust=lambda pkt, x:x-4),
-        PacketListField("data", [], Dot15d4TAP_TLV_Hdr, length_from=lambda x:x.length-4),
+        FieldLenField("length", None, length_of="data", fmt="<H"),
+        PacketListField("data", [], Dot15d4TAP_TLV_Hdr, length_from=lambda x:x.length),
     ]
 
 

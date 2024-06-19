@@ -6,7 +6,6 @@ from scapy.config import conf
 from scapy.layers.dot15d4 import Dot15d4 as Dot15d4NoFCS
 from scapy.layers.dot15d4 import Dot15d4FCS
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr
-
 # Main whad imports
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
@@ -220,6 +219,8 @@ class Dot15d4(WhadDeviceConnector):
                 packet = Dot15d4NoFCS(raw(pdu)[:-2])
             else:
                 packet = pdu
+            if hasattr(packet, "reserved"):
+                packet.reserved = packet.reserved
 
             self.monitor_packet_tx(packet)
 

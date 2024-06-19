@@ -4,7 +4,7 @@ from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad.device.virtual.pcap.capabilities import CAPABILITIES
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.dot15d4 import Commands
-from scapy.layers.dot15d4 import Dot15d4
+from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
 from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, FieldsSize, is_access_address_valid
 from scapy.utils import PcapReader, PcapWriter
 from struct import unpack, pack
@@ -53,7 +53,6 @@ class PCAPDevice(VirtualDevice):
         """
         Create device connection
         """
-        print(filename)
         self.__opened = False
         self.__started = False
         self.__filename = filename
@@ -151,8 +150,6 @@ class PCAPDevice(VirtualDevice):
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
-
-            #print(metadata)
             self._send_whad_zigbee_raw_pdu(bytes(pkt[Dot15d4:]), channel=metadata.channel, lqi=metadata.lqi, rssi=metadata.rssi, timestamp=metadata.timestamp)
         elif self.__domain == WhadDomain.BtLE:
             metadata = self._generate_metadata(pkt)

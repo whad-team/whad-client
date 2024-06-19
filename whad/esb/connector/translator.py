@@ -67,14 +67,14 @@ class ESBMessageTranslator(object):
             packet.preamble = 0xAA
 
             # Create a SendRawPdu message
-            msg = self.hub.get(self.__domain).createSendRawPdu(
+            msg = self.__hub.get(self.__domain).createSendRawPdu(
                 channel if channel is not None else 0xFF,
                 bytes(packet),
                 retransmission_count
             )
         elif ESB_Payload_Hdr in packet:
             # Create a SendPdu message
-            msg = self.hub.get(self.__domain).createSendPdu(
+            msg = self.__hub.get(self.__domain).createSendPdu(
                 channel if channel is not None else 0xFF,
                 bytes(packet),
                 retransmission_count

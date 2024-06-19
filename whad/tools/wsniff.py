@@ -216,6 +216,7 @@ class WhadSniffApp(CommandLineApp):
         """Pre-run operations: configure scapy theme.
         """
         super().pre_run()
+
         # If no color is not selected, configure scapy color theme
         if not self.args.nocolor:
             conf.color_theme = BrightTheme()

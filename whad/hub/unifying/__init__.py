@@ -42,7 +42,7 @@ class UnifyingDomain(Registry):
         message_type = message.unifying.WhichOneof('msg')
         message_clazz = UnifyingDomain.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
-    
+
 
     def createSetNodeAddress(self, node_address: EsbNodeAddress) -> HubMessage:
         """Create a SetNodeAddress message
@@ -54,7 +54,7 @@ class UnifyingDomain(Registry):
         return UnifyingDomain.bound('set_node_addr', self.proto_version)(
             address=node_address.value
         )
-    
+
     def createStart(self) -> HubMessage:
         """Create a Start message
 
@@ -69,7 +69,7 @@ class UnifyingDomain(Registry):
         :return: instance of `Stop` message
         """
         return UnifyingDomain.bound('stop', self.proto_version)()
-    
+
 
     def createJamMode(self, channel: int) -> HubMessage:
         """Create a JamMode message
@@ -98,7 +98,7 @@ class UnifyingDomain(Registry):
             channel=channel,
             show_acks=show_acks
         )
-    
+
     def createJammed(self, timestamp: int):
         """Create a Jammed notification message
 
@@ -109,7 +109,7 @@ class UnifyingDomain(Registry):
         return UnifyingDomain.bound('jammed', self.proto_version)(
             timestamp=timestamp
         )
-    
+
     def createDongleMode(self, channel: int) -> HubMessage:
         """Create DongleMode message
 
@@ -131,7 +131,7 @@ class UnifyingDomain(Registry):
         return UnifyingDomain.bound('keyboard', self.proto_version)(
             channel=channel
         )
-    
+
     def createMouseMode(self, channel: int) -> HubMessage:
         """Create MouseMode message
 
@@ -183,7 +183,7 @@ class UnifyingDomain(Registry):
             pdu=pdu,
             retr_count=retr_count
         )
-    
+
     def createPduReceived(self, channel: int, pdu: bytes, rssi: int = None, timestamp: int = None,
                           crc_validity: bool = None, address: EsbNodeAddress = None) -> HubMessage:
         """Create a PduReceived notification message.

@@ -4,7 +4,7 @@ from whad.protocol.whad_pb2 import Message
 from ..message import pb_bind, PbFieldBytes, PbFieldBool, PbFieldInt, PbMessageWrapper, \
     PbPacketMessageWrapper
 from . import UnifyingDomain
-from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr
+from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
 from whad.scapy.layers.unifying import bind
 
 @pb_bind(UnifyingDomain, 'send', 1)
