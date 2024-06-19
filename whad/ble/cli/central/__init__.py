@@ -33,7 +33,7 @@ class BleCentralApp(CommandLineApp):
             input=CommandLineApp.INPUT_WHAD,
             output=CommandLineApp.OUTPUT_STANDARD
         )
-        
+
         self.add_argument(
             '--bdaddr',
             '-b',
@@ -84,7 +84,7 @@ class BleCentralApp(CommandLineApp):
                         self.error('Source interface does not provide a BLE connection')
                         failed = True
                         break
-                
+
                 if not failed:
                     # Create central device
                     central, _ = create_central(self, piped=True)

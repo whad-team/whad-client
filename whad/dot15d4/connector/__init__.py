@@ -7,7 +7,6 @@ from scapy.layers.dot15d4 import Dot15d4 as Dot15d4NoFCS
 from scapy.layers.dot15d4 import Dot15d4FCS
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr
 from whad.hub.dot15d4 import Dot15d4Metadata
-
 # Main whad imports
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
@@ -32,6 +31,7 @@ class Dot15d4(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+    translator = Dot15d4MessageTranslator
 
     def __init__(self, device=None, synchronous=False, scapy_config='zigbee'):
         """
@@ -224,6 +224,8 @@ class Dot15d4(WhadDeviceConnector):
                 packet = Dot15d4NoFCS(raw(pdu)[:-2])
             else:
                 packet = pdu
+            if hasattr(packet, "reserved"):
+                packet.reserved = packet.reserved
 
             # Set metadata
             packet.metadata = metadata
@@ -315,7 +317,7 @@ class Dot15d4(WhadDeviceConnector):
         """
         if not self.__ready:
             return
-        
+
         # Dispatch packet.
         if packet.metadata.raw:
             self.on_raw_pdu(packet)

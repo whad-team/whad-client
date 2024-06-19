@@ -52,7 +52,7 @@ class TCPSocketDevice(WhadDevice):
         '''
         Returns a list of available TCP socket devices.
         '''
-        return []
+        return None
 
     @classmethod
     def check_interface(cls, interface):
@@ -132,7 +132,6 @@ class TCPSocketDevice(WhadDevice):
                 self.__socket.connect((self.__address, self.__port))
                 self.__fileno = self.__socket.fileno()
                 self.__opened = True
-
                 # Ask parent class to run a background I/O thread
                 super().open()
             except ConnectionRefusedError:
@@ -381,6 +380,10 @@ class TCPSocketConnector(WhadDeviceConnector):
                 logger.debug('Message sent to client')
         except BrokenPipeError as err:
             logger.debug('Client socket disconnected')
+
+    def on_packet(self, packet):
+        pass
+
     def on_msg_sent(self, message):
         pass
 

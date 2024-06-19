@@ -5,7 +5,8 @@ This utility implements a generic sniffer module, automatically adapted to every
 import logging
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
-from whad.cli.app import CommandLineSource
+from whad.cli.app import CommandLineDeviceSource, CommandLineApp
+from whad.cli.ui import error, warning, success, info, display_event, display_packet
 from importlib import import_module
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
 from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
@@ -21,7 +22,6 @@ from whad.common.ipc import IPCPacket
 
 import whad
 import sys
-from whad.common.ipc import IPCConverter
 import os, stat
 
 logger = logging.getLogger(__name__)
@@ -143,109 +143,6 @@ def build_configuration_from_args(environment, args):
     return configuration
 
 
-def display_packet(pkt, show_metadata, format):
-    """
-    Display an packet according to the selected format.
-
-    Four main types of formats can be used:
-        * repr: scapy packet repr method (default)
-        * show: scapy show method, "field" representation
-        * hexdump: hexdump representation of the packet content
-        * raw: raw received bytes
-
-    :param  pkt:        Received Signal Strength Indicator
-    :type   pkt:        :class:`scapy.packet.packet`
-    """
-    if isinstance(pkt, Packet):
-
-        metadata = ""
-        if hasattr(pkt, "metadata") and show_metadata:
-            metadata = repr(pkt.metadata)
-
-        # Process scapy show method format
-        if format == "show":
-            print_formatted_text(
-                HTML(
-                    '<b><ansipurple>{}</ansipurple></b>'
-                ).format(metadata)
-            )
-            pkt.show()
-
-            if hasattr(pkt, "decrypted"):
-                print_formatted_text(
-                    HTML(
-                        "<ansicyan>[i] Decrypted payload:</ansicyan>"
-                    )
-                )
-                pkt.decrypted.show()
-
-        # Process raw bytes format
-        elif format == "raw":
-            print_formatted_text(
-                HTML(
-                    '<b><ansipurple>{metadata}</ansipurple></b> {pkthex}'
-                ).format(metadata=metadata, pkthex=bytes(pkt).hex())
-            )
-
-            if hasattr(pkt, "decrypted"):
-                print_formatted_text(
-                    HTML(
-                        "<ansicyan>[i] Decrypted payload:</ansicyan> %s" %
-                        bytes(pkt.decrypted).hex()
-                    )
-                )
-
-        # Process hexdump format
-        elif format == "hexdump":
-            print_formatted_text(
-                HTML(
-                    '<b><ansipurple>{}</ansipurple></b>'
-                ).format(metadata)
-            )
-            print_formatted_text(
-                HTML("<i>{}</i>").format(
-                    escape(hexdump(bytes(pkt), result="return"))
-                )
-            )
-            if hasattr(pkt, "decrypted"):
-                print_formatted_text(
-                    HTML(
-                        "<ansicyan>[i] Decrypted payload:</ansicyan>"
-                    )
-                )
-                print_formatted_text(
-                        HTML("<i>{}</i>").format(
-                            escape(hexdump(bytes(pkt.decrypted), result="return")
-                        )
-                    )
-                )
-        # Process scapy repr format
-        else:
-            print_formatted_text(
-                HTML(
-                    '<b><ansipurple>{}</ansipurple></b>'
-                ).format(metadata)
-            )
-            print(repr(pkt))
-            if hasattr(pkt, "decrypted"):
-                print_formatted_text(
-                    HTML("<ansicyan>[i] Decrypted payload:</ansicyan>")
-                )
-                print(repr(pkt.decrypted))
-        print()
-    # If it is not a packet, use repr method
-    else:
-        print(repr(pkt))
-
-def display_event(event):
-    """Display an event generated from a sniffer.
-    """
-    print_formatted_text(
-        HTML(
-            "<ansicyan>[i] event: <b>{name}</b></ansicyan> {message}"
-        ).format(name=event.name, message="("+event.message +")" if event.message is not None else "")
-    )
-
 class WhadDomainSubParser(ArgumentParser):
     """
     Implements a Whad Domain subparser.
@@ -253,26 +150,22 @@ class WhadDomainSubParser(ArgumentParser):
     def warning(self, message):
         """Display a warning message in orange (if color is enabled)
         """
-        print_formatted_text(
-            HTML('<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % message)
-        )
+        warning(message)
 
     def error(self, message):
         """Display an error message in red (if color is enabled)
         """
-        print_formatted_text(
-            HTML('<ansired>[!] <b>%s</b></ansired>' % message)
-        )
+        error(message)
 
 
-class WhadSniffApp(CommandLineSource):
+class WhadSniffApp(CommandLineApp):
 
-    def __init__(self):
+    def __init__(self, interface=True, description='WHAD generic sniffing tool'):
         """Application uses an interface and has commands.
         """
         super().__init__(
-            description='WHAD generic sniffing tool',
-            interface=True,
+            description=description,
+            interface=interface,
             commands=False
         )
 
@@ -323,6 +216,7 @@ class WhadSniffApp(CommandLineSource):
         """Pre-run operations: configure scapy theme.
         """
         super().pre_run()
+
         # If no color is not selected, configure scapy color theme
         if not self.args.nocolor:
             conf.color_theme = BrightTheme()
@@ -368,36 +262,11 @@ class WhadSniffApp(CommandLineSource):
 
                     # Start the sniffer
                     sniffer.start()
-                    # Iterates over the packet stream and display packets
 
-                    mode = os.fstat(1).st_mode
-
-                    # Make sure we are piped to another tool
                     if self.is_stdout_piped():
-                        if not stat.S_ISREG(mode):
-                            sys.stdout.write(
-                                IPCConverter(self.args.format, self.args.metadata, self.args.nocolor).to_dump() + "\n"
-                            )
-                            sys.stdout.flush()
-
-                            # Iterates over the packet stream and display packets
-                            for pkt in sniffer.sniff():
-                                #print(IPCConverter(pkt).to_dump())
-                                sys.stdout.write(
-                                    IPCConverter(pkt).to_dump() + "\n"
-                                )
-                                sys.stdout.flush()
-                        else: # output redirected to file
-                            for pkt in sniffer.sniff():
-                                #print(IPCConverter(pkt).to_dump())
-                                from scapy.all import wrpcap
-                                wrpcap("/dev/stdout", pkt, append=True)
-                                '''
-                                sys.stdout.write(
-                                    IPCConverter(pkt).to_dump() + "\n"
-                                )
-                                sys.stdout.flush()
-                                '''
+                        proxy = UnixSocketProxy(self.interface, params={"domain":self.args.domain})
+                        proxy.start()
+                        proxy.join()
                     else:
                         # Iterates over the packet stream and display packets
                         for pkt in sniffer.sniff():
@@ -410,7 +279,6 @@ class WhadSniffApp(CommandLineSource):
                     self.error("You need to specify a domain.")
             else:
                 self.error('You need to specify an interface with option --interface.')
-
 
         except UnsupportedDomain as unsupported_domain:
             self.error('WHAD device doesn\'t support selected domain ({})'.format(self.args.domain))
@@ -505,6 +373,6 @@ class WhadSniffApp(CommandLineSource):
                     )
 
 
-def whadsniff_main():
+def wsniff_main():
     app = WhadSniffApp()
     app.run()

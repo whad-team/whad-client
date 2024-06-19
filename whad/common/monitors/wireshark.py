@@ -24,6 +24,11 @@ class WiresharkMonitor(PcapWriterMonitor):
     def get_dissector(cls, dissector_name):
         return realpath("{}/../ressources/wireshark/{}.lua".format(dirname(whad.__file__), dissector_name))
 
+    @classmethod
+    def get_dlt(cls, domain):
+        dlt = None
+        return dlt
+
     def __init__(self, monitor_reception=True, monitor_transmission=True):
         self._wireshark_process = None
         # Checks the presence of wireshark
@@ -44,8 +49,8 @@ class WiresharkMonitor(PcapWriterMonitor):
     def attach(self, connector):
         """Attach to connector
         """
-        if isinstance(connector, ESB) or isinstance(connector, Unifying):
-                self.dissector = WiresharkMonitor.get_dissector("esb")
+        if connector.domain in ("esb", "unifying"):
+            self.dissector = WiresharkMonitor.get_dissector("esb")
         return super().attach(connector)
 
     def setup(self):

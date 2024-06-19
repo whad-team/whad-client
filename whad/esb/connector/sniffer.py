@@ -63,6 +63,6 @@ class Sniffer(ESB, EventsManager):
                 message_type = PduReceived
 
             message = self.wait_for_message(filter=message_filter(message_type))
-            packet = self.translator.from_message(message.esb, message_type)
+            packet = self.translator.from_message(message)
             self.monitor_packet_rx(packet)
             yield packet

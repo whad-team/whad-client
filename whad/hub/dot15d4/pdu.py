@@ -3,6 +3,7 @@
 from struct import pack, unpack
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
 from whad.protocol.whad_pb2 import Message
+from whad.hub.message import AbstractPacket
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool
 from whad.hub.dot15d4 import Dot15d4Domain, Dot15d4Metadata
@@ -18,7 +19,7 @@ class SendPdu(PbMessageWrapper):
         """Convert message to the corresponding scapy packet
         """
         return Dot15d4(self.pdu)
-    
+
     @staticmethod
     def from_packet(packet, channel: int = 11):
         """Convert a scapy packet to a SendPdu message
@@ -29,7 +30,7 @@ class SendPdu(PbMessageWrapper):
             pdu = bytes(packet[Dot15d4FCS])[:-2]
         else:
             return None
-        
+
         msg = SendPdu(
             channel=channel,
             pdu=pdu
@@ -47,7 +48,7 @@ class SendRawPdu(PbMessageWrapper):
         """Convert message to the corresponding scapy packet
         """
         return Dot15d4FCS(self.pdu + bytes(pack('>H', self.fcs)))
-    
+
     @staticmethod
     def from_packet(packet, channel: int = 11):
         """Convert a scapy packet to a SendPdu message
@@ -58,7 +59,7 @@ class SendRawPdu(PbMessageWrapper):
             pdu = bytes(packet[Dot15d4FCS])[:-2]
         else:
             return None
-        
+
         msg = SendRawPdu(
             channel=channel,
             pdu=pdu,
@@ -93,10 +94,10 @@ class PduReceived(PbMessageWrapper):
             packet.metadata.timestamp = self.timestamp
         if self.fcs_validity is not None:
             packet.metadata.is_fcs_valid = self.fcs_validity
-        
+
         # Return packet
         return packet
-    
+
 
     @staticmethod
     def from_packet(packet):
@@ -120,7 +121,6 @@ class PduReceived(PbMessageWrapper):
 
         # Return metadata
         return msg
-
 
 
 @pb_bind(Dot15d4Domain, 'raw_pdu', 1)
@@ -155,10 +155,10 @@ class RawPduReceived(PbMessageWrapper):
             packet.metadata.timestamp = self.timestamp
         if self.fcs_validity is not None:
             packet.metadata.is_fcs_valid = self.fcs_validity
-        
+
         # Return packet
         return packet
-    
+
     @staticmethod
     def from_packet(packet):
         """Convert packet to a RawPduReceived message.

@@ -3,6 +3,7 @@ from whad.unifying.sniffing import SnifferConfiguration, KeyExtractedEvent
 from whad.unifying.crypto import LogitechUnifyingDecryptor, LogitechUnifyingKeyDerivation
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
+from whad.hub.unifying import RawPduReceived, PduReceived
 from whad.common.sniffing import EventsManager
 from whad.scapy.layers.unifying import Logitech_Encrypted_Keystroke_Payload
 import logging
@@ -110,12 +111,12 @@ class Sniffer(Unifying, EventsManager):
     def sniff(self):
         while True:
             if self.support_raw_pdu():
-                message_type = "raw_pdu"
+                message_type = RawPduReceived
             else:
-                message_type = "pdu"
+                message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter('unifying', message_type))
-            packet = self.translator.from_message(message.unifying, message_type)
+            message = self.wait_for_message(filter=message_filter(message_type))
+            packet = self.translator.from_message(message)
 
             if self.__configuration.pairing:
                 self.__key_derivation.process_packet(packet)

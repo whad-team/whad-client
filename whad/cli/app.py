@@ -280,6 +280,12 @@ class CommandLineApp(ArgumentParser):
         return self.__interface
 
 
+    @interface.setter
+    def interface(self, iface):
+        """Sets the selected WHAD interface.
+        """
+        self.__interface = iface
+
     @property
     def input_interface(self):
         """Input interface
@@ -450,7 +456,7 @@ class CommandLineApp(ArgumentParser):
                 # command handler has been defined, call it.
                 handler = CommandsRegistry.get_handler('interactive')
                 if handler is not None:
-                    return handler(self, self.__args.command_args)                
+                    return handler(self, self.__args.command_args)
 
             # By default, print help if no script is specified
             self.print_help()
