@@ -2,7 +2,7 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.phy.phy_pb2 import GetSupportedFrequenciesCmd
-from ..message import pb_bind, PbFieldInt, PbFieldBool, PbFieldArray, PbMessageWrapper
+from ..message import pb_bind, PbFieldBool, PbMessageWrapper
 from . import PhyDomain
 
 @pb_bind(PhyDomain, 'get_supported_freq', 1)
