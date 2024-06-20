@@ -1,9 +1,15 @@
+from time import time
+from typing import Generator
+
+from scapy.packet import Packet
+
 from whad.esb.connector import ESB
 from whad.esb.sniffing import SnifferConfiguration
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 from whad.common.sniffing import EventsManager
 from whad.hub.esb import PduReceived, RawPduReceived
+from whad.hub.message import AbstractPacket
 
 class Sniffer(ESB, EventsManager):
     """
@@ -55,14 +61,34 @@ class Sniffer(ESB, EventsManager):
         actions = []
         return [action for action in actions if filter is None or isinstance(action, filter)]
 
-    def sniff(self):
+    def sniff(self, timeout: float = None) -> Generator[Packet, None, None]:
+        """Sniff packets
+
+        :param timeout: Number of seconds after which sniffing will stop, uninterrupted if set to None
+        :type timeout: float
+        """
+        # Determine message type
+        if self.support_raw_pdu():
+            message_type = RawPduReceived
+        else:
+            message_type = PduReceived
+
+        # Sniff packets
+        start = time()
+
         while True:
+
+            # Exit if timeout is set and reached
+            if timeout is not None and (time() - start >= timeout):
+                break
+
             if self.support_raw_pdu():
                 message_type = RawPduReceived
             else:
                 message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter(message_type))
-            packet = self.translator.from_message(message.esb, message_type)
-            self.monitor_packet_rx(packet)
-            yield packet
+            message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
+            if message is not None and issubclass(message, AbstractPacket):
+                packet = message.to_packet()
+                self.monitor_packet_rx(packet)
+                yield packet
