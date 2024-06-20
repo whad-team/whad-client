@@ -53,3 +53,11 @@ Bluetooth Low Energy
     ble/ble-wireshark
     ble/ble-proxy
     ble/ble-spawn
+
+Logitech Unifying
+~~~~~~~~~~~~~~~~~
+
+.. toctree::
+    :maxdepth: 1
+
+    unifying/wuni-scan
