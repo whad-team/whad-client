@@ -29,6 +29,7 @@ from typing import Iterator
 from whad.esb.connector import ESB, message_filter, UnsupportedCapability
 from whad.esb.scanning import CommunicatingDevicesDB, CommunicatingDevice
 from whad.hub.esb import PduReceived, RawPduReceived
+from whad.hub.message import AbstractPacket
 
 class Scanner(ESB):
     """
@@ -71,8 +72,9 @@ class Scanner(ESB):
                 message_type = PduReceived
 
             message = self.wait_for_message(filter=message_filter(message_type))
-            packet = self.translator.from_message(message.esb, message_type)
-            yield packet
+            if issubclass(message, AbstractPacket):
+                packet = message.to_packet()
+                yield packet
 
 
     def discover_devices(self, minimal_rssi = None, filter_address = None) -> Iterator[CommunicatingDevice]:
