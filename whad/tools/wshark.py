@@ -37,7 +37,7 @@ def get_translator(protocol):
                 break
         except ModuleNotFoundError:
             pass
-    # return the environment dictionary    
+    # return the environment dictionary
     return translator
 
 class WhadWiresharkApp(CommandLineApp):

@@ -146,7 +146,6 @@ class PcapWriterMonitor(WhadMonitor):
             packet.time = timestamp / 1000000
             try:
                 if self._writer is not None:
-
                     # Write packet
                     self._writer.write(packet)
                     self._nb_pkts_written += 1

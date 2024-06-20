@@ -39,7 +39,7 @@ class Dot15d4TAP_TLV_Hdr(Packet):
     name = "Dot15d4 TAP Type-Length-Value Header"
     fields_desc = [
         LEShortEnumField("type", None, DOT15D4TAP_TYPES),
-        LEShortField("len", None)
+        LenField("len", None, fmt="<H")
     ]
 
 
@@ -149,8 +149,8 @@ class Dot15d4TAP_Hdr(Packet):
     fields_desc = [
         ByteEnumField("version", 0, DOT15D4TAP_VERSIONS),
         ByteField("reserved", 0),
-        FieldLenField("length", None, length_of="data", fmt="<H"),
-        PacketListField("data", [], Dot15d4TAP_TLV_Hdr, length_from=lambda x:x.length),
+        FieldLenField("length", None, length_of="data", fmt="<H", adjust=lambda pkt, f:f+4),
+        PacketListField("data", [], Dot15d4TAP_TLV_Hdr, length_from=lambda x:x.length-4),
     ]
 
 

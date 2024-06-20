@@ -97,7 +97,6 @@ class Sniffer(RF4CE, EventsManager):
             if issubclass(message, AbstractPacket):
                 packet = message.to_packet()
                 self.monitor_packet_rx(packet)
-                print("dec", self.__configuration.decrypt)
                 if self.__configuration.pairing:
                     self.__key_derivation.process_packet(packet)
                     if self.__key_derivation.key is not None:

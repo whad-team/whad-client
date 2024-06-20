@@ -141,8 +141,8 @@ class RawPduReceived(PbMessageWrapper):
         """
 
         # Create packet
-        print('converting %s' % (self.pdu + bytes(pack(">H", self.fcs))).hex())
-        packet = Dot15d4FCS(bytes(self.pdu) + bytes(pack(">H", self.fcs)))
+        #print('converting %s' % (self.pdu + bytes(pack(">H", self.fcs))).hex())
+        packet = Dot15d4FCS(bytes(self.pdu) + bytes(pack("<H", self.fcs)))
 
         # Set packet metadata
         packet.metadata = Dot15d4Metadata()

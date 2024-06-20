@@ -4,7 +4,7 @@ from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad.device.virtual.pcap.capabilities import CAPABILITIES
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.dot15d4 import Commands
-from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
+from scapy.layers.dot15d4 import Dot15d4#, Dot15d4FCS
 from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, FieldsSize, is_access_address_valid
 from scapy.utils import PcapReader, PcapWriter
 from struct import unpack, pack
@@ -150,7 +150,8 @@ class PCAPDevice(VirtualDevice):
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
-            self._send_whad_zigbee_raw_pdu(bytes(pkt[Dot15d4:]), channel=metadata.channel, lqi=metadata.lqi, rssi=metadata.rssi, timestamp=metadata.timestamp)
+            #pkt.show()
+            self._send_whad_zigbee_raw_pdu(bytes(pkt[Dot15d4]), channel=metadata.channel, lqi=metadata.lqi, rssi=metadata.rssi, timestamp=metadata.timestamp)
         elif self.__domain == WhadDomain.BtLE:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
@@ -182,9 +183,8 @@ class PCAPDevice(VirtualDevice):
 
     # Virtual device whad message builder
     def _send_whad_zigbee_raw_pdu(self, packet, channel=None, rssi=None, lqi=None, is_fcs_valid=True, timestamp=None):
-
         pdu = packet[:-2]
-        fcs = unpack("H",packet[-2:])[0]
+        fcs = unpack("<H",packet[-2:])[0]
 
         # Create a RawPduReceived message
         msg = self.hub.dot15d4.createRawPduReceived(
