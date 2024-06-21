@@ -36,6 +36,8 @@ class BleUnixSocketConnector(UnixSocketConnector):
     Specific connector for BLE protocol over UnixSocket.
     """
 
+    domain = 'ble'
+
     def __init__(self, device, path=None):
         """Initialize our Unix Socket connector
         """
