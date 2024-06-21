@@ -14,6 +14,28 @@ class BLEMetadata(Metadata):
     relative_timestamp : int = None
     decrypted : bool = None
 
+    @classmethod
+    def convert_from_header(cls, pkt):
+        header = pkt[BTLE_RF]
+        if header.type == 2:
+            direction = BleDirection.MASTER_TO_SLAVE
+        elif header.type == 3:
+            direction = BleDirection.SLAVE_TO_MASTER
+        else:
+            direction = BleDirection.UNKNOWN
+
+        channel = header.rf_channel
+        is_crc_valid = header.crc_valid == 1
+        rssi = header.signal
+
+        return BLEMetadata(
+            direction = direction,
+            is_crc_valid = is_crc_valid,
+            rssi = rssi,
+            channel = channel,
+            timestamp = int(100000 * pkt.time)
+        )
+
     def convert_to_header(self):
         timestamp = None
         packet_type = 0 # ADV_OR_DATA_UNKNOWN_DIR

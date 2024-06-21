@@ -14,7 +14,7 @@ from prompt_toolkit import print_formatted_text, HTML
 from html import escape
 
 import logging
-logging.basicConfig(level=logging.ERROR)
+#logging.basicConfig(level=logging.DEBUG)
 
 DOMAINS = {
     WhadDomain.Phy: 'Physical Layer',

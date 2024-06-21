@@ -239,6 +239,7 @@ class LWNodeRegistry(object):
             logger.warning('Device %s is already present in node registry' % (
                 node.dev_eui
             ))
+            self.__nodes[node.dev_eui] = node
         else:
             logger.debug('adding node %s' % node)
             self.__nodes[node.dev_eui] = node

@@ -8,6 +8,7 @@ from whad.unifying.sniffing import SnifferConfiguration, KeyExtractedEvent
 from whad.unifying.crypto import LogitechUnifyingDecryptor, LogitechUnifyingKeyDerivation
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
+from whad.hub.unifying import RawPduReceived, PduReceived
 from whad.common.sniffing import EventsManager
 from whad.scapy.layers.unifying import Logitech_Encrypted_Keystroke_Payload
 

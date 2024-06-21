@@ -615,10 +615,11 @@ bind_layers(RF4CE_Vendor_MSO_Audio, RF4CE_Vendor_MSO_Audio_Stop_Response, audio_
 
 # Monkey patch to add RF4CE support in Dot15d4 layer
 old_guess_payload_class = Dot15d4Data.guess_payload_class
-def guess_payload_class(self, payload):
+
+def new_guess_payload_class(self, payload):
     if conf.dot15d4_protocol == "rf4ce":
         return RF4CE_Hdr
     else:
         return old_guess_payload_class(self, payload)
 
-Dot15d4Data.guess_payload_class = guess_payload_class
+Dot15d4Data.guess_payload_class = new_guess_payload_class

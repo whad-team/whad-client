@@ -41,6 +41,8 @@ class BLE(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+    translator = BleMessageTranslator
+
     # correlation table
     SCAPY_CORR_ADV = {
         AdvType.ADV_IND: BTLE_ADV_IND,
@@ -701,7 +703,7 @@ class BLE(WhadDeviceConnector):
         # discard processed packets or if we're not ready
         if packet.metadata.processed or not self.__ready:
             return
-        
+
         if BTLE_ADV in packet:
             adv_pdu = packet[BTLE_ADV:]
             adv_pdu.metadata = packet.metadata

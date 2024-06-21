@@ -13,6 +13,7 @@ from whad.hub.generic.cmdresult import Success
 from whad.hub.esb import EsbNodeAddress, Commands
 from whad.hub.events import JammedEvt
 
+
 class ESB(WhadDeviceConnector):
     """
     Enhanced ShockBurst protocol connector.
@@ -21,6 +22,8 @@ class ESB(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+
+    translator = ESBMessageTranslator
 
     def format(self, packet):
         """
@@ -157,9 +160,9 @@ class ESB(WhadDeviceConnector):
             channel,
             show_acknowledgements
         )
-
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
+
 
 
     def can_be_prx(self):
@@ -301,7 +304,7 @@ class ESB(WhadDeviceConnector):
         """
         if not self.__ready:
             return
-        
+
         if isinstance(event, JammedEvt):
             self.on_jammed(event.timestamp)
 

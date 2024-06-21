@@ -5,6 +5,7 @@ import re
 import shlex
 from prompt_toolkit import PromptSession, HTML, print_formatted_text
 from prompt_toolkit.completion import NestedCompleter, DynamicCompleter
+from whad.cli.ui import error, warning, success, info
 
 class category(object):
     """Shell command handler decorator.
@@ -156,7 +157,7 @@ class InteractiveShell(object):
         except KeyboardInterrupt as kbd:
             # Call do_quit() to terminate
             self.do_quit([])
-        except EOFError as eof: 
+        except EOFError as eof:
             # Call do_quit() to terminate
             self.do_quit([])
 
@@ -256,7 +257,7 @@ class InteractiveShell(object):
                     else:
                         short_desc = ''
                     commands.append((command, short_desc))
-            
+
             # Show commands
             print_formatted_text(HTML('<ansimagenta><b>Generic commands:</b></ansimagenta>'))
             #max_cmd_size = max([len(cmd) for cmd,doc in commands])
@@ -364,22 +365,22 @@ class InteractiveShell(object):
         """
         if len(args)>=1:
             print(args[0])
-        
+
 
     def success(self, message):
         """Display a success message in green (if color is enabled)
         """
-        print_formatted_text(HTML('<aaa fg="#027923"><b>%s</b></aaa>' % message))
+        success(message)
 
     def warning(self, message):
         """Display a warning message in orange (if color is enabled)
         """
-        print_formatted_text(HTML('<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % message))
+        warning(message)
 
     def error(self, message):
         """Display an error message in red (if color is enabled)
         """
-        print_formatted_text(HTML('<ansired>[!] <b>%s</b></ansired>' % message))
+        error(message)
 
 
 

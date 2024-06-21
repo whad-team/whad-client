@@ -44,7 +44,7 @@ def set_bd_address(app, central: Central):
         if BDAddress.check(app.args.bdaddr_rand_src):
             bd_addr = app.args.bdaddr_rand_src
             is_public = False
-            
+
     # Set the BD address
     if central.set_bd_address(bd_addr, public=is_public):
         print_formatted_text(HTML('BLE source address set to <b>%s</b>' % app.args.bdaddr_src.lower()))

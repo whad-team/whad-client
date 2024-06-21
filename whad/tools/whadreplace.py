@@ -16,7 +16,7 @@ import sys
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 logger = logging.getLogger(__name__)
 
-class WhadFilterApp(CommandLinePipe):
+class WhadReplaceApp(CommandLinePipe):
 
     def __init__(self):
         """Application uses an interface and has commands.
@@ -33,6 +33,15 @@ class WhadFilterApp(CommandLinePipe):
             nargs = "*"
         )
 
+        self.add_argument(
+            '--replace',
+            help='modification to apply packets',
+            )
+
+        self.add_argument(
+            '--drop',
+            help='drop matching packets',
+            )
 
         self.add_argument(
             '-o',
@@ -119,6 +128,6 @@ class WhadFilterApp(CommandLinePipe):
         self.post_run()
 
 
-def whadfilter_main():
-    app = WhadFilterApp()
+def whadreplace_main():
+    app = WhadReplaceApp()
     app.run()

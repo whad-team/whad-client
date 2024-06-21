@@ -19,6 +19,7 @@ class Unifying(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+    translator = ESBMessageTranslator
 
     def format(self, packet):
         """
@@ -115,6 +116,7 @@ class Unifying(WhadDeviceConnector):
         packet.metadata.address = tx_address
 
         return super().send_packet(packet)
+
 
     def support_raw_pdu(self):
         """

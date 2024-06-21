@@ -216,7 +216,7 @@ class LWGwLinkLayer(Layer):
                 enc_ja = encrypt_packet(join_accept, appkey=self.appkey)
 
                 # Send response
-                ts = frame.metadata.timestamp.sec + frame.metadata.timestamp.usec/1000000.
+                ts = frame.metadata.timestamp/1000000.
                 logger.debug('JoinRequest timestamp: %f' % ts)
                 logger.debug('will send JoinAccept at %f' % (ts + self.state.join_delay1))
                 self.send('phy', enc_ja, timestamp=ts + self.state.join_delay1)
@@ -294,7 +294,7 @@ class LWGwLinkLayer(Layer):
         connection = self.state.get_connection(mac_layer.dev_addr)
         if connection is not None and connection['timestamp'] is not None:
             # Update connection last packet timestamp
-            ts = unc_data_up.metadata.timestamp.sec + unc_data_up.metadata.timestamp.usec/1000000.
+            ts = unc_data_up.metadata.timestamp/1000000.
             self.state.update_connection(
                 mac_layer.dev_addr,
                 ts

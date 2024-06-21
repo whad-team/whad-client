@@ -3,6 +3,7 @@ from scapy.all import conf
 from scapy.layers.bluetooth4LE import *
 from scapy.utils import PcapWriter,PcapReader
 from os.path import exists
+from whad.common.pcap import patch_pcap_metadata, extract_pcap_metadata
 from time import time
 from os import stat, remove
 from stat import S_ISFIFO
@@ -75,7 +76,7 @@ class PcapWriterMonitor(WhadMonitor):
                                     sync=sync
         )
         self._writer_lock.release()
-        
+
         # Checks if there is a scapy packet formatter associated with the connector.
         # A formatter allows to describe manually how to build the packet, it is mainly
         # useful to populate a relevant header for PCAP export.
@@ -97,6 +98,8 @@ class PcapWriterMonitor(WhadMonitor):
             # Close writer
             try:
                 self._writer.close()
+                patch_pcap_metadata(self._pcap_file, self._connector.domain)
+                
             except BrokenPipeError:
                 pass
 
@@ -122,7 +125,7 @@ class PcapWriterMonitor(WhadMonitor):
     def process_packet(self, packet):
         # Acquire lock on writer lock acquire multithread error
         self._writer_lock.acquire()
-        
+
         if self._processing:
             # Note the current local clock timestamp in us
             now = time() * 1000000
@@ -146,7 +149,6 @@ class PcapWriterMonitor(WhadMonitor):
             packet.time = timestamp / 1000000
             try:
                 if self._writer is not None:
-
                     # Write packet
                     self._writer.write(packet)
                     self._nb_pkts_written += 1

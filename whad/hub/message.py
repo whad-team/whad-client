@@ -16,16 +16,16 @@ class PbField(object):
     @property
     def path(self):
         return self.__path
-    
+
     @property
     def type(self):
         return self.__type
-    
+
     def is_optional(self):
         """Determine if this field is optional
         """
         return self.__optional
-    
+
     def update(self, message: Message):
         """Update field in protobuf message
         """
@@ -43,7 +43,7 @@ class PbFieldInt(PbField):
 class PbFieldBytes(PbField):
     """Protocol buffers bytes field model
     """
-    
+
     def __init__(self, path:  str, optional: bool = False):
         """Create a PB field model for bytes
         """
@@ -107,7 +107,7 @@ class HubMessage(object):
                 setattr(root_node, path_nodes[-1], value)
         else:
             raise IndexError()
-        
+
     def get_field_value(self, field: PbField):
         """Get a message field value.
         """
@@ -120,7 +120,7 @@ class HubMessage(object):
                 root_node = getattr(root_node, node)
             else:
                 raise IndexError()
-        
+
         # Return the final field
         if hasattr(root_node, path_nodes[-1]):
             if isinstance(field, PbFieldMsg):
@@ -132,11 +132,11 @@ class HubMessage(object):
                     return getattr(root_node, path_nodes[-1])
         else:
             raise IndexError()
-    
+
     @property
     def message(self):
         return self.__msg
-    
+
 
 class pb_bind(object):
     """Decorator to add a versioned subclass to a registry.
@@ -157,7 +157,7 @@ class pb_bind(object):
         clazz.message_type = self.__registry.NAME
         clazz.message_name = self.__name
         return clazz
-   
+
 
 class PbMessageWrapper(HubMessage):
     """Protocol Buffers message wrapper
@@ -178,7 +178,7 @@ class PbMessageWrapper(HubMessage):
 
         # Create our HubMessage
         super().__init__(message=message)
-        
+
         # Browse our properties and list PB fields
         for prop in dir(self):
             if not prop.startswith('_'):
@@ -241,11 +241,11 @@ class AbstractPacketMeta(type):
         return cls.__subclasscheck__(type(instance))
 
     def __subclasscheck__(cls, subclass):
-        return (hasattr(subclass, 'to_packet') and 
-                callable(subclass.to_packet) and 
-                hasattr(subclass, 'from_packet') and 
+        return (hasattr(subclass, 'to_packet') and
+                callable(subclass.to_packet) and
+                hasattr(subclass, 'from_packet') and
                 callable(subclass.from_packet))
-    
+
 class AbstractPacket(metaclass=AbstractPacketMeta):
     pass
 
@@ -254,12 +254,12 @@ class AbstractEventMeta(type):
     """
     def __instancecheck__(cls, instance: Any) -> bool:
         return cls.__instancecheck__(type(instance))
-    
+
     def __subclasscheck__(cls, subclass):
-        return (hasattr(subclass, 'to_event') and 
-                callable(subclass.to_event) and 
-                hasattr(subclass, 'from_event') and 
+        return (hasattr(subclass, 'to_event') and
+                callable(subclass.to_event) and
+                hasattr(subclass, 'from_event') and
                 callable(subclass.from_event))
-    
+
 class AbstractEvent(metaclass=AbstractEventMeta):
     pass

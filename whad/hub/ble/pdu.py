@@ -9,7 +9,20 @@ from whad.hub.ble import Direction, AdvType, AddressType, BDAddress, BLEMetadata
 
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool
-from whad.hub.ble import BleDomain
+from whad.hub.ble import BleDomain, AdvType
+from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
+    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
+    BTLE_RF, BTLE_CTRL
+from struct import pack
+
+# correlation table
+SCAPY_CORR_ADV = {
+    AdvType.ADV_IND: BTLE_ADV_IND,
+    AdvType.ADV_NONCONN_IND: BTLE_ADV_NONCONN_IND,
+    AdvType.ADV_DIRECT_IND: BTLE_ADV_DIRECT_IND,
+    AdvType.ADV_SCAN_IND: BTLE_ADV_SCAN_IND,
+    AdvType.ADV_SCAN_RSP: BTLE_SCAN_RSP
+}
 
 
 def packet_to_bytes(packet):
@@ -77,7 +90,7 @@ class SendBleRawPdu(PbMessageWrapper):
             pdu = raw(packet[BTLE_ADV:])
         else:
             return None
-        
+
         return SendBleRawPdu(
             direction=direction,
             pdu=pdu,
@@ -100,7 +113,7 @@ class SendBlePdu(PbMessageWrapper):
         """Convert message to the corresponding Scapy packet
         """
         return BTLE_DATA(self.pdu)
-    
+
     @staticmethod
     def from_packet(packet, encrypt=False):
         """Convert packet to SendBlePdu message.
@@ -117,7 +130,7 @@ class SendBlePdu(PbMessageWrapper):
             pdu = packet_to_bytes(packet[BTLE_ADV:])
         else:
             return None
-        
+
         # Create a SendPdu message
         return SendBlePdu(
             direction=direction,
@@ -125,7 +138,7 @@ class SendBlePdu(PbMessageWrapper):
             pdu=pdu,
             encrypt=encrypt
         )
-            
+
 
 
 @pb_bind(BleDomain, "adv_pdu", 1)
@@ -148,11 +161,11 @@ class BleAdvPduReceived(PbMessageWrapper):
             packet = BTLE_ADV()/SCAPY_CORR_ADV[self.adv_type](
                     bytes(self.bd_address) + data
                 )
-            
+
             # Set TxAdd to 1 if address is random
             if self.addr_type == AddressType.RANDOM:
                 packet.TxAdd = 1
-            
+
             # Set packet metadata
             packet.metadata = BLEMetadata()
             packet.metadata.direction = Direction.UNKNOWN
@@ -164,7 +177,7 @@ class BleAdvPduReceived(PbMessageWrapper):
         else:
             # Unkown advertisement type
             return None
-        
+
     @staticmethod
     def from_packet(packet):
         """Convert packet into BleAdvPduReceived message
@@ -242,7 +255,7 @@ class BleRawPduReceived(PbMessageWrapper):
         """Convert message into its corresponding Scapy packet
         """
         packet = BTLE(bytes(struct.pack("I", self.access_address)) + bytes(self.pdu) + bytes(struct.pack(">I", self.crc)[1:]))
-        
+
         # Populate metadata
         packet.metadata = BLEMetadata()
         packet.metadata.direction = self.direction
@@ -250,7 +263,7 @@ class BleRawPduReceived(PbMessageWrapper):
         packet.metadata.channel = self.channel
         packet.metadata.processed = self.processed
         packet.metadata.raw = True
-        
+
         if self.rssi is not None:
             packet.metadata.rssi = self.rssi
         if self.timestamp is not None:
@@ -261,7 +274,7 @@ class BleRawPduReceived(PbMessageWrapper):
             packet.metadata.relative_timestamp = self.relative_timestamp
         packet.metadata.decrypted = self.decrypted
         return packet
-    
+
     @staticmethod
     def from_packet(packet):
         """Create message from Scapy packet
@@ -277,7 +290,7 @@ class BleRawPduReceived(PbMessageWrapper):
                 pdu = raw(packet[BTLE_ADV:])
             else:
                 return None
-            
+
             return BleRawPduReceived(
                 pdu=pdu,
                 access_address=BTLE(raw(packet)).access_addr,
@@ -292,7 +305,7 @@ class BleRawPduReceived(PbMessageWrapper):
                 decrypted=packet.metadata.decrypted,
                 processed=packet.metadata.processed
             )
-        
+
         return None
 
 @pb_bind(BleDomain, "injected", 1)

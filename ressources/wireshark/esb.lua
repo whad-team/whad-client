@@ -64,7 +64,7 @@ crc16 = function( byteArrIn, len_bits )
         print("CRC: Error, not enough bits " )
         return crc
     end
-    for currentBit=0,len_bits-1 do
+    for currentBit=8,len_bits-1 do
         bitIndex = band( currentBit, 0x07 )                         -- counts from 0 to 7
         if bitIndex == 0 then                                       --   fetch a new byte on 0
             byteIndex = rshift(currentBit,3)
@@ -89,6 +89,7 @@ end
 local f = nrf24.fields
 -- Can be 1 or 2 bytes lower address
 --f.pf_base_adr           = ProtoField.uint64("nrf24.low_adr",   "Lower Address",  base.HEX, nil, 0xFFFFFFFFFF000000 )
+f.pf_preamble           = ProtoField.uint8 ("nrf24.preamble",  "Preamble" ,  base.HEX )
 f.pf_full_adr           = ProtoField.bytes ("nrf24.full_adr",  "Full Address" )
 f.pf_pcf                = ProtoField.uint16("nrf24.pcf",       "Packet Control Field", base.HEX )              -- 9 bit 0b1 1111 1111
 f.pf_pcf_payload_length = ProtoField.uint16("nrf24.pcf.p_len", "Payload Length", base.DEC, nil, 0x01F8 )       -- 6 bit 0b1 1111 1000
@@ -121,36 +122,39 @@ function nrf24.dissector(tvbuf,pktinfo,root)
     -- Prepend the static part of the address to the tvbuf
     local tvbufFull = upperAddrPrepend( tvbuf )
 
+    -- Add preamble to dissection
+    local preambleRange = tvbufFull:range( 0, 1 )
+    tree:add( f.pf_preamble, preambleRange )
     -- Add address to dissections
-    local adrRange = tvbufFull:range( 0, 5 )
+    local adrRange = tvbufFull:range( 1, 5 )
     tree:add( f.pf_full_adr, adrRange )
     -- Add address to upper gui list
     pktinfo.cols.src:set( string.format("0x%02X", adrRange:range(4, 1):uint() ) )
 
     -- extract the 9 bit packet control field
-    local plLengthValue = tvbufFull:range( 5, 1 ):bitfield( 0, 6 )
+    local plLengthValue = tvbufFull:range( 6, 1 ):bitfield( 0, 6 )
     tree:append_text(", Address: " .. adrRange .. ", Payload: " .. plLengthValue .. " bytes" )
     pktinfo.cols.packet_len:set( string.format("%d",plLengthValue) )    -- setting the Length column has no effect :(
-    local pcfRange = tvbufFull:range( 5, 2 ):bitfield( 0, 9 )
+    local pcfRange = tvbufFull:range( 6, 2 ):bitfield( 0, 9 )
     local pcfTree = tree:add( f.pf_pcf, pcfRange )
     pcfTree:add( f.pf_pcf_payload_length, pcfRange )
     pcfTree:add( f.pf_pcf_pid,   pcfRange )
     pcfTree:add( f.pf_pcf_noack, pcfRange )
-    if plLengthValue > 32 then
+    if plLengthValue > 35 then
         pcfTree:add_proto_expert_info( nrf24.experts.ef_p_len_err )
         pktinfo.cols.info:set( string.format("Illegal payload length: %d", plLengthValue ) )
         return
     end
 
     -- extract payload til end of packet and shift it 1 bit to the left to get rid of the NO_ACK 9th bit
-    local unshiftedRemainder = tvbufFull( 6, -1 )
+    local unshiftedRemainder = tvbufFull( 7, -1 )
     local shiftedRemainder = shiftLeft( unshiftedRemainder )
 
     tree:add( f.pf_payload, shiftedRemainder(0,plLengthValue) )
     local readCrc = shiftedRemainder(plLengthValue,nrf24.prefs.crc_length):uint()
     tree:add( f.pf_crc, readCrc )
 
-    local calcCrc = crc16( tvbufFull:bytes(), 8*(5+plLengthValue)+9 ) --Calculated over the address, Payload and Packet Control Field
+    local calcCrc = crc16( tvbufFull:bytes(), 8*(1+5+plLengthValue)+9 ) --Calculated over the address, Payload and Packet Control Field
     tree:add( f.pf_calcCrc, calcCrc )
 
     tree:add( f.pf_garbage, shiftedRemainder(plLengthValue+nrf24.prefs.crc_length,-1) )

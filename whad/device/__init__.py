@@ -340,7 +340,7 @@ class WhadDeviceConnector(object):
     @property
     def device(self):
         return self.__device
-    
+
     @property
     def hub(self):
         return self.__device.hub
@@ -743,8 +743,10 @@ class WhadDevice(object):
 
         available_devices = []
         for device_class in device_classes:
-            for device in device_class.list():
-                available_devices.append(device)
+            device_class_list = device_class.list()
+            if device_class_list is not None:
+                for device in device_class_list:
+                    available_devices.append(device)
         return available_devices
 
     @classmethod

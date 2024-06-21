@@ -7,7 +7,6 @@ from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 from whad.rf4ce.sniffing import KeyExtractedEvent
 from whad.common.sniffing import EventsManager
-
 from whad.hub.dot15d4 import RawPduReceived, PduReceived
 from whad.hub.message import AbstractPacket
 import logging
@@ -98,7 +97,6 @@ class Sniffer(RF4CE, EventsManager):
             if issubclass(message, AbstractPacket):
                 packet = message.to_packet()
                 self.monitor_packet_rx(packet)
-                print("dec", self.__configuration.decrypt)
                 if self.__configuration.pairing:
                     self.__key_derivation.process_packet(packet)
                     if self.__key_derivation.key is not None:

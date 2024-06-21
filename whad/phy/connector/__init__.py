@@ -27,6 +27,7 @@ class Phy(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+    translator = PhyMessageTranslator
 
     def __init__(self, device=None):
         """
@@ -133,14 +134,14 @@ class Phy(WhadDeviceConnector):
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
         return (commands & (1 << Commands.SetQPSKModulation)) > 0
-    
+
     def can_use_lora(self):
         """
         Determine if the device can be configured to use LoRa modulation scheme.
         """
         commands = self.device.get_domain_commands(WhadDomain.Phy)
         return (commands & (1 << Commands.SetLoRaModulation)) > 0
-    
+
     def can_schedule_packets(self):
         """
         Determine if the device can send scheduled packets.
@@ -259,7 +260,7 @@ class Phy(WhadDeviceConnector):
         if success:
             self.__configured_modulation = True
         return success
-    
+
 
     def set_lora(self, sf=7, cr=48, bw=125000, preamble=12, crc=False, explicit=False, invert_iq=False):
         """
@@ -274,14 +275,14 @@ class Phy(WhadDeviceConnector):
         """
         if not self.can_use_lora():
             raise UnsupportedCapability("LoRaModulation")
-        
+
         # Make sure parameters are valid
         if sf not in range(7, 13):
             raise InvalidParameter('spreading factor')
-        
+
         if cr not in range(45, 49):
             raise InvalidParameter('coding rate')
-        
+
         if bw not in [125000, 250000, 500000]:
             raise InvalidParameter('bandwidth')
 
@@ -333,7 +334,7 @@ class Phy(WhadDeviceConnector):
             #print(self.__cached_supported_frequencies)
         if all([frequency < freq_range[0] or frequency > freq_range[1] for freq_range in self.__cached_supported_frequencies]):
             raise UnsupportedFrequency(frequency)
-        
+
         # Create a SetFreq message.
         msg = self.hub.phy.createSetFreq(frequency)
 
@@ -525,7 +526,7 @@ class Phy(WhadDeviceConnector):
         """
         # Create a Start message
         msg = self.hub.phy.createStart()
-        
+
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
@@ -680,14 +681,14 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("Send")
         if not self.can_schedule_packets():
             raise UnsupportedCapability("ScheduledSend")
-        
+
         if isinstance(packet, bytes):
             packet = Phy_Packet(packet)
 
         # Generate TX metadata
         packet.metadata = PhyMetadata()
         packet.metadata.frequency = self.__cached_frequency
-        
+
         # Set timestamp
         msg = self.hub.phy.createSchedulePacket(
             bytes(packet),

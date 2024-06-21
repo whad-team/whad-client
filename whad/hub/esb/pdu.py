@@ -3,6 +3,7 @@
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
 from ..message import pb_bind, PbFieldBytes, PbFieldBool, PbFieldInt, PbMessageWrapper
+from whad.hub.message import AbstractPacket
 from . import EsbDomain, ESBMetadata
 
 @pb_bind(EsbDomain, 'send', 1)
@@ -18,7 +19,7 @@ class SendPdu(PbMessageWrapper):
         """Convert SendPdu message to its scapy equivalent
         """
         return ESB_Payload_Hdr(bytes(self.pdu))
-    
+
     @staticmethod
     def from_packet(packet, retr_count: int = 1):
         """Convert scapy packet to SendPdu message.
@@ -45,7 +46,7 @@ class SendRawPdu(PbMessageWrapper):
         packet.preamble = 0xAA
         return packet
 
-    
+
     @staticmethod
     def from_packet(packet, retr_count: int = 1):
         """Convert scapy packet to SendPdu message.
@@ -83,7 +84,7 @@ class PduReceived(PbMessageWrapper):
         if self.address is not None:
             packet.metadata.address = ":".join(["{:02x}".format(i) for i in self.address])
         return packet
-    
+
     @staticmethod
     def from_packet(packet):
         """Convert scapy packet to PduReceived message
@@ -97,7 +98,7 @@ class PduReceived(PbMessageWrapper):
         if packet.metadata.rssi is not None:
             msg.rssi = packet.metadata.rssi
         if packet.metadata.timestamp is not None:
-            msg.timestamp = packet.metadata.timestamp       
+            msg.timestamp = packet.metadata.timestamp
         if packet.metadata.is_crc_valid is not None:
             msg.crc_validity = packet.metadata.is_crc_valid
         if packet.metadata.address is not None:
@@ -132,14 +133,14 @@ class RawPduReceived(PbMessageWrapper):
         if self.address is not None:
             packet.metadata.address = ":".join(["{:02x}".format(i) for i in self.address])
         return packet
-    
+
     @staticmethod
     def from_packet(packet):
         """Convert scapy packet to RawPduReceived message
         """
         # Force packet preamble to 0xAA
         packet.preamble = 0xAA
-        
+
         msg = RawPduReceived(
             channel=packet.metadata.channel,
             pdu=bytes(packet)
@@ -149,7 +150,7 @@ class RawPduReceived(PbMessageWrapper):
         if packet.metadata.rssi is not None:
             msg.rssi = packet.metadata.rssi
         if packet.metadata.timestamp is not None:
-            msg.timestamp = packet.metadata.timestamp       
+            msg.timestamp = packet.metadata.timestamp
         if packet.metadata.is_crc_valid is not None:
             msg.crc_validity = packet.metadata.is_crc_valid
         if packet.metadata.address is not None:
