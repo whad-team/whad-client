@@ -48,17 +48,13 @@ class WhadPlayApp(CommandLineApp):
             help='pcap to play'
         )
 
-    def pre_run(self):
-        super().pre_run()
+    def run(self):
+        self.pre_run()
         if self.args.pcap is not None:
             self.interface = WhadDevice.create("pcap:" + self.args.pcap)
             self.domain = extract_pcap_metadata(self.args.pcap)
-            print(self.domain)
-        else:
-            exit(1)
+            print(list_implemented_sniffers())
 
-    def run(self):
-        self.pre_run()
 
 
         self.post_run()
@@ -67,5 +63,3 @@ class WhadPlayApp(CommandLineApp):
 def wplay_main():
     app = WhadPlayApp()
     app.run()
-
-wplay_main()

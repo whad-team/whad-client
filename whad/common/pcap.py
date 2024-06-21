@@ -19,7 +19,7 @@ def extract_pcap_metadata(filename):
     with open(filename, "rb") as f:
         dump = f.read()
     return dump[8:16].replace(b"\x00", b"").decode('ascii')
-    
+
 class PCAPReader(object):
 
     def __init__(self, pcapfile : str):
