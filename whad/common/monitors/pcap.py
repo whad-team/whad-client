@@ -3,6 +3,7 @@ from scapy.all import conf
 from scapy.layers.bluetooth4LE import *
 from scapy.utils import PcapWriter,PcapReader
 from os.path import exists
+from whad.common.pcap import patch_pcap_metadata, extract_pcap_metadata
 from time import time
 from os import stat, remove
 from stat import S_ISFIFO
@@ -97,6 +98,8 @@ class PcapWriterMonitor(WhadMonitor):
             # Close writer
             try:
                 self._writer.close()
+                patch_pcap_metadata(self._pcap_file, self._connector.domain)
+                
             except BrokenPipeError:
                 pass
 
