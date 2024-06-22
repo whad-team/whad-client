@@ -91,7 +91,6 @@ class PcapWriterMonitor(WhadMonitor):
     def close(self):
         # Acquire lock on writer
         self._writer_lock.acquire()
-
         if hasattr(self, "_writer") and self._writer is not None:
 
 
@@ -99,7 +98,7 @@ class PcapWriterMonitor(WhadMonitor):
             try:
                 self._writer.close()
                 patch_pcap_metadata(self._pcap_file, self._connector.domain)
-                
+
             except BrokenPipeError:
                 pass
 
@@ -108,6 +107,7 @@ class PcapWriterMonitor(WhadMonitor):
 
         # Release lock on writer
         self._writer_lock.release()
+
 
     def default_formatter(self, packet):
         """
@@ -124,6 +124,7 @@ class PcapWriterMonitor(WhadMonitor):
 
     def process_packet(self, packet):
         # Acquire lock on writer lock acquire multithread error
+
         self._writer_lock.acquire()
 
         if self._processing:
@@ -158,6 +159,5 @@ class PcapWriterMonitor(WhadMonitor):
                     logger.warning('cannot write to PCAP: file has already been closed')
             except BrokenPipeError:
                 pass
-
         # Release lock
         self._writer_lock.release()

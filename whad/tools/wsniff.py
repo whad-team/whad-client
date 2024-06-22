@@ -160,7 +160,7 @@ class WhadDomainSubParser(ArgumentParser):
 
 class WhadSniffApp(CommandLineApp):
 
-    def __init__(self, interface=True, description='WHAD generic sniffing tool'):
+    def __init__(self, interface=True, description='WHAD generic sniffing tool', pcap_argument=False):
         """Application uses an interface and has commands.
         """
         super().__init__(
@@ -200,6 +200,13 @@ class WhadSniffApp(CommandLineApp):
             action='store_true',
             help='Enable wireshark monitoring'
         )
+
+        if pcap_argument:
+            self.add_argument(
+                dest='pcap',
+                help='PCAP file'
+            )
+
 
         subparsers = self.add_subparsers(
             required=True,
@@ -264,17 +271,24 @@ class WhadSniffApp(CommandLineApp):
                     sniffer.start()
 
                     if self.is_stdout_piped():
-                        proxy = UnixSocketProxy(self.interface, params={"domain":self.args.domain})
-                        proxy.start()
-                        proxy.join()
+                        try:
+                            proxy = UnixSocketProxy(self.interface, params={"domain":self.args.domain})
+                            proxy.start()
+                            proxy.join()
+                        except EOFError:
+                            exit()
                     else:
-                        # Iterates over the packet stream and display packets
-                        for pkt in sniffer.sniff():
-                            display_packet(
-                                pkt,
-                                show_metadata = self.args.metadata,
-                                format = self.args.format
-                            )
+                        try:
+                            # Iterates over the packet stream and display packets
+                            for pkt in sniffer.sniff():
+                                display_packet(
+                                    pkt,
+                                    show_metadata = self.args.metadata,
+                                    format = self.args.format
+                                )
+                        except EOFError:
+                            print("here :D")
+
                 else:
                     self.error("You need to specify a domain.")
             else:
@@ -298,7 +312,6 @@ class WhadSniffApp(CommandLineApp):
         """
         Generate the subparsers argument according to the environment.
         """
-
         # List every domain implementing a sniffer
         self.environment = list_implemented_sniffers()
 
@@ -371,7 +384,6 @@ class WhadSniffApp(CommandLineApp):
                         dest=dest,
                         help=parameter_help
                     )
-
 
 def wsniff_main():
     app = WhadSniffApp()

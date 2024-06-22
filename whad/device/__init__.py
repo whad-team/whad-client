@@ -500,7 +500,7 @@ class WhadDeviceConnector(object):
         """
         logger.error('method `on_domain_msg` must be implemented in inherited classes')
         raise RequiredImplementation()
-    
+
 
     def on_packet(self, packet):
         """Callback function to process incoming packets.
@@ -512,7 +512,7 @@ class WhadDeviceConnector(object):
         """
         logger.error('method `on_packet` must be implemented in inherited classes')
         raise RequiredImplementation()
-    
+
     def on_event(self, event):
         """Callback function to process incoming events.
 
@@ -522,7 +522,7 @@ class WhadDeviceConnector(object):
         :type event: :class:`whad.hub.events.AbstractEvent`
         """
         logger.error('method `on_event` must be implemented in inherited classes')
-        raise RequiredImplementation()        
+        raise RequiredImplementation()
 
 
 class WhadDeviceInputThread(Thread):

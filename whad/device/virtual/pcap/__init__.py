@@ -116,16 +116,17 @@ class PCAPDevice(VirtualDevice):
         while self.__started:
             try:
                 if self._is_reader():
-                    pkt = self.__pcap_reader.read_packet()
-                    self._send_packet(pkt)
+                        pkt = self.__pcap_reader.read_packet()
+                        self._send_packet(pkt)
             except EOFError:
-                sleep(0.5)
+                # TODO: add an event to indicate end of stream ?
+                pass
 
     def reset(self):
         pass
 
     def close(self):
-        super().close()
+        exit(1)
 
     def _generate_metadata(self, pkt):
         if self.__domain == WhadDomain.Dot15d4:
