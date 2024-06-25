@@ -75,13 +75,11 @@ class SendBleRawPdu(PbMessageWrapper):
         packet = BTLE(self.pdu)
 
         # Set packet metadata
-        '''
         packet.metadata = BLEMetadata()
         packet.metadata.connection_handle = self.conn_handle
         packet.metadata.encrypt = self.encrypt
         packet.metadata.direction = self.direction
         packet.metadata.raw = True
-        '''
 
         return packet
 
@@ -126,13 +124,11 @@ class SendBlePdu(PbMessageWrapper):
         packet = BTLE_DATA(self.pdu)
 
         # Set packet metadata
-        '''
         packet.metadata = BLEMetadata()
         packet.metadata.connection_handle = self.conn_handle
         packet.metadata.encrypt = self.encrypt
         packet.metadata.direction = self.direction
         packet.metadata.raw = False
-        '''
 
         return packet 
 

@@ -5,101 +5,183 @@ BLE device, and chain this with another tool.
 
 """
 import json
-import sys
-from threading import Thread
 from time import sleep
 
-from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL
-
-from whad.device import WhadDevice, PacketProcessor
-from whad.device.unix import UnixSocketProxy, UnixSocketServerDevice, UnixConnector
-from whad.cli.app import CommandLineDevicePipe
-
-from whad.hub.ble.bdaddr import BDAddress
-from whad.ble.connector import Central
-from whad.ble.exceptions import PeripheralNotFound
-from whad.ble.connector import Peripheral, BLE
+from whad.cli.app import CommandLineDevicePipe==
+from whad.device import Bridge
+from whad.device.unix import UnixSocketServerDevice, UnixConnector
+from whad.hub.ble import Connected, Disconnected, BlePduReceived, BleRawPduReceived
+from whad.ble.connector import Peripheral, Central
 
 
 import logging
 logger = logging.getLogger(__name__)
 
-def reshape_pdu(pdu):
-    """This function remove any SN/NESN/MD bit as it is usually handled by
-    the WHAD BLE-compatible dongle. Some BLE controllers and integrated stacks
-    do not like to get PDUs with these bits set.
+class BleSpawnOutputPipe(Bridge):
+    """ble-spawn output pipe
 
-    :param Packet pdu: Bluetooth LE packet to process
-    :return Packet: Clean Bluetooth LE packet
+    When ble-spawn is chained with another whad tool, it will spawn a device
+    based on the specified profile using the specified WHAD adapter and forward
+    it to the chained tool. The chained tool will then catch a Connected event,
+    extract the connection handle and can forward packets back and forth.
     """
-    metadata = pdu.metadata
-    btle_data = pdu.getlayer(BTLE_DATA)
-    payload = btle_data.payload
-    pkt = BTLE_DATA(
-        LLID=btle_data.LLID,
-        len=len(payload)
-    )/payload
-    pkt.metadata = metadata
-    return pkt
+    def __init__(self, input_connector, output_connector):
+        super().__init__(input_connector, output_connector)
 
-class BlePacketProcessor(PacketProcessor):
+class BleSpawnInputPipe(Bridge):
+    """ble-spawn input pipe
 
-    def __init__(self, conn_handle, input_iface, output_iface):
-        super().__init__(input_iface, output_iface)
-        self.__conn_handle = conn_handle
-
-    def on_ingress_packet(self, packet):
-        """Rewrite connection handle
-        """
-        logger.info('[ble-spawn] incoming packet processed')
-        packet.metadata.connection_handle = self.__conn_handle
-        super().on_ingress_packet(reshape_pdu(packet))
-        
-
-class BleLLProxy(Peripheral):
-    """Proxy for peripheral.
-
-    This class will create a Peripheral and will forward the following events
-    to its associated `proxy` class:
-
-    - Device connection to our peripheral BLE device
-    - Device disconnection
-    - Packet received from a central device connected to our peripheral
-    """
-    def __init__(self, interface, proxy, adv_data: bytes, scan_data: bytes):
-        super().__init__(interface, adv_data=adv_data, scan_data=scan_data)
-        self.__proxy = proxy
-
-    def on_connected(self, connection_data):
-        """Process connection event.
-        """
-        self.__proxy.on_connected(connection_data)
-        return super().on_connected(connection_data)
-    
-    def on_disconnected(self, disconnection_data):
-        """Process disconnection event.
-        """
-        self.__proxy.on_disconnected(disconnection_data)
-        return super().on_disconnected(disconnection_data)
-
-    def on_packet(self, packet):
-        """Process incoming packet.
-        """
-        self.__proxy.on_rx_packet(packet)
-
-class UnixSocketBlePacketProxy(BLE):
-    """This class implements a wrapper that allows to notify a specific
-    object that a packet has been sent.
+    When ble-spawn is chained after another whad tool, it will spawn a device
+    based on the specified profile using the specified WHAD adapter, awaits for
+    a connection and then send every receive packets to the previous tool as
+    well as relay packets it receives to the connected central device.
     """
 
-    def __init__(self, proxy, device):
-        super().__init__(device)
-        self.__proxy = proxy
-
-    def on_packet(self, packet):
-        """Process outgoing packet.
+    def __init__(self, input_connector, output_connector):
+        """Initialize our ble-spawn input pipe.
         """
-        self.__proxy.on_tx_packet(packet)
+        logger.debug('[ble-spawn][input-pipe] Initialization')
+        super().__init__(input_connector, output_connector)
+
+        logger.debug('[ble-spawn][input-pipe] Initialize properties')
+        self.__connected = False
+        self.__in_conn_handle = None
+        self.__out_conn_handle = None
+        self.__output_pending_packets = []
+
+    def set_in_conn_handle(self, conn_handle: int):
+        """Saves the input connector connection handle.
+        """
+        self.__in_conn_handle = conn_handle
+
+    def set_out_conn_handle(self, conn_handle: int):
+        """Saves output connection handle.
+        """
+        logger.debug('[ble-spawn][input-pipe] set output connection handle to %d' % conn_handle)
+        self.__out_conn_handle = conn_handle
+
+    def convert_packet_message(self, message, conn_handle, input=True):
+        """Convert a BleRawPduReceived/BlePduReceived notification into the
+        corresponding SendBleRawPdu/SendBlePdu command, using the provided
+        connection handle.
+        """
+        if input:
+            connector = self.input
+        else:
+            connector = self.output
+
+        # Do we received a packet notification ?
+        logger.debug('[ble-spawn][input-pipe] convert message %s into a command' % message)
+        if isinstance(message, BleRawPduReceived):
+            # Does our input connector support raw packets ?
+            if connector.support_raw_pdu():
+                logger.debug('[ble-spawn][input-pipe] connector supports raw pdu')
+                # Create a SendBleRawPdu command
+                command = connector.hub.ble.createSendRawPdu(
+                    message.direction,
+                    message.pdu,
+                    message.crc,
+                    encrypt=False,
+                    access_address=message.access_address,
+                    conn_handle=conn_handle, # overwrite the connection handle
+                )
+                logger.debug('[ble-spawn][input-pipe] created command %s' % command)
+            else:
+                logger.debug('[ble-spawn][input-pipe] connector does not support raw pdu')
+                # Create a SendBlePdu command
+                command = connector.hub.ble.createSendPdu(
+                    message.direction,
+                    message.pdu,
+                    conn_handle, # overwrite the connection handle
+                    encrypt=False
+                )
+                logger.debug('[ble-spawn][input-pipe] created command %s' % command)
+        elif isinstance(message, BlePduReceived):
+            # Does our input connector support raw packets ?
+            if connector.support_raw_pdu():
+                logger.debug('[ble-spawn][input-pipe] connector supports raw pdu')
+                # Create a SendBleRawPdu command
+                command = connector.hub.ble.createSendRawPdu(
+                    message.direction,
+                    message.pdu,
+                    None,
+                    encrypt=False,
+                    access_address=0x11223344, # We use the default access address
+                    conn_handle=conn_handle, # overwrite the connection handle
+                )
+                logger.debug('[ble-spawn][input-pipe] created command %s' % command)
+            else:
+                logger.debug('[ble-spawn][input-pipe] connector does not support raw pdu')
+                # Create a SendBlePdu command
+                command = self.input.hub.ble.createSendPdu(
+                    message.direction,
+                    message.pdu,
+                    conn_handle, # overwrite the connection handle
+                    encrypt=False
+                )
+                logger.debug('[ble-spawn][input-pipe] created command %s' % command)
+        else:
+            # Not a BLE packet notification
+            command = None
+
+        # Return generated command
+        return command
+
+    def on_inbound(self, message):
+        """Process inbound messages.
+
+        Inbound packets are packets coming from our output connector, i.e. the
+        central device connected to our emulated peripheral, that need to be
+        forwarded as packets to the previous tool.
+
+        Normally, since we get packets from a central device we are supposed to
+        be connected and know the connection handle corresponding to this
+        connection.
+        """
+        if isinstance(message, BleRawPduReceived) or isinstance(message, BlePduReceived):
+            if not self.__connected:
+                logger.debug('[ble-spawn][input-pipe] add pending inbound PDU message %s to queue' % message)
+            else:
+                logger.debug('[ble-spawn][input-pipe] received an inbound PDU message %s' % message)
+                command = self.convert_packet_message(message, self.__in_conn_handle, True)
+                self.input.send_command(command)
+        elif isinstance(message, Disconnected):
+            # Central device has disconnected, we don't care but we don't send this
+            # notification to our chained tool.
+            logger.debug('[ble-spawn][input-pipe] received a disconnection notification, discard')
+            return
+        elif isinstance(message, Connected):
+            logger.debug('[ble-spawn][input-pipe] received a connection notification, update input conn_handle to %d' % message.conn_handle)
+            # Central device has connected, update our output connection handle.
+            self.set_out_conn_handle(message.conn_handle)
+            self.__connected = True
+        else:
+            logger.debug('[ble-spawn][input-pipe] forward default inbound message %s' % message)
+            # Forward other messages
+            super().on_inbound(message)
+
+    def on_outbound(self, message):
+        """Process outbund messages.
+        """
+        if isinstance(message, BleRawPduReceived) or isinstance(message, BlePduReceived):
+            if self.__out_conn_handle is not None:
+                logger.debug('[ble-spawn][input-pipe] received an outbound PDU message %s' % message)
+                command = self.convert_packet_message(message, self.__out_conn_handle, False)
+                self.output.send_command(command)
+        elif isinstance(message, Connected):
+            # Don't forward this message.
+            logger.debug('[ble-spawn][input-pipe] received a connection notification, discard')
+            return
+        elif isinstance(message, Disconnected):
+            # Chained tool has lost connection, we must handle it
+            # TODO
+            logger.debug('[ble-spawn][input-pipe] received a disconnection notification, discard')
+            return
+        else:
+            logger.debug('[ble-spawn][input-pipe] forward default outbound message %s' % message)
+            # Forward other messages
+            super().on_outbound(message)
+
 
 class BleSpawnApp(CommandLineDevicePipe):
     """Bluetooth Low Energy device spawning tool.
@@ -151,14 +233,14 @@ class BleSpawnApp(CommandLineDevicePipe):
                     if self.is_stdin_piped() and not self.is_stdout_piped():
                         # We create a peripheral that will send all packets to our input interface
                         self.__mode = self.MODE_END_CHAIN
-                        self.create_input_proxy(adv_data, scan_rsp)
+                        self.create_input_proxy(adv_data, scan_rsp, int(self.args.conn_handle))
 
                     # Else if stdout is piped, we are supposed to advertise a device
                     # and proxify when connected
                     elif self.is_stdout_piped() and not self.is_stdin_piped():
                         # We create a peripheral that will proxy all messages
                         self.__mode = self.MODE_START_CHAIN
-                        self.create_output_proxy(adv_data, scan_rsp)
+                        self.create_output_proxy(adv_data, scan_rsp, profile_json)
                     else:
                         self.error('Tool must be piped to another WHAD tool.')
                 else:
@@ -172,157 +254,44 @@ class BleSpawnApp(CommandLineDevicePipe):
         # Launch post-run tasks
         self.post_run()
 
-    def create_input_proxy(self, adv_data: bytes, scan_data: bytes):
+    def create_input_proxy(self, adv_data: bytes, scan_data: bytes, conn_handle):
         """Configure our hardware to advertise a BLE peripheral, and once
         a central device is connected relay all packets to our input_interface.
         """
         self.input_conn_handle = int(self.args.conn_handle)
 
         # Create our peripheral
-        '''
-        self.proxy = BleLLProxy(
-            WhadDevice.create(self.args.interface),
-            self,
-            adv_data,
-            scan_data
-        )
-        self.proxy.start()
+        logger.info("[ble-spawn] Creating peripheral ...")
+        peripheral = Peripheral(self.interface)
+
+        # Create our packet bridge
+        logger.info("[ble-spawn] Starting our input pipe")
+        input_pipe = BleSpawnInputPipe(Central(self.input_interface), peripheral)
+        input_pipe.set_in_conn_handle(conn_handle)
         
-        # Loop on our input interface to dispatch packets
-        self.packet_source = UnixSocketBlePacketProxy(self, self.input_interface)
-        '''
-
-        peripheral = Peripheral(self.interface, adv_data=adv_data, scan_data=scan_data)
-        unix_client = UnixConnector(self.input_interface)
-        pproc = PacketProcessor(unix_client, peripheral)
-
-        # Loop
+        # Loop until the user hits CTL-C
         while True:
             sleep(1)
 
-    def on_connected(self, connection_data):
-        if self.__mode == self.MODE_END_CHAIN:
-            # Save output connection handle
-            self.output_conn_handle = connection_data.conn_handle
-            # Save current connection info
-            self.connection = connection_data
-        else:
-            # Save input connection handle
-            self.input_conn_handle = connection_data.conn_handle
-            
-            # Save current connection info
-            self.connection = connection_data
-            
-            # Extract connection data and start a proxy
 
-            metadata = {         
-            'domain':'ble',
-            'conn_handle': connection_data.conn_handle,
-            'initiator_bdaddr':str(BDAddress(connection_data.initiator)),
-            'initiator_addrtype':connection_data.init_addr_type,
-            'target_bdaddr':str(BDAddress(connection_data.advertiser)),
-            'target_addrtype':connection_data.adv_addr_type,
-            }
-            sys.stderr.write(str(metadata))
-
-
-            self.proxy = UnixSocketProxy(self.interface, metadata)
-            self.proxy.start()
-            self.proxy.join()
-
-
-    def on_disconnected(self, disconnection_data):
-        pass
-
-    def on_rx_packet(self, packet):
-        """Process incoming packet (from connected central)
-        """
-        if self.__mode == self.MODE_END_CHAIN:
-            if self.input_conn_handle is not None:
-                packet.metadata.connection_handle = self.input_conn_handle
-                self.packet_source.send_packet(packet)
-        else:
-            if self.input_conn_handle is not None:
-                packet.metadata.connection_handle = self.input_conn_handle
-                self.target.send_packet(packet)
-
-    def on_tx_packet(self, packet):
-        """Process outgoing packet (from input device)
-        """
-        if self.__mode == self.MODE_END_CHAIN:
-            if self.output_conn_handle is not None:
-                packet.metadata.connection_handle = self.output_conn_handle
-                self.proxy.send_packet(packet)
-        else:
-            if self.output_conn_handle is not None:
-                packet.metadata.connection_handle = self.output_conn_handle
-                self.proxy.send_packet(packet)
-
-    def create_output_proxy(self, adv_data, scan_data):
+    def create_output_proxy(self, adv_data, scan_data, profile_json):
         """Create an output proxy that will relay packets from our emulated BLE
         peripheral to a chained tool.
         """
-        
         # Create our peripheral
-        peripheral = Peripheral(self.interface, adv_data=adv_data, scan_data=scan_data)
+        logger.info("[ble-spawn] Creating peripheral ...")
+        peripheral = Peripheral(self.interface)
 
-        # Wait for our peripheral to receive a connection
-        peripheral.wait_connection()
+        # Create our unix socket server
+        unix_server = UnixConnector(UnixSocketServerDevice())
 
-        # Define our packet processor
+        # Create our packet bridge
+        # logger.info("[ble-spawn] Starting our output pipe")
+        output_pipe = BleSpawnOutputPipe(peripheral, unix_server)
 
-        # Once we have a connection, create a Unix socket server device and wait
-        # for a client to connect to our unix socket server
-        unix_server_device = UnixSocketServerDevice(parameters={'domain':'ble'})
-        unix_server_device.open()
-
-        # Bridge our two devices with a packet processor.
-        pproc = BlePacketProcessor(peripheral.conn_handle, self.interface, unix_server_device)
-
+        # Loop until the user hits CTL-C
         while True:
             sleep(1)
-
-    def connect_target(self, bdaddr, random_connection_type=False):
-        """Connect to our target device
-        """
-        # Make sure the bd address is valid
-        if BDAddress.check(bdaddr):
-            # Configure our interface
-            central = Central(self.interface)
-
-            # Spoof source BD address if required
-            if self.args.bdaddr_pub_src is not None:
-                self.set_bd_address(central, self.args.bdaddr_pub_src, public=True)
-            elif self.args.bdaddr_rand_src is not None:
-                self.set_bd_address(central, self.args.bdaddr_rand_src, public=False)
-
-            # Connect to our target device
-            try:
-                periph = central.connect(bdaddr, random_connection_type)
-
-                # Get peers
-                logger.info('local_peer: %s' % central.local_peer)
-
-                # Connected, starts a Unix socket proxy that will relay the underlying
-                # device WHAD messages to the next tool.
-                proxy = UnixSocketProxy(self.interface, {
-                    'domain':'ble',
-                    'conn_handle':periph.conn_handle,
-                    'initiator_bdaddr':str(central.local_peer),
-                    'initiator_addrtype':str(central.local_peer.type),
-                    'target_bdaddr':str(central.target_peer),
-                    'target_addrtype': str(central.target_peer.type)
-                })
-                proxy.start()
-                proxy.join()
-            except PeripheralNotFound as not_found:
-                # Could not connect
-                self.error('Cannot connect to %s' % bdaddr)
-            finally:
-                central.stop()
-        else:
-            self.error('Invalid BD address: %s' % bdaddr)
-
 
 def ble_spawn_main():
     app = BleSpawnApp()

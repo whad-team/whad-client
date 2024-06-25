@@ -79,6 +79,9 @@ class BleUnixSocketConnector(UnixSocketConnector):
         the appropriate header and the timestamp in microseconds.
         """
         return self.hub.ble.format(packet)
+    
+    def on_event(self, event):
+        pass
 
 
 class BleWiresharkApp(CommandLineDevicePipe):

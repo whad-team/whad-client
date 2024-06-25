@@ -41,6 +41,7 @@ class BLE(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+    domain = 'ble'
     translator = BleMessageTranslator
 
     # correlation table
@@ -701,7 +702,6 @@ class BLE(WhadDeviceConnector):
         """Dispatch incoming packet
         """
         logger.debug('[BLE connector] on_packet')
-
         # discard processed packets or if we're not ready
         if packet.metadata.processed or not self.__ready:
             return

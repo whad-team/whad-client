@@ -2,109 +2,220 @@
 
 This utility will configure a compatible whad device to connect to a given
 BLE device, and chain this with another tool.
-
 """
 from time import sleep
-from whad.hub.ble.bdaddr import BDAddress
-from whad.hub.ble import SendBlePdu, SendBleRawPdu, Direction
+
+# WHAD CLI helper
 from whad.cli.app import CommandLineDevicePipe
-from whad.ble.connector import Central
-from whad.device.unix import UnixSocketProxy, UnixSocketConnector, UnixConnector, UnixSocketServerDevice
-from whad.device import PacketProcessor
+
+# WHAD device classes
+from whad.device.unix import UnixConnector, UnixSocketServerDevice
+from whad.device import Bridge
+
+# WHAD BLE interfaces
+from whad.ble import BLE, Central
 from whad.ble.exceptions import PeripheralNotFound
-from whad.ble import BLE
-from whad.hub.ble import BlePduReceived, BleRawPduReceived
 
-from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL
+# WHAD BLE messages
+from whad.hub.ble import BlePduReceived, BleRawPduReceived, Connected, Disconnected
+from whad.hub.ble.bdaddr import BDAddress
 
+# Logging
 import logging
 logger = logging.getLogger(__name__)
 
-def reshape_pdu(pdu):
-    """This function remove any SN/NESN/MD bit as it is usually handled by
-    the WHAD BLE-compatible dongle. Some BLE controllers and integrated stacks
-    do not like to get PDUs with these bits set.
+class BleConnectOutputPipe(Bridge):
+    """ble-connect output pipe
 
-    :param Packet pdu: Bluetooth LE packet to process
-    :return Packet: Clean Bluetooth LE packet
-    """
-    metadata = pdu.metadata
-    btle_data = pdu.getlayer(BTLE_DATA)
-    payload = btle_data.payload
-    pkt = BTLE_DATA(
-        LLID=btle_data.LLID,
-        len=len(payload)
-    )/payload
-    pkt.metadata = metadata
-    return pkt
+    When ble-connect is used with its output piped to another WHAD tool,
+    it creates a connection to a BLE device and then gives access to the
+    WHAD adapter in its entirety. The piped tool can send commands and will
+    receive notifications from the adapter.
 
-class BlePacketProcessor(PacketProcessor):
-
-    def __init__(self, conn_handle, input_iface, output_iface):
-        super().__init__(input_iface, output_iface)
-        self.__conn_handle = conn_handle
-
-    #def on_inbound_packet(self, packet):
-    #    logger.debug('[ble-connect] changed connection handle to %d' % self.__conn_handle)
-    #    packet.metadata.connection_handle = self.__conn_handle
-    #    return packet
-    
-
-class UnixSocketBlePacketProxy(UnixSocketConnector):
-    """This class implements a wrapper that allows to notify a specific
-    object that a packet has been sent.
+    There is not specific process to be applied, we are just bridging a
+    unix socket server device to the central connector and that's it.
     """
 
-    def __init__(self, proxy, device):
-        super().__init__(device)
-        self.__proxy = proxy
+    def __init__(self, input_connector, output_connector):
+        super().__init__(input_connector, output_connector)
 
-    def on_packet(self, packet):
-        """Process outgoing packet.
-        """
-        packet.show()
-        if isinstance(packet, BlePduReceived) or isinstance(packet, BleRawPduReceived):
-            self.__proxy.on_tx_packet(packet)
+class BleConnectInputPipe(Bridge):
+    """ble-connect input pipe
 
-class BleLLProxy(Central):
-    """Proxy for central.
+    When ble-connect has its standard input piped to another WHAD tool
+    standard output, then it will consider that the previous tool configure
+    another WHAD hardware adapter to get a connection and will process incoming
+    connection/disconnection events as well as PDUs. These PDUs will be
+    forwarded to the device ble-connect is connected to, and every PDU coming
+    from our target device will be forwarded to the chained WHAD tool upstream.
 
-    This class will create a Crentral and will forward the following events
-    to its associated `proxy` class:
-
-    - Device connection to our peripheral BLE device
-    - Device disconnection
-    - Packet received from a central device connected to our peripheral
+    Inbound messages (sent by the device we are connected to) are monitored and
+    only PDU-related messages will be forwarded  to the chained tool while
+    outbound messages (coming from the chained tool) are analyzed to detect when
+    a connection occurs and forward every PDU to our target device.
     """
-    def __init__(self, interface, proxy):
-        super().__init__(interface)
-        self.__proxy = proxy
 
-    def on_connected(self, connection_data):
-        """Process connection event.
+    def __init__(self, input_connector, output_connector):
+        """Initialize our ble-connect input pipe.
         """
-        self.__proxy.on_connected(connection_data)
-        return super().on_connected(connection_data)
-    
-    def on_disconnected(self, disconnection_data):
-        """Process disconnection event.
-        """
-        self.__proxy.on_disconnected(disconnection_data)
-        return super().on_disconnected(disconnection_data)
+        logger.debug('[ble-connect][output-pipe] Initialization')
+        super().__init__(input_connector, output_connector)
 
-    def on_packet(self, packet):
-        """Process incoming packet.
+        logger.debug('[ble-connect][output-pipe] Initialize properties')
+        self.__connected = False
+        self.__in_conn_handle = None
+        self.__out_conn_handle = None
+        self.__output_pending_packets = []
+
+    def set_in_conn_handle(self, conn_handle: int):
+        """Saves the input connector connection handle.
         """
-        if BTLE_DATA in packet:
-            self.__proxy.on_rx_packet(packet)
+        self.__in_conn_handle = conn_handle
+
+    def set_out_conn_handle(self, conn_handle: int):
+        """Saves output connection handle.
+        """
+        logger.debug('[ble-connect][output-pipe] set output connection handle to %d' % conn_handle)
+        self.__out_conn_handle = conn_handle
+
+    def convert_packet_message(self, message, conn_handle, input=True):
+        """Convert a BleRawPduReceived/BlePduReceived notification into the
+        corresponding SendBleRawPdu/SendBlePdu command, using the provided
+        connection handle.
+        """
+        if input:
+            connector = self.input
+        else:
+            connector = self.output
+
+        # Do we received a packet notification ?
+        logger.debug('[ble-connect][output-pipe] convert message %s into a command' % message)
+        if isinstance(message, BleRawPduReceived):
+            # Does our input connector support raw packets ?
+            if connector.support_raw_pdu():
+                logger.debug('[ble-connect][output-pipe] connector supports raw pdu')
+                # Create a SendBleRawPdu command
+                command = connector.hub.ble.createSendRawPdu(
+                    message.direction,
+                    message.pdu,
+                    message.crc,
+                    encrypt=False,
+                    access_address=message.access_address,
+                    conn_handle=conn_handle, # overwrite the connection handle
+                )
+                logger.debug('[ble-connect][output-pipe] created command %s' % command)
+            else:
+                logger.debug('[ble-connect][output-pipe] connector does not support raw pdu')
+                # Create a SendBlePdu command
+                command = connector.hub.ble.createSendPdu(
+                    message.direction,
+                    message.pdu,
+                    conn_handle, # overwrite the connection handle
+                    encrypt=False
+                )
+                logger.debug('[ble-connect][output-pipe] created command %s' % command)
+        elif isinstance(message, BlePduReceived):
+            # Does our input connector support raw packets ?
+            if connector.support_raw_pdu():
+                logger.debug('[ble-connect][output-pipe] connector supports raw pdu')
+                # Create a SendBleRawPdu command
+                command = connector.hub.ble.createSendRawPdu(
+                    message.direction,
+                    message.pdu,
+                    None,
+                    encrypt=False,
+                    access_address=0x11223344, # We use the default access address
+                    conn_handle=conn_handle, # overwrite the connection handle
+                )
+                logger.debug('[ble-connect][output-pipe] created command %s' % command)
+            else:
+                logger.debug('[ble-connect][output-pipe] connector does not support raw pdu')
+                # Create a SendBlePdu command
+                command = self.input.hub.ble.createSendPdu(
+                    message.direction,
+                    message.pdu,
+                    conn_handle, # overwrite the connection handle
+                    encrypt=False
+                )
+                logger.debug('[ble-connect][output-pipe] created command %s' % command)
+        else:
+            # Not a BLE packet notification
+            command = None
+
+        # Return generated command
+        return command
+
+    def on_inbound(self, message):
+        """Process inbound messages.
+
+        Inbound messages are coming from our output connector, i.e. the
+        peripheral device we are connected to, we  only process any PDU-related
+        message and discard other events/notifications such as connection or
+        disconnection events.
+
+        Normally, since we get packets from a central device we are supposed to
+        be connected and know the connection handle corresponding to this
+        connection.
+        """
+        if isinstance(message, BleRawPduReceived) or isinstance(message, BlePduReceived):
+            if not self.__connected:
+                logger.debug('[ble-connect][output-pipe] add pending inbound PDU message %s to queue' % message)
+            else:
+                logger.debug('[ble-connect][output-pipe] received an inbound PDU message %s' % message)
+                command = self.convert_packet_message(message, self.__in_conn_handle, True)
+                self.input.send_command(command)
+        elif isinstance(message, Disconnected):
+            # Central device has disconnected, we don't care but we don't send this
+            # notification to our chained tool.
+            logger.debug('[ble-connect][output-pipe] received a disconnection notification, todo')
+            # TODO
+            return
+        elif isinstance(message, Connected):
+            logger.debug('[ble-connect][output-pipe] received a connection notification, discard')
+            return
+        else:
+            logger.debug('[ble-connect][output-pipe] forward default inbound message %s' % message)
+            # Forward other messages
+            super().on_inbound(message)
+
+    def on_outbound(self, message):
+        """Process outbund messages.
+
+        We monitor these messages to catch the connection handle used by our chained
+        tool (upstream) in order to send valid commands.
+        """
+        if isinstance(message, BleRawPduReceived) or isinstance(message, BlePduReceived):
+            if self.__out_conn_handle is not None:
+                logger.debug('[ble-connect][output-pipe] received an outbound PDU message %s' % message)
+                command = self.convert_packet_message(message, self.__out_conn_handle, False)
+                self.output.send_command(command)
+        elif isinstance(message, Connected):
+            # Don't forward this message.
+            self.set_in_conn_handle(message.conn_handle)
+            self.__connected = True
+            return
+        elif isinstance(message, Disconnected):
+            # Chained tool has lost connection, we must handle it
+            # TODO
+            logger.debug('[ble-connect][output-pipe] received a disconnection notification, discard')
+            return
+        else:
+            logger.debug('[ble-connect][output-pipe] forward default outbound message %s' % message)
+            # Forward other messages
+            super().on_outbound(message)
 
 class BleConnectApp(CommandLineDevicePipe):
+    """Bluetooth Low-energy connection tool
+
+    This command-line tool has one job: initiate a BLE connection to a specific
+    device and then let another tool use it for whatever purpose it has.
+    """
 
     def __init__(self):
         """Application uses an interface and has commands.
         """
         super().__init__(
-            description='WHAD Bluetooth Low Energy connect tool',
+            description='WHAD Bluetooth Low Energy connection tool',
             interface=True,
             commands=False
         )
@@ -183,8 +294,6 @@ class BleConnectApp(CommandLineDevicePipe):
         """
         # Make sure the bd address is valid
         if BDAddress.check(bdaddr):
-
-            print('create central')
             central = Central(self.interface)
 
             # Spoof source BD address if required
@@ -195,22 +304,9 @@ class BleConnectApp(CommandLineDevicePipe):
 
             # Connect to our target device
             try:
-                print('connect to peripheral')
                 periph = central.connect(bdaddr, random_connection_type)
-
-                # Configure our interface
-                print('create a proxy for our peripheral')
-                self.packet_source = BleLLProxy(self.interface, self)
-                
-                # Create a proxy to monitor packets coming from our target
-                #print('create a unix socket proxy')
-                #self.packet_source = UnixSocketBlePacketProxy(self, self.input_interface)
-                #self.packet_source.serve()
-                #self.packet_source = UnixSocketClientConnector(self.input_interface)
-                self.proxy = UnixConnector(self.input_interface)
-                
-                #self.packet_source = PacketMonitor(self.packet_source)
-
+                output_pipe = BleConnectInputPipe(BLE(self.input_interface), central)
+                output_pipe.set_out_conn_handle(central.conn_handle)
 
                 while True:
                     sleep(1)
@@ -218,31 +314,6 @@ class BleConnectApp(CommandLineDevicePipe):
             except PeripheralNotFound as not_found:
                 # Could not connect
                 self.error('Cannot connect to %s' % bdaddr)
-            finally:
-                self.proxy.stop()
-
-
-    def on_connected(self, connection_data):
-        pass
-
-    def on_disconnected(self, disconnection_data):
-        pass
-
-    def on_tx_packet(self, packet):
-        """Forward packet coming from our input device to our target device.
-        """
-        print('tx packet, send to unix client')
-        packet.show()
-        self.packet_source.send_packet(packet)
-
-    def on_rx_packet(self, packet):
-        """Forward packet coming from our connected device to our input
-        interface.
-        """
-        packet.show()
-        print(packet.metadata)
-        print('[ble-connect] rx packet, send to unix client')
-        self.proxy.send_packet(reshape_pdu(packet))
 
     def connect_target(self, bdaddr, random_connection_type=False):
         """Connect to our target device
@@ -265,21 +336,7 @@ class BleConnectApp(CommandLineDevicePipe):
                 # Get peers
                 logger.info('local_peer: %s' % central.local_peer)
 
-                # Connected, starts a Unix socket proxy that will relay the underlying
-                # device WHAD messages to the next tool.
-                """
-                proxy = UnixSocketProxy(self.interface, {
-                    'domain':'ble',
-                    'conn_handle':periph.conn_handle,
-                    'initiator_bdaddr':str(central.local_peer),
-                    'initiator_addrtype':str(central.local_peer.type),
-                    'target_bdaddr':str(central.target_peer),
-                    'target_addrtype': str(central.target_peer.type)
-                })
-                proxy.start()
-                proxy.join()
-                
-                """
+                # Insanciate our output pipe
                 proxy = UnixConnector(UnixSocketServerDevice(parameters={
                     'domain':'ble',
                     'conn_handle':periph.conn_handle,
@@ -288,14 +345,11 @@ class BleConnectApp(CommandLineDevicePipe):
                     'target_bdaddr':str(central.target_peer),
                     'target_addrtype': str(central.target_peer.type)
                 }))
-                pproc = BlePacketProcessor(periph.conn_handle, central, proxy)
-                #if proxy.support_raw_pdu():
-                #    logger.error('proxy does support raw PDU')
+                output_pipe = BleConnectOutputPipe(central, proxy)
 
+                # Wait for user CTL-C
                 while True:
                     sleep(1)
-                
-
                 
             except PeripheralNotFound as not_found:
                 # Could not connect
@@ -307,5 +361,7 @@ class BleConnectApp(CommandLineDevicePipe):
 
 
 def ble_connect_main():
+    """Main application wrapper.
+    """
     app = BleConnectApp()
     app.run()
