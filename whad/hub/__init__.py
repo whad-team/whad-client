@@ -7,9 +7,12 @@ pick the correct message wrapper class to parse it. Message wrappers simplifies
 the way protocol buffers messages are created by mapping some of their properties
 to protobuf messages fields.
 """
+import logging
 from typing import Union
 from whad.protocol.whad_pb2 import Message
 from .registry import Registry
+
+logger = logging.getLogger(__name__)
 
 class ProtocolHub(Registry):
     """WHAD Protocol Hub class
@@ -86,15 +89,22 @@ class ProtocolHub(Registry):
 
         # We dispatch packets based on their layers
         if self.ble.isPacketCompat(packet):
+            logger.debug('[hub] convertPacket(): packet is BLE')
             msg = self.ble.convertPacket(packet)
         elif self.dot15d4.isPacketCompat(packet):
+            logger.debug('[hub] convertPacket(): packet is Dot15d4')
             msg = self.dot15d4.convertPacket(packet)
         elif self.esb.isPacketCompat(packet):
+            logger.debug('[hub] convertPacket(): packet is ESB')
             msg = self.esb.convertPacket(packet)
         elif self.phy.isPacketCompat(packet):
+            logger.debug('[hub] convertPacket(): packet is PHY')
             msg = self.phy.convertPacket(packet)
         elif self.unifying.isPacketCompat(packet):
+            logger.debug('[hub] convertPacket(): packet is Unifying')
             msg = self.unifying.convertPacket(packet)
+        else:
+            logger.error('[hub] convertPacket(): packet is unknown !')
 
         return msg
         
