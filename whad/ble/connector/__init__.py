@@ -700,6 +700,8 @@ class BLE(WhadDeviceConnector):
     def on_packet(self, packet):
         """Dispatch incoming packet
         """
+        logger.debug('[BLE connector] on_packet')
+
         # discard processed packets or if we're not ready
         if packet.metadata.processed or not self.__ready:
             return
@@ -805,6 +807,7 @@ class BLE(WhadDeviceConnector):
         :type packet: :class:`scapy.packet.Packet`
         :return: True if packet has correctly been sent, False otherwise.
         """
+
         if self.support_raw_pdu():
             # We expect a BTLE header for raw packets
             if BTLE not in packet and BTLE_DATA in packet:

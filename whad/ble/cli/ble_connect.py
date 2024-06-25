@@ -6,10 +6,11 @@ BLE device, and chain this with another tool.
 """
 from time import sleep
 from whad.hub.ble.bdaddr import BDAddress
+from whad.hub.ble import SendBlePdu, SendBleRawPdu, Direction
 from whad.cli.app import CommandLineDevicePipe
 from whad.ble.connector import Central
-from whad.device import PacketMonitor
-from whad.device.unix import UnixSocketProxy, UnixSocketConnector, UnixSocketClientConnector
+from whad.device.unix import UnixSocketProxy, UnixSocketConnector, UnixConnector, UnixSocketServerDevice
+from whad.device import PacketProcessor
 from whad.ble.exceptions import PeripheralNotFound
 from whad.ble import BLE
 from whad.hub.ble import BlePduReceived, BleRawPduReceived
@@ -36,6 +37,18 @@ def reshape_pdu(pdu):
     )/payload
     pkt.metadata = metadata
     return pkt
+
+class BlePacketProcessor(PacketProcessor):
+
+    def __init__(self, conn_handle, input_iface, output_iface):
+        super().__init__(input_iface, output_iface)
+        self.__conn_handle = conn_handle
+
+    #def on_inbound_packet(self, packet):
+    #    logger.debug('[ble-connect] changed connection handle to %d' % self.__conn_handle)
+    #    packet.metadata.connection_handle = self.__conn_handle
+    #    return packet
+    
 
 class UnixSocketBlePacketProxy(UnixSocketConnector):
     """This class implements a wrapper that allows to notify a specific
@@ -187,15 +200,16 @@ class BleConnectApp(CommandLineDevicePipe):
 
                 # Configure our interface
                 print('create a proxy for our peripheral')
-                self.proxy = BleLLProxy(self.interface, self)
+                self.packet_source = BleLLProxy(self.interface, self)
                 
                 # Create a proxy to monitor packets coming from our target
                 #print('create a unix socket proxy')
                 #self.packet_source = UnixSocketBlePacketProxy(self, self.input_interface)
                 #self.packet_source.serve()
                 #self.packet_source = UnixSocketClientConnector(self.input_interface)
-                self.packet_source = UnixSocketClientConnector(self.input_interface)
-                self.packet_source = PacketMonitor(self.packet_source)
+                self.proxy = UnixConnector(self.input_interface)
+                
+                #self.packet_source = PacketMonitor(self.packet_source)
 
 
                 while True:
@@ -227,7 +241,7 @@ class BleConnectApp(CommandLineDevicePipe):
         """
         packet.show()
         print(packet.metadata)
-        print('rx packet, send to unix client')
+        print('[ble-connect] rx packet, send to unix client')
         self.proxy.send_packet(reshape_pdu(packet))
 
     def connect_target(self, bdaddr, random_connection_type=False):
@@ -253,6 +267,7 @@ class BleConnectApp(CommandLineDevicePipe):
 
                 # Connected, starts a Unix socket proxy that will relay the underlying
                 # device WHAD messages to the next tool.
+                """
                 proxy = UnixSocketProxy(self.interface, {
                     'domain':'ble',
                     'conn_handle':periph.conn_handle,
@@ -263,6 +278,25 @@ class BleConnectApp(CommandLineDevicePipe):
                 })
                 proxy.start()
                 proxy.join()
+                
+                """
+                proxy = UnixConnector(UnixSocketServerDevice(parameters={
+                    'domain':'ble',
+                    'conn_handle':periph.conn_handle,
+                    'initiator_bdaddr':str(central.local_peer),
+                    'initiator_addrtype':str(central.local_peer.type),
+                    'target_bdaddr':str(central.target_peer),
+                    'target_addrtype': str(central.target_peer.type)
+                }))
+                pproc = BlePacketProcessor(periph.conn_handle, central, proxy)
+                #if proxy.support_raw_pdu():
+                #    logger.error('proxy does support raw PDU')
+
+                while True:
+                    sleep(1)
+                
+
+                
             except PeripheralNotFound as not_found:
                 # Could not connect
                 self.error('Cannot connect to %s' % bdaddr)

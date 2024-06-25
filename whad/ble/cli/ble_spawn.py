@@ -11,8 +11,8 @@ from time import sleep
 
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL
 
-from whad.device import WhadDevice
-from whad.device.unix import UnixSocketProxy
+from whad.device import WhadDevice, PacketProcessor
+from whad.device.unix import UnixSocketProxy, UnixSocketServerDevice, UnixConnector
 from whad.cli.app import CommandLineDevicePipe
 
 from whad.hub.ble.bdaddr import BDAddress
@@ -32,12 +32,29 @@ def reshape_pdu(pdu):
     :param Packet pdu: Bluetooth LE packet to process
     :return Packet: Clean Bluetooth LE packet
     """
+    metadata = pdu.metadata
     btle_data = pdu.getlayer(BTLE_DATA)
     payload = btle_data.payload
-    return BTLE_DATA(
+    pkt = BTLE_DATA(
         LLID=btle_data.LLID,
         len=len(payload)
     )/payload
+    pkt.metadata = metadata
+    return pkt
+
+class BlePacketProcessor(PacketProcessor):
+
+    def __init__(self, conn_handle, input_iface, output_iface):
+        super().__init__(input_iface, output_iface)
+        self.__conn_handle = conn_handle
+
+    def on_ingress_packet(self, packet):
+        """Rewrite connection handle
+        """
+        logger.info('[ble-spawn] incoming packet processed')
+        packet.metadata.connection_handle = self.__conn_handle
+        super().on_ingress_packet(reshape_pdu(packet))
+        
 
 class BleLLProxy(Peripheral):
     """Proxy for peripheral.
@@ -162,6 +179,7 @@ class BleSpawnApp(CommandLineDevicePipe):
         self.input_conn_handle = int(self.args.conn_handle)
 
         # Create our peripheral
+        '''
         self.proxy = BleLLProxy(
             WhadDevice.create(self.args.interface),
             self,
@@ -169,9 +187,14 @@ class BleSpawnApp(CommandLineDevicePipe):
             scan_data
         )
         self.proxy.start()
-
+        
         # Loop on our input interface to dispatch packets
         self.packet_source = UnixSocketBlePacketProxy(self, self.input_interface)
+        '''
+
+        peripheral = Peripheral(self.interface, adv_data=adv_data, scan_data=scan_data)
+        unix_client = UnixConnector(self.input_interface)
+        pproc = PacketProcessor(unix_client, peripheral)
 
         # Loop
         while True:
@@ -219,8 +242,6 @@ class BleSpawnApp(CommandLineDevicePipe):
                 packet.metadata.connection_handle = self.input_conn_handle
                 self.packet_source.send_packet(packet)
         else:
-            print('packet rx')
-            packet.show()
             if self.input_conn_handle is not None:
                 packet.metadata.connection_handle = self.input_conn_handle
                 self.target.send_packet(packet)
@@ -241,13 +262,22 @@ class BleSpawnApp(CommandLineDevicePipe):
         """Create an output proxy that will relay packets from our emulated BLE
         peripheral to a chained tool.
         """
+        
         # Create our peripheral
-        self.target = BleLLProxy(
-            WhadDevice.create(self.args.interface),
-            self,
-            adv_data,
-            scan_data
-        )
+        peripheral = Peripheral(self.interface, adv_data=adv_data, scan_data=scan_data)
+
+        # Wait for our peripheral to receive a connection
+        peripheral.wait_connection()
+
+        # Define our packet processor
+
+        # Once we have a connection, create a Unix socket server device and wait
+        # for a client to connect to our unix socket server
+        unix_server_device = UnixSocketServerDevice(parameters={'domain':'ble'})
+        unix_server_device.open()
+
+        # Bridge our two devices with a packet processor.
+        pproc = BlePacketProcessor(peripheral.conn_handle, self.interface, unix_server_device)
 
         while True:
             sleep(1)
