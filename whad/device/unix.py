@@ -177,7 +177,7 @@ class UnixSocketDevice(WhadDevice):
                 if len(data) > 0:
                     self.on_data_received(data)
                 else:
-                    logger.error('No data received from device')
+                    logger.debug('No data received from device')
                     raise WhadDeviceDisconnected()
         except ConnectionResetError as err:
             logger.error('Connection reset by peer')
@@ -189,6 +189,217 @@ class UnixSocketDevice(WhadDevice):
         """
         pass
 
+class UnixSocketServerDevice(WhadDevice):
+    """Unix socket server device
+    """
+
+    INTERFACE_NAME = "unix_server"
+
+    def __init__(self, path: str = None, parameters: dict = None):
+        """Create a WHAD unix socket.
+        """
+        super().__init__()
+
+        # Create our Unix socket path
+        if path is not None:
+            # Use the provided Unix socket path
+            self.__path = path
+        else:
+            # Generate socket path if not provided
+            inst = randint(0x100000, 0x1000000)
+            self.__path = '/tmp/whad_%x.sock' % inst
+
+        logger.debug('Unix socket path: %s' % self.__path)
+
+        # Make sure this path is available
+        try:
+            if os.path.exists(self.__path) and os.path.isfile(self.__path):
+                logger.debug('Unix socket path exists, deleting file...')
+                os.unlink(self.__path)
+            elif os.path.exists(self.__path):
+                logger.debug('Unix socket path exist but is not a file')
+                raise WhadDeviceNotReady
+        except IOError as err:
+            logger.debug('Error while cleaning Unix socket path %s' % self.__path)
+            raise WhadDeviceNotReady
+        
+        self.__socket = None
+        self.__client = None
+        self.__opened = False
+
+        # Set unix socket server parameters
+        if parameters is not None:
+            self.__parameters = parameters
+        else:
+            self.__parameters = {}
+
+
+    @property
+    def identifier(self):
+        '''
+        Returns the identifier of the device (e.g., socket path).
+        '''
+        return self.__path
+    
+    def add_parameter(self, key: str, value):
+        """Add a parameter to this Unix Socket connector.
+
+        :param str key: parameter key
+        :param object value: associated value
+        """
+        self.__parameters[key] = value
+
+    def get_parameter(self, key : str):
+        """Get value from a parameter.
+
+        :param str key: parameter key
+        """
+        try:
+            return self.__parameters[key]
+        except KeyError:
+            return None
+
+    def get_url(self):
+        """Return socket URL
+        """
+        if len(self.__parameters.keys()) == 0:
+            return 'unix://%s\n' % (
+                self.__path
+            )
+        else:
+            params = '&'.join(['%s=%s' % item for item in self.__parameters.items()])
+            return 'unix://%s?%s\n' % (
+                self.__path,
+                params
+            )
+
+    def open(self):
+        """Open socket server and wait for a connection.
+        """
+        if not self.__opened:
+            try:
+                self.__socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                self.__socket.settimeout(0.5)
+                self.__socket.bind(self.__path)
+                self.__socket.listen(5)
+
+                logger.debug('Publishing unix socket info')
+                sys.stdout.write(self.get_url())
+                sys.stdout.flush()
+
+                self.__client, infos = self.__socket.accept()
+                logger.debug('unix socket server got a connection from %s' % infos)
+                self.__fileno = self.__client.fileno()
+                logger.debug('fileno=%s' % self.__fileno)
+                self.__opened = True
+
+                # Ask parent class to run a background I/O thread
+                super().open()
+            except BrokenPipeError as err:
+                logger.error('Broken pipe.')
+                self.__client = None
+            except Exception as other_err:
+                logger.error("Another exception occured !")
+                pass
+
+    def read(self):
+        """Fetches data from the device, if there is any data to read. We call select()
+        to make sure data is waiting to be read before reading it. Data is then sent to
+        our parsing method through on_data_received() that will handle data reassembling
+        and message parsing and dispatch.
+        """
+        try:
+            if not self.__opened:
+                raise WhadDeviceNotReady()
+
+            rlist = [self.__fileno]
+            wlist = []
+            elist = [self.__fileno]
+
+            readers,writers,errors = select.select(
+                rlist,
+                wlist,
+                elist,
+                1
+            )
+
+            # Handle incoming messages if any
+            if len(readers) > 0:
+                data = self.__client.recv(1024)
+                if len(data) > 0:
+                    self.on_data_received(data)
+                else:
+                    logger.debug('No data received from device')
+                    raise WhadDeviceDisconnected()
+        except ConnectionResetError as err:
+            logger.error('Connection reset by peer')
+        except Exception as err:
+            #logger.error('Unknown exception occured (%s)' % err)
+            raise WhadDeviceDisconnected()
+
+    def write(self, data):
+        """Writes data to the device. It relies on select() in order to make sure
+        we are allowed to write to the device and wait without eating too much CPU
+        if the device is not ready to be written to.
+
+        :param bytes data: Data to write
+        :returns: number of bytes written to the device
+        """
+        logger.debug('sending data to unix server client socket: %s' % hexlify(data))
+        if not self.__opened:
+            raise WhadDeviceNotReady()
+
+        nb_bytes_written = 0
+        wlist = [self.__fileno]
+        elist = [self.__fileno]
+        readers,writers,errors = select.select(
+            [],
+            wlist,
+            elist
+        )
+
+        if len(writers) > 0:
+            nb_bytes_written = self.__client.send(data)
+        return nb_bytes_written
+
+    def close(self):
+        """Close connection.
+        """
+        if self.__client is not None:
+            self.__client.close()
+        self.__fileno = None
+
+    def reset(self):
+        """Reset device.
+
+        This method is not supported by this type of device.
+        """
+        pass
+
+    def change_transport_speed(self, speed):
+        """Not supported by Unix socket devices.
+        """
+        pass
+
+class UnixConnector(WhadDeviceConnector):
+    def __init__(self, device):
+        super().__init__(device)
+        device.open()
+
+    def on_discovery_msg(self, message):
+        pass
+
+    def on_generic_msg(self, message):
+        pass
+
+    def on_domain_msg(self, domain, message):
+        pass
+    
+    def on_packet(self, packet):
+        pass
+    
+    def on_event(self, event):
+        pass 
 
 class UnixSocketConnector(WhadDeviceConnector):
     """Unix socket server connector.
@@ -197,6 +408,8 @@ class UnixSocketConnector(WhadDeviceConnector):
     to this socket. It will then forward every message receveived from the
     underlying WHAD device to the connected client, and the messages received
     from the client to the device (passthrough mode).
+
+    WHAD Device <-> Unix socket (created)
     """
 
     def __init__(self, device, path=None):
