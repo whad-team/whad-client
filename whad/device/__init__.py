@@ -155,7 +155,6 @@ class WhadDeviceInfo(object):
         """
         return self.__domains.keys()
 
-
 class WhadDeviceConnector(object):
     """
     Device connector.
@@ -524,6 +523,120 @@ class WhadDeviceConnector(object):
         logger.error('method `on_event` must be implemented in inherited classes')
         raise RequiredImplementation()        
 
+class PacketProcIfaceWrapper(WhadDeviceConnector):
+    def __init__(self, device, processor):
+        super().__init__(device)
+        self.__processor = processor
+
+    def on_any_msg(self, message):
+        logger.debug('[PacketProcIfaceWrapper] on_any_msg: %s' % message)
+        self.__processor.on_any_msg(self, message)
+
+    def on_generic_msg(self, message):
+        #logger.debug('[PacketProcIfaceWrapper] on_generic_msg: %s' % message)
+        #self.__processor.on_other_msg(self, message)
+        pass
+
+    def on_discovery_msg(self, message):
+        #logger.debug('[PacketProcIfaceWrapper] on_discovery_msg: %s' % message)
+        #self.__processor.on_other_msg(self, message)
+        pass
+
+    def on_domain_msg(self, domain, message):
+        #self.__processor.on_other_msg(self, message)
+        pass
+
+    def on_packet(self, packet):
+        #self.__processor.on_packet(self, packet)
+        pass
+
+    def on_event(self, event):
+        #self.__processor.on_event(self, event)
+        pass
+
+
+class PacketProcessor(object):
+
+    def __init__(self, conn1, conn2):
+        """Initialize our packet processor.
+        """
+        # We wrap our two connectors/interfaces
+        self.iface1 = conn1.device
+        self.iface2 = conn2.device
+        self.conn1 = conn1
+        self.conn2 = conn2
+
+        self.input_wrapper = PacketProcIfaceWrapper(self.iface1, self)
+        self.output_wrapper = PacketProcIfaceWrapper(self.iface2, self)
+
+    def on_any_msg(self, wrapper, message):
+        if wrapper == self.input_wrapper:
+            #if issubclass(message, AbstractPacket):
+            #    packet = message.to_packet()
+            #    packet = self.on_outbound_packet(packet)
+            #    if packet is not None:
+            #        message_ = self.iface2.hub.convertPacket(packet)
+            #        self.conn2.send_message(message_)
+            #else:
+            #    self.conn2.send_message(message)
+            self.conn2.send_message(message)
+        else:
+            #if issubclass(message, AbstractPacket):
+            #    packet = message.to_packet()
+            #    packet = self.on_inbound_packet(packet)
+            #    if packet is not None:
+            #        message_ = self.iface1.hub.convertPacket(packet)
+            #        self.conn1.send_message(message_)
+            #else:
+            #    self.conn1.send_message(message)
+            self.conn1.send_message(message)
+    
+
+    def on_inbound_packet(self, packet):
+        return packet
+    
+    def on_outbound_packet(self, packet):
+        return packet
+
+    '''
+    def on_other_msg(self, wrapper, message):
+        if wrapper == self.input_wrapper:
+            logger.debug("[PacketProcessor] received other message %s from %s, relay to %s" % (
+                message,
+                self.iface1.identifier,
+                self.iface2.identifier
+            ))
+            self.conn2.send_message(message)
+        else:
+            logger.debug("[PacketProcessor] received other message %s from %s, relay to %s" % (
+                message,
+                self.iface2.identifier,
+                self.iface1.identifier
+            ))
+            self.conn1.send_message(message)
+
+
+    def on_packet(self, wrapper, packet):
+        # Input->Output packet ?
+        if wrapper == self.input_wrapper:
+            self.on_egress_packet(packet)
+        elif wrapper == self.output_wrapper:
+            self.on_ingress_packet(packet)
+
+    def on_egress_packet(self, packet):
+        """Forward packet to our second interface
+        """
+        logger.debug('[PacketProcessor] on_egress_packet called')
+        self.conn2.on_packet(packet)
+
+    def on_ingress_packet(self, packet):
+        """Forward packet to our first interface
+        """
+        logger.debug('[PacketProcessor] on_ingress_packet called')
+        packet.show()
+        self.conn1.send_packet(packet)
+    '''
+
 
 class WhadDeviceInputThread(Thread):
 
@@ -553,6 +666,7 @@ class WhadDeviceInputThread(Thread):
             try:
                 self.__device.read()
             except WhadDeviceDisconnected as err:
+                logger.debug('Device %s has just disconnected (read returned None)' % self.__device.interface)
                 break
         logger.info('Device IO thread canceled and stopped.')
 
@@ -982,7 +1096,7 @@ class WhadDevice(object):
         :param Message message: Message to send
         :param keep: Message queue filter function
         """
-        logger.info('sending message %s to device' % message)
+        logger.info('sending message %s to device <%s>' % (message, self.interface))
 
         # if `keep` is set, configure queue filter
         if keep is not None:
@@ -1058,7 +1172,7 @@ class WhadDevice(object):
 
         :param bytes data: Data received from the device.
         """
-        logger.debug('received raw data from device: %s' % hexlify(data))
+        logger.debug('received raw data from device <%s>: %s' % (self.interface, hexlify(data)))
         messages = []
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
@@ -1385,6 +1499,7 @@ class WhadDevice(object):
                     if self.__connector.is_synchronous():
                         self.__connector.add_pending_packet(packet)
                     else:
+                        logger.debug('[WhadDevice] on_domain_msg() for device %s: %s' % (self.interface, message))
                         self.__connector.on_packet(packet)
             elif issubclass(message, AbstractEvent):
                 # Convert message into event
