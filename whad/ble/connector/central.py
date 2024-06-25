@@ -51,6 +51,7 @@ class Central(BLE):
         self.__profile_json = from_json
         self.__target = None
         self.__local = None
+        self.__conn_handle = None
 
         # If no connection, check if
         if not self.can_be_central():
@@ -87,6 +88,10 @@ class Central(BLE):
         """Remote peer BD address.
         """
         return self.__target
+
+    @property
+    def conn_handle(self):
+        return self.__conn_handle
 
     @property
     def stack(self):
@@ -200,6 +205,7 @@ class Central(BLE):
             self.__local,
             self.__target
         )
+        self.__conn_handle = connection_data.conn_handle
 
 
     def on_disconnected(self, disconnection_data):
