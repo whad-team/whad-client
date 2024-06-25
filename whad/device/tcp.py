@@ -214,7 +214,7 @@ class TCPSocketDevice(WhadDevice):
                 if len(data) > 0:
                     self.on_data_received(data)
                 else:
-                    logger.error('No data received from device')
+                    #logger.error('No data received from device')
                     raise WhadDeviceDisconnected()
         except ConnectionResetError as err:
             logger.error('Connection reset by peer')
