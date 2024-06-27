@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class BleSpawnOutputPipe(Bridge):
     """ble-spawn output pipe
 
-    When ble-spawn is chained with another whad tool, it will spawn a device
+    When ble-spawn is chained with another whad tool, it spawns a device
     based on the specified profile using the specified WHAD adapter and forward
     it to the chained tool. The chained tool will then catch a Connected event,
     extract the connection handle and can forward packets back and forth.
@@ -31,7 +31,7 @@ class BleSpawnOutputPipe(Bridge):
 class BleSpawnInputPipe(Bridge):
     """ble-spawn input pipe
 
-    When ble-spawn is chained after another whad tool, it will spawn a device
+    When ble-spawn is chained after another whad tool, it spawns a device
     based on the specified profile using the specified WHAD adapter, awaits for
     a connection and then send every receive packets to the previous tool as
     well as relay packets it receives to the connected central device.
