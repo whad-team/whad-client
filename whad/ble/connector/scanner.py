@@ -40,6 +40,8 @@ class Scanner(BLE):
     BLE Observer interface for compatible WHAD device.
     """
 
+    domain = 'ble'
+
     def __init__(self, device):
         """Instantiate scanner connector over `device`.
 

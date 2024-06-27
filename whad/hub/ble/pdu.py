@@ -72,7 +72,16 @@ class SendBleRawPdu(PbMessageWrapper):
     def to_packet(self):
         """Convert message to the corresponding Scapy packet
         """
-        return BTLE(self.pdu)
+        packet = BTLE(self.pdu)
+
+        # Set packet metadata
+        packet.metadata = BLEMetadata()
+        packet.metadata.connection_handle = self.conn_handle
+        packet.metadata.encrypt = self.encrypt
+        packet.metadata.direction = self.direction
+        packet.metadata.raw = True
+
+        return packet
 
     @staticmethod
     def from_packet(packet, encrypt=False):
@@ -112,7 +121,16 @@ class SendBlePdu(PbMessageWrapper):
     def to_packet(self):
         """Convert message to the corresponding Scapy packet
         """
-        return BTLE_DATA(self.pdu)
+        packet = BTLE_DATA(self.pdu)
+
+        # Set packet metadata
+        packet.metadata = BLEMetadata()
+        packet.metadata.connection_handle = self.conn_handle
+        packet.metadata.encrypt = self.encrypt
+        packet.metadata.direction = self.direction
+        packet.metadata.raw = False
+
+        return packet 
 
     @staticmethod
     def from_packet(packet, encrypt=False):

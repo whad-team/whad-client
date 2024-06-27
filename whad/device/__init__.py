@@ -155,7 +155,6 @@ class WhadDeviceInfo(object):
         """
         return self.__domains.keys()
 
-
 class WhadDeviceConnector(object):
     """
     Device connector.
@@ -521,9 +520,107 @@ class WhadDeviceConnector(object):
         :param event: Event to process
         :type event: :class:`whad.hub.events.AbstractEvent`
         """
+        logger.error("Class: %s" % self.__class__)
         logger.error('method `on_event` must be implemented in inherited classes')
         raise RequiredImplementation()
 
+class BridgeIfaceWrapper(WhadDeviceConnector):
+    def __init__(self, device, processor):
+        super().__init__(device)
+        self.__processor = processor
+
+    def send_message(self, message):
+        logger.debug('[PacketProcIfaceWrapper] send_message: %s' % message)
+        return super().send_message(message)
+
+    def on_any_msg(self, message):
+        logger.debug('[PacketProcIfaceWrapper] on_any_msg: %s' % message)
+        self.__processor.on_any_msg(self, message)
+
+    def on_generic_msg(self, message):
+        #logger.debug('[PacketProcIfaceWrapper] on_generic_msg: %s' % message)
+        #self.__processor.on_other_msg(self, message)
+        pass
+
+    def on_discovery_msg(self, message):
+        #logger.debug('[PacketProcIfaceWrapper] on_discovery_msg: %s' % message)
+        #self.__processor.on_other_msg(self, message)
+        pass
+
+    def on_domain_msg(self, domain, message):
+        #self.__processor.on_other_msg(self, message)
+        pass
+
+    def on_packet(self, packet):
+        #self.__processor.on_packet(self, packet)
+        pass
+
+    def on_event(self, event):
+        #self.__processor.on_event(self, event)
+        pass
+
+
+class Bridge(object):
+
+    def __init__(self, input_connector, output_connector):
+        """Initialize our packet processor.
+        """
+        # Save our input connector and its device
+        self.__in = input_connector
+        self.__in_device = self.__in.device
+
+        # Save our output cnnector and its device
+        self.__out = output_connector
+        self.__out_device =self.__out.device
+
+        # Disable message queue filters
+        self.__in_device.set_queue_filter(None)
+        self.__out_device.set_queue_filter(None)
+
+
+        # Bridge our two interfaces with our own connectors.
+        # This will replace each device connector with our own and avoid
+        # any other packet processing.
+        self.__in_wrapper = BridgeIfaceWrapper(self.__in_device, self)
+        self.__out_wrapper = BridgeIfaceWrapper(self.__out_device, self)
+
+    @property
+    def input(self):
+        return self.__in
+    
+    @property
+    def output(self):
+        return self.__out
+
+    def on_any_msg(self, wrapper, message):
+        if wrapper == self.__in_wrapper:
+            self.on_outbound(message)
+        else:
+            self.on_inbound(message)
+
+    def on_inbound(self, message):
+        """Inbound message hook
+
+        This hook is called whenever a message is received on the input
+        connector and about to be relayed to the output connector.
+
+        :param message: Message to process
+        :type message: HubMessage
+        """
+        if message is not None:
+            self.__in.send_message(message)
+    
+    def on_outbound(self, message):
+        """Outbound message hook.
+
+        This hook is called whenever a message is received on the output
+        connector and about to be relayed to the input connector.
+
+        :param message: Message to process
+        :type message: HubMessage
+        """
+        if message is not None:
+            self.__out.send_message(message)
 
 class WhadDeviceInputThread(Thread):
 
@@ -552,7 +649,9 @@ class WhadDeviceInputThread(Thread):
         while not self.__canceled:
             try:
                 self.__device.read()
+                logger.debug("[WhadDeviceInputThread::run()] Read data from device")
             except WhadDeviceDisconnected as err:
+                logger.debug('Device %s has just disconnected (read returned None)' % self.__device.interface)
                 break
         logger.info('Device IO thread canceled and stopped.')
 
@@ -757,17 +856,6 @@ class WhadDevice(object):
         return False
 
     @property
-    def index(self):
-        '''
-        Returns the current index of the device.
-        '''
-        devices = self.__class__.list()
-        for dev in devices:
-            if dev.identifier == self.identifier:
-                return devices.index(dev)
-
-
-    @property
     def interface(self):
         '''
         Returns the current interface of the device.
@@ -791,6 +879,10 @@ class WhadDevice(object):
         self.__discovered = False
         self.__opened = False
         self.__closing = False
+
+        # Generate device index
+        self.inc_dev_index()
+        self.__index = self.__class__.CURRENT_DEVICE_INDEX
 
         # Device connectors
         self.__connector = None
@@ -821,6 +913,19 @@ class WhadDevice(object):
         """Retrieve the device protocol hub (parser/factory)
         """
         return self.__hub
+
+    @property
+    def index(self):
+        return self.__index
+    
+    @classmethod
+    def inc_dev_index(cls):
+        """Inject and maintain device index.
+        """
+        if hasattr(cls, 'CURRENT_DEVICE_INDEX'):
+            cls.CURRENT_DEVICE_INDEX += 1
+        else:
+            cls.CURRENT_DEVICE_INDEX = 0
 
     def lock(self):
         """Locks the pending output data buffer."""
@@ -903,7 +1008,7 @@ class WhadDevice(object):
         This is an internal method that SHALL NOT be used from inherited classes.
         """
         self.lock()
-        logger.debug('sending %s to WHAD device', bytes(data))
+        logger.debug('sending %s to WHAD device %s' % (bytes(data), self.interface))
         self.write(bytes(data))
         self.unlock()
 
@@ -982,7 +1087,7 @@ class WhadDevice(object):
         :param Message message: Message to send
         :param keep: Message queue filter function
         """
-        logger.info('sending message %s to device' % message)
+        logger.info('sending message %s to device <%s>' % (message, self.interface))
 
         # if `keep` is set, configure queue filter
         if keep is not None:
@@ -1058,7 +1163,8 @@ class WhadDevice(object):
 
         :param bytes data: Data received from the device.
         """
-        logger.debug('received raw data from device: %s' % hexlify(data))
+        #logger.info('[WhadDevice] entering on_data_received()')
+        logger.debug('[WhadDevice] received raw data from device <%s>: %s' % (self.interface, hexlify(data)))
         messages = []
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
@@ -1077,21 +1183,24 @@ class WhadDevice(object):
                         # Parse received message with our Protocol Hub
                         msg = self.__hub.parse(bytes(raw_message))
 
-                        logger.debug('WHAD message successfully parsed')
+                        #logger.debug('[WhadDevice] WHAD message successfully parsed')
                         self.on_message_received(msg)
                         # Chomp
                         self.__inpipe = self.__inpipe[msg_size + 4:]
+                        #logger.debug('[WhadDevice] Remaining bytes: %s' % hexlify(self.__inpipe))
                     else:
                         break
                 else:
                     break
             else:
+                #logger.info('[WhadDevice] incorrect header received !')
                 # Nope, that's not a header
                 while (len(self.__inpipe) >= 2):
                     if (self.__inpipe[0] != 0xAC) or (self.__inpipe[1] != 0xBE):
                         self.__inpipe = self.__inpipe[1:]
                     else:
                         break
+        #logger.info('[WhadDevice] exiting on_data_received()')
 
 
     def dispatch_message(self, message):
@@ -1128,8 +1237,8 @@ class WhadDevice(object):
         if self.__closing:
             return
 
-        logger.debug(message)
-        logger.debug(self.__mq_filter)
+        logger.debug('[WhadDevice::on_message_received()][%s] message received: %s' % (self.interface, message))
+        logger.debug('[WhadDevice::on_message_received()][%s] message queue filter: %s' % (self.interface, self.__mq_filter))
         # If message queue filter is defined and message matches this filter,
         # move it into our message queue.
         if self.__mq_filter is not None and self.__mq_filter(message):
@@ -1385,6 +1494,7 @@ class WhadDevice(object):
                     if self.__connector.is_synchronous():
                         self.__connector.add_pending_packet(packet)
                     else:
+                        #logger.debug('[WhadDevice] on_domain_msg() for device %s: %s' % (self.interface, message))
                         self.__connector.on_packet(packet)
             elif issubclass(message, AbstractEvent):
                 # Convert message into event

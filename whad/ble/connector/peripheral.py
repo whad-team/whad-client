@@ -63,6 +63,10 @@ class Peripheral(BLE):
         if att_layer is not None:
             att_layer.add(gatt)
 
+        # Initialize local peer and remote per info
+        self.__local_peer = None
+        self.__remote_peer = None
+
         # Initialize stack
         self.__stack = stack(self)
         self.connection = None
@@ -106,6 +110,17 @@ class Peripheral(BLE):
             if existing_connection is not None:
                 self.on_connected(existing_connection)
 
+    @property
+    def local_peer(self):
+        return self.__local_peer
+    
+    @property
+    def remote_peer(self):
+        return self.__remote_peer
+
+    @property
+    def conn_handle(self):
+        return self.__conn_handle
 
     def get_pairing_parameters(self):
         """Returns the provided pairing parameters, if any.
@@ -217,18 +232,18 @@ class Peripheral(BLE):
         """
         # Retrieve the GATT server instance and set its profile
         logger.info('a device is now connected (connection handle: %d)' % connection_data.conn_handle)
-        self.__local = BDAddress.from_bytes(
+        self.__local_peer = BDAddress.from_bytes(
             connection_data.advertiser,
             connection_data.adv_addr_type
         )
-        self.__target = BDAddress.from_bytes(
+        self.__remote_peer = BDAddress.from_bytes(
             connection_data.initiator,
             connection_data.init_addr_type
         )
         self.__stack.on_connection(
             connection_data.conn_handle,
-            self.__local,
-            self.__target
+            self.__local_peer,
+            self.__remote_peer
         )
 
         # GATT server is now connected
@@ -303,7 +318,7 @@ class Peripheral(BLE):
         self.connection.smp.pairing_parameters = self.__pairing_parameters
 
         # Check if we got a matching LTK
-        crypto_material = self.security_database.get(address=self.__local)
+        crypto_material = self.security_database.get(address=self.__local_peer)
 
         if crypto_material is not None and crypto_material.has_ltk():
             conn_handle = connection.conn_handle

@@ -41,6 +41,7 @@ class BLE(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+    domain = 'ble'
     translator = BleMessageTranslator
 
     # correlation table
@@ -700,6 +701,7 @@ class BLE(WhadDeviceConnector):
     def on_packet(self, packet):
         """Dispatch incoming packet
         """
+        logger.debug('[BLE connector] on_packet')
         # discard processed packets or if we're not ready
         if packet.metadata.processed or not self.__ready:
             return
@@ -794,6 +796,38 @@ class BLE(WhadDeviceConnector):
             return super().send_packet(packet)
         else:
             return False
+        
+    def send_packet(self, packet: Packet):
+        """Packet send hook
+
+        This hook makes sure we are using a valid WHAD message when sending
+        a packet, if this method is called from outside.
+        
+        :param packet: Packet to send
+        :type packet: :class:`scapy.packet.Packet`
+        :return: True if packet has correctly been sent, False otherwise.
+        """
+
+        if self.support_raw_pdu():
+            # We expect a BTLE header for raw packets
+            if BTLE not in packet and BTLE_DATA in packet:
+                # Add a BTLE layer, copy metadata and mark packet
+                # as raw.
+                packet_ = BTLE(access_addr=0x11223344) / packet[BTLE_DATA]
+                packet_.metadata = packet.metadata
+                packet_.metadata.raw = True
+        else:
+            # We don't expect BTLE headers for non-raw packets
+            if BTLE in packet:
+                # Extract the BTLE_DATA layer, copy metadata and mark
+                # packet as non-raw.
+                packet_ = packet[BTLE_DATA]
+                packet_.metadata = packet.metadata
+                packet_.metadata.raw = False
+
+        # Send BLE packet
+        return super().send_packet(packet)
+
 
 
 from whad.ble.connector.peripheral import Peripheral, PeripheralClient
