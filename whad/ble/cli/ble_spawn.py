@@ -7,7 +7,7 @@ BLE device, and chain this with another tool.
 import json
 from time import sleep
 
-from whad.cli.app import CommandLineDevicePipe==
+from whad.cli.app import CommandLineDevicePipe
 from whad.device import Bridge
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
 from whad.hub.ble import Connected, Disconnected, BlePduReceived, BleRawPduReceived
