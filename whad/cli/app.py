@@ -435,6 +435,9 @@ class CommandLineApp(ArgumentParser):
             if isinstance(self.__input_iface, UnixSocketDevice) and self.is_stdout_piped():
                 sys.stdout.write('%s\n' % self.__interface_path)
                 sys.stdout.flush()
+        elif self.__input_type == CommandLineApp.INPUT_WHAD and self.__input_iface is not None:
+            # if stdin is piped, close unix socket
+            self.__input_iface.close()
 
 
     def run(self, pre=True, post=True):

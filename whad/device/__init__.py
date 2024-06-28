@@ -630,9 +630,10 @@ class WhadDeviceInputThread(Thread):
     device read() method to fetch any incoming data.
     """
 
-    def __init__(self, device):
+    def __init__(self, device, io_thread):
         super().__init__()
         self.__device = device
+        self.__io_thread = io_thread
         self.__canceled = False
 
     def cancel(self):
@@ -649,11 +650,12 @@ class WhadDeviceInputThread(Thread):
         while not self.__canceled:
             try:
                 self.__device.read()
-                logger.debug("[WhadDeviceInputThread::run()] Read data from device")
+                #logger.debug("[WhadDeviceInputThread::run()] Read data from device")
             except WhadDeviceDisconnected as err:
                 logger.debug('Device %s has just disconnected (read returned None)' % self.__device.interface)
                 break
         logger.info('Device IO thread canceled and stopped.')
+        self.__io_thread.on_disconnection()
 
 class WhadDeviceMessageThread(Thread):
 
@@ -680,10 +682,11 @@ class WhadDeviceMessageThread(Thread):
 class WhadDeviceIOThread(object):
 
     def __init__(self, device):
-        self.__input = WhadDeviceInputThread(device)
+        self.__input = WhadDeviceInputThread(device, self)
         self.__input.daemon = True
         self.__processing = WhadDeviceMessageThread(device)
         self.__processing.daemon = True
+        self.__disconnected = False
 
     def cancel(self):
         self.__input.cancel()
@@ -697,10 +700,16 @@ class WhadDeviceIOThread(object):
 
     def join(self):
         logger.info('waiting for WhadDevice IO management thread to finish ...')
-        while self.__input.is_alive() or self.__processing.is_alive():
+        while not self.__disconnected and (self.__input.is_alive() or self.__processing.is_alive()):
             self.__input.join(1.0)
             self.__processing.join(1.0)
         logger.info('WhadDevice IO management thread finished.')
+
+    def on_disconnection(self):
+        """Handle underlying device disconnection
+        """
+        logger.debug('[device::io_thread] Adapter has disconnected')
+        self.__disconnected = True
 
 
 class WhadDevice(object):
@@ -995,6 +1004,9 @@ class WhadDevice(object):
 
         self.__opened = False
         self.__closing = False
+
+    def wait(self):
+        self.__io_thread.join()
 
     def is_open(self):
         """Determine if the device has been opened or not.

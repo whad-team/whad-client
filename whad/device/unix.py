@@ -108,20 +108,17 @@ class UnixSocketDevice(WhadDevice):
         """
         Close current device.
         """
-        logger.error('socket close')
+        logger.debug('[UnixSocketDevice] closing unix socket ...')
         # Close underlying device.
         if self.__socket is not None:
             self.__socket.close()
-
-        # Unlink socket path
-        if os.path.exists(self.__path):
-            os.unlink(self.__path)
 
         # Clear fileno and status
         self.__fileno = None
         self.__opened = False
 
         # Ask parent class to stop I/O thread
+        logger.debug('[UnixSocketDevice] stopping I/O thread')
         super().close()
 
 
@@ -168,7 +165,7 @@ class UnixSocketDevice(WhadDevice):
                 rlist,
                 wlist,
                 elist,
-                1
+                0.1
             )
 
             # Handle incoming messages if any
@@ -179,6 +176,8 @@ class UnixSocketDevice(WhadDevice):
                 else:
                     logger.debug('No data received from device')
                     raise WhadDeviceDisconnected()
+            elif len(errors) > 0:
+                raise WhadDeviceDisconnected()
         except ConnectionResetError as err:
             logger.error('Connection reset by peer')
         except Exception as err:
@@ -221,8 +220,8 @@ class UnixSocketServerDevice(WhadDevice):
                 raise WhadDeviceNotReady
         except IOError as err:
             logger.debug('Error while cleaning Unix socket path %s' % self.__path)
-            raise WhadDeviceNotReady
-        
+            raise WhadDeviceNotReady from err
+
         self.__socket = None
         self.__client = None
         self.__opened = False
@@ -240,7 +239,7 @@ class UnixSocketServerDevice(WhadDevice):
         Returns the identifier of the device (e.g., socket path).
         '''
         return self.__path
-    
+
     def add_parameter(self, key: str, value):
         """Add a parameter to this Unix Socket connector.
 
@@ -329,10 +328,13 @@ class UnixSocketServerDevice(WhadDevice):
                 if len(data) > 0:
                     self.on_data_received(data)
                 else:
-                    logger.debug('No data received from device')
+                    logger.debug('No data received from client device')
                     raise WhadDeviceDisconnected()
+            elif len(errors) > 0:
+                raise WhadDeviceDisconnected()
+                
         except ConnectionResetError as err:
-            logger.error('Connection reset by peer')
+            logger.debug('Connection reset by peer')
         except Exception as err:
             #logger.error('Unknown exception occured (%s)' % err)
             raise WhadDeviceDisconnected()
@@ -360,6 +362,8 @@ class UnixSocketServerDevice(WhadDevice):
 
         if len(writers) > 0:
             nb_bytes_written = self.__client.send(data)
+        elif len(errors) > 0:
+            raise WhadDeviceDisconnected()
         return nb_bytes_written
 
     def close(self):
@@ -552,6 +556,7 @@ class UnixSocketConnector(WhadDeviceConnector):
                             logger.debug('Error detected on server socket, exiting.')
                             break
                 except ConnectionResetError as err:
+                    logger.error('connection reset')
                     pass
 
                 self.__client = None
@@ -560,6 +565,7 @@ class UnixSocketConnector(WhadDeviceConnector):
             logger.error('Broken pipe.')
             self.__client = None
         except Exception as other_err:
+            logger.error(other_err)
             pass
 
     # Message callbacks
