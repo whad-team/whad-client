@@ -26,9 +26,9 @@ from whad.cli.app import CommandLineDevicePipe
 logger = logging.getLogger(__name__)
 
 class BleConnectOutputPipe(Bridge):
-    """ble-connect output pipe
+    """wble-connect output pipe
 
-    When ble-connect is used with its output piped to another WHAD tool,
+    When wble-connect is used with its output piped to another WHAD tool,
     it creates a connection to a BLE device and then gives access to the
     WHAD adapter in its entirety. The piped tool can send commands and will
     receive notifications from the adapter.
@@ -38,13 +38,13 @@ class BleConnectOutputPipe(Bridge):
     """
 
 class BleConnectInputPipe(Bridge):
-    """ble-connect input pipe
+    """wble-connect input pipe
 
-    When ble-connect has its standard input piped to another WHAD tool
+    When wble-connect has its standard input piped to another WHAD tool
     standard output, then it will consider that the previous tool configure
     another WHAD hardware adapter to get a connection and will process incoming
     connection/disconnection events as well as PDUs. These PDUs will be
-    forwarded to the device ble-connect is connected to, and every PDU coming
+    forwarded to the device wble-connect is connected to, and every PDU coming
     from our target device will be forwarded to the chained WHAD tool upstream.
 
     Inbound messages (sent by the device we are connected to) are monitored and
@@ -54,12 +54,12 @@ class BleConnectInputPipe(Bridge):
     """
 
     def __init__(self, input_connector, output_connector):
-        """Initialize our ble-connect input pipe.
+        """Initialize our wble-connect input pipe.
         """
-        logger.debug('[ble-connect][output-pipe] Initialization')
+        logger.debug('[wble-connect][output-pipe] Initialization')
         super().__init__(input_connector, output_connector)
 
-        logger.debug('[ble-connect][output-pipe] Initialize properties')
+        logger.debug('[wble-connect][output-pipe] Initialize properties')
         self.__connected = False
         self.__in_conn_handle = None
         self.__out_conn_handle = None
@@ -72,7 +72,7 @@ class BleConnectInputPipe(Bridge):
     def set_out_conn_handle(self, conn_handle: int):
         """Saves output connection handle.
         """
-        logger.debug("[ble-connect][output-pipe] set output connection handle to %d", conn_handle)
+        logger.debug("[wble-connect][output-pipe] set output connection handle to %d", conn_handle)
         self.__out_conn_handle = conn_handle
 
     def convert_packet_message(self, message, conn_handle, incoming=True):
@@ -86,11 +86,11 @@ class BleConnectInputPipe(Bridge):
             connector = self.output
 
         # Do we received a packet notification ?
-        logger.debug("[ble-connect][output-pipe] convert message %s into a command", message)
+        logger.debug("[wble-connect][output-pipe] convert message %s into a command", message)
         if isinstance(message, BleRawPduReceived):
             # Does our input connector support raw packets ?
             if connector.support_raw_pdu():
-                logger.debug('[ble-connect][output-pipe] connector supports raw pdu')
+                logger.debug('[wble-connect][output-pipe] connector supports raw pdu')
                 # Create a SendBleRawPdu command
                 command = connector.hub.ble.createSendRawPdu(
                     message.direction,
@@ -100,9 +100,9 @@ class BleConnectInputPipe(Bridge):
                     access_address=message.access_address,
                     conn_handle=conn_handle, # overwrite the connection handle
                 )
-                logger.debug("[ble-connect][output-pipe] created command %s", command)
+                logger.debug("[wble-connect][output-pipe] created command %s", command)
             else:
-                logger.debug('[ble-connect][output-pipe] connector does not support raw pdu')
+                logger.debug('[wble-connect][output-pipe] connector does not support raw pdu')
                 # Create a SendBlePdu command
                 command = connector.hub.ble.createSendPdu(
                     message.direction,
@@ -110,11 +110,11 @@ class BleConnectInputPipe(Bridge):
                     conn_handle, # overwrite the connection handle
                     encrypt=False
                 )
-                logger.debug("[ble-connect][output-pipe] created command %s", command)
+                logger.debug("[wble-connect][output-pipe] created command %s", command)
         elif isinstance(message, BlePduReceived):
             # Does our input connector support raw packets ?
             if connector.support_raw_pdu():
-                logger.debug('[ble-connect][output-pipe] connector supports raw pdu')
+                logger.debug('[wble-connect][output-pipe] connector supports raw pdu')
                 # Create a SendBleRawPdu command
                 command = connector.hub.ble.createSendRawPdu(
                     message.direction,
@@ -124,9 +124,9 @@ class BleConnectInputPipe(Bridge):
                     access_address=0x11223344, # We use the default access address
                     conn_handle=conn_handle, # overwrite the connection handle
                 )
-                logger.debug("[ble-connect][output-pipe] created command %s", command)
+                logger.debug("[wble-connect][output-pipe] created command %s", command)
             else:
-                logger.debug('[ble-connect][output-pipe] connector does not support raw pdu')
+                logger.debug('[wble-connect][output-pipe] connector does not support raw pdu')
                 # Create a SendBlePdu command
                 command = self.input.hub.ble.createSendPdu(
                     message.direction,
@@ -134,7 +134,7 @@ class BleConnectInputPipe(Bridge):
                     conn_handle, # overwrite the connection handle
                     encrypt=False
                 )
-                logger.debug("[ble-connect][output-pipe] created command %s", command)
+                logger.debug("[wble-connect][output-pipe] created command %s", command)
         else:
             # Not a BLE packet notification
             command = None
@@ -157,12 +157,12 @@ class BleConnectInputPipe(Bridge):
         if isinstance(message, BleRawPduReceived) or isinstance(message, BlePduReceived):
             if not self.__connected:
                 logger.debug(
-                    "[ble-connect][output-pipe] add pending inbound PDU message %s to queue",
+                    "[wble-connect][output-pipe] add pending inbound PDU message %s to queue",
                     message
                 )
             else:
                 logger.debug(
-                    "[ble-connect][output-pipe] received an inbound PDU message %s",
+                    "[wble-connect][output-pipe] received an inbound PDU message %s",
                     message
                 )
                 command = self.convert_packet_message(message, self.__in_conn_handle, True)
@@ -170,13 +170,13 @@ class BleConnectInputPipe(Bridge):
         elif isinstance(message, Disconnected):
             # Central device has disconnected, we don't care but we don't send this
             # notification to our chained tool.
-            logger.debug("[ble-connect][output-pipe] received a disconnection notification, todo")
+            logger.debug("[wble-connect][output-pipe] received a disconnection notification, todo")
             return
         elif isinstance(message, Connected):
-            logger.debug("[ble-connect][output-pipe] received a connection notification, discard")
+            logger.debug("[wble-connect][output-pipe] received a connection notification, discard")
             return
         else:
-            logger.debug("[ble-connect][output-pipe] forward default inbound message %s", message)
+            logger.debug("[wble-connect][output-pipe] forward default inbound message %s", message)
             # Forward other messages
             super().on_inbound(message)
 
@@ -188,7 +188,7 @@ class BleConnectInputPipe(Bridge):
         """
         if isinstance(message, BleRawPduReceived) or isinstance(message, BlePduReceived):
             if self.__out_conn_handle is not None:
-                logger.debug("[ble-connect][output-pipe] received an outbound PDU message %s", message)
+                logger.debug("[wble-connect][output-pipe] received an outbound PDU message %s", message)
                 command = self.convert_packet_message(message, self.__out_conn_handle, False)
                 self.output.send_command(command)
         elif isinstance(message, Connected):
@@ -198,10 +198,10 @@ class BleConnectInputPipe(Bridge):
             return
         elif isinstance(message, Disconnected):
             # Chained tool has lost connection, we must handle it
-            logger.debug("[ble-connect][output-pipe] received a disconnection notification, discard")
+            logger.debug("[wble-connect][output-pipe] received a disconnection notification, discard")
             return
         else:
-            logger.debug("[ble-connect][output-pipe] forward default outbound message %s", message)
+            logger.debug("[wble-connect][output-pipe] forward default outbound message %s", message)
             # Forward other messages
             super().on_outbound(message)
 
@@ -272,7 +272,7 @@ class BleConnectApp(CommandLineDevicePipe):
                 self.error('You need to specify an interface with option --interface.')
 
         except KeyboardInterrupt:
-            self.warning("ble-connect stopped (CTL-C)")
+            self.warning("wble-connect stopped (CTL-C)")
 
         # Launch post-run tasks
         self.post_run()
