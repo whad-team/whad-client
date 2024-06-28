@@ -299,6 +299,9 @@ class CommandLineApp(ArgumentParser):
         return self.__args
 
     def is_piped_interface(self):
+        """Determine if the input interface is piped from a previous app in
+        the command line
+        """
         return self.__is_interface_piped
 
     def pre_run(self):

@@ -13,11 +13,13 @@ Python library allowing to interact with offensive security tools implementing t
 - [ ] wzb-enddevice commandes shell
 - [ ] écriture doc + tuto
 - [ ] nettoyage code exemples
-- [ ] wuni-scan
+- [x] wuni-scan
 - [ ] wuni-keyboard
 - [ ] wuni-mouse
 - [ ] wuni-keymouse
 - [ ] wuni-keylogger
+- [x] Renommage ble-spawn en wble-spawn
+- [x] Renommage ble-connect en wble-connect
 - [ ] Renommage ble-cli en wble-central
 
 ### Repository structure
