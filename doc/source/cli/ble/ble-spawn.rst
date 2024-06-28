@@ -10,7 +10,7 @@ Usage
 
 .. code-block:: text
 
-    ble-spawn -i <INTERFACE> [PROFILE]
+    ble-spawn -i <INTERFACE> -p [PROFILE]
 
 A compatible WHAD *interface* and the path to a JSON *profile* are required to
 populate the BLE device with the corresponding services and characteristics. It
@@ -35,5 +35,5 @@ will be logged by *Wireshark*.
 .. code-block:: text
 
     # ble-central -i hci0 -b 11:22:33:44:55:66 profile mydevice.json
-    # ble-connect -i hci0 11:22:33:44:55:66 | ble-wireshark | ble-spawn -i hci1 mydevice.json
+    # ble-connect -i hci0 11:22:33:44:55:66 | ble-wireshark | ble-spawn -i hci1 -p mydevice.json
 
