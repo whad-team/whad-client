@@ -53,6 +53,7 @@ Bluetooth Low Energy
     ble/ble-wireshark
     ble/ble-proxy
     ble/ble-spawn
+    ble/ble-connect
 
 Logitech Unifying
 ~~~~~~~~~~~~~~~~~
