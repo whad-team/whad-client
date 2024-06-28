@@ -668,6 +668,8 @@ class AdvURI(AdvDataField):
     """
 
     SUPPORTED_SCHEMES = {
+        'aaa'   : 0x0001,
+        'aaas'  : 0x0002,
         'data'  : 0x000C,
         'ftp'   : 0x0011,
         'http'  : 0x0016,
@@ -724,7 +726,11 @@ class AdvURI(AdvDataField):
         if len(ad_record) >= 2:
             scheme = unpack('<H', ad_record[:2])[0]
             uri = ad_record[2:]
-            return AdvURI(AdvURI.get_scheme(scheme)+':' + uri.decode('utf-8'))
+            scheme_alias = AdvURI.get_scheme(scheme)
+            if scheme_alias is not None:
+                return AdvURI(AdvURI.get_scheme(scheme)+':' + uri.decode('utf-8'))
+            else:
+                return AdvURI('<0x%04x>'%scheme + ':'+uri.decode('utf-8'))
 
 
 class AdvAdvertisingInterval(AdvDataField):
