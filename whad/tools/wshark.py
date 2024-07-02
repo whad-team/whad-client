@@ -6,7 +6,7 @@ which can be used to access a device remotely.
 from prompt_toolkit import print_formatted_text, HTML
 
 from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLineDevicePipe, CommandLineApp
+from whad.cli.app import CommandLineDevicePipe, CommandLineApp, ApplicationError
 from scapy.all import *
 from whad.device.unix import UnixSocketProxy, UnixSocketCallbacksConnector
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
@@ -117,5 +117,8 @@ class WhadWiresharkApp(CommandLineApp):
 
 
 def wshark_main():
-    app = WhadWiresharkApp()
-    app.run()
+    try:
+        app = WhadWiresharkApp()
+        app.run()
+    except ApplicationError as err:
+        err.show()

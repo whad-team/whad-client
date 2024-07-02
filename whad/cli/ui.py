@@ -1,5 +1,6 @@
 from prompt_toolkit import print_formatted_text, HTML
 from scapy.all import Packet
+from hexdump import hexdump
 
 def success(message):
     """Display a success message in green (if color is enabled)
@@ -44,54 +45,39 @@ def display_packet(pkt, show_metadata=True, format='repr'):
         # Process scapy show method format
         if format == "show":
             print_formatted_text(
-                HTML(
-                    '<b><ansipurple>%s</ansipurple></b>' % (
-                        metadata
-                    )
-                )
+                HTML("<b><ansipurple>{metadata}</ansipurple></b>").format(metadata=metadata)
             )
             pkt.show()
 
             if hasattr(pkt, "decrypted"):
                 print_formatted_text(
-                    HTML(
-                        "<ansicyan>[i] Decrypted payload:</ansicyan>"
-                    )
+                    HTML("<ansicyan>[i] Decrypted payload:</ansicyan>")
                 )
                 pkt.decrypted.show()
 
         # Process raw bytes format
         elif format == "raw":
             print_formatted_text(
-                HTML(
-                    '<b><ansipurple>%s</ansipurple></b> %s' % (
-                        metadata,
-                        bytes(pkt).hex()
-                    )
+                HTML("<b><ansipurple>{metadata}</ansipurple></b> {pkthex}").format(
+                    metadata=metadata,
+                    pkthex=hexdump(bytes(pkt), result="return")
                 )
             )
 
             if hasattr(pkt, "decrypted"):
                 print_formatted_text(
-                    HTML(
-                        "<ansicyan>[i] Decrypted payload:</ansicyan> %s" %
-                        bytes(pkt.decrypted).hex()
+                    HTML("<ansicyan>[i] Decrypted payload:</ansicyan> {pkthex}").format(
+                        pkthex=bytes(pkt.decrypted).hex()
                     )
                 )
 
         # Process hexdump format
         elif format == "hexdump":
             print_formatted_text(
-                HTML(
-                    '<b><ansipurple>%s</ansipurple></b>' % (
-                        metadata
-                    )
-                )
+                HTML("<b><ansipurple>{metadata}</ansipurple></b>").format(metadata=metadata)
             )
             print_formatted_text(
-                HTML("<i>%s</i>" %
-                    escape(hexdump(bytes(pkt), result="return"))
-                )
+                HTML("<i>{pkthex}</i>").format(pkthex=hexdump(bytes(pkt), result="return"))
             )
             if hasattr(pkt, "decrypted"):
                 print_formatted_text(
@@ -100,19 +86,12 @@ def display_packet(pkt, show_metadata=True, format='repr'):
                     )
                 )
                 print_formatted_text(
-                        HTML("<i>%s</i>" %
-                            escape(hexdump(bytes(pkt.decrypted), result="return")
-                        )
-                    )
+                    HTML("<i>{pkthex</i>").format(pkthex=hexdump(bytes(pkt.decrypted), result="return"))
                 )
         # Process scapy repr format
         else:
             print_formatted_text(
-                HTML(
-                    '<b><ansipurple>%s</ansipurple></b>' % (
-                        metadata
-                    )
-                )
+                HTML("<b><ansipurple>{metadata}</ansipurple></b>").format(metadata=metadata)
             )
             print(repr(pkt))
             if hasattr(pkt, "decrypted"):
@@ -129,10 +108,8 @@ def display_event(event):
     """Display an event generated from a sniffer.
     """
     print_formatted_text(
-        HTML(
-            "<ansicyan>[i] event: <b>%s</b></ansicyan> %s" % (
-                event.name,
-                "("+event.message +")" if event.message is not None else ""
-            )
+        HTML("<ansicyan>[i] event: <b>{name}</b></ansicyan> {message}").format(
+            name=event.name,
+            message="("+event.message +")" if event.message is not None else ""
         )
     )

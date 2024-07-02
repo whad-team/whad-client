@@ -10,7 +10,7 @@ from prompt_toolkit import print_formatted_text, HTML
 from json import loads, dumps
 from hexdump import hexdump
 
-from whad.cli.app import CommandLineApp
+from whad.cli.app import CommandLineApp, ApplicationError
 from whad.ble import Peripheral, GenericProfile, AdvDataFieldList
 from whad.ble.connector import Central, Scanner
 from whad.ble.stack.att.exceptions import AttError
@@ -261,7 +261,7 @@ class BleCloneApp(CommandLineApp):
                     self.error('You must provide a target file to store the device profile.')
             elif self.args.profile is not None:
                 # Emulate device
-                profile_json = open(self.args.profile,'r').read()
+                profile_json = open(self.args.profile, 'r').read()
                 profile = loads(profile_json)
 
                 # Check profile and emulate if everything is OK
@@ -285,7 +285,7 @@ class BleCloneApp(CommandLineApp):
                     ))
                     try:
                         input()
-                    except KeyboardInterrupt as kbd_stop:
+                    except KeyboardInterrupt:
                         pass
                     print('\rStopping emulation ...')
                     periph.stop()
@@ -296,5 +296,10 @@ class BleCloneApp(CommandLineApp):
         self.post_run()
 
 def ble_clone_main():
-    app = BleCloneApp()
-    app.run()
+    """BLE clone application.
+    """
+    try:
+        app = BleCloneApp()
+        app.run()
+    except ApplicationError as err:
+        err.show()

@@ -7,7 +7,7 @@ import logging
 from prompt_toolkit import print_formatted_text, HTML
 import time
 from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLinePipe, CommandLineApp
+from whad.cli.app import CommandLinePipe, CommandLineApp, ApplicationError
 from scapy.all import *
 from whad.common.pcap import extract_pcap_metadata
 import sys, os, stat
@@ -60,5 +60,8 @@ class WhadPlayApp(WhadSniffApp):#CommandLineApp):
             conf.color_theme = BrightTheme()
 
 def wplay_main():
-    app = WhadPlayApp()
-    app.run()
+    try:
+        app = WhadPlayApp()
+        app.run()
+    except ApplicationError as err:
+        err.show()

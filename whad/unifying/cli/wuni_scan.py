@@ -14,7 +14,7 @@ from scapy.packet import Packet
 # Whad dependencies
 from whad.unifying.connector import Sniffer, ESBAddress
 from whad.esb.exceptions import InvalidESBAddressException
-from whad.cli.app import CommandLineDeviceSink
+from whad.cli.app import CommandLineDeviceSink, ApplicationError
 from whad.scapy.layers.esb import ESB_Payload_Hdr
 from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Keepalive_Payload, \
     Logitech_Mouse_Payload, Logitech_Encrypted_Keystroke_Payload, Logitech_Unencrypted_Keystroke_Payload
@@ -188,5 +188,8 @@ class UniScanApp(CommandLineDeviceSink):
 
 
 def wuni_scan_main():
-    app = UniScanApp()
-    app.run()
+    try:
+        app = UniScanApp()
+        app.run()
+    except ApplicationError as err:
+        err.show()

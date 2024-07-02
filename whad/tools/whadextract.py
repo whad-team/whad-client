@@ -7,7 +7,7 @@ import logging
 from prompt_toolkit import print_formatted_text, HTML
 import time
 from whad.tools.whadsniff import display_packet
-from whad.cli.app import CommandLinePipe
+from whad.cli.app import CommandLinePipe, ApplicationError
 from scapy.all import *
 from scapy.config import conf
 from whad.common.ipc import IPCConverter
@@ -150,5 +150,8 @@ class WhadExtractApp(CommandLinePipe):
 
 
 def whadextract_main():
-    app = WhadExtractApp()
-    app.run()
+    try:
+        app = WhadExtractApp()
+        app.run()
+    except ApplicationError as err:
+        err.show()

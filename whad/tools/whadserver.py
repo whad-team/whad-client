@@ -6,7 +6,7 @@ which can be used to access a device remotely.
 import logging
 from prompt_toolkit import print_formatted_text, HTML
 
-from whad.cli.app import CommandLineApp
+from whad.cli.app import CommandLineApp, ApplicationError
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.device.tcp import TCPSocketConnector
 logger = logging.getLogger(__name__)
@@ -84,5 +84,8 @@ class WhadServerApp(CommandLineApp):
         self.server.serve()
 
 def whadserver_main():
-    app = WhadServerApp()
-    app.run()
+    try:
+        app = WhadServerApp()
+        app.run()
+    except ApplicationError as err:
+        err.show()

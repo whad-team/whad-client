@@ -172,5 +172,3 @@ def emulate_handler(app, command_args):
                 app.error('Bad JSON file format')
         else:
             app.error('You must provide an exported profile file (JSON).')
-    elif app.interface is None:
-        app.error('You need to specify an interface with option --interface.')

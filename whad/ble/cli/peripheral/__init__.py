@@ -9,7 +9,7 @@ from prompt_toolkit import print_formatted_text, HTML
 from json import loads, dumps
 from hexdump import hexdump
 
-from whad.cli.app import CommandLineApp
+from whad.cli.app import CommandLineApp, ApplicationError
 from whad.ble import AdvDataFieldList
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
@@ -70,5 +70,8 @@ class BlePeriphApp(CommandLineApp):
         self.post_run()
 
 def ble_periph_main():
-    app = BlePeriphApp()
-    app.run()
+    try:
+        app = BlePeriphApp()
+        app.run()
+    except ApplicationError as err:
+        err.show()

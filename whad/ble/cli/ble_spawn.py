@@ -7,7 +7,7 @@ BLE device, and chain this with another tool.
 import json
 from time import sleep
 
-from whad.cli.app import CommandLineDevicePipe
+from whad.cli.app import CommandLineDevicePipe, ApplicationError
 from whad.device import Bridge
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
 from whad.hub.ble import Connected, Disconnected, BlePduReceived, BleRawPduReceived
@@ -294,5 +294,8 @@ class BleSpawnApp(CommandLineDevicePipe):
             sleep(1)
 
 def ble_spawn_main():
-    app = BleSpawnApp()
-    app.run()
+    try:
+        app = BleSpawnApp()
+        app.run()
+    except ApplicationError as err:
+        err.show()

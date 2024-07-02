@@ -90,13 +90,6 @@ def write_handler(app, command_args):
         # Disconnect
         device.disconnect()
         central.stop()
-
-    elif app.interface is None:
-        # If stdin is piped, that means previous program has failed.
-        # We display this warning only if the tool has been launched in
-        # standalone mode
-        if not app.is_stdin_piped():
-            app.error('You need to specify an interface with option --interface.')
     else:
         app.error('You need to specify a target device with option --bdaddr.')
 
@@ -154,7 +147,7 @@ def writecmd_handler(app, command_args):
 
         # Make sure BD address is valid
         if not BDAddress.check(app.args.bdaddr):
-            app.error('Invalid BD address: %s' % app.args.bdaddr)
+            app.error(f"Invalid BD address: {app.args.bdaddr}")
             return
 
         # Create Central connector based on app configuration
@@ -170,7 +163,7 @@ def writecmd_handler(app, command_args):
         # Connect to target device
         device = central.connect(app.args.bdaddr)
         if device is None:
-            app.error('Cannot connect to %s, device does not respond.' % app.args.bdaddr)
+            app.error(f"Cannot connect to {app.args.bdaddr}, device does not respond.")
         else:
             # Perform write
             perform_write(
@@ -179,13 +172,6 @@ def writecmd_handler(app, command_args):
                 command_args,
                 without_response=True
             )
-        
-    elif app.interface is None:
-        # If stdin is piped, that means previous program has failed.
-        # We display this warning only if the tool has been launched in
-        # standalone mode
-        if not app.is_stdin_piped():
-            app.error('You need to specify an interface with option --interface.')
     else:
         app.error('You need to specify a target device with option --bdaddr.')
 

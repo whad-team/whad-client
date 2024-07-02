@@ -29,5 +29,3 @@ def scan_handler(app, command_args):
         except KeyboardInterrupt as keybd_int:
             print('\rScan terminated by user')
         scanner.stop()
-    else:
-        app.error('You need to specify an interface with option --interface.')

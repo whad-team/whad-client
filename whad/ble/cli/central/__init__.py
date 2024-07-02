@@ -16,12 +16,17 @@ $ ble-central emulate myfile.json
 $ ble-central sniff <bd address> -> capture connections to this device and save to a pcap
 
 """
-from whad.cli.app import CommandLineApp
+import logging
+from whad.cli.app import CommandLineApp, ApplicationError
 
 from .shell import BleCentralShell
 from .commands import *
 
+logger = logging.getLogger(__name__)
+
 class BleCentralApp(CommandLineApp):
+    """BLE Central-role application.
+    """
 
     def __init__(self):
         """Application uses an interface and has commands.
@@ -73,9 +78,12 @@ class BleCentralApp(CommandLineApp):
         """Override App's run() method to handle scripting feature.
         """
         # Launch pre-run tasks
+        logger.debug("Executing pre-run hook")
         self.pre_run()
 
+        logger.debug("Executing main code")
         if self.args.script is not None:
+            logger.debug("Checking is input interface is piped")
             if self.is_piped_interface():
                 # Make sure we have all the required parameters
                 failed = False
@@ -102,16 +110,23 @@ class BleCentralApp(CommandLineApp):
             # We need to have an interface specified
             elif self.interface is not None:
                 # Launch an interactive shell (well, driven by our script)
+                logger.debug("Launching interactive shell with interface %s", self.interface)
                 myshell = BleCentralShell(self.interface)
                 myshell.run_script(self.args.script)
-            else:
-                self.error('You need to specify an interface with option --interface.')
         else:
             super().run(pre=False, post=False)
 
         # Launch post-run tasks
+        logger.debug("Executing post-run hook")
         self.post_run()
 
 def ble_central_main():
-    app = BleCentralApp()
-    app.run()
+    """BLE Central application main routine.
+    """
+    try:
+        # Run our central app
+        app = BleCentralApp()
+        app.run()
+    except ApplicationError as err:
+        # If an error occured, display it.
+        err.show()

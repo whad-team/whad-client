@@ -348,8 +348,9 @@ class BleConnectApp(CommandLineDevicePipe):
                 }))
                 BleConnectOutputPipe(central, proxy)
 
-                # Wait for device to disconnect
-                proxy.device.wait()
+                # Wait for device to disconnect (or user CTL-C)
+                while True:
+                    sleep(1)
 
             except PeripheralNotFound:
                 # Could not connect

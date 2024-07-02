@@ -6,7 +6,7 @@ features:
 - PCAP interpretation
 """
 from os.path import exists, isfile
-from whad.cli.app import CommandLineApp
+from whad.cli.app import CommandLineApp, ApplicationError
 from whad.ble.cli.interpret.interpreter import interpret_pcap
 
 class BleInterpretApp(CommandLineApp):
@@ -37,5 +37,8 @@ class BleInterpretApp(CommandLineApp):
         self.post_run()
 
 def ble_interpret_main():
-    app = BleInterpretApp()
-    app.run()
+    try:
+        app = BleInterpretApp()
+        app.run()
+    except ApplicationError as err:
+        err.show()

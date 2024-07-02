@@ -5,7 +5,7 @@ This utility implements a generic sniffer module, automatically adapted to every
 import logging
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
-from whad.cli.app import CommandLineDeviceSource, CommandLineApp
+from whad.cli.app import CommandLineApp, ApplicationError
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
 from importlib import import_module
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
@@ -386,5 +386,10 @@ class WhadSniffApp(CommandLineApp):
                     )
 
 def wsniff_main():
-    app = WhadSniffApp()
-    app.run()
+    """Main WHAD Sniffer routine.
+    """
+    try:
+        app = WhadSniffApp()
+        app.run()
+    except ApplicationError as err:
+        err.show()

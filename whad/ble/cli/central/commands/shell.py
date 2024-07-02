@@ -18,14 +18,6 @@ def interactive_handler(app, command_args):
     - list services and characteristics
     - read/write characteristics
     """
-    # We need to have an interface specified
-    if app.interface is not None:
-        # Launch an interactive shell
-        myshell = BleCentralShell(app.interface)
-        myshell.run()
-    else:
-        # If stdin is piped, that means previous program has failed.
-        # We display this warning only if the tool has been launched in
-        # standalone mode
-        if not app.is_stdin_piped():
-            app.error('You need to specify an interface with option --interface.')
+    # Launch an interactive shell
+    myshell = BleCentralShell(app.interface)
+    myshell.run()
