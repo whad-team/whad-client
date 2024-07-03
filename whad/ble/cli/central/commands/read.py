@@ -1,21 +1,39 @@
 """BLE characteristic read command handler
 """
+import logging
+from hexdump import hexdump
 
 from prompt_toolkit import print_formatted_text, HTML
-from whad.cli.app import command
 from whad.hub.ble.bdaddr import BDAddress
-from hexdump import hexdump
-from whad.ble.profile.attribute import UUID
+from whad.ble.profile.attribute import UUID, InvalidUUIDException
+from whad.cli.app import command
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.cli.central.helpers import show_att_error, create_central
 
-import logging
+# Global logger
 logger = logging.getLogger(__name__)
 
-from argparse import Namespace
+# Expected parameters that must be passed to our program
+# to use an already established connection
+EXPECTED_BLE_PARAMS = [
+    "initiator_bdaddr",
+    "initiator_addrtype",
+    "target_bdaddr",
+    "target_addrtype",
+    "conn_handle",
+]
 
 def read_gatt_characteristic(app, command_args, device, profile_loaded=False):
+    """Read the value of a GATT characteristic based on the given command arguments.
+
+    :param command_args: arguments to pass to 'read'
+    :type command_args: list
+    :param device: Peripheral device from which the characteristic value has to be read
+    :type device: :class:`whad.ble.profile.PeripheralDevice`
+    :param profile_loaded: pre-loaded GATT profile
+    :type profile_loaded: GattProfile 
+    """
     # parse target arguments
     if len(command_args) == 0:
         app.error('You must provide at least a characteristic value handle or characteristic UUID.')
@@ -23,33 +41,32 @@ def read_gatt_characteristic(app, command_args, device, profile_loaded=False):
     else:
         handle = None
         offset = None
-        uuid = None
 
     # figure out what the handle is
     if command_args[0].lower().startswith('0x'):
         try:
             handle = int(command_args[0].lower(), 16)
-        except ValueError as badval:
-            app.error('Wrong handle: %s' % command_args[0])
+        except ValueError:
+            app.error("Wrong handle: %s", command_args[0])
             return
     else:
         try:
             handle = int(command_args[0])
-        except ValueError as badval:
+        except ValueError:
             try:
                 handle = UUID(command_args[0].replace('-',''))
-            except:
-                app.error('Wrong UUID: %s' % command_args[0])
+            except InvalidUUIDException:
+                app.error("Wrong UUID: %s", command_args[0])
                 return
 
     # Check offset and length
     if len(command_args) >= 2:
         try:
             offset = int(command_args[1])
-        except ValueError as badval:
-            app.error('Wrong offset value, will use 0 instead.')
+        except ValueError:
+            app.error("Wrong offset value, will use 0 instead.")
             offset = None
-        
+
     # Perform characteristic read by handle
     if not isinstance(handle, UUID):
         try:
@@ -60,11 +77,11 @@ def read_gatt_characteristic(app, command_args, device, profile_loaded=False):
                 hexdump(value)
             else:
                 print_formatted_text(HTML('<i>Empty data</i>'))
-                
+
         except AttError as att_err:
             show_att_error(app, att_err)
-        except GattTimeoutException as timeout:
-            app.error('GATT timeout while reading.')
+        except GattTimeoutException:
+            app.error("GATT timeout while reading.")
 
     else:
         if not profile_loaded:
@@ -86,13 +103,13 @@ def read_gatt_characteristic(app, command_args, device, profile_loaded=False):
                     hexdump(value)
                 else:
                     print_formatted_text(HTML('<i>Empty data</i>'))
-            
+
             except AttError as att_err:
                 show_att_error(app, att_err)
-            except GattTimeoutException as timeout:
-                app.error('GATT timeout while reading.')
+            except GattTimeoutException:
+                app.error("GATT timeout while reading.")
         else:
-            app.error('No characteristic found with UUID %s' % handle)
+            app.error("No characteristic found with UUID %s", handle)
 
 @command('read')
 def read_handler(app, command_args):
@@ -112,10 +129,10 @@ def read_handler(app, command_args):
     """
     # We need to have an interface specified
     if app.interface is not None and app.args.bdaddr is not None:
-        
+
         # Make sure BD address is valid
         if not BDAddress.check(app.args.bdaddr):
-            app.error('Invalid BD address: %s' % app.args.bdaddr)
+            app.error("Invalid BD address: %s", app.args.bdaddr)
             return
 
         # Create Central connector based on app configuration
@@ -124,14 +141,14 @@ def read_handler(app, command_args):
         # If no connector returned, there was an error, simply exit.
         if central is None:
             return
-        
+
         # Start central mode
         central.start()
 
         # Connect to target device
-        device = central.connect(app.args.bdaddr)
+        device = central.connect(app.args.bdaddr, random=app.args.random)
         if device is None:
-            app.error('Cannot connect to %s, device does not respond.' % app.args.bdaddr)
+            app.error("Cannot connect to %s, device does not respond.", app.args.bdaddr)
         else:
             # Read GATT characteristic
             read_gatt_characteristic(app, command_args, device, profile_loaded)
@@ -141,15 +158,15 @@ def read_handler(app, command_args):
 
         # Terminate central
         central.stop()
-    
+
     # Piped interface
     elif app.args.bdaddr is None and app.is_piped_interface():
 
         # Make sure we have all the required parameters
-        for param in ['initiator_bdaddr', 'initiator_addrtype', 'target_bdaddr', 'target_addrtype', 'conn_handle']:
+        for param in EXPECTED_BLE_PARAMS:
             if not hasattr(app.args, param):
-                app.error('Source interface does not provide a BLE connection')
-        
+                app.error("Source interface does not provide a BLE connection")
+
         # Create Central connector based on app configuration
         central, profile_loaded = create_central(app, piped=True)
 
@@ -169,4 +186,4 @@ def read_handler(app, command_args):
         central.close()
 
     elif app.interface is not None:
-        app.error('You need to specify a target device with option --bdaddr.')
+        app.error("You need to specify a target device with option --bdaddr.")

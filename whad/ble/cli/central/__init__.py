@@ -18,6 +18,7 @@ $ ble-central sniff <bd address> -> capture connections to this device and save 
 """
 import logging
 from whad.cli.app import CommandLineApp, ApplicationError
+from whad.exceptions import WhadDeviceTimeout, UnsupportedDomain
 
 from .shell import BleCentralShell
 from .commands import *
@@ -40,37 +41,46 @@ class BleCentralApp(CommandLineApp):
         )
 
         self.add_argument(
-            '--bdaddr',
-            '-b',
-            dest='bdaddr',
-            help='Specify target BD address'
+            "--bdaddr",
+            "-b",
+            dest="bdaddr",
+            help="Specify target BD address"
         )
 
         self.add_argument(
-            '--spoof-public',
-            '-s',
-            dest='bdaddr_pub_src',
-            help='Specify a public BD address to spoof'
+            "--random",
+            "-r",
+            action="store_true",
+            dest="random",
+            default=False,
+            help="If set, target device has a random BD address (default: public)"
         )
 
         self.add_argument(
-            '--spoof-random',
-            dest='bdaddr_rand_src',
-            help='Specify a random BD address to spoof'
+            "--spoof-public",
+            "-s",
+            dest="bdaddr_pub_src",
+            help="Specify a public BD address to spoof"
         )
 
         self.add_argument(
-            '--file',
-            '-f',
-            dest='script',
-            help='Specify a script to run'
+            "--spoof-random",
+            dest="bdaddr_rand_src",
+            help="Specify a random BD address to spoof"
         )
 
         self.add_argument(
-            '--profile',
-            '-p',
-            dest='profile',
-            help='Use a saved device profile'
+            "--file",
+            "-f",
+            dest="script",
+            help="Specify a script to run"
+        )
+
+        self.add_argument(
+            "--profile",
+            "-p",
+            dest="profile",
+            help="Use a saved device profile"
         )
 
 
@@ -130,3 +140,9 @@ def ble_central_main():
     except ApplicationError as err:
         # If an error occured, display it.
         err.show()
+    except KeyboardInterrupt:
+        app.warning("Interrupted by user (CTL-C)")
+    except WhadDeviceTimeout:
+        app.error("WHAD adapter has timed out.")
+    except UnsupportedDomain:
+        app.error("WHAD adapter does not support Logitech Unifying protocol.")

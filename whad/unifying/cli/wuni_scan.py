@@ -4,6 +4,7 @@ This utility finds any Logitech Unifying device and displays captured packets,
 with a quick interpretation. It allows the user to quickly identify a mouse or
 a keyboard based on the intepreted values.
 """
+import logging
 
 # Required to display colored texts
 from prompt_toolkit import HTML, print_formatted_text
@@ -12,15 +13,16 @@ from prompt_toolkit import HTML, print_formatted_text
 from scapy.packet import Packet
 
 # Whad dependencies
+from whad.exceptions import UnsupportedDomain, WhadDeviceTimeout
+from whad.cli.app import CommandLineDeviceSink, ApplicationError
 from whad.unifying.connector import Sniffer, ESBAddress
 from whad.esb.exceptions import InvalidESBAddressException
-from whad.cli.app import CommandLineDeviceSink, ApplicationError
 from whad.scapy.layers.esb import ESB_Payload_Hdr
-from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Keepalive_Payload, \
-    Logitech_Mouse_Payload, Logitech_Encrypted_Keystroke_Payload, Logitech_Unencrypted_Keystroke_Payload
+from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, \
+    Logitech_Keepalive_Payload, Logitech_Mouse_Payload, \
+    Logitech_Encrypted_Keystroke_Payload, Logitech_Unencrypted_Keystroke_Payload
 
 # Logging
-import logging
 logger = logging.getLogger(__name__)
 
 TOOL_DESCRIPTION="""Logitech Unifying scanning tool
@@ -97,7 +99,7 @@ class UniScanApp(CommandLineDeviceSink):
                 # Missing interface.
                 self.error('You need to specify an interface with option --interface.')
 
-        except KeyboardInterrupt as keybd:
+        except KeyboardInterrupt:
             self.warning('wuni-scan stopped (CTL-C)')
 
         # Launch post-run tasks
@@ -126,9 +128,10 @@ class UniScanApp(CommandLineDeviceSink):
                 'Following device <ansicyan>{address}</ansicyan> in auto mode ...'
             ).format(address=str(address)))
         else:
-            print_formatted_text(HTML(
-                'Sniffing device <ansicyan>{address}</ansicyan> on channel <ansicyan>{channel}</ansicyan>...'
-            ).format(address=str(address), channel=self.args.channel))
+            print_formatted_text(HTML((
+                "Sniffing device <ansicyan>{address}</ansicyan> "
+                "on channel <ansicyan>{channel}</ansicyan>..."
+                )).format(address=str(address), channel=self.args.channel))
 
         # Loop while CTL-C is not pressed, wait for a Unifying packet and display
         # it with a specific formatting.
@@ -182,14 +185,28 @@ class UniScanApp(CommandLineDeviceSink):
             # Unifying keep-alive
             comment = '| keep-alive'
 
-        print_formatted_text(HTML(
-            '<ansicyan>[{channel:03d}]</ansicyan><ansicyan>[{addr}]</ansicyan> <b>{payload}</b> %s' % comment
-        ).format(channel=packet.metadata.channel, addr=str(packet.address), payload=payload, comment=comment))
+        print_formatted_text(HTML((
+            "<ansicyan>[{channel:03d}]</ansicyan><ansicyan>[{addr}]</ansicyan> "
+            "<b>{payload}</b> %s" % comment
+        )).format(channel=packet.metadata.channel, addr=str(packet.address),
+                  payload=payload))
 
 
 def wuni_scan_main():
+    """Logitech Unifying scanner main routine.
+    """
     try:
         app = UniScanApp()
         app.run()
+
+    # Handle application errors
     except ApplicationError as err:
         err.show()
+
+    # Handle WHAD adapter timeout
+    except WhadDeviceTimeout:
+        app.error("WHAD adapter has timed out.")
+
+    # Handle unsupported domain
+    except UnsupportedDomain:
+        app.error("WHAD adapter does not support Logitech Unifying protocol.")

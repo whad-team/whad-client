@@ -1,4 +1,55 @@
 """Command-line interface application module
+
+This module provides multiple classes to create compatible CLI tools:
+- CommandLineSource
+- CommandLineSink
+- CommandLinePipe
+- CommandLineDeviceSource
+- CommandLineDeviceSink
+- CommandLineDevicePipe
+
+Standard command-line application classes
+-----------------------------------------
+
+Basically, a `CommandLineSource` application can see its standard output tied
+to a `CommandLineSink` or  `CommandLinePipe` application, while a  `CommandLineSink`
+application can see its standard input fed by a `CommandLineSink` or a
+`CommandLinePipe` application. Chosing the right class for an application is
+critical because our CLI framework performs some checks and does not allow
+for instance a `CommandLineSource` application to see its standard input fed
+with another command-line tool.
+
+Generally, applications providing an interactive shell are based on the
+`CommandLineSource` application class, as the user is expected to type
+commands and to interact with the application's interactive shell.
+
+The following schemes are then possible:
+
+- [CommandLineSource] | [CommandLineSink]
+- [CommandLineSource] | [CommandLinePipe] | [CommandLineSink]
+
+
+WHAD-based command-line application classes
+-------------------------------------------
+
+WHAD offers the possibility to chain different tools to create flexible packet
+processing flows. This is automatically handled by our CLI device-based application
+classes. 
+
+An application using the `CommandLineDeviceSource` class will therefore be in
+charge of configuring a WHAD adapter specified with the `--interface` option,
+perform some actions and then allow a chained tool to take control of this
+adapter to perform other actions.
+
+An application using the `CommandLineDeviceSink` class is supposed to get
+messages from the previous tool and process them before sending them to a
+specific device handled by this application itself. Everything is automated
+by our CLI framework and the application's `input_interface` property does
+expose the input interface the application is connected to.
+
+Last but not least, an application using the `CommandLineDevicePipe` class will
+process every incoming message and forward them (or not) to a chained tool.
+
 """
 import os
 import sys
@@ -452,21 +503,26 @@ class CommandLineApp(ArgumentParser):
 
                                 # Copy parameters into our app parameters
                                 params = dict(parse_qsl(url_info.query))
-                                for param in params:
+                                for param, value in params.items():
                                     if not hasattr(self.args, param):
-                                        setattr(self.args, param, params[param])
+                                        setattr(self.args, param, value)
 
                                 # We're done
                                 break
                             else:
-                                print(line)
+                                # If stdout is not piped, print line
+                                if not self.is_stdout_piped():
+                                    print(line)
             else:
-                # Check if this application is supposed to be chained with another
+                # Check if this application is supposed to be chained with
                 # another app and to process its standard input
                 if self.__input_type == CommandLineApp.INPUT_NONE:
-                    logger.error("This application (%s) cannot be piped with another tool.", self.prog)
+                    logger.error(
+                        "This application (%s) cannot be piped with another tool.",
+                        self.prog
+                    )
                     sys.exit(2)
-        
+
         # If we have no WHAD adapter specified then that's abnormal.
         elif self.__interface is None and self.__has_interface:
             raise ApplicationError("You must select a WHAD adapter with the --interface option.")
@@ -648,10 +704,10 @@ class CommandLineDevicePipe(CommandLineApp):
 if __name__ == '__main__':
 
     @command('test', 'this is a small test command', 'detailed desc')
-    def test_handler(app, args):
+    def test_handler(_, args):
         """Handle test command
         """
-        print('this is a test with args: %s' % args)
+        print(f"this is a test with args: {args}")
 
-    app = CommandLineApp('cli-demo',description='Whad CLI demo')
+    app = CommandLineApp(description='Whad CLI demo')
     app.run()
