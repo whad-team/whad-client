@@ -555,18 +555,19 @@ class UnixSocketConnector(WhadDeviceConnector):
                         elif len(errors) > 0:
                             logger.debug('Error detected on server socket, exiting.')
                             break
-                except ConnectionResetError as err:
-                    logger.error('connection reset')
-                    pass
+                except ConnectionResetError:
+                    logger.error("connection reset")
 
                 self.__client = None
 
-        except BrokenPipeError as err:
-            logger.error('Broken pipe.')
+        except BrokenPipeError:
+            logger.error("Broken pipe.")
+            self.__client = None
+        except TimeoutError:
+            logger.debug("Timeout error.")
             self.__client = None
         except Exception as other_err:
-            logger.error(other_err)
-            pass
+            logger.debug("Unknown error of type %s: %s", type(other_err), other_err)
 
     # Message callbacks
     def on_any_msg(self, message):
@@ -577,7 +578,7 @@ class UnixSocketConnector(WhadDeviceConnector):
         :param message: Discovery message
         """
         try:
-            logger.debug('Received a message (%s) from device, forward to client if any' % message)
+            logger.debug("Received a message (%s) from device, forward to client if any", message)
             if self.__client is not None:
                 # Convert message into bytes
                 raw_message = message.SerializeToString()
@@ -593,11 +594,13 @@ class UnixSocketConnector(WhadDeviceConnector):
                 self.__client.send(bytes(header))
                 self.__client.send(raw_message)
                 logger.debug('Message sent to client')
-        except BrokenPipeError as err:
+        except BrokenPipeError:
             logger.debug('Client socket disconnected')
 
     def on_msg_sent(self, message):
-        pass
+        """Outgoing message handler, actually doing nothing but needed by
+        classes that inherit from WhadDeviceConnector.
+        """
 
     def on_generic_msg(self, generic_message):
         """Callback function to process incoming generic messages.
@@ -606,7 +609,6 @@ class UnixSocketConnector(WhadDeviceConnector):
 
         :param message: Generic message
         """
-        pass
 
     def on_discovery_msg(self, discovery_message):
         pass
@@ -625,6 +627,9 @@ class UnixSocketConnector(WhadDeviceConnector):
         """
         pass
 
+    def on_event(self, event):
+        pass
+
     def get_url(self):
         """Return socket URL
         """
@@ -634,10 +639,7 @@ class UnixSocketConnector(WhadDeviceConnector):
             )
         else:
             params = '&'.join(['%s=%s' % item for item in self.__parameters.items()])
-            return 'unix://%s?%s\n' % (
-                self.__path,
-                params
-            )
+            return f"unix://{self.__path}?{params}\n"
 
 class UnixSocketCallbacksConnector(UnixSocketConnector):
     """

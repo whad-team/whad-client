@@ -111,7 +111,6 @@ def create_central(app, piped=False):
             except IOError as err:
                 app.error('Cannot access profile file (%s)' % app.args.profile)
             except Exception as err:
-                print(err)
                 app.error('Cannot parse profile file (%s)' % app.args.profile)
         else:
             # Create classic Central connector
