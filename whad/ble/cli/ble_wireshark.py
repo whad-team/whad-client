@@ -42,8 +42,6 @@ class BleUnixSocketConnector(UnixSocketConnector):
         """Initialize our Unix Socket connector
         """
         super().__init__(device, path)
-        self.__translator = BleMessageTranslator(device.hub)
-
 
     def on_msg_sent(self, message):
         """Incoming message processing.
@@ -55,7 +53,8 @@ class BleUnixSocketConnector(UnixSocketConnector):
         if message.message_type == 'ble':
             # Convert message to packet
             if isinstance(message, SendBlePdu) or isinstance(message, SendBleRawPdu):
-                packet = self.__translator.from_message(message)
+                #packet = self.__translator.from_message(message)
+                packet = message.to_packet()
                 if packet is not None:
                     self.monitor_packet_tx(packet)
 
@@ -67,19 +66,20 @@ class BleUnixSocketConnector(UnixSocketConnector):
             if isinstance(message, BleAdvPduReceived) or \
                 isinstance(message, BlePduReceived) or \
                 isinstance(message, BleRawPduReceived):
-                packet = self.__translator.from_message(message)
+                #packet = self.__translator.from_message(message)
+                packet = message.to_packet()
 
             if packet is not None:
                 self.monitor_packet_rx(packet)
 
-            
+
     def format(self, packet):
         """
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
         return self.hub.ble.format(packet)
-    
+
     def on_event(self, event):
         pass
 
@@ -115,7 +115,7 @@ class BleWiresharkApp(CommandLineDevicePipe):
             else:
                 self.error('<i>ble-wireshark</i> must be placed between two WHAD CLI tools to monitor traffic.')
 
-        except KeyboardInterrupt as keybd:
+        except KeyboardInterrupt:
             self.warning('ble-wireshark stopped (CTL-C)')
             if self.proxy is not None:
                 self.proxy.stop()
