@@ -44,20 +44,25 @@ def get_hci(index):
         socket = BluetoothUserSocketFixed(index)
         logger.debug('Bluetooth socket successfully created.')
         return socket
-    except BluetoothSocketError as err:
+    except BluetoothSocketError:
         logger.debug('An error occured while creating bluetooth socket')
         try:
-            logger.debug('Shutting down HCI interface #%d' % index)
+            logger.debug("Shutting down HCI interface #%d", index)
             HCIConfig.down(index)
-            logger.debug('HCI interface %d shut down, creating Bluetooth socket ...' % index)
+            logger.debug("HCI interface %d shut down, creating Bluetooth socket ...", index)
             socket = BluetoothUserSocketFixed(index)
-            logger.debug('Bluetooth socket successfully created.')
+            logger.debug("Bluetooth socket successfully created.")
             return socket
         except BluetoothSocketError as err:
             logger.debug(err)
-            logger.error('Cannot create Bluetooth socket !')
+            logger.debug("Cannot create Bluetooth socket !")
             return None
-
+        except PermissionError as perm_err:
+            logger.debug("WHAD device hci%d cannot be accessed.", index)
+            raise WhadDeviceAccessDenied("hci%d" % index) from perm_err
+    except PermissionError:
+        logger.debug("WHAD device hci%d cannot be accessed.", index)
+        raise WhadDeviceAccessDenied("hci%d" % index)
 
 
 class HCIDevice(VirtualDevice):
