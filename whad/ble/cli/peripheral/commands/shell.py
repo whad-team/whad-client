@@ -1,8 +1,6 @@
-"""BLE Interactive shell
+"""BLE peripheral emulation interactive shell
 """
-import json
-from binascii import unhexlify
-from prompt_toolkit import print_formatted_text, HTML
+from binascii import unhexlify, Error as BinasciiError
 from whad.cli.app import command
 from whad.ble.cli.peripheral.shell import BlePeriphShell
 
@@ -21,7 +19,7 @@ def check_profile(profile):
         return False
     try:
         unhexlify(profile['devinfo']['adv_data'])
-    except Exception as err:
+    except BinasciiError:
         return False
 
     # Make sure we have a valid scan_rsp entry (if provided)
@@ -30,7 +28,7 @@ def check_profile(profile):
     if profile['devinfo']['scan_rsp'] is not None:
         try:
             unhexlify(profile['devinfo']['scan_rsp'])
-        except Exception as err:
+        except BinasciiError:
             return False
 
     # Make sure we have a BD address
@@ -57,7 +55,6 @@ def interactive_handler(app, _):
         if app.args.profile is not None:
             # Read profile
             profile_json = open(app.args.profile,'rb').read()
-            profile = json.loads(profile_json)
         else:
             profile_json = None
 
