@@ -51,7 +51,7 @@ class Dot15d4(WhadDeviceConnector):
 
         # Check if device supports 802.15.4
         if not self.device.has_domain(WhadDomain.Dot15d4):
-            raise UnsupportedDomain()
+            raise UnsupportedDomain("IEEE 802.15.4")
         else:
             self.__ready = True
             conf.dot15d4_protocol = scapy_config

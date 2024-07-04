@@ -14,9 +14,19 @@ class RequiredImplementation(Exception):
 # Device discovery exceptions
 
 class UnsupportedDomain(Exception):
-    def __init__(self):
+    def __init__(self, domain: str):
         super().__init__()
+        self.__domain = domain
 
+    @property
+    def domain(self):
+        return self.__domain
+
+    def __str__(self):
+        return f"UnsupportedDomain({self.__domain})"
+
+    def __repr__(self):
+        return str(self)
 
 class UnsupportedCapability(Exception):
     def __init__(self, capability):

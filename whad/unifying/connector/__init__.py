@@ -53,7 +53,7 @@ class Unifying(WhadDeviceConnector):
 
         # Check if device supports Logitech Unifying
         if not self.device.has_domain(WhadDomain.LogitechUnifying):
-            raise UnsupportedDomain()
+            raise UnsupportedDomain("Logitech Unifying")
         else:
             self.__ready = True
             bind()

@@ -57,7 +57,7 @@ class ESB(WhadDeviceConnector):
 
         # Check if device supports Enhanced ShockBurst
         if not self.device.has_domain(WhadDomain.Esb):
-            raise UnsupportedDomain()
+            raise UnsupportedDomain("ESB")
         else:
             self.__ready = True
 

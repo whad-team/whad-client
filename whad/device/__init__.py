@@ -1306,7 +1306,7 @@ class WhadDevice(object):
         if isinstance(message, CommandResult):
             if message.result_code == CommandResult.UNSUPPORTED_DOMAIN:
                 logger.error('domain not supported by this device')
-                raise UnsupportedDomain()
+                raise UnsupportedDomain("")
 
         # Forward everything to the connector, if any
         if self.__connector is not None:

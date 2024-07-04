@@ -68,7 +68,7 @@ class Phy(WhadDeviceConnector):
 
         # Check if device supports Logitech Unifying
         if not self.device.has_domain(WhadDomain.Phy):
-            raise UnsupportedDomain()
+            raise UnsupportedDomain("PHY")
         else:
             self.__ready = True
 
