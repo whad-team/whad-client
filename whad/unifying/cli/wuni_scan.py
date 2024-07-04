@@ -13,8 +13,7 @@ from prompt_toolkit import HTML, print_formatted_text
 from scapy.packet import Packet
 
 # Whad dependencies
-from whad.exceptions import UnsupportedDomain, WhadDeviceTimeout
-from whad.cli.app import CommandLineDeviceSink, ApplicationError
+from whad.cli.app import CommandLineDeviceSink, run_app
 from whad.unifying.connector import Sniffer, ESBAddress
 from whad.esb.exceptions import InvalidESBAddressException
 from whad.scapy.layers.esb import ESB_Payload_Hdr
@@ -195,18 +194,5 @@ class UniScanApp(CommandLineDeviceSink):
 def wuni_scan_main():
     """Logitech Unifying scanner main routine.
     """
-    try:
-        app = UniScanApp()
-        app.run()
-
-    # Handle application errors
-    except ApplicationError as err:
-        err.show()
-
-    # Handle WHAD adapter timeout
-    except WhadDeviceTimeout:
-        app.error("WHAD adapter has timed out.")
-
-    # Handle unsupported domain
-    except UnsupportedDomain:
-        app.error("WHAD adapter does not support Logitech Unifying protocol.")
+    app = UniScanApp()
+    run_app(app)

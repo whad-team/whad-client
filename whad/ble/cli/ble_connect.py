@@ -21,7 +21,7 @@ from whad.hub.ble import BlePduReceived, BleRawPduReceived, Connected, Disconnec
 from whad.hub.ble.bdaddr import BDAddress
 
 # WHAD CLI helper
-from whad.cli.app import CommandLineDevicePipe
+from whad.cli.app import CommandLineDevicePipe, run_app
 
 logger = logging.getLogger(__name__)
 
@@ -364,4 +364,4 @@ def ble_connect_main():
     """Main application wrapper.
     """
     app = BleConnectApp()
-    app.run()
+    run_app(app)

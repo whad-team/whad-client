@@ -10,7 +10,7 @@ from prompt_toolkit import print_formatted_text, HTML
 from whad.ble import Scanner
 from whad.device import WhadDevice
 from whad.ble.tools.proxy import GattProxy, LinkLayerProxy
-from whad.cli.app import CommandLineDeviceSource
+from whad.cli.app import CommandLineDeviceSource, run_app
 from whad.hub.ble import Direction
 
 import logging
@@ -292,4 +292,4 @@ class BleProxyApp(CommandLineDeviceSource):
 
 def ble_proxy_main():
     app = BleProxyApp()
-    app.run()
+    run_app(app)

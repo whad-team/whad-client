@@ -17,8 +17,7 @@ $ ble-central sniff <bd address> -> capture connections to this device and save 
 
 """
 import logging
-from whad.cli.app import CommandLineApp, ApplicationError
-from whad.exceptions import WhadDeviceTimeout, UnsupportedDomain
+from whad.cli.app import CommandLineApp, run_app
 
 from .shell import BleCentralShell
 from .commands import *
@@ -133,16 +132,6 @@ class BleCentralApp(CommandLineApp):
 def ble_central_main():
     """BLE Central application main routine.
     """
-    try:
-        # Run our central app
-        app = BleCentralApp()
-        app.run()
-    except ApplicationError as err:
-        # If an error occured, display it.
-        err.show()
-    except KeyboardInterrupt:
-        app.warning("Interrupted by user (CTL-C)")
-    except WhadDeviceTimeout:
-        app.error("WHAD adapter has timed out.")
-    except UnsupportedDomain:
-        app.error("WHAD adapter does not support Logitech Unifying protocol.")
+    # Run our central app
+    app = BleCentralApp()
+    run_app(app)

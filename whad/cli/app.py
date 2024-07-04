@@ -56,6 +56,7 @@ import sys
 import select
 import fcntl
 import logging
+import traceback
 
 from typing import Generator
 from urllib.parse import urlparse, parse_qsl
@@ -69,7 +70,7 @@ from prompt_toolkit.application.current import get_app_session
 
 from whad.device import WhadDevice, UnixSocketDevice
 from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound, \
-    WhadDeviceNotReady
+    WhadDeviceNotReady, WhadDeviceTimeout, UnsupportedDomain
 
 logger = logging.getLogger(__name__)
 
@@ -700,6 +701,26 @@ class CommandLineDevicePipe(CommandLineApp):
         :param bool interface: if enabled, the application will resolve a WHAD interface
         """
         super().__init__(description, commands, interface, CommandLineApp.INPUT_WHAD, CommandLineApp.OUTPUT_WHAD, **kwargs)
+
+def run_app(application: CommandLineApp):
+    """Run an application and handle generic exceptions.
+    """
+    try:
+        application.run()
+    except ApplicationError as err:
+        # If an error occured, display it.
+        err.show()
+    except KeyboardInterrupt:
+        application.warning("Interrupted by user (CTL-C)")
+    except WhadDeviceTimeout:
+        application.error("WHAD adapter has timed out.")
+    except WhadDeviceAccessDenied:
+        application.error("Cannot access WHAD adapter, check permissions.")
+    except UnsupportedDomain as domain_err:
+        application.error("WHAD adapter does not support %s." % domain_err.domain)
+    except Exception as exc:
+        application.error("An unexpected exception occured:")
+        traceback.print_exception(exc)
 
 if __name__ == '__main__':
 

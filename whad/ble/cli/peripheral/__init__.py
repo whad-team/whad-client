@@ -9,7 +9,7 @@ from prompt_toolkit import print_formatted_text, HTML
 from json import loads, dumps
 from hexdump import hexdump
 
-from whad.cli.app import CommandLineApp, ApplicationError
+from whad.cli.app import CommandLineApp, run_app
 from whad.ble import AdvDataFieldList
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
@@ -56,13 +56,9 @@ class BlePeriphApp(CommandLineApp):
         self.pre_run()
 
         if self.args.script is not None:
-            # We need to have an interface specified
-            if self.interface is not None:
-                # Launch an interactive shell (well, driven by our script)
-                myshell = BlePeriphShell(self.interface)
-                myshell.run_script(self.args.script)
-            else:
-                self.error('You need to specify an interface with option --interface.')
+            # Launch an interactive shell (well, driven by our script)
+            myshell = BlePeriphShell(self.interface)
+            myshell.run_script(self.args.script)
         else:
             super().run()
 
@@ -70,8 +66,7 @@ class BlePeriphApp(CommandLineApp):
         self.post_run()
 
 def ble_periph_main():
-    try:
-        app = BlePeriphApp()
-        app.run()
-    except ApplicationError as err:
-        err.show()
+    """Bluetooth Low Energy peripheral emulation main routine.
+    """
+    app = BlePeriphApp()
+    run_app(app)

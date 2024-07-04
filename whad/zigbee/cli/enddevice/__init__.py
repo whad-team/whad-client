@@ -13,7 +13,7 @@ $ zigbee-enddevice associate <network pan id>
 $ zigbee-enddevice -> spawns a shell
 
 """
-from whad.cli.app import CommandLineApp, ApplicationError
+from whad.cli.app import CommandLineApp, run_app
 
 from .helpers import create_enddevice
 from .shell import ZigbeeEndDeviceShell
@@ -90,8 +90,5 @@ class ZigbeeEndDeviceApp(CommandLineApp):
         self.post_run()
 
 def zigbee_enddevice_main():
-    try:
-        app = ZigbeeEndDeviceApp()
-        app.run()
-    except ApplicationError as err:
-        err.show()
+    app = ZigbeeEndDeviceApp()
+    run_app(app)

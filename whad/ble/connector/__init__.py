@@ -87,7 +87,7 @@ class BLE(WhadDeviceConnector):
 
             # Check device supports BLE
             if not self.device.has_domain(WhadDomain.BtLE):
-                raise UnsupportedDomain()
+                raise UnsupportedDomain("Bluetooth Low Energy")
             else:
                 self.__ready = True
 
