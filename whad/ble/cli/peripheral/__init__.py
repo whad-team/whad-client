@@ -1,33 +1,26 @@
 """Bluetooth Low Energy peripheral utility for WHAD
 """
-import logging
-
-from time import time
-from binascii import hexlify, unhexlify
-from os.path import exists, isfile
-from prompt_toolkit import print_formatted_text, HTML
-from json import loads, dumps
-from hexdump import hexdump
 
 from whad.cli.app import CommandLineApp, run_app
-from whad.ble import AdvDataFieldList
-from whad.ble.stack.att.exceptions import AttError
-from whad.ble.stack.gatt.exceptions import GattTimeoutException
-from whad.ble.profile.characteristic import CharacteristicProperties
-#from whad.ble.cli.central.helpers import show_att_error
 from whad.ble.cli.peripheral.shell import BlePeriphShell
 
 from .commands import *
 
 class BlePeriphApp(CommandLineApp):
+    """Bluetooth Low Energy Peripheral emulation app
+    """
 
     def __init__(self):
+        """Initialize our application: we need a WHAD interface (adapter) to be
+        specified and we support custom commands.
+        """
         super().__init__(
             description='WHAD Bluetooth Low Energy peripheral utility',
             commands = True,
             interface = True
         )
 
+        # Add an option to specify the target Bluetooth Device address
         self.add_argument(
             '--bdaddr',
             '-b',
@@ -35,6 +28,7 @@ class BlePeriphApp(CommandLineApp):
             help='Specify target BD address'
         )
 
+        # Add an option to provide an existing device profile
         self.add_argument(
             '--profile',
             '-p',
@@ -42,6 +36,7 @@ class BlePeriphApp(CommandLineApp):
             help='Use a saved device profile'
         )
 
+        # Add an option to allow scripting through a file
         self.add_argument(
             '--file',
             '-f',
@@ -60,6 +55,7 @@ class BlePeriphApp(CommandLineApp):
             myshell = BlePeriphShell(self.interface)
             myshell.run_script(self.args.script)
         else:
+            # Run the application through WHAD's main app routine
             super().run()
 
         # Launch post-run tasks

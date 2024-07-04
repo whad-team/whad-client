@@ -41,7 +41,7 @@ def check_profile(profile):
     return True
 
 @command('interactive')
-def interactive_handler(app, command_args):
+def interactive_handler(app, _):
     """interactive BLE shell
 
     <ansicyan><b>interactive</b></ansicyan>
@@ -65,4 +65,4 @@ def interactive_handler(app, command_args):
         myshell = BlePeriphShell(app.interface, profile_json)
         myshell.run()
     else:
-        app.error('You need to specify an interface with option --interface.')
+        app.error("You need to specify an interface with option --interface.")
