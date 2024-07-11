@@ -431,7 +431,7 @@ class WhadDeviceConnector(object):
     def send_packet(self, packet):
         """Send packet to our device.
         """
-
+        print('send packet')
         # Monitor this outgoing packet
         self.monitor_packet_tx(packet)
 
@@ -577,7 +577,6 @@ class Bridge(object):
         self.__in_device.set_queue_filter(None)
         self.__out_device.set_queue_filter(None)
 
-
         # Bridge our two interfaces with our own connectors.
         # This will replace each device connector with our own and avoid
         # any other packet processing.
@@ -587,7 +586,7 @@ class Bridge(object):
     @property
     def input(self):
         return self.__in
-    
+
     @property
     def output(self):
         return self.__out
@@ -608,8 +607,15 @@ class Bridge(object):
         :type message: HubMessage
         """
         if message is not None:
+            # Monitor packet if required
+            if issubclass(message, AbstractPacket):
+                packet = message.to_packet()
+                self.__in.monitor_packet_rx(packet)
+                self.__out.monitor_packet_tx(packet)
+
+            # Forward message
             self.__in.send_message(message)
-    
+
     def on_outbound(self, message):
         """Outbound message hook.
 
@@ -620,6 +626,12 @@ class Bridge(object):
         :type message: HubMessage
         """
         if message is not None:
+            # Monitor packet if required
+            if issubclass(message, AbstractPacket):
+                packet = message.to_packet()
+                self.__out.monitor_packet_tx(packet)
+                self.__in.monitor_packet_rx(packet)
+
             self.__out.send_message(message)
 
 class WhadDeviceInputThread(Thread):
