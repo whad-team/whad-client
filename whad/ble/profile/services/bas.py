@@ -30,4 +30,4 @@ class BatteryService(object):
     def get_battery_level(self):
         """Return battery level
         """
-        return unpack('B', self.battery.level.value)
+        return unpack('B', self.battery.level.value)[0]
