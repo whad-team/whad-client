@@ -691,7 +691,6 @@ class GenericProfile(object):
             prop_obj = getattr(self, prop)
             # Is this property a callable hook ?
             if callable(prop_obj) and is_method_hook(prop_obj):
-                print('method %s is a hook for %s' % (prop, prop_obj.hooks))
                 # Associate hook method with each operation
                 if prop_obj.characteristic not in self.__hooks:
                     self.__hooks[prop_obj.characteristic] = {}
