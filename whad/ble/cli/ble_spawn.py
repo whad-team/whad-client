@@ -248,7 +248,7 @@ class BleSpawnApp(CommandLineDevicePipe):
             else:
                 self.error('You need to specify an interface with option --interface.')
 
-        except KeyboardInterrupt as keybd:
+        except KeyboardInterrupt:
             self.warning('ble-spawn stopped (CTL-C)')
 
         # Launch post-run tasks
@@ -268,7 +268,7 @@ class BleSpawnApp(CommandLineDevicePipe):
         logger.info("[ble-spawn] Starting our input pipe")
         input_pipe = BleSpawnInputPipe(Central(self.input_interface), peripheral)
         input_pipe.set_in_conn_handle(conn_handle)
-        
+
         # Loop until the user hits CTL-C
         while True:
             sleep(1)
@@ -283,7 +283,9 @@ class BleSpawnApp(CommandLineDevicePipe):
         peripheral = Peripheral(self.interface)
 
         # Create our unix socket server
-        unix_server = UnixConnector(UnixSocketServerDevice())
+        unix_server = UnixConnector(UnixSocketServerDevice(parameters={
+            'domain': 'ble'
+        }))
 
         # Create our packet bridge
         # logger.info("[ble-spawn] Starting our output pipe")
