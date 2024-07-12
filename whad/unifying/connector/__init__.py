@@ -92,6 +92,11 @@ class Unifying(WhadDeviceConnector):
         """
         Send Logitech Unifying packets (on a single channel).
         """
+
+        # Packet is not raw by default
+        metadata = UnifyingMetadata()
+        metadata.raw = False
+
         if not self.can_send():
             raise UnsupportedCapability("Send")
         # If we don't have address or channels, use the cached ones
@@ -103,6 +108,10 @@ class Unifying(WhadDeviceConnector):
                 packet = ESB_Hdr(address=tx_address) / pdu
             else:
                 packet = pdu
+
+            # Mark packet as raw
+            metadata.raw = True
+
         # if we don't support raw PDU and got a packet, crop to keep only the payload
         elif ESB_Hdr in pdu:
             packet = pdu[ESB_Payload_Hdr:]
@@ -111,10 +120,15 @@ class Unifying(WhadDeviceConnector):
             packet = pdu
 
         # Generate TX metadata
-        packet.metadata = UnifyingMetadata()
+        packet.metadata = metadata
         packet.metadata.channel = tx_channel
         packet.metadata.address = tx_address
 
+        # Force packet rebuild
+        packet.preamble=0xaa
+        pkt = self.hub.convertPacket(packet)
+
+        # Send packet
         return super().send_packet(packet)
 
 
