@@ -384,6 +384,9 @@ class TCPSocketConnector(WhadDeviceConnector):
     def on_packet(self, packet):
         pass
 
+    def on_event(self, packet):
+        pass
+
     def on_msg_sent(self, message):
         pass
 

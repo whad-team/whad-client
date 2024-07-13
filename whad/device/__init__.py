@@ -431,13 +431,11 @@ class WhadDeviceConnector(object):
     def send_packet(self, packet):
         """Send packet to our device.
         """
-        print('send packet')
         # Monitor this outgoing packet
         self.monitor_packet_tx(packet)
 
         # Convert packet into the corresponding message
         msg = self.hub.convertPacket(packet)
-
         if msg is not None:
             resp = self.send_command(msg, message_filter(CommandResult))
             logger.info('[ble connector] Command sent, result: %s' % resp)
