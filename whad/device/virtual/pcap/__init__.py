@@ -55,7 +55,8 @@ class PCAPDevice(VirtualDevice):
         """
         self.__opened = False
         self.__started = False
-        self.__filename = filename
+        self.__flush = "flush:" in filename
+        self.__filename = filename.replace("flush:", "")
         self.__pcap_reader = None
         self.__pcap_writer = None
         self.__dlt = None
@@ -101,7 +102,7 @@ class PCAPDevice(VirtualDevice):
         self._fw_url = self._get_url()
         self._fw_version = self._get_firmware_version()
         self._dev_capabilities = self._get_capabilities()
-        self.__flush = False
+        #self.__flush = False
         self.__opened = True
         # Ask parent class to run a background I/O thread
         super().open()
@@ -116,8 +117,8 @@ class PCAPDevice(VirtualDevice):
         while self.__started:
             try:
                 if self._is_reader():
-                        pkt = self.__pcap_reader.read_packet()
-                        self._send_packet(pkt)
+                    pkt = self.__pcap_reader.read_packet()
+                    self._send_packet(pkt)
             except EOFError:
                 # TODO: add an event to indicate end of stream ?
                 pass

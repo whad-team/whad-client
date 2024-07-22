@@ -8,10 +8,11 @@ from prompt_toolkit import print_formatted_text, HTML
 from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.cli.app import CommandLineApp, ApplicationError
 from scapy.all import *
-#from whad.common.ipc import IPCPacket
-from whad.device.unix import UnixSocketProxy, UnixSocketCallbacksConnector
+from whad.device.unix import  UnixSocketConnector
+from whad.device import Bridge
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
+from whad.tools.utils import get_translator
 
 import logging
 import time
@@ -19,6 +20,9 @@ import sys
 
 logger = logging.getLogger(__name__)
 #logging.basicConfig(level=logging.DEBUG)
+
+class WhadExtractUnixSocketConnector(UnixSocketConnector):
+    pass
 
 class WhadExtractApp(CommandLineApp):
 
@@ -59,25 +63,12 @@ class WhadExtractApp(CommandLineApp):
 
         return extractors
 
-    def on_rx_packet(self, pkt):
+    def on_packet(self, pkt):
         extractors = self.build_extractors()
         output = []
         try:
             for extractor in extractors:
                 output.append(str(extractor(pkt)))
-            print(self.args.delimiter.join(output))
-            sys.stdout.flush()
-            return pkt
-        except:
-            return pkt
-
-    def on_tx_packet(self, pkt):
-        extractors = self.build_extractors()
-        output = []
-        try:
-            for extractor in extractors:
-                output.append(str(extractor(pkt)))
-
             print(self.args.delimiter.join(output))
             sys.stdout.flush()
             return pkt
@@ -99,20 +90,16 @@ class WhadExtractApp(CommandLineApp):
 
                 parameters = self.args.__dict__
 
-                parameters.update({
-                    "on_tx_packet_cb" : self.on_tx_packet,
-                    "on_rx_packet_cb" : self.on_rx_packet,
-                })
-                interface.open()
+                connector = WhadExtractUnixSocketConnector(interface)
+                for parameter_name, parameter_value in parameters.items():
+                    connector.add_parameter(parameter_name, parameter_value)
 
-                proxy = UnixSocketProxy(
-                    interface,
-                    params=parameters,
-                    connector=UnixSocketCallbacksConnector
-                )
-                if self.is_stdout_piped():
-                    proxy.start()
-                    proxy.join()
+                connector.domain = self.args.domain
+                connector.translator = get_translator(self.args.domain)(connector.hub)
+                connector.format = connector.translator.format
+                connector.on_packet = self.on_packet
+
+                #interface.open()
 
                 while True:
                     time.sleep(1)
