@@ -47,7 +47,8 @@ class WhadPlayApp(WhadSniffApp):
                 override_domain = True
         if index_pcap_file is not None and not override_domain:
             domain = extract_pcap_metadata(self.pcap_file)
-            sys.argv.insert(index_pcap_file + 1, domain)
+            if domain != "":
+                sys.argv.insert(index_pcap_file + 1, domain)
 
     def pre_run(self):
         """Pre-run operations: configure scapy theme.
