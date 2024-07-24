@@ -378,13 +378,13 @@ class TCPSocketConnector(WhadDeviceConnector):
                 self.__client.send(bytes(header))
                 self.__client.send(raw_message)
                 logger.debug('Message sent to client')
-        except BrokenPipeError as err:
+        except BrokenPipeError:
             logger.debug('Client socket disconnected')
 
     def on_packet(self, packet):
         pass
 
-    def on_event(self, packet):
+    def on_event(self, event):
         pass
 
     def on_msg_sent(self, message):
