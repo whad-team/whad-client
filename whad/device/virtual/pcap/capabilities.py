@@ -2,11 +2,12 @@ from whad import WhadDomain, WhadCapability
 from whad.hub.ble import Commands as BleCommands
 from whad.hub.dot15d4 import Commands as Dot15d4Commands
 from whad.hub.esb import Commands as EsbCommands
-
+from whad.hub.unifying import Commands as UnifyingCommands
 
 DLT_BLUETOOTH_LE_LL_WITH_PHDR   = 256
 DLT_IEEE802_15_4_TAP            = 283
 DLT_RESERVED_02                 = 148
+DLT_RESERVED_03                 = 149
 
 CAPABILITIES = {
     DLT_BLUETOOTH_LE_LL_WITH_PHDR : (
@@ -38,6 +39,25 @@ CAPABILITIES = {
         }
     ),
     DLT_RESERVED_02 : (
-
+        {
+            WhadDomain.Esb : (
+                (WhadCapability.Sniff),
+                [EsbCommands.Sniff, EsbCommands.Start, EsbCommands.Stop]
+            ),
+            WhadDomain.LogitechUnifying : (
+                (WhadCapability.Sniff),
+                [UnifyingCommands.Sniff, UnifyingCommands.Start, UnifyingCommands.Stop]
+            )
+        },
+        {
+            WhadDomain.Esb : (
+                (WhadCapability.Inject),
+                [EsbCommands.Send,EsbCommands.Start, EsbCommands.Stop]
+            ),
+            WhadDomain.LogitechUnifying : (
+                (WhadCapability.Inject),
+                [UnifyingCommands.Send,UnifyingCommands.Start, UnifyingCommands.Stop]
+            )
+        }
     )
 }

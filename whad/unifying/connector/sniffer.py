@@ -22,6 +22,8 @@ class Sniffer(Unifying, EventsManager):
     """
     Logitech Unifying Sniffer interface for compatible WHAD device.
     """
+    domain = "unifying"
+    
     def __init__(self, device):
         """Sniffer initialization.
         """

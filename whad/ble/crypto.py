@@ -289,13 +289,16 @@ class EncryptedSessionInitialization(TrafficAnalyzer):
             self.trigger()
             self.master_skd = packet.skdm
             self.master_iv = packet.ivm
+            self.mark_packet(packet)
         elif LL_ENC_RSP in packet:
             self.trigger()
             self.slave_skd = packet.skds
             self.slave_iv = packet.ivs
-            self.started = True
+            self.mark_packet(packet)
+            #self.started = True
         elif LL_START_ENC_REQ in packet or packet.opcode == 0x05:
             self.trigger()
+            self.mark_packet(packet)
             self.started = True
 
         if self.started:
@@ -303,13 +306,19 @@ class EncryptedSessionInitialization(TrafficAnalyzer):
 
     @property
     def output(self):
-        return {
-            "master_skd" : self.master_skd,
-            "master_iv" : self.master_iv,
-            "slave_skd" : self.slave_skd,
-            "slave_iv" : self.slave_iv,
-            "started" : self.started
-        }
+        if (
+                self.master_skd is not None and
+                self.master_iv is not None and
+                self.slave_skd is not None and
+                self.slave_iv is not None
+        ):
+            return {
+                "master_skd" : self.master_skd,
+                "master_iv" : self.master_iv,
+                "slave_skd" : self.slave_skd,
+                "slave_iv" : self.slave_iv,
+                "started" : self.started
+            }
 
     @property
     def crypto_material(self):
@@ -447,33 +456,33 @@ class LegacyPairingCracking(TrafficAnalyzer):
                 self.trigger()
                 self.initiator = BDAddress(pkt.InitA, random=pkt.TxAdd == 1)
                 self.responder = BDAddress(pkt.AdvA, random=pkt.RxAdd == 1)
-
+                self.mark_packet(pkt)
             elif SM_Pairing_Request in pkt:
                 self.trigger()
                 self.pairing_req = bytes(pkt[SM_Hdr].build()) # why scapy why
-
+                self.mark_packet(pkt)
 
             elif SM_Pairing_Response in pkt:
                 self.trigger()
                 self.pairing_rsp = bytes(pkt[SM_Hdr].build())
-
+                self.mark_packet(pkt)
 
             elif SM_Confirm in pkt and self.master_confirm is None:
                 self.trigger()
                 self.master_confirm = bytes(pkt.confirm)
-
+                self.mark_packet(pkt)
             elif SM_Confirm in pkt and self.master_confirm is not None:
                 self.trigger()
                 self.slave_confirm = bytes(pkt.confirm)
-
+                self.mark_packet(pkt)
             elif SM_Random in pkt and self.master_random is None:
                 self.trigger()
                 self.master_random = bytes(pkt.random)
-
+                self.mark_packet(pkt)
             elif SM_Random in pkt and self.master_random is not None:
                 self.trigger()
                 self.slave_random = bytes(pkt.random)
-
+                self.mark_packet(pkt)
             if (
                 self.initiator is not None and
                 self.responder is not None and

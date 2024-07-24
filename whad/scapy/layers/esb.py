@@ -99,6 +99,9 @@ class ESB_Hdr(Packet):
         crc = bytes_to_bits(crc)
         return bits_to_bytes(preamble + address + header + payload + crc)
 
+    def post_dissect(self, s):
+        self.raw_packet_cache = None
+        return s
 
     def pre_dissect(self,s):
         if s[0] != 0xAA: # Dirty patch if no preamble is included

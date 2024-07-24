@@ -20,6 +20,7 @@ import sys
 
 from whad.ble.crypto import EncryptedSessionInitialization, LegacyPairingCracking
 from whad.rf4ce.crypto import RF4CEKeyDerivation
+from whad.zigbee.crypto import TouchlinkKeyManager
 from whad.ble.utils.analyzer import GATTServerDiscovery
 
 logger = logging.getLogger(__name__)
@@ -42,13 +43,19 @@ class WhadAnalyzeApp(CommandLineApp):
         )
 
     def on_packet(self, pkt):
-        print(repr(pkt))
+        #print(repr(pkt))
         for analyzer in self.analyzers:
             analyzer.process_packet(pkt)
-            if analyzer.triggered:
-                print("[i]", analyzer.__class__.__name__, "->", "triggered")
+            #if analyzer.triggered:
+            #    print("[i]", analyzer.__class__.__name__, "->", "triggered")
             if analyzer.completed:
                 print("[i]", analyzer.__class__.__name__, "->", "completed (output=", repr(analyzer.output),")")
+
+                for pkt in analyzer.marked_packets:
+                    print("\t", repr(pkt))
+
+                print()
+                analyzer.reset()
 
     def run(self):
         # Launch pre-run tasks
@@ -66,6 +73,7 @@ class WhadAnalyzeApp(CommandLineApp):
                 parameters = self.args.__dict__
 
                 self.analyzers = [
+                    TouchlinkKeyManager(),
                     EncryptedSessionInitialization(),
                     LegacyPairingCracking(),
                     RF4CEKeyDerivation(),
@@ -76,6 +84,7 @@ class WhadAnalyzeApp(CommandLineApp):
                 for parameter_name, parameter_value in parameters.items():
                     connector.add_parameter(parameter_name, parameter_value)
 
+                conf.dot15d4_protocol = self.args.domain
                 connector.domain = self.args.domain
                 connector.translator = get_translator(self.args.domain)(connector.hub)
                 connector.format = connector.translator.format

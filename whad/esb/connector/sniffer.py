@@ -15,6 +15,8 @@ class Sniffer(ESB, EventsManager):
     """
     Enhanced ShockBurst Sniffer interface for compatible WHAD device.
     """
+    domain = "esb"
+
     def __init__(self, device):
         ESB.__init__(self, device)
         EventsManager.__init__(self)

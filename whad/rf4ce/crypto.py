@@ -240,9 +240,11 @@ class RF4CEKeyDerivation(TrafficAnalyzer):
     def process_packet(self, packet):
         if RF4CE_Cmd_Pair_Request in packet:
             self.trigger()
+            self.mark_packet(packet)
             self.seeds_number = packet.key_exchange_transfer_count
         elif RF4CE_Cmd_Key_Seed in packet:
             self.trigger()
+            self.mark_packet(packet)
             self.seeds.append(packet.seed_data)
 
         if (
