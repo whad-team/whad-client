@@ -124,9 +124,11 @@ class Unifying(WhadDeviceConnector):
         packet.metadata.channel = tx_channel
         packet.metadata.address = tx_address
 
-        # Force packet rebuild
-        packet.preamble=0xaa
-        pkt = self.hub.convertPacket(packet)
+        # Set packet preamble depending on address
+        if bytes.fromhex(packet.address[:2])[0] >= 0x80:
+            packet.preamble = 0xAA
+        else:
+            packet.preamble = 0x55
 
         # Send packet
         return super().send_packet(packet)

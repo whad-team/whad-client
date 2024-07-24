@@ -117,6 +117,11 @@ class ESB(WhadDeviceConnector):
             packet.metadata.channel = tx_channel
             packet.metadata.address = tx_address
 
+            if bytes.fromhex(packet.address[:2])[0] >= 0x80:
+                packet.preamble = 0xAA
+            else:
+                packet.preamble = 0x55
+
             # Send packet
             return super().send_packet(packet)
         else:
