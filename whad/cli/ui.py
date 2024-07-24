@@ -15,7 +15,7 @@ def warning(message):
 def error(message):
     """Display an error message in red (if color is enabled)
     """
-    print_formatted_text(HTML('<ansired>[!] <b>%s</b></ansired>' % message))
+    print_formatted_text(HTML('<ansired>[!] <b>{message}</b></ansired>').format(message=message))
 
 def info(message):
     """Display an error info message in cyan (if color is enabled)
