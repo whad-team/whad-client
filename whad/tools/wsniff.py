@@ -21,8 +21,6 @@ from scapy.all import BrightTheme, Packet
 from whad.common.ipc import IPCPacket
 
 import whad
-import sys
-import os, stat
 
 logger = logging.getLogger(__name__)
 
