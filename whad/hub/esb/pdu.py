@@ -43,7 +43,6 @@ class SendRawPdu(PbMessageWrapper):
         """Convert SendPdu message to its scapy equivalent
         """
         packet = ESB_Hdr(bytes(self.pdu))
-        packet.preamble = 0xAA
         return packet
 
 
@@ -138,9 +137,6 @@ class RawPduReceived(PbMessageWrapper):
     def from_packet(packet):
         """Convert scapy packet to RawPduReceived message
         """
-        # Force packet preamble to 0xAA
-        packet.preamble = 0xAA
-
         msg = RawPduReceived(
             channel=packet.metadata.channel,
             pdu=bytes(packet)

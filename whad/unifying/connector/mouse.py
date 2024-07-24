@@ -8,6 +8,9 @@ class Mouse(Unifying):
     """
     Logitech Unifying Mouse interface for compatible WHAD device.
     """
+
+    domain = "esb"
+
     def __init__(self, device):
         super().__init__(device)
 
