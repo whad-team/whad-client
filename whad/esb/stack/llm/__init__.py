@@ -86,7 +86,6 @@ class LinkLayer(Layer):
             try:
                 queue = self.__ack_queue if queue == self.__data_queue else self.__data_queue
                 msg = queue.get(block=False,timeout=0.05)
-                print(msg)
                 if hasattr(msg, "metadata") and hasattr(msg.metadata, "channel"):
                     self.channel = msg.metadata.channel
                     if not self.state.synchronized:
