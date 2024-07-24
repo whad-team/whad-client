@@ -3,6 +3,7 @@ from whad.scapy.layers.rf4ce import RF4CE_Hdr, \
     RF4CE_Cmd_Pair_Request, RF4CE_Cmd_Key_Seed
 from whad.rf4ce.exceptions import MissingRF4CEHeader, \
     MissingCryptographicMaterial, MissingRF4CESecurityFlag
+from whad.common.analyzer import TrafficAnalyzer
 from Cryptodome.Cipher import AES
 from Cryptodome.Random import get_random_bytes
 
@@ -230,16 +231,33 @@ def xor(a, b):
         ]
     )
 
-class RF4CEKeyDerivation:
+class RF4CEKeyDerivation(TrafficAnalyzer):
     def __init__(self, seeds_number=None, seeds=[]):
+        self.reset()
         self.seeds_number = seeds_number
         self.seeds = seeds
 
     def process_packet(self, packet):
         if RF4CE_Cmd_Pair_Request in packet:
+            self.trigger()
+            self.mark_packet(packet)
             self.seeds_number = packet.key_exchange_transfer_count
         elif RF4CE_Cmd_Key_Seed in packet:
+            self.trigger()
+            self.mark_packet(packet)
             self.seeds.append(packet.seed_data)
+
+        if (
+                self.seeds_number is not None and
+                len(self.seeds) == (1 + self.seeds_number)
+        ):
+            self.complete()
+
+    @property
+    def output(self):
+        key = self.key
+        if key is not None:
+            return {"key":key}
 
     @property
     def key(self):
@@ -252,6 +270,7 @@ class RF4CEKeyDerivation:
             return None
 
     def reset(self):
+        super().reset()
         self.seeds_number = None
         self.seeds = []
 
@@ -340,6 +359,7 @@ class RF4CEDecryptor:
         for key in self.keys:
             manager = RF4CECryptoManager(key)
             candidate_addresses = self.addresses_combination()
+
             for (source_address, destination_address) in candidate_addresses:
                 try:
                     decrypted_packet, success = manager.decrypt(
@@ -347,6 +367,7 @@ class RF4CEDecryptor:
                         source_address,
                         destination_address
                     )
+
                     if success:
                         return (decrypted_packet, True)
 

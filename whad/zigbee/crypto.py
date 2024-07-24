@@ -3,6 +3,7 @@ from Cryptodome.Cipher import AES
 from scapy.layers.dot15d4 import Dot15d4,Dot15d4FCS
 from scapy.layers.zigbee import ZigbeeSecurityHeader,ZigbeeNWK, ZigbeeAppDataPayload, ZigbeeNWKCommandPayload
 from whad.scapy.layers.zll import ZLLScanRequest, ZLLScanResponse, ZLLNetworkJoinRouterRequest
+from whad.common.analyzer import TrafficAnalyzer
 from scapy.compat import raw
 from scapy.config import conf
 from struct import pack
@@ -319,8 +320,9 @@ ZIGBEE_ZLL_KEYS = {
 }
 
 
-class TouchlinkKeyManager:
+class TouchlinkKeyManager(TrafficAnalyzer):
     def __init__(self, encrypted_key=None, unencrypted_key=None, transaction_id=None, response_id=None, key_index=None):
+        self.reset()
         self.transaction_id = transaction_id
         self.response_id = response_id
         self.key_index = key_index
@@ -328,14 +330,29 @@ class TouchlinkKeyManager:
         self._unencrypted_key = unencrypted_key
 
     def process_packet(self, packet):
-        if ZLLScanRequest in packet:
-            self.transaction_id = packet.inter_pan_transaction_id
-        elif ZLLScanResponse in packet:
-            self.response_id = packet.response_id
-        elif ZLLNetworkJoinRouterRequest in packet:
-            self.key_index = packet.key_index
-            self._encrypted_key = packet.encrypted_network_key.to_bytes(16, "big")
 
+        if ZLLScanRequest in packet:
+            self.trigger()
+            self.transaction_id = packet.inter_pan_transaction_id
+            self.mark_packet(packet)
+        elif ZLLScanResponse in packet:
+            self.trigger()
+            self.response_id = packet.response_id
+            self.mark_packet(packet)
+        elif ZLLNetworkJoinRouterRequest in packet:
+            self.trigger()
+            self.key_index = packet.key_index
+            self._encrypted_key = packet.encrypted_network_key#.to_bytes(16, "big")
+            self.mark_packet(packet)
+            self.complete()
+
+    @property
+    def output(self):
+        return {
+            "key_index" : self.key_index,
+            "encrypted_key": self._encrypted_key,
+            "decrypted_key": self._decrypt_key(),
+        }
     @property
     def encrypted_key(self):
         if self._encrypted_key is not None:
@@ -365,6 +382,7 @@ class TouchlinkKeyManager:
             return None
 
     def reset(self):
+        super().reset()
         self.transaction_id = None
         self.response_id = None
         self.key_index = None

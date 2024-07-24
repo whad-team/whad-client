@@ -769,6 +769,7 @@ class WhadDevice(object):
 
         This method should NOT be used outside of this class. Use WhadDevice.create instead.
         """
+
         if interface_string.startswith(cls.INTERFACE_NAME):
             identifier = None
             index = None
@@ -808,7 +809,6 @@ class WhadDevice(object):
                     ""
                 )
                 if cls.check_interface(formatted_interface_string):
-
                     return cls(formatted_interface_string)
                 raise WhadDeviceNotFound
 
@@ -936,7 +936,7 @@ class WhadDevice(object):
     @property
     def index(self):
         return self.__index
-    
+
     @classmethod
     def inc_dev_index(cls):
         """Inject and maintain device index.

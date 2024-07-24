@@ -11,7 +11,8 @@ from struct import unpack, pack
 from scapy.layers.bluetooth4LE import BTLE
 from whad.dot15d4.metadata import Dot15d4Metadata
 from whad.ble.metadata import BLEMetadata
-
+from whad.esb.metadata import ESBMetadata
+from whad.unifying.metadata import UnifyingMetadata
 from time import sleep
 from whad import WhadDomain
 from os.path import exists
@@ -55,7 +56,8 @@ class PCAPDevice(VirtualDevice):
         """
         self.__opened = False
         self.__started = False
-        self.__filename = filename
+        self.__flush = "flush:" in filename
+        self.__filename = filename.replace("flush:", "")
         self.__pcap_reader = None
         self.__pcap_writer = None
         self.__dlt = None
@@ -101,7 +103,7 @@ class PCAPDevice(VirtualDevice):
         self._fw_url = self._get_url()
         self._fw_version = self._get_firmware_version()
         self._dev_capabilities = self._get_capabilities()
-        self.__flush = False
+        #self.__flush = False
         self.__opened = True
         # Ask parent class to run a background I/O thread
         super().open()
@@ -116,8 +118,8 @@ class PCAPDevice(VirtualDevice):
         while self.__started:
             try:
                 if self._is_reader():
-                        pkt = self.__pcap_reader.read_packet()
-                        self._send_packet(pkt)
+                    pkt = self.__pcap_reader.read_packet()
+                    self._send_packet(pkt)
             except EOFError:
                 # TODO: add an event to indicate end of stream ?
                 pass
@@ -133,6 +135,11 @@ class PCAPDevice(VirtualDevice):
             metadata = Dot15d4Metadata.convert_from_header(pkt)
         elif self.__domain == WhadDomain.BtLE:
             metadata = BLEMetadata.convert_from_header(pkt)
+        elif self.__domain == WhadDomain.Esb:
+            metadata = ESBMetadata.convert_from_header(pkt)
+        elif self.__domain == WhadDomain.LogitechUnifying:
+            metadata = UnifyingMetadata.convert_from_header(pkt)
+
         else:
             return None
         if self.__start_timestamp is None:
@@ -158,6 +165,46 @@ class PCAPDevice(VirtualDevice):
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
             self._send_whad_ble_raw_pdu(pkt, metadata)
+        elif self.__domain == WhadDomain.Esb:
+            metadata = self._generate_metadata(pkt)
+            self._interframe_delay(metadata.timestamp)
+            self.__last_timestamp = metadata.timestamp
+            self._send_whad_esb_raw_pdu(pkt, metadata)
+        elif self.__domain == WhadDomain.LogitechUnifying:
+            metadata = self._generate_metadata(pkt)
+            self._interframe_delay(metadata.timestamp)
+            self.__last_timestamp = metadata.timestamp
+            self._send_whad_unifying_raw_pdu(pkt, metadata)
+
+
+    def _send_whad_unifying_raw_pdu(self, packet, metadata):
+        # Create a RawPduReceived message
+        msg = self.hub.unifying.createRawPduReceived(
+            metadata.channel,
+            bytes(packet),
+            metadata.rssi,
+            metadata.timestamp,
+            metadata.is_crc_valid,
+            metadata.address
+        )
+
+        # Send message
+        self._send_whad_message(msg)
+
+    def _send_whad_esb_raw_pdu(self, packet, metadata):
+
+        # Create a RawPduReceived message
+        msg = self.hub.esb.createRawPduReceived(
+            metadata.channel,
+            bytes(packet),
+            metadata.rssi,
+            metadata.timestamp,
+            metadata.is_crc_valid,
+            metadata.address
+        )
+
+        # Send message
+        self._send_whad_message(msg)
 
     def _send_whad_ble_raw_pdu(self, packet, metadata):
         packet = packet[BTLE:]
@@ -232,6 +279,38 @@ class PCAPDevice(VirtualDevice):
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_dot15d4_start(self, message):
+        self.__started = True
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_esb_stop(self, message):
+        self.__started = False
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_esb_send_raw(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_esb_sniff(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_esb_start(self, message):
+        self.__started = True
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_unifying_stop(self, message):
+        self.__domain = WhadDomain.LogitechUnifying
+        self.__started = False
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_unifying_send_raw(self, message):
+        self.__domain = WhadDomain.LogitechUnifying
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_unifying_sniff(self, message):
+        self.__domain = WhadDomain.LogitechUnifying
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_unifying_start(self, message):
+        self.__domain = WhadDomain.LogitechUnifying
         self.__started = True
         self._send_whad_command_result(CommandResult.SUCCESS)
 

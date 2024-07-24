@@ -7,138 +7,31 @@ from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import CommandLineApp, ApplicationError
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
-from importlib import import_module
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
 from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
-from whad.device.unix import UnixSocketProxy
-from dataclasses import fields, is_dataclass
-from pkgutil import iter_modules
-from inspect import getdoc
+from whad.device.unix import UnixSocketServerDevice, UnixConnector
+from whad.tools.utils import list_implemented_sniffers, get_sniffer_parameters, build_configuration_from_args
+from whad.device import Bridge
 from scapy.config import conf
 from html import escape
 from hexdump import hexdump
 from scapy.all import BrightTheme, Packet
-from whad.common.ipc import IPCPacket
+from time import sleep
 
 import whad
 
 logger = logging.getLogger(__name__)
 
-def list_implemented_sniffers():
-    """Build a dictionnary of sniffers connector and configuration, by domain.
+
+class WhadSniffOutputPipe(Bridge):
+    """Whad sniff output pipe
+
+    When wsniff is chained with another whad tool, it spawns a device
+    based on the specified profile using the specified WHAD adapter and forward
+    it to the chained tool. The chained tool will then forward packets back and forth.
     """
-    environment = {}
-
-    # Iterate over modules
-    for _, candidate_protocol,_ in iter_modules(whad.__path__):
-        # If the module contains a sniffer connector and a sniffing module,
-        # store the associated classes in the environment dictionary
-        try:
-            module = import_module("whad.{}.connector.sniffer".format(candidate_protocol))
-            configuration_module = import_module("whad.{}.sniffing".format(candidate_protocol))
-            environment[candidate_protocol] = {
-                "sniffer_class":module.Sniffer,
-                "configuration_class":configuration_module.SnifferConfiguration
-            }
-        except ModuleNotFoundError:
-            pass
-    # return the environment dictionary
-    return environment
-
-def get_sniffer_parameters(configuration_class):
-    """
-    Extract all parameters from a sniffer configuration class, with their name and associated documentation.
-
-    :param configuration_class: sniffer configuration class
-    :return: dict containing parameters for a given configuration class
-    """
-    parameters = {}
-    # Extract documentation of every field in the configuration class
-    fields_configuration_documentation = {
-        i.replace(":param ","").split(":")[0] : i.replace(":param ","").split(":")[1]
-        for i in getdoc(configuration_class).split("\n")
-        if i.startswith(":param ")
-    }
-
-    # Iterate over the fields of the configuration class
-    for field in fields(configuration_class):
-
-        # If the field is a dataclass, process subfields
-        if is_dataclass(field.type):
-            # Extract documentation of every subfields
-            subfields_configuration_documentation = {
-                i.replace(":param ","").split(":")[0] : i.replace(":param ","").split(":")[1]
-                for i in getdoc(field.type).split("\n")
-                if i.startswith(":param ")
-            }
-
-            # Populate parameters dict with subfields configuration
-            for subfield in fields(field.type):
-                parameters["{}.{}".format(field.name,subfield.name)] = (
-                    subfield.type,
-                    subfield.default,
-                    field.type,
-                    (
-                        subfields_configuration_documentation[subfield.name]
-                        if subfield.name in subfields_configuration_documentation
-                        else None
-                    )
-                )
-        # if the field is not a dataclass, process it
-        else:
-            # Populate parameters dict with field configuration
-            parameters[field.name] = (
-                field.type,
-                field.default,
-                None,
-                (
-                    fields_configuration_documentation[field.name]
-                    if field.name in fields_configuration_documentation
-                    else None
-                )
-            )
-    return parameters
-
-
-def build_configuration_from_args(environment, args):
-    """
-    Build sniffer configuration from arguments provided via argparse.
-
-    :param environment: environment
-    :type environment: dict
-    :param args: arguments provided by user
-    :type args: :class:`argparse.ArgumentParser`
-    """
-    configuration = environment[args.domain]["configuration_class"]()
-    subfields = {}
-    for parameter in environment[args.domain]["parameters"]:
-        base_class = None
-
-        base_class = environment[args.domain]["parameters"][parameter][2]
-
-        if base_class is None:
-            try:
-                setattr(configuration,parameter,getattr(args,parameter))
-            except AttributeError:
-                pass
-        else:
-            main, sub = parameter.split(".")
-            if main not in subfields:
-                subfields[main] = base_class()
-            setattr(subfields[main], sub, getattr(args, parameter))
-
-
-    for subfield in subfields:
-        create = False
-        for item in fields(subfields[subfield]):
-            if getattr(subfields[subfield], item.name) is not None:
-                create = True
-                break
-        if create:
-            setattr(configuration, subfield, subfields[subfield])
-        else:
-            setattr(configuration, subfield, None)
-    return configuration
+    def __init__(self, input_connector, output_connector):
+        super().__init__(input_connector, output_connector)
 
 
 class WhadDomainSubParser(ArgumentParser):
@@ -265,27 +158,38 @@ class WhadSniffApp(CommandLineApp):
                         monitor_wireshark.start()
                         monitors.append(monitor_wireshark)
 
-                    # Start the sniffer
-                    sniffer.start()
 
+
+                    sniffer.domain = self.args.domain
                     if self.is_stdout_piped():
-                        try:
-                            proxy = UnixSocketProxy(self.interface, params={"domain":self.args.domain})
-                            proxy.start()
-                            proxy.join()
-                        except EOFError:
-                            exit()
+                        # Create output proxy
+                        #proxy = UnixSocketProxy(self.interface, params={"domain":self.args.domain})
+
+                        # Create our unix socket server
+                        unix_server = UnixConnector(UnixSocketServerDevice(parameters={
+                            'format': self.args.format,
+                            'metadata':self.args.metadata,
+                            'domain': self.args.domain
+                        }))
+                        # Create our packet bridge
+                        # logger.info("[ble-spawn] Starting our output pipe")
+                        output_pipe = WhadSniffOutputPipe(sniffer, unix_server)
+                        # Start the sniffer
+                        sniffer.start()
+                        # Loop until the user hits CTL-C
+                        while True:
+                            sleep(1)
                     else:
-                        try:
-                            # Iterates over the packet stream and display packets
-                            for pkt in sniffer.sniff():
-                                display_packet(
-                                    pkt,
-                                    show_metadata = self.args.metadata,
-                                    format = self.args.format
-                                )
-                        except EOFError:
-                            print("here :D")
+                        # Start the sniffer
+                        sniffer.start()
+                        # Iterates over the packet stream and display packets
+                        for pkt in sniffer.sniff():
+                            display_packet(
+                                pkt,
+                                show_metadata = self.args.metadata,
+                                format = self.args.format
+                            )
+
 
                 else:
                     self.error("You need to specify a domain.")

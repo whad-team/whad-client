@@ -18,62 +18,44 @@ import logging
 import time
 import sys
 
+from whad.ble.crypto import EncryptedSessionInitialization, LegacyPairingCracking
+from whad.rf4ce.crypto import RF4CEKeyDerivation
+from whad.zigbee.crypto import TouchlinkKeyManager
+from whad.ble.utils.analyzer import GATTServerDiscovery
+
 logger = logging.getLogger(__name__)
 #logging.basicConfig(level=logging.DEBUG)
 
-class WhadExtractUnixSocketConnector(UnixSocketConnector):
+class WhadAnalyzeUnixSocketConnector(UnixSocketConnector):
     pass
 
-class WhadExtractApp(CommandLineApp):
+class WhadAnalyzeApp(CommandLineApp):
 
     def __init__(self):
         """Application uses an interface and has commands.
         """
         super().__init__(
-            description='WHAD filter tool',
+            description='WHAD analyze tool',
             interface=True,
             commands=False,
             input=CommandLineApp.INPUT_WHAD,
             output=CommandLineApp.OUTPUT_STANDARD
         )
 
-        self.add_argument(
-            'extractor',
-            help='extractor to evaluate',
-            nargs='*'
-        )
-
-        self.add_argument(
-            '-d',
-            '--delimiter',
-            dest='delimiter',
-            default=" ",
-            help='delimiter between extractor'
-        )
-
-    def build_extractors(self):
-        extractor_template = "lambda p : %s"
-        extractors = []
-        for extractor in self.args.extractor:
-            if "packet." in extractor:
-                extractor.replace("packet.", "p.")
-            elif "pkt." in extractor:
-                extractor.replace("pkt.", "p.")
-            extractors.append(eval(extractor_template % extractor))
-
-        return extractors
-
     def on_packet(self, pkt):
-        extractors = self.build_extractors()
-        output = []
-        try:
-            for extractor in extractors:
-                output.append(str(extractor(pkt)))
-            print(self.args.delimiter.join(output))
-            sys.stdout.flush()
-            return pkt
-        except:
-            return pkt
+        #print(repr(pkt))
+        for analyzer in self.analyzers:
+            analyzer.process_packet(pkt)
+            #if analyzer.triggered:
+            #    print("[i]", analyzer.__class__.__name__, "->", "triggered")
+            if analyzer.completed:
+                print("[i]", analyzer.__class__.__name__, "->", "completed (output=", repr(analyzer.output),")")
+
+                for pkt in analyzer.marked_packets:
+                    print("\t", repr(pkt))
+
+                print()
+                analyzer.reset()
 
     def run(self):
         # Launch pre-run tasks
@@ -90,7 +72,15 @@ class WhadExtractApp(CommandLineApp):
 
                 parameters = self.args.__dict__
 
-                connector = WhadExtractUnixSocketConnector(interface)
+                self.analyzers = [
+                    TouchlinkKeyManager(),
+                    EncryptedSessionInitialization(),
+                    LegacyPairingCracking(),
+                    RF4CEKeyDerivation(),
+                    GATTServerDiscovery()
+                ]
+
+                connector = WhadAnalyzeUnixSocketConnector(interface)
                 for parameter_name, parameter_value in parameters.items():
                     connector.add_parameter(parameter_name, parameter_value)
 
@@ -100,8 +90,6 @@ class WhadExtractApp(CommandLineApp):
                 connector.format = connector.translator.format
                 connector.on_packet = self.on_packet
 
-                #interface.open()
-
                 while True:
                     time.sleep(1)
 
@@ -110,9 +98,9 @@ class WhadExtractApp(CommandLineApp):
             self.post_run()
 
 
-def wextract_main():
+def wanalyze_main():
     try:
-        app = WhadExtractApp()
+        app = WhadAnalyzeApp()
         app.run()
     except ApplicationError as err:
         err.show()

@@ -20,6 +20,8 @@ class Sniffer(Dot15d4, EventsManager):
     """
     802.15.4 Sniffer interface for compatible WHAD device.
     """
+    domain = "dot15d4"
+
     def __init__(self, device):
         """Initialize our sniffer.
         """

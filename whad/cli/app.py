@@ -34,7 +34,7 @@ WHAD-based command-line application classes
 
 WHAD offers the possibility to chain different tools to create flexible packet
 processing flows. This is automatically handled by our CLI device-based application
-classes. 
+classes.
 
 An application using the `CommandLineDeviceSource` class will therefore be in
 charge of configuring a WHAD adapter specified with the `--interface` option,
@@ -601,12 +601,18 @@ class CommandLineApp(ArgumentParser):
     def warning(self, message):
         """Display a warning message in orange (if color is enabled)
         """
-        print_formatted_text(HTML('<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % message))
+        try:
+            print_formatted_text(HTML('<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % message))
+        except:
+            print_formatted_text(HTML('<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % 'an unknown warning occured'))
 
     def error(self, message):
         """Display an error message in red (if color is enabled)
         """
-        print_formatted_text(HTML('<ansired>[!] <b>%s</b></ansired>' % message))
+        try:
+            print_formatted_text(HTML('<ansired>[!] <b>%s</b></ansired>' % message))
+        except:
+            print_formatted_text(HTML('<ansired>[!] <b>%s</b></ansired>' % 'an unknown error occured'))
 
 
 class CommandLineSource(CommandLineApp):

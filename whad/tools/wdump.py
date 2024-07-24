@@ -9,37 +9,21 @@ from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.cli.app import CommandLineApp, ApplicationError
 from scapy.all import *
 #from whad.common.ipc import IPCPacket
-from whad.device.unix import UnixSocketProxy, UnixSocketCallbacksConnector
+from whad.device.unix import UnixConnector, UnixSocketServerDevice
+from whad.device import Bridge
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
 from whad.common.monitors import PcapWriterMonitor
+from whad.tools.utils import get_translator
+from time import sleep
 import logging
-import time
 import sys
-from pkgutil import iter_modules
-from importlib import import_module
-import whad
+
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 
-def get_translator(protocol):
-    """Get a translator according to a specific domain.
-    """
-    translator = None
-
-    # Iterate over modules
-    for _, candidate_protocol,_ in iter_modules(whad.__path__):
-        # If the module contains a sniffer connector,
-        # store the associated translator in translator variable
-        try:
-            module = import_module("whad.{}.connector.sniffer".format(candidate_protocol))
-            if candidate_protocol == protocol:
-                translator = module.Sniffer.translator
-                break
-        except ModuleNotFoundError:
-            pass
-    # return the environment dictionary
-    return translator
+class WhadDumpPipe(Bridge):
+    pass
 
 class WhadDumpApp(CommandLineApp):
     connector = None
@@ -58,15 +42,6 @@ class WhadDumpApp(CommandLineApp):
             help='Pcap file to export'
         )
 
-    def on_rx_packet(self, pkt):
-        if self.connector is not None:
-            self.connector.monitor_packet_rx(pkt)
-        return pkt
-
-    def on_tx_packet(self, pkt):
-        if self.connector is not None:
-            self.connector.monitor_packet_tx(pkt)
-        return pkt
 
     def run(self):
         # Launch pre-run tasks
@@ -86,35 +61,30 @@ class WhadDumpApp(CommandLineApp):
 
                     parameters = self.args.__dict__
 
-                    parameters.update({
-                        "on_tx_packet_cb" : self.on_tx_packet,
-                        "on_rx_packet_cb" : self.on_rx_packet,
-                    })
 
+                    connector = UnixConnector(interface)
+                    conf.dot15d4_protocol = self.args.domain
+                    connector.domain = self.args.domain
+                    connector.translator = get_translator(self.args.domain)(connector.hub)
+                    connector.format = connector.translator.format
 
-                    interface.open()
-
-                    proxy = UnixSocketProxy(
-                        interface,
-                        params=parameters,
-                        connector=UnixSocketCallbacksConnector
-                    )
-
-                    self.connector = proxy.connector
-                    self.connector.domain = self.args.domain
-                    self.connector.translator = get_translator(self.args.domain)(self.connector.hub)
-                    self.connector.format = self.connector.translator.format
-
+                    self.connector = connector
                     monitor = PcapWriterMonitor(self.args.pcap)
-                    monitor.attach(self.connector)
+                    monitor.attach(connector)
                     monitor.start()
 
                     if self.is_stdout_piped():
-                        proxy.start()
-                        proxy.join()
+                        unix_server = UnixConnector(UnixSocketServerDevice(parameters={
+                            'domain': self.args.domain,
+                            'format': self.args.format,
+                            'metadata': self.args.metadata
+                        }))
+                        # Create our packet bridge
+                        logger.info("[ble-spawn] Starting our output pipe")
+                        output_pipe = WhadDumpPipe(connector, unix_server)
 
                     while True:
-                        time.sleep(1)
+                        sleep(1)
             else:
                 pass
         except KeyboardInterrupt:

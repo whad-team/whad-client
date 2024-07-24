@@ -1,5 +1,7 @@
 from whad.common.metadata import Metadata
 from dataclasses import dataclass
+from whad.scapy.layers.esb import ESB_Hdr
+from whad.esb.esbaddr import ESBAddress
 
 @dataclass(repr=False)
 class UnifyingMetadata(Metadata):
@@ -8,6 +10,16 @@ class UnifyingMetadata(Metadata):
 
     def convert_to_header(self):
         return None, timestamp
+
+    @classmethod
+    def convert_from_header(cls, pkt):
+        metadata = UnifyingMetadata()
+        pkt = ESB_Hdr(bytes(pkt))
+        metadata.address = ESBAddress(pkt.address)
+        metadata.is_crc_valid = pkt.valid_crc
+        metadata.timestamp = int(100000 * pkt.time)
+        metadata.channel = 0
+        return metadata
 
 def generate_unifying_metadata(message, msg_type):
     metadata = UnifyingMetadata()

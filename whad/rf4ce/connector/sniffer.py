@@ -17,6 +17,8 @@ class Sniffer(RF4CE, EventsManager):
     """
     RF4CE Sniffer interface for compatible WHAD device.
     """
+    domain = "rf4ce"
+
     def __init__(self, device, configuration=SnifferConfiguration()):
         RF4CE.__init__(self, device)
         EventsManager.__init__(self)

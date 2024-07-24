@@ -8,6 +8,7 @@ from scapy.layers.bluetooth4LE import LL_ENC_REQ, LL_ENC_RSP, LL_START_ENC_REQ, 
     BTLE_CTRL, BTLE_DATA, BTLE, BTLE_CONNECT_REQ
 from scapy.layers.bluetooth import SM_Hdr, SM_Pairing_Request, SM_Random, \
     SM_Pairing_Response, SM_Confirm
+from whad.common.analyzer import TrafficAnalyzer
 from whad.hub.ble.bdaddr import BDAddress
 from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.ble.exceptions import MissingCryptographicMaterial
@@ -264,12 +265,20 @@ class LinkLayerCryptoManager:
 
 
 
-class EncryptedSessionInitialization:
+class EncryptedSessionInitialization(TrafficAnalyzer):
     def __init__(self, master_skd = None, master_iv = None, slave_skd = None, slave_iv = None):
+        self.reset()
         self.master_skd = master_skd
         self.master_iv = master_iv
         self.slave_skd = slave_skd
         self.slave_iv = slave_iv
+
+    def reset(self):
+        super().reset()
+        self.master_skd = None
+        self.master_iv = None
+        self.slave_skd = None
+        self.slave_iv = None
         self.started = False
 
     def process_packet(self, packet):
@@ -277,14 +286,39 @@ class EncryptedSessionInitialization:
             return
 
         if LL_ENC_REQ in packet:
+            self.trigger()
             self.master_skd = packet.skdm
             self.master_iv = packet.ivm
+            self.mark_packet(packet)
         elif LL_ENC_RSP in packet:
+            self.trigger()
             self.slave_skd = packet.skds
             self.slave_iv = packet.ivs
-            self.started = True
+            self.mark_packet(packet)
+            #self.started = True
         elif LL_START_ENC_REQ in packet or packet.opcode == 0x05:
+            self.trigger()
+            self.mark_packet(packet)
             self.started = True
+
+        if self.started:
+            self.complete()
+
+    @property
+    def output(self):
+        if (
+                self.master_skd is not None and
+                self.master_iv is not None and
+                self.slave_skd is not None and
+                self.slave_iv is not None
+        ):
+            return {
+                "master_skd" : self.master_skd,
+                "master_iv" : self.master_iv,
+                "slave_skd" : self.slave_skd,
+                "slave_iv" : self.slave_iv,
+                "started" : self.started
+            }
 
     @property
     def crypto_material(self):
@@ -302,12 +336,6 @@ class EncryptedSessionInitialization:
     def encryption(self):
         return self.crypto_material is not None and self.started
 
-    def reset(self):
-        self.master_skd = None
-        self.master_iv = None
-        self.slave_skd = None
-        self.slave_iv = None
-        self.started = False
 
 
 
@@ -385,7 +413,7 @@ class LinkLayerDecryptor:
             else:
                 return (None, False)
 
-class LegacyPairingCracking:
+class LegacyPairingCracking(TrafficAnalyzer):
         def __init__(
             self,
             initiator = None,
@@ -397,7 +425,7 @@ class LegacyPairingCracking:
             slave_confirm = None,
             slave_random = None
         ):
-
+            self.reset()
             self.initiator = initiator
             self.responder = responder
 
@@ -408,30 +436,64 @@ class LegacyPairingCracking:
             self.slave_confirm = slave_confirm
             self.slave_random = slave_random
 
+        def reset(self):
+            super().reset()
+            self.initiator = None
+            self.responder = None
+
+            self.pairing_req = None
+            self.pairing_rsp = None
+            self.master_confirm = None
+            self.master_random = None
+            self.slave_confirm = None
+            self.slave_random = None
+
+            self.tk = None
+            self.stk = None
+
         def process_packet(self, pkt):
             if BTLE_CONNECT_REQ in pkt:
+                self.trigger()
                 self.initiator = BDAddress(pkt.InitA, random=pkt.TxAdd == 1)
                 self.responder = BDAddress(pkt.AdvA, random=pkt.RxAdd == 1)
-
+                self.mark_packet(pkt)
             elif SM_Pairing_Request in pkt:
+                self.trigger()
                 self.pairing_req = bytes(pkt[SM_Hdr].build()) # why scapy why
-
+                self.mark_packet(pkt)
 
             elif SM_Pairing_Response in pkt:
+                self.trigger()
                 self.pairing_rsp = bytes(pkt[SM_Hdr].build())
-
+                self.mark_packet(pkt)
 
             elif SM_Confirm in pkt and self.master_confirm is None:
+                self.trigger()
                 self.master_confirm = bytes(pkt.confirm)
-
+                self.mark_packet(pkt)
             elif SM_Confirm in pkt and self.master_confirm is not None:
+                self.trigger()
                 self.slave_confirm = bytes(pkt.confirm)
-
+                self.mark_packet(pkt)
             elif SM_Random in pkt and self.master_random is None:
+                self.trigger()
                 self.master_random = bytes(pkt.random)
-
+                self.mark_packet(pkt)
             elif SM_Random in pkt and self.master_random is not None:
+                self.trigger()
                 self.slave_random = bytes(pkt.random)
+                self.mark_packet(pkt)
+            if (
+                self.initiator is not None and
+                self.responder is not None and
+                self.pairing_req is not None and
+                self.pairing_rsp is not None and
+                self.master_confirm is not None and
+                self.slave_confirm is not None and
+                self.master_random is not None and
+                self.slave_random is not None
+            ):
+                self.complete()
 
         def process_connected(self, initiator, responder):
             self.initiator = initiator
@@ -455,6 +517,19 @@ class LegacyPairingCracking:
             )
 
         @property
+        def output(self):
+            keys = self.keys
+            if keys is None:
+                return None
+
+            else:
+                tk, stk = keys
+                return {
+                    "tk" : tk,
+                    "stk" : stk
+                }
+
+        @property
         def keys(self):
 
             if self.master_confirm is not None and self.master_random is not None:
@@ -465,6 +540,9 @@ class LegacyPairingCracking:
                 confirm = self.slave_confirm
             else:
                 return None
+
+            if self.tk is not None and self.stk is not None:
+                return (self.tk, self.stk)
 
             for i in range(0,1000000):
                 tk = pack(">IIII", 0,0,0,i)
@@ -485,9 +563,12 @@ class LegacyPairingCracking:
                 if res2 == confirm[::-1]:
 
                     stk = s1(tk, self.slave_random[::-1], self.master_random[::-1])[::-1]
+                    self.tk = tk
+                    self.stk = stk
                     return (tk, stk)
             return None
 
+        '''
         def reset(self):
             self.initiator = None
             self.responder = None
@@ -495,3 +576,4 @@ class LegacyPairingCracking:
             self.pairing_req = None
             self.pairing_rsp = None
             self.confirm = None
+        '''

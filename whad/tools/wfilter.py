@@ -8,37 +8,66 @@ from prompt_toolkit import print_formatted_text, HTML
 from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.cli.app import CommandLineApp, ApplicationError
 from scapy.all import *
-#from whad.common.ipc import IPCPacket
-from whad.device.unix import UnixSocketProxy, UnixSocketCallbacksConnector
+from whad.device.unix import UnixSocketServerDevice, UnixConnector
+from whad.device import Bridge
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
-from pkgutil import iter_modules
-from importlib import import_module
-import whad
+from whad.tools.utils import get_translator
 import logging
-import time
+from time import sleep
 from scapy.config import conf
 
 logger = logging.getLogger(__name__)
 #logging.basicConfig(level=logging.DEBUG)
 
-def get_translator(protocol):
-    """Get a translator according to a specific domain.
+class WhadFilterPipe(Bridge):
+    """Whad filter output pipe
+
+    When wfilter is chained with another whad tool, it spawns a device
+    based on the specified profile using the specified WHAD adapter and forward
+    it to the chained tool. The chained tool will then forward packets back and forth.
     """
-    translator = None
-    # Iterate over modules
-    for _, candidate_protocol,_ in iter_modules(whad.__path__):
-        # If the module contains a sniffer connector,
-        # store the associated translator in translator variable
-        try:
-            module = import_module("whad.{}.connector.sniffer".format(candidate_protocol))
-            if candidate_protocol == protocol:
-                translator = module.Sniffer.translator
-                break
-        except ModuleNotFoundError:
-            pass
-    # return the environment dictionary
-    return translator
+    def __init__(self, input_connector, output_connector, on_rx_packet_cb, on_tx_packet_cb):
+        super().__init__(input_connector, output_connector)
+        self.on_rx_packet = on_rx_packet_cb
+        self.on_tx_packet = on_tx_packet_cb
+
+
+    def on_outbound(self, message):
+        """Process outbound messages.
+
+        Outbound packets are packets coming from our input connector,that need to be
+        forwarded as packets to the next tool.
+        """
+        if hasattr(message, "to_packet"):
+            pkt = message.to_packet()
+            pkt = self.on_rx_packet(pkt)
+            if pkt is not None:
+                msg = message.from_packet(pkt)
+                super().on_outbound(msg)
+        else:
+            logger.debug('[wfilter][input-pipe] forward default outbound message %s' % message)
+            # Forward other messages
+            super().on_outbound(message)
+
+
+    def on_inbound(self, message):
+        """Process inbound messages.
+
+        Inbound packets are packets coming from our output connector,that need to be
+        forwarded as packets to the previous tool.
+        """
+        if hasattr(message, "to_packet"):
+            pkt = message.to_packet()
+            pkt = self.on_tx_packet(pkt)
+            if pkt is not None:
+                msg = message.from_packet(pkt)
+                super().on_inbound(msg)
+        else:
+            logger.debug('[wfilter][input-pipe] forward default inbound message %s' % message)
+            # Forward other messages
+            super().on_inbound(message)
+
 
 class WhadFilterApp(CommandLineApp):
 
@@ -116,7 +145,11 @@ class WhadFilterApp(CommandLineApp):
     def on_rx_packet(self, pkt):
         if not self.args.down:
             if not self.is_stdout_piped():
-                display_packet(pkt)
+                display_packet(
+                    pkt,
+                    show_metadata = self.args.metadata,
+                    format = self.args.format
+                )
             return pkt
 
         filter = self.build_filter()
@@ -127,24 +160,40 @@ class WhadFilterApp(CommandLineApp):
                     exec(self.args.transform)
                     # recompute CRC ?
                 if not self.is_stdout_piped():
-                    display_packet(pkt)
+                    display_packet(
+                        pkt,
+                        show_metadata = self.args.metadata,
+                        format = self.args.format
+                    )
                 return pkt
             else:
 
                 if self.args.forward:
-                    display_packet(pkt)
+                    display_packet(
+                        pkt,
+                        show_metadata = self.args.metadata,
+                        format = self.args.format
+                    )
                     return pkt
                 return None
         except:
             if self.args.forward:
-                display_packet(pkt)
+                display_packet(
+                    pkt,
+                    show_metadata = self.args.metadata,
+                    format = self.args.format
+                )
                 return pkt
             return None
 
     def on_tx_packet(self, pkt):
         if not self.args.up:
             if not self.is_stdout_piped():
-                display_packet(pkt)
+                display_packet(
+                    pkt,
+                    show_metadata = self.args.metadata,
+                    format = self.args.format
+                )
             return pkt
 
         filter = self.build_filter()
@@ -154,16 +203,28 @@ class WhadFilterApp(CommandLineApp):
                     p = packet = pkt
                     exec(self.args.transform)
                 if not self.is_stdout_piped():
-                    display_packet(pkt)
+                    display_packet(
+                        pkt,
+                        show_metadata = self.args.metadata,
+                        format = self.args.format
+                    )
                 return pkt
             else:
                 if self.args.forward:
-                    display_packet(pkt)
+                    display_packet(
+                        pkt,
+                        show_metadata = self.args.metadata,
+                        format = self.args.format
+                    )
                     return pkt
                 return None
         except:
             if self.args.forward:
-                display_packet(pkt)
+                display_packet(
+                    pkt,
+                    show_metadata = self.args.metadata,
+                    format = self.args.format
+                )
                 return pkt
             return None
 
@@ -187,28 +248,27 @@ class WhadFilterApp(CommandLineApp):
 
             parameters = self.args.__dict__
 
-            parameters.update({
-                "on_tx_packet_cb" : self.on_tx_packet,
-                "on_rx_packet_cb" : self.on_rx_packet,
-            })
-            proxy = UnixSocketProxy(
-                interface,
-                params=parameters,
-                connector=UnixSocketCallbacksConnector
-            )
-            interface.open()
-            self.connector = proxy.connector
-            self.connector.domain = self.args.domain
-            self.connector.translator = get_translator(self.args.domain)(self.connector.hub)
-            self.connector.format = self.connector.translator.format
+            connector = UnixConnector(interface)
+            conf.dot15d4_protocol = self.args.domain
+            connector.domain = self.args.domain
+            connector.translator = get_translator(self.args.domain)(connector.hub)
+            connector.format = connector.translator.format
 
             if self.is_stdout_piped():
-                proxy.start()
-                proxy.join()
+                unix_server = UnixConnector(UnixSocketServerDevice(parameters={
+                    'domain': self.args.domain,
+                    'format': self.args.format,
+                    'metadata' : self.args.metadata
+                }))
+                # Create our packet bridge
+                logger.info("[ble-spawn] Starting our output pipe")
+                output_pipe = WhadFilterPipe(connector, unix_server, self.on_rx_packet, self.on_tx_packet)
 
+            else:
+                connector.on_packet = self.on_rx_packet
 
             while True:
-                time.sleep(1)
+                sleep(1)
 
         except KeyboardInterrupt:
             # Launch post-run tasks
