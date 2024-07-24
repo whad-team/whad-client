@@ -438,14 +438,13 @@ class WhadDeviceConnector(object):
         msg = self.hub.convertPacket(packet)
         if msg is not None:
             resp = self.send_command(msg, message_filter(CommandResult))
-            logger.info('[ble connector] Command sent, result: %s' % resp)
+            logger.info('[connector] Command sent, result: %s' % resp)
             if resp is None:
-                print('resp is none')
-                raise WhadDeviceDisconnected(None)
+                raise WhadDeviceDisconnected()
             else:
                 return isinstance(resp, Success)
         else:
-            logger.error('[ble connector] Packet cannot be converted into the corresponding WHAD message')
+            logger.error('[connector] Packet cannot be converted into the corresponding WHAD message')
             return False
 
 
