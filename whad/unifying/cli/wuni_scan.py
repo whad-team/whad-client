@@ -16,7 +16,6 @@ from scapy.packet import Packet
 from whad.cli.app import CommandLineDeviceSink, run_app
 from whad.unifying.connector import Sniffer, ESBAddress
 from whad.esb.exceptions import InvalidESBAddressException
-from whad.scapy.layers.esb import ESB_Payload_Hdr
 from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, \
     Logitech_Keepalive_Payload, Logitech_Mouse_Payload, \
     Logitech_Encrypted_Keystroke_Payload, Logitech_Unencrypted_Keystroke_Payload
@@ -160,14 +159,14 @@ class UniScanApp(CommandLineDeviceSink):
         print('Scanning for Unifying devices on channels 0-100 ...')
         while True:
             for packet in sniffer.sniff():
-                if ESB_Payload_Hdr in packet:
+                if Logitech_Unifying_Hdr in packet:
                     self.show_packet(packet)
 
     def show_packet(self, packet: Packet):
         """Display a Logitech Unifying packet with a short analysis.
         """
-        # Extract ESB payload
-        payload = bytes(packet[ESB_Payload_Hdr].payload).hex()
+        # Extract Logitech Unifying payload
+        payload = packet[Logitech_Unifying_Hdr]
 
         # Determine device type and generate comment
         comment = ''
@@ -188,7 +187,7 @@ class UniScanApp(CommandLineDeviceSink):
             "<ansicyan>[{channel:03d}]</ansicyan><ansicyan>[{addr}]</ansicyan> "
             "<b>{payload}</b> %s" % comment
         )).format(channel=packet.metadata.channel, addr=str(packet.address),
-                  payload=payload))
+                  payload=bytes(payload).hex()))
 
 
 def wuni_scan_main():
