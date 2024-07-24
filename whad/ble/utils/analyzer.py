@@ -1,3 +1,4 @@
+from whad.common.analyzer import TrafficAnalyzer
 from scapy.layers.bluetooth import  ATT_Read_By_Group_Type_Request, ATT_Read_By_Group_Type_Response, \
                                     ATT_Read_By_Type_Request, ATT_Read_By_Type_Response, ATT_Error_Response, \
                                     ATT_Find_Information_Request, ATT_Find_Information_Response
@@ -8,33 +9,6 @@ from whad.ble.profile.characteristic import Characteristic, CharacteristicDescri
 from whad.ble.profile.service import PrimaryService, SecondaryService
 from struct import unpack
 
-
-
-class TrafficAnalyzer:
-    def __init__(self):
-        self.reset()
-
-    def process_packet(self, packet):
-        pass
-
-    def reset(self):
-        self.__triggered = False
-        self.__completed = False
-
-    def trigger(self):
-        self.__triggered = True
-
-    def complete(self):
-        self.__completed = True
-
-    @property
-    def triggered(self):
-        return self.__triggered
-
-    @property
-    def completed(self):
-        return self.__completed
-
 class ReadByGroupTypeDiscovery(TrafficAnalyzer):
 
     def reset(self):
@@ -44,6 +18,16 @@ class ReadByGroupTypeDiscovery(TrafficAnalyzer):
         self.start_handle = None
         self.end_handle = None
         self.items = []
+
+    @property
+    def output(self):
+        return {
+            "uuid" : self.uuid,
+            "handle" : self.handle,
+            "start_handle" : self.start_handle,
+            "end_handle" : self.end_handle,
+            "items" : self.items
+        }
 
     def process_packet(self, packet):
         if ATT_Read_By_Group_Type_Request in packet:
@@ -85,6 +69,17 @@ class ReadByTypeDiscovery(TrafficAnalyzer):
         self.end_handle = None
         self.items = []
 
+
+    @property
+    def output(self):
+        return {
+            "uuid" : self.uuid,
+            "handle" : self.handle,
+            "start_handle" : self.start_handle,
+            "end_handle" : self.end_handle,
+            "items" : self.items
+        }
+
     def process_packet(self, packet):
         if ATT_Read_By_Type_Request in packet:
             if not self.triggered:
@@ -123,6 +118,15 @@ class FindInformationDiscovery(TrafficAnalyzer):
         self.end_handle = None
         self.items = []
 
+
+    @property
+    def output(self):
+        return {
+            "start_handle" : self.start_handle,
+            "end_handle" : self.end_handle,
+            "items" : self.items
+        }
+
     def process_packet(self, packet):
         if ATT_Find_Information_Request in packet:
             if not self.triggered:
@@ -154,6 +158,13 @@ class PrimaryServicesDiscovery(ReadByGroupTypeDiscovery):
         super().reset()
         self.primary_services = []
 
+
+    @property
+    def output(self):
+        return {
+            "primary_services" : self.primary_services,
+        }
+
     def complete(self):
         if self.uuid == 0x2800:
             self.primary_services = [
@@ -173,6 +184,12 @@ class CharacteristicsDiscovery(ReadByTypeDiscovery):
     def reset(self):
         super().reset()
         self.characteristics = []
+
+    @property
+    def output(self):
+        return {
+            "characteristics" : self.characteristics,
+        }
 
     def complete(self):
         if self.uuid == 0x2803:
@@ -197,6 +214,12 @@ class SecondaryServicesDiscovery(ReadByGroupTypeDiscovery):
         super().reset()
         self.secondary_services = []
 
+    @property
+    def output(self):
+        return {
+            "secondary_services" : self.secondary_services,
+        }
+
     def complete(self):
         if self.uuid == 0x2801:
             self.secondary_services = [
@@ -218,6 +241,12 @@ class ServicesDiscovery(TrafficAnalyzer):
         self.primary_service_analyzer = PrimaryServicesDiscovery()
         self.secondary_service_analyzer = SecondaryServicesDiscovery()
         self.services = []
+
+    @property
+    def output(self):
+        return {
+            "services" : self.services,
+        }
 
     def complete(self):
         super().complete()
@@ -241,6 +270,13 @@ class DescriptorsDiscovery(FindInformationDiscovery):
     def reset(self):
         super().reset()
         self.descriptors = []
+
+
+    @property
+    def output(self):
+        return {
+            "descriptors" : self.descriptors,
+        }
 
     def complete(self):
         for item in self.items:
@@ -266,6 +302,14 @@ class GATTServerDiscovery(TrafficAnalyzer):
         self.services = []
         self.characteristics = []
         self.descriptors = []
+
+    @property
+    def output(self):
+        return {
+            "services" : self.services,
+            "characteristics" : self.characteristics, 
+            "descriptors" : self.descriptors,
+        }
 
     def complete(self):
         super().complete()

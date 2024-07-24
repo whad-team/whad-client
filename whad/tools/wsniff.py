@@ -162,6 +162,7 @@ class WhadSniffApp(CommandLineApp):
 
 
 
+                    sniffer.domain = self.args.domain
                     if self.is_stdout_piped():
                         # Create output proxy
                         #proxy = UnixSocketProxy(self.interface, params={"domain":self.args.domain})
