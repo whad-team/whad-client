@@ -166,14 +166,16 @@ class UniMouseApp(CommandLineSink):
         """Duplicate stdin moves and clicks to the target wireless mouse dongle.
 
         Read lines from stdin and inject corresponding moves. Timing need to be
-        handled from the program sending mouse moves (and clicks) on stdin.
+        handled bythe program sending mouse moves (and clicks) on stdin.
 
-        Format is the following:
-          X,Y,BTNS
+        Linme format is the following:
+
+          X,Y,WHEEL_X,WHEEL_Y,BTNS
         
-        with X and Y decimal integers representing the mouse movement and BTNS
-        being a series of letters ffrom "L", "R" and "M" corresponding to a
-        click event to send.
+        with X and Y decimal integers representing the mouse movement, WHEEL_X
+        and WHEEL_Y decimal integers representing the mouse wheel movement and
+        BTNS being a series of letters ffrom "L", "R" and "M" corresponding to
+        a click event to send.
         """
         # Sync with target mouse
         connector = Mouse(self.interface)
@@ -188,13 +190,17 @@ class UniMouseApp(CommandLineSink):
         for line in sys.stdin:
             try:
                 move = line.split(',')
-                if len(move) == 3:
-                    dx,dy,btns = move
+                if len(move) == 5:
+                    dx,dy,wx,wy,btns = move
 
                     # Extract move delta
-                    dx,dy = int(dx),int(dy)
+                    dx = int(dx) if len(dx) > 0 else 0
+                    dy = int(dy) if len(dy) > 0 else 0
+                    wx = int(wx) if len(wx) > 0 else 0
+                    wy = int(wy) if len(wy) > 0 else 0
 
-                    # Cap values (-2047, 2047)
+                    # Cap values ([-2047, 2047] for dx/dy and
+                    # [-127,127] for wx/wy
                     if dx > 2047:
                         dx = 2047
                     elif dx < -2047:
@@ -204,10 +210,22 @@ class UniMouseApp(CommandLineSink):
                     elif dy < -2047:
                         dy = -2047
 
-                    # Send mouse move
-                    connector.move(dx, dy)
+                    # Send mouse move if any
+                    # (0,0) means no move !
+                    if dx != 0 or dy != 0:
+                        connector.move(dx, dy)
 
-                    # Extract clicks
+                    # Send wheel moves (if any)
+                    if wx > 0:
+                        connector.wheel_down()
+                    elif wx < 0:
+                        connector.wheel_up()
+                    if wy > 0:
+                        connector.wheel_right()
+                    elif wy < 0:
+                        connector.wheel_left()
+
+                    # Send clicks if any
                     btns = btns.upper()
                     if 'R' in btns:
                         connector.right_click()

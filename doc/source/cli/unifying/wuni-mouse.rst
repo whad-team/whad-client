@@ -85,9 +85,10 @@ moves and clicks to a target wireless mouse. When ``wuni-mouse`` standard input
 is piped with another program, it will read any incoming line and interpret it
 as a mouse command.
 
-This command has to respect the following format: `DELTA_X,DELTA_Y,BUTTONS`,
-with `DELTA_X` and `DELTA_Y` decimal integers indicating a relative mouse move
-while `BUTTONS` can be used to specify a click using respectively `R` for a
+This command has to respect the following format: `DELTA_X,DELTA_Y,WHEEL_X,WHEEL_Y,BUTTONS`,
+with `DELTA_X` and `DELTA_Y` decimal integers indicating a relative mouse move,
+`WHEEL_X` and `WHEEL_Y` decimal integers indicating a relative wheel mouse on X
+and Y axes while `BUTTONS` can be used to specify a click using respectively `R` for a
 right-button click, `L` for a left-button click and `M` for a middle-button
 click.
 
@@ -96,5 +97,5 @@ X and Y and then send a right-button click.
 
 .. code-block:: text
 
-    $ echo "100,100,R" | wuni-mouse -i uart0 -a 49:f9:51:2e:a4
+    $ echo "100,100,0,0,R" | wuni-mouse -i uart0 -a 49:f9:51:2e:a4
 
