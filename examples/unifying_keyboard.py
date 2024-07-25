@@ -24,10 +24,10 @@ if __name__ == '__main__':
             connector = Keyboard(dev)
             connector.start()
             # Program key and AES counter
-            connector.key = bytes.fromhex("08f59b42c46f2a139688a44d69ac4066")
-            connector.aes_counter = 0
+            #connector.key = bytes.fromhex("08f59b42c46f2a139688a44d69ac4066")
+            #connector.aes_counter = 0
             # Select a specific address
-            connector.address = "9b:0a:90:42:a7"
+            connector.address = "ca:e9:06:ec:a4"#"9b:0a:90:42:a7"
 
             # Synchronize with the dongle
             connector.synchronize()

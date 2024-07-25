@@ -82,7 +82,7 @@ class ESB_Hdr(Packet):
             XShortField("crc",None)
     ]
 
-    
+
     def post_build(self, p, pay):
         """Effectively build the ESB packet based on its properties.
         """
@@ -119,10 +119,11 @@ class ESB_Hdr(Packet):
         # Append the packet CRC
         out[-1] |= crc[0]>>1
         out.append((crc[1]>>1) | (crc[0]&1)<<7)
-        out.append((crc[1]&1)<<7)        
+        out.append((crc[1]&1)<<7)
+
 
         # Build the final frame
-        return bytes([preamble]) + address + bytes([pcf>>1]) + bytes(out)  
+        return bytes([preamble]) + address + bytes([pcf>>1]) + bytes(out)
 
     def post_dissect(self, s):
         """Override layer post_dissect() function to reset raw packet cache.
@@ -174,6 +175,7 @@ class ESB_Hdr(Packet):
 
         padding = "0"*6
 
+        #print("pl",bits_to_bytes(preamble + bytes_to_bits(bytes([0,addr_length])) + address + pcf + padding + validCrc + crc + payload).hex())
         return bits_to_bytes(preamble + bytes_to_bits(bytes([0,addr_length])) + address + pcf + padding + validCrc + crc + payload)
 
 

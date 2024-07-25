@@ -25,6 +25,13 @@ class Logitech_Unifying_Hdr(Packet):
             return s
         return  s[:2] + s[currentByte:currentByte+1] + s[2:currentByte] + s[currentByte+1:]
 
+
+    def post_dissect(self, s):
+        """Override layer post_dissect() function to reset raw packet cache.
+        """
+        self.raw_packet_cache = None  # Reset packet to allow post_build
+        return s
+
     def post_build(self,p,pay):
         if self.checksum is None:
             cksum = 0xFF

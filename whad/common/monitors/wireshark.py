@@ -67,7 +67,23 @@ class WiresharkMonitor(PcapWriterMonitor):
             self._wireshark_process = Popen([self._wireshark_path,"-X","lua_script:"+dissector,"-o","uat:user_dlts:\"User 1 (DLT=148)\",\""+dissector_name+"\",\"\",\"\",\"\",\"\"", "-k", "-i", fifo], stderr=DEVNULL, stdout=DEVNULL)
 
     def close(self):
-        super().close()
+        self._writer_lock.acquire()
+        if hasattr(self, "_writer") and self._writer is not None:
+
+
+            # Close writer
+            try:
+                self._writer.close()
+
+            except BrokenPipeError:
+                pass
+
+            # Mark writer as not available anymore
+            self._writer = None
+
+        # Release lock on writer
+        self._writer_lock.release()
+
         if self._wireshark_process is not None:
             self._wireshark_process.terminate()
         if exists(self.fifo_name):
