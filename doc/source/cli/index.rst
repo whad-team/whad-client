@@ -62,3 +62,4 @@ Logitech Unifying
     :maxdepth: 1
 
     unifying/wuni-scan
+    unifying/wuni-mouse
