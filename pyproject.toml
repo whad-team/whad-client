@@ -37,6 +37,7 @@ dependencies = [
     "cryptography==36.0.0",
     "prompt_toolkit==3.0.43",
     "hexdump==3.3",
+    "pynput==1.7.7",
     "Sphinx>=5.3.0",
     "sphinx-rtd-theme==2.0.0",
     "sphinxcontrib-mermaid==0.9.2",
@@ -66,6 +67,7 @@ ble-wireshark = "whad.ble.cli.ble_wireshark:ble_wireshark_main"
 wble-spawn = "whad.ble.cli.ble_spawn:ble_spawn_main"
 wble-proxy = "whad.ble.cli.ble_proxy:ble_proxy_main"
 wuni-scan = "whad.unifying.cli.wuni_scan:wuni_scan_main"
+wuni-mouse = "whad.unifying.cli.wuni_mouse:wuni_mouse_main"
 
 # setuptools specific
 [tool.setuptools]
