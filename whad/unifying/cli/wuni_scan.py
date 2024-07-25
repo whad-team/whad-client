@@ -23,9 +23,7 @@ from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, \
 # Logging
 logger = logging.getLogger(__name__)
 
-TOOL_DESCRIPTION="""Logitech Unifying scanning tool
-
-This tool scans for Logitech Unifying devices and tries to classify them
+TOOL_DESCRIPTION="""This tool scans for Logitech Unifying devices and tries to classify them
 based on the data they send. It can search for devices in automatic mode,
 listen on a specific channel or target a specific device.
 """
