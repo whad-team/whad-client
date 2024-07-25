@@ -16,7 +16,6 @@ class Sniffer(Zigbee, EventsManager):
     """
     Zigbee Sniffer interface for compatible WHAD device.
     """
-    domain = "zigbee"
 
     def __init__(self, device):
         Zigbee.__init__(self, device)

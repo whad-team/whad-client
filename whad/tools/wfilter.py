@@ -249,6 +249,7 @@ class WhadFilterApp(CommandLineApp):
             parameters = self.args.__dict__
 
             connector = UnixConnector(interface)
+            
             conf.dot15d4_protocol = self.args.domain
             connector.domain = self.args.domain
             connector.translator = get_translator(self.args.domain)(connector.hub)

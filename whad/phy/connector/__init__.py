@@ -28,6 +28,7 @@ class Phy(WhadDeviceConnector):
     domain-specific messages.
     """
     translator = PhyMessageTranslator
+    domain = "phy"
 
     def __init__(self, device=None):
         """

@@ -10,7 +10,7 @@ from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 from whad.hub.unifying import RawPduReceived, PduReceived
 from whad.common.sniffing import EventsManager
-from whad.scapy.layers.unifying import Logitech_Encrypted_Keystroke_Payload
+from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Encrypted_Keystroke_Payload
 
 from whad.hub.message import AbstractPacket
 from whad.hub.unifying import RawPduReceived, PduReceived
@@ -22,8 +22,7 @@ class Sniffer(Unifying, EventsManager):
     """
     Logitech Unifying Sniffer interface for compatible WHAD device.
     """
-    domain = "unifying"
-    
+
     def __init__(self, device):
         """Sniffer initialization.
         """
@@ -195,8 +194,14 @@ class Sniffer(Unifying, EventsManager):
 
                 if Logitech_Encrypted_Keystroke_Payload in packet and self.__configuration.decrypt:
                     decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
-
                     if success:
                         packet.decrypted = decrypted
+
+                        # Replace packet if decrypted
+                        decrypted_packet = packet.copy()
+                        decrypted_packet.metadata = packet.metadata
+                        decrypted_packet[Logitech_Unifying_Hdr].remove_payload()
+                        decrypted_packet.payload = decrypted
+                        packet = decrypted_packet
                 self.monitor_packet_rx(packet)
                 yield packet

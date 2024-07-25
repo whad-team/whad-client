@@ -22,6 +22,8 @@ from whad.ble.crypto import EncryptedSessionInitialization, LegacyPairingCrackin
 from whad.rf4ce.crypto import RF4CEKeyDerivation
 from whad.zigbee.crypto import TouchlinkKeyManager
 from whad.ble.utils.analyzer import GATTServerDiscovery
+from whad.unifying.crypto import LogitechUnifyingKeyDerivation
+from whad.unifying.utils.analyzer import UnifyingMouseMovement, UnifyingKeystroke
 
 logger = logging.getLogger(__name__)
 #logging.basicConfig(level=logging.DEBUG)
@@ -77,14 +79,16 @@ class WhadAnalyzeApp(CommandLineApp):
                     EncryptedSessionInitialization(),
                     LegacyPairingCracking(),
                     RF4CEKeyDerivation(),
-                    GATTServerDiscovery()
+                    GATTServerDiscovery(),
+                    UnifyingMouseMovement(),
+                    UnifyingKeystroke(),
+                    LogitechUnifyingKeyDerivation()
                 ]
 
                 connector = WhadAnalyzeUnixSocketConnector(interface)
                 for parameter_name, parameter_value in parameters.items():
                     connector.add_parameter(parameter_name, parameter_value)
 
-                conf.dot15d4_protocol = self.args.domain
                 connector.domain = self.args.domain
                 connector.translator = get_translator(self.args.domain)(connector.hub)
                 connector.format = connector.translator.format

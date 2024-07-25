@@ -24,6 +24,7 @@ class ESB(WhadDeviceConnector):
     """
 
     translator = ESBMessageTranslator
+    domain = "esb"
 
     def format(self, packet):
         """

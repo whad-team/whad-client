@@ -9,6 +9,7 @@ class Zigbee(Dot15d4):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+    domain = "zigbee"
 
     def __init__(self, device=None, synchronous=False):
         """

@@ -18,7 +18,6 @@ class Sniffer(Phy, EventsManager):
     """
     Phy Sniffer interface for compatible WHAD device.
     """
-    domain = "phy"
 
     def __init__(self, device):
         Phy.__init__(self, device)

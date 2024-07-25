@@ -32,6 +32,7 @@ class Dot15d4(WhadDeviceConnector):
     domain-specific messages.
     """
     translator = Dot15d4MessageTranslator
+    domain = "dot15d4"
 
     def __init__(self, device=None, synchronous=False, scapy_config='zigbee'):
         """

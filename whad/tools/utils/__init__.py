@@ -4,7 +4,7 @@ from pkgutil import iter_modules
 from importlib import import_module
 from inspect import getdoc
 from dataclasses import fields, is_dataclass
-
+from scapy.config import conf
 
 def list_implemented_sniffers():
     """Build a dictionnary of sniffers connector and configuration, by domain.
@@ -126,6 +126,15 @@ def get_translator(protocol):
     """Get a translator according to a specific domain.
     """
     translator = None
+
+    if protocol in ("zigbee", "rf4ce"):
+        conf.dot15d4_protocol = protocol
+    elif protocol == "esb":
+        from whad.scapy.layers.unifying import unbind
+        unbind()
+    elif protocol == "unifying":
+        from whad.scapy.layers.unifying import bind
+        bind()
     # Iterate over modules
     for _, candidate_protocol,_ in iter_modules(whad.__path__):
         # If the module contains a sniffer connector,

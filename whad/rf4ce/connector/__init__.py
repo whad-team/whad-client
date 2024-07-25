@@ -10,6 +10,7 @@ class RF4CE(Dot15d4):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
+    domain = "rf4ce"
 
     def __init__(self, device=None, synchronous=False):
         """

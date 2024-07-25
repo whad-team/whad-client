@@ -13,6 +13,7 @@ from whad.device import Bridge, ProtocolHub
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.common.monitors import WiresharkMonitor
 from whad.cli.app import CommandLineApp, run_app
+from whad.tools.utils import get_translator
 
 # wshark logger
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class WhadWiresharkApp(CommandLineApp):
 
     # App connector
     connector = None
-    
+
     def __init__(self):
         """Application uses an interface and has commands.
         """
@@ -61,21 +62,24 @@ class WhadWiresharkApp(CommandLineApp):
                 })
 
                 # Using a UnixConnector is just a small hack, as it acts like
-                # a dummy connector. 
+                # a dummy connector.
                 connector = UnixConnector(interface)
-                proxy = UnixConnector(UnixSocketServerDevice(parameters=self.args.__dict__))
-
-                # Bridge both connectors and their respective interfaces
-                bridge = Bridge(connector, proxy)
+                if self.is_stdout_piped():
+                    proxy = UnixConnector(UnixSocketServerDevice(parameters=self.args.__dict__))
+                    # Bridge both connectors and their respective interfaces
+                    bridge = Bridge(connector, proxy)
 
                 # Save our connector and force its domain
                 self.connector = connector
                 self.connector.domain = self.args.domain
+                self.connector.translator = get_translator(self.args.domain)(connector.hub)
+                self.connector.format = connector.translator.format
+
 
                 # Query our protocol hub to gather the correct format function
                 # based on the provided domain
-                hub = ProtocolHub(1)
-                self.connector.format = hub.get(self.args.domain).format
+                #hub = ProtocolHub(1)
+                #self.connector.format = hub.get(self.args.domain).format
 
                 # Attack a wireshark monitor
                 monitor = WiresharkMonitor()

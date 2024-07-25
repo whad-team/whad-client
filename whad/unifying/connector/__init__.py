@@ -20,6 +20,7 @@ class Unifying(WhadDeviceConnector):
     domain-specific messages.
     """
     translator = ESBMessageTranslator
+    domain = "unifying"
 
     def format(self, packet):
         """

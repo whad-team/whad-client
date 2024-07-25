@@ -124,9 +124,6 @@ class RawPduReceived(PbMessageWrapper):
         """Convert message to the corresponding scapy packet
         """
         packet = ESB_Hdr(bytes(self.pdu))
-        #print("aa" + self.pdu.hex())
-        #print(bytes(packet).hex())
-        #print(repr(packet))
         packet.metadata = UnifyingMetadata()
         packet.metadata.channel = self.channel
         packet.metadata.raw = True

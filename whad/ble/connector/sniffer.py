@@ -17,7 +17,6 @@ class Sniffer(BLE, EventsManager):
     """
     BLE Sniffer interface for compatible WHAD device.
     """
-    domain = "ble"
 
     def __init__(self, device):
         BLE.__init__(self, device)

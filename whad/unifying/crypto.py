@@ -3,6 +3,7 @@ from struct import pack
 from copy import copy
 
 from whad.unifying.exceptions import MissingEncryptedKeystrokePayload
+from whad.common.analyzer import TrafficAnalyzer
 from whad.scapy.layers.esb import ESB_Hdr
 from whad.scapy.layers.unifying import bind, Logitech_Unifying_Hdr, \
     Logitech_Unencrypted_Keystroke_Payload, Logitech_Encrypted_Keystroke_Payload, \
@@ -78,8 +79,9 @@ class LogitechUnifyingCryptoManager:
         encrypted_packet.aes_counter = counter
         return encrypted_packet
 
-class LogitechUnifyingKeyDerivation:
+class LogitechUnifyingKeyDerivation(TrafficAnalyzer):
     def __init__(self, address=None, dongle_wpid=None, device_wpid=None, dongle_nonce=None, device_nonce=None):
+        self.reset()
         self.address = address
         self.dongle_wpid = dongle_wpid
         self.device_wpid = device_wpid
@@ -88,14 +90,31 @@ class LogitechUnifyingKeyDerivation:
 
     def process_packet(self, packet):
         if Logitech_Pairing_Request_1_Payload in packet:
+            self.trigger()
             self.device_wpid = pack(">H", packet.device_wpid)
+            self.mark_packet(packet)
         elif Logitech_Pairing_Response_1_Payload in packet:
             self.address = bytes.fromhex(packet.rf_address.replace(":", ""))
             self.dongle_wpid = pack(">H", packet.dongle_wpid)
+            self.mark_packet(packet)
         elif Logitech_Pairing_Request_2_Payload in packet:
             self.device_nonce = packet.device_nonce
+            self.mark_packet(packet)
         elif Logitech_Pairing_Response_2_Payload in packet:
             self.dongle_nonce = packet.dongle_nonce
+            self.mark_packet(packet)
+        if (
+                self.address is not None and
+                self.dongle_wpid is not None and
+                self.device_wpid is not None and
+                self.dongle_nonce is not None and
+                self.device_nonce is not None
+        ):
+            self.complete()
+
+    @property
+    def output(self):
+        return {"key" : self.key}
 
     @property
     def key(self):
@@ -111,6 +130,7 @@ class LogitechUnifyingKeyDerivation:
             return None
 
     def reset(self):
+        super().reset()
         self.address = None
         self.dongle_wpid = None
         self.device_wpid = None
@@ -169,6 +189,7 @@ class LogitechUnifyingDecryptor:
         for key in self.keys:
             manager = LogitechUnifyingCryptoManager(key)
             decrypted = manager.decrypt(packet)
+            
             if b"\x00\x00" in decrypted.hid_data:
                 return decrypted[Logitech_Unifying_Hdr:], True
 
