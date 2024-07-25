@@ -4,7 +4,10 @@ class ClickType(IntEnum):
     NONE = 0
     LEFT = 1
     RIGHT = 2
+    LEFT_RIGHT = 3
     MIDDLE = 4
+    LEFT_MIDDLE = 5
+    RIGHT_MIDDLE = 6
 
 
 class UnifyingRole(IntEnum):
