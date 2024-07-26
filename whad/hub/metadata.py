@@ -11,6 +11,7 @@ def channel_to_frequency(channel):
 @dataclass(repr=False)
 class Metadata:
     raw : bool = None
+    decrypted : bool = None
     timestamp : Union[int, float] = None
     channel : int = None
     rssi : int = None
@@ -28,5 +29,3 @@ class Metadata:
             return ""
         else:
             return "[ " + ", ".join(metadatas) + " ]"
-
-

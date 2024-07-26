@@ -33,13 +33,13 @@ class Logitech_Unifying_Hdr(Packet):
         return s
 
     def post_build(self,p,pay):
-        if self.checksum is None:
-            cksum = 0xFF
-            for i in (p[:2] + pay):
-                cksum = (cksum - i) & 0xFF
-            cksum = (cksum + 1) & 0xFF
-        else:
-            cksum = self.checksum
+        #if self.checksum is None:
+        cksum = 0xFF
+        for i in (p[:2] + pay):
+            cksum = (cksum - i) & 0xFF
+        cksum = (cksum + 1) & 0xFF
+        #else:
+        #    cksum = self.checksum
         return p[:2] + pay + pack('B', cksum)
 
 

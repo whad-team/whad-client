@@ -7,7 +7,8 @@ from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, \
 from scapy.layers.bluetooth4LE import LL_ENC_REQ, LL_ENC_RSP, LL_START_ENC_REQ, \
     BTLE_CTRL, BTLE_DATA, BTLE, BTLE_CONNECT_REQ
 from scapy.layers.bluetooth import SM_Hdr, SM_Pairing_Request, SM_Random, \
-    SM_Pairing_Response, SM_Confirm
+    SM_Pairing_Response, SM_Confirm, SM_Encryption_Information, SM_Master_Identification, \
+    SM_Identity_Information, SM_Identity_Address_Information, SM_Signing_Information
 from whad.common.analyzer import TrafficAnalyzer
 from whad.hub.ble.bdaddr import BDAddress
 from whad.protocol.ble.ble_pb2 import BleDirection
@@ -246,22 +247,37 @@ class LinkLayerCryptoManager:
         mic = cipher.digest()
         return payload[:2] + ciphertext + mic
 
-    def decrypt(self, payload, direction=BleDirection.MASTER_TO_SLAVE):
+    def decrypt(self, payload, direction=BleDirection.MASTER_TO_SLAVE, error_tolerance=2):
         """
         Decrypt and verify a payload (according to the direction and payload).
         """
         header = bytes([payload[0] & 0xe3])
         ciphertext = payload[2:-4]
         mic = payload[-4:]
-        nonce = self.generate_nonce(direction)
-        cipher = AES.new(self.session_key, AES.MODE_CCM, nonce=nonce, mac_len=4, assoc_len=len(header))
-        cipher.update(header)
-        plaintext = cipher.decrypt(ciphertext)
-        try:
-            cipher.verify(mic)
-            return (payload[:2] + plaintext, True)
-        except ValueError:
-            return (payload[:2] + plaintext, False)
+        if direction == BleDirection.MASTER_TO_SLAVE:
+            old_counter = self.master_cnt
+        else:
+            old_counter = self.slave_cnt
+
+        for i in range(error_tolerance):
+            nonce = self.generate_nonce(direction)
+            cipher = AES.new(self.session_key, AES.MODE_CCM, nonce=nonce, mac_len=4, assoc_len=len(header))
+            cipher.update(header)
+            plaintext = cipher.decrypt(ciphertext)
+            try:
+                cipher.verify(mic)
+                return (payload[:2] + plaintext, True)
+            except ValueError:
+                if direction == BleDirection.MASTER_TO_SLAVE:
+                    self.master_cnt += 1
+                else:
+                    self.slave_cnt += 1
+        if direction == BleDirection.MASTER_TO_SLAVE:
+            self.master_cnt = old_counter
+        else:
+            self.slave_cnt = old_counter
+
+        return (payload[:2] + plaintext, False)
 
 
 
@@ -343,17 +359,17 @@ class LinkLayerDecryptor:
     def __init__(self, *keys):
         self.keys = list(keys)
         self.managers = {}
-        self.master_skd = None
-        self.master_iv = None
-        self.slave_skd = None
-        self.slave_iv = None
+        self.master_skd = []
+        self.master_iv = []
+        self.slave_skd = []
+        self.slave_iv = []
 
 
     def add_crypto_material(self, master_skd, master_iv, slave_skd, slave_iv):
-        self.master_skd = master_skd
-        self.master_iv = master_iv
-        self.slave_skd = slave_skd
-        self.slave_iv = slave_iv
+        self.master_skd.append(master_skd)
+        self.master_iv.append(master_iv)
+        self.slave_skd.append(slave_skd)
+        self.slave_iv.append(slave_iv)
 
 
     def add_key(self, key):
@@ -376,10 +392,10 @@ class LinkLayerDecryptor:
 
     def attempt_to_decrypt(self, packet):
         if (
-                self.master_skd is None or
-                self.master_iv is None or
-                self.slave_skd is None or
-                self.slave_iv is None or
+                len(self.master_skd) == 0 or
+                len(self.master_iv) == 0 or
+                len(self.slave_skd) == 0 or
+                len(self.slave_iv) == 0 or
                 len(self.keys) == 0
         ):
             raise MissingCryptographicMaterial()
@@ -390,28 +406,108 @@ class LinkLayerDecryptor:
         if packet.len == 0 and packet.LLID == 1:
             return (None, False)
 
-        for key in self.keys:
-            if key not in self.managers:
-                manager = LinkLayerCryptoManager(key, self.master_skd, self.master_iv, self.slave_skd, self.slave_iv)
-            else:
-                manager = self.managers[key]
+        for i in range(len(self.master_skd)):
+            for key in self.keys:
 
-            plaintext, success = manager.decrypt(bytes(packet)[4:-3], direction=BleDirection.MASTER_TO_SLAVE)
-            if success:
-                manager.increment_master_counter()
-                self.managers[key] = manager
-            else:
-                plaintext, success = manager.decrypt(bytes(packet)[4:-3], direction=BleDirection.SLAVE_TO_MASTER)
+                if key not in self.managers:
+                    manager = LinkLayerCryptoManager(key, self.master_skd[i], self.master_iv[i], self.slave_skd[i], self.slave_iv[i])
+                else:
+                    manager = self.managers[key]
+
+                plaintext, success = manager.decrypt(bytes(packet)[4:-3], direction=BleDirection.MASTER_TO_SLAVE)
                 if success:
-                    manager.increment_slave_counter()
+                    manager.increment_master_counter()
                     self.managers[key] = manager
+                else:
+                    plaintext, success = manager.decrypt(bytes(packet)[4:-3], direction=BleDirection.SLAVE_TO_MASTER)
+                    if success:
+                        manager.increment_slave_counter()
+                        self.managers[key] = manager
 
-            if success:
-                decrypted_packet = BTLE_DATA(plaintext)
-                decrypted_packet.len = decrypted_packet.len - 4
-                return (decrypted_packet, True)
-            else:
-                return (None, False)
+                if success:
+                    decrypted_packet = BTLE_DATA(plaintext)
+                    decrypted_packet.len = decrypted_packet.len - 4
+                    return (decrypted_packet, True)
+        return (None, False)
+
+
+class IdentityResolvingKeyDistribution(TrafficAnalyzer):
+    def __init__(self):
+        self.reset()
+
+    @property
+    def output(self):
+        return {
+            "address" : self.address,
+            "irk" : self.irk
+        }
+
+    def process_packet(self, packet):
+        if SM_Identity_Information in packet:
+            self.trigger()
+            self.irk = packet.irk
+            self.mark_packet(packet)
+        elif SM_Identity_Address_Information in packet:
+            self.trigger()
+            self.address = BDAddress(packet.address, random=packet.atype == "random")
+            self.mark_packet(packet)
+            self.complete()
+
+    def reset(self):
+        super().reset()
+        self.irk = None
+        self.address = None
+
+class LongTermKeyDistribution(TrafficAnalyzer):
+    def __init__(self):
+        self.reset()
+
+    @property
+    def output(self):
+        return {
+            "ltk" : self.ltk,
+            "rand" : self.rand,
+            "ediv" : self.ediv
+        }
+
+    def process_packet(self, packet):
+        if SM_Encryption_Information in packet:
+            self.trigger()
+            self.ltk = packet.ltk
+            self.mark_packet(packet)
+        elif SM_Master_Identification in packet:
+            self.trigger()
+            self.ediv = packet.ediv
+            self.rand = packet.rand
+            self.mark_packet(packet)
+            self.complete()
+
+    def reset(self):
+        super().reset()
+        self.ediv = None
+        self.rand = None
+        self.ltk = None
+
+class ConnectionSignatureResolvingKeyDistribution(TrafficAnalyzer):
+    def __init__(self):
+        self.reset()
+
+    @property
+    def output(self):
+        return {
+            "csrk" : self.csrk
+        }
+
+    def process_packet(self, packet):
+        if SM_Signing_Information in packet:
+            self.trigger()
+            self.csrk = packet.csrk
+            self.mark_packet(packet)
+            self.complete()
+
+    def reset(self):
+        super().reset()
+        self.csrk = None
 
 class LegacyPairingCracking(TrafficAnalyzer):
         def __init__(
@@ -567,13 +663,3 @@ class LegacyPairingCracking(TrafficAnalyzer):
                     self.stk = stk
                     return (tk, stk)
             return None
-
-        '''
-        def reset(self):
-            self.initiator = None
-            self.responder = None
-
-            self.pairing_req = None
-            self.pairing_rsp = None
-            self.confirm = None
-        '''

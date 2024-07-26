@@ -6,7 +6,7 @@ which can be used to access a device remotely.
 from prompt_toolkit import print_formatted_text, HTML
 
 from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLineApp, ApplicationError
+from whad.cli.app import CommandLineApp, ApplicationError, run_app
 from scapy.all import *
 #from whad.common.ipc import IPCPacket
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
@@ -95,8 +95,5 @@ class WhadDumpApp(CommandLineApp):
 
 
 def wdump_main():
-    try:
-        app = WhadDumpApp()
-        app.run()
-    except ApplicationError as err:
-        err.show()
+    app = WhadDumpApp()
+    run_app(app)

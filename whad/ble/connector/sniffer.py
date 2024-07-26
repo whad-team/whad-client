@@ -4,6 +4,7 @@ from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, Acce
     SynchronizationEvent, DesynchronizationEvent, KeyExtractedEvent
 from whad.ble.crypto import EncryptedSessionInitialization, LinkLayerDecryptor, LegacyPairingCracking
 from whad.hub.ble import AccessAddressDiscovered, Synchronized, BleRawPduReceived, BlePduReceived, BleRawPduReceived
+from whad.ble.exceptions import MissingCryptographicMaterial
 from whad.ble import UnsupportedCapability, message_filter
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE
 from whad.common.sniffing import EventsManager
@@ -105,12 +106,14 @@ class Sniffer(BLE, EventsManager):
         logger.info("Connection lost.")
 
     def _enable_sniffing(self):
+
+        for key in self.__configuration.keys:
+            self.__decryptor.add_key(key)
+
         if self.__configuration.access_addresses_discovery:
             self.discover_access_addresses()
 
         elif self.__configuration.active_connection is not None:
-            for key in self.__configuration.keys:
-                self.__decryptor.add_key(key)
 
             access_address = self.__configuration.active_connection.access_address
             crc_init = self.__configuration.active_connection.crc_init
@@ -213,6 +216,41 @@ class Sniffer(BLE, EventsManager):
 
             return [action for action in actions if filter is None or isinstance(action, filter)]
 
+    def process_packet(self, packet):
+        if self.__configuration.decrypt and BTLE_DATA in packet:
+            self.__encrypted_session_initialization.process_packet(packet)
+            if self.__encrypted_session_initialization.encryption:
+                self.__decryptor.add_crypto_material(*self.__encrypted_session_initialization.crypto_material)
+                self.__encrypted_session_initialization.reset()
+            try:
+                decrypted, success = self.__decryptor.attempt_to_decrypt(packet[BTLE])
+                if success:
+                    #packet.decrypted = decrypted
+                    decrypted_packet = decrypted
+                    decrypted_packet.metadata = packet.metadata
+                    packet[BTLE_DATA].remove_payload()
+                    packet.payload = decrypted
+                    packet.metadata = decrypted_packet.metadata
+                    packet.metadata.decrypted = True
+                    return packet
+            except MissingCryptographicMaterial:
+                pass
+
+
+        if self.__configuration.pairing:
+            self.__legacy_pairing_cracking.process_packet(packet[BTLE])
+            if self.__legacy_pairing_cracking.ready:
+                keys = self.__legacy_pairing_cracking.keys
+                if keys is not None:
+                    tk, stk = keys
+                    logger.info("[i] New temporary key extracted: ", tk.hex())
+                    logger.info("[i] New short term key extracted: ", stk.hex())
+                    self.trigger_event(KeyExtractedEvent(stk))
+                    self.__decryptor.add_key(stk[::-1])
+                    self.__legacy_pairing_cracking.reset()
+
+        return packet
+
     def sniff(self):
         while True:
             if self.__configuration.access_addresses_discovery:
@@ -259,26 +297,7 @@ class Sniffer(BLE, EventsManager):
                 message = self.wait_for_message(filter=message_filter(message_type))
                 packet = self.translator.from_message(message)
 
-                if self.__configuration.decrypt and BTLE_DATA in packet:
-                    self.__encrypted_session_initialization.process_packet(packet)
-                    if self.__encrypted_session_initialization.encryption:
-                        self.__decryptor.add_crypto_material(*self.__encrypted_session_initialization.crypto_material)
-
-                        decrypted, success = self.__decryptor.attempt_to_decrypt(packet[BTLE])
-                        if success:
-                            packet.decrypted = decrypted
-
-                if self.__configuration.pairing:
-                    self.__legacy_pairing_cracking.process_packet(packet[BTLE])
-                    if self.__legacy_pairing_cracking.ready:
-                        keys = self.__legacy_pairing_cracking.keys
-                        if keys is not None:
-                            tk, stk = keys
-                            logger.info("[i] New temporary key extracted: ", tk.hex())
-                            logger.info("[i] New short term key extracted: ", stk.hex())
-                            self.trigger_event(KeyExtractedEvent(stk))
-                            self.__decryptor.add_key(stk[::-1])
-                            self.__legacy_pairing_cracking.reset()
+                packet = self.process_packet(packet)
 
                 self.monitor_packet_rx(packet)
                 yield packet

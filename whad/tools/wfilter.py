@@ -6,7 +6,7 @@ which can be used to access a device remotely.
 from prompt_toolkit import print_formatted_text, HTML
 
 from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLineApp, ApplicationError
+from whad.cli.app import CommandLineApp, ApplicationError, run_app
 from scapy.all import *
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
 from whad.device import Bridge
@@ -249,9 +249,9 @@ class WhadFilterApp(CommandLineApp):
             parameters = self.args.__dict__
 
             connector = UnixConnector(interface)
-            
-            conf.dot15d4_protocol = self.args.domain
+
             connector.domain = self.args.domain
+
             connector.translator = get_translator(self.args.domain)(connector.hub)
             connector.format = connector.translator.format
 
@@ -277,8 +277,5 @@ class WhadFilterApp(CommandLineApp):
 
 
 def wfilter_main():
-    try:
-        app = WhadFilterApp()
-        app.run()
-    except ApplicationError as err:
-        err.show()
+    app = WhadFilterApp()
+    run_app(app)

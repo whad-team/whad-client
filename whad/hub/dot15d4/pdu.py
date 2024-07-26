@@ -86,6 +86,9 @@ class PduReceived(PbMessageWrapper):
         # Set packet metadata
         packet.metadata = Dot15d4Metadata()
         packet.metadata.channel = self.channel
+
+        packet.metadata.decrypted = False
+
         if self.lqi is not None:
             packet.metadata.lqi = self.lqi
         if self.rssi is not None:
@@ -108,8 +111,10 @@ class PduReceived(PbMessageWrapper):
             channel=packet.metadata.channel,
             pdu=bytes(packet.getlayer(Dot15d4)),
         )
-
         # Add optional metadata
+
+        if packet.metadata.decrypted is not None:
+            msg.decrypted = packet.metadata.decrypted
         if packet.metadata.lqi is not None:
             msg.lqi = packet.metadata.lqi
         if packet.metadata.rssi is not None:
@@ -147,6 +152,7 @@ class RawPduReceived(PbMessageWrapper):
         # Set packet metadata
         packet.metadata = Dot15d4Metadata()
         packet.metadata.channel = self.channel
+        packet.metadata.decrypted = False
         if self.lqi is not None:
             packet.metadata.lqi = self.lqi
         if self.rssi is not None:
@@ -171,6 +177,9 @@ class RawPduReceived(PbMessageWrapper):
         )
 
         # Add optional metadata
+
+        if packet.metadata.decrypted is not None:
+            msg.decrypted = packet.metadata.decrypted
         if packet.metadata.lqi is not None:
             msg.lqi = packet.metadata.lqi
         if packet.metadata.rssi is not None:

@@ -7,7 +7,7 @@ import logging
 from prompt_toolkit import print_formatted_text, HTML
 import time
 from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLinePipe, CommandLineApp, ApplicationError
+from whad.cli.app import CommandLinePipe, CommandLineApp, ApplicationError, run_app
 from scapy.all import *
 from whad.common.pcap import extract_pcap_metadata
 import sys, os, stat
@@ -46,9 +46,13 @@ class WhadPlayApp(WhadSniffApp):
             elif sys.argv[i] in list_implemented_sniffers().keys():
                 override_domain = True
         if index_pcap_file is not None and not override_domain:
-            domain = extract_pcap_metadata(self.pcap_file)
-            if domain != "":
-                sys.argv.insert(index_pcap_file + 1, domain)
+            if os.path.exists(self.pcap_file):
+                domain = extract_pcap_metadata(self.pcap_file)
+                if domain != "":
+                    sys.argv.insert(index_pcap_file + 1, domain)
+            else:
+                self.error("PCAP file not found")
+                exit(1)
 
     def pre_run(self):
         """Pre-run operations: configure scapy theme.
@@ -65,9 +69,7 @@ class WhadPlayApp(WhadSniffApp):
         if not self.args.nocolor:
             conf.color_theme = BrightTheme()
 
+from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound
 def wplay_main():
-    try:
-        app = WhadPlayApp()
-        app.run()
-    except ApplicationError as err:
-        err.show()
+    app = WhadPlayApp()
+    run_app(app)
