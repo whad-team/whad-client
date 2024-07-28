@@ -40,13 +40,12 @@ def display_packet(pkt, show_metadata=True, format='repr'):
         metadata = ""
         if hasattr(pkt, "metadata") and show_metadata:
             metadata = repr(pkt.metadata)
-
         # Process scapy show method format
         if format == "show":
 
-            if show_metadata == True:
+            if show_metadata:
                 print_formatted_text(
-                    HTML("<b><ansipurple>{metadata}</ansipurple></b>").format(metadata=metadata)
+                    HTML("<b>{metadata}</b>").format(metadata=metadata)
                 )
             pkt.show()
 
@@ -59,9 +58,9 @@ def display_packet(pkt, show_metadata=True, format='repr'):
         # Process raw bytes format
         elif format == "raw":
 
-            if show_metadata == True:
+            if show_metadata:
                 print_formatted_text(
-                    HTML("<b><ansipurple>{metadata}</ansipurple></b>").format(
+                    HTML("<b>{metadata}</b>").format(
                         metadata=metadata
                     )
                 )
@@ -77,9 +76,9 @@ def display_packet(pkt, show_metadata=True, format='repr'):
 
         # Process hexdump format
         elif format == "hexdump":
-            if show_metadata == True:
+            if show_metadata:
                 print_formatted_text(
-                    HTML("<b><ansipurple>{metadata}</ansipurple></b>").format(metadata=metadata)
+                    HTML("<b>{metadata}</b>").format(metadata=metadata)
                 )
             print_formatted_text(
                 HTML("<i>{pkthex}</i>").format(pkthex=hexdump(bytes(pkt), result="return"))
@@ -91,13 +90,13 @@ def display_packet(pkt, show_metadata=True, format='repr'):
                     )
                 )
                 print_formatted_text(
-                    HTML("<i>{pkthex</i>").format(pkthex=hexdump(bytes(pkt.decrypted), result="return"))
+                    HTML("<i>{pkthex}</i>").format(pkthex=hexdump(bytes(pkt.decrypted), result="return"))
                 )
         # Process scapy repr format
-        else:
-            if show_metadata == True:
+        elif format == "repr":
+            if show_metadata:
                 print_formatted_text(
-                    HTML("<b><ansipurple>{metadata}</ansipurple></b>").format(metadata=metadata)
+                    HTML("<b>{metadata}</b>").format(metadata=metadata)
                 )
             print(repr(pkt))
             if hasattr(pkt, "decrypted"):

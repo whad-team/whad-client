@@ -77,6 +77,8 @@ class PduReceived(PbMessageWrapper):
         packet.metadata = UnifyingMetadata()
         packet.metadata.channel = self.channel
         packet.metadata.raw = False
+
+        packet.metadata.decrypted = False
         if self.rssi is not None:
             packet.metadata.rssi = self.rssi
         if self.timestamp is not None:
@@ -97,6 +99,8 @@ class PduReceived(PbMessageWrapper):
         )
 
         # Set message fields based on packet metadata
+        if packet.metadata.decrypted is not None:
+            msg.decrypted = packet.metadata.decrypted
         if packet.metadata.rssi is not None:
             msg.rssi = packet.metadata.rssi
         if packet.metadata.timestamp is not None:
@@ -127,6 +131,9 @@ class RawPduReceived(PbMessageWrapper):
         packet.metadata = UnifyingMetadata()
         packet.metadata.channel = self.channel
         packet.metadata.raw = True
+
+        packet.metadata.decrypted = False
+
         if self.rssi is not None:
             packet.metadata.rssi = self.rssi
         if self.timestamp is not None:
@@ -150,6 +157,9 @@ class RawPduReceived(PbMessageWrapper):
         )
 
         # Set message fields based on packet metadata
+
+        if packet.metadata.decrypted is not None:
+            msg.decrypted = packet.metadata.decrypted
         if packet.metadata.rssi is not None:
             msg.rssi = packet.metadata.rssi
         if packet.metadata.timestamp is not None:

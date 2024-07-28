@@ -127,14 +127,6 @@ def get_translator(protocol):
     """
     translator = None
 
-    if protocol in ("zigbee", "rf4ce"):
-        conf.dot15d4_protocol = protocol
-    elif protocol == "esb":
-        from whad.scapy.layers.unifying import unbind
-        unbind()
-    elif protocol == "unifying":
-        from whad.scapy.layers.unifying import bind
-        bind()
     # Iterate over modules
     for _, candidate_protocol,_ in iter_modules(whad.__path__):
         # If the module contains a sniffer connector,
@@ -147,4 +139,14 @@ def get_translator(protocol):
         except ModuleNotFoundError:
             pass
     # return the environment dictionary
+
+    if protocol in ("zigbee", "rf4ce"):
+        conf.dot15d4_protocol = protocol
+    elif protocol == "esb":
+        from whad.scapy.layers.unifying import unbind
+        unbind()
+    elif protocol == "unifying":
+        from whad.scapy.layers.unifying import bind
+        bind()
+
     return translator

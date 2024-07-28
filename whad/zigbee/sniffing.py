@@ -6,6 +6,7 @@ class SnifferConfiguration:
     """
     Configuration for sniffing a Zigbee communication.
 
+    :param pairing: sniff pairing procedure and break key if possible (p)
     :param channel: select the channel to sniff (c)
     :param decrypt: indicate if decryption is enabled (d)
     :param keys: provide decryption keys (k)

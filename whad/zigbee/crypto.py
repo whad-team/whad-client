@@ -1,11 +1,13 @@
 from whad.zigbee.exceptions import MissingNetworkSecurityHeader
 from Cryptodome.Cipher import AES
 from scapy.layers.dot15d4 import Dot15d4,Dot15d4FCS
-from scapy.layers.zigbee import ZigbeeSecurityHeader,ZigbeeNWK, ZigbeeAppDataPayload, ZigbeeNWKCommandPayload
+from scapy.layers.zigbee import ZigbeeSecurityHeader,ZigbeeNWK, ZigbeeAppCommandPayload, \
+    ZigbeeAppDataPayload, ZigbeeNWKCommandPayload
 from whad.scapy.layers.zll import ZLLScanRequest, ZLLScanResponse, ZLLNetworkJoinRouterRequest
 from whad.common.analyzer import TrafficAnalyzer
 from scapy.compat import raw
 from scapy.config import conf
+from scapy.all import Packet
 from struct import pack
 
 conf.dot15d4_protocol = "zigbee"
@@ -281,11 +283,14 @@ class ZigbeeDecryptor:
                         return decrypted.data, True
         else:
             for key in self.keys:
-                manager = ApplicationSubLayerCryptoManager(key)
+                manager = ApplicationSubLayerCryptoManager(key, 1)
                 decrypted, success = manager.decrypt(packet)
                 if success:
                     if packet.frametype == 0:
-                        return ZigbeeAppDataPayload(decrypted.data), True
+                        if packet.aps_frametype == 0:
+                            return ZigbeeAppDataPayload(decrypted.data), True
+                        else:
+                            return ZigbeeAppCommandPayload(decrypted.data), True
                     elif packet.frametype == 1:
                         return ZigbeeNWKCommandPayload(decrypted.data), True
                     else:
@@ -295,7 +300,10 @@ class ZigbeeDecryptor:
                 decrypted, success = manager.decrypt(packet)
                 if success:
                     if packet.frametype == 0:
-                        return ZigbeeAppDataPayload(decrypted.data), True
+                        if packet.aps_frametype == 0:
+                            return ZigbeeAppDataPayload(decrypted.data), True
+                        else:
+                            return ZigbeeAppCommandPayload(decrypted.data), True
                     elif packet.frametype == 1:
                         return ZigbeeNWKCommandPayload(decrypted.data), True
                     else:
@@ -305,7 +313,10 @@ class ZigbeeDecryptor:
                 decrypted, success = manager.decrypt(packet)
                 if success:
                     if packet.frametype == 0:
-                        return ZigbeeAppDataPayload(decrypted.data), True
+                        if packet.aps_frametype == 0:
+                            return ZigbeeAppDataPayload(decrypted.data), True
+                        else:
+                            return ZigbeeAppCommandPayload(decrypted.data), True
                     elif packet.frametype == 1:
                         return ZigbeeNWKCommandPayload(decrypted.data), True
                     else:
@@ -318,6 +329,28 @@ ZIGBEE_ZLL_KEYS = {
     "master_key":           b"\x9F\x55\x95\xF1\x02\x57\xC8\xA4\x69\xCB\xF4\x2B\xC9\x3F\xEE\x31",
     "certification_key":    b"\xC0\xC1\xC2\xC3\xC4\xC5\xC6\xC7\xC8\xC9\xCA\xCB\xCC\xCD\xCE\xCF",
 }
+
+
+class TransportKeyDistribution(TrafficAnalyzer):
+    def reset(self):
+        super().reset()
+        self.transport_key = None
+
+    def process_packet(self, packet):
+
+        if ZigbeeSecurityHeader in packet and packet[ZigbeeSecurityHeader].key_type == 2:
+            self.trigger()
+            dec_packet = ZigbeeAppCommandPayload(bytes(packet.data))
+            self.mark_packet(packet)
+            self.transport_key = dec_packet.key
+            print(self.transport_key)
+            self.complete()
+
+    @property
+    def output(self):
+        return {
+            "transport_key":self.transport_key
+        }
 
 
 class TouchlinkKeyManager(TrafficAnalyzer):

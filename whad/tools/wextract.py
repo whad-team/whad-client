@@ -6,7 +6,7 @@ which can be used to access a device remotely.
 from prompt_toolkit import print_formatted_text, HTML
 
 from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLineApp, ApplicationError
+from whad.cli.app import CommandLineApp, ApplicationError, run_app
 from scapy.all import *
 from whad.device.unix import  UnixSocketConnector
 from whad.device import Bridge
@@ -110,8 +110,5 @@ class WhadExtractApp(CommandLineApp):
 
 
 def wextract_main():
-    try:
-        app = WhadExtractApp()
-        app.run()
-    except ApplicationError as err:
-        err.show()
+    app = WhadExtractApp()
+    run_app(app)

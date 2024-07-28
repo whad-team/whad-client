@@ -160,6 +160,36 @@ class Sniffer(Unifying, EventsManager):
         actions = []
         return [action for action in actions if filter is None or isinstance(action, filter)]
 
+    def process_packet(self, packet):
+        """Implement the packet decryption if needed.
+        """
+
+        if self.__configuration.pairing:
+            self.__key_derivation.process_packet(packet)
+            if self.__key_derivation.key is not None:
+                logger.info("[i] New key extracted: ", self.__key_derivation.key.hex())
+                self.trigger_event(KeyExtractedEvent(self.__key_derivation.key))
+                self.add_key(self.__key_derivation.key)
+                self.__key_derivation.reset()
+
+        if Logitech_Encrypted_Keystroke_Payload in packet and self.__configuration.decrypt:
+            decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
+            if success:
+                packet.decrypted = decrypted
+                # Replace packet if decrypted
+                decrypted_packet = packet.copy()
+                decrypted_packet.metadata = packet.metadata
+                decrypted_packet[Logitech_Unifying_Hdr].remove_payload()
+                decrypted_packet.payload = decrypted
+                packet = decrypted_packet
+                # packet.checksum = None
+                packet.metadata = decrypted_packet.metadata
+                packet.metadata.decrypted = True
+                return packet
+
+        return packet
+
+
     def sniff(self, timeout: float = None) -> Generator[Packet, None, None]:
         """Sniff Logitech Unifying packets
 
@@ -184,24 +214,6 @@ class Sniffer(Unifying, EventsManager):
             if issubclass(message, AbstractPacket):
                 packet = message.to_packet()
 
-                if self.__configuration.pairing:
-                    self.__key_derivation.process_packet(packet)
-                    if self.__key_derivation.key is not None:
-                        logger.info("[i] New key extracted: ", self.__key_derivation.key.hex())
-                        self.trigger_event(KeyExtractedEvent(self.__key_derivation.key))
-                        self.add_key(self.__key_derivation.key)
-                        self.__key_derivation.reset()
-
-                if Logitech_Encrypted_Keystroke_Payload in packet and self.__configuration.decrypt:
-                    decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
-                    if success:
-                        packet.decrypted = decrypted
-
-                        # Replace packet if decrypted
-                        decrypted_packet = packet.copy()
-                        decrypted_packet.metadata = packet.metadata
-                        decrypted_packet[Logitech_Unifying_Hdr].remove_payload()
-                        decrypted_packet.payload = decrypted
-                        packet = decrypted_packet
+                packet = self.process_packet(packet)
                 self.monitor_packet_rx(packet)
                 yield packet

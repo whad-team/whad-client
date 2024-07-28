@@ -3,7 +3,7 @@ import logging
 from scapy.layers.zigbee import ZigbeeSecurityHeader
 from whad.zigbee.connector import Zigbee
 from whad.zigbee.sniffing import SnifferConfiguration, KeyExtractedEvent
-from whad.zigbee.crypto import ZigbeeDecryptor, TouchlinkKeyManager
+from whad.zigbee.crypto import ZigbeeDecryptor, TouchlinkKeyManager, TransportKeyDistribution
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 from whad.common.sniffing import EventsManager
@@ -25,7 +25,7 @@ class Sniffer(Zigbee, EventsManager):
         self.__configuration = SnifferConfiguration()
         self.__decryptor = ZigbeeDecryptor()
         self.__touchlink_key_derivation = TouchlinkKeyManager()
-
+        self.__transport_key_distribution = TransportKeyDistribution()
         # Check if device can perform sniffing
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
@@ -71,6 +71,35 @@ class Sniffer(Zigbee, EventsManager):
         self.__configuration = new_configuration
         self._enable_sniffing()
 
+    def process_packet(self, packet):
+        if self.__touchlink_key_derivation.unencrypted_key is not None:
+            logger.info("[i] New key extracted: ", self.__touchlink_key_derivation.unencrypted_key.hex())
+            self.trigger_event(KeyExtractedEvent(self.__touchlink_key_derivation.unencrypted_key))
+            self.add_key(self.__touchlink_key_derivation.unencrypted_key)
+            self.__decryptor.add_key(self.__touchlink_key_derivation.unencrypted_key)
+            self.__touchlink_key_derivation.reset()
+
+        if self.__transport_key_distribution.transport_key is not None:
+            logger.info("[i] New key extracted: ", self.__transport_key_distribution.transport_key.hex())
+            self.trigger_event(KeyExtractedEvent(self.__transport_key_distribution.transport_key))
+            self.add_key(self.__transport_key_distribution.transport_key)
+            self.__decryptor.add_key(self.__transport_key_distribution.transport_key)
+            self.__transport_key_distribution.reset()
+
+
+        if ZigbeeSecurityHeader in packet and self.__configuration.decrypt:
+            decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
+            if success:
+                packet.data = decrypted
+                packet.metadata.decrypted = True
+
+
+        if self.__configuration.pairing:
+            self.__touchlink_key_derivation.process_packet(packet)
+            self.__transport_key_distribution.process_packet(packet)
+
+        return packet
+
     def sniff(self):
         while True:
             if self.support_raw_pdu():
@@ -82,17 +111,5 @@ class Sniffer(Zigbee, EventsManager):
             if issubclass(message, AbstractPacket):
                 packet = message.to_packet()
                 self.monitor_packet_rx(packet)
-                if self.__touchlink_key_derivation.unencrypted_key is not None:
-                    logger.info("[i] New key extracted: ", self.__touchlink_key_derivation.unencrypted_key.hex())
-                    self.trigger_event(KeyExtractedEvent(self.__touchlink_key_derivation.unencrypted_key))
-                    self.add_key(self.__touchlink_key_derivation.unencrypted_key)
-                    self.__touchlink_key_derivation.reset()
-
-                if self.__configuration.pairing:
-                    self.__touchlink_key_derivation.process_packet(packet)
-
-                if ZigbeeSecurityHeader in packet and self.__configuration.decrypt:
-                    decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
-                    if success:
-                        packet.decrypted = decrypted
+                packet = self.process_packet(packet)
                 yield packet

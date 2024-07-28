@@ -95,6 +95,8 @@ class PCAPDevice(VirtualDevice):
                 self.__domain = self._get_domain()
             else:
                 logger.info("No PCAP file")
+                raise WhadDeviceNotFound("pcap")
+
         except:
             raise WhadDeviceAccessDenied("pcap")
 

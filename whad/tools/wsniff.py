@@ -5,7 +5,7 @@ This utility implements a generic sniffer module, automatically adapted to every
 import logging
 from argparse import ArgumentParser
 from prompt_toolkit import print_formatted_text, HTML
-from whad.cli.app import CommandLineApp, ApplicationError
+from whad.cli.app import CommandLineApp, ApplicationError, run_app
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
 from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
@@ -32,6 +32,23 @@ class WhadSniffOutputPipe(Bridge):
     """
     def __init__(self, input_connector, output_connector):
         super().__init__(input_connector, output_connector)
+
+    def on_outbound(self, message):
+        """Process outbound messages.
+
+        Outbound packets are packets coming from our input connector,that need to be
+        forwarded as packets to the next tool.
+        """
+        if hasattr(message, "to_packet") and hasattr(self.input, "process_packet"):
+            pkt = message.to_packet()
+            pkt = self.input.process_packet(pkt)
+            msg = message.from_packet(pkt)
+            super().on_outbound(msg)
+        else:
+            logger.debug('[wsniff][input-pipe] forward default outbound message %s' % message)
+            # Forward other messages
+            super().on_outbound(message)
+
 
 
 class WhadDomainSubParser(ArgumentParser):
@@ -290,8 +307,5 @@ class WhadSniffApp(CommandLineApp):
 def wsniff_main():
     """Main WHAD Sniffer routine.
     """
-    try:
-        app = WhadSniffApp()
-        app.run()
-    except ApplicationError as err:
-        err.show()
+    app = WhadSniffApp()
+    run_app(app)

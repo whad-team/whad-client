@@ -122,6 +122,8 @@ class RawPduReceived(PbMessageWrapper):
         """
         packet = ESB_Hdr(bytes(self.pdu))
         packet.metadata = ESBMetadata()
+        packet.metadata.raw = True
+        packet.metadata.decrypted = False
         packet.metadata.channel = self.channel
         if self.rssi is not None:
             packet.metadata.rssi = self.rssi

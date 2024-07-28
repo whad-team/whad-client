@@ -6,7 +6,7 @@ which can be used to access a device remotely.
 from prompt_toolkit import print_formatted_text, HTML
 
 from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLineApp, ApplicationError
+from whad.cli.app import CommandLineApp, ApplicationError, run_app
 from scapy.all import *
 from whad.device.unix import  UnixSocketConnector
 from whad.device import Bridge
@@ -18,9 +18,10 @@ import logging
 import time
 import sys
 
-from whad.ble.crypto import EncryptedSessionInitialization, LegacyPairingCracking
+from whad.ble.crypto import EncryptedSessionInitialization, LegacyPairingCracking, \
+    LongTermKeyDistribution, IdentityResolvingKeyDistribution, ConnectionSignatureResolvingKeyDistribution
 from whad.rf4ce.crypto import RF4CEKeyDerivation
-from whad.zigbee.crypto import TouchlinkKeyManager
+from whad.zigbee.crypto import TouchlinkKeyManager, TransportKeyDistribution
 from whad.ble.utils.analyzer import GATTServerDiscovery
 from whad.unifying.crypto import LogitechUnifyingKeyDerivation
 from whad.unifying.utils.analyzer import UnifyingMouseMovement, UnifyingKeystroke
@@ -82,7 +83,11 @@ class WhadAnalyzeApp(CommandLineApp):
                     GATTServerDiscovery(),
                     UnifyingMouseMovement(),
                     UnifyingKeystroke(),
-                    LogitechUnifyingKeyDerivation()
+                    LogitechUnifyingKeyDerivation(),
+                    LongTermKeyDistribution(),
+                    IdentityResolvingKeyDistribution(),
+                    ConnectionSignatureResolvingKeyDistribution(),
+                    TransportKeyDistribution()
                 ]
 
                 connector = WhadAnalyzeUnixSocketConnector(interface)
@@ -103,8 +108,5 @@ class WhadAnalyzeApp(CommandLineApp):
 
 
 def wanalyze_main():
-    try:
-        app = WhadAnalyzeApp()
-        app.run()
-    except ApplicationError as err:
-        err.show()
+    app = WhadAnalyzeApp()
+    run_app(app)

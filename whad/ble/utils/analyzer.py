@@ -379,7 +379,10 @@ class GATTServerDiscovery(TrafficAnalyzer):
                         selected_service = service
                         break
 
-                characteristics = list(selected_service.characteristics())
+                if selected_service is not None:
+                    characteristics = list(selected_service.characteristics())
+                else:
+                    characteristics = []
                 selected_characteristic = None
                 for characteristic in characteristics:
                     if characteristic.handle <= descriptor.handle:
