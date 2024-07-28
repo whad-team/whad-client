@@ -15,12 +15,12 @@ Python library allowing to interact with offensive security tools implementing t
 - [ ] nettoyage code exemples
 - [x] wuni-scan
 - [ ] wuni-keyboard
-- [ ] wuni-mouse
+- [x] wuni-mouse
 - [ ] wuni-keymouse
 - [ ] wuni-keylogger
 - [x] Renommage ble-spawn en wble-spawn
 - [x] Renommage ble-connect en wble-connect
-- [ ] Renommage ble-cli en wble-central
+- [x] Renommage ble-cli en wble-central
 
 ### Repository structure
 - [ ] Adding WHAD definitions repository as a submodule
