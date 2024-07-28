@@ -222,14 +222,15 @@ class UnifyingApplicativeLayer(Layer):
                 Logitech_Unencrypted_Keystroke_Payload(
                     hid_data=LogitechUnifyingKeystrokeConverter.get_hid_data_from_key(
                         key,
-                        ctrl=False,
-                        alt=False,
-                        shift=False,
-                        gui=False,
+                        ctrl=ctrl,
+                        alt=alt,
+                        shift=shift,
+                        gui=gui,
                         locale=self.state.locale
                     )
                 )
             )
+
             keep_alive = self.prepare_message(
                 Logitech_Keepalive_Payload(timeout=1250)
             )
