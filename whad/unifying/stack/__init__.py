@@ -10,6 +10,7 @@ from whad.unifying.hid import LogitechUnifyingMouseMovementConverter, LogitechUn
 from whad.unifying.stack.constants import UnifyingRole, ClickType, MultimediaKey
 from whad.unifying.crypto import LogitechUnifyingCryptoManager
 from whad.unifying.exceptions import MissingEncryptedKeystrokePayload
+from whad.exceptions import WhadDeviceDisconnected, WhadDeviceTimeout
 from whad.common.stack import Layer, alias, source, state, LayerState
 from time import sleep, time
 from threading import Thread, Lock
@@ -108,14 +109,23 @@ class UnifyingApplicativeLayer(Layer):
 
     def _transmit_timeouts_thread(self):
         while self.state.transmit_timeouts or not self.__packets_queue.empty():
-            self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250))
             try:
+                self.send_message(Logitech_Set_Keepalive_Payload(timeout=1250))
                 packet = self.__packets_queue.get(timeout=0.01, block=False)
                 self.send_message(packet)
                 self.send_message(Logitech_Keepalive_Payload(timeout=1250))
-            except Empty:
-                self.send_message(Logitech_Keepalive_Payload(timeout=1250))
-                sleep(0.01)
+            except Empty as empty_err:
+                try:
+                    self.send_message(Logitech_Keepalive_Payload(timeout=1250))
+                    sleep(0.01)
+                except WhadDeviceTimeout:
+                    return
+                except WhadDeviceDisconnected:
+                    return
+            except WhadDeviceTimeout:
+                return
+            except WhadDeviceDisconnected:
+                return
 
     def send_message(self, message, waiting_ack=False):
         result = self.send('ll', Logitech_Unifying_Hdr()/message, tag='data')
