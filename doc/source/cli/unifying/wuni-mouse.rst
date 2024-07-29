@@ -31,7 +31,7 @@ Logging mouse moves and button presses
 --------------------------------------
 
 If ``wuni-mouse`` is simply executed against a wireless Logitech Unifying mouse,
-it will synchronizes with this mouse and logs every move and button press sent
+it synchronizes with this mouse and logs every move and button press sent
 by the device to its associated dongle.
 
 .. code-block:: text
@@ -99,3 +99,4 @@ X and Y and then send a right-button click.
 
     $ echo "100,100,0,0,R" | wuni-mouse -i uart0 -a 49:f9:51:2e:a4
 
+.. warning:: This tool cannot be used in conjunction with ``whadserver``, due to extra latency induced by the TCP connection

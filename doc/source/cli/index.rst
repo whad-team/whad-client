@@ -63,3 +63,4 @@ Logitech Unifying
 
     unifying/wuni-scan
     unifying/wuni-mouse
+    unifying/wuni-keyboard
