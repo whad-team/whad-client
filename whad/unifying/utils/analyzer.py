@@ -3,12 +3,15 @@ from whad.unifying.stack.constants import ClickType
 from whad.unifying.hid import LogitechUnifyingMouseMovementConverter
 from whad.scapy.layers.unifying import Logitech_Mouse_Payload, Logitech_Unencrypted_Keystroke_Payload, Logitech_Encrypted_Keystroke_Payload
 from whad.unifying.hid import LogitechUnifyingKeystrokeConverter, HIDCodeNotFound, InvalidHIDData
+from whad.unifying.crypto import LogitechUnifyingKeyDerivation
 
 class UnifyingMouseMovement(TrafficAnalyzer):
         def reset(self):
             super().reset()
             self.x = None
             self.y = None
+            self.wheel_x = None
+            self.wheel_y = None
             self.button = None
 
         @property
@@ -16,6 +19,8 @@ class UnifyingMouseMovement(TrafficAnalyzer):
             return {
                 "x" : self.x,
                 "y" : self.y,
+                "wheel_x" : self.wheel_x,
+                "wheel_y" : self.wheel_y,
                 "button" : self.button
             }
 
@@ -25,6 +30,7 @@ class UnifyingMouseMovement(TrafficAnalyzer):
                 self.mark_packet(packet)
                 converter = LogitechUnifyingMouseMovementConverter()
                 self.x, self.y = converter.get_coordinates_from_hid_data(packet.movement)
+                self.wheel_x, self.wheel_y = packet.wheel_x, packet.wheel_y
                 self.button = ClickType(packet.button_mask)
                 self.complete()
 
@@ -64,9 +70,16 @@ class UnifyingKeystroke(TrafficAnalyzer):
                                 self.key = " [{}] ".format(self.key)
                             self.complete()
                     except (HIDCodeNotFound, InvalidHIDData):
-                        print(":()")
+                        pass
 
         def reset(self):
             super().reset()
             self.__locale = "fr"
             self.key = None
+
+
+analyzers = {
+    "pairing_cracking" : LogitechUnifyingKeyDerivation,
+    "mouse" : UnifyingMouseMovement,
+    "keystroke" : UnifyingKeystroke
+}

@@ -4,7 +4,8 @@ ADPCM codec implementation.
 *All* credits for this code goes to https://github.com/ShowerXu/python-adpcm/.
 '''
 from whad.scapy.layers.rf4ce import RF4CE_Vendor_MSO_Audio_Start_Request, \
-		RF4CE_Vendor_MSO_Audio_Data_Notify, RF4CE_Vendor_MSO_Audio_Stop_Request
+		RF4CE_Vendor_MSO_Audio_Data_Notify, RF4CE_Vendor_MSO_Audio_Stop_Request, \
+		RF4CE_Vendor_MSO_Audio
 from struct import pack, unpack
 import wave
 
@@ -245,7 +246,7 @@ class ADPCM:
 			if self.output_file is not None:
 				self.output_file.writeframes(decoded_samples)
 
-		elif RF4CE_Vendor_MSO_Audio_Stop_Request in packet:
+		elif RF4CE_Vendor_MSO_Audio_Stop_Request in packet or (RF4CE_Vendor_MSO_Audio in packet and packet.audio_cmd_id == 2):
 			if self.output_stream is not None:
 				if self.live_play:
 					self.output_stream.close()
