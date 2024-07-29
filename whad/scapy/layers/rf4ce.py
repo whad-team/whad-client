@@ -174,6 +174,12 @@ class RF4CE_Hdr(Packet):
         else:
             return p + pay
 
+    def post_dissect(self, s):
+        """Override layer post_dissect() function to reset raw packet cache.
+        """
+        self.raw_packet_cache = None  # Reset packet to allow post_build
+        return s
+        
 class RF4CE_Vendor_Hdr(Packet):
     name = "RF4CE Vendor Data Packet"
     fields_desc = [
