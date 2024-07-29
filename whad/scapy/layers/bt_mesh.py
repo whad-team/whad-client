@@ -18,6 +18,7 @@ from scapy.fields import (
     BoundStrLenField,
     XStrField,
     ByteField,
+    XByteField,
     ShortField,
     ThreeBytesField,
     XStrLenField,
@@ -233,6 +234,7 @@ PROVISIONING PDU LAYER
 ================================
 """
 
+
 class BTMesh_Provisioning_Hdr(Packet):
     name = "Bluetooth Mesh Provisioning PDU"
     fields_desc = [
@@ -259,7 +261,6 @@ class BTMesh_Provisioning_Hdr(Packet):
             },
         ),
     ]
-
 
 
 class BTMesh_Provisioning_Invite(Packet):
@@ -518,13 +519,13 @@ GENERIC PROVISIONING PDU LAYER
 class BTMesh_Generic_Provisioning_Hdr(Packet):
     name = "Bluetooth Mesh Generic Provisioning PDU"
     fields_desc = [
-        # Check 2 LSF values for opcode, gives us the meaning of first field
+        # Since the generic_provisioning_control_format is after in the fields, need to work with post_dissection and do_build to make sure generic_provisioning_control_format gets processed first
         ConditionalField(
             BitField("segment_number", 0, 6),
             lambda pkt: pkt.generic_provisioning_control_format == 0b00,
         ),
         ConditionalField(
-            XBitField("padding", 0b000000, 6),
+            BitField("padding", 0, 6),
             lambda pkt: pkt.generic_provisioning_control_format == 0b01,
         ),
         ConditionalField(
@@ -536,11 +537,7 @@ class BTMesh_Generic_Provisioning_Hdr(Packet):
                 "bearer_opcode",
                 0,
                 6,
-                {
-                    0x00: "Link Open",
-                    0x01: "Link Ack",
-                    0x02: "Link Close",
-                },
+                {0x00: "Link Open", 0x01: "Link ACK", 0x02: "Link Close"},
             ),
             lambda pkt: pkt.generic_provisioning_control_format == 0b11,
         ),
@@ -556,6 +553,21 @@ class BTMesh_Generic_Provisioning_Hdr(Packet):
             },
         ),
     ]
+
+    def pre_dissect(self, s):
+        """trick to make generic_provisioning_control_format available before dissecting the first 6 bits"""
+        # set the generic_provisioning_control_format value in the original packet
+        if len(s) < 1:
+            return s
+        # we force the fecthing of the value for generic_provisioning_control_format from the raw bytes of the packet, this way the do_dissect function knows what ConditionalField to choose for the first field
+        self.generic_provisioning_control_format = (s[-1] >> 6) & 0b11
+        return s 
+
+    def post_build(self, p, pay):
+        """ generic_provisioning_control_format should be last, but we need to know its value to build other fields """
+        p = p[:-1] + bytes([(self.generic_provisioning_control_format << 6) | (p[-1] & 0x3F)])
+        return p + pay
+
 
 
 class BTMesh_Generic_Provisioning_Transaction_Start(Packet):
@@ -654,7 +666,7 @@ class EIR_PB_ADV_PDU(Packet):
     name = "Bluetooth Mesh PB_ADV PDU"
     fields_desc = [
         XIntField("link_id", None),
-        ByteField("transaction_number", None),
+        XByteField("transaction_number", None),
     ]
 
 
