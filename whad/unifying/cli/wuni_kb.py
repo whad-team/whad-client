@@ -122,12 +122,17 @@ class DuckyScriptRunner(object):
         if format is None:
             return []
 
-        # Make sure we have the exact number of tokens
-        if len(tokens) != len(format):
+        # If we expect a single text string, all the tokens following the
+        # instruction are part of the string. To handle this specific case,
+        # we update the format string to take into account all remaining
+        # tokens.
+        if format.strip() == "s":
+            format = "s"*len(tokens)
+        elif len(tokens) != len(format):
             raise DuckyScriptError(f"Invalid format for instruction {tokens[0]}")
 
         # Try to convert token to expected format
-        for i, token in tokens.enumerate():
+        for i, token in enumerate(tokens):
             parsed_operands.append(self.parse_operand(token.strip(), format[i]))
         
         return parsed_operands
@@ -183,7 +188,7 @@ class DuckyScriptRunner(object):
         for line in lines:
             output.append({
                 "func": "send_text",
-                "args":[line]
+                "args":[line["data"]]
             })
             output.append({
                 "func": "send_keys",
@@ -219,7 +224,7 @@ class DuckyScriptRunner(object):
                 elif line["inst"] == "DEFAULTDELAY":
                     block.append({
                         "func": "set_delay",
-                        "args": line["operands"][0]
+                        "args": line["operands"]
                     })
                 elif line["inst"] == "DEFAULTCHARDELAY":
                     block.append({
@@ -238,11 +243,12 @@ class DuckyScriptRunner(object):
                     })
                 elif line["inst"] == "STRING":
                     # Combine operands to rebuild our string
-                    op_string = ""
+                    op_string = []
                     for str_bit in line["operands"]:
                         if str_bit["format"] != "s":
                             raise DuckyScriptError("Syntax error line {i}")
-                        op_string += str_bit["value"]
+                        op_string.append(str_bit["value"])
+                    op_string = " ".join(op_string)
 
                     block.append({
                         "func": "send_text",
@@ -250,11 +256,12 @@ class DuckyScriptRunner(object):
                     })
                 elif line["inst"] == "STRINGLN":
                     # Combine operands to rebuild our string
-                    op_string = ""
+                    op_string = []
                     for str_bit in line["operands"]:
                         if str_bit["format"] != "s":
                             raise DuckyScriptError("Syntax error line {i}")
-                        op_string += str_bit["value"]
+                        op_string.append(str_bit["value"])
+                    op_string = " ".join(op_string)
 
                     block.append({
                         "func": "send_textline",
@@ -385,7 +392,9 @@ class DuckyScriptRunner(object):
             self.execute(script)
         except IOError:
             logger.debug("I/O Error while reading script %s", self.__script_path)
-        except DuckyScriptError:
+        except DuckyScriptError as exc:
+            print(line)
+            print(exc)
             logger.error("DuckyScript parsing error at line %d", line_counter)
 
     def do_repeat(self, inst, operand):
@@ -423,6 +432,7 @@ class DuckyScriptRunner(object):
         :param text: Text to send
         :type text: str
         """
+        print(text)
         self.__connector.send_text(text)
 
     def send_textline(self, text):
@@ -469,6 +479,24 @@ class DuckyScriptRunner(object):
         # Send key through connector
         self.__connector.send_key(key, gui=gui, alt=alt, shift=shift, ctrl=ctrl)
         
+    def set_delay(self, delay):
+        """Set default delay.
+
+        :param delay: Abstract operand that specifies the delay (in milliseconds)
+        :type delay: dict
+        """
+        delay = self.evaluate_expr(delay)
+        self.__default_delay = delay
+
+    def set_char_delay(self, delay):
+        """Set default char delay.
+
+        :param delay: Abstract operand that specifies the delay (in milliseconds)
+        :type delay: dict
+        """
+        delay = self.evaluate_expr(delay)
+        self.__default_char_delay = delay
+
     def delay(self, delay):
         """Wait for a specific delay in ms.
 
