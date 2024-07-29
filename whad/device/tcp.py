@@ -205,7 +205,7 @@ class TCPSocketDevice(WhadDevice):
                 rlist,
                 wlist,
                 elist,
-                1
+                .01
             )
 
             # Handle incoming messages if any
@@ -314,6 +314,7 @@ class TCPSocketConnector(WhadDeviceConnector):
         """
         logger.debug('Creating TCP socket server')
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.__socket.bind((self.__address, self.__port))
         self.__socket.listen()
 
