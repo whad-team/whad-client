@@ -8,6 +8,8 @@ from whad.ble.profile import GenericProfile
 from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
 from whad.ble.profile.service import PrimaryService, SecondaryService
 from struct import unpack
+from whad.ble.crypto import EncryptedSessionInitialization, LegacyPairingCracking, \
+    LongTermKeyDistribution, IdentityResolvingKeyDistribution, ConnectionSignatureResolvingKeyDistribution
 
 class ReadByGroupTypeDiscovery(TrafficAnalyzer):
 
@@ -442,3 +444,13 @@ class GATTServerDiscovery(TrafficAnalyzer):
                     list(range(min(*handles), max(*handles)+1)) == handles
                 ):
                 self.complete()
+
+
+analyzers = {
+    "encrypted_session_initialization" : EncryptedSessionInitialization,
+    "legacy_pairing_cracking" : LegacyPairingCracking,
+    "ltk_distribution" : LongTermKeyDistribution,
+    "irk_distribution" : IdentityResolvingKeyDistribution,
+    "csrk_distribution" : ConnectionSignatureResolvingKeyDistribution,
+    "profile_discovery" : GATTServerDiscovery
+}

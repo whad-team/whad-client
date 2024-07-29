@@ -76,6 +76,7 @@ class RF4CECryptoManager:
         return plaintext
 
     def decrypt(self, packet, source=None, destination=None, rf4ce_only=False):
+        fcs_present = False
         # convert source and destination address if provided
         if isinstance(source, str) and ":" in source:
             source = bytes.fromhex(source.replace(":", ""))[::-1]
@@ -102,6 +103,8 @@ class RF4CECryptoManager:
                 packet = packet.do_build()[:-2]
                 packet = Dot15d4(packet)
 
+                fcs_present = True
+
         if RF4CE_Hdr not in packet:
             raise MissingRF4CEHeader()
 
@@ -121,7 +124,6 @@ class RF4CECryptoManager:
                 return (packet, False)
 
             ciphertext, mic = self.extractCiphertextPayload(packet)
-
             # Perform the decryption and integrity check
             cipher = AES.new(self.key, AES.MODE_CCM, nonce=self.nonce, mac_len=4)
             cipher.update(self.auth)
@@ -134,6 +136,9 @@ class RF4CECryptoManager:
                     packet = RF4CE_Hdr(header + plaintext + mic)
                 else:
                     packet = Dot15d4(header + plaintext + mic)
+                    if fcs_present:
+                        # rebuild Dot15d4FCS packet
+                        packet = Dot15d4FCS(bytes(packet) + Dot15d4FCS.compute_fcs(None, bytes(packet)))
 
                 return (packet, True)
 
@@ -146,8 +151,8 @@ class RF4CECryptoManager:
 
 
     def encrypt(self, packet, source=None, destination=None, rf4ce_only=False):
+        fcs_present = False
         # convert source and destination address if provided
-
         if isinstance(source, str) and ":" in source:
             source = bytes.fromhex(source.replace(":", ""))[::-1]
 
@@ -168,6 +173,7 @@ class RF4CECryptoManager:
 
             # don't process FCS if present
             if Dot15d4FCS in packet:
+                fcs_present = True
                 # force a rebuild just in case
                 packet.reserved = 1
                 packet = bytes(packet)[:-2]
@@ -211,6 +217,9 @@ class RF4CECryptoManager:
                 packet = RF4CE_Hdr(header + ciphertext + mic)
             else:
                 packet = Dot15d4(header + ciphertext +  mic)
+                if fcs_present:
+                    # rebuild Dot15d4FCS packet
+                    packet = Dot15d4FCS(bytes(packet) + Dot15d4FCS.compute_fcs(None, bytes(packet)))
 
             # Set the security flag and force a rebuild
             packet.security_enabled = 1
@@ -255,9 +264,7 @@ class RF4CEKeyDerivation(TrafficAnalyzer):
 
     @property
     def output(self):
-        key = self.key
-        if key is not None:
-            return {"key":key}
+        return {"key":self.key}
 
     @property
     def key(self):

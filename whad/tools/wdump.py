@@ -37,6 +37,7 @@ class WhadDumpApp(CommandLineApp):
             input=CommandLineApp.INPUT_WHAD,
             output=CommandLineApp.OUTPUT_WHAD
         )
+
         self.add_argument(
             'pcap',
             help='Pcap file to export'

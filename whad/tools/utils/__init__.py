@@ -150,3 +150,20 @@ def get_translator(protocol):
         bind()
 
     return translator
+
+
+def get_analyzers(protocol=None):
+    analyzers = {}
+    for _, candidate_protocol,_ in iter_modules(whad.__path__):
+        # If the module contains a list of analyzers,
+        # store the associated analyzers in analyzers variable
+        try:
+            module = import_module("whad.{}.utils.analyzer".format(candidate_protocol))
+            if candidate_protocol == protocol:
+                analyzers = module.analyzers
+                break
+            elif protocol is None:
+                analyzers[candidate_protocol] = module.analyzers
+        except ModuleNotFoundError:
+            pass
+    return analyzers

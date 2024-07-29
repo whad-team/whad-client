@@ -87,6 +87,46 @@ class Sniffer(RF4CE, EventsManager):
         self.__configuration = new_configuration
         self._enable_sniffing()
 
+    def process_packet(self, packet):
+
+        if self.__configuration.pairing:
+            self.__key_derivation.process_packet(packet)
+            if self.__key_derivation.key is not None:
+                logger.info("[i] New key extracted: ", self.__key_derivation.key.hex())
+                self.trigger_event(KeyExtractedEvent(self.__key_derivation.key))
+                self.__decryptor.add_key(self.__key_derivation.key)
+                self.__key_derivation.reset()
+
+        if (
+            hasattr(packet, "fcf_destaddrmode") and
+            packet.fcf_destaddrmode == 3
+        ):
+            self.__decryptor.add_address(packet.dest_addr)
+
+        if (
+            hasattr(packet, "fcf_srcaddrmode") and
+            packet.fcf_srcaddrmode == 3
+        ):
+            self.__decryptor.add_address(packet.src_addr)
+
+        if (
+            hasattr(packet, "security_enabled") and
+            packet.security_enabled == 1 and
+            self.__configuration.decrypt
+        ):
+            try:
+                decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
+                if success:
+                    metadata = packet.metadata
+                    packet = decrypted
+                    packet.metadata = metadata
+                    if self.__configuration.audio:
+                        self.__audio_stream.process_packet(packet)
+
+            except MissingCryptographicMaterial:
+                pass
+        return packet
+
     def sniff(self):
         while True:
             if self.support_raw_pdu():
@@ -97,39 +137,8 @@ class Sniffer(RF4CE, EventsManager):
             message = self.wait_for_message(filter=message_filter(message_type))
             if issubclass(message, AbstractPacket):
                 packet = message.to_packet()
+                packet = self.process_packet(packet)
+
                 self.monitor_packet_rx(packet)
-                if self.__configuration.pairing:
-                    self.__key_derivation.process_packet(packet)
-                    if self.__key_derivation.key is not None:
-                        logger.info("[i] New key extracted: ", self.__key_derivation.key.hex())
-                        self.trigger_event(KeyExtractedEvent(self.__key_derivation.key))
-                        self.__decryptor.add_key(self.__key_derivation.key)
-                        self.__key_derivation.reset()
 
-                if (
-                    hasattr(packet, "fcf_destaddrmode") and
-                    packet.fcf_destaddrmode == 3
-                ):
-                    self.__decryptor.add_address(packet.dest_addr)
-
-                if (
-                    hasattr(packet, "fcf_srcaddrmode") and
-                    packet.fcf_srcaddrmode == 3
-                ):
-                    self.__decryptor.add_address(packet.src_addr)
-
-                if (
-                    hasattr(packet, "security_enabled") and
-                    packet.security_enabled == 1 and
-                    self.__configuration.decrypt
-                ):
-                    try:
-                        decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
-                        if success:
-                            packet.decrypted = decrypted
-                            if self.__configuration.audio:
-                                self.__audio_stream.process_packet(packet.decrypted)
-
-                    except MissingCryptographicMaterial:
-                        pass
                 yield packet

@@ -322,19 +322,13 @@ class EncryptedSessionInitialization(TrafficAnalyzer):
 
     @property
     def output(self):
-        if (
-                self.master_skd is not None and
-                self.master_iv is not None and
-                self.slave_skd is not None and
-                self.slave_iv is not None
-        ):
-            return {
-                "master_skd" : self.master_skd,
-                "master_iv" : self.master_iv,
-                "slave_skd" : self.slave_skd,
-                "slave_iv" : self.slave_iv,
-                "started" : self.started
-            }
+        return {
+            "master_skd" : self.master_skd,
+            "master_iv" : self.master_iv,
+            "slave_skd" : self.slave_skd,
+            "slave_iv" : self.slave_iv,
+            "started" : self.started
+        }
 
     @property
     def crypto_material(self):
@@ -616,8 +610,10 @@ class LegacyPairingCracking(TrafficAnalyzer):
         def output(self):
             keys = self.keys
             if keys is None:
-                return None
-
+                return {
+                    "tk" : None,
+                    "stk" : None
+                }
             else:
                 tk, stk = keys
                 return {

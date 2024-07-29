@@ -12,19 +12,12 @@ from whad.device.unix import  UnixSocketConnector
 from whad.device import Bridge
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
-from whad.tools.utils import get_translator
+from whad.tools.utils import get_translator, get_analyzers
 
 import logging
 import time
 import sys
 
-from whad.ble.crypto import EncryptedSessionInitialization, LegacyPairingCracking, \
-    LongTermKeyDistribution, IdentityResolvingKeyDistribution, ConnectionSignatureResolvingKeyDistribution
-from whad.rf4ce.crypto import RF4CEKeyDerivation
-from whad.zigbee.crypto import TouchlinkKeyManager, TransportKeyDistribution
-from whad.ble.utils.analyzer import GATTServerDiscovery
-from whad.unifying.crypto import LogitechUnifyingKeyDerivation
-from whad.unifying.utils.analyzer import UnifyingMouseMovement, UnifyingKeystroke
 
 logger = logging.getLogger(__name__)
 #logging.basicConfig(level=logging.DEBUG)
@@ -39,30 +32,53 @@ class WhadAnalyzeApp(CommandLineApp):
         """
         super().__init__(
             description='WHAD analyze tool',
-            interface=True,
+            interface=False,
             commands=False,
             input=CommandLineApp.INPUT_WHAD,
             output=CommandLineApp.OUTPUT_STANDARD
         )
 
+        self.add_argument(
+            'analyzer',
+            help='Analyzer to use',
+            nargs="*"
+        )
+        self.add_argument(
+            '-l',
+            '--list',
+            action="store_true",
+            help='List of available analyzers'
+        )
+
     def on_packet(self, pkt):
         #print(repr(pkt))
-        for analyzer in self.analyzers:
+        for analyzer_name, analyzer in self.selected_analyzers.items():
             analyzer.process_packet(pkt)
             #if analyzer.triggered:
             #    print("[i]", analyzer.__class__.__name__, "->", "triggered")
             if analyzer.completed:
-                print("[i]", analyzer.__class__.__name__, "->", "completed (output=", repr(analyzer.output),")")
-
+                print("[i]", analyzer_name, "->", "completed (output=", repr(analyzer.output),")")
                 for pkt in analyzer.marked_packets:
                     print("\t", repr(pkt))
-
-                print()
                 analyzer.reset()
-
+                '''
+                if "raw_audio" in analyzer.output:
+                    import sys
+                    sys.stdout.buffer.write(analyzer.output['raw_audio'])
+                    sys.stdout.flush()
+                    '''
     def run(self):
         # Launch pre-run tasks
         self.pre_run()
+
+        if self.args.list:
+            analyzers = get_analyzers()
+            for domain, analyzers_list in analyzers.items():
+                print(domain)
+                for analyzer_name, analyzer_class in analyzers_list.items():
+                    print("\t -", analyzer_name, str(list(analyzer_class().output.keys())))
+                print()
+
         try:
             if self.is_piped_interface():
                 interface = self.input_interface
@@ -75,24 +91,13 @@ class WhadAnalyzeApp(CommandLineApp):
 
                 parameters = self.args.__dict__
 
-                self.analyzers = [
-                    TouchlinkKeyManager(),
-                    EncryptedSessionInitialization(),
-                    LegacyPairingCracking(),
-                    RF4CEKeyDerivation(),
-                    GATTServerDiscovery(),
-                    UnifyingMouseMovement(),
-                    UnifyingKeystroke(),
-                    LogitechUnifyingKeyDerivation(),
-                    LongTermKeyDistribution(),
-                    IdentityResolvingKeyDistribution(),
-                    ConnectionSignatureResolvingKeyDistribution(),
-                    TransportKeyDistribution()
-                ]
-
                 connector = WhadAnalyzeUnixSocketConnector(interface)
                 for parameter_name, parameter_value in parameters.items():
                     connector.add_parameter(parameter_name, parameter_value)
+
+                self.selected_analyzers = {}
+                for analyzer_name, analyzer_class in get_analyzers(self.args.domain).items():
+                    self.selected_analyzers[analyzer_name] = analyzer_class()
 
                 connector.domain = self.args.domain
                 connector.translator = get_translator(self.args.domain)(connector.hub)
