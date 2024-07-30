@@ -156,7 +156,8 @@ class WhadSniffApp(CommandLineApp):
                     sniffer = self.environment[self.args.domain]["sniffer_class"](self.interface)
 
                     # Add an event listener to display incoming events
-                    sniffer.add_event_listener(display_event)
+                    # sniffer.add_event_listener(display_event)
+                    
                     try:
                         sniffer.configuration = configuration
                     except Exception as e:
