@@ -13,7 +13,6 @@ from scapy.fields import (
     XIntField,
     BitEnumField,
     BitField,
-    XBitField,
     FlagsField,
     BoundStrLenField,
     XStrField,
@@ -25,7 +24,7 @@ from scapy.fields import (
     XStrFixedLenField,
     StrField,
     MultipleTypeField,
-    FieldLenField,
+    BitFieldLenField,
 )
 from scapy.layers.bluetooth import EIR_Element, EIR_Hdr, EIR_Raw
 
@@ -234,33 +233,22 @@ PROVISIONING PDU LAYER
 ================================
 """
 
-
-class BTMesh_Provisioning_Hdr(Packet):
-    name = "Bluetooth Mesh Provisioning PDU"
-    fields_desc = [
-        BitField("padding", 0b00, 2),
-        BitEnumField(
-            "type",
-            None,
-            6,
-            {
-                0x00: "provisioning_invite",
-                0x01: "provisioning_capabilities",
-                0x02: "provisioning_start",
-                0x03: "provisioning_public_key",
-                0x04: "provisioning_input_complete",
-                0x05: "provisioning_confirmation",
-                0x06: "provisioning_random",
-                0x07: "provisioning_data",
-                0x08: "provisioning_complete",
-                0x09: "provisioning_failed",
-                0x0A: "provisioning_record_request",
-                0x0B: "provisioning_record_response",
-                0x0C: "provisioning_record_get",
-                0x0D: "provisioning_record_list",
-            },
-        ),
-    ]
+_provisioning_pdu_types = {
+    0x00: "Provisioning_Invite",
+    0x01: "Provisioning_Capabilities",
+    0x02: "Provisioning_Start",
+    0x03: "Provisioning_Public_Key",
+    0x04: "Provisioning_Input_Complete",
+    0x05: "Provisioning_Confirmation",
+    0x06: "Provisioning_Random",
+    0x07: "Provisioning_Data",
+    0x08: "Provisioning_Complete",
+    0x09: "Provisioning_Failed",
+    0x0A: "Provisioning_Record_Request",
+    0x0B: "Provisioning_Record_Response",
+    0x0C: "Provisioning_Records_Get",
+    0x0D: "Provisioning_Records_List",
+}
 
 
 class BTMesh_Provisioning_Invite(Packet):
@@ -272,6 +260,7 @@ class BTMesh_Provisioning_Capabilities(Packet):
     name = "Bluetooth Mesh Provisioning Capabilities"
     fields_desc = [
         ByteField("number_of_elements", None),
+        BitField("RFU", 0, 14),
         FlagsField(
             "algorithms",
             None,
@@ -281,7 +270,6 @@ class BTMesh_Provisioning_Capabilities(Packet):
                 0b10: "BTM_ECDH_P256_HMAC_SHA256_AES_CCM",
             },
         ),
-        BitField("RFU", 0, 14),
         ByteEnumField(
             "public_key_type",
             None,
@@ -408,7 +396,7 @@ class BTMesh_Provisioning_Confirmation(Packet):
     name = "Bluetooth Mesh Provisioning Confirmation"
     fields_desc = [
         # Size depends on algorithm used, 16 or 32 bits
-        BoundStrLenField("confirmation", "", minlen=16, maxlen=32)
+        StrField("confirmation", "")
     ]
 
 
@@ -416,7 +404,7 @@ class BTMesh_Provisioning_Random(Packet):
     name = "Bluetooth Mesh Provisioning Random"
     fields_desc = [
         # Size depends on algorithm used, 16 or 32 bits
-        BoundStrLenField("random", "", minlen=16, maxlen=32)
+        StrField("random", "")
     ]
 
 
@@ -424,7 +412,7 @@ class BTMesh_Provisioning_Data(Packet):
     name = "Bluetooth Mesh Provisioning Data"
     fields_desc = [
         XStrFixedLenField("encrypted_provisioning_data", None, length=25),
-        LongField("provisioning_data_mic", None),
+        XLongField("provisioning_data_mic", None),
     ]
 
 
@@ -494,20 +482,129 @@ class BTMesh_Provisioning_Records_List(Packet):
     ]
 
 
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Invite, type=0x00)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Capabilities, type=0x01)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Start, type=0x02)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Public_Key, type=0x03)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Input_Complete, type=0x04)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Confirmation, type=0x05)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Random, type=0x06)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Data, type=0x07)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Complete, type=0x08)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Failed, type=0x09)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Record_Request, type=0x0A)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Record_Response, type=0x0B)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Records_Get, type=0x0C)
-bind_layers(BTMesh_Provisioning_Hdr, BTMesh_Provisioning_Records_List, type=0x0D)
+class BTMesh_Provisioning_Hdr(Packet):
+    name = "Bluetooth Mesh Provisioning PDU"
+    fields_desc = [
+        BitField("padding", 0b00, 2),
+        BitEnumField("type", 0, 6, _provisioning_pdu_types),
+        MultipleTypeField(
+            [
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Invite(),
+                        BTMesh_Provisioning_Invite,
+                    ),
+                    lambda pkt: pkt.type == 0x00,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Capabilities(),
+                        BTMesh_Provisioning_Capabilities,
+                    ),
+                    lambda pkt: pkt.type == 0x01,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Start(),
+                        BTMesh_Provisioning_Start,
+                    ),
+                    lambda pkt: pkt.type == 0x02,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Public_Key(),
+                        BTMesh_Provisioning_Public_Key,
+                    ),
+                    lambda pkt: pkt.type == 0x03,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Input_Complete(),
+                        BTMesh_Provisioning_Input_Complete,
+                    ),
+                    lambda pkt: pkt.type == 0x04,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Confirmation(),
+                        BTMesh_Provisioning_Confirmation,
+                    ),
+                    lambda pkt: pkt.type == 0x05,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Random(),
+                        BTMesh_Provisioning_Random,
+                    ),
+                    lambda pkt: pkt.type == 0x06,
+                ),
+                (
+                    PacketField(
+                        "message", BTMesh_Provisioning_Data(), BTMesh_Provisioning_Data
+                    ),
+                    lambda pkt: pkt.type == 0x07,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Complete(),
+                        BTMesh_Provisioning_Complete,
+                    ),
+                    lambda pkt: pkt.type == 0x08,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Failed(),
+                        BTMesh_Provisioning_Failed,
+                    ),
+                    lambda pkt: pkt.type == 0x09,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Record_Request(),
+                        BTMesh_Provisioning_Record_Request,
+                    ),
+                    lambda pkt: pkt.type == 0x0A,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Record_Response(),
+                        BTMesh_Provisioning_Record_Response,
+                    ),
+                    lambda pkt: pkt.type == 0x0B,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Records_Get(),
+                        BTMesh_Provisioning_Records_Get,
+                    ),
+                    lambda pkt: pkt.type == 0x0C,
+                ),
+                (
+                    PacketField(
+                        "message",
+                        BTMesh_Provisioning_Records_List(),
+                        BTMesh_Provisioning_Records_List,
+                    ),
+                    lambda pkt: pkt.type == 0x0D,
+                ),
+            ],
+            PacketField(
+                "message", BTMesh_Provisioning_Invite(), BTMesh_Provisioning_Invite
+            ),
+        ),
+    ]
 
 
 """
@@ -516,60 +613,7 @@ GENERIC PROVISIONING PDU LAYER
 """
 
 
-"""
-class BTMesh_Generic_Provisioning_Hdr(Packet):
-    name = "Bluetooth Mesh Generic Provisioning PDU"
-    fields_desc = [
-        # Since the generic_provisioning_control_format is after in the fields, need to work with pre_dissect to make sure generic_provisioning_control_format gets processed first
-        # Example of creation
-        # pkt = BTMesh_Generic_Provisioning_Hdr(segment_number=1, generic_provisioning_control_format=0b00)
-        # pkt = BTMesh_Generic_Provisioning_Hdr(segment_index=3, generic_provisioning_control_format=0b10)
-        ConditionalField(
-            BitField("segment_number", 0, 6),
-            lambda pkt: pkt.generic_provisioning_control_format == 0b00,
-        ),
-        ConditionalField(
-            BitField("padding", 0, 6),
-            lambda pkt: pkt.generic_provisioning_control_format == 0b01,
-        ),
-        ConditionalField(
-            BitField("segment_index", 0, 6),
-            lambda pkt: pkt.generic_provisioning_control_format == 0b10,
-        ),
-        ConditionalField(
-            BitEnumField(
-                "bearer_opcode",
-                None,
-                6,
-                {0x00: "Link Open", 0x01: "Link ACK", 0x02: "Link Close"},
-            ),
-            lambda pkt: pkt.generic_provisioning_control_format == 0b11,
-        ),
-        BitEnumField(
-            "generic_provisioning_control_format",
-            None,
-            2,
-            {
-                0b00: "Transaction Start",
-                0b01: "Transaction Acknowledgment",
-                0b10: "Transaction Continuation",
-                0b11: "Provisioning Bearer Control",
-            },
-        ),
-    ]
-
-    def pre_dissect(self, s):
-        trick to make generic_provisioning_control_format available before dissecting the first 6 bits
-        # set the generic_provisioning_control_format value in the original packet
-        if len(s) < 1:
-            return s
-        # we force the fecthing of the value for generic_provisioning_control_format from the raw bytes of the packet, this way the do_dissect function knows what ConditionalField to choose for the first field
-        self.generic_provisioning_control_format = (s[0] >> 6) & 0b11
-        return s
-
-"""
-
-
+# Dont use on its own, use subclasses directly
 class BTMesh_Generic_Provisioning_Hdr(Packet):
     name = "Bluetooth Mesh Generic Provisioning PDU"
     fields_desc = [
@@ -592,9 +636,7 @@ class BTMesh_Generic_Provisioning_Hdr(Packet):
     @classmethod
     def dispatch_hook(cls, _pkt=None, *args, **kargs):
         if _pkt:
-            generic_provisioning_payload_format = (
-                _pkt[0] & 0b11
-            )  # Get the last 2 bits
+            generic_provisioning_payload_format = _pkt[0] & 0b11  # Get the last 2 bits
             if generic_provisioning_payload_format == 0b00:
                 return BTMesh_Generic_Provisioning_Transaction_Start
             elif generic_provisioning_payload_format == 0b01:
@@ -629,13 +671,13 @@ class BTMesh_Generic_Provisioning_Transaction_Start(BTMesh_Generic_Provisioning_
                 0b11: "Provisioning Bearer Control",
             },
         ),
-        FieldLenField(
-            "total_length", None, length_of="generic_provisioning_payload_fragment"
+        BitFieldLenField(
+            "total_length", None, 16, length_of="generic_provisioning_payload_fragment"
         ),
-        ByteField("frame_check_sequence", None),
-        StrFixedLenField(
-            "generic_provisioning_payload_fragment", None, length_from="total_length"
-        ),
+        XByteField("frame_check_sequence", None),
+        # StrFixedLenField(
+        #    "generic_provisioning_payload_fragment", None, length_from="total_length"
+        # ),
     ]
 
 
@@ -657,7 +699,9 @@ class BTMesh_Generic_Provisioning_Transaction_Ack(BTMesh_Generic_Provisioning_Hd
     ]
 
 
-class BTMesh_Generic_Provisioning_Transaction_Continuation(BTMesh_Generic_Provisioning_Hdr):
+class BTMesh_Generic_Provisioning_Transaction_Continuation(
+    BTMesh_Generic_Provisioning_Hdr
+):
     name = "Bluetooth Mesh Generic Provisioning Transaction Continuation"
     fields_desc = [
         BitField("segment_index", 0, 6),
@@ -1028,6 +1072,8 @@ bind_layers(EIR_Hdr, EIR_PB_ADV_PDU, type=0x29)
 bind_layers(BTMesh_Mesh_Message, BTMesh_Lower_Transport_PDU)
 bind_layers(BTMesh_Unsegmented_Access_Message, BTMesh_Model_Message)
 bind_layers(EIR_PB_ADV_PDU, BTMesh_Generic_Provisioning_Hdr)
+# need to remove this one, fragments and all ...
+bind_layers(BTMesh_Generic_Provisioning_Hdr, BTMesh_Provisioning_Hdr)
 
 
 def unbind():
