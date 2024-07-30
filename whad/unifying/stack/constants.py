@@ -9,6 +9,21 @@ class ClickType(IntEnum):
     LEFT_MIDDLE = 5
     RIGHT_MIDDLE = 6
 
+    def __str__(self):
+        if self == ClickType.NONE:
+            return ""
+        elif self == ClickType.LEFT:
+            return "L"
+        elif self == ClickType.RIGHT:
+            return "R"
+        elif self == ClickType.LEFT_RIGHT:
+            return "LR"
+        elif self == ClickType.MIDDLE:
+            return "M"
+        elif self == ClickType.LEFT_MIDDLE:
+            return "LM"
+        elif self == ClickType.RIGHT_MIDDLE:
+            return "RM"
 
 class UnifyingRole(IntEnum):
     DONGLE = 0

@@ -45,6 +45,7 @@ class WhadExtractApp(CommandLineApp):
 
         self.add_argument(
             '-d',
+            '-D',
             '--delimiter',
             dest='delimiter',
             default=" ",
