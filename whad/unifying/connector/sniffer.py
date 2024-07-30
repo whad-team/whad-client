@@ -214,7 +214,7 @@ class Sniffer(Unifying, EventsManager):
                     break
 
                 message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
-                if issubclass(message, AbstractPacket):
+                if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
 
                     packet = self.process_packet(packet)

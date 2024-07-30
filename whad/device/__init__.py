@@ -709,7 +709,7 @@ class WhadDeviceMessageThread(Thread):
         
         # Finish processing remaining messages
         logger.debug('[WhadDeviceMessageThread] processing remaining messages ...')
-        while self.__device.process_messages():
+        while self.__device.process_messages(timeout=.1):
             pass
 
         logger.info('Device message thread canceled and stopped, closing device.')
@@ -761,8 +761,8 @@ class WhadDeviceIOThread(object):
         """
         logger.debug('[device::io_thread] Adapter has disconnected')
         self.__disconnected = True
-        self.__device.close()
-        #self.__processing.cancel()
+        #self.__device.close()
+        self.__processing.cancel()
 
 
 class WhadDevice(object):

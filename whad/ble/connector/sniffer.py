@@ -257,20 +257,20 @@ class Sniffer(BLE, EventsManager):
             while True:
                 if self.__configuration.access_addresses_discovery:
                     message = self.wait_for_message(filter=AccessAddressDiscovered, timeout=0.1)
+                    if message is not None:
+                        rssi = None
+                        timestamp = None
+                        if message.rssi:
+                            rssi = message.rssi
+                        if message.timestamp:
+                            timestamp = message.timestamp
+                        aa = message.access_address
 
-                    rssi = None
-                    timestamp = None
-                    if message.rssi:
-                        rssi = message.rssi
-                    if message.timestamp:
-                        timestamp = message.timestamp
-                    aa = message.access_address
-
-                    if aa not in self.__access_addresses:
-                        self.__access_addresses[aa] = AccessAddress(aa, timestamp=timestamp, rssi=rssi)
-                    else:
-                        self.__access_addresses[aa].update(timestamp=timestamp, rssi=rssi)
-                    yield self.__access_addresses[aa]
+                        if aa not in self.__access_addresses:
+                            self.__access_addresses[aa] = AccessAddress(aa, timestamp=timestamp, rssi=rssi)
+                        else:
+                            self.__access_addresses[aa].update(timestamp=timestamp, rssi=rssi)
+                        yield self.__access_addresses[aa]
 
                 elif self.__configuration.active_connection is not None:
                     message = self.wait_for_message(filter=message_filter(Synchronized), timeout=0.1)
@@ -285,9 +285,10 @@ class Sniffer(BLE, EventsManager):
                             message_type = BleAdvPduReceived
 
                         message = self.wait_for_message(filter=message_filter(message_type), timeout=0.1)
-                        packet = self.translator.from_message(message)
-                        self.monitor_packet_rx(packet)
-                        yield packet
+                        if message is not None:
+                            packet = self.translator.from_message(message)
+                            self.monitor_packet_rx(packet)
+                            yield packet
 
                 else:
                     if self.support_raw_pdu():
@@ -298,13 +299,11 @@ class Sniffer(BLE, EventsManager):
                         message_type = BleAdvPduReceived
 
                     message = self.wait_for_message(filter=message_filter(message_type), timeout=0.1)
-
-                    packet = self.translator.from_message(message)
-
-                    packet = self.process_packet(packet)
-
-                    self.monitor_packet_rx(packet)
-                    yield packet
+                    if message is not None:
+                        packet = self.translator.from_message(message)
+                        packet = self.process_packet(packet)
+                        self.monitor_packet_rx(packet)
+                        yield packet
 
         # Handle device disconnection
         except WhadDeviceDisconnected:
