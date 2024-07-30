@@ -83,8 +83,8 @@ class WhadDumpApp(CommandLineApp):
                         logger.info("[ble-spawn] Starting our output pipe")
                         output_pipe = WhadDumpPipe(connector, unix_server)
 
-                    while True:
-                        sleep(1)
+                    while interface.opened:
+                        time.sleep(.1)
             else:
                 pass
         except KeyboardInterrupt:

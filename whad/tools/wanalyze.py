@@ -244,8 +244,8 @@ class WhadAnalyzeApp(CommandLineApp):
                 connector.format = connector.translator.format
                 connector.on_packet = self.on_packet
 
-                while True:
-                    time.sleep(1)
+                while interface.opened:
+                    time.sleep(.1)
 
         except KeyboardInterrupt:
             # Launch post-run tasks

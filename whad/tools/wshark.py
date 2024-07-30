@@ -87,8 +87,9 @@ class WhadWiresharkApp(CommandLineApp):
                 monitor.start()
 
                 # Wait for the user to CTL-C
-                while True:
-                    time.sleep(1)
+                while interface.opened:
+                    time.sleep(.1)
+
 
         except KeyboardInterrupt:
             # Launch post-run tasks
