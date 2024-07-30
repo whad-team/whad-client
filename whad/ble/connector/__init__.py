@@ -1,13 +1,9 @@
 import struct
 import logging
 
-from queue import Queue, Empty
-
 # Scapy
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
-    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
-    BTLE_RF, BTLE_CTRL
-from scapy.compat import raw
+    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
 from scapy.packet import Packet
 
 # Device interface
@@ -17,13 +13,12 @@ from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
 # Protocol hub
 from whad.helpers import message_filter
-from whad.hub.message import AbstractPacket
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble.chanmap import ChannelMap
-from whad.hub.ble import Commands, AdvType, Direction, Synchronized, Desynchronized, \
-    Connected, Disconnected, Triggered, BLEMetadata
-from whad.hub.events import ConnectionEvt, DisconnectionEvt, SyncEvt, DesyncEvt, TriggeredEvt
+from whad.hub.ble import Commands, AdvType, Direction, BLEMetadata
+from whad.hub.events import ConnectionEvt, DisconnectionEvt, SyncEvt, DesyncEvt, \
+    TriggeredEvt, WhadEvent
 
 # Bluetooth Low Energy dependencies
 from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
@@ -61,46 +56,48 @@ class BLE(WhadDeviceConnector):
         return self.hub.ble.format(packet)
 
     def __init__(self, device=None, synchronous=False):
-            """
-            Initialize the connector, open the device (if not already opened), discover
-            the services (if not already discovered).
+        """
+        Initialize the connector, open the device (if not already opened), discover
+        the services (if not already discovered).
 
-            If `auto` is set to False, PDUs must be processed manually and
-            won't be forwarded to PDU-related callbacks.
-            """
-            self.__ready = False
-            super().__init__(device)
+        If `auto` is set to False, PDUs must be processed manually and
+        won't be forwarded to PDU-related callbacks.
+        """
+        self.__ready = False
+        super().__init__(device)
 
-            # Capability cache
-            self.__can_send = None
-            self.__can_send_raw = None
+        # Capability cache
+        self.__can_send = None
+        self.__can_send_raw = None
 
-            # Link-layer encryption
-            self.__encrypted = False
+        # Link-layer encryption
+        self.__encrypted = False
 
-            # List of active triggers
-            self.__triggers = []
+        # List of active triggers
+        self.__triggers = []
 
-            # Open device and make sure it is compatible
-            self.device.open()
-            self.device.discover()
+        # Open device and make sure it is compatible
+        self.device.open()
+        self.device.discover()
 
-            # Check device supports BLE
-            if not self.device.has_domain(WhadDomain.BtLE):
-                raise UnsupportedDomain("Bluetooth Low Energy")
-            else:
-                self.__ready = True
+        # Check device supports BLE
+        if not self.device.has_domain(WhadDomain.BtLE):
+            raise UnsupportedDomain("Bluetooth Low Energy")
+        else:
+            self.__ready = True
 
-            # Initialize translator
-            self.translator = BleMessageTranslator(self.hub)
+        # Initialize translator
+        self.translator = BleMessageTranslator(self.hub)
 
-            # Set synchronous mode if provided
-            self.enable_synchronous(synchronous)
+        # Set synchronous mode if provided
+        self.enable_synchronous(synchronous)
 
     def close(self):
+        """Close BLE device
+        """
         self.device.close()
 
-    def support_raw_pdu(self):
+    def support_raw_pdu(self) -> bool:
         """
         Determine if the device supports raw PDU.
         """
@@ -123,7 +120,10 @@ class BLE(WhadDeviceConnector):
         if self.__can_send is None:
             # Retrieve supported commands
             commands = self.device.get_domain_commands(WhadDomain.BtLE)
-            self.__can_send = ((commands & (1 << Commands.SendPDU))>0 or (commands & (1 << Commands.SendRawPDU)))
+            self.__can_send = (
+                (commands & (1 << Commands.SendPDU))>0 or
+                (commands & (1 << Commands.SendRawPDU))
+            )
         return self.__can_send
 
     def can_scan(self):
@@ -411,7 +411,7 @@ class BLE(WhadDeviceConnector):
             raise UnsupportedCapability("AccessAddressesDiscovery")
 
         # Create SniffAccessAddress message
-        msg = self.hub.ble.create_sniff_access_address(b"\xFF\xFF\xFF\xFF\x1F")
+        msg = self.hub.ble.create_sniff_access_address(range(40))
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -477,7 +477,8 @@ class BLE(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def sniff_new_connection(self, channel=37, show_advertisements=True, show_empty_packets=False, bd_address="FF:FF:FF:FF:FF:FF"):
+    def sniff_new_connection(self, channel=37, show_advertisements=True,
+                             show_empty_packets=False, bd_address="FF:FF:FF:FF:FF:FF"):
         """
         Sniff Bluetooth Low Energy connection (from initiation).
         """
@@ -485,7 +486,7 @@ class BLE(WhadDeviceConnector):
             raise UnsupportedCapability("Sniff")
 
         # Create a SniffConnReq message
-        msg = self.hub.ble.create_sniff_conn_req(
+        msg = self.hub.ble.create_sniff_connreq(
             channel,
             bd_address=BDAddress(bd_address),
             show_empty=show_empty_packets,
@@ -631,11 +632,12 @@ class BLE(WhadDeviceConnector):
 
         return isinstance(resp, Success)
 
-    def set_encryption(self, conn_handle, enabled=False, ll_key=None, ll_iv=None, key=None, rand=None, ediv=None):
+    def set_encryption(self, conn_handle, enabled=False, ll_key=None, ll_iv=None,
+                       key=None, rand=None, ediv=None):
         """Notify WHAD device about encryption status
         """
 
-        print("set_encryption", enabled, ll_key.hex(), ll_iv.hex(), key.hex(), rand, ediv)
+        #print("set_encryption", enabled, ll_key.hex(), ll_iv.hex(), key.hex(), rand, ediv)
 
         # Create a SetEncryption message
         msg = self.hub.ble.create_set_encryption(
@@ -653,29 +655,43 @@ class BLE(WhadDeviceConnector):
         # Update LL encryption status
         if isinstance(resp, Success):
             self.__encrypted = enabled
-            logger.info('[ble connector] encryption is now: %s' % self.__encrypted)
+            logger.info('[ble connector] encryption is now: %s', self.__encrypted)
 
         # Return command result
         return isinstance(resp, Success)
 
     def on_generic_msg(self, message):
-        logger.info('generic message: %s' % message)
-        pass
+        """Generic message callback.
+        """
+        logger.info('generic message: %s', message)
 
     def on_discovery_msg(self, message):
-        logger.info('discovery message: %s' % message)
-        pass
+        """Discovery message callback.
+        """
+        logger.info('discovery message: %s', message)
 
     def on_domain_msg(self, domain, message):
-        pass
+        """Domain-related message callback.
+        """
+        return
 
-    def on_synchronized(self, access_address=None, crc_init=None, hop_increment=None, hop_interval=None, channel_map=None):
-        pass
+    def on_synchronized(self, access_address=None, crc_init=None, hop_increment=None,
+                        hop_interval=None, channel_map=None):
+        """Connection synchronization event callback.
+        """
+        return
 
     def on_desynchronized(self, access_address=None):
-        pass
+        """Connection desynchronization callback.
+        """
+        return
 
-    def on_event(self, event):
+    def on_event(self, event: WhadEvent):
+        """WHAD event callback handler.
+
+        :param event: WHAD event to process
+        :type event: :class:`whad.hub.events.WhadEvent`
+        """
         # Don't process if connector is not ready
         if not self.__ready:
             return
@@ -698,8 +714,11 @@ class BLE(WhadDeviceConnector):
         elif isinstance(event, TriggeredEvt):
             self.on_triggered(event.id)
 
-    def on_packet(self, packet):
-        """Dispatch incoming packet
+    def on_packet(self, packet: Packet):
+        """Dispatch incoming packet.
+
+        :param packet: Incoming packet
+        :type packet: :class:`scapy.packet.Packet`
         """
         logger.debug('[BLE connector] on_packet')
         # discard processed packets or if we're not ready
@@ -720,53 +739,66 @@ class BLE(WhadDeviceConnector):
             else:
                 self.on_error_pdu(conn_pdu)
 
-    def on_adv_pdu(self, packet):
-        logger.info('received an advertisement PDU')
+    def on_adv_pdu(self, packet: Packet):
+        """Advertisement PDU callback
+        """
+        logger.info("received an advertisement PDU")
 
-    def on_connected(self, connection_data):
-        logger.info('a connection has been established')
+    def on_connected(self, connection_data: dict):
+        """Connection event callback
+        """
+        logger.info("a connection has been established")
         logger.debug(
-            'connection handle: %d' % connection_data.conn_handle if connection_data.conn_handle is not None else 0
+            "connection handle: %d" % connection_data.conn_handle if connection_data.conn_handle is not None else 0
         )
 
     def on_triggered(self, identifier):
+        """Prepare sequence triggered event callback 
+        """
         for trigger in self.__triggers:
             if trigger.identifier == identifier:
                 trigger.triggered = True
 
-    def on_disconnected(self, disconnection_data):
-        logger.info('a connection has been terminated')
+    def on_disconnected(self, disconnection_data: dict):
+        """Disconnection event handler.
+        """
+        logger.info("a connection has been terminated")
         for trigger in self.__triggers:
             self.delete_sequence(trigger)
 
     def on_data_pdu(self, pdu):
-        logger.info('received a data PDU')
-        pass
+        """Data PDU handler.
+        """
+        logger.info("received a data PDU")
 
     def on_ctl_pdu(self, pdu):
-        logger.info('received a control PDU')
-        pass
+        """Control PDU handler.
+        """
+        logger.info("received a control PDU")
 
     def on_error_pdu(self, pdu):
-        pass
+        """Error PDU handler
+        """
+        return
 
-    def send_ctrl_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
+    def send_ctrl_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE,
+                      access_address=0x8e89bed6, encrypt=None):
+        """Send control PDU
         """
-        Send CTRL PDU
-        """
-        logger.info('send control PDU to connection (handle:%d)' % conn_handle)
-        return self.send_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
+        logger.info("send control PDU to connection (handle:%d)", conn_handle)
+        return self.send_pdu(pdu, conn_handle=conn_handle, direction=direction,
+                             access_address=access_address, encrypt=encrypt)
 
-    def send_data_pdu(self, data, conn_handle=0, direction=Direction.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
+    def send_data_pdu(self, data, conn_handle=0, direction=Direction.MASTER_TO_SLAVE,
+                      access_address=0x8e89bed6, encrypt=None):
+        """Send data (L2CAP) PDU.
         """
-        Send data (L2CAP) PDU.
-        """
-        logger.info('send data PDU to connection (handle:%d)' % conn_handle)
+        logger.info("send data PDU to connection (handle:%d)", conn_handle)
         return self.send_pdu(data, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
 
-    def send_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None):
-        """
-        Send a generic BLE PDU.
+    def send_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE,
+                 access_address=0x8e89bed6, encrypt=None):
+        """Send a generic BLE PDU.
         """
         if self.can_send():
             if self.support_raw_pdu():
@@ -827,8 +859,6 @@ class BLE(WhadDeviceConnector):
 
         # Send BLE packet
         return super().send_packet(packet)
-
-
 
 from whad.ble.connector.peripheral import Peripheral, PeripheralClient
 from whad.ble.connector.central import Central

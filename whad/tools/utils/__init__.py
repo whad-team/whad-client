@@ -6,6 +6,22 @@ from inspect import getdoc
 from dataclasses import fields, is_dataclass
 from scapy.config import conf
 
+def gen_option_name(config_param_name: str) -> str:
+    """Generate an option name from a parameter name.
+
+    Basically, this function replaces all "_" with "-".
+
+    >>> gen_option_name("spreading_factor")
+    """
+    return config_param_name.replace('_', '-')
+
+def gen_config_param_name(option_name: str) -> str:
+    """Generate a config parameter name from an option name.
+
+    Basically, this function replaces all "-" with "_".
+    """
+    return option_name.replace('-', '_')
+
 def list_implemented_sniffers():
     """Build a dictionnary of sniffers connector and configuration, by domain.
     """
@@ -44,6 +60,7 @@ def get_sniffer_parameters(configuration_class):
 
     # Iterate over the fields of the configuration class
     for field in fields(configuration_class):
+        field_name = gen_option_name(field.name)
 
         # If the field is a dataclass, process subfields
         if is_dataclass(field.type):
@@ -56,6 +73,7 @@ def get_sniffer_parameters(configuration_class):
 
             # Populate parameters dict with subfields configuration
             for subfield in fields(field.type):
+                subfield_name = gen_option_name(subfield.name)
                 parameters["{}.{}".format(field.name,subfield.name)] = (
                     subfield.type,
                     subfield.default,
@@ -66,16 +84,17 @@ def get_sniffer_parameters(configuration_class):
                         else None
                     )
                 )
+
         # if the field is not a dataclass, process it
         else:
             # Populate parameters dict with field configuration
-            parameters[field.name] = (
+            parameters[field_name] = (
                 field.type,
                 field.default,
                 None,
                 (
-                    fields_configuration_documentation[field.name]
-                    if field.name in fields_configuration_documentation
+                    fields_configuration_documentation[field_name]
+                    if field_name in fields_configuration_documentation
                     else None
                 )
             )
@@ -94,32 +113,35 @@ def build_configuration_from_args(environment, args):
     configuration = environment[args.domain]["configuration_class"]()
     subfields = {}
     for parameter in environment[args.domain]["parameters"]:
+
+        parameter_real_field = gen_config_param_name(parameter)
         base_class = None
 
         base_class = environment[args.domain]["parameters"][parameter][2]
-
         if base_class is None:
             try:
-                setattr(configuration,parameter,getattr(args,parameter))
+                setattr(configuration,parameter_real_field, getattr(args,parameter))
             except AttributeError:
                 pass
         else:
             main, sub = parameter.split(".")
             if main not in subfields:
                 subfields[main] = base_class()
-            setattr(subfields[main], sub, getattr(args, parameter))
-
+            sub_real_name = gen_config_param_name(sub)
+            setattr(subfields[main], sub_real_name, getattr(args, parameter))
 
     for subfield in subfields:
+        subfield_real_name = gen_config_param_name(subfield)
         create = False
         for item in fields(subfields[subfield]):
-            if getattr(subfields[subfield], item.name) is not None:
+            item_real_name = gen_config_param_name(item.name)
+            if getattr(subfields[subfield], item_real_name) is not None:
                 create = True
                 break
         if create:
-            setattr(configuration, subfield, subfields[subfield])
+            setattr(configuration, subfield_real_name, subfields[subfield])
         else:
-            setattr(configuration, subfield, None)
+            setattr(configuration, subfield_real_name, None)
     return configuration
 
 def get_translator(protocol):

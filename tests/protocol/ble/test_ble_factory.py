@@ -52,7 +52,7 @@ class TestBleDomainFactory(object):
     def test_SniffAA(self, factory: BleDomain):
         """Test creation of SniffAccessAddress message
         """
-        obj = factory.create_sniff_access_address(channels=[0,1,2,3,4])
+        obj = factory.create_sniff_access_address([0,1,2,3,4])
         assert isinstance(obj, SniffAccessAddress)
 
     def test_SniffActiveConn(self, factory: BleDomain):

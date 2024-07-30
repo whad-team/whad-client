@@ -10,7 +10,7 @@ from whad.cli.ui import error, warning, success, info, display_event, display_pa
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
 from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
-from whad.tools.utils import list_implemented_sniffers, get_sniffer_parameters, build_configuration_from_args
+from whad.tools.utils import list_implemented_sniffers, get_sniffer_parameters, build_configuration_from_args, gen_option_name
 from whad.device import Bridge
 from scapy.config import conf
 from html import escape
@@ -78,7 +78,7 @@ class WhadSniffApp(CommandLineApp):
         )
 
         self.add_argument(
-            '--hide_metadata',
+            '--no-metadata',
             dest='metadata',
             action="store_false",
             help='Hide packets metadata'
@@ -246,6 +246,7 @@ class WhadSniffApp(CommandLineApp):
                 domain_name,
                 description="WHAD {} Sniffing tool".format(domain_name.capitalize())
             )
+
             # Iterate over every parameters, and add arguments to subparsers
             for (
                     parameter_name,
@@ -253,9 +254,12 @@ class WhadSniffApp(CommandLineApp):
                 ) in self.environment[domain_name]["parameters"].items():
 
                 dest = parameter_name
+
                 # If parameter is based on a dataclass, process a subparameter
                 if parameter_base_class is not None:
                     parameter_base, parameter_name = parameter_name.split(".")
+
+                parameter_name = gen_option_name(parameter_name)
 
                 # Process parameter help and shortname
                 if parameter_help is not None and "(" in parameter_help:

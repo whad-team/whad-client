@@ -248,7 +248,7 @@ class BleDomain(Registry):
         :return-type: HubMessage
         """
         return BleDomain.bound('sniff_aa', self.proto_version)(
-            monitored_channels=bytes(channels)
+            monitored_channels=ChannelMap(channels).value
         )
 
     def create_sniff_active_conn(self, access_address: int, crc_init: int = None,

@@ -104,7 +104,11 @@ def display_packet(pkt, show_metadata=True, format='repr'):
                     HTML("<ansicyan>[i] Decrypted payload:</ansicyan>")
                 )
                 print(repr(pkt.decrypted))
-        print()
+
+        # Add an empty line if metadata is shown
+        if show_metadata:
+            print()
+
     # If it is not a packet, use repr method
     else:
         print(repr(pkt))
