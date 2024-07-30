@@ -102,8 +102,8 @@ class WhadExtractApp(CommandLineApp):
 
                 #interface.open()
 
-                while True:
-                    time.sleep(1)
+                while interface.opened:
+                    time.sleep(.1)
 
         except KeyboardInterrupt:
             # Launch post-run tasks
