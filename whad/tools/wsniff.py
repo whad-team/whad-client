@@ -198,9 +198,10 @@ class WhadSniffApp(CommandLineApp):
 
                         # Loop until the user hits CTL-C or interface disconnects
                         while self.interface.opened:
-                            sleep(1)
+                            sleep(.1)
 
                         # Stop unix server
+                        logger.debug('wsniff: closing device')
                         unix_server.device.close()
 
                     else:

@@ -126,6 +126,7 @@ class PCAPDevice(VirtualDevice):
                     self._send_packet(pkt)
             except EOFError:
                 # TODO: add an event to indicate end of stream ?
+                logger.debug('[PCAPDevice] EOF reached')
                 raise WhadDeviceDisconnected()
 
     def reset(self):

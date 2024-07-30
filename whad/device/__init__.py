@@ -539,6 +539,7 @@ class BridgeIfaceWrapper(WhadDeviceConnector):
     def on_disconnection(self):
         """Notify bridge on disconnection.
         """
+        logger.debug('[PacketProcIfaceWrapper] on_disconnection')
         self.__processor.on_disconnect(self)
 
     def on_any_msg(self, message):
@@ -707,6 +708,7 @@ class WhadDeviceMessageThread(Thread):
             self.__device.process_messages()
         
         # Finish processing remaining messages
+        logger.debug('[WhadDeviceMessageThread] processing remaining messages ...')
         while self.__device.process_messages():
             pass
 
@@ -751,6 +753,7 @@ class WhadDeviceIOThread(object):
         logger.info('WhadDevice IO management thread finished.')
         self.__alive = False
         if self.__device.opened:
+            logger.info('Closing device due to IO termination.')
             self.__device.close()
 
     def on_disconnection(self):
@@ -1043,6 +1046,7 @@ class WhadDevice(object):
         """
         # Avoid recursion when closing
         if not self.__opened or self.__closing:
+            logger.debug('exiting close() to avoid recursion')
             return
 
         logger.info('closing WHAD device')
@@ -1054,8 +1058,10 @@ class WhadDevice(object):
                 self.__io_thread.cancel()
 
         # Send a NOP message to unlock process_messages()
+        logger.debug('send NOP message')
         msg = self.hub.generic.create_verbose(b'')
         self.on_message_received(msg)
+        logger.debug('NOP message sent')
 
         # Wait for the thread to terminate nicely.
         if self.__io_thread is not None:
@@ -1336,8 +1342,8 @@ class WhadDevice(object):
         """
         result = False
 
-        if self.__closing:
-            return
+        #if self.__closing:
+        #    return
 
         try:
             message = self.__messages.get(block=True, timeout=timeout)
@@ -1345,6 +1351,8 @@ class WhadDevice(object):
                 logger.debug('[process_messages] retrieved message %s' % message)
                 self.dispatch_message(message)
                 result = True
+            
+            return result
         except Empty:
             return False
 
