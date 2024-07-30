@@ -343,7 +343,6 @@ class TransportKeyDistribution(TrafficAnalyzer):
             dec_packet = ZigbeeAppCommandPayload(bytes(packet.data))
             self.mark_packet(packet)
             self.transport_key = dec_packet.key
-            print(self.transport_key)
             self.complete()
 
     @property
