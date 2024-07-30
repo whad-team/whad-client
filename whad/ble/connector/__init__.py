@@ -411,7 +411,7 @@ class BLE(WhadDeviceConnector):
             raise UnsupportedCapability("AccessAddressesDiscovery")
 
         # Create SniffAccessAddress message
-        msg = self.hub.ble.create_sniff_access_address(range(40))
+        msg = self.hub.ble.create_sniff_access_address(range(37))
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
