@@ -93,8 +93,8 @@ def get_sniffer_parameters(configuration_class):
                 field.default,
                 None,
                 (
-                    fields_configuration_documentation[field_name]
-                    if field_name in fields_configuration_documentation
+                    fields_configuration_documentation[field.name]
+                    if field.name in fields_configuration_documentation
                     else None
                 )
             )

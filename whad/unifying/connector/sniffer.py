@@ -3,6 +3,7 @@ from typing import Generator, List
 
 from scapy.packet import Packet
 
+from whad.exceptions import WhadDeviceDisconnected
 from whad.unifying.connector import Unifying
 from whad.unifying.sniffing import SnifferConfiguration, KeyExtractedEvent
 from whad.unifying.crypto import LogitechUnifyingDecryptor, LogitechUnifyingKeyDerivation
@@ -204,16 +205,20 @@ class Sniffer(Unifying, EventsManager):
 
         # Sniff packets
         start = time()
-        while True:
 
-            # Exit if timeout is set and reached
-            if timeout is not None and (time() - start >= timeout):
-                break
+        try:
+            while True:
 
-            message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
-            if issubclass(message, AbstractPacket):
-                packet = message.to_packet()
+                # Exit if timeout is set and reached
+                if timeout is not None and (time() - start >= timeout):
+                    break
 
-                packet = self.process_packet(packet)
-                self.monitor_packet_rx(packet)
-                yield packet
+                message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
+                if issubclass(message, AbstractPacket):
+                    packet = message.to_packet()
+
+                    packet = self.process_packet(packet)
+                    self.monitor_packet_rx(packet)
+                    yield packet
+        except WhadDeviceDisconnected:
+            return

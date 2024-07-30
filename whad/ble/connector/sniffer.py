@@ -3,8 +3,9 @@ from whad.ble.utils.phy import is_access_address_valid
 from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress, \
     SynchronizationEvent, DesynchronizationEvent, KeyExtractedEvent
 from whad.ble.crypto import EncryptedSessionInitialization, LinkLayerDecryptor, LegacyPairingCracking
-from whad.hub.ble import AccessAddressDiscovered, Synchronized, BleRawPduReceived, BlePduReceived, BleRawPduReceived
+from whad.hub.ble import AccessAddressDiscovered, Synchronized, BleRawPduReceived, BlePduReceived, BleAdvPduReceived
 from whad.ble.exceptions import MissingCryptographicMaterial
+from whad.exceptions import WhadDeviceDisconnected
 from whad.ble import UnsupportedCapability, message_filter
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE
 from whad.common.sniffing import EventsManager
@@ -252,28 +253,43 @@ class Sniffer(BLE, EventsManager):
         return packet
 
     def sniff(self):
-        while True:
-            if self.__configuration.access_addresses_discovery:
-                message = self.wait_for_message(filter=AccessAddressDiscovered)
-                rssi = None
-                timestamp = None
-                if message.rssi:
-                    rssi = message.rssi
-                if message.timestamp:
-                    timestamp = message.timestamp
-                aa = message.access_address
+        try:
+            while True:
+                if self.__configuration.access_addresses_discovery:
+                    message = self.wait_for_message(filter=AccessAddressDiscovered, timeout=0.1)
 
-                if aa not in self.__access_addresses:
-                    self.__access_addresses[aa] = AccessAddress(aa, timestamp=timestamp, rssi=rssi)
+                    rssi = None
+                    timestamp = None
+                    if message.rssi:
+                        rssi = message.rssi
+                    if message.timestamp:
+                        timestamp = message.timestamp
+                    aa = message.access_address
+
+                    if aa not in self.__access_addresses:
+                        self.__access_addresses[aa] = AccessAddress(aa, timestamp=timestamp, rssi=rssi)
+                    else:
+                        self.__access_addresses[aa].update(timestamp=timestamp, rssi=rssi)
+                    yield self.__access_addresses[aa]
+
+                elif self.__configuration.active_connection is not None:
+                    message = self.wait_for_message(filter=message_filter(Synchronized), timeout=0.1)
+
+                    # TODO : improve the switch
+                    if message.hop_increment > 0:
+                        if self.support_raw_pdu():
+                            message_type = BleRawPduReceived
+                        elif self.__synchronized:
+                            message_type = BlePduReceived
+                        else:
+                            message_type = BleAdvPduReceived
+
+                        message = self.wait_for_message(filter=message_filter(message_type), timeout=0.1)
+                        packet = self.translator.from_message(message)
+                        self.monitor_packet_rx(packet)
+                        yield packet
+
                 else:
-                    self.__access_addresses[aa].update(timestamp=timestamp, rssi=rssi)
-                yield self.__access_addresses[aa]
-
-            elif self.__configuration.active_connection is not None:
-                message = self.wait_for_message(filter=message_filter(Synchronized))
-
-                # TODO : improve the switch
-                if message.hop_increment > 0:
                     if self.support_raw_pdu():
                         message_type = BleRawPduReceived
                     elif self.__synchronized:
@@ -281,23 +297,15 @@ class Sniffer(BLE, EventsManager):
                     else:
                         message_type = BleAdvPduReceived
 
-                    message = self.wait_for_message(filter=message_filter(message_type))
+                    message = self.wait_for_message(filter=message_filter(message_type), timeout=0.1)
+
                     packet = self.translator.from_message(message)
+
+                    packet = self.process_packet(packet)
+
                     self.monitor_packet_rx(packet)
                     yield packet
 
-            else:
-                if self.support_raw_pdu():
-                    message_type = BleRawPduReceived
-                elif self.__synchronized:
-                    message_type = BlePduReceived
-                else:
-                    message_type = BleAdvPduReceived
-
-                message = self.wait_for_message(filter=message_filter(message_type))
-                packet = self.translator.from_message(message)
-
-                packet = self.process_packet(packet)
-
-                self.monitor_packet_rx(packet)
-                yield packet
+        # Handle device disconnection
+        except WhadDeviceDisconnected:
+            return

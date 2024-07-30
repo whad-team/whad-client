@@ -1,4 +1,5 @@
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
+from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
+    WhadDeviceDisconnected
 from whad.device.virtual import VirtualDevice
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad.device.virtual.pcap.capabilities import CAPABILITIES
@@ -17,6 +18,7 @@ from time import sleep
 from whad import WhadDomain
 from os.path import exists
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -124,13 +126,10 @@ class PCAPDevice(VirtualDevice):
                     self._send_packet(pkt)
             except EOFError:
                 # TODO: add an event to indicate end of stream ?
-                pass
+                raise WhadDeviceDisconnected()
 
     def reset(self):
         pass
-
-    def close(self):
-        exit(1)
 
     def _generate_metadata(self, pkt):
         if self.__domain == WhadDomain.Dot15d4:

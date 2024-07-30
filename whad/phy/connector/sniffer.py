@@ -1,5 +1,6 @@
 from queue import Queue
 
+from whad.exceptions import WhadDeviceDisconnected
 from whad.phy.connector import Phy
 from whad.phy import Endianness
 from whad.phy.sniffing import SnifferConfiguration
@@ -104,14 +105,17 @@ class Sniffer(Phy, EventsManager):
         self.__packet_queue.put(packet)
 
     def sniff(self):
-        while True:
-            if self.support_raw_iq_stream():
-                message_type = RawPacketReceived
-            else:
-                message_type = PacketReceived
+        try:
+            while True:
+                if self.support_raw_iq_stream():
+                    message_type = RawPacketReceived
+                else:
+                    message_type = PacketReceived
 
-            message = self.wait_for_message(filter=message_filter(message_type))
-            if issubclass(message, AbstractPacket):
-                packet = message.to_packet()
-                self.monitor_packet_rx(packet)
-                yield packet
+                message = self.wait_for_message(filter=message_filter(message_type))
+                if issubclass(message, AbstractPacket):
+                    packet = message.to_packet()
+                    self.monitor_packet_rx(packet)
+                    yield packet
+        except WhadDeviceDisconnected:
+            return

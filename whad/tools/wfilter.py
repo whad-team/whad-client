@@ -267,8 +267,9 @@ class WhadFilterApp(CommandLineApp):
             else:
                 connector.on_packet = self.on_rx_packet
 
-            while True:
-                sleep(1)
+            # Keep running while interface is active
+            while interface.opened:
+                sleep(.1)
 
         except KeyboardInterrupt:
             # Launch post-run tasks
