@@ -435,7 +435,7 @@ class WhadDeviceConnector(object):
         self.monitor_packet_tx(packet)
 
         # Convert packet into the corresponding message
-        msg = self.hub.convertPacket(packet)
+        msg = self.hub.convert_packet(packet)
         if msg is not None:
             resp = self.send_command(msg, message_filter(CommandResult))
             logger.info('[connector] Command sent, result: %s' % resp)
@@ -1004,7 +1004,7 @@ class WhadDevice(object):
             self.__io_thread.cancel()
 
         # Send a NOP message to unlock process_messages()
-        msg = self.hub.generic.createVerbose(b'')
+        msg = self.hub.generic.create_verbose(b'')
         self.on_message_received(msg)
 
         # Wait for the thread to terminate nicely.
@@ -1116,7 +1116,7 @@ class WhadDevice(object):
             self.set_queue_filter(keep)
 
         # Convert message into bytes
-        raw_message = message.SerializeToString()
+        raw_message = message.serialize()
 
 
         # Define header
@@ -1387,7 +1387,7 @@ class WhadDevice(object):
         answer.
         """
         logger.info('preparing a DeviceInfoQuery message')
-        msg = self.__hub.discovery.createInfoQuery(proto_version)
+        msg = self.__hub.discovery.create_info_query(proto_version)
         return self.send_command(
             msg,
             message_filter(InfoQueryResp)
@@ -1400,7 +1400,7 @@ class WhadDevice(object):
         answer.
         """
         logger.info('preparing a DeviceDomainInfoQuery message')
-        msg = self.__hub.discovery.createDomainQuery(domain)
+        msg = self.__hub.discovery.create_domain_query(domain)
         return self.send_command(
             msg,
             message_filter(DomainInfoQueryResp)
@@ -1462,7 +1462,7 @@ class WhadDevice(object):
         """Reset device
         """
         logger.info('preparing a DeviceResetQuery message')
-        msg = self.hub.discovery.createResetQuery()
+        msg = self.hub.discovery.create_reset_query()
         return self.send_command(
             msg,
             message_filter(DeviceReady)

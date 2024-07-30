@@ -326,7 +326,7 @@ class RFStormDevice(VirtualDevice):
             self._send_whad_phy_pdu(address + pdu, timestamp)
 
     def _send_whad_esb_pdu(self, pdu, address, timestamp=None):
-        msg = self.hub.esb.createPduReceived(
+        msg = self.hub.esb.create_pdu_received(
             self.__channel,
             pdu,
             address=address
@@ -340,7 +340,7 @@ class RFStormDevice(VirtualDevice):
         self._send_whad_message(msg)
 
     def _send_whad_unifying_pdu(self, pdu, address, timestamp=None):
-        msg = self.hub.unifying.createPduReceived(
+        msg = self.hub.unifying.create_pdu_received(
             self.__channel,
             pdu,
             address=address
@@ -355,7 +355,7 @@ class RFStormDevice(VirtualDevice):
         self._send_whad_message(msg)
 
     def _send_whad_phy_pdu(self, packet, timestamp=None):
-        msg = self.hub.phy.createPacketReceived(
+        msg = self.hub.phy.create_packet_received(
             (self.__channel + 2400) * 1000000,
             packet
         )
@@ -378,7 +378,7 @@ class RFStormDevice(VirtualDevice):
         ranges = (self.__supported_frequency_range[0], self.__supported_frequency_range[1])
 
         # Create a SupportedFreqRanges response message
-        msg = self.hub.phy.createSupportedFreqRanges([ranges])
+        msg = self.hub.phy.create_supported_freq_ranges([ranges])
 
         # Send message
         self._send_whad_message(msg)

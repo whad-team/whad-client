@@ -101,12 +101,12 @@ class EsbDomain(Registry):
         """
         self.proto_version = version
 
-    def isPacketCompat(self, packet) -> bool:
+    def is_packet_compat(self, packet) -> bool:
         """Determine if a packet is an ESB packet.
         """
         return isinstance(packet.metadata, ESBMetadata)
     
-    def convertPacket(self, packet) -> HubMessage:
+    def convert_packet(self, packet) -> HubMessage:
         """Convert an ESB packet to SendPdu or SendBlePdu message.
         """
         if isinstance(packet.metadata, ESBMetadata):
@@ -148,7 +148,7 @@ class EsbDomain(Registry):
         return message_clazz.parse(proto_version, message)
     
 
-    def createSetNodeAddress(self, node_address: EsbNodeAddress) -> HubMessage:
+    def create_set_node_address(self, node_address: EsbNodeAddress) -> HubMessage:
         """Create a SetNodeAddress message
 
         :param node_address: Node address to set (size must be 1-5 bytes)
@@ -159,7 +159,7 @@ class EsbDomain(Registry):
             address=node_address.value
         )
     
-    def createStart(self) -> HubMessage:
+    def create_start(self) -> HubMessage:
         """Create a Start message
 
         :return: instance of `Start` message
@@ -167,7 +167,7 @@ class EsbDomain(Registry):
         return EsbDomain.bound('start', self.proto_version)()
 
 
-    def createStop(self) -> HubMessage:
+    def create_stop(self) -> HubMessage:
         """Create a Stop message
 
         :return: instance of `Stop` message
@@ -175,7 +175,7 @@ class EsbDomain(Registry):
         return EsbDomain.bound('stop', self.proto_version)()
     
 
-    def createJamMode(self, channel: int) -> HubMessage:
+    def create_jam_mode(self, channel: int) -> HubMessage:
         """Create a JamMode message
 
         :param channel: ESB channel to jam
@@ -186,7 +186,7 @@ class EsbDomain(Registry):
             channel=channel
         )
 
-    def createSniffMode(self, address: EsbNodeAddress, channel: int = 0xFF, show_acks: bool = False) -> HubMessage:
+    def create_sniff_mode(self, address: EsbNodeAddress, channel: int = 0xFF, show_acks: bool = False) -> HubMessage:
         """Create a SniffMode message
 
         :param address: Node address to filter
@@ -203,7 +203,7 @@ class EsbDomain(Registry):
             show_acks=show_acks
         )
     
-    def createJammed(self, timestamp: int):
+    def create_jammed(self, timestamp: int):
         """Create a Jammed notification message
 
         :param timestamp: Timestamp at which the jamming has succeeded
@@ -214,7 +214,7 @@ class EsbDomain(Registry):
             timestamp=timestamp
         )
     
-    def createPrxMode(self, channel: int) -> HubMessage:
+    def create_prx_mode(self, channel: int) -> HubMessage:
         """Create PrxMode message
 
         :param channel: Channel to listen on
@@ -225,7 +225,7 @@ class EsbDomain(Registry):
             channel=channel
         )
 
-    def createPtxMode(self, channel: int) -> HubMessage:
+    def create_ptx_mode(self, channel: int) -> HubMessage:
         """Create PtxMode message
 
         :param channel: Channel to listen on
@@ -236,7 +236,7 @@ class EsbDomain(Registry):
             channel=channel
         )
     
-    def createSendPdu(self, channel: int, pdu: bytes, retr_count: int = 0):
+    def create_send_pdu(self, channel: int, pdu: bytes, retr_count: int = 0):
         """Create a SendPdu message
 
         :param channel: Channel to use for transmission
@@ -253,7 +253,7 @@ class EsbDomain(Registry):
             retr_count=retr_count
         )
 
-    def createSendRawPdu(self, channel: int, pdu: bytes, retr_count: int = 0):
+    def create_send_raw_pdu(self, channel: int, pdu: bytes, retr_count: int = 0):
         """Create a SendRawPdu message
 
         :param channel: Channel to use for transmission
@@ -270,7 +270,7 @@ class EsbDomain(Registry):
             retr_count=retr_count
         )
     
-    def createPduReceived(self, channel: int, pdu: bytes, rssi: int = None, timestamp: int = None,
+    def create_pdu_received(self, channel: int, pdu: bytes, rssi: int = None, timestamp: int = None,
                           crc_validity: bool = None, address: EsbNodeAddress = None) -> HubMessage:
         """Create a PduReceived notification message.
 
@@ -308,7 +308,7 @@ class EsbDomain(Registry):
         return msg
 
 
-    def createRawPduReceived(self, channel: int, pdu: bytes, rssi: int = None, timestamp: int = None,
+    def create_raw_pdu_received(self, channel: int, pdu: bytes, rssi: int = None, timestamp: int = None,
                           crc_validity: bool = None, address: EsbNodeAddress = None) -> HubMessage:
         """Create a RawPduReceived notification message.
 

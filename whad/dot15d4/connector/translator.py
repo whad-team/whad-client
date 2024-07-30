@@ -60,19 +60,19 @@ class Dot15d4MessageTranslator(object):
 
         if Dot15d4FCS in packet:
             # Create a SendPdu
-            msg = self.__hub.dot15d4.createSendRawPdu(
+            msg = self.__hub.dot15d4.create_send_raw_pdu(
                 channel,
                 bytes(packet)[:-2],
                 packet.fcs
             )
         elif Dot15d4 in packet:
-            msg = self.__hub.dot15d4.createSendPdu(
+            msg = self.__hub.dot15d4.create_send_pdu(
                 channel,
                 bytes(packet)
             )
         else:
             # Raw MAC
-            msg = self.__hub.dot15d4.createSendPdu(
+            msg = self.__hub.dot15d4.create_send_pdu(
                 channel,
                 bytes(packet)
             )

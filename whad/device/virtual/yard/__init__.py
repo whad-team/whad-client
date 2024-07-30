@@ -100,7 +100,7 @@ class YardStickOneDevice(VirtualDevice):
 
     def _on_whad_phy_get_supported_freq(self, message):
         # Create a SupportedFreqRanges
-        msg = self.hub.phy.createSupportedFreqRanges(
+        msg = self.hub.phy.create_supported_freq_ranges(
             self.__supported_frequency_range
         )
 
@@ -267,7 +267,7 @@ class YardStickOneDevice(VirtualDevice):
 
     def _send_whad_phy_pdu(self, packet, timestamp=None):
         # Create a PacketReceived message
-        msg = self.hub.phy.createPacketReceived(
+        msg = self.hub.phy.create_packet_received(
             self._get_frequency(),
             packet
         )

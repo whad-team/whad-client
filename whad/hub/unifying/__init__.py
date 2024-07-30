@@ -53,12 +53,12 @@ class UnifyingDomain(Registry):
         message_clazz = UnifyingDomain.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
 
-    def isPacketCompat(self, packet) -> bool:
+    def is_packet_compat(self, packet) -> bool:
         """Determine if a packet is an ESB packet.
         """
         return isinstance(packet.metadata, UnifyingMetadata)
 
-    def convertPacket(self, packet) -> HubMessage:
+    def convert_packet(self, packet) -> HubMessage:
         """Convert an ESB packet to SendPdu or SendBlePdu message.
         """
         if isinstance(packet.metadata, UnifyingMetadata):
@@ -74,7 +74,7 @@ class UnifyingDomain(Registry):
             # Error
             return None
 
-    def createSetNodeAddress(self, node_address: EsbNodeAddress) -> HubMessage:
+    def create_set_node_address(self, node_address: EsbNodeAddress) -> HubMessage:
         """Create a SetNodeAddress message
 
         :param node_address: Node address to set (size must be 1-5 bytes)
@@ -85,7 +85,7 @@ class UnifyingDomain(Registry):
             address=node_address.value
         )
 
-    def createStart(self) -> HubMessage:
+    def create_start(self) -> HubMessage:
         """Create a Start message
 
         :return: instance of `Start` message
@@ -93,7 +93,7 @@ class UnifyingDomain(Registry):
         return UnifyingDomain.bound('start', self.proto_version)()
 
 
-    def createStop(self) -> HubMessage:
+    def create_stop(self) -> HubMessage:
         """Create a Stop message
 
         :return: instance of `Stop` message
@@ -101,7 +101,7 @@ class UnifyingDomain(Registry):
         return UnifyingDomain.bound('stop', self.proto_version)()
 
 
-    def createJamMode(self, channel: int) -> HubMessage:
+    def create_jam_mode(self, channel: int) -> HubMessage:
         """Create a JamMode message
 
         :param channel: ESB channel to jam
@@ -112,7 +112,7 @@ class UnifyingDomain(Registry):
             channel=channel
         )
 
-    def createSniffMode(self, address: EsbNodeAddress, channel: int = 0xFF, show_acks: bool = False) -> HubMessage:
+    def create_sniff_mode(self, address: EsbNodeAddress, channel: int = 0xFF, show_acks: bool = False) -> HubMessage:
         """Create a SniffMode message
 
         :param address: Node address to filter
@@ -129,7 +129,7 @@ class UnifyingDomain(Registry):
             show_acks=show_acks
         )
 
-    def createJammed(self, timestamp: int):
+    def create_jammed(self, timestamp: int):
         """Create a Jammed notification message
 
         :param timestamp: Timestamp at which the jamming has succeeded
@@ -140,7 +140,7 @@ class UnifyingDomain(Registry):
             timestamp=timestamp
         )
 
-    def createDongleMode(self, channel: int) -> HubMessage:
+    def create_dongle_mode(self, channel: int) -> HubMessage:
         """Create DongleMode message
 
         :param channel: Channel to listen on
@@ -151,7 +151,7 @@ class UnifyingDomain(Registry):
             channel=channel
         )
 
-    def createKeyboardMode(self, channel: int) -> HubMessage:
+    def create_keyboard_mode(self, channel: int) -> HubMessage:
         """Create KeyboardMode message
 
         :param channel: Channel to listen on
@@ -162,7 +162,7 @@ class UnifyingDomain(Registry):
             channel=channel
         )
 
-    def createMouseMode(self, channel: int) -> HubMessage:
+    def create_mouse_mode(self, channel: int) -> HubMessage:
         """Create MouseMode message
 
         :param channel: Channel to listen on
@@ -173,14 +173,14 @@ class UnifyingDomain(Registry):
             channel=channel
         )
 
-    def createSniffPairing(self) -> HubMessage:
+    def create_sniff_pairing(self) -> HubMessage:
         """Create SniffPairing message
 
         :return: instance of `SniffPairing`
         """
         return UnifyingDomain.bound('sniff_pairing', self.proto_version)()
 
-    def createSendPdu(self, channel: int, pdu: bytes, retr_count: int = 0):
+    def create_send_pdu(self, channel: int, pdu: bytes, retr_count: int = 0):
         """Create a SendPdu message
 
         :param channel: Channel to use for transmission
@@ -197,7 +197,7 @@ class UnifyingDomain(Registry):
             retr_count=retr_count
         )
 
-    def createSendRawPdu(self, channel: int, pdu: bytes, retr_count: int = 0):
+    def create_send_raw_pdu(self, channel: int, pdu: bytes, retr_count: int = 0):
         """Create a SendRawPdu message
 
         :param channel: Channel to use for transmission
@@ -214,7 +214,7 @@ class UnifyingDomain(Registry):
             retr_count=retr_count
         )
 
-    def createPduReceived(self, channel: int, pdu: bytes, rssi: int = None, timestamp: int = None,
+    def create_pdu_received(self, channel: int, pdu: bytes, rssi: int = None, timestamp: int = None,
                           crc_validity: bool = None, address: EsbNodeAddress = None) -> HubMessage:
         """Create a PduReceived notification message.
 
@@ -252,7 +252,7 @@ class UnifyingDomain(Registry):
         return msg
 
 
-    def createRawPduReceived(self, channel: int, pdu: bytes, rssi: int = None, timestamp: int = None,
+    def create_raw_pdu_received(self, channel: int, pdu: bytes, rssi: int = None, timestamp: int = None,
                           crc_validity: bool = None, address: EsbNodeAddress = None) -> HubMessage:
         """Create a RawPduReceived notification message.
 
@@ -295,7 +295,7 @@ from .mode import UnifyingStart, UnifyingStop, JamMode, SniffMode, Jammed, Dongl
 from .pdu import PduReceived, RawPduReceived, SendPdu, SendRawPdu
 
 __all__ = [
-    'EsbDomain',
+    'UnifyingDomain',
     'SetNodeAddress',
     'UnifyingStart',
     'UnifyingStop',

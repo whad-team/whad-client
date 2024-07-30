@@ -131,7 +131,7 @@ class RZUSBStickDevice(VirtualDevice):
         fcs = unpack("H",packet[-2:])[0]
 
         # Create a RawPduReceived message
-        msg = self.hub.dot15d4.createRawPduReceived(
+        msg = self.hub.dot15d4.create_raw_pdu_received(
             self.__channel,
             pdu,
             fcs,

@@ -161,7 +161,7 @@ class ESB(WhadDeviceConnector):
         else:
             self.__cached_channel = channel
 
-        msg = self.hub.esb.createSniffMode(
+        msg = self.hub.esb.create_sniff_mode(
             EsbNodeAddress(self.__cached_address.value),
             channel,
             show_acknowledgements
@@ -197,7 +197,7 @@ class ESB(WhadDeviceConnector):
         self.__cached_channel = channel
 
         # Create a PrxMode message.
-        msg = self.hub.esb.createPrxMode(channel)
+        msg = self.hub.esb.create_prx_mode(channel)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -230,7 +230,7 @@ class ESB(WhadDeviceConnector):
             self.__cached_channel = channel
 
         # Create a PtxMode message.
-        msg = self.hub.esb.createPtxMode(channel)
+        msg = self.hub.esb.create_ptx_mode(channel)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -257,7 +257,7 @@ class ESB(WhadDeviceConnector):
         self.__cached_address = node_address
 
         # Create a SetNodeAddress message
-        msg = self.hub.esb.createSetNodeAddress(
+        msg = self.hub.esb.create_set_node_address(
             EsbNodeAddress(node_address.value)
         )
 
@@ -269,7 +269,7 @@ class ESB(WhadDeviceConnector):
         Start currently enabled mode.
         """
         # Create a Start message.
-        msg = self.hub.esb.createStart()
+        msg = self.hub.esb.create_start()
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -279,7 +279,7 @@ class ESB(WhadDeviceConnector):
         Stop currently enabled mode.
         """
         # Create a Stop message.
-        msg = self.hub.esb.createStop()
+        msg = self.hub.esb.create_stop()
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)

@@ -141,7 +141,7 @@ class Dot15d4(WhadDeviceConnector):
             raise UnsupportedCapability("Sniff")
 
         # Create a SniffMode message
-        msg = self.hub.dot15d4.createSniffMode(channel)
+        msg = self.hub.dot15d4.create_sniff_mode(channel)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -157,7 +157,7 @@ class Dot15d4(WhadDeviceConnector):
         node_addr = NodeAddress(address, mode)
 
         # Create a SetNodAddress message
-        msg = self.hub.dot15d4.createSetNodeAddress(node_addr)
+        msg = self.hub.dot15d4.create_set_node_address(node_addr)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -170,7 +170,7 @@ class Dot15d4(WhadDeviceConnector):
             raise UnsupportedCapability("EndDevice")
 
         # Create EndDeviceMode message
-        msg = self.hub.dot15d4.createEndDeviceMode(channel)
+        msg = self.hub.dot15d4.create_end_device_mode(channel)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -196,7 +196,7 @@ class Dot15d4(WhadDeviceConnector):
             raise UnsupportedCapability("Coordinator")
 
         # Create EndDeviceMode message
-        msg = self.hub.dot15d4.createCoordMode(channel)
+        msg = self.hub.dot15d4.create_coord_mode(channel)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -263,7 +263,7 @@ class Dot15d4(WhadDeviceConnector):
         """
         if self.can_perform_ed_scan():
             # Create an EnergyDetectionMode message
-            msg = self.hub.dot15d4.createEnergyDetectionMode(channel)
+            msg = self.hub.dot15d4.create_energy_detection_mode(channel)
 
             resp = self.send_command(msg, message_filter(CommandResult))
             return isinstance(resp, Success)
@@ -275,7 +275,7 @@ class Dot15d4(WhadDeviceConnector):
         Start currently enabled mode.
         """
         # Create a Start message
-        msg = self.hub.dot15d4.createStart()
+        msg = self.hub.dot15d4.create_start()
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -285,7 +285,7 @@ class Dot15d4(WhadDeviceConnector):
         Stop currently enabled mode.
         """
         # Create a Stop message
-        msg = self.hub.dot15d4.createStop()
+        msg = self.hub.dot15d4.create_stop()
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)

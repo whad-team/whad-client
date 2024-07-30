@@ -72,7 +72,7 @@ class HCIConverter:
                 processed = False
                 conn_handle = message.conn_handle
 
-                msg = self.__device.hub.ble.createPduReceived(
+                msg = self.__device.hub.ble.create_pdu_received(
                     direction,
                     raw(pdu),
                     conn_handle,
@@ -91,7 +91,7 @@ class HCIConverter:
                 processed = False
                 conn_handle = message.conn_handle
 
-                msg = self.__device.hub.ble.createPduReceived(
+                msg = self.__device.hub.ble.create_pdu_received(
                     direction,
                     raw(pdu),
                     conn_handle,
@@ -144,7 +144,7 @@ class HCIConverter:
         processed = False
         conn_handle = event.handle
 
-        msg = self.__device.hub.ble.createPduReceived(
+        msg = self.__device.hub.ble.create_pdu_received(
             direction,
             raw(pdu),
             conn_handle,
@@ -174,7 +174,7 @@ class HCIConverter:
         processed = False
         conn_handle = event.handle
 
-        msg = self.__device.hub.ble.createPduReceived(
+        msg = self.__device.hub.ble.create_pdu_received(
             direction,
             raw(pdu),
             conn_handle,
@@ -202,7 +202,7 @@ class HCIConverter:
             processed = False
             conn_handle = event.handle
 
-            msg = self.__device.hub.ble.createPduReceived(
+            msg = self.__device.hub.ble.create_pdu_received(
                 direction,
                 raw(pdu),
                 conn_handle,
@@ -227,7 +227,7 @@ class HCIConverter:
             processed = False
             conn_handle = event.handle
 
-            msg = self.__device.hub.ble.createPduReceived(
+            msg = self.__device.hub.ble.create_pdu_received(
                 direction,
                 raw(pdu),
                 conn_handle,
@@ -258,7 +258,7 @@ class HCIConverter:
                 responder_address = bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
                 responder_address_type = self.__device._bd_address_type
             
-            msg = self.__device.hub.ble.createConnected(
+            msg = self.__device.hub.ble.create_connected(
                 BDAddress(initiator_address, addr_type=initiator_address_type),
                 BDAddress(responder_address, addr_type=responder_address_type),
                 0, # No access address
@@ -274,7 +274,7 @@ class HCIConverter:
             self.__device._active_handles.remove(event.handle)
 
             # Send disconnection message to consumer.
-            msg = self.__device.hub.ble.createDisconnected(
+            msg = self.__device.hub.ble.create_disconnected(
                 event.reason,
                 event.handle
             )
@@ -302,7 +302,7 @@ class HCIConverter:
             for data in report.data:
                 eir_data += raw(data)
 
-            msg = self.__device.hub.ble.createAdvPduReceived(
+            msg = self.__device.hub.ble.create_adv_pdu_received(
                 adv_type,
                 report.rssi if hasattr(report, "rssi") else 0,
                 BDAddress(report.addr, random = not (report.atype == 0)),

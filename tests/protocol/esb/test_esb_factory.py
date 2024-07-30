@@ -47,14 +47,14 @@ class TestBleDomainFactory(object):
     def test_SetNodeAddress(self, factory: EsbDomain):
         """Check SetNodeAddress crafting
         """
-        msg = factory.createSetNodeAddress(DEFAULT_NODE_ADDRESS)
+        msg = factory.create_set_node_address(DEFAULT_NODE_ADDRESS)
         assert isinstance(msg, SetNodeAddress)
         assert msg.address == DEFAULT_NODE_ADDRESS.value
 
     def test_SniffMode(self, factory: EsbDomain):
         """Check SniffMode crafting
         """
-        msg = factory.createSniffMode(DEFAULT_NODE_ADDRESS, 12, True)
+        msg = factory.create_sniff_mode(DEFAULT_NODE_ADDRESS, 12, True)
         assert isinstance(msg, SniffMode)
         assert msg.address == DEFAULT_NODE_ADDRESS.value
         assert msg.channel == 12
@@ -63,21 +63,21 @@ class TestBleDomainFactory(object):
     def test_JamMode(self, factory: EsbDomain):
         """Check JamMode crafting
         """
-        msg = factory.createJamMode(32)
+        msg = factory.create_jam_mode(32)
         assert isinstance(msg, JamMode)
         assert msg.channel == 32
 
     def test_Jammed(self, factory: EsbDomain):
         """Check Jammed crafting
         """
-        msg = factory.createJammed(1234)
+        msg = factory.create_jammed(1234)
         assert isinstance(msg, Jammed)
         assert msg.timestamp == 1234
 
     def test_SendPdu(self, factory: EsbDomain):
         """Check SendPdu crafting
         """
-        msg = factory.createSendPdu(27, b"FOOBAR", 1)
+        msg = factory.create_send_pdu(27, b"FOOBAR", 1)
         assert isinstance(msg, SendPdu)
         assert msg.channel == 27
         assert msg.pdu == b"FOOBAR"
@@ -86,7 +86,7 @@ class TestBleDomainFactory(object):
     def test_SendRawPdu(self, factory: EsbDomain):
         """Check SendRawPdu crafting
         """
-        msg = factory.createSendRawPdu(11, b"HELLOWORLD", 2)
+        msg = factory.create_send_raw_pdu(11, b"HELLOWORLD", 2)
         assert isinstance(msg, SendRawPdu)
         assert msg.channel == 11
         assert msg.pdu == b"HELLOWORLD"
@@ -95,7 +95,7 @@ class TestBleDomainFactory(object):
     def test_PduReceived_0(self, factory: EsbDomain):
         """Check PduReceived crafting
         """
-        msg = factory.createPduReceived(17, b"FOOBAR")
+        msg = factory.create_pdu_received(17, b"FOOBAR")
         assert isinstance(msg, PduReceived)
         assert msg.channel == 17
         assert msg.pdu == b"FOOBAR"
@@ -107,7 +107,7 @@ class TestBleDomainFactory(object):
     def test_PduReceived_1(self, factory: EsbDomain):
         """Check PduReceived crafting, including rssi
         """
-        msg = factory.createPduReceived(5, b"FOOBAR", rssi=-40)
+        msg = factory.create_pdu_received(5, b"FOOBAR", rssi=-40)
         assert isinstance(msg, PduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -119,7 +119,7 @@ class TestBleDomainFactory(object):
     def test_PduReceived_2(self, factory: EsbDomain):
         """Check PduReceived crafting, including timestamp
         """
-        msg = factory.createPduReceived(5, b"FOOBAR",timestamp=1234)
+        msg = factory.create_pdu_received(5, b"FOOBAR",timestamp=1234)
         assert isinstance(msg, PduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -131,7 +131,7 @@ class TestBleDomainFactory(object):
     def test_PduReceived_3(self, factory: EsbDomain):
         """Check PduReceived crafting, including address
         """
-        msg = factory.createPduReceived(5, b"FOOBAR", address=DEFAULT_NODE_ADDRESS)
+        msg = factory.create_pdu_received(5, b"FOOBAR", address=DEFAULT_NODE_ADDRESS)
         assert isinstance(msg, PduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -143,7 +143,7 @@ class TestBleDomainFactory(object):
     def test_PduReceived_4(self, factory: EsbDomain):
         """Check PduReceived crafting, including crc_validity
         """
-        msg = factory.createPduReceived(5, b"FOOBAR", crc_validity=True)
+        msg = factory.create_pdu_received(5, b"FOOBAR", crc_validity=True)
         assert isinstance(msg, PduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -155,7 +155,7 @@ class TestBleDomainFactory(object):
     def test_RawPduReceived_0(self, factory: EsbDomain):
         """Check RawPduReceived crafting
         """
-        msg = factory.createRawPduReceived(17, b"FOOBAR")
+        msg = factory.create_raw_pdu_received(17, b"FOOBAR")
         assert isinstance(msg, RawPduReceived)
         assert msg.channel == 17
         assert msg.pdu == b"FOOBAR"
@@ -167,7 +167,7 @@ class TestBleDomainFactory(object):
     def test_RawPduReceived_1(self, factory: EsbDomain):
         """Check RawPduReceived crafting, including rssi
         """
-        msg = factory.createRawPduReceived(5, b"FOOBAR", rssi=-40)
+        msg = factory.create_raw_pdu_received(5, b"FOOBAR", rssi=-40)
         assert isinstance(msg, RawPduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -179,7 +179,7 @@ class TestBleDomainFactory(object):
     def test_RawPduReceived_2(self, factory: EsbDomain):
         """Check RawPduReceived crafting, including timestamp
         """
-        msg = factory.createRawPduReceived(5, b"FOOBAR",timestamp=1234)
+        msg = factory.create_raw_pdu_received(5, b"FOOBAR",timestamp=1234)
         assert isinstance(msg, RawPduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -191,7 +191,7 @@ class TestBleDomainFactory(object):
     def test_RawPduReceived_3(self, factory: EsbDomain):
         """Check RawPduReceived crafting, including address
         """
-        msg = factory.createRawPduReceived(5, b"FOOBAR", address=DEFAULT_NODE_ADDRESS)
+        msg = factory.create_raw_pdu_received(5, b"FOOBAR", address=DEFAULT_NODE_ADDRESS)
         assert isinstance(msg, RawPduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -203,7 +203,7 @@ class TestBleDomainFactory(object):
     def test_RawPduReceived_4(self, factory: EsbDomain):
         """Check RawPduReceived crafting, including crc_validity
         """
-        msg = factory.createRawPduReceived(5, b"FOOBAR", crc_validity=True)
+        msg = factory.create_raw_pdu_received(5, b"FOOBAR", crc_validity=True)
         assert isinstance(msg, RawPduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -215,25 +215,25 @@ class TestBleDomainFactory(object):
     def test_PrxMode(self, factory: EsbDomain):
         """Check PrxMode crafting
         """
-        msg = factory.createPrxMode(18)
+        msg = factory.create_prx_mode(18)
         assert isinstance(msg, PrxMode)
         assert msg.channel == 18
 
     def test_PtxMode(self, factory: EsbDomain):
         """Check PtxMode crafting
         """
-        msg = factory.createPtxMode(18)
+        msg = factory.create_ptx_mode(18)
         assert isinstance(msg, PtxMode)
         assert msg.channel == 18
 
     def test_EsbStart(self, factory: EsbDomain):
         """Check EsbStart crafting
         """
-        msg = factory.createStart()
+        msg = factory.create_start()
         assert isinstance(msg, EsbStart)
 
     def test_EsbStop(self, factory: EsbDomain):
         """Check EsbStop crafting
         """
-        msg = factory.createStop()
+        msg = factory.create_stop()
         assert isinstance(msg, EsbStop)

@@ -220,69 +220,69 @@ class TestGeneric(object):
         """Test generic message factory for error message crafting
         """
         generic = Generic(1)
-        msg = generic.createError()
+        msg = generic.create_error()
         assert isinstance(msg, Error)
 
     def test_success_factory(self):
         """Test generic message factory for success message crafting
         """
         generic = Generic(1)
-        msg = generic.createSuccess()
+        msg = generic.create_success()
         assert isinstance(msg, Success)
 
     def test_param_error_factory(self):
         """Test generic message factory for parameter error message crafting
         """
         generic = Generic(1)
-        msg = generic.createParamError()
+        msg = generic.create_param_error()
         assert isinstance(msg, ParameterError)
 
     def test_disconnected_factory(self):
         """Test generic message factory for disconnected error message crafting
         """
         generic = Generic(1)
-        msg = generic.createDisconnected()
+        msg = generic.create_disconnected()
         assert isinstance(msg, Disconnected)
 
     def test_wrong_mode_factory(self):
         """Test generic message factory for wrong mode error message crafting
         """
         generic = Generic(1)
-        msg = generic.createWrongMode()
+        msg = generic.create_wrong_mode()
         assert isinstance(msg, WrongMode)
 
     def test_unsupported_domain_factory(self):
         """Test generic message factory for unsupported domain error message crafting
         """
         generic = Generic(1)
-        msg = generic.createUnsupportedDomain()
+        msg = generic.create_unsupported_domain()
         assert isinstance(msg, UnsupportedDomain)
 
     def test_busy_factory(self):
         """Test generic message factory for unsupported busy error message crafting
         """
         generic = Generic(1)
-        msg = generic.createBusy()
+        msg = generic.create_busy()
         assert isinstance(msg, Busy)
 
     def test_verbose_factory(self):
         """Test generic message factory for verbose message crafting
         """
         generic = Generic(1)
-        msg = generic.createVerbose(b'TestMessage')
+        msg = generic.create_verbose(b'TestMessage')
         assert isinstance(msg, Verbose)
 
     def test_debug_factory(self):
         """Test generic message factory for debug message crafting
         """
         generic = Generic(1)
-        msg = generic.createDebug(42, b'TestMessage')
+        msg = generic.create_debug(42, b'TestMessage')
         assert isinstance(msg, Debug)
 
     def test_progress_factory(self):
         """Test generic message factory for progress message crafting
         """
         generic = Generic(1)
-        msg = generic.createProgress(10)
+        msg = generic.create_progress(10)
         assert isinstance(msg, Progress)
         

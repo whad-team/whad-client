@@ -131,7 +131,7 @@ class BleMessageTranslator(object):
                 return None
 
             # Create SendRawPdu message
-            msg = self.__hub.ble.createSendRawPdu(
+            msg = self.__hub.ble.create_send_raw_pdu(
                 direction,
                 pdu,
                 crc=BTLE(raw(packet)).crc, # force the CRC to be generated if not provided
@@ -153,7 +153,7 @@ class BleMessageTranslator(object):
                 return None
 
             # Create a SendPdu message
-            msg = self.__hub.ble.createSendPdu(
+            msg = self.__hub.ble.create_send_pdu(
                 direction,
                 pdu,
                 connection_handle,

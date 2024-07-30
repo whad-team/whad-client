@@ -153,14 +153,14 @@ class UartDevice(WhadDevice):
                 self.dispatch_message(msg)
             except Empty:
                 # Use the classic way to reset device (RTS-based reset failed)
-                msg = self.hub.discovery.createResetQuery()
+                msg = self.hub.discovery.create_reset_query()
                 self.send_command(
                     msg,
                     message_filter(DeviceReady)
                 )
         else:
             # Device is ACM, send a classic reset message to device
-            msg = self.hub.discovery.createResetQuery()
+            msg = self.hub.discovery.create_reset_query()
             self.send_command(
                 msg,
                 message_filter(DeviceReady)
@@ -243,7 +243,7 @@ class UartDevice(WhadDevice):
         if not self.__is_acm:
             #msg = Message()
             #msg.discovery.set_speed.speed = speed
-            msg = self.hub.discovery.createSetSpeed(speed)
+            msg = self.hub.discovery.create_set_speed(speed)
             resp = self.send_command(
                 msg,
                 message_filter(CommandResult)

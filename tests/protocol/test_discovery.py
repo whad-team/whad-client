@@ -184,14 +184,14 @@ class TestDiscoveryFactory(object):
         """Test info query factory.
         """
         discovery = Discovery(1)
-        msg = discovery.createInfoQuery(proto_ver=1)
+        msg = discovery.create_info_query(proto_ver=1)
         assert isinstance(msg, InfoQuery)
 
     def test_discovery_info_resp_factory(self):
         """Test info response factory.
         """
         discovery = Discovery(1)
-        msg = discovery.createInfoResp(type = 42, device_id = b'bidon', proto_min_ver = 3,
+        msg = discovery.create_info_resp(type = 42, device_id = b'bidon', proto_min_ver = 3,
                             max_speed = 115200, fw_author = b'John Wick',
                             fw_url = b'https://linux.org', fw_version_major=2,
                             fw_version_minor=3, fw_version_rev=4,capabilities=[
@@ -204,35 +204,35 @@ class TestDiscoveryFactory(object):
         """Test discovery domain query factory.
         """
         discovery = Discovery(1)
-        msg = discovery.createDomainQuery(domain=42)
+        msg = discovery.create_domain_query(domain=42)
         assert isinstance(msg, DomainInfoQuery)
 
     def test_discovery_domain_resp_factory(self):
         """Test discovery domain response factory.
         """
         discovery = Discovery(1)
-        msg = discovery.createDomainResp(domain=42, supported_commands=0x112233445566)
+        msg = discovery.create_domain_resp(domain=42, supported_commands=0x112233445566)
         assert isinstance(msg, DomainInfoQueryResp)
 
     def test_discovery_set_speed_factory(self):
         """Test discovery speed update factory.
         """
         discovery = Discovery(1)
-        msg = discovery.createSetSpeed(speed=9600)
+        msg = discovery.create_set_speed(speed=9600)
         assert isinstance(msg, SetSpeed)
 
     def test_discovery_reset_query_factory(self):
         """Test discovery reset query factory.
         """
         discovery = Discovery(1)
-        msg = discovery.createResetQuery()
+        msg = discovery.create_reset_query()
         assert isinstance(msg, ResetQuery)
 
     def test_discovery_device_ready_factory(self):
         """Test discovery ready resp factory.
         """
         discovery = Discovery(1)
-        msg = discovery.createDeviceReady()
+        msg = discovery.create_device_ready()
         assert isinstance(msg, DeviceReady)
 
 class TestDiscoveryDispatch(object):

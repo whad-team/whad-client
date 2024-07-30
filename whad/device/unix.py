@@ -581,7 +581,7 @@ class UnixSocketConnector(WhadDeviceConnector):
             logger.debug("Received a message (%s) from device, forward to client if any", message)
             if self.__client is not None:
                 # Convert message into bytes
-                raw_message = message.SerializeToString()
+                raw_message = message.serialize()
 
                 # Define header
                 header = [

@@ -223,7 +223,7 @@ class APIMoteDevice(VirtualDevice):
         is_fcs_valid = Dot15d4FCS().compute_fcs(pdu) == packet[-2:]
         timestamp = None
 
-        msg = self.hub.dot15d4.createRawPduReceived(
+        msg = self.hub.dot15d4.create_raw_pdu_received(
             self._get_channel(),
             pdu,
             fcs,

@@ -188,7 +188,7 @@ class UbertoothDevice(VirtualDevice):
         is_crc_valid = calculated_crc == sniffed_crc
 
         # Create a RawPduReceived message
-        msg = self.hub.ble.createRawPduReceived(
+        msg = self.hub.ble.create_raw_pdu_received(
             Direction.UNKNOWN,
             pdu,
             access_address,
@@ -210,7 +210,7 @@ class UbertoothDevice(VirtualDevice):
 
     def _send_whad_ble_synchronized(self):
         # Create a Synchronized message
-        msg = self.hub.ble.createSynchronized(
+        msg = self.hub.ble.create_synchronized(
             self.__access_address,
             self.__hop_interval,
             self.__hop_increment,
@@ -224,7 +224,7 @@ class UbertoothDevice(VirtualDevice):
 
     def _send_whad_ble_aa_disc(self, access_address, timestamp, rssi):
         # Create an AccessAddressDiscovered
-        msg = self.hub.ble.createAccessAddressDiscovered(
+        msg = self.hub.ble.create_access_address_discovered(
             access_address,
             rssi,
             timestamp

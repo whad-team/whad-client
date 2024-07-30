@@ -158,7 +158,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("ASKModulation")
 
         # Create a SetAskMod message.
-        msg = self.hub.phy.createSetAskMod(on_off_keying)
+        msg = self.hub.phy.create_set_ask_mod(on_off_keying)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
@@ -180,7 +180,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("FSKModulation")
 
         # Create a SetFskMod message.
-        msg = self.hub.phy.createSetFskMod(deviation)
+        msg = self.hub.phy.create_set_fsk_mod(deviation)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
@@ -196,7 +196,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("4FSKModulation")
 
         # Create a Set4fskMod message.
-        msg = self.hub.phy.createSet4FskMod(deviation)
+        msg = self.hub.phy.create_set_4fsk_mod(deviation)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
@@ -219,7 +219,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("GFSKModulation")
 
         # Create a SetGfskMod message.
-        msg = self.hub.phy.createSetGfskMod(deviation)
+        msg = self.hub.phy.create_set_gfsk_mod(deviation)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
@@ -236,7 +236,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("BPSKModulation")
 
         # Create a SetBpskMod message.
-        msg = self.hub.phy.createSetBpskMod()
+        msg = self.hub.phy.create_set_bpsk_mod()
 
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
@@ -254,7 +254,7 @@ class Phy(WhadDeviceConnector):
 
 
         # Create a SetQpskMod message (offset set to False by default).
-        msg = self.hub.phy.createSetQpskMod(False)
+        msg = self.hub.phy.create_set_qpsk_mod(False)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
@@ -288,7 +288,7 @@ class Phy(WhadDeviceConnector):
             raise InvalidParameter('bandwidth')
 
         # Create a SetLoRaMod message.
-        msg = self.hub.phy.createSetLoRaMod(
+        msg = self.hub.phy.create_set_lora_mod(
             bw,
             lora_sf(sf),
             lora_cr(cr),
@@ -313,7 +313,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("GetSupportedFrequencies")
 
         # Create a GetSupportedFreqs message.
-        msg = self.hub.phy.createGetSupportedFreqs()
+        msg = self.hub.phy.create_get_supported_freqs()
 
         resp = self.send_command(msg, message_filter(SupportedFreqRanges))
         assert isinstance(resp, SupportedFreqRanges)
@@ -337,7 +337,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedFrequency(frequency)
 
         # Create a SetFreq message.
-        msg = self.hub.phy.createSetFreq(frequency)
+        msg = self.hub.phy.create_set_freq(frequency)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
@@ -362,7 +362,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("DataRate")
 
         # Create a SetDatarate message.
-        msg = self.hub.phy.createSetDatarate(rate)
+        msg = self.hub.phy.create_set_datarate(rate)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
@@ -385,7 +385,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("Endianness")
 
         # Create a SetEndianness message.
-        msg = self.hub.phy.createSetEndianness(endianness==Endianness.LITTLE)
+        msg = self.hub.phy.create_set_endianness(endianness==Endianness.LITTLE)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
@@ -418,7 +418,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("TXPower")
 
         # Create a SetTxPower message.
-        msg = self.hub.phy.createSetTxPower(tx_power)
+        msg = self.hub.phy.create_set_tx_power(tx_power)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -440,7 +440,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("PacketSize")
 
         # Create a SetPacketSize message
-        msg = self.hub.phy.createSetPacketSize(size)
+        msg = self.hub.phy.create_set_packet_size(size)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
@@ -464,7 +464,7 @@ class Phy(WhadDeviceConnector):
             raise UnsupportedCapability("SyncWord")
 
         # Create a SetSyncWord message
-        msg = self.hub.phy.createSetSyncWord(sync_word)
+        msg = self.hub.phy.create_set_sync_word(sync_word)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
@@ -516,7 +516,7 @@ class Phy(WhadDeviceConnector):
         """
 
         # Create a SniffMode message
-        msg = self.hub.phy.createSniffMode(iq_stream)
+        msg = self.hub.phy.create_sniff_mode(iq_stream)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -526,7 +526,7 @@ class Phy(WhadDeviceConnector):
         Start currently enabled mode.
         """
         # Create a Start message
-        msg = self.hub.phy.createStart()
+        msg = self.hub.phy.create_start()
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -536,7 +536,7 @@ class Phy(WhadDeviceConnector):
         Stop currently enabled mode.
         """
         # Create a Stop message
-        msg = self.hub.phy.createStop()
+        msg = self.hub.phy.create_stop()
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -691,7 +691,7 @@ class Phy(WhadDeviceConnector):
         packet.metadata.frequency = self.__cached_frequency
 
         # Set timestamp
-        msg = self.hub.phy.createSchedulePacket(
+        msg = self.hub.phy.create_schedule_packet(
             bytes(packet),
             int(timestamp*1000000)
         )

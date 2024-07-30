@@ -116,12 +116,12 @@ class Dot15d4Domain(Registry):
         """
         self.proto_version = version
 
-    def isPacketCompat(self, packet) -> bool:
+    def is_packet_compat(self, packet) -> bool:
         """Determine if a packet is a Dot15d4 packet.
         """
         return isinstance(packet.metadata, Dot15d4Metadata)
     
-    def convertPacket(self, packet) -> HubMessage:
+    def convert_packet(self, packet) -> HubMessage:
         """Convert a Dot15d4 packet to SendPdu or SendBlePdu message.
         """
         if isinstance(packet.metadata, Dot15d4Metadata):
@@ -163,7 +163,7 @@ class Dot15d4Domain(Registry):
         message_clazz = Dot15d4Domain.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
 
-    def createSetNodeAddress(self, address: NodeAddress) -> HubMessage:
+    def create_set_node_address(self, address: NodeAddress) -> HubMessage:
         """Create a SetNodeAddress message.
 
         :param address: instance of `Dot15d4Address`
@@ -175,7 +175,7 @@ class Dot15d4Domain(Registry):
             addr_type=address.address_type
         )
 
-    def createSniffMode(self, channel: int) -> HubMessage:
+    def create_sniff_mode(self, channel: int) -> HubMessage:
         """Create a SniffMode message
 
         :param channel: Channel to sniff
@@ -186,7 +186,7 @@ class Dot15d4Domain(Registry):
             channel=channel
         )
 
-    def createJamMode(self, channel: int) -> HubMessage:
+    def create_jam_mode(self, channel: int) -> HubMessage:
         """Create a JamMode message
 
         :param channel: Channel to jam
@@ -197,7 +197,7 @@ class Dot15d4Domain(Registry):
             channel=channel
         )
 
-    def createEnergyDetectionMode(self, channel: int) -> HubMessage:
+    def create_energy_dectection_mode(self, channel: int) -> HubMessage:
         """Create a EnergyDetectionMode message
 
         :param channel: Channel to detect
@@ -208,7 +208,7 @@ class Dot15d4Domain(Registry):
             channel=channel
         )
 
-    def createEndDeviceMode(self, channel: int) -> HubMessage:
+    def create_end_device_mode(self, channel: int) -> HubMessage:
         """Create a EndDeviceMode message
 
         :param channel: Channel to use for end device
@@ -219,7 +219,7 @@ class Dot15d4Domain(Registry):
             channel=channel
         )
 
-    def createRouterMode(self, channel: int) -> HubMessage:
+    def create_router_mode(self, channel: int) -> HubMessage:
         """Create a RouterMode message
 
         :param channel: Channel to use for router
@@ -230,7 +230,7 @@ class Dot15d4Domain(Registry):
             channel=channel
         )
 
-    def createCoordMode(self, channel: int) -> HubMessage:
+    def create_coord_mode(self, channel: int) -> HubMessage:
         """Create a CoordMode message
 
         :param channel: Channel to use for router
@@ -241,7 +241,7 @@ class Dot15d4Domain(Registry):
             channel=channel
         )
 
-    def createMitmMode(self, role: int) -> HubMessage:
+    def create_mitm_mode(self, role: int) -> HubMessage:
         """Create a MitmMode message
 
         :return: instance of `MitmMode`
@@ -250,21 +250,21 @@ class Dot15d4Domain(Registry):
             role=role
         )
 
-    def createStart(self) -> HubMessage:
+    def create_start(self) -> HubMessage:
         """Create a Start message
 
         :return: instance of `Start`
         """
         return Dot15d4Domain.bound('start', self.proto_version)()
 
-    def createStop(self) -> HubMessage:
+    def create_stop(self) -> HubMessage:
         """Create a Stop message
 
         :return: instance of `Stop`
         """
         return Dot15d4Domain.bound('stop', self.proto_version)()
 
-    def createSendPdu(self, channel: int, pdu: bytes) -> HubMessage:
+    def create_send_pdu(self, channel: int, pdu: bytes) -> HubMessage:
         """Create a SendPdu message
 
         :param channel: Channel on which the PDU has to be sent
@@ -278,7 +278,7 @@ class Dot15d4Domain(Registry):
             pdu=pdu
         )
 
-    def createSendRawPdu(self, channel: int, pdu: bytes, fcs: int) -> HubMessage:
+    def create_send_raw_pdu(self, channel: int, pdu: bytes, fcs: int) -> HubMessage:
         """Create a SendPdu message
 
         :param channel: Channel on which the PDU has to be sent
@@ -295,7 +295,7 @@ class Dot15d4Domain(Registry):
             fcs=fcs
         )
 
-    def createJammed(self, timestamp: int) -> HubMessage:
+    def create_jammed(self, timestamp: int) -> HubMessage:
         """Create a jammed notification.
 
         :param timestamp: Timestamp when jamming is successful
@@ -306,7 +306,7 @@ class Dot15d4Domain(Registry):
             timestamp=timestamp
         )
 
-    def createEnergyDetectionSample(self, timestamp: int, sample: int) -> HubMessage:
+    def create_energy_detection_sample(self, timestamp: int, sample: int) -> HubMessage:
         """Create an energy detection sample notification message.
 
         :param timestamp: Timestamp at wich the sample has been computed
@@ -320,7 +320,7 @@ class Dot15d4Domain(Registry):
             sample=sample
         )
 
-    def createRawPduReceived(self, channel: int, pdu: bytes, fcs: int, rssi: int = None, \
+    def create_raw_pdu_received(self, channel: int, pdu: bytes, fcs: int, rssi: int = None, \
                              timestamp: int = None, fcs_validity: bool = None, \
                              lqi: int = None):
         """Create a received PDU notification message.
@@ -361,7 +361,7 @@ class Dot15d4Domain(Registry):
         # Return the generated message
         return msg
 
-    def createPduReceived(self, channel: int, pdu: bytes, rssi: int = None, \
+    def create_pdu_received(self, channel: int, pdu: bytes, rssi: int = None, \
                              timestamp: int = None, fcs_validity: bool = None, \
                              lqi: int = None):
         """Create a received PDU notification message.

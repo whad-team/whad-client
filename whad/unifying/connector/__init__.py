@@ -170,7 +170,7 @@ class Unifying(WhadDeviceConnector):
 
 
         # Create a SniffMode message.
-        msg = self.hub.unifying.createSniffMode(
+        msg = self.hub.unifying.create_sniff_mode(
             EsbNodeAddress(self.__cached_address.value),
             channel,
             show_acknowledgements
@@ -205,7 +205,7 @@ class Unifying(WhadDeviceConnector):
         self.__cached_channel = channel
 
         # Create a DongleMode message
-        msg = self.hub.unifying.createDongleMode(channel)
+        msg = self.hub.unifying.create_dongle_mode(channel)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -237,7 +237,7 @@ class Unifying(WhadDeviceConnector):
             self.__cached_channel = channel
 
         # Create a KeyboardMode message
-        msg = self.hub.unifying.createKeyboardMode(channel)
+        msg = self.hub.unifying.create_keyboard_mode(channel)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -268,7 +268,7 @@ class Unifying(WhadDeviceConnector):
             self.__cached_channel = channel
 
         # Create a MouseMode message
-        msg = self.hub.unifying.createMouseMode(channel)
+        msg = self.hub.unifying.create_mouse_mode(channel)
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -295,7 +295,7 @@ class Unifying(WhadDeviceConnector):
         self.__cached_address = node_address
 
         # Create a SetNodeAddress message.
-        msg = self.hub.unifying.createSetNodeAddress(
+        msg = self.hub.unifying.create_set_node_address(
             EsbNodeAddress(node_address.value)
         )
 
@@ -321,7 +321,7 @@ class Unifying(WhadDeviceConnector):
             raise UnsupportedCapability("SniffPairing")
 
         # Create a SniffPairing message.
-        msg = self.hub.unifying.createSniffPairing()
+        msg = self.hub.unifying.create_sniff_pairing()
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -332,7 +332,7 @@ class Unifying(WhadDeviceConnector):
         Start currently enabled mode.
         """
         # Create a Start message.
-        msg = self.hub.unifying.createStart()
+        msg = self.hub.unifying.create_start()
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
@@ -342,7 +342,7 @@ class Unifying(WhadDeviceConnector):
         Stop currently enabled mode.
         """
         # Create a Stop message.
-        msg = self.hub.unifying.createStop()
+        msg = self.hub.unifying.create_stop()
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)

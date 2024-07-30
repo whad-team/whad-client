@@ -96,12 +96,12 @@ class PhyDomain(Registry):
         message_clazz = PhyDomain.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
 
-    def isPacketCompat(self, packet) -> bool:
+    def is_packet_compat(self, packet) -> bool:
         """Determine if a packet is a compatible BLE packet
         """
         return isinstance(packet.metadata, PhyMetadata)
 
-    def convertPacket(self, packet) -> HubMessage:
+    def convert_packet(self, packet) -> HubMessage:
         """Convert a BLE packet to SendPdu or SendBlePdu message.
         """
         if isinstance(packet.metadata, PhyMetadata):
@@ -124,7 +124,7 @@ class PhyDomain(Registry):
         """
         return packet, 0
 
-    def createSetAskMod(self, ook: bool = False) -> HubMessage:
+    def create_set_ask_mod(self, ook: bool = False) -> HubMessage:
         """Create a SetAskMod message
 
         :param ook: Enable On/Off Keying if set to True
@@ -135,7 +135,7 @@ class PhyDomain(Registry):
             ook=ook
         )
     
-    def createSetFskMod(self, deviation: int) -> HubMessage:
+    def create_set_fsk_mod(self, deviation: int) -> HubMessage:
         """Create a SetFskMod message
 
         :param deviation: FSK deviation to use, in Hz
@@ -146,7 +146,7 @@ class PhyDomain(Registry):
             deviation=deviation
         )
     
-    def createSetGfskMod(self, deviation: int) -> HubMessage:
+    def create_set_gfsk_mod(self, deviation: int) -> HubMessage:
         """Create a SetGfskMod message
 
         :param deviation: GFSK deviation to use, in Hz
@@ -157,13 +157,13 @@ class PhyDomain(Registry):
             deviation=deviation
         )
     
-    def createSetBpskMod(self) -> HubMessage:
+    def create_set_bpsk_mod(self) -> HubMessage:
         """Create a SetBpskMod message
         :return: instance of `SetBpskMod`
         """
         return PhyDomain.bound('mod_bpsk', self.proto_version)()
     
-    def createSetQpskMod(self, offset: bool) -> HubMessage:
+    def create_set_qpsk_mod(self, offset: bool) -> HubMessage:
         """Create a SetQpskMod message
 
         :param offset: Use QPSK offset if set to True
@@ -174,7 +174,7 @@ class PhyDomain(Registry):
             offset=offset
         )
     
-    def createSet4FskMod(self, deviation: int) -> HubMessage:
+    def create_set_4fsk_mod(self, deviation: int) -> HubMessage:
         """Create a Set4FskMod message
         
         :param deviation: 4FSK deviation to use, in Hz
@@ -185,7 +185,7 @@ class PhyDomain(Registry):
             deviation=deviation
         )
     
-    def createSetMskMod(self, deviation: int) -> HubMessage:
+    def create_set_msk_mod(self, deviation: int) -> HubMessage:
         """Create a SetMskMod message
         
         :param deviation: MSK deviation to use, in Hz
@@ -196,7 +196,7 @@ class PhyDomain(Registry):
             deviation=deviation
         )
     
-    def createSetLoRaMod(self, bandwidth: int, sf: int, cr: int, preamble_length: int, \
+    def create_set_lora_mod(self, bandwidth: int, sf: int, cr: int, preamble_length: int, \
                          enable_crc:bool = True, explicit_mode: bool = True, \
                          invert_iq: bool = False):
         """Create a SetLoRaMod message
@@ -226,7 +226,7 @@ class PhyDomain(Registry):
         )
 
 
-    def createSetFreq(self, frequency: int) -> HubMessage:
+    def create_set_freq(self, frequency: int) -> HubMessage:
         """Create a SetFreq message
 
         :param frequency: Frequency to set
@@ -237,14 +237,14 @@ class PhyDomain(Registry):
             frequency=frequency
         )
     
-    def createGetSupportedFreqs(self) -> HubMessage:
+    def create_get_supported_freqs(self) -> HubMessage:
         """Create a GetSupportedFreqs message
 
         :return: instance of `GetSupportedFreqs`
         """
         return PhyDomain.bound('get_supported_freq', self.proto_version)()
     
-    def createSupportedFreqRanges(self, ranges: List[tuple]) -> HubMessage:
+    def create_supported_freq_ranges(self, ranges: List[tuple]) -> HubMessage:
         """Create a SupportedFreqRanges message
 
         :param ranges: List of tuples containing range start and end frequencies
@@ -261,7 +261,7 @@ class PhyDomain(Registry):
         # Return created message
         return msg
     
-    def createSniffMode(self, iq_stream: bool = False) -> HubMessage:
+    def create_sniff_mode(self, iq_stream: bool = False) -> HubMessage:
         """Create a SniffMode message
 
         :param iq_stream: Sniff I/Q stream if set to True, packets otherwise
@@ -270,7 +270,7 @@ class PhyDomain(Registry):
         """
         return PhyDomain.bound('sniff', self.proto_version)(iq_stream=iq_stream)
     
-    def createJamMode(self, mode: int) -> HubMessage:
+    def create_jam_mode(self, mode: int) -> HubMessage:
         """Create a JamMode message
 
         :param mode: Jamming mode, as defined in `Jamming` class
@@ -279,28 +279,28 @@ class PhyDomain(Registry):
         """
         return PhyDomain.bound('jam', self.proto_version)(mode=mode)
     
-    def createMonitorMode(self) -> HubMessage:
+    def create_monitor_mode(self) -> HubMessage:
         """Create a MonitorMode message.
 
         :return: instance of `MonitorMode`
         """
         return PhyDomain.bound('monitor', self.proto_version)()
     
-    def createStart(self) -> HubMessage:
+    def create_start(self) -> HubMessage:
         """Create a Start message
 
         :return: instance of `Start`
         """ 
         return PhyDomain.bound('start', self.proto_version)()
 
-    def createStop(self) -> HubMessage:
+    def create_stop(self) -> HubMessage:
         """Create a Stop message
 
         :return: instance of `Stop`
         """ 
         return PhyDomain.bound('stop', self.proto_version)()
     
-    def createJammed(self, timestamp: int) -> HubMessage:
+    def create_jammed(self, timestamp: int) -> HubMessage:
         """Create a Jammed notification
 
         :param timestamp: Timestamp at which the jamming has succeeded, in microseconds
@@ -311,7 +311,7 @@ class PhyDomain(Registry):
             timestamp=timestamp
         )
     
-    def createMonitoringReport(self, timestamp: int, reports: List[int]) -> HubMessage:
+    def create_montoring_report(self, timestamp: int, reports: List[int]) -> HubMessage:
         """Create a MonitoringReport notification message
 
         :param timestamp: Report timestamp
@@ -332,7 +332,7 @@ class PhyDomain(Registry):
         # Return message
         return msg
     
-    def createSetDatarate(self, datarate: int) -> HubMessage:
+    def create_set_datarate(self, datarate: int) -> HubMessage:
         """Create a SetDatarate message
 
         :param datarate: data rate to use
@@ -343,7 +343,7 @@ class PhyDomain(Registry):
             rate=datarate
         )
     
-    def createSetEndianness(self, little: bool = True) -> HubMessage:
+    def create_set_endianness(self, little: bool = True) -> HubMessage:
         """Create a SetEndianness message
 
         :param little: Use little-endian if set to True, big-endian otherwise
@@ -354,7 +354,7 @@ class PhyDomain(Registry):
             endianness=Endianness.LITTLE if little else Endianness.BIG
         )
     
-    def createSetPacketSize(self, size: int) -> HubMessage:
+    def create_set_packet_size(self, size: int) -> HubMessage:
         """Create a SetPacketSize message
 
         :param size: Desired packet size
@@ -365,7 +365,7 @@ class PhyDomain(Registry):
             packet_size=size
         )
     
-    def  createSetTxPower(self, power: int) -> HubMessage:
+    def  create_set_tx_power(self, power: int) -> HubMessage:
         """Create a SetTxPower message
 
         :param power: Specify the TX power, as defined in `TxPower`
@@ -376,7 +376,7 @@ class PhyDomain(Registry):
             power=power
         )
 
-    def createSetSyncWord(self, syncword: bytes) -> HubMessage:
+    def create_set_sync_word(self, syncword: bytes) -> HubMessage:
         """Create a SetSyncWord message
 
         :param syncword: Synchronization word to use
@@ -387,7 +387,7 @@ class PhyDomain(Registry):
             sync_word=syncword
         )
     
-    def createSendPacket(self, packet: bytes) -> HubMessage:
+    def create_send_packet(self, packet: bytes) -> HubMessage:
         """Create a SendPacket message
 
         :param packet: Packet data to send
@@ -398,7 +398,7 @@ class PhyDomain(Registry):
             packet=packet
         )
     
-    def createSendRawPacket(self, iq: List[int]) -> HubMessage:
+    def create_send_raw_packet(self, iq: List[int]) -> HubMessage:
         """Create a SendPacket message
 
         :param iq: List of I/Q samples to send
@@ -416,7 +416,7 @@ class PhyDomain(Registry):
         return msg
 
 
-    def createPacketReceived(self, frequency: int, packet: bytes, rssi: int = None, \
+    def create_packet_received(self, frequency: int, packet: bytes, rssi: int = None, \
                              timestamp: int = None) -> HubMessage:
         """Create a PacketReceived notification message
 
@@ -444,7 +444,7 @@ class PhyDomain(Registry):
         # Success
         return msg
     
-    def createRawPacketReceived(self, frequency: int, packet: bytes, rssi: int = None, \
+    def create_raw_packet_received(self, frequency: int, packet: bytes, rssi: int = None, \
                              timestamp: int = None, iq: List[int] = None) -> HubMessage:
         """Create a RawPacketReceived notification message
 
@@ -475,7 +475,7 @@ class PhyDomain(Registry):
         # Success
         return msg
     
-    def createSchedulePacket(self, packet: bytes, timestamp: int) -> HubMessage:
+    def create_schedule_packet(self, packet: bytes, timestamp: int) -> HubMessage:
         """Create a SchedulePacket message
 
         :param packet: Packet data
@@ -495,7 +495,7 @@ class PhyDomain(Registry):
         # Return message
         return msg
     
-    def createSchedulePacketResponse(self, packet_id: int, full: bool = False) -> HubMessage:
+    def create_schedule_packet_response(self, packet_id: int, full: bool = False) -> HubMessage:
         """Create a SchedulePacketResponse message
 
         :param packet_id: Packet ID
@@ -509,7 +509,7 @@ class PhyDomain(Registry):
             full=full
         )
     
-    def createSchedulePacketSent(self, packet_id: int) -> HubMessage:
+    def create_schedule_packet_sent(self, packet_id: int) -> HubMessage:
         """Create a SchedulePacketSent notification message
 
         :param packet_id: Packet id that has been sent

@@ -24,14 +24,14 @@ class TestBleDomainFactory(object):
     def test_SetNodeAddress(self, factory: UnifyingDomain):
         """Check SetNodeAddress crafting
         """
-        msg = factory.createSetNodeAddress(DEFAULT_NODE_ADDRESS)
+        msg = factory.create_set_node_address(DEFAULT_NODE_ADDRESS)
         assert isinstance(msg, SetNodeAddress)
         assert msg.address == DEFAULT_NODE_ADDRESS.value
 
     def test_SniffMode(self, factory: UnifyingDomain):
         """Check SniffMode crafting
         """
-        msg = factory.createSniffMode(DEFAULT_NODE_ADDRESS, 12, True)
+        msg = factory.create_sniff_mode(DEFAULT_NODE_ADDRESS, 12, True)
         assert isinstance(msg, SniffMode)
         assert msg.address == DEFAULT_NODE_ADDRESS.value
         assert msg.channel == 12
@@ -40,21 +40,21 @@ class TestBleDomainFactory(object):
     def test_JamMode(self, factory: UnifyingDomain):
         """Check JamMode crafting
         """
-        msg = factory.createJamMode(32)
+        msg = factory.create_jam_mode(32)
         assert isinstance(msg, JamMode)
         assert msg.channel == 32
 
     def test_Jammed(self, factory: UnifyingDomain):
         """Check Jammed crafting
         """
-        msg = factory.createJammed(1234)
+        msg = factory.create_jammed(1234)
         assert isinstance(msg, Jammed)
         assert msg.timestamp == 1234
 
     def test_SendPdu(self, factory: UnifyingDomain):
         """Check SendPdu crafting
         """
-        msg = factory.createSendPdu(27, b"FOOBAR", 1)
+        msg = factory.create_send_pdu(27, b"FOOBAR", 1)
         assert isinstance(msg, SendPdu)
         assert msg.channel == 27
         assert msg.pdu == b"FOOBAR"
@@ -63,7 +63,7 @@ class TestBleDomainFactory(object):
     def test_SendRawPdu(self, factory: UnifyingDomain):
         """Check SendRawPdu crafting
         """
-        msg = factory.createSendRawPdu(11, b"HELLOWORLD", 2)
+        msg = factory.create_send_raw_pdu(11, b"HELLOWORLD", 2)
         assert isinstance(msg, SendRawPdu)
         assert msg.channel == 11
         assert msg.pdu == b"HELLOWORLD"
@@ -72,7 +72,7 @@ class TestBleDomainFactory(object):
     def test_PduReceived_0(self, factory: UnifyingDomain):
         """Check PduReceived crafting
         """
-        msg = factory.createPduReceived(17, b"FOOBAR")
+        msg = factory.create_pdu_received(17, b"FOOBAR")
         assert isinstance(msg, PduReceived)
         assert msg.channel == 17
         assert msg.pdu == b"FOOBAR"
@@ -84,7 +84,7 @@ class TestBleDomainFactory(object):
     def test_PduReceived_1(self, factory: UnifyingDomain):
         """Check PduReceived crafting, including rssi
         """
-        msg = factory.createPduReceived(5, b"FOOBAR", rssi=-40)
+        msg = factory.create_pdu_received(5, b"FOOBAR", rssi=-40)
         assert isinstance(msg, PduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -96,7 +96,7 @@ class TestBleDomainFactory(object):
     def test_PduReceived_2(self, factory: UnifyingDomain):
         """Check PduReceived crafting, including timestamp
         """
-        msg = factory.createPduReceived(5, b"FOOBAR",timestamp=1234)
+        msg = factory.create_pdu_received(5, b"FOOBAR",timestamp=1234)
         assert isinstance(msg, PduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -108,7 +108,7 @@ class TestBleDomainFactory(object):
     def test_PduReceived_3(self, factory: UnifyingDomain):
         """Check PduReceived crafting, including address
         """
-        msg = factory.createPduReceived(5, b"FOOBAR", address=DEFAULT_NODE_ADDRESS)
+        msg = factory.create_pdu_received(5, b"FOOBAR", address=DEFAULT_NODE_ADDRESS)
         assert isinstance(msg, PduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -120,7 +120,7 @@ class TestBleDomainFactory(object):
     def test_PduReceived_4(self, factory: UnifyingDomain):
         """Check PduReceived crafting, including crc_validity
         """
-        msg = factory.createPduReceived(5, b"FOOBAR", crc_validity=True)
+        msg = factory.create_pdu_received(5, b"FOOBAR", crc_validity=True)
         assert isinstance(msg, PduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -132,7 +132,7 @@ class TestBleDomainFactory(object):
     def test_RawPduReceived_0(self, factory: UnifyingDomain):
         """Check RawPduReceived crafting
         """
-        msg = factory.createRawPduReceived(17, b"FOOBAR")
+        msg = factory.create_raw_pdu_received(17, b"FOOBAR")
         assert isinstance(msg, RawPduReceived)
         assert msg.channel == 17
         assert msg.pdu == b"FOOBAR"
@@ -144,7 +144,7 @@ class TestBleDomainFactory(object):
     def test_RawPduReceived_1(self, factory: UnifyingDomain):
         """Check RawPduReceived crafting, including rssi
         """
-        msg = factory.createRawPduReceived(5, b"FOOBAR", rssi=-40)
+        msg = factory.create_raw_pdu_received(5, b"FOOBAR", rssi=-40)
         assert isinstance(msg, RawPduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -156,7 +156,7 @@ class TestBleDomainFactory(object):
     def test_RawPduReceived_2(self, factory: UnifyingDomain):
         """Check RawPduReceived crafting, including timestamp
         """
-        msg = factory.createRawPduReceived(5, b"FOOBAR",timestamp=1234)
+        msg = factory.create_raw_pdu_received(5, b"FOOBAR",timestamp=1234)
         assert isinstance(msg, RawPduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -168,7 +168,7 @@ class TestBleDomainFactory(object):
     def test_RawPduReceived_3(self, factory: UnifyingDomain):
         """Check RawPduReceived crafting, including address
         """
-        msg = factory.createRawPduReceived(5, b"FOOBAR", address=DEFAULT_NODE_ADDRESS)
+        msg = factory.create_raw_pdu_received(5, b"FOOBAR", address=DEFAULT_NODE_ADDRESS)
         assert isinstance(msg, RawPduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -180,7 +180,7 @@ class TestBleDomainFactory(object):
     def test_RawPduReceived_4(self, factory: UnifyingDomain):
         """Check RawPduReceived crafting, including crc_validity
         """
-        msg = factory.createRawPduReceived(5, b"FOOBAR", crc_validity=True)
+        msg = factory.create_raw_pdu_received(5, b"FOOBAR", crc_validity=True)
         assert isinstance(msg, RawPduReceived)
         assert msg.channel == 5
         assert msg.pdu == b"FOOBAR"
@@ -192,38 +192,38 @@ class TestBleDomainFactory(object):
     def test_DongleMode(self, factory: UnifyingDomain):
         """Check DongleMode crafting
         """
-        msg = factory.createDongleMode(18)
+        msg = factory.create_dongle_mode(18)
         assert isinstance(msg, DongleMode)
         assert msg.channel == 18
 
     def test_KeyboardMode(self, factory: UnifyingDomain):
         """Check KeyboardMode crafting
         """
-        msg = factory.createKeyboardMode(18)
+        msg = factory.create_keyboard_mode(18)
         assert isinstance(msg, KeyboardMode)
         assert msg.channel == 18
 
     def test_MouseMode(self, factory: UnifyingDomain):
         """Check MouseMode crafting
         """
-        msg = factory.createMouseMode(18)
+        msg = factory.create_mouse_mode(18)
         assert isinstance(msg, MouseMode)
         assert msg.channel == 18
 
     def test_SniffPairing(self, factory: UnifyingDomain):
         """Check SniffPairing crafting
         """
-        msg = factory.createSniffPairing()
+        msg = factory.create_sniff_pairing()
         assert isinstance(msg, SniffPairing)
 
     def test_UnifyingStart(self, factory: UnifyingDomain):
         """Check EsbStart crafting
         """
-        msg = factory.createStart()
+        msg = factory.create_start()
         assert isinstance(msg, UnifyingStart)
 
     def test_UnifyingStop(self, factory: UnifyingDomain):
         """Check EsbStop crafting
         """
-        msg = factory.createStop()
+        msg = factory.create_stop()
         assert isinstance(msg, UnifyingStop)

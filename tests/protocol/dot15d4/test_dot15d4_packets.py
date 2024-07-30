@@ -13,7 +13,7 @@ def test_pdu_recv(factory):
     """Test conversion from PduReceived to packet
     """
     # Craft a BlePduReceived message
-    pdu_recv = factory.createPduReceived(
+    pdu_recv = factory.create_pdu_received(
         14,
         b"FOOBAR",
         rssi=-40,
@@ -40,7 +40,7 @@ def test_raw_pdu_recv(factory):
     """Test conversion from RawPduReceived to packet
     """
     # Craft a RawBlePduReceived message
-    pdu_recv = factory.createRawPduReceived(
+    pdu_recv = factory.create_raw_pdu_received(
         14,
         b"FOOBAR",
         fcs=0x1122,

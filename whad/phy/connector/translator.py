@@ -70,9 +70,9 @@ class PhyMessageTranslator(object):
 
     def from_packet(self, packet):
         if Phy_Packet in packet or isinstance(packet, bytes):
-            msg = self.__hub.phy.createSendPacket(bytes(packet))
+            msg = self.__hub.phy.create_send_packet(bytes(packet))
         elif isinstance(packet, list) and len(packet) % 2 == 0:
-            msg = self.__hub.phy.createSendRawPacket(packet)
+            msg = self.__hub.phy.create_send_raw_packet(packet)
         else:
             msg = None
         return msg

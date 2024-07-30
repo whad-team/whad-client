@@ -92,7 +92,7 @@ class BleConnectInputPipe(Bridge):
             if connector.support_raw_pdu():
                 logger.debug('[wble-connect][output-pipe] connector supports raw pdu')
                 # Create a SendBleRawPdu command
-                command = connector.hub.ble.createSendRawPdu(
+                command = connector.hub.ble.create_send_raw_pdu(
                     message.direction,
                     message.pdu,
                     message.crc,
@@ -104,7 +104,7 @@ class BleConnectInputPipe(Bridge):
             else:
                 logger.debug('[wble-connect][output-pipe] connector does not support raw pdu')
                 # Create a SendBlePdu command
-                command = connector.hub.ble.createSendPdu(
+                command = connector.hub.ble.create_send_pdu(
                     message.direction,
                     message.pdu,
                     conn_handle, # overwrite the connection handle
@@ -116,7 +116,7 @@ class BleConnectInputPipe(Bridge):
             if connector.support_raw_pdu():
                 logger.debug('[wble-connect][output-pipe] connector supports raw pdu')
                 # Create a SendBleRawPdu command
-                command = connector.hub.ble.createSendRawPdu(
+                command = connector.hub.ble.create_send_raw_pdu(
                     message.direction,
                     message.pdu,
                     None,
@@ -128,7 +128,7 @@ class BleConnectInputPipe(Bridge):
             else:
                 logger.debug('[wble-connect][output-pipe] connector does not support raw pdu')
                 # Create a SendBlePdu command
-                command = self.input.hub.ble.createSendPdu(
+                command = self.input.hub.ble.create_send_pdu(
                     message.direction,
                     message.pdu,
                     conn_handle, # overwrite the connection handle

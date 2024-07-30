@@ -181,7 +181,7 @@ class PCAPDevice(VirtualDevice):
 
     def _send_whad_unifying_raw_pdu(self, packet, metadata):
         # Create a RawPduReceived message
-        msg = self.hub.unifying.createRawPduReceived(
+        msg = self.hub.unifying.create_raw_pdu_received(
             metadata.channel,
             bytes(packet),
             metadata.rssi,
@@ -196,7 +196,7 @@ class PCAPDevice(VirtualDevice):
     def _send_whad_esb_raw_pdu(self, packet, metadata):
 
         # Create a RawPduReceived message
-        msg = self.hub.esb.createRawPduReceived(
+        msg = self.hub.esb.create_raw_pdu_received(
             metadata.channel,
             bytes(packet),
             metadata.rssi,
@@ -214,7 +214,7 @@ class PCAPDevice(VirtualDevice):
         pdu = bytes(packet)[FieldsSize.ACCESS_ADDRESS_SIZE:-FieldsSize.CRC_SIZE]
 
         # Create a RawPduReceived message
-        msg = self.hub.ble.createRawPduReceived(
+        msg = self.hub.ble.create_raw_pdu_received(
             metadata.direction,
             pdu,
             access_address,
@@ -237,7 +237,7 @@ class PCAPDevice(VirtualDevice):
         fcs = unpack("<H",packet[-2:])[0]
 
         # Create a RawPduReceived message
-        msg = self.hub.dot15d4.createRawPduReceived(
+        msg = self.hub.dot15d4.create_raw_pdu_received(
             channel,
             pdu,
             fcs,

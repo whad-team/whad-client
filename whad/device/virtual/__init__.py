@@ -59,7 +59,7 @@ class VirtualDevice(WhadDevice):
 
     def _on_whad_discovery_info_query(self, message):
         major, minor, revision = self._fw_version
-        msg = self.hub.discovery.createInfoResp(
+        msg = self.hub.discovery.create_info_resp(
             DeviceType.VirtualDevice,
             self._dev_id,
             0x0100,
@@ -79,7 +79,7 @@ class VirtualDevice(WhadDevice):
             commands |= (1 << command)
 
         # Create a DomainResp message and send it
-        msg = self.hub.discovery.createDomainResp(
+        msg = self.hub.discovery.create_domain_resp(
             message.domain,
             commands
         )
@@ -90,7 +90,7 @@ class VirtualDevice(WhadDevice):
         self.on_message_received(message)
 
     def _send_whad_command_result(self, code):
-        msg = self.hub.generic.createCommandResult(code)
+        msg = self.hub.generic.create_command_result(code)
         self._send_whad_message(msg)
 
 from .ubertooth import UbertoothDevice

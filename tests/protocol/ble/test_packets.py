@@ -14,7 +14,7 @@ def test_pdu_recv(factory):
     """Test conversion from BlePduReceived to packet
     """
     # Craft a BlePduReceived message
-    pdu_recv = factory.createPduReceived(
+    pdu_recv = factory.create_pdu_received(
         Direction.MASTER_TO_SLAVE,
         b"FOOBAR",
         12,
@@ -37,7 +37,7 @@ def test_raw_pdu_recv(factory):
     """Test conversion from RawBlePduReceived to packet
     """
     # Craft a RawBlePduReceived message
-    pdu_recv = factory.createRawPduReceived(
+    pdu_recv = factory.create_raw_pdu_received(
         Direction.MASTER_TO_SLAVE,
         b"FOOBAR",
         access_address=0x12345678,
@@ -66,7 +66,7 @@ def test_adv(factory):
     """Test conversion from BleAdvPduReceived to packet
     """
     # Craft a BleAdvPduReceive message
-    adv_pdu = factory.createAdvPduReceived(
+    adv_pdu = factory.create_adv_pdu_received(
         AdvType.ADV_IND,
         -50,
         BDAddress("00:11:22:33:44:55", random=True),

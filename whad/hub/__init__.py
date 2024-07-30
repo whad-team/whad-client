@@ -81,33 +81,33 @@ class ProtocolHub(Registry):
         return ProtocolHub.bound(
             msg.WhichOneof('msg'),
             self.__version).parse(self.__version, msg)
-    
-    def convertPacket(self, packet):
+
+    def convert_packet(self, packet):
         """Convert packet to the corresponding message.
         """
         msg = None
 
         # We dispatch packets based on their layers
-        if self.ble.isPacketCompat(packet):
-            logger.debug('[hub] convertPacket(): packet is BLE')
-            msg = self.ble.convertPacket(packet)
-        elif self.dot15d4.isPacketCompat(packet):
-            logger.debug('[hub] convertPacket(): packet is Dot15d4')
-            msg = self.dot15d4.convertPacket(packet)
-        elif self.esb.isPacketCompat(packet):
-            logger.debug('[hub] convertPacket(): packet is ESB')
-            msg = self.esb.convertPacket(packet)
-        elif self.phy.isPacketCompat(packet):
-            logger.debug('[hub] convertPacket(): packet is PHY')
-            msg = self.phy.convertPacket(packet)
-        elif self.unifying.isPacketCompat(packet):
-            logger.debug('[hub] convertPacket(): packet is Unifying')
-            msg = self.unifying.convertPacket(packet)
+        if self.ble.is_packet_compat(packet):
+            logger.debug('[hub] convert_packet(): packet is BLE')
+            msg = self.ble.convert_packet(packet)
+        elif self.dot15d4.is_packet_compat(packet):
+            logger.debug('[hub] convert_packet(): packet is Dot15d4')
+            msg = self.dot15d4.convert_packet(packet)
+        elif self.esb.is_packet_compat(packet):
+            logger.debug('[hub] convert_packet(): packet is ESB')
+            msg = self.esb.convert_packet(packet)
+        elif self.phy.is_packet_compat(packet):
+            logger.debug('[hub] convert_packet(): packet is PHY')
+            msg = self.phy.convert_packet(packet)
+        elif self.unifying.is_packet_compat(packet):
+            logger.debug('[hub] convert_packet(): packet is Unifying')
+            msg = self.unifying.convert_packet(packet)
         else:
-            logger.error('[hub] convertPacket(): packet is unknown !')
+            logger.error('[hub] convert_packet(): packet is unknown !')
 
         return msg
-        
+
 
 
 from .generic import Generic

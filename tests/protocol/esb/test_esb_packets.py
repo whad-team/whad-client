@@ -48,7 +48,7 @@ def test_pkt_recv(factory):
     """Test conversion from BlePduReceived to packet
     """
     # Craft a BlePduReceived message
-    pdu_recv = factory.createPduReceived(
+    pdu_recv = factory.create_pdu_received(
         14,
         b"FOOBAR",
         rssi=-40,
@@ -76,7 +76,7 @@ def test_raw_pdu_recv(factory):
     """
     # Craft a RawBlePduReceived message
     esb_frame = build_esb_frame("11:22:33:44:55", b"FOOBAR")
-    pdu_recv = factory.createRawPduReceived(
+    pdu_recv = factory.create_raw_pdu_received(
         14,
         esb_frame,
         rssi=-40,
