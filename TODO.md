@@ -1,8 +1,6 @@
 # WHAD library
 Python library allowing to interact with offensive security tools implementing the WHAD protocol.
 
-
-
 ### First release
 - [ ] winject
 - [ ] wplay / pcapDev
@@ -11,16 +9,15 @@ Python library allowing to interact with offensive security tools implementing t
 - [ ] definir les events generiques dans le protocole
 - [ ] integration event à wfilter, wextract etc
 - [ ] wzb-enddevice commandes shell
-- [ ] écriture doc + tuto
-- [ ] nettoyage code exemples
-- [x] wuni-scan
-- [ ] wuni-keyboard
-- [x] wuni-mouse
-- [ ] wuni-keymouse
-- [ ] wuni-keylogger
-- [x] Renommage ble-spawn en wble-spawn
-- [x] Renommage ble-connect en wble-connect
-- [x] Renommage ble-cli en wble-central
+- [ ] Write documentation and tutorials
+- [ ] Clean examples code
+- [x] Create wuni-scan
+- [x] Create wuni-keyboard
+- [x] Create wuni-mouse
+- [x] Rename ble-spawn to wble-spawn
+- [x] Rename ble-connect to wble-connect
+- [x] Rename ble-cli to wble-central
+- [x] Rename protocol hub methods to follow snake case
 
 ### Repository structure
 - [ ] Adding WHAD definitions repository as a submodule
