@@ -25,6 +25,14 @@ logger = logging.getLogger(__name__)
 class WhadAnalyzeUnixSocketConnector(UnixSocketConnector):
     pass
 
+def display_analyzers(analyzers):
+    for domain, analyzers_list in analyzers.items():
+        print_formatted_text(HTML("<b><ansicyan>Available analyzers: </ansicyan> {domain}</b>".format(domain=domain)))
+        for analyzer_name, analyzer_class in analyzers_list.items():
+            print_formatted_text(HTML("  <b>- {analyzer_name}</b> : {output}".format(analyzer_name=analyzer_name, output=", ".join(analyzer_class().output.keys()))))
+
+        print()
+
 class WhadAnalyzeApp(CommandLineApp):
 
     def __init__(self):
@@ -58,8 +66,8 @@ class WhadAnalyzeApp(CommandLineApp):
             #    print("[i]", analyzer.__class__.__name__, "->", "triggered")
             if analyzer.completed:
                 print("[i]", analyzer_name, "->", "completed (output=", repr(analyzer.output),")")
-                for pkt in analyzer.marked_packets:
-                    print("\t", repr(pkt))
+                #for pkt in analyzer.marked_packets:
+                #    print("\t", repr(pkt))
                 analyzer.reset()
                 '''
                 if "raw_audio" in analyzer.output:
@@ -73,11 +81,7 @@ class WhadAnalyzeApp(CommandLineApp):
 
         if self.args.list:
             analyzers = get_analyzers()
-            for domain, analyzers_list in analyzers.items():
-                print(domain)
-                for analyzer_name, analyzer_class in analyzers_list.items():
-                    print("\t -", analyzer_name, str(list(analyzer_class().output.keys())))
-                print()
+            display_analyzers(analyzers)
 
         try:
             if self.is_piped_interface():
@@ -97,13 +101,14 @@ class WhadAnalyzeApp(CommandLineApp):
 
                 self.selected_analyzers = {}
                 for analyzer_name, analyzer_class in get_analyzers(self.args.domain).items():
-                    self.selected_analyzers[analyzer_name] = analyzer_class()
+                    if analyzer_name in self.args.analyzer or len(self.args.analyzer) == 0:
+                        self.selected_analyzers[analyzer_name] = analyzer_class()
 
                 connector.domain = self.args.domain
                 connector.translator = get_translator(self.args.domain)(connector.hub)
                 connector.format = connector.translator.format
                 connector.on_packet = self.on_packet
-
+                
                 while True:
                     time.sleep(1)
 
