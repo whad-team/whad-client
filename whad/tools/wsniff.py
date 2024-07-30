@@ -156,7 +156,7 @@ class WhadSniffApp(CommandLineApp):
 
                     # Add an event listener to display incoming events
                     # sniffer.add_event_listener(display_event)
-                    
+
                     try:
                         sniffer.configuration = configuration
                     except Exception as e:

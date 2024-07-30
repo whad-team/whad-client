@@ -1,4 +1,4 @@
-import re
+import re, json
 from binascii import hexlify, unhexlify
 
 class InvalidBDAddressException(Exception):
@@ -50,6 +50,9 @@ class BDAddress(object):
 
     def __repr__(self):
         return 'BDAddress(%s)' % str(self)
+
+    def export_json(self):
+        return json.dumps(str(self))
 
     @property
     def type(self):

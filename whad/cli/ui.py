@@ -1,6 +1,10 @@
 from prompt_toolkit import print_formatted_text, HTML
 from scapy.all import Packet
 from hexdump import hexdump
+import sys
+import time
+import threading
+import json
 
 def success(message):
     """Display a success message in green (if color is enabled)
@@ -123,7 +127,7 @@ def display_event(event):
         )
     )
 
-def format_analyzer_output(output, delimiter="\n", mode="human_readable"):
+def format_analyzer_output(output, mode="human_readable"):
     if mode == "human_readable":
         if isinstance(output, bytes):
             return output.hex()
@@ -133,16 +137,13 @@ def format_analyzer_output(output, delimiter="\n", mode="human_readable"):
             return str(output)
     elif mode == "raw":
         return output
-
-
-
-def progress_bar(value=0, max_value=4, size=10):
-    filled = int(size * (value / max_value))
-    if filled > size:
-        filled = size
-    unfilled = size - filled
-    return "\r\x1b[36m{filled_bar}\x1b[0m{unfilled_bar}".format(filled_bar=filled* "─", unfilled_bar=unfilled* "─")
-
-def display_running_analyzers(analyzers):
-    for analyzer_name, analyzer in self.selected_analyzers.items():
-        print("\r" analyzer_name)
+    elif mode == "json":
+        if hasattr(output, "export_json") and callable(output.export_json):
+            return output.export_json()
+        elif isinstance(output, bytes):
+            return json.dumps(output.hex())
+        else:
+            try:
+                return json.dumps(output)
+            except TypeError:
+                return None

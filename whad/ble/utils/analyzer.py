@@ -311,21 +311,16 @@ class GATTServerDiscovery(TrafficAnalyzer):
         self.services_completed = False
         self.characteristics_completed = False
 
+        self.profile = None
         self.services = []
         self.characteristics = []
         self.descriptors = []
 
     @property
     def output(self):
-        class InferredProfile(GenericProfile):
-            pass
-
-        inferred_profile = InferredProfile()
-        for service in self.services:
-            inferred_profile.add_service(service)
 
         return {
-            "profile" : inferred_profile,
+            "profile" : self.profile,
             #"services" : self.services,
             #"characteristics" : self.characteristics,
             #"descriptors" : self.descriptors,

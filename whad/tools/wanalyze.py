@@ -17,7 +17,7 @@ from whad.tools.utils import get_translator, get_analyzers
 import logging
 import time
 import sys
-
+import json
 
 logger = logging.getLogger(__name__)
 #logging.basicConfig(level=logging.DEBUG)
@@ -52,6 +52,40 @@ class WhadAnalyzeApp(CommandLineApp):
             nargs="*"
         )
 
+
+        self.add_argument(
+            '--trigger',
+            dest='trigger',
+            default=False,
+            action="store_true",
+            help='show when an analyzer is triggered'
+        )
+
+        self.add_argument(
+            '--json',
+            dest='json',
+            default=False,
+            action="store_true",
+            help='serialize output into json format'
+        )
+
+        self.add_argument(
+            '-p',
+            '--packets',
+            dest='packets',
+            default=False,
+            action="store_true",
+            help='display packets associated with the analyzer'
+        )
+
+        self.add_argument(
+            '--label',
+            dest='label',
+            default=False,
+            action="store_true",
+            help='display labels before output value'
+        )
+
         self.add_argument(
             '-d',
             '-D',
@@ -78,36 +112,77 @@ class WhadAnalyzeApp(CommandLineApp):
         )
 
     def on_packet(self, pkt):
-        #print(repr(pkt))
         for analyzer_name, analyzer in self.selected_analyzers.items():
             analyzer.process_packet(pkt)
-            #if analyzer.triggered:
-            #    print("[i]", analyzer.__class__.__name__, "->", "triggered")
+
+            if analyzer.triggered and not analyzer._displayed and self.args.trigger:
+                info(analyzer_name + " → " + "triggered")
+                analyzer._displayed = True
             if analyzer.completed:
                 if analyzer_name in self.provided_parameters:
                     out = []
-                    for parameter in self.provided_parameters[analyzer_name]:
-                        out.append(format_analyzer_output(analyzer.output[parameter], mode="human_readable" if not self.args.raw else "raw"))
-
-                    if all([isinstance(i, str) for i in out]):
+                    if not self.args.raw and not self.args.json:
+                        for parameter in self.provided_parameters[analyzer_name]:
+                            try:
+                                out.append(
+                                    ((parameter + ": ") if self.args.label else "") +
+                                    format_analyzer_output(analyzer.output[parameter], mode="human_readable")
+                                )
+                            except KeyError:
+                                error("Unknown output parameter {param}, ignoring.".format(param=parameter))
                         print(self.args.delimiter.join(out))
-                    else:
-                        for i in out:
-                            sys.stdout.buffer.write(i)
+                    elif self.args.raw:
+                        for parameter in self.provided_parameters[analyzer_name]:
+                            try:
+                                sys.stdout.buffer.write(format_analyzer_output(analyzer.output[parameter], mode="raw"))
+                            except KeyError:
+                                error("Unknown output parameter {param}, ignoring.".format(param=parameter))
+                    elif self.args.json:
+                        for parameter in self.provided_parameters[analyzer_name]:
+                            try:
+                                json_value = format_analyzer_output(analyzer.output[parameter], mode="json")
+                                if json_value is not None:
+                                    if self.args.label:
+                                        print("{\"" + parameter + "\": " + json_value + "}")
+                                    else:
+                                        print(json_value)
+                                else:
+                                    error("Parameter {param} not serializable in JSON, ignoring.".format(param=parameter))
+                            except KeyError:
+                                error("Unknown output parameter {param}, ignoring.".format(param=parameter))
+
                     sys.stdout.flush()
 
                 else:
-                    print("[i]", analyzer_name, "->", "completed (output=", repr(analyzer.output),")")
+                    if not self.args.json:
+                        success("[✓] " + analyzer_name + " → " + "completed")
+                        for output_name, output_value in analyzer.output.items():
+                            print_formatted_text(
+                                HTML("  - <b>{name}: </b> {value}".format(
+                                        name=output_name,
+                                        value=format_analyzer_output(output_value,mode="human_readable")
+                                    )
+                                )
+                            )
+                        if self.args.packets:
+                            print()
+                            print_formatted_text(HTML("  - <b>{count} packets analyzed: </b>".format(count=len(analyzer.marked_packets))))
 
-                #for pkt in analyzer.marked_packets:
-                #    print("\t", repr(pkt))
-
-                '''
-                if "raw_audio" in analyzer.output:
-                    import sys
-                    sys.stdout.buffer.write(analyzer.output['raw_audio'])
-                    sys.stdout.flush()
-                '''
+                            for packet in analyzer.marked_packets:
+                                display_packet(
+                                    pkt,
+                                    show_metadata = self.args.metadata,
+                                    format = self.args.format
+                                )
+                        print()
+                    else:
+                            out = "{"
+                            for output_name, output_value in analyzer.output.items():
+                                json_value = format_analyzer_output(output_value,mode="json")
+                                out += "\"" + output_name + "\": " + json_value + ", "
+                            out = out[:-2] + "}"
+                            print(out)
+                    analyzer._displayed = False
                 analyzer.reset()
 
     def get_provided_analyzers(self):
@@ -124,12 +199,14 @@ class WhadAnalyzeApp(CommandLineApp):
                     else:
                         parameters[name] = [param]
                 else:
-                    error("Unknown analyzer ({analyzer}), ignoring".format(analyzer=name))
+                    error("Unknown analyzer ({analyzer}).".format(analyzer=name))
+                    exit(1)
             else:
                 if analyzer in available_analyzers:
                     analyzers.append(analyzer)
                 else:
-                    error("Unknown analyzer ({analyzer}), ignoring".format(analyzer=analyzer))
+                    error("Unknown analyzer ({analyzer}).".format(analyzer=analyzer))
+                    exit(1)
         return list(set(analyzers)), parameters
 
     def run(self):
@@ -161,7 +238,7 @@ class WhadAnalyzeApp(CommandLineApp):
                 for analyzer_name, analyzer_class in get_analyzers(self.args.domain).items():
                     if analyzer_name in self.provided_analyzers or len(self.provided_analyzers) == 0:
                         self.selected_analyzers[analyzer_name] = analyzer_class()
-
+                        self.selected_analyzers[analyzer_name]._displayed = False
                 connector.domain = self.args.domain
                 connector.translator = get_translator(self.args.domain)(connector.hub)
                 connector.format = connector.translator.format

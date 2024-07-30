@@ -247,7 +247,6 @@ class WhadFilterApp(CommandLineApp):
                 conf.color_theme = BrightTheme()
 
             parameters = self.args.__dict__
-
             connector = UnixConnector(interface)
 
             connector.domain = self.args.domain
