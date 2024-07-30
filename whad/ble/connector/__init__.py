@@ -486,7 +486,7 @@ class BLE(WhadDeviceConnector):
             raise UnsupportedCapability("Sniff")
 
         # Create a SniffConnReq message
-        msg = self.hub.ble.create_sniff_conn_req(
+        msg = self.hub.ble.create_sniff_connreq(
             channel,
             bd_address=BDAddress(bd_address),
             show_empty=show_empty_packets,
