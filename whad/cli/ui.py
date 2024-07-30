@@ -40,6 +40,8 @@ def display_packet(pkt, show_metadata=True, format='repr'):
     :param  pkt:        Received Signal Strength Indicator
     :type   pkt:        :class:`scapy.packet.packet`
     """
+    if isinstance(show_metadata, str):
+        show_metadata = show_metadata == 'True'
     if isinstance(pkt, Packet):
         metadata = ""
         if hasattr(pkt, "metadata") and show_metadata:
