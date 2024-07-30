@@ -33,7 +33,7 @@ Welcome to WHAD's documentation!
     lorawan/channel
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
     :caption: Contributing
 
     device/index

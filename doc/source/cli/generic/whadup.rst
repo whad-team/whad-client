@@ -1,7 +1,7 @@
 whadup: WHAD device information
 ===============================
 
-*Whadup* is a convenient tool to enumerate all your WHAD devices plugged into
+``whadup`` is a convenient tool to enumerate all your WHAD devices plugged into
 your computer and find out what they are capable of as well as other valuable
 information.
 
