@@ -239,7 +239,7 @@ class BleDomain(Registry):
             show_advertisements=show_adv
         )
 
-    def create_sniff_access_address(self, channels: ChannelMap) -> HubMessage:
+    def create_sniff_access_address(self, channels: List[int]) -> HubMessage:
         """Create a SniffAccessAddress message.
 
         :param channels: List of channels
@@ -248,7 +248,7 @@ class BleDomain(Registry):
         :return-type: HubMessage
         """
         return BleDomain.bound('sniff_aa', self.proto_version)(
-            monitored_channels=channels.value()
+            monitored_channels=ChannelMap(channels).value
         )
 
     def create_sniff_active_conn(self, access_address: int, crc_init: int = None,
