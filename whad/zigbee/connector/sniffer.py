@@ -9,6 +9,7 @@ from whad.helpers import message_filter, is_message_type
 from whad.common.sniffing import EventsManager
 from whad.hub.dot15d4 import RawPduReceived, PduReceived
 from whad.hub.message import AbstractPacket
+from whad.exceptions import WhadDeviceDisconnected
 
 logger = logging.getLogger(__name__)
 
@@ -101,15 +102,18 @@ class Sniffer(Zigbee, EventsManager):
         return packet
 
     def sniff(self):
-        while True:
-            if self.support_raw_pdu():
-                message_type = RawPduReceived
-            else:
-                message_type = PduReceived
+        try:
+            while True:
+                if self.support_raw_pdu():
+                    message_type = RawPduReceived
+                else:
+                    message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter(message_type))
-            if issubclass(message, AbstractPacket):
-                packet = message.to_packet()
-                self.monitor_packet_rx(packet)
-                packet = self.process_packet(packet)
-                yield packet
+                message = self.wait_for_message(filter=message_filter(message_type))
+                if issubclass(message, AbstractPacket):
+                    packet = message.to_packet()
+                    self.monitor_packet_rx(packet)
+                    packet = self.process_packet(packet)
+                    yield packet
+        except WhadDeviceDisconnected:
+            return

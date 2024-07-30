@@ -3,6 +3,7 @@ from typing import Generator
 
 from scapy.packet import Packet
 
+from whad.exceptions import WhadDeviceDisconnected
 from whad.esb.connector import ESB
 from whad.esb.sniffing import SnifferConfiguration
 from whad.exceptions import UnsupportedCapability
@@ -77,19 +78,24 @@ class Sniffer(ESB, EventsManager):
         # Sniff packets
         start = time()
 
-        while True:
+        try:
+            while True:
 
-            # Exit if timeout is set and reached
-            if timeout is not None and (time() - start >= timeout):
-                break
+                # Exit if timeout is set and reached
+                if timeout is not None and (time() - start >= timeout):
+                    break
 
-            if self.support_raw_pdu():
-                message_type = RawPduReceived
-            else:
-                message_type = PduReceived
+                if self.support_raw_pdu():
+                    message_type = RawPduReceived
+                else:
+                    message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
-            if message is not None and issubclass(message, AbstractPacket):
-                packet = message.to_packet()
-                self.monitor_packet_rx(packet)
-                yield packet
+                message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
+                if message is not None and issubclass(message, AbstractPacket):
+                    packet = message.to_packet()
+                    self.monitor_packet_rx(packet)
+                    yield packet
+                
+        # Handle device disconnection
+        except WhadDeviceDisconnected:
+            return

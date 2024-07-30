@@ -9,6 +9,7 @@ from whad.rf4ce.sniffing import KeyExtractedEvent
 from whad.common.sniffing import EventsManager
 from whad.hub.dot15d4 import RawPduReceived, PduReceived
 from whad.hub.message import AbstractPacket
+from whad.exceptions import WhadDeviceDisconnected
 import logging
 
 logger = logging.getLogger(__name__)
@@ -128,17 +129,20 @@ class Sniffer(RF4CE, EventsManager):
         return packet
 
     def sniff(self):
-        while True:
-            if self.support_raw_pdu():
-                message_type = RawPduReceived
-            else:
-                message_type = PduReceived
+        try:
+            while True:
+                if self.support_raw_pdu():
+                    message_type = RawPduReceived
+                else:
+                    message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter(message_type))
-            if issubclass(message, AbstractPacket):
-                packet = message.to_packet()
-                packet = self.process_packet(packet)
+                message = self.wait_for_message(filter=message_filter(message_type))
+                if issubclass(message, AbstractPacket):
+                    packet = message.to_packet()
+                    packet = self.process_packet(packet)
 
-                self.monitor_packet_rx(packet)
+                    self.monitor_packet_rx(packet)
 
-                yield packet
+                    yield packet
+        except WhadDeviceDisconnected:
+            return

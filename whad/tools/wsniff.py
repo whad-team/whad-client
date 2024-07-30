@@ -17,6 +17,7 @@ from html import escape
 from hexdump import hexdump
 from scapy.all import BrightTheme, Packet
 from time import sleep
+import sys
 
 import whad
 
@@ -193,9 +194,14 @@ class WhadSniffApp(CommandLineApp):
                         output_pipe = WhadSniffOutputPipe(sniffer, unix_server)
                         # Start the sniffer
                         sniffer.start()
-                        # Loop until the user hits CTL-C
-                        while True:
+
+                        # Loop until the user hits CTL-C or interface disconnects
+                        while self.interface.opened:
                             sleep(1)
+
+                        # Stop unix server
+                        unix_server.device.close()
+
                     else:
                         # Start the sniffer
                         sniffer.start()

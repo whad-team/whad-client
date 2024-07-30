@@ -35,6 +35,7 @@ class WhadPlayApp(WhadSniffApp):
             action="store_true",
 
         )
+
     def infer_domain_from_pcap(self):
         self.pcap_file = None
         index_pcap_file = None
