@@ -229,8 +229,11 @@ class UartDevice(WhadDevice):
             1
         )
 
+        if not self.__opened:
+            raise WhadDeviceNotReady()
+
         # Handle incoming messages if any
-        if len(readers) > 0:
+        if len(readers) > 0 and self.__fileno is not None:
             data = os.read(self.__fileno, 1024)
             self.on_data_received(data)
 

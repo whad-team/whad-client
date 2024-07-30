@@ -424,6 +424,12 @@ class WhadDeviceConnector(object):
             logger.debug('an error occured while communicating with the WHAD device !')
             self.on_error(device_error)
 
+    def on_disconnection(self):
+        """Device has disconnected or been closed.
+        """
+        pass
+
+
     ######################################
     # Packet flow handling
     ######################################
@@ -530,6 +536,11 @@ class BridgeIfaceWrapper(WhadDeviceConnector):
         logger.debug('[PacketProcIfaceWrapper] send_message: %s' % message)
         return super().send_message(message)
 
+    def on_disconnection(self):
+        """Notify bridge on disconnection.
+        """
+        self.__processor.on_disconnect(self)
+
     def on_any_msg(self, message):
         logger.debug('[PacketProcIfaceWrapper] on_any_msg: %s' % message)
         self.__processor.on_any_msg(self, message)
@@ -587,6 +598,11 @@ class Bridge(object):
     @property
     def output(self):
         return self.__out
+
+    def on_disconnect(self, wrapper):
+        """When a wrapper disconnects, stop bridge.
+        """
+        pass
 
     def on_any_msg(self, wrapper, message):
         if wrapper == self.__in_wrapper:
@@ -660,6 +676,9 @@ class WhadDeviceInputThread(Thread):
             try:
                 self.__device.read()
                 #logger.debug("[WhadDeviceInputThread::run()] Read data from device")
+            except WhadDeviceNotReady as not_ready:
+                logger.debug('Device %s has just disconnected (device not ready)' % self.__device.interface)
+                break
             except WhadDeviceDisconnected as err:
                 logger.debug('Device %s has just disconnected (read returned None)' % self.__device.interface)
                 break
@@ -686,16 +705,29 @@ class WhadDeviceMessageThread(Thread):
         """
         while not self.__canceled:
             self.__device.process_messages()
-        logger.info('Device message thread canceled and stopped.')
+        
+        # Finish processing remaining messages
+        while self.__device.process_messages():
+            pass
+
+        logger.info('Device message thread canceled and stopped, closing device.')
+        self.__device.close()
 
 class WhadDeviceIOThread(object):
 
     def __init__(self, device):
+        self.__device = device
         self.__input = WhadDeviceInputThread(device, self)
         self.__input.daemon = True
         self.__processing = WhadDeviceMessageThread(device)
         self.__processing.daemon = True
         self.__disconnected = False
+        self.__alive = False
+
+    def is_alive(self) -> bool:
+        """Check if IO thread is still alive.
+        """
+        return self.__alive
 
     def cancel(self):
         self.__input.cancel()
@@ -706,19 +738,28 @@ class WhadDeviceIOThread(object):
         self.__input.start()
         self.__processing.start()
         logger.info('WhadDevice IO management thread up and running.')
+        self.__alive = True
 
     def join(self):
         logger.info('waiting for WhadDevice IO management thread to finish ...')
-        while not self.__disconnected and (self.__input.is_alive() or self.__processing.is_alive()):
+        while not self.__disconnected: #and (self.__input.is_alive() or self.__processing.is_alive()):
+            logger.info("Waiting for io thread ...")
             self.__input.join(1.0)
+            logger.info("Waiting for processing thread ...")
             self.__processing.join(1.0)
+        
         logger.info('WhadDevice IO management thread finished.')
+        self.__alive = False
+        if self.__device.opened:
+            self.__device.close()
 
     def on_disconnection(self):
         """Handle underlying device disconnection
         """
         logger.debug('[device::io_thread] Adapter has disconnected')
         self.__disconnected = True
+        self.__device.close()
+        #self.__processing.cancel()
 
 
 class WhadDevice(object):
@@ -891,6 +932,10 @@ class WhadDevice(object):
         return self.__class__.__name__
 
 
+    @property
+    def opened(self):
+        return self.__opened
+
     def __init__(self):
         # Device information
         self.__info = None
@@ -979,8 +1024,8 @@ class WhadDevice(object):
         # Ask firmware for a reset
         try:
             logger.info('resetting device (if possible)')
-            self.reset()
             self.__opened = True
+            self.reset()
         except Empty as err:
             # Device is unresponsive, does not seem compatible
             # Shutdown IO thread
@@ -996,12 +1041,17 @@ class WhadDevice(object):
 
         This method MUST be overriden by inherited classes.
         """
+        # Avoid recursion when closing
+        if not self.__opened or self.__closing:
+            return
+
         logger.info('closing WHAD device')
         self.__closing = True
 
-        # Cancel I/O thread
+        # Cancel I/O thread if required
         if self.__io_thread is not None:
-            self.__io_thread.cancel()
+            if self.__io_thread.is_alive():
+                self.__io_thread.cancel()
 
         # Send a NOP message to unlock process_messages()
         msg = self.hub.generic.create_verbose(b'')
@@ -1013,6 +1063,10 @@ class WhadDevice(object):
 
         self.__opened = False
         self.__closing = False
+
+        # Notify connector device has closed
+        if self.__connector is not None:
+            self.__connector.on_disconnection()
 
     def wait(self):
         self.__io_thread.join()
@@ -1065,6 +1119,11 @@ class WhadDevice(object):
         :param int timeout: Timeout
         :param filter: Message queue filtering function (optional)
         """
+
+        # Check if device is still opem
+        if not self.__opened and self.__msg_queue.empty():
+            raise WhadDeviceDisconnected()
+
         logger.debug('entering wait_for_message ...')
         if filter is not None:
             self.set_queue_filter(filter)
@@ -1272,9 +1331,11 @@ class WhadDevice(object):
             self.__messages.put(message, block=True)
             logger.info('message added to default message queue')
 
-    def process_messages(self, timeout=1.0):
+    def process_messages(self, timeout=1.0) -> bool:
         """Process pending messages
         """
+        result = False
+
         if self.__closing:
             return
 
@@ -1283,8 +1344,9 @@ class WhadDevice(object):
             if message is not None:
                 logger.debug('[process_messages] retrieved message %s' % message)
                 self.dispatch_message(message)
+                result = True
         except Empty:
-            return None
+            return False
 
     ######################################
     # Any messages
