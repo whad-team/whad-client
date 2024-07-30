@@ -516,10 +516,14 @@ GENERIC PROVISIONING PDU LAYER
 """
 
 
+"""
 class BTMesh_Generic_Provisioning_Hdr(Packet):
     name = "Bluetooth Mesh Generic Provisioning PDU"
     fields_desc = [
-        # Since the generic_provisioning_control_format is after in the fields, need to work with post_dissection and do_build to make sure generic_provisioning_control_format gets processed first
+        # Since the generic_provisioning_control_format is after in the fields, need to work with pre_dissect to make sure generic_provisioning_control_format gets processed first
+        # Example of creation
+        # pkt = BTMesh_Generic_Provisioning_Hdr(segment_number=1, generic_provisioning_control_format=0b00)
+        # pkt = BTMesh_Generic_Provisioning_Hdr(segment_index=3, generic_provisioning_control_format=0b10)
         ConditionalField(
             BitField("segment_number", 0, 6),
             lambda pkt: pkt.generic_provisioning_control_format == 0b00,
@@ -535,7 +539,7 @@ class BTMesh_Generic_Provisioning_Hdr(Packet):
         ConditionalField(
             BitEnumField(
                 "bearer_opcode",
-                0,
+                None,
                 6,
                 {0x00: "Link Open", 0x01: "Link ACK", 0x02: "Link Close"},
             ),
@@ -555,24 +559,76 @@ class BTMesh_Generic_Provisioning_Hdr(Packet):
     ]
 
     def pre_dissect(self, s):
-        """trick to make generic_provisioning_control_format available before dissecting the first 6 bits"""
+        trick to make generic_provisioning_control_format available before dissecting the first 6 bits
         # set the generic_provisioning_control_format value in the original packet
         if len(s) < 1:
             return s
         # we force the fecthing of the value for generic_provisioning_control_format from the raw bytes of the packet, this way the do_dissect function knows what ConditionalField to choose for the first field
-        self.generic_provisioning_control_format = (s[-1] >> 6) & 0b11
-        return s 
+        self.generic_provisioning_control_format = (s[0] >> 6) & 0b11
+        return s
 
-    def post_build(self, p, pay):
-        """ generic_provisioning_control_format should be last, but we need to know its value to build other fields """
-        p = p[:-1] + bytes([(self.generic_provisioning_control_format << 6) | (p[-1] & 0x3F)])
-        return p + pay
+"""
 
 
+class BTMesh_Generic_Provisioning_Hdr(Packet):
+    name = "Bluetooth Mesh Generic Provisioning PDU"
+    fields_desc = [
+        BitField(
+            "placeholder_first_6_bits", 0, 6
+        ),  # The first 6 bits, name will change in subclasses
+        BitEnumField(
+            "generic_provisioning_control_format",
+            None,
+            2,
+            {
+                0b00: "Transaction Start",
+                0b01: "Transaction Acknowledgment",
+                0b10: "Transaction Continuation",
+                0b11: "Provisioning Bearer Control",
+            },
+        ),
+    ]
 
-class BTMesh_Generic_Provisioning_Transaction_Start(Packet):
+    @classmethod
+    def dispatch_hook(cls, _pkt=None, *args, **kargs):
+        if _pkt:
+            generic_provisioning_payload_format = (
+                _pkt[0] & 0b11
+            )  # Get the last 2 bits
+            if generic_provisioning_payload_format == 0b00:
+                return BTMesh_Generic_Provisioning_Transaction_Start
+            elif generic_provisioning_payload_format == 0b01:
+                return BTMesh_Generic_Provisioning_Transaction_Ack
+            elif generic_provisioning_payload_format == 0b10:
+                return BTMesh_Generic_Provisioning_Transaction_Continuation
+            elif generic_provisioning_payload_format == 0b11:
+                bearer_opcode = (_pkt[0] & 0b11111100) >> 2
+                if bearer_opcode == 0x00:
+                    return BTMesh_Generic_Provisioning_Link_Open
+                elif bearer_opcode == 0x01:
+                    return BTMesh_Generic_Provisioning_Link_Ack
+                elif bearer_opcode == 0x02:
+                    return BTMesh_Generic_Provisioning_Link_Close
+        return cls
+
+
+class BTMesh_Generic_Provisioning_Transaction_Start(BTMesh_Generic_Provisioning_Hdr):
     name = "Bluetooth Mesh Generic Provisioning Transaction Start"
     fields_desc = [
+        BitField(
+            "segment_number", 0, 6
+        ),  # The first 6 bits, name will change in subclasss
+        BitEnumField(
+            "generic_provisioning_control_format",
+            0b00,
+            2,
+            {
+                0b00: "Transaction Start",
+                0b01: "Transaction Acknowledgment",
+                0b10: "Transaction Continuation",
+                0b11: "Provisioning Bearer Control",
+            },
+        ),
         FieldLenField(
             "total_length", None, length_of="generic_provisioning_payload_fragment"
         ),
@@ -583,77 +639,114 @@ class BTMesh_Generic_Provisioning_Transaction_Start(Packet):
     ]
 
 
-bind_layers(
-    BTMesh_Generic_Provisioning_Hdr,
-    BTMesh_Generic_Provisioning_Transaction_Start,
-    generic_provisioning_control_format=0b00,
-)
-
-
-class BTMesh_Generic_Provisioning_Transaction_Ack(Packet):
+class BTMesh_Generic_Provisioning_Transaction_Ack(BTMesh_Generic_Provisioning_Hdr):
     name = "Bluetooth Mesh Generic Provisioning Transaction Ack"
-
-
-bind_layers(
-    BTMesh_Generic_Provisioning_Hdr,
-    BTMesh_Generic_Provisioning_Transaction_Ack,
-    generic_provisioning_control_format=0b01,
-)
-
-
-class BTMesh_Generic_Provisioning_Transaction_Continuation(Packet):
-    name = "Bluetooth Mesh Generic Provisioning Transaction Continuation"
     fields_desc = [
-        BoundStrLenField(
-            "generic_provisioning_payload_fragment", None, minlen=1, maxlen=64
-        )
+        BitField("padding", 0, 6),
+        BitEnumField(
+            "generic_provisioning_control_format",
+            0b01,
+            2,
+            {
+                0b00: "Transaction Start",
+                0b01: "Transaction Acknowledgment",
+                0b10: "Transaction Continuation",
+                0b11: "Provisioning Bearer Control",
+            },
+        ),
     ]
 
 
-bind_layers(
-    BTMesh_Generic_Provisioning_Hdr,
-    BTMesh_Generic_Provisioning_Transaction_Continuation,
-    generic_provisioning_control_format=0b10,
-)
+class BTMesh_Generic_Provisioning_Transaction_Continuation(BTMesh_Generic_Provisioning_Hdr):
+    name = "Bluetooth Mesh Generic Provisioning Transaction Continuation"
+    fields_desc = [
+        BitField("segment_index", 0, 6),
+        BitEnumField(
+            "generic_provisioning_control_format",
+            0b10,
+            2,
+            {
+                0b00: "Transaction Start",
+                0b01: "Transaction Acknowledgment",
+                0b10: "Transaction Continuation",
+                0b11: "Provisioning Bearer Control",
+            },
+        ),
+        BoundStrLenField(
+            "generic_provisioning_payload_fragment", None, minlen=1, maxlen=64
+        ),
+    ]
 
 
-class BTMesh_Generic_Provisioning_Link_Ack(Packet):
+class BTMesh_Generic_Provisioning_Link_Ack(BTMesh_Generic_Provisioning_Hdr):
     name = "Bluetooth Mesh Provisioning Bearer Link Ack"
+    fields_desc = [
+        BitEnumField(
+            "bearer_opcode",
+            0,
+            6,
+            {0x00: "Link Open", 0x01: "Link ACK", 0x02: "Link Close"},
+        ),
+        BitEnumField(
+            "generic_provisioning_control_format",
+            0b01,
+            2,
+            {
+                0b00: "Transaction Start",
+                0b01: "Transaction Acknowledgment",
+                0b10: "Transaction Continuation",
+                0b11: "Provisioning Bearer Control",
+            },
+        ),
+    ]
 
 
-bind_layers(
-    BTMesh_Generic_Provisioning_Hdr,
-    BTMesh_Generic_Provisioning_Transaction_Ack,
-    generic_provisioning_control_format=0b11,
-)
-
-
-class BTMesh_Generic_Provisioning_Link_Open(Packet):
+class BTMesh_Generic_Provisioning_Link_Open(BTMesh_Generic_Provisioning_Hdr):
     name = "Bluetooth Mesh Generic Provisioning Bearer Link Open"
     fields_desc = [
+        BitEnumField(
+            "bearer_opcode",
+            0,
+            6,
+            {0x00: "Link Open", 0x01: "Link ACK", 0x02: "Link Close"},
+        ),
+        BitEnumField(
+            "generic_provisioning_control_format",
+            0b01,
+            2,
+            {
+                0b00: "Transaction Start",
+                0b01: "Transaction Acknowledgment",
+                0b10: "Transaction Continuation",
+                0b11: "Provisioning Bearer Control",
+            },
+        ),
         UUIDField("device_uuid", None, uuid_fmt=UUIDField.FORMAT_BE),
     ]
 
 
-bind_layers(
-    BTMesh_Generic_Provisioning_Hdr,
-    BTMesh_Generic_Provisioning_Link_Open,
-    generic_provisioning_control_format=0b11,
-)
-
-
-class BTMesh_Generic_Provisioning_Link_Close(Packet):
+class BTMesh_Generic_Provisioning_Link_Close(BTMesh_Generic_Provisioning_Hdr):
     name = "Bluetooth Mesh Generic Provisioning Bearer Link Close"
     fields_desc = [
-        ByteEnumField("reason", None, {0x00: "Success", 0x01: "Timeout", 0x02: "Fail"})
+        BitEnumField(
+            "bearer_opcode",
+            0,
+            6,
+            {0x00: "Link Open", 0x01: "Link ACK", 0x02: "Link Close"},
+        ),
+        BitEnumField(
+            "generic_provisioning_control_format",
+            0b01,
+            2,
+            {
+                0b00: "Transaction Start",
+                0b01: "Transaction Acknowledgment",
+                0b10: "Transaction Continuation",
+                0b11: "Provisioning Bearer Control",
+            },
+        ),
+        ByteEnumField("reason", None, {0x00: "Success", 0x01: "Timeout", 0x02: "Fail"}),
     ]
-
-
-bind_layers(
-    BTMesh_Generic_Provisioning_Hdr,
-    BTMesh_Generic_Provisioning_Link_Close,
-    generic_provisioning_control_format=0b11,
-)
 
 
 """ 
@@ -935,7 +1028,6 @@ bind_layers(EIR_Hdr, EIR_PB_ADV_PDU, type=0x29)
 bind_layers(BTMesh_Mesh_Message, BTMesh_Lower_Transport_PDU)
 bind_layers(BTMesh_Unsegmented_Access_Message, BTMesh_Model_Message)
 bind_layers(EIR_PB_ADV_PDU, BTMesh_Generic_Provisioning_Hdr)
-bind_layers(BTMesh_Generic_Provisioning_Hdr, BTMesh_Provisioning_Hdr)
 
 
 def unbind():
