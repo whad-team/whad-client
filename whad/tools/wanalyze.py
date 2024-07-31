@@ -277,7 +277,7 @@ class WhadAnalyzeApp(CommandLineApp):
 
 
 
-                if self.is_stdout_piped():
+                if self.is_stdout_piped() and self.args.packets:
                     unix_server = UnixConnector(UnixSocketServerDevice(parameters={
                         'domain': self.args.domain,
                         'format': self.args.format,
