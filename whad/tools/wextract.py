@@ -60,7 +60,7 @@ class WhadExtractApp(CommandLineApp):
                 extractor.replace("packet.", "p.")
             elif "pkt." in extractor:
                 extractor.replace("pkt.", "p.")
-            extractors.append(eval(extractor_template % extractor))
+            extractors.append((extractor, eval(extractor_template % extractor)))
 
         return extractors
 
@@ -68,12 +68,14 @@ class WhadExtractApp(CommandLineApp):
         extractors = self.build_extractors()
         output = []
         try:
-            for extractor in extractors:
-                output.append(str(extractor(pkt)))
+            for extractor,processor in extractors:
+                output.append(str(processor(pkt)))
             print(self.args.delimiter.join(output))
             sys.stdout.flush()
             return pkt
-        except:
+        except Exception as e:
+            sys.stderr.write(f"Exception raised when evaluating {extractor}\n")
+            sys.stderr.flush()
             return pkt
 
     def run(self):
