@@ -284,7 +284,7 @@ class WhadAnalyzeApp(CommandLineApp):
                         'metadata' : self.args.metadata
                     }))
                     # Create our packet bridge
-                    logger.info("[wfilter] Starting our output pipe")
+                    logger.info("[wanalyze] Starting our output pipe")
                     output_pipe = WhadAnalyzePipe(connector, unix_server, self.on_packet)
                 else:
                     connector.on_packet = self.on_packet
