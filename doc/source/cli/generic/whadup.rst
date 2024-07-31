@@ -1,4 +1,4 @@
-whadup: WHAD device information
+whadup: device information tool
 ===============================
 
 ``whadup`` is a convenient tool to enumerate all your WHAD devices plugged into

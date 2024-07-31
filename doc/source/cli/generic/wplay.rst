@@ -1,5 +1,5 @@
-wplay: WHAD generic replay tool
-===============================
+wplay: generic replay tool
+==========================
 
 ``wplay`` is a simple tool that replays packets from a PCAP file and send them
 to a piped WHAD tool. It allows PCAP post-processing, data extraction or simple

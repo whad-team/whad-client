@@ -1,5 +1,5 @@
-wsniff: WHAD generic sniffing tool
-==================================
+wsniff: generic sniffing tool
+=============================
 
 ``wsniff`` is a convenient tool to sniff data from various wireless protocols or
 wireless modulations. It supports any domain natively supported by WHAD and is
