@@ -191,7 +191,7 @@ class WhadSniffApp(CommandLineApp):
                             'domain': self.args.domain
                         }))
                         # Create our packet bridge
-                        # logger.info("[ble-spawn] Starting our output pipe")
+                        logger.info("[wsniff] Starting our output pipe")
                         output_pipe = WhadSniffOutputPipe(sniffer, unix_server)
                         # Start the sniffer
                         sniffer.start()

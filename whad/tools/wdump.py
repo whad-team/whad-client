@@ -80,7 +80,7 @@ class WhadDumpApp(CommandLineApp):
                             'metadata': self.args.metadata
                         }))
                         # Create our packet bridge
-                        logger.info("[ble-spawn] Starting our output pipe")
+                        logger.info("[wdump] Starting our output pipe")
                         output_pipe = WhadDumpPipe(connector, unix_server)
 
                     while interface.opened:

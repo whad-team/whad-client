@@ -8,7 +8,7 @@ from prompt_toolkit import print_formatted_text, HTML
 from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.cli.app import CommandLineApp, ApplicationError, run_app
 from scapy.all import *
-from whad.device.unix import  UnixSocketConnector
+from whad.device.unix import  UnixSocketConnector, UnixConnector, UnixSocketServerDevice
 from whad.device import Bridge
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.cli.ui import error, warning, success, info, display_event, display_packet, format_analyzer_output
@@ -24,6 +24,31 @@ logger = logging.getLogger(__name__)
 
 class WhadAnalyzeUnixSocketConnector(UnixSocketConnector):
     pass
+
+class WhadAnalyzePipe(Bridge):
+
+    def __init__(self, input_connector, output_connector, processing_function):
+        super().__init__(input_connector, output_connector)
+        self.processing_function = processing_function
+
+    def on_outbound(self, message):
+        """Process outbound messages.
+
+        Outbound packets are packets coming from our input connector,that need to be
+        forwarded as packets to the next tool.
+        """
+        if hasattr(message, "to_packet"):
+            pkt = message.to_packet()
+            pkts = self.processing_function(pkt, piped=True)
+            if pkts is not None:
+                for forwarded in pkts:
+                    msg = message.from_packet(forwarded)
+                    super().on_outbound(msg)
+        else:
+            logger.debug('[wfilter][input-pipe] forward default outbound message %s' % message)
+            # Forward other messages
+            super().on_outbound(message)
+
 
 def display_analyzers(analyzers):
     for domain, analyzers_list in analyzers.items():
@@ -111,14 +136,20 @@ class WhadAnalyzeApp(CommandLineApp):
             help='List of available analyzers'
         )
 
-    def on_packet(self, pkt):
+    def on_packet(self, pkt, piped=False):
         for analyzer_name, analyzer in self.selected_analyzers.items():
             analyzer.process_packet(pkt)
 
-            if analyzer.triggered and not analyzer._displayed and self.args.trigger:
+            if analyzer.triggered and not analyzer._displayed and self.args.trigger and not piped:
                 info(analyzer_name + " → " + "triggered")
                 analyzer._displayed = True
+
             if analyzer.completed:
+                if self.args.packets and piped:
+                    marked_packets = analyzer.marked_packets
+                    analyzer.reset()
+                    return marked_packets
+
                 if analyzer_name in self.provided_parameters:
                     out = []
                     if not self.args.raw and not self.args.json:
@@ -239,10 +270,24 @@ class WhadAnalyzeApp(CommandLineApp):
                     if analyzer_name in self.provided_analyzers or len(self.provided_analyzers) == 0:
                         self.selected_analyzers[analyzer_name] = analyzer_class()
                         self.selected_analyzers[analyzer_name]._displayed = False
+
                 connector.domain = self.args.domain
                 connector.translator = get_translator(self.args.domain)(connector.hub)
                 connector.format = connector.translator.format
-                connector.on_packet = self.on_packet
+
+
+
+                if self.is_stdout_piped():
+                    unix_server = UnixConnector(UnixSocketServerDevice(parameters={
+                        'domain': self.args.domain,
+                        'format': self.args.format,
+                        'metadata' : self.args.metadata
+                    }))
+                    # Create our packet bridge
+                    logger.info("[wfilter] Starting our output pipe")
+                    output_pipe = WhadAnalyzePipe(connector, unix_server, self.on_packet)
+                else:
+                    connector.on_packet = self.on_packet
 
                 while interface.opened:
                     time.sleep(.1)

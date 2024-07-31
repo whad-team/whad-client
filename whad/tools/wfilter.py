@@ -261,7 +261,7 @@ class WhadFilterApp(CommandLineApp):
                     'metadata' : self.args.metadata
                 }))
                 # Create our packet bridge
-                logger.info("[ble-spawn] Starting our output pipe")
+                logger.info("[wfilter] Starting our output pipe")
                 output_pipe = WhadFilterPipe(connector, unix_server, self.on_rx_packet, self.on_tx_packet)
 
             else:
