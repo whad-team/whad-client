@@ -7,6 +7,7 @@ import os
 import logging
 import time
 
+from whad.cli.ui import wait, success
 from whad.cli.app import CommandLineApp, run_app
 from whad.device import Bridge
 from scapy.all import *
@@ -59,7 +60,7 @@ class WhadDumpApp(CommandLineApp):
 
     def run(self):
         # Launch pre-run tasks
-        monitor = None
+        self.monitor = None
         self.pre_run()
 
         try:
@@ -101,31 +102,48 @@ class WhadDumpApp(CommandLineApp):
                     connector.format = connector.translator.format
 
                     self.connector = connector
-                    monitor = PcapWriterMonitor(self.args.pcap)
-                    monitor.attach(connector)
-                    monitor.start()
+                    self.monitor = PcapWriterMonitor(self.args.pcap)
+                    self.monitor.attach(connector)
+                    self.monitor.start()
 
                     if self.is_stdout_piped():
-                        unix_server = UnixConnector(UnixSocketServerDevice(parameters={
-                            'domain': self.args.domain,
-                            'format': self.args.format,
-                            'metadata': self.args.metadata
-                        }))
+                        unix_server = UnixConnector(UnixSocketServerDevice(parameters=self.args.__dict__))
                         # Create our packet bridge
                         logger.info("[wdump] Starting our output pipe")
                         output_pipe = WhadDumpPipe(connector, unix_server)
-
-                    while interface.opened:
-                        time.sleep(.1)
+                        while interface.opened:
+                            time.sleep(.1)
+                    else:
+                        while interface.opened:
+                            wait("Dumping {count} packets into pcap file: ".format(
+                                    count=str(self.monitor.packets_written)
+                                ),
+                                suffix = self.args.pcap
+                            )
+                            time.sleep(.2)
             else:
                 pass
         except KeyboardInterrupt:
             # Launch post-run tasks
-            if monitor is not None:
-                monitor.stop()
-                monitor.close()
+            if self.monitor is not None:
+                self.monitor.stop()
+                self.monitor.close()
             self.post_run()
 
+    def post_run(self):
+        if not self.is_stdout_piped():
+            wait("Dumping {count} packets into pcap file: ".format(
+                    count=str(self.monitor.packets_written)
+                ),
+                suffix = self.args.pcap,
+                end = True
+            )
+            success("{count} packets have been dumped into {pcap}".format(
+                    count = str(self.monitor.packets_written),
+                    pcap = self.args.pcap
+                )
+            )
+        super().post_run()
 
 def wdump_main():
     app = WhadDumpApp()

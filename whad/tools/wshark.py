@@ -8,7 +8,7 @@ import time
 
 from scapy.all import *
 from scapy.config import conf
-
+from whad.cli.ui import wait, success
 from whad.device import Bridge, ProtocolHub
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.common.monitors import WiresharkMonitor
@@ -42,7 +42,7 @@ class WhadWiresharkApp(CommandLineApp):
         """
 
         # Launch pre-run tasks
-        monitor = None
+        self.monitor = None
         self.pre_run()
         try:
             if self.is_piped_interface():
@@ -82,21 +82,42 @@ class WhadWiresharkApp(CommandLineApp):
                 #self.connector.format = hub.get(self.args.domain).format
 
                 # Attack a wireshark monitor
-                monitor = WiresharkMonitor()
-                monitor.attach(self.connector)
-                monitor.start()
+                self.monitor = WiresharkMonitor()
+                self.monitor.attach(self.connector)
+                self.monitor.start()
 
-                # Wait for the user to CTL-C
-                while interface.opened:
-                    time.sleep(.1)
+                if self.is_stdout_piped():
+                    # Wait for the user to CTL-C
+                    while interface.opened:
+                        time.sleep(.1)
+                else:
+                    while interface.opened:
+                        wait("Forwarding {count} packets to wireshark".format(
+                                count=str(self.monitor.packets_written)
+                            )
+                        )
+                        time.sleep(.2)
 
 
         except KeyboardInterrupt:
             # Launch post-run tasks
-            if monitor is not None:
-                monitor.stop()
-                monitor.close()
+            if self.monitor is not None:
+                self.monitor.stop()
+                self.monitor.close()
             self.post_run()
+
+    def post_run(self):
+        if not self.is_stdout_piped():
+            wait("Forwarding {count} packets to wireshark".format(
+                    count=str(self.monitor.packets_written)
+                ),
+                end=True
+            )
+            success("{count} packets have been forwarded to wireshark".format(
+                    count = str(self.monitor.packets_written)
+                )
+            )
+        super().post_run()
 
 
 def wshark_main():

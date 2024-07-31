@@ -149,3 +149,24 @@ def format_analyzer_output(output, mode="human_readable"):
                 return json.dumps(output)
             except TypeError:
                 return None
+
+def wait(message, suffix="", end=False):
+    spinner = [
+        "∙∙∙",
+        "●∙∙",
+        "∙●∙",
+        "∙∙●",
+        "∙∙∙",
+        "∙∙●",
+        "∙●∙",
+        "●∙∙",
+    ]
+    if hasattr(wait, "_count"):
+        wait._count = (wait._count + 1) % len(spinner)
+    else:
+        wait._count = 0
+    output = "\r\x1b[1;36m[{spinner}]".format(spinner=spinner[wait._count]) + message + "\x1b[0;0m" + suffix
+    if end:
+        output = "\r" + len(output) * " " + "\x1b[#1\r"
+    sys.stdout.write(output)
+    sys.stdout.flush()
