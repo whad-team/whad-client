@@ -716,8 +716,9 @@ class BTMesh_Generic_Provisioning_Transaction_Continuation(
                 0b11: "Provisioning Bearer Control",
             },
         ),
-        BoundStrLenField(
-            "generic_provisioning_payload_fragment", None, minlen=1, maxlen=64
+        StrField(
+            "generic_provisioning_payload_fragment",
+            None,
         ),
     ]
 
@@ -804,6 +805,40 @@ class EIR_PB_ADV_PDU(Packet):
     fields_desc = [
         XIntField("link_id", None),
         XByteField("transaction_number", None),
+    ]
+
+
+"""
+MESH PROXY LAYER
+================================
+"""
+
+
+class BTMesh_Proxy_Hdr(Packet):
+    name = "Bluetooth Mesh Proxy PDU"
+    fields_desc = [
+        BitEnumField(
+            "SAR",
+            0,
+            2,
+            {
+                0b00: "Data field contains a complete message",
+                0b01: "Data field contains the first segment of a message",
+                0b10: "Data field contains a continuation segment of a message",
+                0b11: "Data field contains the last segment of a message",
+            },
+        ),
+        BitEnumField(
+            "message_type",
+            0,
+            6,
+            {
+                0x00: "Network PDU",
+                0x01: "Mesh Beacon",
+                0x02: "Proxy Configuration",
+                0x03: "Provisioning PDU",
+            },
+        ),
     ]
 
 
@@ -1072,6 +1107,8 @@ bind_layers(EIR_Hdr, EIR_PB_ADV_PDU, type=0x29)
 bind_layers(BTMesh_Mesh_Message, BTMesh_Lower_Transport_PDU)
 bind_layers(BTMesh_Unsegmented_Access_Message, BTMesh_Model_Message)
 bind_layers(EIR_PB_ADV_PDU, BTMesh_Generic_Provisioning_Hdr)
+bind_layers(BTMesh_Proxy_Hdr, BTMesh_Provisioning_Hdr, message_type=0x03)
+
 # need to remove this one, fragments and all ...
 bind_layers(BTMesh_Generic_Provisioning_Hdr, BTMesh_Provisioning_Hdr)
 

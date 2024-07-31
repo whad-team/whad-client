@@ -4,6 +4,7 @@ from whad.exceptions import WhadDeviceNotFound
 from time import time,sleep
 from scapy.layers.bluetooth import EIR_Hdr
 from scapy.layers.bluetooth4LE import BTLE_ADV
+from whad.scapy.layers.bt_mesh import *
 import sys
 
 def bt_mesh_filter(packet, ignore_regular_adv):
