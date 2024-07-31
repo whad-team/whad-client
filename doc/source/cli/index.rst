@@ -30,11 +30,8 @@ monitor every Bluetooth Low Energy packet sent or received thanks to `wshark`,
 and then use `wble-central` to enumerate the target services and characteristics.
 
 
-Tools provided by WHAD
-----------------------
-
 Generic tools
-~~~~~~~~~~~~~
+-------------
 
 .. toctree::
     :maxdepth: 1
@@ -46,8 +43,8 @@ Generic tools
     generic/wextract
     generic/whadserver
 
-Bluetooth Low Energy
-~~~~~~~~~~~~~~~~~~~~
+Bluetooth Low Energy tools
+--------------------------
 
 .. toctree::
     :maxdepth: 1
@@ -59,8 +56,8 @@ Bluetooth Low Energy
     ble/ble-spawn
     ble/ble-connect
 
-Logitech Unifying
-~~~~~~~~~~~~~~~~~
+Logitech Unifying tools
+-----------------------
 
 .. toctree::
     :maxdepth: 1
