@@ -1,3 +1,5 @@
+.. _generic-tools-wfilter:
+
 wfilter: generic packet filtering and processing tool
 =====================================================
 

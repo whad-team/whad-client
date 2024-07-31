@@ -1,3 +1,5 @@
+.. _generic-tools-wplay:
+
 wplay: generic replay tool
 ==========================
 
