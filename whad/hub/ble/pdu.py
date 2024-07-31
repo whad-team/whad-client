@@ -72,7 +72,8 @@ class SendBleRawPdu(PbMessageWrapper):
     def to_packet(self):
         """Convert message to the corresponding Scapy packet
         """
-        packet = BTLE(self.pdu)
+        print(self)
+        packet = BTLE(access_addr=self.access_address, crc=self.crc)/self.pdu
 
         # Set packet metadata
         packet.metadata = BLEMetadata()
