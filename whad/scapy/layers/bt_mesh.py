@@ -27,6 +27,7 @@ from scapy.fields import (
     BitFieldLenField,
 )
 from scapy.layers.bluetooth import EIR_Element, EIR_Hdr, EIR_Raw
+from scapy.all import Raw
 
 
 MESSAGE_MODEL_OPCODES = {
@@ -680,6 +681,13 @@ class BTMesh_Generic_Provisioning_Transaction_Start(BTMesh_Generic_Provisioning_
         # ),
     ]
 
+    def guess_payload_class(self, payload):
+        # if more than one segment, return Raw data
+        if self.getfieldval("segment_number") > 0:
+            return Raw
+        else:
+            return Packet.guess_payload_class(self, payload)
+
 
 class BTMesh_Generic_Provisioning_Transaction_Ack(BTMesh_Generic_Provisioning_Hdr):
     name = "Bluetooth Mesh Generic Provisioning Transaction Ack"
@@ -721,6 +729,10 @@ class BTMesh_Generic_Provisioning_Transaction_Continuation(
             None,
         ),
     ]
+
+    def guess_payload_class(self, payload):
+        # Since payload are fragments only, should not have anything after
+        return None
 
 
 class BTMesh_Generic_Provisioning_Link_Ack(BTMesh_Generic_Provisioning_Hdr):
@@ -840,6 +852,9 @@ class BTMesh_Proxy_Hdr(Packet):
             },
         ),
     ]
+
+
+bind_layers(BTMesh_Proxy_Hdr, BTMesh_Provisioning_Hdr, message_type=0x03)
 
 
 """
