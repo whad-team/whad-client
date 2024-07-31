@@ -3,24 +3,19 @@
 This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
-from prompt_toolkit import print_formatted_text, HTML
-
-from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLineApp, ApplicationError, run_app
-from scapy.all import *
-#from whad.common.ipc import IPCPacket
-from whad.device.unix import UnixConnector, UnixSocketServerDevice
-from whad.device import Bridge
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
-from whad.cli.ui import error, warning, success, info, display_event, display_packet
-from whad.common.monitors import PcapWriterMonitor
-from whad.tools.utils import get_translator
-from time import sleep
+import os
 import logging
-import sys
+import time
+
+from whad.cli.app import CommandLineApp, run_app
+from whad.device import Bridge
+from scapy.all import *
+from whad.device.unix import UnixConnector, UnixSocketServerDevice
+from whad.common.monitors import PcapWriterMonitor
+from whad.common.monitors.pcap import PcapWriterMonitor
+from whad.tools.utils import get_translator
 
 logger = logging.getLogger(__name__)
-#logging.basicConfig(level=logging.INFO)
 
 class WhadDumpPipe(Bridge):
     pass
@@ -39,6 +34,24 @@ class WhadDumpApp(CommandLineApp):
         )
 
         self.add_argument(
+            '-f',
+            '--force',
+            action='store_true',
+            dest='force',
+            default=False,
+            help="Force file overwrite"
+        )
+
+        self.add_argument(
+            '-a',
+            '--append',
+            dest='append',
+            action='store_true',
+            default=False,
+            help="Append packets to existing file"
+        )
+
+        self.add_argument(
             'pcap',
             help='Pcap file to export'
         )
@@ -51,6 +64,25 @@ class WhadDumpApp(CommandLineApp):
 
         try:
             if self.args.pcap is not None:
+
+                # If pcap file already exists, ask the user if he/she wants to
+                # overwrite it if no '--append' option set
+                if os.path.exists(self.args.pcap):
+                    if os.path.isfile(self.args.pcap):
+                        if not self.args.append:
+                            if not self.args.force:
+                                self.warning('PCAP file already exists, use --append to add packets to it or --force to force overwriting')
+                                return
+                            else:
+                                try:
+                                    # Remove file
+                                    os.unlink(self.args.pcap)
+                                except IOError:
+                                    self.error("Cannot create PCAP file")
+                    else:
+                        self.error('Cannot write to PCAP file (not a regular file)')
+                        return
+
                 if self.is_piped_interface():
                     interface = self.input_interface
                 else:
