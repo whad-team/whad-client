@@ -1,4 +1,6 @@
 from whad.common.analyzer import TrafficAnalyzer
+from scapy.layers.bluetooth4LE import BTLE_ADV_IND, BTLE_SCAN_RSP, BTLE_CONNECT_REQ
+from whad.hub.ble.bdaddr import BDAddress
 from scapy.layers.bluetooth import  ATT_Read_By_Group_Type_Request, ATT_Read_By_Group_Type_Response, \
                                     ATT_Read_By_Type_Request, ATT_Read_By_Type_Response, ATT_Error_Response, \
                                     ATT_Find_Information_Request, ATT_Find_Information_Response
@@ -10,6 +12,52 @@ from whad.ble.profile.service import PrimaryService, SecondaryService
 from struct import unpack
 from whad.ble.crypto import EncryptedSessionInitialization, LegacyPairingCracking, \
     LongTermKeyDistribution, IdentityResolvingKeyDistribution, ConnectionSignatureResolvingKeyDistribution
+import json
+
+class PeripheralInformation(TrafficAnalyzer):
+    def reset(self):
+        super().reset()
+        self.adv_ind_list = []
+        self.scan_rsp_list = []
+        self.adv_data = None
+        self.scan_rsp = None
+        self.address = None
+
+    @property
+    def output(self):
+        if self.scan_rsp is None:
+            return {
+                "adv_data" : self.adv_data,
+                "bd_addr" : str(self.address),
+                "addr_type" : self.address.type
+            }
+        else:
+            return {
+                "adv_data" : self.adv_data,
+                "scan_rsp" : self.scan_rsp,
+                "bd_addr" : str(self.address),
+                "addr_type" : self.address.type
+            }
+    def process_packet(self, packet):
+        if BTLE_ADV_IND in packet:
+            self.trigger()
+            self.adv_ind_list.append(packet)
+        elif BTLE_SCAN_RSP in packet:
+            self.trigger()
+            self.scan_rsp_list.append(packet)
+        elif BTLE_CONNECT_REQ in packet:
+            self.trigger()
+            self.address = BDAddress(packet.AdvA, random=(packet.TxAdd != 0))
+            for adv_ind in self.adv_ind_list[::-1]:
+                if adv_ind.AdvA == packet.AdvA:
+                    self.adv_data = b"".join([bytes(i) for i in adv_ind.data])
+                    break
+            for scan_rsp in self.adv_ind_list[::-1]:
+                if scan_rsp.AdvA == packet.AdvA:
+                    self.scan_rsp = b"".join([bytes(i) for i in scan_rsp.data])
+                    break
+            if self.scan_rsp is not None and self.adv_data is not None:
+                self.complete()
 
 class ReadByGroupTypeDiscovery(TrafficAnalyzer):
 
@@ -300,6 +348,17 @@ class DescriptorsDiscovery(FindInformationDiscovery):
 
 
 class GATTServerDiscovery(TrafficAnalyzer):
+    class InferredProfile(GenericProfile):
+        def export_json(self):
+            json_value = super().export_json()
+            if hasattr(self, "devinfo"):
+                profile = json.loads(json_value)
+                profile["devinfo"] = self.devinfo
+                for k in profile["devinfo"].keys():
+                    if isinstance(profile["devinfo"][k], bytes):
+                        profile["devinfo"][k] = profile["devinfo"][k].hex()
+                json_value = json.dumps(profile)
+            return json_value
 
     def reset(self):
         super().reset()
@@ -307,6 +366,7 @@ class GATTServerDiscovery(TrafficAnalyzer):
         self.secondary_service_analyzer = SecondaryServicesDiscovery()
         self.characteristics_analyzer = CharacteristicsDiscovery()
         self.descriptors_discovery = DescriptorsDiscovery()
+        self.peripheral_information = PeripheralInformation()
 
         self.services_completed = False
         self.characteristics_completed = False
@@ -320,23 +380,23 @@ class GATTServerDiscovery(TrafficAnalyzer):
     def output(self):
 
         return {
-            "profile" : self.profile,
-            #"services" : self.services,
-            #"characteristics" : self.characteristics,
-            #"descriptors" : self.descriptors,
+            "profile" : self.profile
         }
 
     def complete(self):
         super().complete()
-        self.profile = GenericProfile()
+        self.profile = self.InferredProfile()
         for service in self.services:
             self.profile.add_service(service)
+        if self.peripheral_information.completed:
+            self.profile.devinfo = self.peripheral_information.output
 
     def process_packet(self, pkt):
         self.primary_service_analyzer.process_packet(pkt)
         self.secondary_service_analyzer.process_packet(pkt)
         self.characteristics_analyzer.process_packet(pkt)
         self.descriptors_discovery.process_packet(pkt)
+        self.peripheral_information.process_packet(pkt)
 
 
         if self.primary_service_analyzer.triggered:
@@ -442,6 +502,7 @@ class GATTServerDiscovery(TrafficAnalyzer):
 
 
 analyzers = {
+    "peripheral_information" : PeripheralInformation,
     "encrypted_session_initialization" : EncryptedSessionInitialization,
     "legacy_pairing_cracking" : LegacyPairingCracking,
     "ltk_distribution" : LongTermKeyDistribution,

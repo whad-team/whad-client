@@ -277,14 +277,14 @@ class WhadAnalyzeApp(CommandLineApp):
 
 
 
-                if self.is_stdout_piped():
+                if self.is_stdout_piped() and self.args.packets:
                     unix_server = UnixConnector(UnixSocketServerDevice(parameters={
                         'domain': self.args.domain,
                         'format': self.args.format,
                         'metadata' : self.args.metadata
                     }))
                     # Create our packet bridge
-                    logger.info("[wfilter] Starting our output pipe")
+                    logger.info("[wanalyze] Starting our output pipe")
                     output_pipe = WhadAnalyzePipe(connector, unix_server, self.on_packet)
                 else:
                     connector.on_packet = self.on_packet
