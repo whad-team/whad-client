@@ -458,7 +458,7 @@ class CommandLineApp(ArgumentParser):
         # - the application is supposed to handle "normal" data from stdin
         # - the application is supposed to be chained with another WHAD CLI tool
         if self.is_stdin_piped():
-
+            self.__input_iface = None
             # If stdin is piped to a WHAD tool, we must wait for a specific URL
             # sent in a single line that describes the interface to use.
             if self.__input_type == CommandLineApp.INPUT_WHAD:
@@ -492,6 +492,7 @@ class CommandLineApp(ArgumentParser):
                             line, pending_input = pending_input[:idx], pending_input[idx+1:]
 
                             # parse URL
+
                             url_info = urlparse(line)
                             if url_info.scheme == 'unix' and url_info.path is not None:
                                 self.__interface_path = line
@@ -612,7 +613,7 @@ class CommandLineApp(ArgumentParser):
         try:
             print_formatted_text(HTML('<ansired>[!] <b>%s</b></ansired>' % message))
         except:
-            print_formatted_text(HTML('<ansired>[!] <b>%s</b></ansired>' % 'an unknown error occured'))
+            print_formatted_text(HTML('<ansired>[!] <b>an unknown error occured</b></ansired>'))
 
 
 class CommandLineSource(CommandLineApp):

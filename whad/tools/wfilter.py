@@ -228,8 +228,6 @@ class WhadFilterApp(CommandLineApp):
                 return pkt
             return None
 
-
-
     def run(self):
         # Launch pre-run tasks
         self.pre_run()
@@ -243,34 +241,36 @@ class WhadFilterApp(CommandLineApp):
             else:
                 interface = self.interface
 
-            if not self.args.nocolor:
-                conf.color_theme = BrightTheme()
+            if interface is not None:
+                if not self.args.nocolor:
+                    conf.color_theme = BrightTheme()
 
-            parameters = self.args.__dict__
-            connector = UnixConnector(interface)
+                parameters = self.args.__dict__
+                connector = UnixConnector(interface)
 
-            connector.domain = self.args.domain
+                connector.domain = self.args.domain
 
-            connector.translator = get_translator(self.args.domain)(connector.hub)
-            connector.format = connector.translator.format
+                connector.translator = get_translator(self.args.domain)(connector.hub)
+                connector.format = connector.translator.format
 
-            if self.is_stdout_piped():
-                unix_server = UnixConnector(UnixSocketServerDevice(parameters={
-                    'domain': self.args.domain,
-                    'format': self.args.format,
-                    'metadata' : self.args.metadata
-                }))
-                # Create our packet bridge
-                logger.info("[wfilter] Starting our output pipe")
-                output_pipe = WhadFilterPipe(connector, unix_server, self.on_rx_packet, self.on_tx_packet)
+                if self.is_stdout_piped():
+                    unix_server = UnixConnector(UnixSocketServerDevice(parameters={
+                        'domain': self.args.domain,
+                        'format': self.args.format,
+                        'metadata' : self.args.metadata
+                    }))
+                    # Create our packet bridge
+                    logger.info("[wfilter] Starting our output pipe")
+                    output_pipe = WhadFilterPipe(connector, unix_server, self.on_rx_packet, self.on_tx_packet)
 
+                else:
+                    connector.on_packet = self.on_rx_packet
+
+                # Keep running while interface is active
+                while interface.opened:
+                    sleep(.1)
             else:
-                connector.on_packet = self.on_rx_packet
-
-            # Keep running while interface is active
-            while interface.opened:
-                sleep(.1)
-
+                exit(1)
         except KeyboardInterrupt:
             # Launch post-run tasks
             self.post_run()
