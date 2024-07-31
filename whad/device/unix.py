@@ -332,7 +332,7 @@ class UnixSocketServerDevice(WhadDevice):
                     raise WhadDeviceDisconnected()
             elif len(errors) > 0:
                 raise WhadDeviceDisconnected()
-                
+
         except ConnectionResetError as err:
             logger.debug('Connection reset by peer')
         except Exception as err:
@@ -354,11 +354,14 @@ class UnixSocketServerDevice(WhadDevice):
         nb_bytes_written = 0
         wlist = [self.__fileno]
         elist = [self.__fileno]
-        readers,writers,errors = select.select(
-            [],
-            wlist,
-            elist
-        )
+        try:
+            readers,writers,errors = select.select(
+                [],
+                wlist,
+                elist
+            )
+        except TypeError:
+            return 0
 
         if len(writers) > 0:
             nb_bytes_written = self.__client.send(data)
@@ -398,12 +401,12 @@ class UnixConnector(WhadDeviceConnector):
 
     def on_domain_msg(self, domain, message):
         pass
-    
+
     def on_packet(self, packet):
         pass
-    
+
     def on_event(self, event):
-        pass 
+        pass
 
 class UnixSocketConnector(WhadDeviceConnector):
     """Unix socket server connector.
