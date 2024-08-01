@@ -48,6 +48,16 @@ class UniMouseApp(CommandLineSink):
             help="Target mouse with address ADDRESS"
         )
 
+        # Mouse logging raw output
+        self.add_argument(
+            '-r',
+            '--raw',
+            dest='raw',
+            action="store_true",
+            default=False,
+            help="Log mouse output in raw format"
+        )
+
         # Mouse duplication option
         self.add_argument(
             '-d',
@@ -77,7 +87,7 @@ class UniMouseApp(CommandLineSink):
                     try:
                         # Check address format
                         addr = ESBAddress(self.args.address)
-                        
+
                         # If -r option is set, sync and replicate our mouse moves
                         if self.args.duplicate:
                             self.duplicate_mouse(addr)
@@ -101,7 +111,7 @@ class UniMouseApp(CommandLineSink):
             self.warning('wuni-mouse stopped (CTL-C)')
 
         # Launch post-run tasks
-        self.post_run() 
+        self.post_run()
 
     def duplicate_mouse(self, address: ESBAddress):
         """Duplicate current mouse to the target wireless mouse dongle.
@@ -171,7 +181,7 @@ class UniMouseApp(CommandLineSink):
         Linme format is the following:
 
           X,Y,WHEEL_X,WHEEL_Y,BTNS
-        
+
         with X and Y decimal integers representing the mouse movement, WHEEL_X
         and WHEEL_Y decimal integers representing the mouse wheel movement and
         BTNS being a series of letters ffrom "L", "R" and "M" corresponding to
@@ -236,7 +246,7 @@ class UniMouseApp(CommandLineSink):
 
             except ValueError:
                 self.warning('Invalid value in mouse move')
-       
+
         # Wait for connector to send message
         time.sleep(1)
         connector.stop()
@@ -253,7 +263,7 @@ class UniMouseApp(CommandLineSink):
         buttons_state = [0, 0, 0]
 
         connector.start()
-        for delta, buttons in connector.stream():
+        for delta, wheel, buttons in connector.stream():
             buttons_event = []
             # detect any button state change
             if buttons & ClickType.LEFT > 0:
@@ -281,12 +291,20 @@ class UniMouseApp(CommandLineSink):
                     buttons_event.append("middle button released")
                 buttons_state[2] = 0
 
-            if len(buttons_event) > 0:
-                events = " | " + ", ".join(buttons_event)
+            wheel_events = []
+            if wheel[0] != 0:
+                wheel_events.append("wheel_x:"+str(wheel[0]))
+            if wheel[1] != 0:
+                wheel_events.append("wheel_y:"+str(wheel[1]))
+
+            if len(buttons_event) > 0 or len(wheel_events) > 0:
+                events = " | " + ", ".join(wheel_events + buttons_event)
             else:
                 events = ""
-
-            print(f"Mouse move (dx:{delta[0]:d}, dy:{delta[1]:d}){events}")
+            if not self.args.raw:
+                print(f"Mouse move (dx:{delta[0]:d}, dy:{delta[1]:d}){events}")
+            else:
+                print(str(delta[0])+","+str(delta[1])+","+str(wheel[0])+","+str(wheel[1])+","+str(buttons))
 
 def wuni_mouse_main():
     """Logitech Unifying mouse tool main routine.

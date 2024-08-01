@@ -21,4 +21,4 @@ class Mouselogger(Sniffer):
                 x, y = converter.get_coordinates_from_hid_data(movement)
                 button = ClickType(packet.button_mask)
 
-                yield ((x,y), button)
+                yield ((x,y), (packet.wheel_x, packet.wheel_y), button)
