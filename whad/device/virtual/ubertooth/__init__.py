@@ -203,7 +203,7 @@ class UbertoothDevice(VirtualDevice):
             msg.rssi = rssi
         if timestamp is not None:
             msg.timestamp = timestamp
-       
+
         # Send message
         self._send_whad_message(msg)
 
@@ -217,7 +217,7 @@ class UbertoothDevice(VirtualDevice):
             ChannelMap.from_int(self.__channel_map),
             self.__crc_init
         )
-       
+
         # Send message
         self._send_whad_message(msg)
 
@@ -319,8 +319,11 @@ class UbertoothDevice(VirtualDevice):
         return received_data
 
     def _ubertooth_ctrl_transfer_out(self, request, value=0, data=None, timeout=100):
-        self.__ubertooth.ctrl_transfer(UbertoothTransfers.CTRL_OUT, request, value, 0, data, timeout=timeout)
-
+        try:
+            self.__ubertooth.ctrl_transfer(UbertoothTransfers.CTRL_OUT, request, value, 0, data, timeout=timeout)
+            return True
+        except USBError:
+            return False
 
     # Discovery related functions
     def _get_capabilities(self):
