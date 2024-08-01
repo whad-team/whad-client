@@ -25,7 +25,7 @@ def hmac_sha256(key, message):
     """
     Implements HMAC-SHA-256, defined in Mesh Protocol Specification, p. 190, Section 3.9.2.4
     """
-    return HMAC.new(key, digestmod=SHA256).update(message)
+    return HMAC.new(key, digestmod=SHA256).update(message).digest()
 
 
 def s1(m):
@@ -71,8 +71,8 @@ def k3(n):
     """
     salt = s1(b"smk3")
     t = aes_cmac(salt, n)
-    return (int.from_bytes(aes_cmac(t, b"id64" + b"\x01"), byteorder="big")).to_bytes(
-        16, byteorder="big"
+    return (int.from_bytes(aes_cmac(t, b"id64" + b"\x01"), byteorder="big") % (2**64)).to_bytes(
+        8, byteorder="big"
     )
 
 
@@ -82,8 +82,8 @@ def k4(n):
     """
     salt = s1(b"smk4")
     t = aes_cmac(salt, n)
-    return (int.from_bytes(aes_cmac(t, b"id6" + b"\x01"), byteorder="big")).to_bytes(
-        16, byteorder="big"
+    return (int.from_bytes(aes_cmac(t, b"id6" + b"\x01"), byteorder="big") % (2**6)).to_bytes(
+        1, byteorder="big"
     )
 
 
@@ -174,6 +174,7 @@ class ProvisioningBearerAdvCryptoManager:
         provisioning_capabilities_pdu,
         provisioning_start_pdu,
     ):
+
         """
         Computes the Confirmation Salt, defined in Mesh Protocol Specification, p. 593, Section 5.4.2.4.1
         pub_keys are concat of x and y coordinates
