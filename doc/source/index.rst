@@ -37,6 +37,8 @@ Welcome to WHAD's documentation!
     :caption: Enhanced ShockBurst API
 
     esb/started
+    esb/prx
+    esb/ptx
     esb/scanner
     esb/sniffer
 

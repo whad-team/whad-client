@@ -1,7 +1,5 @@
-Devices scanning
-----------------
+Scanner connector
+=================
 
-.. autoclass:: whad.esb.connector.Scanner
+.. automodule:: whad.esb.connector.scanner
     :members:
-
-    .. automethod:: __init__

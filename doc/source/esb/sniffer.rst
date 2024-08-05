@@ -1,7 +1,5 @@
-Sniffing Enhanced ShockBurst frames
------------------------------------
+Sniffer connector
+-----------------
 
-.. autoclass:: whad.esb.connector.Sniffer
+.. automodule:: whad.esb.connector.sniffer
     :members:
-
-    .. automethod:: __init__
