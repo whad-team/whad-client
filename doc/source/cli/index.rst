@@ -8,7 +8,7 @@ WHAD provides two types of command-line tools:
   any WHAD device (**whadup** for instance).
 
 * domain-specific tools named in the form of *w<domain>-<tool>*: these tools can
-  be used with any WHAD device that supports a specific domain (**ble-central**
+  be used with any WHAD device that supports a specific domain (**wble-central**
   for instance).
 
 
