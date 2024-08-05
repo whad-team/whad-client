@@ -36,7 +36,7 @@ class LWGwLinkLayerState(LayerState):
         :type dev_addr: int
 
         :returns: True if device address is known, False otherwise.
-        :return-type: bool
+        :rtype: bool
         """
         return (dev_addr in self.connections)
 
@@ -87,7 +87,7 @@ class LWGwLinkLayerState(LayerState):
         :param dev_addr: device address
         :type dev_addr: int
         :returns: connection data
-        :return-type: dict
+        :rtype: dict
         """
         if self.has_devaddr(dev_addr):
             return self.connections[dev_addr]
@@ -102,7 +102,7 @@ class LWGwLinkLayerState(LayerState):
         :type mac_node: str
         
         :returns: Connection data or None if not found
-        :return-type: dict
+        :rtype: dict
         """
         for dev_addr in self.connections:
             if self.connections[dev_addr]['mac_node'] == mac_node:
@@ -137,7 +137,7 @@ class LWGwLinkLayer(Layer):
         """Generate a free device network address
 
         :returns: Attributed device network address
-        :return-type: int
+        :rtype: int
         """
         nok = True
         while nok:

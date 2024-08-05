@@ -31,7 +31,7 @@ def compute_crc(packet) -> bytes:
     :param packet: ESB packet with an extra null byte
     :type packet: :class:`whad.scapy.layers.esb.ESB_Hdr`
     :return: CRC encoded as a byte array
-    :return-type: bytes
+    :rtype: bytes
     """
     # CRC initial value is 0xFFFF
     crc = 0xFFFF

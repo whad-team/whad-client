@@ -25,7 +25,7 @@ the emulated device appear the same way the original does.
 Example
 -------
 
-The following example first creates a JSON profile file using :ref:`ble-central <whad-ble-central>`,
+The following example first creates a JSON profile file using :ref:`ble-central <whad-wble-central>`,
 then connects to the same device, launches *Wireshark* to monitor BLE packets and spawns a
 device based on the `mydevice.json` profile.
 

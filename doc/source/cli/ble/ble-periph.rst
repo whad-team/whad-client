@@ -1,7 +1,7 @@
-ble-periph: Bluetooth Low Energy GATT server
+wble-periph: Bluetooth Low Energy GATT server
 ============================================
 
-``ble-periph`` provides a GATT server with customizable services and characteristics
+``wble-periph`` provides a GATT server with customizable services and characteristics
 as well as some advertising data records. This tool must be used with a device
 supporting the *Bluetooth Low Energy* domain.
 
@@ -15,15 +15,15 @@ Usage
 
 .. code-block:: text
 
-    ble-periph [OPTIONS] ([COMMAND] ([COMMAND ARGS]))
+    wble-periph [OPTIONS] ([COMMAND] ([COMMAND ARGS]))
 
-``ble-periph`` accepts one or more options, and requires a valid command as its
+``wble-periph`` accepts one or more options, and requires a valid command as its
 first parameter. This command may or may not accepts arguments.
 
 Command-line options
 --------------------
 
-**ble-periph** supports the following options:
+**wble-periph** supports the following options:
 
 * ``--interface`` (``-i``): specifies the WHAD interface to use
 * ``--bdaddr`` (``-b``): specifies a Bluetooth Device address to use for the GATT server in the form *XX:XX:XX:XX:XX:XX*
@@ -38,59 +38,59 @@ Configuring a peripheral
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 We can create a custom BLE peripheral profile with the interactive shell. So let's get
-an interactive session from `ble-periph`:
+an interactive session from `wble-periph`:
 
 .. code-block:: text
 
-    $ ble-periph -i hci0 interactive
-    ble-periph>
+    $ wble-periph -i hci0 interactive
+    wble-periph>
 
 First, we add a generic service (*Generic Access*):
 
 .. code-block:: text
 
-    ble-periph> service add 1800
+    wble-periph> service add 1800
     Service 1800 successfully added.
-    ble-periph|service(1800)>
+    wble-periph|service(1800)>
 
 Once this service added, it is automatically selected as shown in the prompt. We can
 add a characteristic:
 
 .. code-block:: text
 
-    ble-periph|service(1800)> char add 2a00 read notify
+    wble-periph|service(1800)> char add 2a00 read notify
     Successfully added characteristic 2A00
-    ble-periph|service(1800)>
+    wble-periph|service(1800)>
 
 Once done, we deselect the currently selected service using the `back` command:
 
 .. code-block:: text
 
-    ble-periph|service(1800)> back
-    ble-periph>
+    wble-periph|service(1800)> back
+    wble-periph>
 
 And we can check our created GATT profile with the `service` command, as shown below:
 
 .. code-block:: text
 
-    ble-periph> service
+    wble-periph> service
     Service 1800 (Generic Access) (handles from 2 to 5):
     └─ Characteristic 2A00 (Device Name)
     └─ handle:3, value handle: 4, props: read,notify
     └─ Descriptor 2902 (handle: 5)
-    ble-periph>
+    wble-periph>
 
 Eventually, we set the complete device name for our peripheral, and write the same
 name in the 2A00 characteristic (which is supposed to contain the device name):
 
 .. code-block:: text
 
-    ble-periph> name "WHAD DemoDevice"
+    wble-periph> name "WHAD DemoDevice"
     Device name set to "WHAD DemoDevice"
-    ble-periph> write 2a00 "WHAD DemoDevice"
-    ble-periph> read 2a00
+    wble-periph> write 2a00 "WHAD DemoDevice"
+    wble-periph> read 2a00
     00000000: 57 48 41 44 20 44 65 6D  6F 44 65 76 69 63 65     WHAD DemoDevice
-    ble-periph>
+    wble-periph>
 
 
 
@@ -103,13 +103,13 @@ json profile that will populate all the services and characteristics by using th
 
 .. code-block:: text
 
-    $ ble-periph -i hci0 -p mydevice.json interactive
+    $ wble-periph -i hci0 -p mydevice.json interactive
 
 We can check the services and characteristics have been automatically populated:
 
 .. code-block:: text
 
-    ble-periph> service
+    wble-periph> service
     Service 1800 (Generic Access) (handles from 1 to 9):
     ├─ Characteristic 2A00 (Device Name)
     │ └─ handle:2, value handle: 3, props: read
@@ -169,8 +169,8 @@ Once done, we can start our peripheral:
 
 .. code-block:: text
 
-    ble-periph> start
-    ble-periph[running]>
+    wble-periph> start
+    wble-periph[running]>
     
 We get a notification in the interactive console when a device connects to our
 peripheral:
@@ -178,7 +178,7 @@ peripheral:
 .. code-block:: text
 
     New connection handle:68
-    ble-periph[running]>
+    wble-periph[running]>
 
 And we also get some notification when a device is read, written or subscribed to:
 
@@ -194,8 +194,8 @@ While a peripheral is running, we can write and read the values of characteristi
 
 .. code-block:: text
 
-    ble-periph[running]>write 2a00 notified
-    ble-periph[running]>read 2a00
+    wble-periph[running]>write 2a00 notified
+    wble-periph[running]>read 2a00
     00000000: 6E 6F 74 69 66 69 65 64                           notified
 
 If we write to a characteristic a device has subscribed to for notification/indication,
@@ -209,8 +209,8 @@ The `stop` command will stop our peripheral and disconnect any connected device:
 
 .. code-block:: text
 
-    ble-periph[running]> stop
-    ble-periph>
+    wble-periph[running]> stop
+    wble-periph>
 
 
 Supported commands
@@ -241,8 +241,8 @@ one.
 
 .. code-block:: text
 
-    $ ble-periph -i hci0 interactive
-    ble-periph>
+    $ wble-periph -i hci0 interactive
+    wble-periph>
 
 More information about this interactive shell in the :ref:`dedicated section <periph-interactive-shell>`.
 
@@ -269,7 +269,7 @@ This command can add, edit and remove services from the current GATT server. The
 
 .. code-block:: text
 
-    ble-periph> service add 1800
+    wble-periph> service add 1800
     Service 1800 successfully added.
 
 The generic syntax for adding a service is the following:
@@ -285,7 +285,7 @@ with the `char <char_command>` command. The prompt displays the selected service
 
 .. code-block:: text
 
-    ble-periph|service(1800)>
+    wble-periph|service(1800)>
 
 
 To remove a service, use the `remove` action with an existing UUID:
@@ -302,7 +302,7 @@ with all their associated handles and descriptors:
 
 .. code-block:: text
 
-    ble-periph> service
+    wble-periph> service
     Service 1800 (Generic Access) (handles from 1 to 5):
     ├─ Characteristic 2A00 (Device Name)
     │ └─ handle:2, value handle: 3, props: read
@@ -325,7 +325,7 @@ as shown below:
 
 .. code-block:: text
 
-    ble-periph|service(1800)> char add 0x2A00 read notify 
+    wble-periph|service(1800)> char add 0x2A00 read notify 
 
 The following rights are supported:
 
@@ -339,7 +339,7 @@ selected service:
 
 .. code-block:: text
 
-    ble-periph|service(1800)> char remove 0x2A00
+    wble-periph|service(1800)> char remove 0x2A00
 
 write
 ~~~~~
@@ -354,8 +354,8 @@ following are valid commands setting the value of a characteristic:
 
 .. code-block:: text
 
-    ble-periph|service(1800)> write 0x2A00 "DeviceName"
-    ble-periph|service(1800)> write 0x2A00 hex 41 42 43
+    wble-periph|service(1800)> write 0x2A00 "DeviceName"
+    wble-periph|service(1800)> write 0x2A00 hex 41 42 43
 
 
 read
@@ -369,7 +369,7 @@ This commands reads the value of a characteristic designed by its handle or UUID
 
 .. code-block:: text
 
-    ble-periph|service(1800)> read 0x2A00
+    wble-periph|service(1800)> read 0x2A00
     00000000: 54 65 73 74 44 65 76 69  63 65                    TestDevice
 
 
@@ -386,7 +386,7 @@ Example:
 
 .. code-block:: text
 
-    ble-periph> name TestDevice
+    wble-periph> name TestDevice
 
 shortname
 ~~~~~~~~~
@@ -401,7 +401,7 @@ This command configures the short name that will be advertised in the advertisin
 
 .. code-block:: text
 
-    ble-periph> shortname TestDevice
+    wble-periph> shortname TestDevice
 
 manuf
 ~~~~~
@@ -422,7 +422,7 @@ Assigned Numbers* document to find the complete list of company IDs).
 
 .. code-block:: text
 
-    ble-periph> manuf 0x0001 4142434445
+    wble-periph> manuf 0x0001 4142434445
 
 
 start

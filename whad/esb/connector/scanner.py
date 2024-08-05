@@ -1,7 +1,4 @@
 """
-ESB Scanner connector
-=====================
-
 This module provides a scanner connector :class:`whad.esb.connector.scanner.Scanner`
 for WHAD ESB devices, allowing to discover available Enhanced ShockBurst devices.
 
@@ -24,8 +21,8 @@ If the underlying device does not support promiscuous sniffing, this connector w
 an :class:`UnsupportedCapability` exception.
 
 """
-from scapy.packet import Packet
 from typing import Iterator
+from scapy.packet import Packet
 from whad.esb.connector import ESB, message_filter, UnsupportedCapability
 from whad.esb.scanning import CommunicatingDevicesDB, CommunicatingDevice
 from whad.hub.esb import PduReceived, RawPduReceived

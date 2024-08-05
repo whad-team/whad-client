@@ -1,19 +1,19 @@
 """Bluetooth Low Energy utility for WHAD
 
-This utility is exposed in WHAD as `ble-central` and provides the following
+This utility is exposed in WHAD as `wble-central` and provides the following
 features:
 
 - BLE scanning
 - GATT client
 - Device emulation
 
-$ ble-central scan    -> find the first usable BLE-capable device
-$ ble-central -i uart scan
-$ ble-central connect <bd address> <random/public>
+$ wble-central scan    -> find the first usable BLE-capable device
+$ wble-central -i uart scan
+$ wble-central connect <bd address> <random/public>
  -> gatttool like, spawns a shell
-$ ble-central -> spawns a shell
-$ ble-central emulate myfile.json
-$ ble-central sniff <bd address> -> capture connections to this device and save to a pcap
+$ wble-central -> spawns a shell
+$ wble-central emulate myfile.json
+$ wble-central sniff <bd address> -> capture connections to this device and save to a pcap
 
 """
 import logging

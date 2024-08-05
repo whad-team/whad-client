@@ -15,7 +15,7 @@ class ChannelMap(object):
         :param channel_map: Channel map value
         :type channel_map: int
         :return: Channel map
-        :return-type: ChannelMap
+        :rtype: ChannelMap
         """
         channels = []
         for i in range(40):
@@ -30,7 +30,7 @@ class ChannelMap(object):
         :param channel_map: Channel map value
         :type channel_map: bytes
         :return: Channel map
-        :return-type: ChannelMap
+        :rtype: ChannelMap
         """
         assert len(channel_map) == 5
         chanmap_int = unpack("<I", channel_map[:4])[0]
@@ -87,7 +87,7 @@ class ChannelMap(object):
         :param channel: Channel to check
         :type channel: int
         :return: True if channel is present in channel map, False otherwise
-        :return-type: bool
+        :rtype: bool
         """
         return (self.__map & (1 << channel)) != 0
         

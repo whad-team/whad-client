@@ -32,7 +32,7 @@ from whad.device.unix import UnixSocketDevice
 from whad.cli.shell import InteractiveShell, category
 
 INTRO='''
-ble-central, the WHAD Bluetooth Low Energy central utility
+wble-central, the WHAD Bluetooth Low Energy central utility
 '''
 
 BDADDR_REGEXP = "^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$"
@@ -59,7 +59,7 @@ class BleCentralShell(InteractiveShell):
     """
 
     def __init__(self, interface: WhadDevice = None, connector=None, bd_address=None):
-        super().__init__(HTML("<b>ble-central></b>"))
+        super().__init__(HTML("<b>wble-central></b>"))
 
         # If interface is None, pick the first matching our needs
         self.__interface = interface
@@ -115,10 +115,10 @@ class BleCentralShell(InteractiveShell):
         """Update prompt to reflect current state
         """
         if not self.__target_bd:
-            self.set_prompt(HTML("<b>ble-central></b>"), force)
+            self.set_prompt(HTML("<b>wble-central></b>"), force)
         else:
             self.set_prompt(HTML(
-                "<b>ble-central|<ansicyan>%s</ansicyan>></b>" % self.__target_bd
+                "<b>wble-central|<ansicyan>%s</ansicyan>></b>" % self.__target_bd
             ), force)
 
 
@@ -333,7 +333,7 @@ class BleCentralShell(InteractiveShell):
 
         # Ensure we are not using a unix socket interface (we cannot connect if this is the case)
         if self.is_stdin_piped():
-            self.error("<u>connect</u> cannot be used when ble-central is chained with another tool.")
+            self.error("<u>connect</u> cannot be used when wble-central is chained with another tool.")
             return
 
         try:
@@ -465,7 +465,7 @@ class BleCentralShell(InteractiveShell):
         This command performs a GATT services and characteristics discovery,
         collecting all this information and keeping it in a dedicated <b>cache</b>.
 
-        If <ansicyan>PROFILE</ansicyan> is provided, <i>ble-central</i> will load this file JSON content
+        If <ansicyan>PROFILE</ansicyan> is provided, <i>wble-central</i> will load this file JSON content
         as current device GATT profile instead of discovering GATT services and
         characteristics. If not, it will discover the device services and
         characteristics, this operation may take some time to complete.
@@ -1214,7 +1214,7 @@ class BleCentralShell(InteractiveShell):
 
 
     def do_quit(self, args):
-        """close ble-central
+        """close wble-central
         """
         if self.__target_bd is not None:
             self.__target.disconnect()
