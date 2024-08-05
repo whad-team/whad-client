@@ -37,14 +37,14 @@ class Discovery(Registry):
         message_type = message.discovery.WhichOneof('msg')
         message_clazz = Discovery.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
-    
+
     def create_info_query(self, proto_ver: int) -> HubMessage:
         """Create a device info query message.
         """
         return Discovery.bound('info_query', self.proto_version)(
             proto_ver=proto_ver
         )
-    
+
     def create_info_resp(self, type: int, device_id: bytes, proto_min_ver: int,
                               max_speed: int, fw_author: bytes, fw_url: bytes,
                               fw_version_major: int, fw_version_minor: int,
@@ -57,7 +57,7 @@ class Discovery(Registry):
             fw_version_major=fw_version_major, fw_version_min=fw_version_minor,
             fw_version_rev=fw_version_rev, capabilities=capabilities
         )
-    
+
     def create_domain_query(self, domain: int) -> HubMessage:
         """Create a domain info query message.
         """
@@ -71,24 +71,24 @@ class Discovery(Registry):
         return Discovery.bound('domain_resp', self.proto_version)(
             domain=domain, supported_commands=supported_commands
         )
-    
+
     def create_set_speed(self, speed: int) -> HubMessage:
         """Create a speed update message.
         """
         return Discovery.bound('set_speed', self.proto_version)(
             speed=speed
         )
-    
+
     def create_reset_query(self) -> HubMessage:
         """Create a device reset query.
         """
         return Discovery.bound('reset_query', self.proto_version)()
-    
+
     def create_device_ready(self) -> HubMessage:
         """Create a device ready response.
         """
         return Discovery.bound('ready_resp', self.proto_version)()
-    
+
 from .info import InfoQuery, InfoQueryResp
 from .domain import DomainInfoQuery, DomainInfoQueryResp
 from .speed import SetSpeed
