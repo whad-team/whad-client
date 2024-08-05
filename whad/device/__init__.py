@@ -171,6 +171,7 @@ class WhadDeviceConnector(object):
 
         :param WhadDevice device: Device to be used with this connector.
         """
+        self.__device = None
         self.set_device(device)
         if self.__device is not None:
             self.__device.set_connector(self)
@@ -706,7 +707,7 @@ class WhadDeviceMessageThread(Thread):
         """
         while not self.__canceled:
             self.__device.process_messages()
-        
+
         # Finish processing remaining messages
         logger.debug('[WhadDeviceMessageThread] processing remaining messages ...')
         while self.__device.process_messages(timeout=.1):
@@ -749,7 +750,7 @@ class WhadDeviceIOThread(object):
             self.__input.join(1.0)
             logger.info("Waiting for processing thread ...")
             self.__processing.join(1.0)
-        
+
         logger.info('WhadDevice IO management thread finished.')
         self.__alive = False
         if self.__device.opened:
@@ -1351,7 +1352,7 @@ class WhadDevice(object):
                 logger.debug('[process_messages] retrieved message %s' % message)
                 self.dispatch_message(message)
                 result = True
-            
+
             return result
         except Empty:
             return False

@@ -51,6 +51,9 @@ class WhadPlayApp(WhadSniffApp):
                 domain = extract_pcap_metadata(self.pcap_file)
                 if domain != "":
                     sys.argv.insert(index_pcap_file + 1, domain)
+                else:
+                    self.error("You need to provide a domain")
+                    exit(1)
             else:
                 self.error("PCAP file not found")
                 exit(1)
@@ -63,12 +66,12 @@ class WhadPlayApp(WhadSniffApp):
         self.infer_domain_from_pcap()
         super().pre_run()
 
+        if not self.args.nocolor:
+            conf.color_theme = BrightTheme()
 
         if self.args.pcap is not None:
             self.interface = WhadDevice.create("pcap:" + ("flush:" if self.args.flush else "") + self.args.pcap )
 
-        if not self.args.nocolor:
-            conf.color_theme = BrightTheme()
 
 from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound
 def wplay_main():

@@ -106,7 +106,7 @@ class Scanner(BLE):
 
             message = self.wait_for_message(filter=message_filter(message_type))
             # Convert message from rebuilt PDU
-            packet = self.translator.from_message(message)
+            packet = message.to_packet()
             self.monitor_packet_rx(packet)
             # Force TxAdd value to propagate the address type
             if isinstance(message, BleAdvPduReceived):

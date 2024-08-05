@@ -12,9 +12,7 @@ from whad.helpers import message_filter, is_message_type
 from whad.hub.unifying import RawPduReceived, PduReceived
 from whad.common.sniffing import EventsManager
 from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Encrypted_Keystroke_Payload
-
 from whad.hub.message import AbstractPacket
-from whad.hub.unifying import RawPduReceived, PduReceived
 import logging
 
 logger = logging.getLogger(__name__)

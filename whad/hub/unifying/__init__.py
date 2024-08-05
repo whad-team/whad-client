@@ -8,6 +8,8 @@ from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
 from whad.hub.esb import EsbNodeAddress
 from whad.hub.metadata import Metadata
+from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
+
 
 class Commands:
     """Unifying commands
@@ -24,6 +26,7 @@ class Commands:
     Stop = 0x09
     SniffPairing = 0x0a
 
+
 @dataclass(repr=False)
 class UnifyingMetadata(Metadata):
     is_crc_valid : bool = None
@@ -31,6 +34,35 @@ class UnifyingMetadata(Metadata):
 
     def convert_to_header(self):
         return None, self.timestamp
+
+    @classmethod
+    def convert_from_header(cls, pkt):
+        metadata = UnifyingMetadata()
+        pkt = ESB_Hdr(bytes(pkt))
+        metadata.address = EsbNodeAddress(pkt.address)
+        metadata.is_crc_valid = pkt.valid_crc
+        metadata.timestamp = int(100000 * pkt.time)
+        metadata.channel = 0
+        return metadata
+
+def generate_unifying_metadata(message, msg_type):
+    metadata = UnifyingMetadata()
+
+    if msg_type == "raw_pdu":
+        message = message.raw_pdu
+    elif msg_type == "pdu":
+        message = message.pdu
+
+    if message.HasField("rssi"):
+        metadata.rssi = message.rssi
+    metadata.channel = message.channel
+    if message.HasField("timestamp"):
+        metadata.timestamp = message.timestamp
+    if message.HasField("crc_validity"):
+        metadata.is_crc_valid = message.crc_validity
+    if message.HasField("address"):
+        metadata.address = ":".join(["{:02x}".format(i) for i in message.address])
+    return metadata
 
 @pb_bind(ProtocolHub, name="unifying", version=1)
 class UnifyingDomain(Registry):
@@ -44,6 +76,8 @@ class UnifyingDomain(Registry):
         """Initializes a Logitech Unifying domain instance
         """
         self.proto_version = version
+        from whad.scapy.layers.unifying import bind
+        bind()
 
     @staticmethod
     def parse(proto_version: int, message) -> HubMessage:
@@ -73,6 +107,24 @@ class UnifyingDomain(Registry):
         else:
             # Error
             return None
+
+
+    def format(self, packet):
+        """
+        Converts a scapy packet with its metadata to a tuple containing a scapy packet with
+        the appropriate header and the timestamp in microseconds.
+        """
+        if ESB_Hdr not in packet:
+            packet = ESB_Hdr(address=None)/packet
+
+        packet.preamble = 0xAA # force a rebuild
+        formatted_packet = ESB_Pseudo_Packet(bytes(packet))
+
+        timestamp = None
+        if hasattr(packet, "metadata"):
+            timestamp = packet.metadata.timestamp
+
+        return formatted_packet, timestamp
 
     def create_set_node_address(self, node_address: EsbNodeAddress) -> HubMessage:
         """Create a SetNodeAddress message

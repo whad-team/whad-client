@@ -65,6 +65,7 @@ class WhadDomainSubParser(ArgumentParser):
         """Display an error message in red (if color is enabled)
         """
         error(message)
+        exit(1)
 
 
 class WhadSniffApp(CommandLineApp):
@@ -176,8 +177,6 @@ class WhadSniffApp(CommandLineApp):
                         monitor_wireshark.attach(sniffer)
                         monitor_wireshark.start()
                         monitors.append(monitor_wireshark)
-
-
 
                     sniffer.domain = self.args.domain
                     if self.is_stdout_piped():

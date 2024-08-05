@@ -2,10 +2,9 @@
 """
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr, Dot15d4TAP_FCS_Type
-from whad.dot15d4.metadata import generate_dot15d4_metadata
 from whad.protocol.whad_pb2 import Message
 from whad.hub import ProtocolHub
-from whad.hub.dot15d4 import RawPduReceived, PduReceived
+from whad.hub.dot15d4 import RawPduReceived, PduReceived, generate_dot15d4_metadata
 from struct import pack
 import logging
 

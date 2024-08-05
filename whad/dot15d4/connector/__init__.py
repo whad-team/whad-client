@@ -13,8 +13,6 @@ from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
-# Dot15d4 message translator
-from whad.dot15d4.connector.translator import Dot15d4MessageTranslator
 
 # WHAD Protocol hub
 from whad.hub.generic.cmdresult import Success, CommandResult
@@ -31,7 +29,6 @@ class Dot15d4(WhadDeviceConnector):
     It is required by various role classes to interact with a real device and pre-process
     domain-specific messages.
     """
-    translator = Dot15d4MessageTranslator
     domain = "dot15d4"
 
     def __init__(self, device=None, synchronous=False, scapy_config='zigbee'):
@@ -56,7 +53,6 @@ class Dot15d4(WhadDeviceConnector):
         else:
             self.__ready = True
             conf.dot15d4_protocol = scapy_config
-            self.translator = Dot15d4MessageTranslator(self.hub)
 
         self.enable_synchronous(synchronous)
 

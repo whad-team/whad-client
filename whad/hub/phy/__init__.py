@@ -9,7 +9,7 @@ from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
 from whad.hub.metadata import Metadata
-
+from whad.scapy.layers.phy import Phy_Packet_Hdr
 class Commands:
     """PHY Commands
     """
@@ -24,7 +24,7 @@ class Commands:
     SetFrequency = 0x08
     SetDataRate = 0x09
     SetEndianness = 0x0a
-    SetTXPower = 0x0b 
+    SetTXPower = 0x0b
     SetPacketSize = 0x0c
     SetSyncWord = 0x0d
     Sniff = 0x0e
@@ -73,7 +73,36 @@ class PhyMetadata(Metadata):
     iq : list = field(default_factory=lambda: [])
 
     def convert_to_header(self):
-        return None, self.timestamp
+        return Phy_Packet_Hdr(frequency=self.frequency, rssi=self.rssi), self.timestamp
+
+
+    @classmethod
+    def convert_from_header(cls, pkt):
+        header = pkt[Phy_Packet_Hdr]
+
+        return PhyMetadata(
+            rssi = header.rssi,
+            frequency = header.frequency,
+            timestamp = int(100000 * pkt.time)
+        )
+
+def generate_phy_metadata(message):
+    metadata = PhyMetadata()
+
+    if message.rssi is not None:
+        metadata.rssi = message.rssi
+
+    metadata.frequency = message.frequency
+
+    if message.timestamp is not None:
+        metadata.timestamp = message.timestamp.sec*0.001 + message.timestamp.usec*0.000001
+
+    if isinstance(message, RawPacketReceived):
+        if message.iq is not None:
+            metadata.iq = [complex(message.iq[i], message.iq[i+1]) for i in range(0,len(message.iq)-1,2)]
+
+    return metadata
+
 
 @pb_bind(ProtocolHub, name="phy", version=1)
 class PhyDomain(Registry):
@@ -134,7 +163,7 @@ class PhyDomain(Registry):
         return PhyDomain.bound('mod_ask', self.proto_version)(
             ook=ook
         )
-    
+
     def create_set_fsk_mod(self, deviation: int) -> HubMessage:
         """Create a SetFskMod message
 
@@ -145,7 +174,7 @@ class PhyDomain(Registry):
         return PhyDomain.bound('mod_fsk', self.proto_version)(
             deviation=deviation
         )
-    
+
     def create_set_gfsk_mod(self, deviation: int) -> HubMessage:
         """Create a SetGfskMod message
 
@@ -156,13 +185,13 @@ class PhyDomain(Registry):
         return PhyDomain.bound('mod_gfsk', self.proto_version)(
             deviation=deviation
         )
-    
+
     def create_set_bpsk_mod(self) -> HubMessage:
         """Create a SetBpskMod message
         :return: instance of `SetBpskMod`
         """
         return PhyDomain.bound('mod_bpsk', self.proto_version)()
-    
+
     def create_set_qpsk_mod(self, offset: bool) -> HubMessage:
         """Create a SetQpskMod message
 
@@ -173,10 +202,10 @@ class PhyDomain(Registry):
         return PhyDomain.bound('mod_qpsk', self.proto_version)(
             offset=offset
         )
-    
+
     def create_set_4fsk_mod(self, deviation: int) -> HubMessage:
         """Create a Set4FskMod message
-        
+
         :param deviation: 4FSK deviation to use, in Hz
         :type deviation: int
         :return: instance of `Set4FskMod`
@@ -184,10 +213,10 @@ class PhyDomain(Registry):
         return PhyDomain.bound('mod_4fsk', self.proto_version)(
             deviation=deviation
         )
-    
+
     def create_set_msk_mod(self, deviation: int) -> HubMessage:
         """Create a SetMskMod message
-        
+
         :param deviation: MSK deviation to use, in Hz
         :type deviation: int
         :return: instance of `SetMskMod`
@@ -195,7 +224,7 @@ class PhyDomain(Registry):
         return PhyDomain.bound('mod_msk', self.proto_version)(
             deviation=deviation
         )
-    
+
     def create_set_lora_mod(self, bandwidth: int, sf: int, cr: int, preamble_length: int, \
                          enable_crc:bool = True, explicit_mode: bool = True, \
                          invert_iq: bool = False):
@@ -236,14 +265,14 @@ class PhyDomain(Registry):
         return PhyDomain.bound('set_freq', self.proto_version)(
             frequency=frequency
         )
-    
+
     def create_get_supported_freqs(self) -> HubMessage:
         """Create a GetSupportedFreqs message
 
         :return: instance of `GetSupportedFreqs`
         """
         return PhyDomain.bound('get_supported_freq', self.proto_version)()
-    
+
     def create_supported_freq_ranges(self, ranges: List[tuple]) -> HubMessage:
         """Create a SupportedFreqRanges message
 
@@ -260,7 +289,7 @@ class PhyDomain(Registry):
 
         # Return created message
         return msg
-    
+
     def create_sniff_mode(self, iq_stream: bool = False) -> HubMessage:
         """Create a SniffMode message
 
@@ -269,7 +298,7 @@ class PhyDomain(Registry):
         :return: instance of `SniffMode`
         """
         return PhyDomain.bound('sniff', self.proto_version)(iq_stream=iq_stream)
-    
+
     def create_jam_mode(self, mode: int) -> HubMessage:
         """Create a JamMode message
 
@@ -278,28 +307,28 @@ class PhyDomain(Registry):
         :return: instance of `JamMode`
         """
         return PhyDomain.bound('jam', self.proto_version)(mode=mode)
-    
+
     def create_monitor_mode(self) -> HubMessage:
         """Create a MonitorMode message.
 
         :return: instance of `MonitorMode`
         """
         return PhyDomain.bound('monitor', self.proto_version)()
-    
+
     def create_start(self) -> HubMessage:
         """Create a Start message
 
         :return: instance of `Start`
-        """ 
+        """
         return PhyDomain.bound('start', self.proto_version)()
 
     def create_stop(self) -> HubMessage:
         """Create a Stop message
 
         :return: instance of `Stop`
-        """ 
+        """
         return PhyDomain.bound('stop', self.proto_version)()
-    
+
     def create_jammed(self, timestamp: int) -> HubMessage:
         """Create a Jammed notification
 
@@ -310,7 +339,7 @@ class PhyDomain(Registry):
         return PhyDomain.bound('jammed', self.proto_version)(
             timestamp=timestamp
         )
-    
+
     def create_montoring_report(self, timestamp: int, reports: List[int]) -> HubMessage:
         """Create a MonitoringReport notification message
 
@@ -331,7 +360,7 @@ class PhyDomain(Registry):
 
         # Return message
         return msg
-    
+
     def create_set_datarate(self, datarate: int) -> HubMessage:
         """Create a SetDatarate message
 
@@ -342,7 +371,7 @@ class PhyDomain(Registry):
         return PhyDomain.bound('datarate', self.proto_version)(
             rate=datarate
         )
-    
+
     def create_set_endianness(self, little: bool = True) -> HubMessage:
         """Create a SetEndianness message
 
@@ -353,7 +382,7 @@ class PhyDomain(Registry):
         return PhyDomain.bound('endianness', self.proto_version)(
             endianness=Endianness.LITTLE if little else Endianness.BIG
         )
-    
+
     def create_set_packet_size(self, size: int) -> HubMessage:
         """Create a SetPacketSize message
 
@@ -364,7 +393,7 @@ class PhyDomain(Registry):
         return PhyDomain.bound('packet_size', self.proto_version)(
             packet_size=size
         )
-    
+
     def  create_set_tx_power(self, power: int) -> HubMessage:
         """Create a SetTxPower message
 
@@ -386,7 +415,7 @@ class PhyDomain(Registry):
         return PhyDomain.bound('sync_word', self.proto_version)(
             sync_word=syncword
         )
-    
+
     def create_send_packet(self, packet: bytes) -> HubMessage:
         """Create a SendPacket message
 
@@ -397,7 +426,7 @@ class PhyDomain(Registry):
         return PhyDomain.bound('send', self.proto_version)(
             packet=packet
         )
-    
+
     def create_send_raw_packet(self, iq: List[int]) -> HubMessage:
         """Create a SendPacket message
 
@@ -440,10 +469,10 @@ class PhyDomain(Registry):
             msg.rssi = rssi
         if timestamp is not None:
             msg.timestamp = timestamp
-        
+
         # Success
         return msg
-    
+
     def create_raw_packet_received(self, frequency: int, packet: bytes, rssi: int = None, \
                              timestamp: int = None, iq: List[int] = None) -> HubMessage:
         """Create a RawPacketReceived notification message
@@ -471,10 +500,10 @@ class PhyDomain(Registry):
         if iq is not None:
             for sample in iq:
                 msg.iq.append(sample)
-        
+
         # Success
         return msg
-    
+
     def create_schedule_packet(self, packet: bytes, timestamp: int) -> HubMessage:
         """Create a SchedulePacket message
 
@@ -494,7 +523,7 @@ class PhyDomain(Registry):
 
         # Return message
         return msg
-    
+
     def create_schedule_packet_response(self, packet_id: int, full: bool = False) -> HubMessage:
         """Create a SchedulePacketResponse message
 
@@ -508,7 +537,7 @@ class PhyDomain(Registry):
             id=packet_id,
             full=full
         )
-    
+
     def create_schedule_packet_sent(self, packet_id: int) -> HubMessage:
         """Create a SchedulePacketSent notification message
 

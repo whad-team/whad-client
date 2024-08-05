@@ -9,10 +9,10 @@ from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.cli.app import CommandLineApp, ApplicationError, run_app
 from scapy.all import *
 from whad.device.unix import  UnixSocketConnector, UnixConnector, UnixSocketServerDevice
-from whad.device import Bridge
+from whad.device import Bridge, ProtocolHub
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.cli.ui import error, warning, success, info, display_event, display_packet, format_analyzer_output
-from whad.tools.utils import get_translator, get_analyzers
+from whad.tools.utils import get_analyzers
 
 import logging
 import time
@@ -272,9 +272,8 @@ class WhadAnalyzeApp(CommandLineApp):
                         self.selected_analyzers[analyzer_name]._displayed = False
 
                 connector.domain = self.args.domain
-                connector.translator = get_translator(self.args.domain)(connector.hub)
-                connector.format = connector.translator.format
-
+                hub = ProtocolHub(1)
+                connector.format = hub.get(self.args.domain).format
 
 
                 if self.is_stdout_piped() and self.args.packets:

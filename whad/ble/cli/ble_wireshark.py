@@ -21,11 +21,9 @@ from whad.cli.app import CommandLineDevicePipe, ApplicationError
 from whad.ble.connector import Central
 from whad.common.monitors import WiresharkMonitor
 from whad.device.unix import UnixSocketProxy, UnixSocketConnector
-from whad.ble.metadata import generate_ble_metadata, BLEMetadata
-from whad.hub.ble import SendBlePdu, SendBleRawPdu, BleAdvPduReceived, BlePduReceived, \
-    BleRawPduReceived
 
-from whad.ble.connector.translator import BleMessageTranslator
+from whad.hub.ble import SendBlePdu, SendBleRawPdu, BleAdvPduReceived, BlePduReceived, \
+    BleRawPduReceived, generate_ble_metadata, BLEMetadata
 
 
 logger = logging.getLogger(__name__)
@@ -135,7 +133,7 @@ class BleWiresharkApp(CommandLineDevicePipe):
         monitor.start()
         self.proxy.start()
         self.proxy.join()
-        
+
 
 def ble_wireshark_main():
     try:
@@ -143,4 +141,3 @@ def ble_wireshark_main():
         app.run()
     except ApplicationError as err:
         err.show()
-

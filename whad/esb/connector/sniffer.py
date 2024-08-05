@@ -99,7 +99,7 @@ class Sniffer(ESB, EventsManager):
         actions = []
         return [action for action in actions if filter is None or isinstance(action, filter)]
 
-    def sniff(self, channel: int = None, address: str = None, show_acknowledgements: bool = False, 
+    def sniff(self, channel: int = None, address: str = None, show_acknowledgements: bool = False,
               timeout: float = None) -> Generator[Packet, None, None]:
         """Update current sniffing configuration if required and sniff packets. This function
         returns after `timeout` seconds, if specified.

@@ -10,10 +10,11 @@ from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, 
 from scapy.utils import PcapReader, PcapWriter
 from struct import unpack, pack
 from scapy.layers.bluetooth4LE import BTLE
-from whad.dot15d4.metadata import Dot15d4Metadata
-from whad.ble.metadata import BLEMetadata
-from whad.esb.metadata import ESBMetadata
-from whad.unifying.metadata import UnifyingMetadata
+from whad.hub.dot15d4 import Dot15d4Metadata
+from whad.hub.ble import BLEMetadata
+from whad.hub.esb import ESBMetadata
+from whad.hub.phy import PhyMetadata
+from whad.hub.unifying import UnifyingMetadata
 from time import sleep
 from whad import WhadDomain
 from os.path import exists
@@ -65,6 +66,14 @@ class PCAPDevice(VirtualDevice):
         self.__dlt = None
         self.__domain = None
         self.__start_timestamp, self.__last_timestamp = None, None
+
+
+        self.__supported_frequency_range = [
+            (281000000, 361000000),
+            (378000000, 481000000),
+            (749000000, 962000000),
+            (2400000000, 2500000000)
+        ]
         super().__init__()
 
     def _is_reader(self):
@@ -141,6 +150,8 @@ class PCAPDevice(VirtualDevice):
             metadata = ESBMetadata.convert_from_header(pkt)
         elif self.__domain == WhadDomain.LogitechUnifying:
             metadata = UnifyingMetadata.convert_from_header(pkt)
+        elif self.__domain == WhadDomain.Phy:
+            metadata = PhyMetadata.convert_from_header(pkt)
 
         else:
             return None
@@ -177,7 +188,22 @@ class PCAPDevice(VirtualDevice):
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
             self._send_whad_unifying_raw_pdu(pkt, metadata)
+        elif self.__domain == WhadDomain.Phy:
+            metadata = self._generate_metadata(pkt)
+            self._interframe_delay(metadata.timestamp)
+            self.__last_timestamp = metadata.timestamp
+            self._send_whad_phy_pdu(pkt, metadata)
 
+
+    def _send_whad_phy_pdu(self, packet, metadata):
+        msg = self.hub.phy.create_packet_received(
+            metadata.frequency, # TODO: frequency,
+            bytes(packet),
+            metadata.rssi, # TODO: rssi
+            metadata.timestamp
+        )
+        # Send message
+        self._send_whad_message(msg)
 
     def _send_whad_unifying_raw_pdu(self, packet, metadata):
         # Create a RawPduReceived message
@@ -269,6 +295,77 @@ class PCAPDevice(VirtualDevice):
 
     def _on_whad_ble_sniff_conn(self, message):
         self._send_whad_command_result(CommandResult.SUCCESS)
+
+
+    def _on_whad_phy_stop(self, message):
+        self.__started = False
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_phy_send_raw(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_phy_sniff(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_phy_start(self, message):
+        self.__started = True
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+
+    def _on_whad_phy_get_supported_freq(self, message):
+        # Create a SupportedFreqRanges
+        msg = self.hub.phy.create_supported_freq_ranges(
+            self.__supported_frequency_range
+        )
+
+        # Send message
+        self._send_whad_message(msg)
+
+    def _on_whad_phy_send(self, message):
+        self._send_packet(message.packet)
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+
+    def _on_whad_phy_set_freq(self, message):
+        found = False
+        for supported_range in self.__supported_frequency_range:
+            range_start, range_end = supported_range[0], supported_range[1]
+            if message.frequency >= range_start and message.frequency <= range_end:
+                found = True
+                break
+        if found:
+            self.__frequency = message.frequency
+            self._send_whad_command_result(CommandResult.SUCCESS)
+        else:
+            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
+
+    def _on_whad_phy_datarate(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_phy_packet_size(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_phy_endianness(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_phy_tx_power(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_phy_mod_ask(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_phy_mod_4fsk(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_phy_mod_fsk(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_phy_mod_gfsk(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_phy_sync_word(self, message):
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
 
     def _on_whad_dot15d4_stop(self, message):
         self.__started = False

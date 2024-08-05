@@ -9,12 +9,11 @@ import time
 
 from whad.cli.ui import wait, success
 from whad.cli.app import CommandLineApp, run_app
-from whad.device import Bridge
+from whad.device import Bridge, ProtocolHub
 from scapy.all import *
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.common.monitors import PcapWriterMonitor
 from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.tools.utils import get_translator
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +97,10 @@ class WhadDumpApp(CommandLineApp):
 
                     connector = UnixConnector(interface)
                     connector.domain = self.args.domain
-                    connector.translator = get_translator(self.args.domain)(connector.hub)
-                    connector.format = connector.translator.format
+                    hub = ProtocolHub(1)
+                    connector.format = hub.get(self.args.domain).format
+                    #connector.translator = get_translator(self.args.domain)(connector.hub)
+                    #connector.format = connector.translator.format
 
                     self.connector = connector
                     self.monitor = PcapWriterMonitor(self.args.pcap)
@@ -122,7 +123,7 @@ class WhadDumpApp(CommandLineApp):
                             )
                             time.sleep(.2)
             else:
-                pass
+                error("You must provide a pcap file.")
         except KeyboardInterrupt:
             # Launch post-run tasks
             if self.monitor is not None:
