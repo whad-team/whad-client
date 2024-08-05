@@ -29,7 +29,6 @@ from scapy.fields import (
 from scapy.layers.bluetooth import EIR_Element, EIR_Hdr, EIR_Raw
 from scapy.all import Raw
 
-
 MESSAGE_MODEL_OPCODES = {
     0x8201: "Generic_OnOff_Get",
     0x8202: "Generic_OnOff_Set",
@@ -228,6 +227,8 @@ MESSAGE_MODEL_OPCODES = {
     0x63: "Light_LC_Property_Set_Unacknowledged",
     0x64: "Light_LC_Property_Status",
 }
+
+
 
 """
 PROVISIONING PDU LAYER

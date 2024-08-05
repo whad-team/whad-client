@@ -121,6 +121,10 @@ def test_k4(test_input, expected):
     assert k4(n) == expected
 
 
+"""
+For new test values, copy this dict, fill it with values, and add it in the params of the fixture crypto_manager_setup below, it should use it
+"""
+
 _BTM_ECDH_P256_CMAC_AES128_AES_CCM_values = dict(
     test_input=dict(
         alg="BTM_ECDH_P256_CMAC_AES128_AES_CCM",
@@ -227,7 +231,7 @@ def crypto_manager_setup(request):
     test_values = request.param
     test_input = test_values["test_input"]
     test_pdu_values = test_values["test_pdu_values"]
-    crypto_manager = ProvisioningBearerAdvCryptoManager(**test_input)
+    crypto_manager = ProvisioningBearerAdvCryptoManager(**test_input, test=True)
 
     crypto_manager.compute_confirmation_salt(**test_pdu_values)
 
