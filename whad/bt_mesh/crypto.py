@@ -4,6 +4,7 @@ from whad.ble.crypto import (
     aes_cmac,
     generate_diffie_hellman_shared_secret,
     generate_public_key_from_coordinates,
+    generate_p256_keypair,
 )
 from cryptography.hazmat.primitives.asymmetric.ec import derive_private_key, SECP256R1
 
@@ -71,9 +72,9 @@ def k3(n):
     """
     salt = s1(b"smk3")
     t = aes_cmac(salt, n)
-    return (int.from_bytes(aes_cmac(t, b"id64" + b"\x01"), byteorder="big") % (2**64)).to_bytes(
-        8, byteorder="big"
-    )
+    return (
+        int.from_bytes(aes_cmac(t, b"id64" + b"\x01"), byteorder="big") % (2**64)
+    ).to_bytes(8, byteorder="big")
 
 
 def k4(n):
@@ -82,9 +83,9 @@ def k4(n):
     """
     salt = s1(b"smk4")
     t = aes_cmac(salt, n)
-    return (int.from_bytes(aes_cmac(t, b"id6" + b"\x01"), byteorder="big") % (2**6)).to_bytes(
-        1, byteorder="big"
-    )
+    return (
+        int.from_bytes(aes_cmac(t, b"id6" + b"\x01"), byteorder="big") % (2**6)
+    ).to_bytes(1, byteorder="big")
 
 
 def k5(n, salt, p):
@@ -120,7 +121,14 @@ class ProvisioningBearerAdvCryptoManager:
         rand_provisioner=None,
         rand_device=None,
         auth_value=None,
+        *,
+        test=False,
     ):
+        """
+        Constructor for testing when we already have values
+        """
+
+        # if not intancited for test, do nothing
         self.alg = alg
         self.private_key_device = private_key_device
         self.private_key_provisioner = private_key_provisioner
@@ -138,11 +146,17 @@ class ProvisioningBearerAdvCryptoManager:
         self.confirmation_provisioner = None
         self.confirmation_device = None
 
-        self.compute_ecdh_secret()
+        # if in test mode, we directly compute the ecdh secret
+        if test:
+            self.compute_ecdh_secret()
+
+    def set_alg(self, alg):
+        self.alg = alg
 
     def compute_ecdh_secret(self):
         """
         Get the keys in the correct format to compute ECDH shared secret
+        Only for test we need to process like this, overwritten in subclasses
         """
         if self.private_key_provisioner is not None:
             public_key_device = generate_public_key_from_coordinates(
@@ -174,7 +188,6 @@ class ProvisioningBearerAdvCryptoManager:
         provisioning_capabilities_pdu,
         provisioning_start_pdu,
     ):
-
         """
         Computes the Confirmation Salt, defined in Mesh Protocol Specification, p. 593, Section 5.4.2.4.1
         pub_keys are concat of x and y coordinates
@@ -283,3 +296,47 @@ class ProvisioningBearerAdvCryptoManager:
             return (plaintext, True)
         except ValueError:
             return (plaintext, False)
+
+class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoManager):
+    def __init__(self):
+        super().__init__()  # does nothing, but better to have super...
+        self.public_key_device = None
+        self.public_key_provisioner = None
+
+    def generate_p256_keypair(self):
+        """Generate the P256 private key / public key"""
+        self.private_key_device, self.public_key_device = (
+            generate_p256_keypair()
+        )
+
+    def compute_ecdh_secret(self):
+        """
+        Get the keys in the correct format to compute ECDH shared secret
+        """
+        self.ecdh_secret = generate_diffie_hellman_shared_secret(
+            self.private_key_provisioner, self.public_key_device
+        )
+
+
+
+class ProvisioningBearerAdvCryptoManagerDevice(ProvisioningBearerAdvCryptoManager):
+    def __init__(self):
+        super().__init__()  # does nothing, but better to have super...
+        self.public_key_device = None
+        self.public_key_provisioner = None
+
+    def generate_p256_keypair(self):
+        """Generate the P256 private key / public key"""
+        self.private_key_device, self.public_key_device = (
+            generate_p256_keypair()
+        )
+
+    def compute_ecdh_secret(self):
+        """
+        Get the keys in the correct format to compute ECDH shared secret
+        """
+        self.ecdh_secret = generate_diffie_hellman_shared_secret(
+            self.private_key_device, self.public_key_provisioner
+        )
+
+
