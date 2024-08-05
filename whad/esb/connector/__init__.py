@@ -2,7 +2,6 @@ from scapy.packet import Packet
 
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
-from whad.esb.connector.translator import ESBMessageTranslator
 from whad.esb.esbaddr import ESBAddress
 from whad.hub.esb import ESBMetadata
 from whad.scapy.layers.esb import ESB_Hdr,ESB_Payload_Hdr,ESB_Ack_Response
@@ -23,7 +22,6 @@ class ESB(WhadDeviceConnector):
     domain-specific messages.
     """
 
-    translator = ESBMessageTranslator
     domain = "esb"
 
     def format(self, packet):
@@ -61,9 +59,6 @@ class ESB(WhadDeviceConnector):
             raise UnsupportedDomain("ESB")
         else:
             self.__ready = True
-
-        # Initialize translator
-        self.translator = ESBMessageTranslator(protocol_hub=self.hub)
 
         # Set synchronous mode
         self.enable_synchronous(synchronous)
@@ -147,7 +142,7 @@ class ESB(WhadDeviceConnector):
             (commands & (1 << Commands.SetNodeAddress)) > 0
         )
 
-    def sniff(self, channel : int = None, address : str = "FF:FF:FF:FF:FF", 
+    def sniff(self, channel : int = None, address : str = "FF:FF:FF:FF:FF",
               show_acknowledgements : bool = False):
         """
         Sniff Enhanced ShockBurst packets.

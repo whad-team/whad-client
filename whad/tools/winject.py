@@ -10,12 +10,11 @@ import time
 from whad.exceptions import RequiredImplementation
 from whad.cli.ui import wait, success, display_packet
 from whad.cli.app import CommandLineApp, run_app
-from whad.device import Bridge
+from whad.device import Bridge, ProtocolHub
 from scapy.all import *
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.common.monitors import PcapWriterMonitor
 from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.tools.utils import get_translator
 #from whad.unifying import Injector
 from whad.phy.connector.injector import Injector
 
@@ -55,9 +54,12 @@ class WhadInjectApp(CommandLineApp):
 
 
                     connector = UnixConnector(self.input_interface)
+
                     connector.domain = self.args.domain
-                    connector.translator = get_translator(self.args.domain)(connector.hub)
-                    connector.format = connector.translator.format
+                    hub = ProtocolHub(1)
+                    connector.format = hub.get(self.args.domain).format
+                    #connector.translator = get_translator(self.args.domain)(connector.hub)
+                    #connector.format = connector.translator.format
 
                     connector.on_packet = self.on_incoming_packet
                     self.injector = Injector(self.interface)

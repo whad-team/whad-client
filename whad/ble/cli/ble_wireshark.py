@@ -25,8 +25,6 @@ from whad.device.unix import UnixSocketProxy, UnixSocketConnector
 from whad.hub.ble import SendBlePdu, SendBleRawPdu, BleAdvPduReceived, BlePduReceived, \
     BleRawPduReceived, generate_ble_metadata, BLEMetadata
 
-from whad.ble.connector.translator import BleMessageTranslator
-
 
 logger = logging.getLogger(__name__)
 

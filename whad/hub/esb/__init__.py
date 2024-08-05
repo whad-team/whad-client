@@ -43,7 +43,7 @@ class EsbNodeAddress(object):
     >>> print(addr2.value)
     """
 
-    def __init__(self, address: Union[bytes, int], address_size: int = 0):
+    def __init__(self, address: Union[str, bytes, int], address_size: int = 0):
         """Initialize our node address
 
         :param address: ESB node address
@@ -52,7 +52,9 @@ class EsbNodeAddress(object):
         :type address_size: int, optional
         """
         self.__address = None
-        if isinstance(address, bytes):
+        if isinstance(address, str):
+            self.__address = bytes([int(i, 16) for i in address.split(":")])
+        elif isinstance(address, bytes):
             if len(address) >= 1 and len(address) <= 5:
                 self.__address = address
             else:
@@ -91,7 +93,7 @@ class ESBMetadata(Metadata):
     def convert_from_header(cls, pkt):
         metadata = ESBMetadata()
         pkt = ESB_Hdr(bytes(pkt))
-        metadata.address = ESBAddress(pkt.address)
+        metadata.address = EsbNodeAddress(pkt.address)
         metadata.is_crc_valid = pkt.valid_crc
         metadata.timestamp = int(100000 * pkt.time)
         metadata.channel = 0
@@ -123,6 +125,8 @@ class EsbDomain(Registry):
         """Initializes a ESB domain instance
         """
         self.proto_version = version
+        from whad.scapy.layers.unifying import unbind
+        unbind()
 
     def is_packet_compat(self, packet) -> bool:
         """Determine if a packet is an ESB packet.
@@ -154,7 +158,7 @@ class EsbDomain(Registry):
             packet = ESB_Hdr(address=None)/packet
 
         packet.preamble = 0xAA # force a rebuild
-        formatted_packet = ESB_Pseudo_Packet(bytes(packet)[1:])
+        formatted_packet = ESB_Pseudo_Packet(bytes(packet))
 
         timestamp = None
         if hasattr(packet, "metadata"):

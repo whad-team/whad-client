@@ -4,7 +4,8 @@ from typing import List
 from dataclasses import dataclass, field, fields
 
 from scapy.layers.dot15d4 import Dot15d4FCS
-
+from whad.scapy.layers.rf4ce import RF4CE_Hdr
+from scapy.config import conf
 from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4MitmRole, AddressType
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr,\
     Dot15d4TAP_Received_Signal_Strength, Dot15d4TAP_Channel_Assignment, \
@@ -436,6 +437,30 @@ class Dot15d4Domain(Registry):
 
         # Return the generated message
         return msg
+
+@pb_bind(ProtocolHub, name="rf4ce", version=1)
+class RF4CEDomain(Dot15d4Domain):
+    NAME = 'rf4ce'
+    VERSIONS = {}
+
+    def __init__(self, version: int):
+        """Initializes a RF4CE domain instance
+        """
+        super().__init__(version)
+        conf.dot15d4_protocol = "rf4ce"
+
+
+@pb_bind(ProtocolHub, name="zigbee", version=1)
+class ZigBeeDomain(Dot15d4Domain):
+    NAME = 'zigbee'
+    VERSIONS = {}
+
+    def __init__(self, version: int):
+        """Initializes a ZigBee domain instance
+        """
+        super().__init__(version)
+        conf.dot15d4_protocol = "zigbee"
+
 
 from .address import SetNodeAddress
 from .mode import SniffMode, RouterMode, EndDeviceMode, CoordMode, EnergyDetectionMode, \

@@ -144,6 +144,7 @@ def build_configuration_from_args(environment, args):
             setattr(configuration, subfield_real_name, None)
     return configuration
 
+'''
 def get_translator(protocol):
     """Get a translator according to a specific domain.
     """
@@ -172,7 +173,7 @@ def get_translator(protocol):
         bind()
 
     return translator
-
+'''
 
 def get_analyzers(protocol=None):
     analyzers = {}

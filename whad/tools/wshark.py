@@ -13,7 +13,6 @@ from whad.device import Bridge, ProtocolHub
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.common.monitors import WiresharkMonitor
 from whad.cli.app import CommandLineApp, run_app
-from whad.tools.utils import get_translator
 
 # wshark logger
 logger = logging.getLogger(__name__)
@@ -72,14 +71,14 @@ class WhadWiresharkApp(CommandLineApp):
                 # Save our connector and force its domain
                 self.connector = connector
                 self.connector.domain = self.args.domain
-                self.connector.translator = get_translator(self.args.domain)(connector.hub)
-                self.connector.format = connector.translator.format
+                #self.connector.translator = get_translator(self.args.domain)(connector.hub)
+                #self.connector.format = connector.translator.format
 
 
                 # Query our protocol hub to gather the correct format function
                 # based on the provided domain
-                #hub = ProtocolHub(1)
-                #self.connector.format = hub.get(self.args.domain).format
+                hub = ProtocolHub(1)
+                self.connector.format = hub.get(self.args.domain).format
 
                 # Attack a wireshark monitor
                 self.monitor = WiresharkMonitor()

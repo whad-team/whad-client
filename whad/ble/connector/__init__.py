@@ -22,7 +22,6 @@ from whad.hub.events import ConnectionEvt, DisconnectionEvt, SyncEvt, DesyncEvt,
 
 # Bluetooth Low Energy dependencies
 from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
-from whad.ble.connector.translator import BleMessageTranslator
 from whad.ble.profile.advdata import AdvDataFieldList
 
 # Logging
@@ -37,7 +36,6 @@ class BLE(WhadDeviceConnector):
     domain-specific messages.
     """
     domain = 'ble'
-    translator = BleMessageTranslator
 
     # correlation table
     SCAPY_CORR_ADV = {
@@ -85,9 +83,6 @@ class BLE(WhadDeviceConnector):
             raise UnsupportedDomain("Bluetooth Low Energy")
         else:
             self.__ready = True
-
-        # Initialize translator
-        self.translator = BleMessageTranslator(self.hub)
 
         # Set synchronous mode if provided
         self.enable_synchronous(synchronous)
@@ -753,7 +748,7 @@ class BLE(WhadDeviceConnector):
         )
 
     def on_triggered(self, identifier):
-        """Prepare sequence triggered event callback 
+        """Prepare sequence triggered event callback
         """
         for trigger in self.__triggers:
             if trigger.identifier == identifier:
@@ -828,13 +823,13 @@ class BLE(WhadDeviceConnector):
             return super().send_packet(packet)
         else:
             return False
-        
+
     def send_packet(self, packet: Packet):
         """Packet send hook
 
         This hook makes sure we are using a valid WHAD message when sending
         a packet, if this method is called from outside.
-        
+
         :param packet: Packet to send
         :type packet: :class:`scapy.packet.Packet`
         :return: True if packet has correctly been sent, False otherwise.

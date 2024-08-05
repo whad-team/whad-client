@@ -9,10 +9,9 @@ from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.cli.app import CommandLineApp, ApplicationError, run_app
 from scapy.all import *
 from whad.device.unix import  UnixSocketConnector
-from whad.device import Bridge
+from whad.device import Bridge, ProtocolHub
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
-from whad.tools.utils import get_translator
 
 import logging
 import time
@@ -98,8 +97,11 @@ class WhadExtractApp(CommandLineApp):
                     connector.add_parameter(parameter_name, parameter_value)
 
                 connector.domain = self.args.domain
-                connector.translator = get_translator(self.args.domain)(connector.hub)
-                connector.format = connector.translator.format
+                hub = ProtocolHub(1)
+                connector.format = hub.get(self.args.domain).format
+
+                #connector.translator = get_translator(self.args.domain)(connector.hub)
+                #connector.format = connector.translator.format
                 connector.on_packet = self.on_packet
 
                 #interface.open()

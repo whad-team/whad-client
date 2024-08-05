@@ -9,10 +9,9 @@ from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.cli.app import CommandLineApp, ApplicationError, run_app
 from scapy.all import *
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
-from whad.device import Bridge
+from whad.device import Bridge, ProtocolHub
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.cli.ui import error, warning, success, info, display_event, display_packet
-from whad.tools.utils import get_translator
 import logging
 from time import sleep
 from scapy.config import conf
@@ -249,9 +248,11 @@ class WhadFilterApp(CommandLineApp):
                 connector = UnixConnector(interface)
 
                 connector.domain = self.args.domain
+                hub = ProtocolHub(1)
+                connector.format = hub.get(self.args.domain).format
 
-                connector.translator = get_translator(self.args.domain)(connector.hub)
-                connector.format = connector.translator.format
+                #connector.translator = get_translator(self.args.domain)(connector.hub)
+                #connector.format = connector.translator.format
 
                 if self.is_stdout_piped():
                     unix_server = UnixConnector(UnixSocketServerDevice(parameters={

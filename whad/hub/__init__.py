@@ -33,7 +33,7 @@ class ProtocolHub(Registry):
     @property
     def version(self) -> int:
         return self.__version
-    
+
     @property
     def generic(self):
         return self.get('generic')
@@ -41,11 +41,11 @@ class ProtocolHub(Registry):
     @property
     def discovery(self):
         return self.get('discovery')
-    
+
     @property
     def ble(self):
         return self.get('ble')
-    
+
     @property
     def dot15d4(self):
         return self.get('dot15d4')
@@ -53,11 +53,11 @@ class ProtocolHub(Registry):
     @property
     def phy(self):
         return self.get('phy')
-    
+
     @property
     def esb(self):
         return self.get('esb')
-    
+
     @property
     def unifying(self):
         return self.get('unifying')
@@ -86,7 +86,6 @@ class ProtocolHub(Registry):
         """Convert packet to the corresponding message.
         """
         msg = None
-
         # We dispatch packets based on their layers
         if self.ble.is_packet_compat(packet):
             logger.debug('[hub] convert_packet(): packet is BLE')
