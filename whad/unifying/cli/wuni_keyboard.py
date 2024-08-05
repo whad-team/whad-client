@@ -98,7 +98,7 @@ class DuckyScriptRunner(object):
         :param format: expected format
         :type format: str
         :return: dict representing this operand
-        :return-type: dict
+        :rtype: dict
         """
         return {
             "value": token,
@@ -114,7 +114,7 @@ class DuckyScriptRunner(object):
         :param format: list of operands types
         :type format: str
         :return: list of parsed operands
-        :return-type: list
+        :rtype: list
         """
         parsed_operands = []
         
@@ -145,7 +145,7 @@ class DuckyScriptRunner(object):
         :param line: line to parse
         :type line: str
         :return: abstract representation for this line
-        :return-type: dict
+        :rtype: dict
         """
         # Trim line
         line = line.strip()

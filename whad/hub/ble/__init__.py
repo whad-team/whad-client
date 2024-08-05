@@ -184,7 +184,7 @@ class BleDomain(Registry):
         :param bd_address: BD address to set
         :type bd_address: BDAddress
         :return: SetBdAddress message
-        :return-type: HubMessage
+        :rtype: HubMessage
         """
         return BleDomain.bound('set_bd_addr', self.proto_version)(
             bd_address=bd_address.value,
@@ -202,7 +202,7 @@ class BleDomain(Registry):
         :param use_ext_adv: Use extended advertisements
         :type use_ext_adv: bool, optional
         :return: instance of SniffAdv message
-        :return-type: HubMessage
+        :rtype: HubMessage
         """
         if bd_address is not None:
             target_address = bd_address
@@ -226,7 +226,7 @@ class BleDomain(Registry):
         :type show_empty: bool, optional
         :param show_adv: Report advertisements
         :type show_adv: bool, optional
-        :return-type: HubMessage
+        :rtype: HubMessage
         """
         if bd_address is not None:
             target_address = bd_address
@@ -245,7 +245,7 @@ class BleDomain(Registry):
         :param channels: List of channels
         :type channels: list
         :return: an instance of SniffAccessAddress message
-        :return-type: HubMessage
+        :rtype: HubMessage
         """
         return BleDomain.bound('sniff_aa', self.proto_version)(
             monitored_channels=ChannelMap(channels).value
@@ -269,7 +269,7 @@ class BleDomain(Registry):
         :param channels: Channels to sniff on when recovering connection parameters
         :type channels: list, optional
         :return: instance of SniffActiveConn message
-        :return-type: SniffActiveConn
+        :rtype: SniffActiveConn
         """
         # Create default createSniffActiveConn message
         sniff_connreq = BleDomain.bound('sniff_conn', self.proto_version)(
@@ -301,7 +301,7 @@ class BleDomain(Registry):
         :param timestamp: Timestamp at which the access address has been discovered
         :type timestamp: int
         :return: instance of AccessAddressDiscovered
-        :return-type: AccessAddressDiscovered
+        :rtype: AccessAddressDiscovered
         """
         return BleDomain.bound('aa_disc', self.proto_version)(
             access_address=access_address,
@@ -313,7 +313,7 @@ class BleDomain(Registry):
         """Create a JamAdv message.
 
         :return: instance of JamAdv message
-        :return-type: JamAdv
+        :rtype: JamAdv
         """
         return BleDomain.bound('jam_adv', self.proto_version)()
 
@@ -323,7 +323,7 @@ class BleDomain(Registry):
         :param channel: Advertising channel to jam
         :type channel: int
         :return: instance of JamAdvChan
-        :return-type: JamAdvChan
+        :rtype: JamAdvChan
         """
         return BleDomain.bound('jam_adv_chan', self.proto_version)(
             channel=channel
@@ -335,7 +335,7 @@ class BleDomain(Registry):
         :param access_address: Target connection access address
         :type access_address: int
         :return: instance of JamConn message
-        :return-type: JamConn
+        :rtype: JamConn
         """
         return BleDomain.bound('jam_conn', self.proto_version)(
             access_address=access_address
@@ -351,7 +351,7 @@ class BleDomain(Registry):
         :param position: Triger pattern position
         :type position: int
         :return: instance of ReactiveJam
-        :return-type: ReactiveJam
+        :rtype: ReactiveJam
         """
         return BleDomain.bound('reactive_jam', self.proto_version)(
             channel=channel,
@@ -365,7 +365,7 @@ class BleDomain(Registry):
         :param active: Enable active scan mode
         :type active: bool
         :return: instance of ScanMode
-        :return-type: ScanMode
+        :rtype: ScanMode
         """
         return BleDomain.bound('scan_mode', self.proto_version)(
             active=active
@@ -379,7 +379,7 @@ class BleDomain(Registry):
         :param scan_rsp: Scan response data (31 bytes max)
         :type scan_rsp: bytes, optional
         :return: instance of AdvMode message
-        :return-type: AdvMode
+        :rtype: AdvMode
         """
         message = BleDomain.bound('adv_mode', self.proto_version)(
             scan_data=adv_data
@@ -392,7 +392,7 @@ class BleDomain(Registry):
         """Create a CentralMode message.
 
         :return: instance of CentralMode message
-        :return-type: CentralMode
+        :rtype: CentralMode
         """
         return BleDomain.bound('central_mode', self.proto_version)()
 
@@ -404,7 +404,7 @@ class BleDomain(Registry):
         :param scan_rsp: Scan response data (31 bytes max)
         :type scan_rsp: bytes, optional
         :return: instance of PeriphMode message
-        :return-type: PeriphMode
+        :rtype: PeriphMode
         """
         message = BleDomain.bound('periph_mode', self.proto_version)(
         )
@@ -418,7 +418,7 @@ class BleDomain(Registry):
         """Create a Start message.
 
         :return: instance of Start message
-        :return-type: Start
+        :rtype: Start
         """
         return BleDomain.bound("start", self.proto_version)()
 
@@ -426,7 +426,7 @@ class BleDomain(Registry):
         """Create a Stop message.
 
         :return: instance of Stop message
-        :return-type: Stop
+        :rtype: Stop
         """
         return BleDomain.bound("stop", self.proto_version)()
 
@@ -448,7 +448,7 @@ class BleDomain(Registry):
         :param crc_init: CRC initial value to use
         :type crc_init: int, optional
         :return: instance of ConnectTo message
-        :return-type: ConnectTo
+        :rtype: ConnectTo
         """
         message = BleDomain.bound("connect", self.proto_version)()
 
@@ -486,7 +486,7 @@ class BleDomain(Registry):
         :param conn_handle: Connection handle
         :type conn_handle: int
         :return: instance of Disconnect message
-        :return-type: Disconnect
+        :rtype: Disconnect
         """
         return BleDomain.bound("disconnect", self.proto_version)(
             conn_handle=conn_handle
@@ -505,7 +505,7 @@ class BleDomain(Registry):
         :param channel_map: Connection channel map
         :type channel_map: ChannelMap
         :return: instance of Synchronized
-        :return-type: Synchronized
+        :rtype: Synchronized
         """
         return BleDomain.bound("synchronized", self.proto_version)(
             access_address=access_address,
@@ -528,7 +528,7 @@ class BleDomain(Registry):
         :param conn_handle: Connection handle
         :type conn_handle: int
         :return: instance of a Connected message
-        :return-type: Connected
+        :rtype: Connected
         """
         return BleDomain.bound("connected", self.proto_version)(
             initiator=initiator.value,
@@ -547,7 +547,7 @@ class BleDomain(Registry):
         :param conn_handle: Connection handle
         :type conn_handle: int
         :return: instance of Disconnected
-        :return-type: Disconnected
+        :rtype: Disconnected
         """
         return BleDomain.bound("disconnected", self.proto_version)(
             reason=reason,
@@ -560,7 +560,7 @@ class BleDomain(Registry):
         :param access_address: Connection access address
         :type access_address: int
         :return: instance of Desynchronized
-        :return-type: Desynchronized
+        :rtype: Desynchronized
         """
         return BleDomain.bound("desynchronized", self.proto_version)(
             accesss_address=accesss_address
@@ -574,7 +574,7 @@ class BleDomain(Registry):
         :param scan_rsp: Scan response data
         :type scan_rsp: bytes, optional
         :return: instance of SetAdvData message
-        :return-type: SetAdvData
+        :rtype: SetAdvData
         """
         message = BleDomain.bound("set_adv_data", self.proto_version)(
             scan_data=adv_data
@@ -604,7 +604,7 @@ class BleDomain(Registry):
         :param access_address: Connection access address
         :type access_address: int, optional
         :return: instance of SendRawPdu message
-        :return-type: SendRawPdu
+        :rtype: SendRawPdu
         """
         # Create a SendRawPdu message
         message = BleDomain.bound("send_raw_pdu", self.proto_version)(
@@ -640,7 +640,7 @@ class BleDomain(Registry):
         :param encrypt: Encrypt PDU before sending
         :type encrypt: bool, optional
         :return: instance of SendRawPdu message
-        :return-type: SendBleRawPdu
+        :rtype: SendBleRawPdu
         """
         return BleDomain.bound("send_pdu", self.proto_version)(
             direction=direction,
@@ -662,7 +662,7 @@ class BleDomain(Registry):
         :param adv_data: Advertisement data
         :type adv_data: bytes
         :return: instance of AdvPduReceived
-        :return-type: AdvPduReceived
+        :rtype: AdvPduReceived
         """
         return BleDomain.bound("adv_pdu", self.proto_version)(
             adv_type=adv_type,
@@ -687,7 +687,7 @@ class BleDomain(Registry):
         :param decrypted: Set to True if PDU has been decrypted by firmware
         :type decrypted: bool
         :return: instance of PduReceived
-        :return-type: PduReceived
+        :rtype: PduReceived
         """
         return BleDomain.bound("pdu", self.proto_version)(
             direction=direction,
@@ -727,7 +727,7 @@ class BleDomain(Registry):
         :param decrypted: Set to True if PDU has been decrypted by firmware
         :type decrypted: bool
         :return: instance of RawPduReceived
-        :return-type: RawPduReceived
+        :rtype: RawPduReceived
         """
         # Build message with mandatory fields
         message = BleDomain.bound("raw_pdu", self.proto_version)(
@@ -768,7 +768,7 @@ class BleDomain(Registry):
         :param attempts: Number of attempts
         :type attempts: int
         :return: instance of Injected message
-        :return-type: Injected
+        :rtype: Injected
         """
         return BleDomain.bound("injected", self.proto_version)(
             access_address=access_address,
@@ -782,7 +782,7 @@ class BleDomain(Registry):
         :param access_address: Target access address
         :type access_address: int
         :return: instance of HijackMaster
-        :return-type: HijackMaster
+        :rtype: HijackMaster
         """
         return BleDomain.bound("hijack_master", self.proto_version)(
             access_address=access_address
@@ -794,7 +794,7 @@ class BleDomain(Registry):
         :param access_address: Target access address
         :type access_address: int
         :return: instance of HijackSlave
-        :return-type: HijackSlave
+        :rtype: HijackSlave
         """
         return BleDomain.bound("hijack_slave", self.proto_version)(
             access_address=access_address
@@ -806,7 +806,7 @@ class BleDomain(Registry):
         :param access_address: Target access address
         :type access_address: int
         :return: instance of HijackBoth
-        :return-type: HijackBoth
+        :rtype: HijackBoth
         """
         return BleDomain.bound("hijack_both", self.proto_version)(
             access_address=access_address
@@ -820,7 +820,7 @@ class BleDomain(Registry):
         :param success: Set to True if injection succeeded, False otherwise
         :type success: bool
         :return: instance of Hijacked message
-        :return-type: Hijacked
+        :rtype: Hijacked
         """
         return BleDomain.bound("hijacked", self.proto_version)(
             access_address=access_address,
@@ -837,7 +837,7 @@ class BleDomain(Registry):
         :param packets: List of PDUs to send
         :type packets: list
         :return: instance of PrepareSequenceManual
-        :return-type: PrepareSequenceManual
+        :rtype: PrepareSequenceManual
         """
         # Create our PrepareSequenceManual message
         message = BleDomain.bound("prepare_manual", self.proto_version)(
@@ -865,7 +865,7 @@ class BleDomain(Registry):
         :param packets: List of PDUs to send
         :type packets: list
         :return: instance of PrepareSequenceConnEvt
-        :return-type: PrepareSequenceConnEvt
+        :rtype: PrepareSequenceConnEvt
         """
         message = BleDomain.bound("prepare_connevt", self.proto_version)(
             sequence_id=seq_id,
@@ -897,7 +897,7 @@ class BleDomain(Registry):
         :param packets: List of PDUs to send
         :type packets: list
         :return: instance of PrepareSequencePattern
-        :return-type: PrepareSequencePattern
+        :rtype: PrepareSequencePattern
         """
         message = BleDomain.bound("prepare_pattern", self.proto_version)(
             sequence_id=seq_id,
@@ -920,7 +920,7 @@ class BleDomain(Registry):
         :param seq_id: Sequence identifier triggered
         :type seq_id: int
         :return: instance of Triggered
-        :return-type: Triggered
+        :rtype: Triggered
         """
         return BleDomain.bound("triggered", self.proto_version)(
             seq_id=seq_id
@@ -932,7 +932,7 @@ class BleDomain(Registry):
         :param seq_id: Sequence identifier to trigger
         :type seq_id: int
         :return: instance of Trigger
-        :return-type: Trigger
+        :rtype: Trigger
         """
         return BleDomain.bound("trigger", self.proto_version)(
             sequence_id=seq_id
@@ -944,7 +944,7 @@ class BleDomain(Registry):
         :param seq_id: Sequence identifier to delete
         :type seq_id: int
         :return: instance of DeleteSequence
-        :return-type: DeleteSequence
+        :rtype: DeleteSequence
         """
         return BleDomain.bound("delete_seq", self.proto_version)(
             sequence_id=seq_id

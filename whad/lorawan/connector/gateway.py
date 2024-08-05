@@ -77,7 +77,7 @@ class LWGateway(LoRaWAN):
         :type dev_eui: str
 
         :returns: True if device is allowed, False otherwise.
-        :return-type: bool
+        :rtype: bool
         """
         # Forward to our application
         return self.__app.is_authorized(dev_eui)
@@ -121,7 +121,7 @@ class LWGateway(LoRaWAN):
         :type upcount: int
 
         :returns: Data to be sent back to the device
-        :return-type: bytes
+        :rtype: bytes
         """
         logger.info('[gateway] Device %s sent data: %s' % (
             dev_eui,
