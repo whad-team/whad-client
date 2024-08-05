@@ -1,7 +1,7 @@
 .. _whad-wble-central:
 
 wble-central: Bluetooth Low Energy GATT client
-=============================================
+==============================================
 
 ``wble-central`` provides a scanner that can be used to detect surrounding BLE devices
 as well as a GATT client allowing to connect to a remote BLE device and access
@@ -422,7 +422,7 @@ shell:
 
 And the following output in Wireshark:
 
-.. image:: ../../_static/wble-central/wireshark-monitor.png
+.. image:: ../../_static/ble-central/wireshark-monitor.png
     :width: 600
 
 Quick tutorial
