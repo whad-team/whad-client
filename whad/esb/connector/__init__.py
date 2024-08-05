@@ -147,9 +147,17 @@ class ESB(WhadDeviceConnector):
             (commands & (1 << Commands.SetNodeAddress)) > 0
         )
 
-    def sniff(self, channel=None, address="FF:FF:FF:FF:FF", show_acknowledgements=False):
+    def sniff(self, channel : int = None, address : str = "FF:FF:FF:FF:FF", 
+              show_acknowledgements : bool = False):
         """
         Sniff Enhanced ShockBurst packets.
+
+        :param channel: Channel to listen, None to iterate over all possible channels
+        :type channel: int
+        :param address: Device address to target
+        :type address: str
+        :param show_acknowledgements: Sniff packets acknowledgements if set to True (default: False)
+        :type show_acknowledgements: bool
         """
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
