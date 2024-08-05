@@ -1,9 +1,9 @@
 .. _whad-ble-proxy:
 
-ble-proxy: Bluetooth Low Energy GATT and Link-layer Proxy
-=========================================================
+wble-proxy: Bluetooth Low Energy GATT and Link-layer Proxy
+==========================================================
 
-``ble-proxy`` provides a basic tool to proxify a BLE connection and monitor traffic
+``wble-proxy`` provides a basic tool to proxify a BLE connection and monitor traffic
 between both devices. This tool must be used with two WHAD devices supporting the
 *Bluetooth Low Energy* domain.
 
@@ -16,14 +16,14 @@ Usage
 
 .. code-block:: text
 
-    ble-proxy [OPTIONS] BDADDR
+    wble-proxy [OPTIONS] BDADDR
 
-``ble-proxy`` accepts one or more options and requires the target BD address.
+``wble-proxy`` accepts one or more options and requires the target BD address.
 
 Command-line options
 --------------------
 
-**ble-proxy** supports the following options:
+**wble-proxy** supports the following options:
 
 * ``--interface`` (``-i``): specifies the WHAD interface to use to connect to the target device
 * ``--no-color``: disables colors in output
@@ -38,7 +38,7 @@ Command-line options
 Create a GATT proxy and monitor traffic
 ---------------------------------------
 
-``ble-proxy`` default mode is GATT, meaning it will use its default WHAD interface (specified
+``wble-proxy`` default mode is GATT, meaning it will use its default WHAD interface (specified
 with the ``--interface`` option) to look for a target device and connect to it, and then create
 an emulated BLE device exposed on a second interface (specified with ``--proxy-interface``) that
 will have the exact same services and characteristics.
@@ -55,7 +55,7 @@ dump will be saved into the provided output file.
 
 .. code-block:: text
 
-    $ ble-proxy -i uart0 -p hci0 --wireshark --output /tmp/capture.pcap a4:c1:38:55:3d:11
+    $ wble-proxy -i uart0 -p hci0 --wireshark --output /tmp/capture.pcap a4:c1:38:55:3d:11
     Scanning for target device (timeout: 30 seconds)...
     Proxy is ready, press a key to stop.
     Remote device connected
@@ -72,19 +72,19 @@ dump will be saved into the provided output file.
 Create a Link-layer proxy and monitor traffic
 ---------------------------------------------
 
-``ble-proxy`` also provides a link-layer mode that works quite differently from its default
-GATT mode. In GATT mode, ``ble-proxy`` connects to the target device, enumerates its
+``wble-proxy`` also provides a link-layer mode that works quite differently from its default
+GATT mode. In GATT mode, ``wble-proxy`` connects to the target device, enumerates its
 services and characteristics and use this information to create a new emulated BLE peripheral
-with the exact same profile. In link-layer mode however, ``ble-proxy`` directly forward
+with the exact same profile. In link-layer mode however, ``wble-proxy`` directly forward
 BLE PDUs from one device to another, avoiding this services and characteristics discovery
 process. This link-layer mode offers better performances than GATT mode, but the output of
-``ble-proxy`` will be harder to read as there is no interpretation of the data exchanged between
+``wble-proxy`` will be harder to read as there is no interpretation of the data exchanged between
 the target device and the client connected to the emulated device.
 
 
 .. code-block:: text
 
-    $ ble-proxy -i uart0 -p hci0 --wireshark --output /tmp/capture.pcap --link-layer a4:c1:38:55:3d:11
+    $ wble-proxy -i uart0 -p hci0 --wireshark --output /tmp/capture.pcap --link-layer a4:c1:38:55:3d:11
     Proxy is ready, press a key to stop.
     >>> Data PDU
     00000000: 0A 10 0C 00 05 00 12 01  08 00 12 00 22 00 00 00  ............"...
