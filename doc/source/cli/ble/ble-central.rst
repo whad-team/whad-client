@@ -1,9 +1,9 @@
-.. _whad-ble-central:
+.. _whad-wble-central:
 
-ble-central: Bluetooth Low Energy GATT client
+wble-central: Bluetooth Low Energy GATT client
 =============================================
 
-``ble-central`` provides a scanner that can be used to detect surrounding BLE devices
+``wble-central`` provides a scanner that can be used to detect surrounding BLE devices
 as well as a GATT client allowing to connect to a remote BLE device and access
 its services and characteristics. This tool must be used with a device supporting
 the *Bluetooth Low Energy* domain.
@@ -17,15 +17,15 @@ Usage
 
 .. code-block:: text
 
-    ble-central [OPTIONS] ([COMMAND] ([COMMAND ARGS]))
+    wble-central [OPTIONS] ([COMMAND] ([COMMAND ARGS]))
 
-``ble-central`` accepts one or more options, and requires a valid command as its
+``wble-central`` accepts one or more options, and requires a valid command as its
 first parameter. This command may or may not accepts arguments.
 
 Command-line options
 --------------------
 
-**ble-central** supports the following options:
+**wble-central** supports the following options:
 
 * ``--interface`` (``-i``): specifies the WHAD interface to use
 * ``--bdaddr`` (``-b``): specifies a target Bluetooth Device address in the form *XX:XX:XX:XX:XX:XX*
@@ -40,16 +40,16 @@ help
 
 .. code-block:: text
 
-    $ ble-central help [command]
+    $ wble-central help [command]
 
-The ``help`` command provides useful help about any command implemented in ``ble-central``.
+The ``help`` command provides useful help about any command implemented in ``wble-central``.
 
 interactive
 ~~~~~~~~~~~
 
 .. code-block:: text
 
-    $ ble-central -i <interface> interactive
+    $ wble-central -i <interface> interactive
 
 The ``interactive`` command provides an interactive shell allowing the user to
 scan, connect and access a Bluetooth Low Energy device in an interactive way.
@@ -60,8 +60,8 @@ one.
 
 .. code-block:: text
 
-    $ ble-central -i hci0 interactive
-    ble-central>
+    $ wble-central -i hci0 interactive
+    wble-central>
 
 More information about this interactive shell in the :ref:`dedicated section <central-interactive-shell>`.
 
@@ -70,14 +70,14 @@ profile
 
 .. code-block:: text
 
-    $ ble-central -i <interface> -b <bdaddress> scan
+    $ wble-central -i <interface> -b <bdaddress> scan
 
 The ``profile`` command connects to a specific Bluetooth Low Energy device and queries its
 services and characteristics. The ``--interface`` and ``--bdaddr`` options must be provided.
 
 .. code-block:: text
 
-    $ ble-central -i hci0 -b 00:11:22:33:44:55 profile
+    $ wble-central -i hci0 -b 00:11:22:33:44:55 profile
     Service Generic Attribute (0x1801) (handle 0x0001 to 0x0005)
       Service Changed (0x2A05) I, handle 0x0002, value handle 0x0003
 
@@ -95,7 +95,7 @@ scan
 
 .. code-block:: text
 
-    $ ble-central -i <interface> scan
+    $ wble-central -i <interface> scan
 
 The ``scan`` command searches for surrounding BLE devices and displays them in
 the output. An interface must be provided with the ``--interface`` option for
@@ -103,7 +103,7 @@ this command to work properly.
 
 .. code-block:: text
 
-    $ ble-central -i hci0 scan
+    $ wble-central -i hci0 scan
      RSSI Lvl  Type  BD Address        Extra info
     [ -58 dBm] [PUB] d0:d0:03:77:53:28 
     [ -58 dBm] [PUB] d0:d0:03:77:53:28 name:"[TV] Samsung 7 Series (55)"
@@ -113,14 +113,14 @@ read
 
 .. code-block:: text
 
-    $ ble-central -i <interface> -b <address> read [UUID | handle]
+    $ wble-central -i <interface> -b <address> read [UUID | handle]
 
 The ``read`` command connects to a specified BLE device and reads a given characteristic.
 The parameter passed to this command may be a valid characteristic UUID or a GATT handle.
 
 .. code-block:: text
 
-    $ ble-central -i hci0 -b 00:11:22:33:44:55 read 81
+    $ wble-central -i hci0 -b 00:11:22:33:44:55 read 81
     00000000: 22 76 65 72 22 3A 22 34  22                       "ver":"4"
 
 
@@ -129,7 +129,7 @@ write
 
 .. code-block:: text
 
-    $ ble-central -i <interface> -b <address> write [UUID | handle] [["hex"] VALUE]
+    $ wble-central -i <interface> -b <address> write [UUID | handle] [["hex"] VALUE]
 
 The `write` command connects to a specified BLE device and writes a given characteristic
 with a given value. Characteristic must be identified with its UUID or GATT handle. The
@@ -137,12 +137,12 @@ provided value can be a string or a HEX value.
 
 .. code-block:: text
 
-    $ble-central -i hci0 -b 00:11:22:33:44:55 write 42 "this is a test"
-    $ble-central -i hci0 -b 00:11:22:33:44:55 read 42
+    $wble-central -i hci0 -b 00:11:22:33:44:55 write 42 "this is a test"
+    $wble-central -i hci0 -b 00:11:22:33:44:55 read 42
     00000000: 74 68 69 73 20 69 73 20  61 20 74 65 73 74        this is a test
 
-    $ble-central -i hci0 -b 00:11:22:33:44:55 write 42 hex 41 42 43
-    $ble-central -i hci0 -b 00:11:22:33:44:55 read 42
+    $wble-central -i hci0 -b 00:11:22:33:44:55 write 42 hex 41 42 43
+    $wble-central -i hci0 -b 00:11:22:33:44:55 read 42
     00000000: 41 42 43                                          ABC
 
 writecmd
@@ -150,7 +150,7 @@ writecmd
 
 .. code-block:: text
 
-    $ ble-central -i <interface> -b <address> write [UUID | handle] [["hex"] VALUE]
+    $ wble-central -i <interface> -b <address> write [UUID | handle] [["hex"] VALUE]
 
 The ``writecmd`` command is similar to the previous ``write`` command, accepts the
 same parameters, but sens a GATT *WriteRequestWithNoResponse* instead of a *WriteRequest*.
@@ -165,7 +165,7 @@ Interactive shell
 
 The interactive shell offers the possibility to dynamically interact with any device,
 with an helpful interface that provides autocompletion. This interactive shell implements
-all the commands supported by ``ble-central`` in non-interactive mode plus some extra
+all the commands supported by ``wble-central`` in non-interactive mode plus some extra
 commands.
 
 scan
@@ -180,7 +180,7 @@ are shown in the console as they are discovered.
 
 .. code-block:: text
 
-    ble-central> scan
+    wble-central> scan
      RSSI Lvl  Type  BD Address        Extra info
     [ -62 dBm] [PUB] d0:d0:03:77:53:28 
     [ -62 dBm] [PUB] d0:d0:03:77:53:28 name:"[TV] Samsung 7 Series (55)"
@@ -198,7 +198,7 @@ device *NAME* or BD address *BDADDR* must be provided as parameter.
 
 .. code-block:: text
 
-    ble-central> info d0:d0:03:77:53:28
+    wble-central> info d0:d0:03:77:53:28
     Device d0:d0:03:77:53:28
     RSSI:               -62 dBm
     Address type:       public
@@ -223,7 +223,7 @@ Shows the previously discovered devices.
 
 .. code-block:: text
 
-    ble-central> devices
+    wble-central> devices
      RSSI Lvl  Type  BD Address        Extra info
     [ -62 dBm] [PUB] d0:d0:03:77:53:28 name:"[TV] Samsung 7 Series (55)"
 
@@ -239,7 +239,7 @@ BD address *BDADDR*.
 
 .. code-block:: text
 
-    ble-central> connect d0:d0:03:77:53:28
+    wble-central> connect d0:d0:03:77:53:28
     Successfully connected to target d0:d0:03:77:53:28
 
 profile
@@ -253,7 +253,7 @@ Searches the device services and characteristics and display its GATT profile.
 
 .. code-block:: text
 
-    ble-central|d0:d0:03:77:53:28> profile
+    wble-central|d0:d0:03:77:53:28> profile
 
     Service 1801
 
@@ -285,7 +285,7 @@ Shows the discovered characteristics.
 
 .. code-block:: text
 
-    ble-central|d0:d0:03:77:53:28> characteristics
+    wble-central|d0:d0:03:77:53:28> characteristics
      2A05 handle: 2, value handle: 3
       | access rights: indicate
      2A00 handle: 21, value handle: 22
@@ -308,7 +308,7 @@ Reads a characteristic given its *UUID* or *HANDLE*.
 
 .. code-block:: text
 
-    ble-central|d0:d0:03:77:53:28> read 22
+    wble-central|d0:d0:03:77:53:28> read 22
     00000000: 5B 54 56 5D 20 53 61 6D  73 75 6E 67 20 37 20 53  [TV] Samsung 7 S
     00000010: 65 72 69 65 73 20                                 eries 
 
@@ -325,7 +325,7 @@ must be provided in HEX if prefixed by *hex*.
 
 .. code-block:: text
 
-    ble-central|d0:d0:03:77:53:28> write 22 "This is a test"
+    wble-central|d0:d0:03:77:53:28> write 22 "This is a test"
 
 sub
 ~~~
@@ -339,7 +339,7 @@ and indications will be notified in the console.
 
 .. code-block:: text
     
-    ble-central|d0:d0:03:77:53:28> sub 22
+    wble-central|d0:d0:03:77:53:28> sub 22
     
 
 unsub
@@ -353,7 +353,7 @@ Unsubscribes from a characteristic identified by its *UUID* or *HANDLE*.
 
 .. code-block:: text
     
-    ble-central|d0:d0:03:77:53:28> unsub 22
+    wble-central|d0:d0:03:77:53:28> unsub 22
 
 
 set
@@ -368,7 +368,7 @@ This value can be used in any command using *$VAR*.
 
 .. code-block:: text
 
-    ble-central> set TARGET d0:d0:03:77:53:28
+    wble-central> set TARGET d0:d0:03:77:53:28
 
 env
 ~~~
@@ -381,7 +381,7 @@ Shows all the declared variables.
 
 .. code-block:: text
 
-    ble-central> env
+    wble-central> env
     TARGET=d0:d0:03:77:53:28
 
 unset
@@ -395,7 +395,7 @@ Unsets variable *VAR*. Once done, variable *VAR* does not exist anymore.
 
 .. code-block:: text
 
-    ble-central> unset TARGET
+    wble-central> unset TARGET
 
 
 wireshark
@@ -415,14 +415,14 @@ shell:
 
 .. code-block:: text
 
-    ble-central|d0:d0:03:77:53:28> wireshark on
-    ble-central|d0:d0:03:77:53:28> read 22
+    wble-central|d0:d0:03:77:53:28> wireshark on
+    wble-central|d0:d0:03:77:53:28> read 22
     00000000: 5B 54 56 5D 20 53 61 6D  73 75 6E 67 20 37 20 53  [TV] Samsung 7 S
     00000010: 65 72 69 65 73 20                                 eries 
 
 And the following output in Wireshark:
 
-.. image:: ../../_static/ble-central/wireshark-monitor.png
+.. image:: ../../_static/wble-central/wireshark-monitor.png
     :width: 600
 
 Quick tutorial
@@ -440,7 +440,7 @@ information about each discovered device:
 
 .. code-block::
 
-    $ ble-central -i hci1 scan
+    $ wble-central -i hci1 scan
      RSSI Lvl  Type  BD Address        Extra info
     [ -61 dBm] [PUB] d0:d0:03:77:53:28 
     [ -87 dBm] [PUB] 40:b3:14:04:b7:07 
@@ -449,17 +449,17 @@ information about each discovered device:
 The RSSI (Received Signal Strength Indication) is displayed as well as the BD address
 type (public or random), the BD address and some extra information extracted from
 the advertising records. But it is possible to get more information using the interactive
-mode of *ble-central*, with the *info* command as shown below:
+mode of *wble-central*, with the *info* command as shown below:
 
 .. code-block::
 
-    $ ble-central -i hci1 interactive
-    ble-central> scan
+    $ wble-central -i hci1 interactive
+    wble-central> scan
      RSSI Lvl  Type  BD Address        Extra info
     [ -62 dBm] [PUB] d0:d0:03:77:53:28 
     [ -92 dBm] [PUB] 40:b3:14:04:b7:07 
     Scan terminated by user
-    ble-central> info 40:b3:14:04:b7:07
+    wble-central> info 40:b3:14:04:b7:07
     Device 40:b3:14:04:b7:07
     RSSI:            -92 dBm
     Address type:    public
@@ -473,7 +473,7 @@ mode of *ble-central*, with the *info* command as shown below:
     11 07 75 5d 03 75 bb 43 a8 85 54 4e 3c 76 21 dd
     4e c7
 
-    ble-central>
+    wble-central>
 
 Connecting to a device and reading a characteristic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -483,9 +483,9 @@ and characteristics using the **connect** and **profile** commands:
 
 .. code-block:: text
 
-    ble-central> connect 
+    wble-central> connect 
     Successfully connected to target 40:b3:14:04:b7:07
-    ble-central|40:b3:14:04:b7:07> profile
+    wble-central|40:b3:14:04:b7:07> profile
     Service 1801
 
     2A05 handle: 2, value handle: 3
@@ -506,5 +506,5 @@ the *read* command, as shown below:
 
 .. code-block:: text
 
-    ble-central|40:b3:14:04:b7:07> read 22
+    wble-central|40:b3:14:04:b7:07> read 22
     00000000: 53 6f 6d 65 44 65 76 69 63 65                  SomeDevice

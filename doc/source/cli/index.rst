@@ -12,6 +12,45 @@ WHAD provides two types of command-line tools:
   for instance).
 
 
+Generic tools
+-------------
+
+.. toctree::
+    :maxdepth: 1
+
+    generic/whadup
+    generic/wplay
+    generic/wsniff
+    generic/wfilter
+    generic/wextract
+    generic/wdump
+    generic/wshark
+    generic/whadserver
+
+Bluetooth Low Energy tools
+--------------------------
+
+.. toctree::
+    :maxdepth: 1
+
+    ble/ble-central
+    ble/ble-periph
+    ble/ble-proxy
+    ble/ble-spawn
+    ble/ble-connect
+
+Logitech Unifying tools
+-----------------------
+
+.. toctree::
+    :maxdepth: 1
+
+    unifying/wuni-scan
+    unifying/wuni-mouse
+    unifying/wuni-keyboard
+
+
+
 Tool chaining and packet processing chain
 -----------------------------------------
 
@@ -88,48 +127,4 @@ already established connection. Packets can travel from ``wble-central`` to
 as a basic proxy.
 
 In this example, ``wble-central`` cannot be chained with another WHAD-enable CLI
-tool as it is intended to produce a very specific output for the user. Other tools
-however can be chained to implement more complex packet processing like the
-following:
-
-.. code-block:: text
-
-    
-
-Generic tools
--------------
-
-.. toctree::
-    :maxdepth: 1
-
-    generic/whadup
-    generic/wplay
-    generic/wsniff
-    generic/wfilter
-    generic/wextract
-    generic/wdump
-    generic/wshark
-    generic/whadserver
-
-Bluetooth Low Energy tools
---------------------------
-
-.. toctree::
-    :maxdepth: 1
-
-    ble/ble-central
-    ble/ble-periph
-    ble/ble-wireshark
-    ble/ble-proxy
-    ble/ble-spawn
-    ble/ble-connect
-
-Logitech Unifying tools
------------------------
-
-.. toctree::
-    :maxdepth: 1
-
-    unifying/wuni-scan
-    unifying/wuni-mouse
-    unifying/wuni-keyboard
+tool as it is intended to produce a very specific output for the user.
