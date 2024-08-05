@@ -29,7 +29,7 @@ from whad.common.monitors import WiresharkMonitor
 from whad.cli.shell import InteractiveShell, category
 
 INTRO='''
-ble-periph, the WHAD Bluetooth Low Energy peripheral utility
+wble-periph, the WHAD Bluetooth Low Energy peripheral utility
 '''
 
 BDADDR_REGEXP = '^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$'
@@ -111,7 +111,7 @@ class BlePeriphShell(InteractiveShell):
     MODE_STARTED = 2
 
     def __init__(self, interface: WhadDevice = None, dev_profile=None):
-        super().__init__(HTML('<b>ble-periph></b> '))
+        super().__init__(HTML('<b>wble-periph></b> '))
 
         self.__current_mode = self.MODE_NORMAL
 
@@ -145,16 +145,16 @@ class BlePeriphShell(InteractiveShell):
         """
         # Are we in service edit mode ?
         if self.__current_mode == self.MODE_SERVICE_EDIT:
-            self.set_prompt(HTML('<b>ble-periph|<ansicyan>service(%s)</ansicyan>></b> ' % (
+            self.set_prompt(HTML('<b>wble-periph|<ansicyan>service(%s)</ansicyan>></b> ' % (
                 self.__selected_service
             )), force)
         elif self.__current_mode == self.MODE_NORMAL:
             if not self.__central_bd:
-                self.set_prompt(HTML('<b>ble-periph></b> '), force)
+                self.set_prompt(HTML('<b>wble-periph></b> '), force)
             else:
-                self.set_prompt(HTML('<b>ble-periph|<ansicyan>%s</ansicyan>></b> ' % self.__central_bd), force)
+                self.set_prompt(HTML('<b>wble-periph|<ansicyan>%s</ansicyan>></b> ' % self.__central_bd), force)
         elif self.__current_mode == self.MODE_STARTED:
-            self.set_prompt(HTML('<b>ble-periph<ansimagenta>[running]</ansimagenta>></b>'))
+            self.set_prompt(HTML('<b>wble-periph<ansimagenta>[running]</ansimagenta>></b>'))
 
 
 
