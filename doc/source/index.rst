@@ -34,10 +34,17 @@ Welcome to WHAD's documentation!
 
 .. toctree::
     :maxdepth: 1
+    :caption: Enhanced ShockBurst API
+
+    esb/started
+    esb/scanner
+    esb/sniffer
+
+.. toctree::
+    :maxdepth: 1
     :caption: Contributing
 
     device/index
     device/protocol
     protocol/index
     protocol/reference
-    
