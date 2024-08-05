@@ -2,7 +2,7 @@ from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.esb.metadata import ESBMetadata
+from whad.hub.esb import ESBMetadata
 from whad.esb.connector.translator import ESBMessageTranslator
 from whad.esb.esbaddr import ESBAddress
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
@@ -395,3 +395,4 @@ from whad.unifying.connector.mouselogger import Mouselogger
 from whad.unifying.connector.mouse import Mouse
 from whad.unifying.connector.keyboard import Keyboard
 from whad.unifying.connector.dongle import Dongle
+from whad.unifying.connector.injector import Injector

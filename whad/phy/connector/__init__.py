@@ -1,7 +1,7 @@
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
-from whad.phy.metadata import generate_phy_metadata, PhyMetadata
+from whad.hub.phy import generate_phy_metadata, PhyMetadata
 from whad.phy.utils.definitions import OOKModulationScheme, ASKModulationScheme, \
     OQPSKModulationScheme, QPSKModulationScheme, BPSKModulationScheme, \
     FSKModulationScheme, GFSKModulationScheme, QFSKModulationScheme
@@ -245,7 +245,7 @@ class Phy(WhadDeviceConnector):
         return success
 
 
-    def set_qpsk(self, ):
+    def set_qpsk(self):
         """
         Enable Quadrature Phase Shift Keying modulation scheme.
         """

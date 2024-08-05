@@ -122,7 +122,7 @@ class WhadDumpApp(CommandLineApp):
                             )
                             time.sleep(.2)
             else:
-                pass
+                error("You must provide a pcap file.")
         except KeyboardInterrupt:
             # Launch post-run tasks
             if self.monitor is not None:

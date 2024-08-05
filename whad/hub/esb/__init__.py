@@ -64,13 +64,13 @@ class EsbNodeAddress(object):
                 raise EsbNodeAddressError('address size must be big enough to hold address') from overflow_err
         else:
             raise EsbNodeAddressError('address must be provided as an array of bytes or an integer')
-        
+
     @property
     def value(self) -> bytes:
         """Retrieve the address value (bytes)
         """
         return self.__address
-    
+
 
     def __eq__(self, other) -> bool:
         """Compare two ESB node addresses
@@ -78,15 +78,38 @@ class EsbNodeAddress(object):
         return self.value == other.value
 
 
-
 @dataclass(repr=False)
 class ESBMetadata(Metadata):
     is_crc_valid : bool = None
     address : str = None
+    timestamp : int = None
 
     def convert_to_header(self):
         return None, self.timestamp
 
+    @classmethod
+    def convert_from_header(cls, pkt):
+        metadata = ESBMetadata()
+        pkt = ESB_Hdr(bytes(pkt))
+        metadata.address = ESBAddress(pkt.address)
+        metadata.is_crc_valid = pkt.valid_crc
+        metadata.timestamp = int(100000 * pkt.time)
+        metadata.channel = 0
+        return metadata
+
+def generate_esb_metadata(message):
+    metadata = ESBMetadata()
+
+    if message.rssi is not None:
+        metadata.rssi = message.rssi
+    metadata.channel = message.channel
+    if message.timestamp is not None:
+        metadata.timestamp = message.timestamp
+    if message.crc_validity is not None:
+        metadata.is_crc_valid = message.crc_validity
+    if message.address is not None:
+        metadata.address = ":".join(["{:02x}".format(i) for i in message.address])
+    return metadata
 
 @pb_bind(ProtocolHub, name="esb", version=1)
 class EsbDomain(Registry):
@@ -105,7 +128,7 @@ class EsbDomain(Registry):
         """Determine if a packet is an ESB packet.
         """
         return isinstance(packet.metadata, ESBMetadata)
-    
+
     def convert_packet(self, packet) -> HubMessage:
         """Convert an ESB packet to SendPdu or SendBlePdu message.
         """
@@ -146,7 +169,7 @@ class EsbDomain(Registry):
         message_type = message.esb.WhichOneof('msg')
         message_clazz = EsbDomain.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
-    
+
 
     def create_set_node_address(self, node_address: EsbNodeAddress) -> HubMessage:
         """Create a SetNodeAddress message
@@ -158,7 +181,7 @@ class EsbDomain(Registry):
         return EsbDomain.bound('set_node_addr', self.proto_version)(
             address=node_address.value
         )
-    
+
     def create_start(self) -> HubMessage:
         """Create a Start message
 
@@ -173,7 +196,7 @@ class EsbDomain(Registry):
         :return: instance of `Stop` message
         """
         return EsbDomain.bound('stop', self.proto_version)()
-    
+
 
     def create_jam_mode(self, channel: int) -> HubMessage:
         """Create a JamMode message
@@ -202,7 +225,7 @@ class EsbDomain(Registry):
             channel=channel,
             show_acks=show_acks
         )
-    
+
     def create_jammed(self, timestamp: int):
         """Create a Jammed notification message
 
@@ -213,7 +236,7 @@ class EsbDomain(Registry):
         return EsbDomain.bound('jammed', self.proto_version)(
             timestamp=timestamp
         )
-    
+
     def create_prx_mode(self, channel: int) -> HubMessage:
         """Create PrxMode message
 
@@ -235,7 +258,7 @@ class EsbDomain(Registry):
         return EsbDomain.bound('ptx', self.proto_version)(
             channel=channel
         )
-    
+
     def create_send_pdu(self, channel: int, pdu: bytes, retr_count: int = 0):
         """Create a SendPdu message
 
@@ -269,7 +292,7 @@ class EsbDomain(Registry):
             pdu=pdu,
             retr_count=retr_count
         )
-    
+
     def create_pdu_received(self, channel: int, pdu: bytes, rssi: int = None, timestamp: int = None,
                           crc_validity: bool = None, address: EsbNodeAddress = None) -> HubMessage:
         """Create a PduReceived notification message.

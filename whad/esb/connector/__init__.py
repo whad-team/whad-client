@@ -4,7 +4,7 @@ from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
 from whad.esb.connector.translator import ESBMessageTranslator
 from whad.esb.esbaddr import ESBAddress
-from whad.esb.metadata import ESBMetadata
+from whad.hub.esb import ESBMetadata
 from whad.scapy.layers.esb import ESB_Hdr,ESB_Payload_Hdr,ESB_Ack_Response
 from whad.helpers import message_filter
 from whad.hub.generic.cmdresult import Success, CommandResult

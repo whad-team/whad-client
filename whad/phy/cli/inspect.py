@@ -66,7 +66,7 @@ class FrequencyScanner(object):
     this device close to our receiver and make it send as much packets as
     possible.
     """
-    
+
     def __init__(self, app : CommandLineApp, phy : PhyCorrelator, freq_start : int, freq_end : int,
                  freq_step : int, delay : int):
         """Initialize the frequency scanner.
@@ -185,7 +185,7 @@ class PhyInspector(CommandLineApp):
             dest='pattern_match',
             help='''Search hex pattern in received packets, no matter what endianness or whitening used.
             Matching packets are displayed as well as guessed configuration. Patterns may contain wildcards
-            noted as ??. 
+            noted as ??.
             '''
         )
 

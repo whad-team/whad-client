@@ -2,11 +2,19 @@
 Python library allowing to interact with offensive security tools implementing the WHAD protocol.
 
 ### First release
+- [ ] harmonize metadatas and translators in hub for each protocol
+- [ ] include parameters as optional field for PHY message (modulation, datarate, freq, endinanness, ...)
+  - [ ] modify phy protocol definition
+  - [ ] adapt in whad-lib
+  - [ ] adapt in whad-client hub
+  - [ ] adapt in butterfly
+  - [ ] fix bugs in yardstickone, timeout are too frequent
 - [ ] winject
-- [ ] wplay / pcapDev
-- [ ] parametre flush pour PCAPDevice + DLT
-- [ ] wanalyzer
-- [ ] definir les events generiques dans le protocole
+  - [ ] integrate a InjectionConfiguration or equivalent
+- [x] wplay / pcapDev
+- [x] parametre flush pour PCAPDevice + DLT
+- [x] wanalyzer
+- [x] definir les events generiques dans le protocole
 - [ ] integration event à wfilter, wextract etc
 - [ ] wzb-enddevice commandes shell
 - [ ] Write documentation and tutorials

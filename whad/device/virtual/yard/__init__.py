@@ -157,7 +157,8 @@ class YardStickOneDevice(VirtualDevice):
             TxPower.MEDIUM : 0x80,
             TxPower.HIGH : 0xC0
         }
-        if message.tx_power in list(tx_powers.keys()):
+
+        if message.power in list(tx_powers.keys()):
             self._enter_configuration_mode()
             self._set_power(
                 tx_powers[message.power]
@@ -427,7 +428,6 @@ class YardStickOneDevice(VirtualDevice):
         recv_app, recv_verb, recv_data = None, None, None
         while (recv_app != app and recv_verb != command):
             self.__yard.write(YardStickOneEndPoints.OUT_ENDPOINT, message, timeout=timeout)
-
             recv_app, recv_verb, recv_data = self._yard_read_response()
         return recv_data
 
@@ -481,7 +481,7 @@ class YardStickOneDevice(VirtualDevice):
     def _get_url(self):
         return "https://github.com/atlas0fd00m/rfcat".encode('utf-8')
 
-    def _send_packet(self, packet, repeat=3, offset=0):
+    def _send_packet(self, packet, repeat=1, offset=0):
         data = bytes(packet)
 
         # It is the only solution we found to allow transmitting data without breaking the sniffer mode.
@@ -490,11 +490,18 @@ class YardStickOneDevice(VirtualDevice):
         opened_stream = self.__opened_stream
         self.__opened_stream = False
 
+        self._set_idle_mode()
+        self._strobe_idle_mode()
+
+
         self._set_tx_mode()
         self._strobe_tx_mode()
 
-        message = bytes([YardApplications.NIC, YardNICCommands.LONG_XMIT]) + pack("<H", len(data)) + data
-        self.__yard.write(YardStickOneEndPoints.OUT_ENDPOINT, message, timeout=1000)
+        self._yard_send_command(YardApplications.NIC, YardNICCommands.XMIT, pack("<HHH", len(data), repeat, offset) + data, timeout=500)
+        #message = bytes([YardApplications.NIC, YardNICCommands.LONG_XMIT]) + pack("<H", len(data)) + data
+        #self.__yard.write(YardStickOneEndPoints.OUT_ENDPOINT, message, timeout=5000)
+        #message = bytes([YardApplications.NIC, YardNICCommands.LONG_XMIT_MORE]) + b"\x00"
+        #self.__yard.write(YardStickOneEndPoints.OUT_ENDPOINT, message, timeout=1000)
 
         self.__internal_state = old_state
         self._restore_previous_mode()

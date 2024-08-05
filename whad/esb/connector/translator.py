@@ -1,7 +1,7 @@
 """ESB Packet translator
 """
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
-from whad.esb.metadata import generate_esb_metadata
+from whad.hub.esb import generate_esb_metadata
 from whad.protocol.whad_pb2 import Message
 from whad.hub import ProtocolHub
 from whad.hub.esb import RawPduReceived as EsbRawPduReceived, PduReceived as EsbPduReceived

@@ -111,8 +111,8 @@ class Sniffer(Phy, EventsManager):
                     message_type = RawPacketReceived
                 else:
                     message_type = PacketReceived
-
                 message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
+                
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
                     self.monitor_packet_rx(packet)

@@ -1,10 +1,9 @@
 """Phy Packet translator
 """
-from whad.scapy.layers.phy import Phy_Packet
-from whad.phy.metadata import generate_phy_metadata
+from whad.scapy.layers.phy import Phy_Packet_Hdr, Phy_Packet
 from whad.protocol.whad_pb2 import Message
 from whad.hub import ProtocolHub
-from whad.hub.phy import PacketReceived, RawPacketReceived
+from whad.hub.phy import PacketReceived, RawPacketReceived, generate_phy_metadata
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,7 +31,7 @@ class PhyMessageTranslator(object):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
-        return packet, 0
+        return Phy_Packet_Hdr(rssi=packet.metadata.rssi, frequency=packet.metadata.frequency) / packet, None
 
 
     def from_message(self, message):
