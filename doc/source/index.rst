@@ -11,6 +11,7 @@ Welcome to WHAD's documentation!
     :caption: General documentation
 
     intro
+    device/compat
     cli/index
 
 .. toctree::
@@ -41,6 +42,12 @@ Welcome to WHAD's documentation!
     esb/ptx
     esb/scanner
     esb/sniffer
+
+.. toctree::
+    :maxdepth: 1
+    :caption: Logitech Unifying API
+
+    unifying/started
 
 .. toctree::
     :maxdepth: 1
