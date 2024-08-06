@@ -1,6 +1,11 @@
 Getting started
 ===============
 
+*Enhanced ShockBurst* is a wireless communication protocol designed by Nordic
+Semiconductor and supported by a set of wireless system-on-chips including
+the *nRF24* and *nRF5x* series. See `Nordic Semiconductor ESB documentation <https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v12.0.0%2Fesb_users_guide.html>`_ for
+more details.
+
 Scan available devices
 ----------------------
 
