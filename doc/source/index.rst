@@ -16,6 +16,12 @@ Welcome to WHAD's documentation!
 
 .. toctree::
     :maxdepth: 1
+    :caption: PHY API
+
+    phy/started
+
+.. toctree::
+    :maxdepth: 1
     :caption: Bluetooth Low Energy API
 
     ble/started

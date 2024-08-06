@@ -1,15 +1,12 @@
 from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
-from whad.helpers import message_filter, is_message_type
-from whad.hub.phy import generate_phy_metadata, PhyMetadata
+from whad.helpers import message_filter
 from whad.phy.utils.definitions import OOKModulationScheme, ASKModulationScheme, \
     OQPSKModulationScheme, QPSKModulationScheme, BPSKModulationScheme, \
     FSKModulationScheme, GFSKModulationScheme, QFSKModulationScheme
 from whad.phy.utils.helpers import lora_sf, lora_cr
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.protocol.generic_pb2 import ResultCode
 from whad.scapy.layers.phy import Phy_Packet
-from whad.exceptions import RequiredImplementation, UnsupportedCapability, UnsupportedDomain
 from whad.phy.exceptions import UnsupportedFrequency, NoModulation, NoDatarate, NoFrequency, \
     NoSyncWord, NoEndianess, NoPacketSize, InvalidParameter, ScheduleFifoFull, \
     UnknownPhysicalLayer, UnknownPhysicalLayerFunction
