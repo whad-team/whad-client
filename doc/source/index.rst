@@ -20,7 +20,7 @@ Welcome to WHAD's documentation!
 
     phy/started
     phy/sniffer
-    phy/lora
+    phy/derived
 
 .. toctree::
     :maxdepth: 1
