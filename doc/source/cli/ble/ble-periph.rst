@@ -1,5 +1,5 @@
 wble-periph: Bluetooth Low Energy GATT server
-============================================
+=============================================
 
 ``wble-periph`` provides a GATT server with customizable services and characteristics
 as well as some advertising data records. This tool must be used with a device

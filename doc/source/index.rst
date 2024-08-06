@@ -19,6 +19,8 @@ Welcome to WHAD's documentation!
     :caption: PHY API
 
     phy/started
+    phy/sniffer
+    phy/lora
 
 .. toctree::
     :maxdepth: 1
