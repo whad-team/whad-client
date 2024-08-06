@@ -6,6 +6,29 @@ Stores the information about the current Provisoning process instanced by the Ge
 
 from whad.common.stack import Layer, LayerState, ContextualLayer, alias, source, state, instance
 from whad.bt_mesh.crypto import ProvisioningBearerAdvCryptoManager
+from whad.scapy.layers.bt_mesh import (
+    BTMesh_Provisioning_Invite,
+    BTMesh_Provisioning_Capabilities,
+    BTMesh_Provisioning_Start,
+    BTMesh_Provisioning_Public_Key,
+    BTMesh_Provisioning_Confirmation,
+    BTMesh_Provisioning_Random,
+    BTMesh_Provisioning_Data,
+    BTMesh_Provisioning_Complete,
+)
+
+# Status of the Provisioning protocol
+# set when the Transaction Ack has been notified to the Layer
+# stores the class of last provisioning state done
+
+PROV_INVITE_DONE =  BTMesh_Provisioning_Invite
+PROV_CAPABILTIES_DONE = BTMesh_Provisioning_Capabilities
+PROV_START_DONE =BTMesh_Provisioning_Start
+PROV_PUB_KEY_DONE = BTMesh_Provisioning_Public_Key
+PROV_CONFIRMATION_DONE =BTMesh_Provisioning_Confirmation
+PROV_RANDOM_DONE = BTMesh_Provisioning_Random
+PROV_DATA_DONE = BTMesh_Provisioning_Data
+PROV_COMPLETE_DONE = BTMesh_Provisioning_Complete
 
 
 class ProvisioningState(LayerState):
@@ -36,6 +59,8 @@ class ProvisioningState(LayerState):
 
 
         self.crypto_manager = None
+
+        self.status = None
 
 
     @property
