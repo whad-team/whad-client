@@ -48,6 +48,9 @@ Welcome to WHAD's documentation!
     :caption: Logitech Unifying API
 
     unifying/started
+    unifying/sniffer
+    unifying/mouse
+    unifying/keyboard
 
 .. toctree::
     :maxdepth: 1

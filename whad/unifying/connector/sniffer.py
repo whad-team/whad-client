@@ -1,19 +1,27 @@
+"""
+This module provides the :class:`whad.unifying.connector.sniffer.Sniffer` class
+that allows Logitech Unifying packets sniffing.
+
+
+
+"""
+import logging
+
 from time import time
 from typing import Generator, List
-
 from scapy.packet import Packet
 
+from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceDisconnected
 from whad.unifying.connector import Unifying
 from whad.unifying.sniffing import SnifferConfiguration, KeyExtractedEvent
 from whad.unifying.crypto import LogitechUnifyingDecryptor, LogitechUnifyingKeyDerivation
 from whad.exceptions import UnsupportedCapability
-from whad.helpers import message_filter, is_message_type
+from whad.helpers import message_filter
 from whad.hub.unifying import RawPduReceived, PduReceived
 from whad.common.sniffing import EventsManager
 from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Encrypted_Keystroke_Payload
 from whad.hub.message import AbstractPacket
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +30,11 @@ class Sniffer(Unifying, EventsManager):
     Logitech Unifying Sniffer interface for compatible WHAD device.
     """
 
-    def __init__(self, device):
+    def __init__(self, device: WhadDevice):
         """Sniffer initialization.
+
+        :param device: WHAD device to use
+        :type device: :class:`whad.device.WhadDevice`
         """
         Unifying.__init__(self, device)
         EventsManager.__init__(self)
@@ -66,15 +77,23 @@ class Sniffer(Unifying, EventsManager):
         return self.__configuration
 
     @configuration.setter
-    def configuration(self, new_configuration):
+    def configuration(self, new_configuration) -> SnifferConfiguration:
         """Sniffing configuration setter.
+
+        :return: Sniffing configuration object
+        :rtype: :class:`whad.unifying.sniffing.SnifferConfiguration`
         """
         self.stop()
         self.__configuration = new_configuration
         self._enable_sniffing()
 
     @property
-    def channel(self):
+    def channel(self) -> int:
+        """Retrieve current channel.
+
+        :return: current channel
+        :rtype: int
+        """
         return self.__configuration.channel
 
     @channel.setter
