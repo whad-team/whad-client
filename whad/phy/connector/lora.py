@@ -1,6 +1,11 @@
-'''WHAD LoRa modulation connector
+'''
+This module provides the :class:`whad.phy.connector.lora.LoRa` connector that wraps PHY's
+default :class:`whad.phy.connector.Phy` connector and make it easier to receive
+and send LoRa packets.
 '''
 from queue import Queue, Empty
+from scapy.packet import Packet
+from whad.device import WhadDevice
 from whad.exceptions import UnsupportedCapability
 from whad.phy.connector import Phy
 from whad.phy.exceptions import InvalidParameter
@@ -15,8 +20,8 @@ class LoRa(Phy):
 
     domain = "lora"
 
-    def __init__(self, device=None):
-        '''
+    def __init__(self, device: WhadDevice = None):
+        '''Initialization
         '''
         # Initialize our underlying Phy connector.
         super().__init__(device)
@@ -44,7 +49,7 @@ class LoRa(Phy):
 
     @property
     def sf(self):
-        '''Retrieve the current spreading factor.
+        '''Current spreading factor.
         '''
         return self.__spreading_factor
 
@@ -61,7 +66,7 @@ class LoRa(Phy):
 
     @property
     def cr(self):
-        '''Retrieve the current coding rate.
+        '''Current coding rate.
         '''
         return self.__coding_rate
 
@@ -78,7 +83,7 @@ class LoRa(Phy):
 
     @property
     def bw(self):
-        '''Retrieve the current bandwidth.
+        '''Current bandwidth.
         '''
         return self.__bandwidth
 
@@ -95,7 +100,7 @@ class LoRa(Phy):
 
     @property
     def preamble_length(self):
-        '''Retrieve the current preamble size (in symbols).
+        '''Current preamble size (in symbols).
         '''
         return self.__preamble_length
 
@@ -112,7 +117,7 @@ class LoRa(Phy):
 
     @property
     def crc_enabled(self):
-        '''Retrieve the current CRC configuration.
+        '''Current CRC configuration.
         '''
         return self.__crc_enabled
 
@@ -125,7 +130,7 @@ class LoRa(Phy):
 
     @property
     def explicit_mode(self):
-        '''Retrieve the current packet type and check if Explicit mode is set.
+        '''Current packet type (check if Explicit mode is set)
         '''
         return self.__explicit_mode
 
@@ -137,22 +142,29 @@ class LoRa(Phy):
 
     @property
     def invert_iq(self):
+        """Current IQ inversion setting
+        """
         return self.__invert_iq
 
     @invert_iq.setter
     def invert_iq(self, enabled : bool):
+        """Set IQ inversion.
+        """
         self.__invert_iq = enabled
 
 
     @property
     def syncword(self):
-        '''Retrieve the current configured synchronization word.
+        '''Current configured synchronization word.
         '''
         return self.__syncword
 
     @syncword.setter
     def syncword(self, syncword: bytes):
         '''Set synchronization word.
+
+        :param syncword: new synchronization word
+        :type syncword: bytes
         '''
         self.__syncword = syncword
 
@@ -184,15 +196,22 @@ class LoRa(Phy):
 
 
     def on_packet(self, packet):
+        """Incoming packet handler.
+        """
         # Add packet to our packet queue
         self.__pkt_queue.put(packet)
 
 
-    def wait_packet(self, timeout=None):
-        """Wait for a LoRa packet
+    def wait_packet(self, timeout: float = None) -> Packet:
+        """Wait for a LoRa packet.
+
+        :param timeout: if set, wait ``timeout`` seconds until returning
+        :type timeout: float
+        :return: received packet if any, ``None`` otherwise
+        :rtype: :class:`scapy.packet.Packet`
         """
         try:
             packet = self.__pkt_queue.get(block=True, timeout=timeout)
             return packet
-        except Empty as empty:
+        except Empty:
             return None
