@@ -20,8 +20,9 @@ class GenericFragmentsAssembler(object):
 
     pkts: List[Packet] = []
 
-    def __init__(self):
+    def __init__(self, pkts=[]):
         super(GenericFragmentsAssembler, self).__init__()
+        self.pkts = pkts
 
     def add_next_packet(self, pkt):
         """

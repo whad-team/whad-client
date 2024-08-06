@@ -9,11 +9,15 @@ from time import sleep
 
 class Injector(BLE):
 
-    def __init__(self, device, connection=None):
+    def __init__(self, device):
         super().__init__(device)
+<<<<<<< HEAD
         self.__connection = connection
         self.__synchronized = connection is not None
 
+=======
+        self.__exception = None
+>>>>>>> 3b74997 (First draft pb whad layers and Provisioner profile)
         # Check if device accepts injection
         if not self.can_inject():
             raise UnsupportedCapability("Inject")

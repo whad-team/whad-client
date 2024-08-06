@@ -24,7 +24,7 @@ from scapy.fields import (
     XStrFixedLenField,
     StrField,
     MultipleTypeField,
-    BitFieldLenField,
+    LenField
 )
 from scapy.layers.bluetooth import EIR_Element, EIR_Hdr, EIR_Raw
 from scapy.all import Raw
@@ -227,7 +227,6 @@ MESSAGE_MODEL_OPCODES = {
     0x63: "Light_LC_Property_Set_Unacknowledged",
     0x64: "Light_LC_Property_Status",
 }
-
 
 
 """
@@ -661,7 +660,7 @@ class BTMesh_Generic_Provisioning_Transaction_Start(BTMesh_Generic_Provisioning_
     fields_desc = [
         BitField(
             "segment_number", 0, 6
-        ),  # The first 6 bits, name will change in subclasss
+        ),
         BitEnumField(
             "generic_provisioning_control_format",
             0b00,
@@ -673,10 +672,8 @@ class BTMesh_Generic_Provisioning_Transaction_Start(BTMesh_Generic_Provisioning_
                 0b11: "Provisioning Bearer Control",
             },
         ),
-        BitFieldLenField(
-            "total_length", None, 16, length_of="generic_provisioning_payload_fragment"
-        ),
-        XByteField("frame_check_sequence", None),
+        LenField("total_length", None, fmt="H"),  # Add bytes mark  # noqa: E501
+        XByteField("frame_check_sequence", None),  # TO COMPUTE IN LOGIC, ON THE WHOLE PROVISIONING PDU IN PAYLOAD (not just the 1st fragment)
         # StrFixedLenField(
         #    "generic_provisioning_payload_fragment", None, length_from="total_length"
         # ),
@@ -741,13 +738,13 @@ class BTMesh_Generic_Provisioning_Link_Ack(BTMesh_Generic_Provisioning_Hdr):
     fields_desc = [
         BitEnumField(
             "bearer_opcode",
-            0,
+            0x01,
             6,
             {0x00: "Link Open", 0x01: "Link ACK", 0x02: "Link Close"},
         ),
         BitEnumField(
             "generic_provisioning_control_format",
-            0b01,
+            0b11,
             2,
             {
                 0b00: "Transaction Start",
@@ -764,13 +761,13 @@ class BTMesh_Generic_Provisioning_Link_Open(BTMesh_Generic_Provisioning_Hdr):
     fields_desc = [
         BitEnumField(
             "bearer_opcode",
-            0,
+            0x00,
             6,
             {0x00: "Link Open", 0x01: "Link ACK", 0x02: "Link Close"},
         ),
         BitEnumField(
             "generic_provisioning_control_format",
-            0b01,
+            0b11,
             2,
             {
                 0b00: "Transaction Start",
@@ -788,13 +785,13 @@ class BTMesh_Generic_Provisioning_Link_Close(BTMesh_Generic_Provisioning_Hdr):
     fields_desc = [
         BitEnumField(
             "bearer_opcode",
-            0,
+            0x02,
             6,
             {0x00: "Link Open", 0x01: "Link ACK", 0x02: "Link Close"},
         ),
         BitEnumField(
             "generic_provisioning_control_format",
-            0b01,
+            0b11,
             2,
             {
                 0b00: "Transaction Start",

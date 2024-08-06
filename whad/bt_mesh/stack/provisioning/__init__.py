@@ -22,21 +22,52 @@ from whad.scapy.layers.bt_mesh import (
     BTMesh_Provisioning_Records_Get,
     BTMesh_Provisioning_Records_List,
     BTMesh_Provisioning_Record_Response,
-    BTMesh_Provisioning_Hdr,
 )
-from whad.common.stack import Layer, alias, instance, state
-from whad.bt_mesh.stack.provisioning.state import ProvisioningState
-from whad.exceptions import UnsupportedCapability, RequiredImplementation
+from whad.common.stack import Layer, alias, instance, state, LayerState
 from whad.bt_mesh.stack.exceptions import (
-    UnknownParameterValueSend,
-    FailedProvisioningReceived,
-    UnknownProvisioningPacketType,
-    UncompatibleAlgorithmsAvailable,
+    UnknownParameterValueSendError,
+    FailedProvisioningReceivedError,
+    UnknownProvisioningPacketTypeError,
+    UncompatibleAlgorithmsAvailableError,
 )
 from whad.bt_mesh.crypto import ProvisioningBearerAdvCryptoManager
 
 logger = logging.getLogger(__name__)
 
+class ProvisioningState(LayerState):
+    """
+    State (DB) of the Provisioning layer, instance by the associated Generic Provisioner
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        self.capabilities = dict(
+            alg = 0b11, #default support 2 algs
+            public_key_type = 0x00, #default no OOB public key support
+            static_oob_type = 0x00, #default no static OOB info available
+            output_oob_type = 0x00, # default no output OOB action available
+            output_oob_size = 0x00,
+            input_oob_type = 0x00, # default no input OOB a available
+            input_oob_size = 0x00
+        )
+
+        self.chosen_parameters = dict(
+            alg = 0b11, #default 2 algs
+            public_key_type = 0x00, #default no OOB public key
+            authentication_method = 0x00, # no OOB auth default
+            authentication_action = 0x00, # no OOB auth default
+            authentication_size = 0x00
+        )
+
+
+        self.crypto_manager = None
+
+        self.status = None
+
+
+    def set_crypto_manager(self, crypto_manager):
+        self.crypto_manager = crypto_manager
 
 @state(ProvisioningState)
 @alias("provisioning")
@@ -63,26 +94,29 @@ class ProvisioningLayer(Layer):
             BTMesh_Provisioning_Record_Response: self.on_record_response,
         }
 
+
     def send_error_response(self, error_code):
         """Sends a BTMesh_Provisioning_Failed to other device. Error code defined in scapy layer"""
         if error_code < 0x1 or error_code > 0x09:
-            raise UnknownParameterValueSend(
+            raise UnknownParameterValueSendError(
                 "BTMesh_Provisioning_Failed.error_code", error_code
             )
         self.send("gen_prov", BTMesh_Provisioning_Failed(error_code=error_code))
 
+    
     @instance("gen_prov")
     def on_packet_received(self, packet):
         """Process incoming packets from the Generic Provisioning Layer"""
-        packet_type = type(packet)
+        packet_type = type(packet[1])
         if packet_type not in self._handlers:
-            raise UnknownProvisioningPacketType(packet_type)
-        self._handlers[packet_type](packet)
+            raise UnknownProvisioningPacketTypeError(packet_type)
+        self._handlers[packet_type](packet[1])
+        logger.warning("RECEIVED PACKET IN PROVISIONING : %s" % packet.show(dump=True))
 
         # All handlers except Failed return errors here since we are in the generic layer. Needs implement in Provisioner/Device classes.
 
     def on_failed(self, packet):
-        raise FailedProvisioningReceived(packet.error_code)
+        raise FailedProvisioningReceivedError(packet.error_code)
 
     def on_invite(self, packet):
         self.send_error_response(0x07)
@@ -123,13 +157,17 @@ class ProvisioningLayer(Layer):
     def on_record_response(self, packet):
         self.send_error_response(0x07)
 
+    def on_ack(self,message):
+        pass
 
-def ProvisioningLayerProvisioner(ProvisioningLayer):
+
+class ProvisioningLayerProvisioner(ProvisioningLayer):
     def __init__(self, parent=None, layer_name=None, options={}):
         super().__init__(parent=parent, layer_name=layer_name, options=options)
 
     def configure(self, options):
         super().configure(options)
+
 
     def on_capabilities(self, packet):
         """
@@ -143,7 +181,7 @@ def ProvisioningLayerProvisioner(ProvisioningLayer):
         elif packet.algorithms & 0x01 and self.state.capabilities & 0x01:
             self.state.chosen_parameters.alg = "BTM_ECDH_P256_CMAC_AES128_AES_CCM"
         else:
-            raise UncompatibleAlgorithmsAvailable
+            raise UncompatibleAlgorithmsAvailableError
 
         # the rest is static for now, already set in state init
         params = self.state.chosen_parameters
@@ -168,10 +206,22 @@ class ProvisioningLayerDevice(ProvisioningLayer):
     def configure(self, options):
         super().configure(options)
 
-
     def on_invite(self, packet):
         """
         Responds to an invite to connect to network with capablities
         """
         capabilities = self.state.capabilities
+        nb_output_oob_action = sum([
+            capabilities.output_oob_action[i] & 0b01 << i for i in range(5)
+        ])
 
+        nb_input_oob_action = sum([
+            capabilities.input_oob_action[i] & 0b01 << i for i in range(5)
+        ])
+        number_of_elements = nb_input_oob_action + nb_output_oob_action
+        self.send(
+            "gen_prov",
+            BTMesh_Provisioning_Capabilities(
+                number_of_elements=number_of_elements, **capabilities
+            ),
+        )

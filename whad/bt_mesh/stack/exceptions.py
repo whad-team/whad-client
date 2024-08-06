@@ -7,7 +7,7 @@ BT Mesh domain exceptions
 #############
 
 
-class UnknownParameterValueReceived(Exception):
+class UnknownParameterValueReceivedError(Exception):
     """
     Raised when a parameter received in the Provisoning Layer does not exist
     """
@@ -25,12 +25,12 @@ class UnknownParameterValueReceived(Exception):
         return self._value
 
     def __str__(self):
-        return f"UnsupportedParameterValueReceived({self._parameter}, {self._value})"
+        return f"UnsupportedParameterValueReceivedError({self._parameter}, {self._value})"
 
     def __repr__(self):
         return str(self)
 
-class UnknownParameterValueSend(Exception):
+class UnknownParameterValueSendError(Exception):
     """
     Raised when a parameter trying to be sent in the Provisoning Layer does not exist
     """
@@ -48,13 +48,13 @@ class UnknownParameterValueSend(Exception):
         return self._value
 
     def __str__(self):
-        return f"UnsupportedParameterValueSend({self._parameter}, {self._value})"
+        return f"UnsupportedParameterValueSendError({self._parameter}, {self._value})"
 
     def __repr__(self):
         return str(self)
 
 
-class FailedProvisioningReceived(Exception):
+class FailedProvisioningReceivedError(Exception):
     """
     Raised when a BTMesh_Provisioning_Failed packet is received
     """
@@ -67,12 +67,12 @@ class FailedProvisioningReceived(Exception):
         return self._error_code
 
     def __str__(self):
-        return f"FailedProvisioningReceived({self._error_code})"
+        return f"FailedProvisioningReceivedError({self._error_code})"
 
     def __repr__(self):
         return str(self)
 
-class UnknownProvisioningPacketType(Exception):
+class UnknownProvisioningPacketTypeError(Exception):
     """
     Raised when an unknown packet type is received in the Provisioning Layer (should never be raised but hey for completion)
     """
@@ -85,13 +85,13 @@ class UnknownProvisioningPacketType(Exception):
         return self._unknown_type
 
     def __str__(self):
-        return f"UnknownPacketType({self._unknown_type})"
+        return f"UnknownPacketTypeError({self._unknown_type})"
 
     def __repr__(self):
         return str(self)
 
 
-class UncompatibleAlgorithmsAvailable(Exception):
+class UncompatibleAlgorithmsAvailableError(Exception):
     """
     Raised when a Provisioner and a Device dont have any alg in common
     """ 
@@ -99,10 +99,56 @@ class UncompatibleAlgorithmsAvailable(Exception):
         super().__init__()
 
     def __str__(self):
-        return "UncompatibleAlgorithmsAvailable()"
+        return "UncompatibleAlgorithmsAvailableError()"
 
     def __repr__(self):
         return str(self)
 
+
+class GenericProvisioningTimeoutError(Exception):
+    """
+    Raised when an expected message in Generic Provisioning layer doesnt arrive in time
+    """ 
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self):
+        return "GenericProvisioningTimeoutError()"
+
+    def __repr__(self):
+        return str(self)
+
+
+class InvalidFrameCheckSequenceError(Exception):
+    """
+    Raised when a Provisioning packet has the wrong fcs in the Generic Provisioning field
+    """ 
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self):
+        return "InvalidFrameCheckSequenceError()"
+
+    def __repr__(self):
+        return str(self)
+
+
+class UnexepectedGenericProvisioningPacketError(Exception):
+    """
+    Raised when a Provisioning packet has the wrong fcs in the Generic Provisioning field
+    """ 
+    def __init__(self, pkt_type):
+        super().__init__()
+        self._pkt_type = pkt_type
+
+    @property
+    def pkt_type(self):
+        return self._pkt_type.__name__
+
+    def __str__(self):
+        return f"UnexepectedGenericProvisioningPacketError({self.pkt_type})"
+
+    def __repr__(self):
+        return str(self)
 
 
