@@ -1,6 +1,14 @@
 Getting started
 ===============
 
+Logitech Unifying is a protocol designed and used by Logitech for their wireless
+mice and keyboards branded as *Unifying*, but this protocol is also supported by
+non-unifying devices advertised as using a proprietary 2.4 GHz wireless protocol.
+
+Logitech's Unifying technology is based on a series of compatible USB dongles that
+allow devices to be paired and used with it, managed by a dedicated software only
+compatible with Windows. See `Logitech Unifying sales pitch <https://www.logitech.com/en-us/resource-center/what-is-unifying.html?searchclick=logi>` to learn more about it.
+
 Sniffing Logitech Unifying frames
 ---------------------------------
 
@@ -120,7 +128,7 @@ an encrypted keyboard.
 
 However, previous research from Bastille Research demonstrated that some encrypted
 keyboards are using a Logitech Unifying dongle that accepts unencrypted keystrokes
-(see `https://www.bastille.net/research/vulnerabilities/mousejack`_ ). And some
+(see `Mousejack website <https://www.bastille.net/research/vulnerabilities/mousejack>`_ ). And some
 mice dongles also accept these unencrypted keystrokes as well.
 
 Sending mouse events
