@@ -36,21 +36,39 @@ Of course, WHAD provides many host-based wireless protocol stacks such as
 Bluetooth Low Energy and ZigBee that may be tuned to implement some attacks or
 to fuzz a specific protocol.
 
-WHAD-compatible devices
------------------------
+Hardware interfaces
+^^^^^^^^^^^^^^^^^^^
 
-We do also provide a set of WHAD-enable firmwares for various hardware platforms:
+In WHAD, an *interface* is basically some piece of hardware that acts as a
+transceiver: a device that is able to turn a series of bytes into air frames
+and to receive air frames and turn them into a series of bytes, depending on a
+modulation.
 
-* ESP32-WROOM-32 (NodeMCU)
-* nRF52840 dongle
-* NUCLEO WL55 from STMicro Electronics
-* LoRa-e5-Mini from SeeedStudio
+For some wireless protocols, this interface also handles time-critical operations
+such as channel hopping or connection-specific procedures that cannot be handled
+by the host.
 
-Some other devices were made compatible with WHAD through an adaptation layer (no firmware update required):
+Each hardware interface supports our discovery protocol: a protocol designed to
+get as much information as possible from any interface including its capabilities,
+its supported domains as well as the firmware it runs and where to find its source
+code.
 
-* Ubertooth One
-* Yard Stick One
-* Bluetooth HCI dongles
+These interfaces exchange data with the host through our extensible WHAD
+protocol.
+
+Connectors
+^^^^^^^^^^
+
+WHAD also introduces the concept of *connectors*. A *connector* is an abstract
+class that connects an interface to a specific domain and role. A *connector*
+uses the interface communication channel to interact with it and exposes some
+higher-level functions to the user, adding an abstraction layer. It also checks
+that the specified device supports the required domain and capabilities, and
+accepts all the commands required to achieve it task(s).
+
+Connectors can inherit from other connectors as well, allowing specialization
+and adding more abstraction level for the user thus making things simpler.
+
 
 
 

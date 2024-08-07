@@ -2,7 +2,7 @@ Getting started
 ===============
 
 WHAD provides dedicated tools to interact with LoRaWAN networks and compatible
-devices.
+devices. These tools are based on PHY's LoRa capabilities.
 
 LoRaWAN Channel Plan
 --------------------
