@@ -77,7 +77,7 @@ class WhadWiresharkApp(CommandLineApp):
 
                 # Query our protocol hub to gather the correct format function
                 # based on the provided domain
-                hub = ProtocolHub(1)
+                hub = ProtocolHub(2)
                 self.connector.format = hub.get(self.args.domain).format
 
                 # Attack a wireshark monitor

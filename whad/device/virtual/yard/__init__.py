@@ -8,7 +8,7 @@ from whad.device.virtual.yard.constants import YardStickOneId, YardStickOneEndPo
     YardInternalStates
 from whad import WhadDomain, WhadCapability
 from whad.hub.generic.cmdresult import CommandResult
-from whad.hub.phy import Commands, TxPower
+from whad.hub.phy import Commands, TxPower, Endianness as PhyEndianness, Modulation as PhyModulation
 from usb.core import find, USBError, USBTimeoutError
 from usb.util import get_string
 from whad.phy import Endianness
@@ -78,6 +78,7 @@ class YardStickOneDevice(VirtualDevice):
         self.__frequency = None
         self.__endianness = Endianness.BIG
 
+        self.__start_time = time()*1000000
         self.__in_buffer = b""
         self.__queue = Queue()
 
@@ -270,12 +271,15 @@ class YardStickOneDevice(VirtualDevice):
         # Create a PacketReceived message
         msg = self.hub.phy.create_packet_received(
             self._get_frequency(),
-            packet
+            packet,
+            syncword=self._get_sync_word(),
+            endianness=PhyEndianness.LITTLE if self.__endianness == Endianness.LITTLE else PhyEndianness.BIG,
+            deviation=int(self._get_deviation()),
+            datarate=int(self._get_data_rate())
         )
 
         # Set packet timestamp if available
         if timestamp is not None:
-
             msg.timestamp = timestamp
 
         self._send_whad_message(msg)
@@ -321,40 +325,6 @@ class YardStickOneDevice(VirtualDevice):
         #self._set_channel_spacing(self.compute_best_channel_bandwidth())
         self._set_channel(0)
         self._set_intermediate_frequency(44444)
-        #self._strobe_idle_mode()
-
-        #self.set_test_config()
-        #self._set_rx_mode()
-        #self._strobe_rx_mode()
-
-        '''
-
-
-        self._set_sync_word(b"\x00\x00\x00\x00")
-        self._set_preamble_quality_threshold(0)
-        self._set_packet_length(250, variable=False)
-
-        print("length:", self._get_packet_length())
-        print("datarate:", self._get_data_rate())
-
-        frame =b"\x00\x00\x00\x00\x00\x7f\xff\x83\xe0\x00\x1f\xff\xc0\xff\xfe\x0f\x80\x00|\x00\x03\xff\xf8?\x00\x01\xf0\x00\x0f\x80\x00\xfc\x00\x07\xff\xf8?\xff\x81\xf0\x00\x1f\xff\xe0\xff\xff\x07\xff\xf0>\x00\x03\xe0\x00\x1f\x00\x00\xf8\x00\x0f\xff\xf0|\x00\x03\xff\xf8?\xff\xc1\xff\xfe\x0f\x80\x00\x7f\xff\x07\xe0\x00>\x00\x01\xff\xfc\x1f\xff\xe0\xf8\x00\x00\x00\x00\x00\x00\x00\x00\x03\xff\xf8\x1f\x00\x01\xff\xfe\x0f\xff\xf0|\x00\x07\xe0\x00?\xff\xc1\xf0\x00\x0f\x80\x00\xf8\x00\x07\xc0\x00?\xff\x83\xff\xfc\x1f\x00\x00\xff\xfe\x0f\xff\xf0\x7f\xff\x83\xe0\x00\x1f\x00\x01\xf8\x00\x0f\x80\x00\x7f\xff\x07\xe0\x00?\xff\xc1\xff\xfc\x0f\xff\xe0\xfc\x00\x07\xff\xf8>\x00\x01\xf0\x00\x1f\xff\xe0\xff\xff\x07\xc0\x00\x00\x00\x00\x00\x00\x00\x00?\xff\xc1\xf0\x00\x0f\xff\xe0\xff\xff"
-        #self._set_rx_mode()
-        #self._strobe_rx_mode()
-        #frame = bytes.fromhex("")
-        #self._set_packet_length(len(frame), variable=False)
-        self._set_power(0x80)
-        #frame = bytes([i for i in range(250)])
-        self._set_packet_length(len(frame), variable=False)
-#
-        self._set_tx_mode()
-        self._send_packet(frame)
-        sleep(2)
-
-        self._set_idle_mode()
-
-        self._set_rx_mode()
-        self._strobe_rx_mode()
-        '''
         self._set_idle_mode()
 
         # Ask parent class to run a background I/O thread
@@ -383,11 +353,7 @@ class YardStickOneDevice(VirtualDevice):
                         else:
                             formatted_data = data[2]
 
-                        self._send_whad_phy_pdu(formatted_data, int(time()))
-                    #self.radio_structure.update()
-                    #print(self.radio_structure.get("MARCSTATE"))
-                    #print(self.radio_structure)
-
+                        self._send_whad_phy_pdu(formatted_data, int(time()*1000000 - self.__start_time))
 
             except USBTimeoutError:
                 pass
@@ -1134,7 +1100,6 @@ class YardStickOneDevice(VirtualDevice):
         self._set_rf_register("PKTCTRL0", pktctrl0)
 
     def set_test_config(self):
-        '''
         self._set_rf_register("IOCFG0",0x06)
         self._set_rf_register("SYNC1",0xaa)
         self._set_rf_register("SYNC0",0xaa)
@@ -1170,9 +1135,3 @@ class YardStickOneDevice(VirtualDevice):
         self._set_rf_register("TEST0",0x09)
         self._set_rf_register("PA_TABLE0",0x05)
         self._set_rf_register("PA_TABLE1",0x00)
-        '''
-
-
-        #self._set_channel_bandwidth(self.compute_best_channel_bandwidth())
-        #self._set_deviation(self.compute_best_deviation())
-        #self._set_channel(0)

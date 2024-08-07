@@ -2,9 +2,10 @@
 """
 from typing import List
 from dataclasses import dataclass, field, fields
+from enum import IntEnum
 
 from whad.protocol.phy.phy_pb2 import LoRaSpreadingFactor, LoRaCodingRate, JammingMode, \
-    Endianness as PbEndianness, TXPower
+    Endianness as PbEndianness, TXPower, Modulation as PbModulation
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
@@ -37,11 +38,33 @@ class Commands:
     SetLoRaModulation = 0x15
     ScheduleSend = 0x16
 
-class Endianness:
+class Endianness(IntEnum):
     """PHY Endianness
     """
     BIG = PbEndianness.BIG
     LITTLE = PbEndianness.LITTLE
+
+    def __str__(self):
+        return self.name
+
+class Modulation(IntEnum):
+    """PHY Modulation
+    """
+    ASK = PbModulation.ASK
+    FSK = PbModulation.FSK
+    FOURFSK = PbModulation.FOURFSK
+    GFSK = PbModulation.GFSK
+    MSK = PbModulation.MSK
+    BPSK = PbModulation.BPSK
+    QPSK = PbModulation.QPSK
+    LORA = PbModulation.LORA
+
+    def __str__(self):
+        return self.name
+
+class Syncword(bytes):
+    def __str__(self):
+        return self.hex()
 
 class SpreadingFactor:
     SF7 = LoRaSpreadingFactor.SF7
@@ -71,9 +94,23 @@ class TxPower:
 class PhyMetadata(Metadata):
     frequency : int = None
     iq : list = field(default_factory=lambda: [])
+    endianness : Endianness = None
+    deviation : int = None
+    datarate : int = None
+    modulation : Modulation = None
+    syncword : Syncword = None
 
     def convert_to_header(self):
-        return Phy_Packet_Hdr(frequency=self.frequency, rssi=self.rssi), self.timestamp
+        return Phy_Packet_Hdr(
+            frequency=self.frequency,
+            rssi=self.rssi,
+            endianness=self.endianness,
+            deviation=self.deviation,
+            datarate=self.datarate,
+            modulation=self.modulation,
+            syncword=self.syncword,
+            syncword_length=len(self.syncword)
+        ), self.timestamp
 
 
     @classmethod
@@ -83,6 +120,11 @@ class PhyMetadata(Metadata):
         return PhyMetadata(
             rssi = header.rssi,
             frequency = header.frequency,
+            endianness = Endianness(header.endianness),
+            deviation = header.deviation,
+            datarate = header.datarate,
+            modulation = Modulation(header.modulation),
+            syncword = header.syncword,
             timestamp = int(100000 * pkt.time)
         )
 
@@ -96,6 +138,14 @@ def generate_phy_metadata(message):
 
     if message.timestamp is not None:
         metadata.timestamp = message.timestamp.sec*0.001 + message.timestamp.usec*0.000001
+
+
+    if isinstance(message, ExtendedPacketReceived):
+        metadata.endianness = message.endianness
+        metadata.syncword = message.syncword
+        metadata.deviation = message.deviation
+        metadata.datarate = message.datarate
+        metadata.modulation = message.modulation
 
     if isinstance(message, RawPacketReceived):
         if message.iq is not None:
@@ -131,7 +181,7 @@ class PhyDomain(Registry):
         return isinstance(packet.metadata, PhyMetadata)
 
     def convert_packet(self, packet) -> HubMessage:
-        """Convert a BLE packet to SendPdu or SendBlePdu message.
+        """Convert a Phy packet to SendPdu or SendBlePdu message.
         """
         if isinstance(packet.metadata, PhyMetadata):
             if packet.metadata.raw:
@@ -151,7 +201,8 @@ class PhyDomain(Registry):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
-        return packet, 0
+        header, timestamp =  packet.metadata.convert_to_header()
+        return header / packet, timestamp
 
     def create_set_ask_mod(self, ook: bool = False) -> HubMessage:
         """Create a SetAskMod message
@@ -446,7 +497,9 @@ class PhyDomain(Registry):
 
 
     def create_packet_received(self, frequency: int, packet: bytes, rssi: int = None, \
-                             timestamp: int = None) -> HubMessage:
+                             timestamp: int = None, syncword : bytes = None, datarate : int = None, \
+                             deviation : int = None, modulation : Modulation = None, \
+                             endianness : Endianness = None) -> HubMessage:
         """Create a PacketReceived notification message
 
         :param frequency: Frequency on which the packet has been received
@@ -457,18 +510,39 @@ class PhyDomain(Registry):
         :type rssi: int, optional
         :param timestamp: Timestamp at which the packet has been received, in microseconds
         :type timestamp: int, optional
+        :param syncword: Word used for radio synchronization
+        :type syncword: bytes, optional
+        :param datarate: Datarate
+        :type datarate: int, optional
+        :param deviation: Deviation if a frequency modulation is in use
+        :type deviation: int, optional
+        :param modulation: Modulation in use
+        :type modulation: Modulation
+        :param endianness: Endianness in use
+        :type endianness: Endianness
         :return: instance of `PacketReceived`
         """
+
         msg = PhyDomain.bound('packet', self.proto_version)(
             frequency=frequency,
             packet=packet
         )
-
         # Add optional fields if provided
         if rssi is not None:
             msg.rssi = rssi
         if timestamp is not None:
             msg.timestamp = timestamp
+
+        if syncword is not None:
+            msg.syncword = syncword
+        if datarate is not None:
+            msg.datarate = datarate
+        if deviation is not None:
+            msg.deviation = deviation
+        if endianness is not None:
+            msg.endian = endianness
+        if modulation is not None:
+            msg.modulation = modulation
 
         # Success
         return msg
@@ -553,7 +627,7 @@ from .mod import SetAskMod, SetBpskMod, SetFskMod, SetGfskMod, SetLoRaMod, \
     SetMskMod, SetQpskMod, Set4FskMod
 from .freq import GetSupportedFreqs, SetFreq, SupportedFreqRanges
 from .packet import SetDatarate, SetEndianness, SetTxPower, SetPacketSize, SetSyncWord, \
-    SendPacket, SendRawPacket, RawPacketReceived, PacketReceived
+    SendPacket, SendRawPacket, RawPacketReceived, PacketReceived, ExtendedPacketReceived
 from .mode import SniffMode, JamMode, MonitorMode, Start, Stop, Jammed, MonitoringReport
 from .schedule import SchedulePacket, ScheduledPacketSent, SchedulePacketResponse
 
@@ -577,6 +651,7 @@ __all__ = [
     'SendPacket',
     'SendRawPacket',
     'PacketReceived',
+    'ExtendedPacketReceived',
     'RawPacketReceived',
     'SniffMode',
     'JamMode',

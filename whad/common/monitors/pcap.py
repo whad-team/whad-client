@@ -131,7 +131,7 @@ class PcapWriterMonitor(WhadMonitor):
             # Note the current local clock timestamp in us
             now = time() * 1000000
             packet, timestamp = self._formatter(packet)
-
+            
             # Relative time synchronization
             if timestamp is None:
                 timestamp = now
