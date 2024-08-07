@@ -37,10 +37,10 @@ class Transaction(object):
     Represents a transaction (one provisioning packet) currently sent OR received by the Generic Provisioning Layer.
     """
 
-    def __init__(self, transaction_number, fragments, total_nb_fragement):
+    def __init__(self, transaction_number, fragments, total_nb_fragements):
         self.transaction_number = transaction_number
         self.fragments = fragments
-        self.total_nb_fragements = total_nb_fragement
+        self.total_nb_fragements = total_nb_fragements
         self.next_fragment_number = 0
 
     def get_next_fragment_to_send(self):
@@ -89,6 +89,8 @@ class GenericProvisioningLayer(ContextualLayer):
 
     @source("provisioning")
     def on_provisioning_packet(self, packet):
+        if not self.state.is_link_open:
+            self.open_link
         if self._queue.empty() and not self.state.in_transaction:
             self.process_provisioning_packet(packet)
         else:
@@ -102,7 +104,7 @@ class GenericProvisioningLayer(ContextualLayer):
             self._handlers[BTMesh_Generic_Provisioning_Link_Close](message)
             return
 
-        if self.state.expected_class is not None and not isinstance(
+        if self.state.expected_class is None or not isinstance(
             pkt, self.state.expected_class
         ):
             logger.warning(
@@ -124,20 +126,45 @@ class GenericProvisioningLayer(ContextualLayer):
         self._handlers[type(pkt)](message)
 
     def send_to_peer(self, transaction_number, packet):
+        """
+        Send packet to peer via sublayer
+
+        :param transaction_number: Number of current transaction (can be 0 for some packets)
+        :type transaction_number: [TODO:type]
+        :param packet: [TODO:description]
+        :type packet: [TODO:type]
+        """
         message = GenericProvisioningMessage(packet, transaction_number)
         self.send("pb_adv", message)
         self.state.last_packet_sent = packet
 
     def send_to_upper_layer(self, packet):
+        """
+        Transfer packet to the Provisioning Layer
+
+        :param packet:
+        :type packet: BTMesh_Provisioning_Hdr
+        """
         self.send("provisioning", packet)
 
     def check_queue(self):
-        """Check is Provisioning messages are left to be sent"""
+        """
+        Check is Provisioning messages are left to be sent? If not, we wait for a Transaction Start.
+        """
         if not self._queue.empty():
             self.process_provisioning_packet(self._queue.get_nowait())
+        else:
+            self.expected_class = BTMesh_Generic_Provisioning_Transaction_Start
+
+    def open_link(self):
+        """
+        In subclass Provisioner. Open a Link with peer device
+        """
+        pass
 
     def on_link_open(self, message):
         """IN subclass, provisioner should never receive this"""
+        pass
 
     def on_link_ack(self, message):
         """IN subclass, device should never receieve this"""
@@ -173,7 +200,7 @@ class GenericProvisioningLayer(ContextualLayer):
             self.state.current_transaction = Transaction(
                 transaction_number=transaction_number,
                 fragments=[pkt],
-                total_nb_fragement=pkt.segment_number,
+                total_nb_fragements=pkt.segment_number,
             )
             self.state.expected_class = (
                 BTMesh_Generic_Provisioning_Transaction_Continuation
@@ -198,7 +225,7 @@ class GenericProvisioningLayer(ContextualLayer):
         )
 
         # if last segment index, defragment and send to upper layer, and check queue
-        if pkt.segment_index == self.state.current_transaction.total_nb_fragement:
+        if pkt.segment_index == self.state.current_transaction.total_nb_fragements:
             assembler = GenericFragmentsAssembler(
                 self.state.current_transaction.fragments
             )
@@ -228,7 +255,7 @@ class GenericProvisioningLayer(ContextualLayer):
         self.state.current_transaction = Transaction(
             transaction_number=self.state.last_sent_transaction_number + 1,
             fragments=fragments,
-            total_nb_fragement=len(fragments),
+            total_nb_fragements=len(fragments),
         )
 
         # Send the first fragment in a Transaction Start
@@ -239,10 +266,10 @@ class GenericProvisioningLayer(ContextualLayer):
         self.send_to_peer(
             self.state.current_transaction.transaction_number,
             BTMesh_Generic_Provisioning_Transaction_Start(
-                segment_number=self.state.current_transaction.total_nb_fragement,
+                segment_number=self.state.current_transaction.total_nb_fragements - 1,
                 frame_check_sequence=frame_check_sequence,
             )
-            / Raw(bytes.fromhex(fragment)),
+            / Raw(fragment),
         )
 
         if len(self.state.current_transaction.fragments) == 0:
@@ -264,7 +291,13 @@ class GenericProvisioningLayer(ContextualLayer):
             ),
         )
 
-    def compute_frame_check_sequence(data):
+    def compute_frame_check_sequence(self, data):
+        """
+        Comptute the Frame Chack sequence on all the Provisioning PDU
+
+        :param data: Raw Bytes of the Provisioning PDU
+        :type data: Bytes
+        """
         fcs = 0xFF
         polynomial = 0x107
 
@@ -285,21 +318,23 @@ class GenericProvisioningLayerProvisioner(GenericProvisioningLayer):
     def configure(self, options):
         super().configure(options)
 
-        self.state.expected_class = BTMesh_Generic_Provisioning_Link_Open
+        self.state.expected_class = None
         self.state.last_sent_transaction_number = -1
-
-        # send the link open directly
-
-        self.open_link()
-        self.send_to_peer(
-            transaction_number=0x00,
-            packet=BTMesh_Generic_Provisioning_Link_Open(device_uuid=options["uuid"]),
-        )
 
     def on_link_ack(self, message):
         if not self.state.is_link_open:
             self.state.is_link_open = True
+            self.expected_class = None
             self.check_queue()
+
+    def open_link(self):
+        self.state.expected_class = BTMesh_Generic_Provisioning_Link_Ack
+        self.send_to_peer(
+            transaction_number=0x00,
+            packet=BTMesh_Generic_Provisioning_Link_Open(
+                device_uuid=self.state.peer_uuid
+            ),
+        )
 
 
 class GenericProvisioningLayerDevice(GenericProvisioningLayer):
