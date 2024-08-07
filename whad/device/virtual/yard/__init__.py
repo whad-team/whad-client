@@ -783,13 +783,6 @@ class YardStickOneDevice(VirtualDevice):
         )
         return pqt
 
-    def _set_append_packet_status(self, enable=False):
-        self.radio_structure.update()
-        mask_pktctrl1 = YardRegistersMasks.PKTCTRL1
-        pktctrl1 = self.radio_structure.get("PKTCTRL1") & ~(mask_pktctrl1.APPEND_STATUS.mask << mask_pktctrl1.APPEND_STATUS.offset)
-        pktctrl1 |= int(enable) << mask_pktctrl1.APPEND_STATUS.offset
-        self._set_rf_register("PKTCTRL1", pktctrl1)
-
 
     def _is_append_packet_status_enabled(self):
         self.radio_structure.update()
