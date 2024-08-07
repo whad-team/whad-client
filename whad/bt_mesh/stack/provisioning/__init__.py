@@ -22,6 +22,7 @@ from whad.scapy.layers.bt_mesh import (
     BTMesh_Provisioning_Records_Get,
     BTMesh_Provisioning_Records_List,
     BTMesh_Provisioning_Record_Response,
+    BTMesh_Provisioning_Hdr,
 )
 from whad.common.stack import Layer, alias, instance, state, LayerState
 from whad.bt_mesh.stack.exceptions import (
@@ -30,9 +31,11 @@ from whad.bt_mesh.stack.exceptions import (
     UnknownProvisioningPacketTypeError,
     UncompatibleAlgorithmsAvailableError,
 )
+from whad.bt_mesh.stack.provisioning.constants import PROVISIONING_TYPES
 from whad.bt_mesh.crypto import ProvisioningBearerAdvCryptoManager
 
 logger = logging.getLogger(__name__)
+
 
 class ProvisioningState(LayerState):
     """
@@ -43,31 +46,30 @@ class ProvisioningState(LayerState):
         super().__init__()
 
         self.capabilities = dict(
-            alg = 0b11, #default support 2 algs
-            public_key_type = 0x00, #default no OOB public key support
-            static_oob_type = 0x00, #default no static OOB info available
-            output_oob_type = 0x00, # default no output OOB action available
-            output_oob_size = 0x00,
-            input_oob_type = 0x00, # default no input OOB a available
-            input_oob_size = 0x00
+            alg=0b11,  # default support 2 algs
+            public_key_type=0x00,  # default no OOB public key support
+            static_oob_type=0x00,  # default no static OOB info available
+            output_oob_type=0x00,  # default no output OOB action available
+            output_oob_size=0x00,
+            input_oob_type=0x00,  # default no input OOB a available
+            input_oob_size=0x00,
         )
 
         self.chosen_parameters = dict(
-            alg = 0b11, #default 2 algs
-            public_key_type = 0x00, #default no OOB public key
-            authentication_method = 0x00, # no OOB auth default
-            authentication_action = 0x00, # no OOB auth default
-            authentication_size = 0x00
+            alg=0b11,  # default 2 algs
+            public_key_type=0x00,  # default no OOB public key
+            authentication_method=0x00,  # no OOB auth default
+            authentication_action=0x00,  # no OOB auth default
+            authentication_size=0x00,
         )
-
 
         self.crypto_manager = None
 
         self.status = None
 
-
     def set_crypto_manager(self, crypto_manager):
         self.crypto_manager = crypto_manager
+
 
 @state(ProvisioningState)
 @alias("provisioning")
@@ -94,16 +96,20 @@ class ProvisioningLayer(Layer):
             BTMesh_Provisioning_Record_Response: self.on_record_response,
         }
 
-
     def send_error_response(self, error_code):
         """Sends a BTMesh_Provisioning_Failed to other device. Error code defined in scapy layer"""
         if error_code < 0x1 or error_code > 0x09:
             raise UnknownParameterValueSendError(
                 "BTMesh_Provisioning_Failed.error_code", error_code
             )
-        self.send("gen_prov", BTMesh_Provisioning_Failed(error_code=error_code))
+        self.send_to_gen_prov(BTMesh_Provisioning_Failed(error_code=error_code))
 
-    
+    def send_to_gen_prov(self, packet):
+        hdr = BTMesh_Provisioning_Hdr(
+            type=PROVISIONING_TYPES[type(packet)], message=packet
+        )
+        self.send("gen_prov", hdr)
+
     @instance("gen_prov")
     def on_packet_received(self, packet):
         """Process incoming packets from the Generic Provisioning Layer"""
@@ -157,7 +163,7 @@ class ProvisioningLayer(Layer):
     def on_record_response(self, packet):
         self.send_error_response(0x07)
 
-    def on_ack(self,message):
+    def on_ack(self, message):
         pass
 
 
@@ -168,6 +174,11 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
     def configure(self, options):
         super().configure(options)
 
+    def initiate_provisioning(self):
+        """
+        When Unprovisoned Beacon received and we choose to provision, send invite
+        """
+        self.send_to_gen_prov(BTMesh_Provisioning_Invite())
 
     def on_capabilities(self, packet):
         """
@@ -186,8 +197,7 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         # the rest is static for now, already set in state init
         params = self.state.chosen_parameters
 
-        self.send(
-            "gen_prov",
+        self.send_to_gen_prov(
             BTMesh_Provisioning_Start(
                 algorithms=params.alg,
                 public_key_type=params.public_key_type,
@@ -196,7 +206,6 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
                 authencation_size=params.authencation_size,
             ),
         )
-
 
 
 class ProvisioningLayerDevice(ProvisioningLayer):
@@ -219,8 +228,7 @@ class ProvisioningLayerDevice(ProvisioningLayer):
             capabilities.input_oob_action[i] & 0b01 << i for i in range(5)
         ])
         number_of_elements = nb_input_oob_action + nb_output_oob_action
-        self.send(
-            "gen_prov",
+        self.send_to_gen_prov(
             BTMesh_Provisioning_Capabilities(
                 number_of_elements=number_of_elements, **capabilities
             ),
