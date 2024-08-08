@@ -1,15 +1,17 @@
 import logging
 
+from scapy.packet import Packet
 from scapy.layers.zigbee import ZigbeeSecurityHeader
 from whad.zigbee.connector import Zigbee
 from whad.zigbee.sniffing import SnifferConfiguration, KeyExtractedEvent
 from whad.zigbee.crypto import ZigbeeDecryptor, TouchlinkKeyManager, TransportKeyDistribution
 from whad.exceptions import UnsupportedCapability
-from whad.helpers import message_filter, is_message_type
+from whad.helpers import message_filter
 from whad.common.sniffing import EventsManager
 from whad.hub.dot15d4 import RawPduReceived, PduReceived
 from whad.hub.message import AbstractPacket
 from whad.exceptions import WhadDeviceDisconnected
+from whad.device import WhadDevice
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,12 @@ class Sniffer(Zigbee, EventsManager):
     Zigbee Sniffer interface for compatible WHAD device.
     """
 
-    def __init__(self, device):
+    def __init__(self, device: WhadDevice):
+        """Sniffer initialization.
+
+        :param device: Device to use for sniffing
+        :type device: WhadDevice
+        """
         Zigbee.__init__(self, device)
         EventsManager.__init__(self)
 
@@ -36,34 +43,54 @@ class Sniffer(Zigbee, EventsManager):
             self.__decryptor.add_key(key)
         self.sniff_zigbee(channel=self.__configuration.channel)
 
-    def add_key(self, key):
+    def add_key(self, key: bytes):
+        """Add an encryption key to our sniffer.
+
+        :param key: encryption key to add
+        :type key: bytes
+        """
         self.__configuration.keys.append(key)
 
     def clear_keys(self):
+        """Clear all stored encryption keys.
+        """
         self.__configuration.keys = []
 
     @property
-    def decrypt(self):
+    def decrypt(self) -> bool:
+        """Decryption enabled
+        """
         return self.__configuration.decrypt
 
     @decrypt.setter
-    def decrypt(self, decrypt):
+    def decrypt(self, decrypt: bool):
+        """Set decryption status
+        """
         self.__configuration.decrypt = decrypt
 
 
     @property
-    def channel(self):
+    def channel(self) -> int:
+        """Current channel
+        """
         return self.__configuration.channel
 
     @channel.setter
-    def channel(self, channel=11):
+    def channel(self, channel: int = 11):
+        """Set current channel.
+
+        :param channel: new ZigBee channel to use
+        :type channel: int
+        """
         self.stop()
         self.__configuration.channel = channel
         self._enable_sniffing()
 
 
     @property
-    def configuration(self):
+    def configuration(self) -> SnifferConfiguration:
+        """Current sniffer configuration.
+        """
         return self.__configuration
 
     @configuration.setter
@@ -72,7 +99,14 @@ class Sniffer(Zigbee, EventsManager):
         self.__configuration = new_configuration
         self._enable_sniffing()
 
-    def process_packet(self, packet):
+    def process_packet(self, packet: Packet):
+        """Process received ZigBee packet.
+
+        :param packet: received packet
+        :type packet: :class:`scapy.packet.Packet`
+        :return: received packet
+        :rtype: :class:`scapy.packet.Packet`
+        """
         if self.__touchlink_key_derivation.unencrypted_key is not None:
             logger.info("[i] New key extracted: ", self.__touchlink_key_derivation.unencrypted_key.hex())
             self.trigger_event(KeyExtractedEvent(self.__touchlink_key_derivation.unencrypted_key))
