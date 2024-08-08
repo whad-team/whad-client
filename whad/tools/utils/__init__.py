@@ -144,36 +144,86 @@ def build_configuration_from_args(environment, args):
             setattr(configuration, subfield_real_name, None)
     return configuration
 
-'''
-def get_translator(protocol):
-    """Get a translator according to a specific domain.
+
+def list_implemented_injectors():
+    """Build a dictionnary of injectors connector and configuration, by domain.
     """
-    translator = None
+    environment = {}
 
     # Iterate over modules
     for _, candidate_protocol,_ in iter_modules(whad.__path__):
-        # If the module contains a sniffer connector,
-        # store the associated translator in translator variable
+        # If the module contains an injector connector and a injecting module,
+        # store the associated classes in the environment dictionary
         try:
-            module = import_module("whad.{}.connector.sniffer".format(candidate_protocol))
-            if candidate_protocol == protocol:
-                translator = module.Sniffer.translator
-                break
+            module = import_module("whad.{}.connector.injector".format(candidate_protocol))
+            configuration_module = import_module("whad.{}.injecting".format(candidate_protocol))
+            environment[candidate_protocol] = {
+                "injector_class":module.Injector,
+                "configuration_class":configuration_module.InjectionConfiguration
+            }
         except ModuleNotFoundError:
             pass
     # return the environment dictionary
+    return environment
 
-    if protocol in ("zigbee", "rf4ce"):
-        conf.dot15d4_protocol = protocol
-    elif protocol == "esb":
-        from whad.scapy.layers.unifying import unbind
-        unbind()
-    elif protocol == "unifying":
-        from whad.scapy.layers.unifying import bind
-        bind()
 
-    return translator
-'''
+def get_injector_parameters(configuration_class):
+    """
+    Extract all parameters from a injector configuration class, with their name and associated documentation.
+
+    :param configuration_class: injector configuration class
+    :return: dict containing parameters for a given configuration class
+    """
+    parameters = {}
+    # Extract documentation of every field in the configuration class
+    fields_configuration_documentation = {
+        i.replace(":param ","").split(":")[0] : i.replace(":param ","").split(":")[1]
+        for i in getdoc(configuration_class).split("\n")
+        if i.startswith(":param ")
+    }
+
+    # Iterate over the fields of the configuration class
+    for field in fields(configuration_class):
+        field_name = gen_option_name(field.name)
+
+        # If the field is a dataclass, process subfields
+        if is_dataclass(field.type):
+            # Extract documentation of every subfields
+            subfields_configuration_documentation = {
+                i.replace(":param ","").split(":")[0] : i.replace(":param ","").split(":")[1]
+                for i in getdoc(field.type).split("\n")
+                if i.startswith(":param ")
+            }
+
+            # Populate parameters dict with subfields configuration
+            for subfield in fields(field.type):
+                subfield_name = gen_option_name(subfield.name)
+                parameters["{}.{}".format(field.name,subfield.name)] = (
+                    subfield.type,
+                    subfield.default,
+                    field.type,
+                    (
+                        subfields_configuration_documentation[subfield.name]
+                        if subfield.name in subfields_configuration_documentation
+                        else None
+                    )
+                )
+
+        # if the field is not a dataclass, process it
+        else:
+            # Populate parameters dict with field configuration
+            parameters[field_name] = (
+                field.type,
+                field.default,
+                None,
+                (
+                    fields_configuration_documentation[field.name]
+                    if field.name in fields_configuration_documentation
+                    else None
+                )
+            )
+    return parameters
+
 
 def get_analyzers(protocol=None):
     analyzers = {}
