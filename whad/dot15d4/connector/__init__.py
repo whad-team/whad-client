@@ -366,3 +366,10 @@ class Dot15d4(WhadDeviceConnector):
 from whad.dot15d4.connector.sniffer import Sniffer
 from whad.dot15d4.connector.enddevice import EndDevice
 from whad.dot15d4.connector.coordinator import Coordinator
+
+__all__ = [
+    "Dot15d4",
+    "Sniffer",
+    "EndDevice",
+    "Coordinator"
+]

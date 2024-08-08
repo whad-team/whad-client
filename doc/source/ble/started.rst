@@ -109,7 +109,7 @@ characteristic. This is done through the `subscribe()` method of :class:`whad.bl
 Close connection
 ~~~~~~~~~~~~~~~~
 
-To close an existing connection, simply call the `disconnect()` method of the class:`whad.ble.profile.device.PeripheralDevice` class:
+To close an existing connection, simply call the `disconnect()` method of the :class:`whad.ble.profile.device.PeripheralDevice` class:
 
 .. code-block:: python
 
@@ -173,12 +173,6 @@ using this profile:
 
 It is also possible to trigger specific actions when a characteristic is read or written,
 through the dedicated callbacks provided by :class:`whad.ble.profile.GenericProfile`.
-
-Use a link-layer proxy
-~~~~~~~~~~~~~~~~~~~~~~
-
-Use a GATT proxy
-~~~~~~~~~~~~~~~~
 
 Advanced features
 -----------------

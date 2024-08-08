@@ -32,4 +32,7 @@ channel and sniff packets:
     for packet in sniffer.sniff():
         packet.show()
 
+Sending packets
+---------------
+
 
