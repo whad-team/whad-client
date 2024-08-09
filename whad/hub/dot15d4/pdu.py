@@ -1,9 +1,7 @@
 """WHAD Protocol Dot15d4 pdu messages abstraction layer.
 """
-from struct import pack, unpack
+from struct import pack
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
-from whad.protocol.whad_pb2 import Message
-from whad.hub.message import AbstractPacket
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool
 from whad.hub.dot15d4 import Dot15d4Domain, Dot15d4Metadata
@@ -36,6 +34,8 @@ class SendPdu(PbMessageWrapper):
             pdu=pdu
         )
 
+        return msg
+
 @pb_bind(Dot15d4Domain, 'send_raw', 1)
 class SendRawPdu(PbMessageWrapper):
     """Send Dot15d4 raw PDU message class
@@ -65,6 +65,8 @@ class SendRawPdu(PbMessageWrapper):
             pdu=pdu,
             fcs=packet.fcs
         )
+
+        return msg
 
 @pb_bind(Dot15d4Domain, 'pdu', 1)
 class PduReceived(PbMessageWrapper):
