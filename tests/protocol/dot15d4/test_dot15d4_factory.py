@@ -2,9 +2,8 @@
 """
 import pytest
 
-from whad.protocol.whad_pb2 import Message
 from whad.hub.dot15d4 import Dot15d4Domain, SetNodeAddress, NodeAddressShort, NodeAddressExt, \
-    NodeAddress, NodeAddressType, SniffMode, JamMode, EnergyDetectionMode, EndDeviceMode, \
+    NodeAddressType, SniffMode, JamMode, EnergyDetectionMode, EndDeviceMode, \
     RouterMode, CoordMode, Start, Stop, MitmRole, MitmMode, SendPdu, SendRawPdu, Jammed, \
     EnergyDetectionSample, RawPduReceived, PduReceived
 
@@ -15,7 +14,7 @@ class TestDot15d4DomainFactory(object):
     @pytest.fixture
     def factory(self):
         return Dot15d4Domain(1)
-    
+
     def test_set_node_address_short(self, factory: Dot15d4Domain):
         """Test creation of SetNodeAddress message for short addresses
         """
@@ -31,7 +30,7 @@ class TestDot15d4DomainFactory(object):
         assert isinstance(msg, SetNodeAddress)
         assert msg.address == 0x12345678
         assert msg.addr_type == NodeAddressType.EXTENDED
-    
+
     def test_sniff_mode(self, factory: Dot15d4Domain):
         """Test creation of SniffMode message
         """
@@ -138,7 +137,7 @@ class TestDot15d4DomainFactory(object):
         assert msg.timestamp is None
         assert msg.fcs_validity == True
         assert msg.lqi == 10
-    
+
     def test_pdu_received(self, factory: Dot15d4Domain):
         """Test creation of RawPduReceived notification message
         """
