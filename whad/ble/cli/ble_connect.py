@@ -309,7 +309,7 @@ class BleConnectApp(CommandLineDevicePipe):
                 output_pipe = BleConnectInputPipe(BLE(self.input_interface), central)
                 output_pipe.set_out_conn_handle(central.conn_handle)
 
-                while True:
+                while self.input_interface.opened:
                     sleep(1)
 
             except PeripheralNotFound:
