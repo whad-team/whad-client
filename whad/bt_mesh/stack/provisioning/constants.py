@@ -33,7 +33,6 @@ PROVISIONING_ERROR_CODES = {
 }
 
 PROVISIONING_TYPES = {
-
     BTMesh_Provisioning_Invite : 0x00,
     BTMesh_Provisioning_Capabilities : 0x01,
     BTMesh_Provisioning_Start : 0x02,

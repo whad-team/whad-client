@@ -13,18 +13,15 @@ react on specific events.
 from random import randbytes
 from time import time
 
-from whad.ble.connector import Sniffer
+from whad.bt_mesh.connectors import BTMesh
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_ADV_NONCONN_IND, EIR_Hdr
 from whad.scapy.layers.bt_mesh import EIR_BTMesh_Beacon
 from whad.ble import UnsupportedCapability, message_filter, BleDirection
-from whad.hub.ble import Injected, Synchronized
-from whad.ble.sniffing import SynchronizedConnection
-
-from whad.ble.exceptions import ConnectionLostException
-
 
 from whad.bt_mesh.stack import PBAdvBearerLayer
-from whad.scapy.layers.bt_mesh import BTMesh_Provisioning_Hdr
+from scapy.all import raw
+from whad.scapy.layers.bt_mesh import EIR_PB_ADV_PDU
+import pdb
 
 
 class UnprovisionedDeviceList:
@@ -34,7 +31,7 @@ class UnprovisionedDeviceList:
 
     def __init__(self):
         super().__init__()
-        self._devices = {}
+        self.__devices = {}
 
     def update(self, dev_uuid):
         """
@@ -43,7 +40,7 @@ class UnprovisionedDeviceList:
         :param dev_uuid: [TODO:description]
         :type dev_uuid: [TODO:type]
         """
-        self._devices[dev_uuid] = time()
+        self.__devices[dev_uuid] = time()
 
     def check(self, dev_uuid):
         """
@@ -52,64 +49,41 @@ class UnprovisionedDeviceList:
         :param dev_uuid: [TODO:description]
         :type dev_uuid: [TODO:type]
         """
-        return dev_uuid in self._devices and (time() - self._devices[dev_uuid] < 30)
+        return dev_uuid in self.__devices and (time() - self.__devices[dev_uuid] < 30)
 
     def remove(self, dev_uuid):
-        if dev_uuid in self._devices:
-            del self._devices[dev_uuid]
+        if dev_uuid in self.__devices:
+            del self.__devices[dev_uuid]
 
     def list(self):
         dev_list = []
-        for dev_uuid in self._devices.keys():
+        for dev_uuid in self.__devices.keys():
             if self.check(dev_uuid):
                 dev_list.append(dev_uuid)
 
         return dev_list
 
 
-class Provisioner(Sniffer):
+class Provisioner(BTMesh):
     def __init__(self, device, connection=None):
         """Create a Provisioner Device"""
-        super().__init__(device)
-        if not self.can_inject():
-            raise UnsupportedCapability("Inject")
-
-        self.__stack = PBAdvBearerLayer(connector=self, options={"role": "provisioner"})
-        self.__stack.configure({"role": "provisioner"})
-        self.attach_callback(
-            callback=lambda pkt: self.on_recv_adv(pkt),
-            filter=lambda pkt: self.bt_mesh_filter(pkt, True),
-            on_transmission=False,
-        )
-
-        # List of unprovisioned devices waiting to be provisioned
+        super().__init__(device, stack=PBAdvBearerLayer, options={"role": "provisioner"})
         self.__unprovisioned_devices = UnprovisionedDeviceList()
 
-    def bt_mesh_filter(self, packet, ignore_regular_adv):
-        """
-        Filter out non Mesh advertising packets
-        """
-        if BTLE_ADV in packet:
-            if hasattr(packet, "data"):
-                if EIR_Hdr in packet and (
-                    any([i.type in (0x29, 0x2A, 0x2B) for i in packet.data])
-                    or any(
-                        h in [[0x1827], [0x1828]]
-                        for h in [
-                            i.svc_uuids
-                            for i in packet.data
-                            if hasattr(i, "svc_uuids") and not ignore_regular_adv
-                        ]
-                    )
-                ):
-                    return True
 
-    def on_recv_adv(self, packet: BTLE):
+    def process_rx_packets(self, packet):
         """
-        Process an received advertising Mesh packet. Send it to our PB-ADV layer
+        Process a received Mesh Packet. Sends to stack if provisioning PDU OR 
+        initiates provisioning if unprovisioned beacon
+
+        :param packet: Packet received
+        :type packet: Packet
         """
         if packet.haslayer(EIR_BTMesh_Beacon):
             self.process_beacon(packet.getlayer(EIR_BTMesh_Beacon))
+        elif packet.haslayer(EIR_PB_ADV_PDU):
+            self._stack.on_provisioning_pdu(packet.getlayer(EIR_PB_ADV_PDU))
+
 
     def process_beacon(self, packet):
         """
@@ -124,24 +98,4 @@ class Provisioner(Sniffer):
             print("UNPROVISIONED BEACON RECEIVED FOR > " + str(beacon_data.device_uuid))
             choice = input("PROVISION DEVICE ? Y/N :")
             if choice == "Y":
-                self.__stack.on_new_unprovisoned_device(beacon_data.device_uuid)
-
-    def send_raw(self, packet, channel=37):
-        """
-        Sends the packet through the BLE advertising bearer
-
-        :param packet: Packet to send
-        :type packet: EIR_PB_ADV_PDU
-        :param channel: [TODO:description], defaults to 37
-        :type channel: [TODO:type], optional
-        """
-
-        AdvA = randbytes(6).hex(":")  # random in spec
-        adv_pkt = BTLE_ADV(TxAdd=1) / BTLE_ADV_NONCONN_IND(AdvA=AdvA, data=packet)
-
-        return self.send_pdu(
-            adv_pkt,
-            access_address=0x8E89BED6,
-            conn_handle=channel,
-            direction=BleDirection.UNKNOWN,
-        )
+                self._stack.on_new_unprovisoned_device(beacon_data.device_uuid)

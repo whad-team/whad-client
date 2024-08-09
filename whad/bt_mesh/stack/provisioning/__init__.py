@@ -24,17 +24,28 @@ from whad.scapy.layers.bt_mesh import (
     BTMesh_Provisioning_Record_Response,
     BTMesh_Provisioning_Hdr,
 )
+from time import sleep
 from whad.common.stack import Layer, alias, instance, state, LayerState
 from whad.bt_mesh.stack.exceptions import (
     UnknownParameterValueSendError,
     FailedProvisioningReceivedError,
     UnknownProvisioningPacketTypeError,
     UncompatibleAlgorithmsAvailableError,
+    InvalidConfirmationError,
 )
 from whad.bt_mesh.stack.provisioning.constants import PROVISIONING_TYPES
-from whad.bt_mesh.crypto import ProvisioningBearerAdvCryptoManager
+from whad.bt_mesh.crypto import (
+    ProvisioningBearerAdvCryptoManagerProvisioner,
+    ProvisioningBearerAdvCryptoManagerDevice,
+)
+from scapy.all import raw
 
 logger = logging.getLogger(__name__)
+
+_ALGS_FLAGS = {
+    0b01: "BTM_ECDH_P256_CMAC_AES128_AES_CCM",
+    0b10: "BTM_ECDH_P256_HMAC_SHA256_AES_CCM",
+}
 
 
 class ProvisioningState(LayerState):
@@ -46,17 +57,17 @@ class ProvisioningState(LayerState):
         super().__init__()
 
         self.capabilities = dict(
-            alg=0b11,  # default support 2 algs
+            algorithms=0b11,  # default support 2 algs
             public_key_type=0x00,  # default no OOB public key support
-            static_oob_type=0x00,  # default no static OOB info available
-            output_oob_type=0x00,  # default no output OOB action available
+            oob_type=0x00,  # no static OOB supported
             output_oob_size=0x00,
-            input_oob_type=0x00,  # default no input OOB a available
+            output_oob_action=0x00,  # default no output OOB action available
             input_oob_size=0x00,
+            input_oob_action=0x00,  # default no input OOB a available
         )
 
         self.chosen_parameters = dict(
-            alg=0b11,  # default 2 algs
+            algorithms=0b10,  # default BTM_ECDH_P256_HMAC_SHA256_AES_CCM
             public_key_type=0x00,  # default no OOB public key
             authentication_method=0x00,  # no OOB auth default
             authentication_action=0x00,  # no OOB auth default
@@ -66,6 +77,8 @@ class ProvisioningState(LayerState):
         self.crypto_manager = None
 
         self.status = None
+
+        self.auth_value = 0x0000  # for now 0, no OOB anyway
 
     def set_crypto_manager(self, crypto_manager):
         self.crypto_manager = crypto_manager
@@ -111,13 +124,12 @@ class ProvisioningLayer(Layer):
         self.send("gen_prov", hdr)
 
     @instance("gen_prov")
-    def on_packet_received(self, packet):
+    def on_packet_received(self, source, packet):
         """Process incoming packets from the Generic Provisioning Layer"""
         packet_type = type(packet[1])
         if packet_type not in self._handlers:
             raise UnknownProvisioningPacketTypeError(packet_type)
         self._handlers[packet_type](packet[1])
-        logger.warning("RECEIVED PACKET IN PROVISIONING : %s" % packet.show(dump=True))
 
         # All handlers except Failed return errors here since we are in the generic layer. Needs implement in Provisioner/Device classes.
 
@@ -134,7 +146,24 @@ class ProvisioningLayer(Layer):
         self.send_error_response(0x07)
 
     def on_public_key(self, packet):
-        self.send_error_response(0x07)
+        """
+        On receiving Peer Public Key
+        Same first actions for Provisioner and Device. See subclasses for the rest
+        """
+        pub_key_x = packet.public_key_x
+        pub_key_y = packet.public_key_y
+
+        self.crypto_manager.add_peer_public_key(pub_key_x, pub_key_y)
+
+        # compute ECDH secret
+        self.crypto_manager.compute_ecdh_secret()
+
+        # compute Confirmation Salt, and confirmation key, and generate random value
+        self.crypto_manager.compute_confirmation_salt(
+            self.state.invite_pdu, self.state.capabilities_pdu, self.state.start_pdu
+        )
+        self.crypto_manager.compute_confirmation_key()
+        self.crypto_manager.generate_random()
 
     def on_input_complete(self, packet):
         self.send_error_response(0x07)
@@ -178,7 +207,11 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         """
         When Unprovisoned Beacon received and we choose to provision, send invite
         """
-        self.send_to_gen_prov(BTMesh_Provisioning_Invite())
+        invite_packet = BTMesh_Provisioning_Invite()
+
+        # store for Confirmation Inputs
+        self.state.invite_pdu = raw(invite_packet)
+        self.send_to_gen_prov(invite_packet)
 
     def on_capabilities(self, packet):
         """
@@ -187,25 +220,108 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         Send Start pdu after
         """
 
-        if packet.algorithms & 0x10 and self.state.capabilities & 0x10:
-            self.state.chosen_parameters.alg = "BTM_ECDH_P256_HMAC_SHA256_AES_CCM"
-        elif packet.algorithms & 0x01 and self.state.capabilities & 0x01:
-            self.state.chosen_parameters.alg = "BTM_ECDH_P256_CMAC_AES128_AES_CCM"
+        # store for Confirmation inputs
+        self.state.capabilities_pdu = raw(packet)
+
+        if packet.algorithms & 0b10 and self.state.capabilities["algorithms"] & 0b10:
+            self.state.chosen_parameters["algorithms"] = 0b10
+        elif packet.algorithms & 0b01 and self.state.capabilities["algorithms"] & 0b01:
+            self.state.chosen_parameters["algorithms"] = 0b01
         else:
             raise UncompatibleAlgorithmsAvailableError
 
         # the rest is static for now, already set in state init
         params = self.state.chosen_parameters
 
-        self.send_to_gen_prov(
-            BTMesh_Provisioning_Start(
-                algorithms=params.alg,
-                public_key_type=params.public_key_type,
-                authencation_method=params.authencation_method,
-                authencation_action=params.authencation_action,
-                authencation_size=params.authencation_size,
-            ),
+        start_packet = BTMesh_Provisioning_Start(
+            algorithms=params["algorithms"],
+            public_key_type=params["public_key_type"],
+            authentication_method=params["authentication_method"],
+            authentication_action=params["authentication_action"],
+            authentication_size=params["authentication_size"],
         )
+
+        # store for Confirmation Inputs
+        self.state.start_pdu = raw(start_packet)
+        self.send_to_gen_prov(start_packet)
+
+        self.state.crypto_manager = ProvisioningBearerAdvCryptoManagerProvisioner(
+            alg=_ALGS_FLAGS[params["algorithms"]]
+        )
+        # generate keys
+        self.state.crypto_manager.generate_p256_keypair()
+
+        # Size of coordinates in bytes depends on algorthim used
+        if params["algorithms"] == 0b01:
+            size_coord = 16
+        elif params["algorithms"] == 0b10:
+            size_coord = 32
+
+        # Send our public key to device
+        self.send_to_gen_prov(
+            BTMesh_Provisioning_Public_Key(
+                public_key_x=self.state.crypto_manager.public_key_coord_provisioner[
+                    0
+                ].to_bytes(
+                    size_coord,
+                    "big",
+                ),
+                public_key_y=self.state.crypto_manager.public_key_coord_provisioner[
+                    1
+                ].to_bytes(
+                    size_coord,
+                    "big",
+                ),
+            )
+        )
+
+    def on_public_key(self, packet):
+        """
+        On receiving Device Public Key.
+        """
+        super().on_public_key(packet)
+
+        # Compute Confirmation Provisioner Value and send it
+        self.state.crypto_manager.compute_confirmation_provisioner()
+        self.send_to_gen_prov(
+            BTMesh_Provisioning_Confirmation(
+                self.state.crypto_manager.confirmation_provisioner
+            )
+        )
+
+    def on_confirmation(self, packet):
+        """
+        Process a Confirmation packet from the Device. Stores it for later verification.
+        Sends the random value used for the Provisioner Confirmation computation.
+
+        :param packet: [TODO:description]
+        :type packet: [TODO:type]
+        """
+        self.state.crypto_manager.received_confirmation_device = packet.confirmation
+
+        self.send_to_gen_prov(
+            BTMesh_Provisioning_Random(
+                random=self.state.crypto_manager.rand_provisioner
+            )
+        )
+
+    def on_random(self, packet):
+        """
+        Process the random packet from device. Verifies the confirmation value previouly received.
+
+        :param packet: [TODO:description]
+        :type packet: [TODO:type]
+        """
+        self.state.crypto_manager.rand_device = packet.random
+
+        # compute confirmation device and verifies if it matches received one
+        self.state.crypto_manager.compute_confirmation_device()
+
+        if (
+            self.state.crypto_manager.received_confirmation_device
+            != self.state.crypto_manager.confirmation_device
+        ):
+            raise InvalidConfirmationError
 
 
 class ProvisioningLayerDevice(ProvisioningLayer):
@@ -221,15 +337,103 @@ class ProvisioningLayerDevice(ProvisioningLayer):
         """
         capabilities = self.state.capabilities
         nb_output_oob_action = sum([
-            capabilities.output_oob_action[i] & 0b01 << i for i in range(5)
+            capabilities["output_oob_action"] & 0b01 << i for i in range(5)
         ])
 
         nb_input_oob_action = sum([
-            capabilities.input_oob_action[i] & 0b01 << i for i in range(5)
+            capabilities["input_oob_action"] & 0b01 << i for i in range(5)
         ])
         number_of_elements = nb_input_oob_action + nb_output_oob_action
+
+        # store for Confirmation Inputs
+        self.state.invite_pdu = raw(packet)
+        capabilities_packet = BTMesh_Provisioning_Capabilities(
+            number_of_elements=number_of_elements, **capabilities
+        )
+        self.send_to_gen_prov(capabilities_packet)
+        # store for Confirmation Inputs
+        self.state.capabilities_pdu = raw(capabilities_packet)
+
+    def on_start(self, packet):
+        """
+        Process a received Provisioning Start Packet. Retrives chosen parameters and creates crypto manager
+        """
+        # for now the rest is default ... so we dont even use it
+        self.state.chosen_parameters["algorithms"] = packet.algorithms
+
+        self.state.crypto_manager = ProvisioningBearerAdvCryptoManagerDevice(
+            alg=_ALGS_FLAGS[self.state.chosen_parameters["algorithms"]]
+        )
+
+        # store the PDU to compute Confirmation Inputs
+        self.state.start_pdu = raw(packet)
+
+    def on_public_key(self, packet):
+        """
+        Process the Provisoner Public Key by storing it and send the device public key
+
+        :param packet: [TODO:description]
+        :type packet: [TODO:type]
+        """
+
+        self.state.crypto_manager.add_peer_public_key(
+            packet.public_key_x, packet.public_key_y
+        )
+        self.state.crypto_manager.generate_p256_keypair()
         self.send_to_gen_prov(
-            BTMesh_Provisioning_Capabilities(
-                number_of_elements=number_of_elements, **capabilities
-            ),
+            BTMesh_Provisioning_Public_Key(
+                public_key_x=self.state.crypto_manager.public_key_coord_devicd[
+                    0
+                ].to_bytes(
+                    len(self.state.crypto_manager.public_key_coord_device[0]),
+                    "big",
+                ),
+                public_key_y=self.state.crypto_manager.public_key_coord_device[
+                    1
+                ].to_bytes(
+                    len(self.state.crypto_manager.public_key_coord_device[1]),
+                    "big",
+                ),
+            )
+        )
+
+    def on_confirmation(self, packet):
+        """
+        Process a Confirmation packet from the Provisioner. Stores the value for later verification and sends device Confirmation
+
+        :param packet: [TODO:description]
+        :type packet: [TODO:type]
+        """
+        self.crypto_manager.received_confirmation_provisioner = packet.confirmation
+
+        self.crypto_manager.compute_confirmation_device()
+        self.send_to_gen_prov(
+            BTMesh_Provisioning_Confirmation(
+                confirmation=self.state.crypto_manager.confirmation_device
+            )
+        )
+
+    def on_random(self, packet):
+        """
+        Process a Confirmation packet from the Provisioner. Verify the confirmation provisioner value with it
+        Sends the random value used for the Device Confirmation computation.
+
+        :param packet: [TODO:description]
+        :type packet: [TODO:type]
+        """
+        self.state.crypto_manager.rand_provisioner = packet.random
+
+        # verification of previoulsy received confirmation value
+        self.state.crypto_manager.compute_confirmation_provisioner()
+
+        if (
+            self.state.crypto_manager.received_confirmation_provisioner
+            != self.state.crypto_manager.confirmation_provisioner
+        ):
+            raise InvalidConfirmationError
+
+        # send device random value
+
+        self.send_to_gen_prov(
+            BTMesh_Provisioning_Random(self.state.crypto_manager.rand_device)
         )

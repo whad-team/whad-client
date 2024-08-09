@@ -497,6 +497,7 @@ class WhadDeviceConnector(object):
     def send_packet(self, packet):
         """Send packet to our device.
         """
+
         # Monitor this outgoing packet
         self.monitor_packet_tx(packet)
 

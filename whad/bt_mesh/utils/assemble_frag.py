@@ -20,29 +20,26 @@ class GenericFragmentsAssembler(object):
 
     pkts: List[Packet] = []
 
-    def __init__(self, pkts=[]):
+    def __init__(self, fragments=[]):
         super(GenericFragmentsAssembler, self).__init__()
-        self.pkts = pkts
+        self.fragments = fragments
 
-    def add_next_packet(self, pkt):
+    def add_next_fragment(self, fragment):
         """
         Add next packet of transaction (considered in order)
 
         :param pkt: Packet to add
         :type pkt: Packet
         """
-        self.pkts.append(pkt)
+        self.fragments.append(fragment)
 
     def reassemble(self):
-        if len(self.pkts) < 1:
+        if len(self.fragments) < 1:
             return None
-        elif len(self.pkts) == 1:
-            return self.pkts[0]
+        elif len(self.fragments) == 1:
+            return self.fragments[0]
 
-        if BTMesh_Generic_Provisioning_Transaction_Start in self.pkts[0]:
-            return self.reassemble_generic_provisioning()
-
-        return None
+        return self.reassemble_generic_provisioning()
 
     def _get_generic_provisioning_fragment(self, pkt):
         """

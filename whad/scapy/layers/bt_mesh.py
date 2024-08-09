@@ -24,7 +24,8 @@ from scapy.fields import (
     XStrFixedLenField,
     StrField,
     MultipleTypeField,
-    LenField
+    LenField,
+    XNBytesField,
 )
 from scapy.layers.bluetooth import EIR_Element, EIR_Hdr, EIR_Raw
 from scapy.all import Raw
@@ -261,7 +262,7 @@ class BTMesh_Provisioning_Capabilities(Packet):
     name = "Bluetooth Mesh Provisioning Capabilities"
     fields_desc = [
         ByteField("number_of_elements", None),
-        BitField("RFU", 0, 14),
+        BitField("RFU_alg", 0, 14),
         FlagsField(
             "algorithms",
             None,
@@ -271,27 +272,32 @@ class BTMesh_Provisioning_Capabilities(Packet):
                 0b10: "BTM_ECDH_P256_HMAC_SHA256_AES_CCM",
             },
         ),
-        ByteEnumField(
+        BitField("RFU_pub_key_type", 0, 6),
+        FlagsField(
             "public_key_type",
             None,
+            2,
             {
-                0x00: "No OOB Public Key is used",
-                0x01: "OOB Public Key is used",
+                0b01: "No OOB Public Key is used",
+                0b10: "OOB Public Key is used",
             },
         ),
-        ByteEnumField(
-            "static_oob_type",
+        BitField("RFU_oob_type", 0, 6),
+        FlagsField(
+            "oob_type",
             None,
+            2,
             {
-                0x00: "Static OOB Information not available",
-                0x01: "Static OOB Information available",
+                0b01: "Static OOB Information not available",
+                0b10: "Static OOB Information available",
             },
         ),
         ByteField("output_oob_size", None),
+        BitField("RFU_output_oob_action", 0, 11),
         FlagsField(
             "output_oob_action",
             None,
-            16,
+            5,
             {
                 0b00001: "Blink",
                 0b00010: "Beep",
@@ -301,10 +307,11 @@ class BTMesh_Provisioning_Capabilities(Packet):
             },
         ),
         ByteField("input_oob_size", None),
+        BitField("RFU_input_oob_action", 0, 12),
         FlagsField(
             "input_oob_action",
             None,
-            16,
+            4,
             {
                 0b0001: "Push",
                 0b0010: "Twist",
@@ -382,10 +389,24 @@ class BTMesh_Provisioning_Start(Packet):
 
 
 class BTMesh_Provisioning_Public_Key(Packet):
+    """
+    Public Key Provisioning Packet
+    Should have two 16 bytes values OR two 32 bytes values (depends on algorithm used)
+    """
+
     name = "Bluetooth Mesh Provisioning Public Key"
+
     fields_desc = [
-        XStrFixedLenField("public_key_x", None, length=32),
-        XStrFixedLenField("public_key_y", None, length=32),
+        StrField("public_key_x", None),
+        MultipleTypeField(
+            [
+                (
+                    StrFixedLenField("public_key_y", None, length=16),
+                    lambda pkt: len(pkt.public_key_x) == 16,
+                ),
+            ],
+            (StrFixedLenField("public_key_y", None, length=32)),
+        ),
     ]
 
 
@@ -658,9 +679,7 @@ class BTMesh_Generic_Provisioning_Hdr(Packet):
 class BTMesh_Generic_Provisioning_Transaction_Start(BTMesh_Generic_Provisioning_Hdr):
     name = "Bluetooth Mesh Generic Provisioning Transaction Start"
     fields_desc = [
-        BitField(
-            "segment_number", 0, 6
-        ),
+        BitField("segment_number", 0, 6),
         BitEnumField(
             "generic_provisioning_control_format",
             0b00,
@@ -673,7 +692,9 @@ class BTMesh_Generic_Provisioning_Transaction_Start(BTMesh_Generic_Provisioning_
             },
         ),
         LenField("total_length", None, fmt="H"),  # Add bytes mark  # noqa: E501
-        XByteField("frame_check_sequence", None),  # TO COMPUTE IN LOGIC, ON THE WHOLE PROVISIONING PDU IN PAYLOAD (not just the 1st fragment)
+        XByteField(
+            "frame_check_sequence", None
+        ),  # TO COMPUTE IN LOGIC, ON THE WHOLE PROVISIONING PDU IN PAYLOAD (not just the 1st fragment)
         # StrFixedLenField(
         #    "generic_provisioning_payload_fragment", None, length_from="total_length"
         # ),
@@ -810,11 +831,12 @@ PB-ADV LAYER
 """
 
 
-class EIR_PB_ADV_PDU(Packet):
+class EIR_PB_ADV_PDU(EIR_Element):
     name = "Bluetooth Mesh PB_ADV PDU"
     fields_desc = [
-        XIntField("link_id", None),
+        StrFixedLenField("link_id", None, length=4),
         XByteField("transaction_number", None),
+        PacketField("data", None, pkt_cls=BTMesh_Generic_Provisioning_Hdr),
     ]
 
 
@@ -1119,7 +1141,6 @@ bind_layers(EIR_Hdr, EIR_BTMesh_Beacon, type=0x2B)
 bind_layers(EIR_Hdr, EIR_PB_ADV_PDU, type=0x29)
 bind_layers(BTMesh_Mesh_Message, BTMesh_Lower_Transport_PDU)
 bind_layers(BTMesh_Unsegmented_Access_Message, BTMesh_Model_Message)
-bind_layers(EIR_PB_ADV_PDU, BTMesh_Generic_Provisioning_Hdr)
 bind_layers(BTMesh_Proxy_Hdr, BTMesh_Provisioning_Hdr, message_type=0x03)
 
 # need to remove this one, fragments and all ...

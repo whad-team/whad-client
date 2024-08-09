@@ -7,6 +7,7 @@ from whad.ble.crypto import (
     generate_p256_keypair,
 )
 from cryptography.hazmat.primitives.asymmetric.ec import derive_private_key, SECP256R1
+from random import randbytes
 
 
 def aes_ccm(key, nonce, plaintext, additional_data=b""):
@@ -149,6 +150,12 @@ class ProvisioningBearerAdvCryptoManager:
         # if in test mode, we directly compute the ecdh secret
         if test:
             self.compute_ecdh_secret()
+        # if not in test, set default auth_value if no OOB will be used
+        else:
+            if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
+                self.auth_value = b"\x00" * 16
+            elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
+                self.auth_value = b"\x00" * 32
 
     def set_alg(self, alg):
         self.alg = alg
@@ -297,17 +304,22 @@ class ProvisioningBearerAdvCryptoManager:
         except ValueError:
             return (plaintext, False)
 
+
 class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoManager):
-    def __init__(self):
-        super().__init__()  # does nothing, but better to have super...
+    def __init__(self, alg):
+        super().__init__(alg=alg)  # does nothing, but better to have super...
         self.public_key_device = None
         self.public_key_provisioner = None
+        self.received_confirmation_device = None
 
     def generate_p256_keypair(self):
         """Generate the P256 private key / public key"""
-        self.private_key_device, self.public_key_device = (
+        self.private_key_provisioner, self.public_key_provisioner = (
             generate_p256_keypair()
         )
+        # Get coordinates format for the Provisioning Packets
+        public_key_numbers = self.public_key_provisioner.public_numbers()
+        self.public_key_coord_provisioner = (public_key_numbers.x, public_key_numbers.y)
 
     def compute_ecdh_secret(self):
         """
@@ -317,19 +329,38 @@ class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoM
             self.private_key_provisioner, self.public_key_device
         )
 
+    def add_peer_public_key(self, public_key_x, public_key_y):
+        self.public_key_device = generate_public_key_from_coordinates(
+            int.from_bytes(self.public_key_coord_device[0], "big"),
+            int.from_bytes(public_key_x, "big"),
+            int.from_bytes(public_key_y),
+        )
+
+    def generate_random(self):
+        """
+        Generates the random values used in Confirmation Process
+        NOT SAFE
+        """
+        if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
+            self.rand_provisioner = randbytes(16)
+        elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
+            self.rand_provisioner = randbytes(32)
 
 
 class ProvisioningBearerAdvCryptoManagerDevice(ProvisioningBearerAdvCryptoManager):
-    def __init__(self):
-        super().__init__()  # does nothing, but better to have super...
+    def __init__(self, alg):
+        super().__init__(alg=alg)  # does nothing, but better to have super...
         self.public_key_device = None
         self.public_key_provisioner = None
+        self.received_confirmation_provisioner = None
 
     def generate_p256_keypair(self):
         """Generate the P256 private key / public key"""
-        self.private_key_device, self.public_key_device = (
-            generate_p256_keypair()
-        )
+        self.private_key_device, self.public_key_device = generate_p256_keypair()
+
+        # Get coordinates format for the Provisioning Packets
+        public_key_numbers = self.public_key_device.public_numbers()
+        self.public_key_coord_device = (public_key_numbers.x, public_key_numbers.y)
 
     def compute_ecdh_secret(self):
         """
@@ -339,4 +370,19 @@ class ProvisioningBearerAdvCryptoManagerDevice(ProvisioningBearerAdvCryptoManage
             self.private_key_device, self.public_key_provisioner
         )
 
+    def add_peer_public_key(self, public_key_x, public_key_y):
+        self.public_key_provisioner = generate_public_key_from_coordinates(
+            int.from_bytes(self.public_key_coord_device[0], "big"),
+            int.from_bytes(public_key_x, "big"),
+            int.from_bytes(public_key_y),
+        )
 
+    def generate_random(self):
+        """
+        Generates the random values used in Confirmation Process
+        NOT SAFE
+        """
+        if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
+            self.rand_device = randbytes(16)
+        elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
+            self.rand_device = randbytes(32)

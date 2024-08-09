@@ -13,7 +13,7 @@ from whad.exceptions import WhadDeviceNotFound
 from whad.device import WhadDevice
 from whad.ble.exceptions import ConnectionLostException
 import sys
-from whad.bt_mesh.connectors.provisioner import Provisioner
+from whad.bt_mesh.connectors.device import Device
 from time import sleep
 
 from whad.scapy.layers.bt_mesh import *
@@ -47,23 +47,31 @@ if len(sys.argv) != 2:
 
 interface = sys.argv[1]
 
-pkt = (
-    EIR_Hdr(type=0x29)
-    / EIR_PB_ADV_PDU(link_id=0xC72DB67A, transaction_number=0)
-    / BTMesh_Generic_Provisioning_Transaction_Start(
-        segment_number=0, generic_provisioning_control_format=0
-    )
-    / BTMesh_Provisioning_Hdr(type=0, message=BTMesh_Provisioning_Invite())
+link_open = BTMesh_Generic_Provisioning_Link_Open(
+    bearer_opcode=0,
+    generic_provisioning_control_format=3,
+    device_uuid="7462d668-bc88-3473-0000-000000000000",
+)
+beacon_data = BTMesh_Unprovisioned_Device_Beacon(
+    device_uuid="7462d668-bc88-3473-0000-000000000000", uri_hash=1
+)
+pkt = EIR_Hdr(type=0x29) / EIR_PB_ADV_PDU(
+    link_id=b"abcd", transaction_number=0, data=link_open
+)
+
+pkt_beacon = EIR_Hdr(type=0x2B) / EIR_BTMesh_Beacon(
+    mesh_beacon_type=0x00, unprovisioned_device_beacon_data=beacon_data
 )
 try:
     dev = WhadDevice.create(interface)
-    provisioner = Provisioner(dev)
-    provisioner.configure(advertisements=True, connection=False)
-    provisioner.start()
+    device = Device(dev)
+    device.configure(advertisements=True, connection=False)
+    device.start()
+    device.send_raw(pkt_beacon)
 
     while True:
-        provisioner.send_raw(pkt)
-        sleep(1)
+        device.polling_rx_packets()
+        sleep(0.1)
 except ConnectionLostException as e:
     print("Connection lost", e)
 
