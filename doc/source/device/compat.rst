@@ -114,7 +114,7 @@ Installing a WHAD-compatible firmware
 
 .. attention::
 
-    This section will be completed pretty soon, firmware is available in our `WHAD dedicated repository <https://github.com/whad-team/stm32wlxx-firmware>`_
+    This section will be completed pretty soon, firmware is available in our `STM32WL dedicated repository <https://github.com/whad-team/stm32wlxx-firmware>`_
 
 .. _dev-stm32wl:
 
@@ -134,7 +134,7 @@ Installing a WHAD-compatible firmware
 
 .. attention::
 
-    This section will be completed pretty soon, firmware is available in our `WHAD dedicated repository <https://github.com/whad-team/stm32wlxx-firmware>`_
+    This section will be completed pretty soon, firmware is available in our `STM32WLXX dedicated repository <https://github.com/whad-team/stm32wlxx-firmware>`_
 
 .. _dev-esp32-wroom:
 
@@ -155,4 +155,4 @@ Install a WHAD-compatible firmware
 
 .. attention::
 
-    This section will be completed pretty soon, firmware is available in our `WHAD dedicated repository <https://github.com/whad-team/nodemcu-esp32-firmware>`_. Build instructions included in README, well for what it's worth.
+    This section will be completed pretty soon, firmware is available in our `NodeMCU dedicated repository <https://github.com/whad-team/nodemcu-esp32-firmware>`_. Build instructions included in README, well for what it's worth.

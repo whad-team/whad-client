@@ -11,6 +11,7 @@ Welcome to WHAD's documentation!
     :caption: General documentation
 
     intro
+    device/protocol
     device/compat
     cli/index
 
