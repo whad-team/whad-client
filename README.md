@@ -16,7 +16,7 @@ pip install whad
 
 ## Online documentation
 
-Project documentation is available on ReadTheDocs.
+Project documentation is `available on ReadTheDocs <https://whad.readthedocs.io/en/latest/>`_.
 
 ## Running unit tests
 
