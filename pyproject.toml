@@ -10,11 +10,12 @@ testpaths = [
 
 [project]
 name = "whad"
-version = "0.0.1"
+version = "1.0.0"
 authors = [
     { name="Damien CAUQUIL" },
     { name="Romain CAYRE" },
 ]
+readme="README.md"
 
 license = { text="MIT" }
 requires-python = ">=3.7, <4"
@@ -25,7 +26,10 @@ classifiers = [
   "Programming Language :: Python :: 3.7",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10"
+  "Programming Language :: Python :: 3.10",
+  "Operating System :: POSIX :: Linux",
+  "License :: OSI Approved :: Apache Software License"
+
 ]
 dependencies = [
     "protobuf==3.20.*",
@@ -79,3 +83,7 @@ exclude = [
     "ressource*",
     "doc*",
 ]
+
+[project.urls]
+Homepage = "https://github.com/whad-team/whad-client"
+Issues = "https://github.com/whad-team/whad-client/issues"
