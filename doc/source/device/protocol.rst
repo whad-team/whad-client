@@ -3,8 +3,7 @@ WHAD communication protocol
 
 WHAD communication protocol has been designed with the following ideas in mind:
 
-- Genericity: the protocol is the same for all supported devices and allows the host to discover
-              what a device is capable of and adapt its features based on this
+- Genericity: the protocol is the same for all supported devices and allows the host to discover what a device is capable of and adapt its features based on this
 - Extensibility: the protocol must allow new wireless protocols or modulation to be added easily with backward compatibility
 - Efficiency: exchanges must be as compact as possible to provide a good throughput
 - Stability: backward compatibility is key and older versions of this protocol must be supported

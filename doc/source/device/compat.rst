@@ -64,7 +64,7 @@ Installing *Butterfly* firmware on an nRF52840 MDK dongle (UF2 Bootloader)
 
 Follow this procedure to install a WHAD-compatible firmware on this device:
 
-1. Download the [latest version](https://github.com/whad-team/butterfly/releases/latest) of Butterfly for nRF52840 MDK USB Dongle (UF2 file)
+1. Download the `latest version <https://github.com/whad-team/butterfly/releases/latest>`_ of Butterfly for nRF52840 MDK USB Dongle (UF2 file)
 2. Plug your nRF52840 MDK USB dongle into your computer
 3. Press the tactile switch during 2 seconds and release, a red LED must blink
 4. Access with a file explorer the new mass storage device and copy the firmware update file into it
@@ -74,7 +74,7 @@ Installing *Butterfly* firmware on an nRF52840 MDK dongle (nrfutil)
 
 Follow this procedure to install a WHAD-compatible firmware on this device:
 
-1. Download the [latest version](https://github.com/whad-team/butterfly/releases/latest) of Butterfly built for Nordic nRF52840 dongle (zip archive)
+1. Download the `latest version <https://github.com/whad-team/butterfly/releases/latest>`_ of Butterfly built for Nordic nRF52840 dongle (zip archive)
 2. Download and install Nordic *nrfutil* on your computer
 3. Plug your Nordic nRF52840 dongle in your computer and press the *RESET* button for 2 seconds
 4. Make sure a red LED blinks before continuing with next steps. If not retry step 4.
@@ -101,7 +101,7 @@ Installing *Butterfly* firmware on a Nordic nRF52840 Dongle
 
 Follow this procedure to install a WHAD-compatible firmware on this device:
 
-1. Download the [latest version](https://github.com/whad-team/butterfly/releases/latest) of Butterfly built for Nordic nRF52840 dongle (zip archive)
+1. Download the `latest version <https://github.com/whad-team/butterfly/releases/latest>`_ of Butterfly built for Nordic nRF52840 dongle (zip archive)
 2. Download and install Nordic *nrfutil* on your computer
 3. Plug your Nordic nRF52840 dongle in your computer and press the *RESET* button for 2 seconds
 4. Make sure a red LED blinks before continuing with next steps. If not retry step 4.
@@ -146,7 +146,7 @@ Installing a WHAD-compatible firmware
 
 .. attention::
     
-    You must have the [STM32 Cube Programmer](https://www.st.com/en/development-tools/stm32cubeprog.html) installed on your machine to flash this firmware.
+    You must have the `STM32 Cube Programmer <https://www.st.com/en/development-tools/stm32cubeprog.html>`_ installed on your machine to flash this firmware.
 
 1. Download the latest version of our WHAD-compatible firmware from the [corresponding repository](https://github.com/whad-team/stm32wlxx-firmware/releases/latest) named ``nucleo_wl55.hex``
 2. Launch STM32 Cube Programmer, connect the Nucleo STM32WL55 board to your computer and click *Connect*
