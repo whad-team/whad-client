@@ -108,14 +108,17 @@ class Sniffer(Zigbee, EventsManager):
         :rtype: :class:`scapy.packet.Packet`
         """
         if self.__touchlink_key_derivation.unencrypted_key is not None:
-            logger.info("[i] New key extracted: ", self.__touchlink_key_derivation.unencrypted_key.hex())
+            logger.info("[i] New key extracted: %s",
+                        self.__touchlink_key_derivation.unencrypted_key.hex())
             self.trigger_event(KeyExtractedEvent(self.__touchlink_key_derivation.unencrypted_key))
             self.add_key(self.__touchlink_key_derivation.unencrypted_key)
             self.__decryptor.add_key(self.__touchlink_key_derivation.unencrypted_key)
             self.__touchlink_key_derivation.reset()
 
         if self.__transport_key_distribution.transport_key is not None:
-            logger.info("[i] New key extracted: ", self.__transport_key_distribution.transport_key.hex())
+            logger.info(
+                "[i] New key extracted: %s",
+                self.__transport_key_distribution.transport_key.hex())
             self.trigger_event(KeyExtractedEvent(self.__transport_key_distribution.transport_key))
             self.add_key(self.__transport_key_distribution.transport_key)
             self.__decryptor.add_key(self.__transport_key_distribution.transport_key)
