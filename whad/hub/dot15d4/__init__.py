@@ -166,11 +166,11 @@ class Dot15d4Domain(Registry):
         if isinstance(packet.metadata, Dot15d4Metadata):
             if packet.metadata.raw:
                 return Dot15d4Domain.bound('send_raw', self.proto_version).from_packet(
-                    packet, encrypt=packet.metadata.encrypt
+                    packet, channel=packet.metadata.channel
                 )
             else:
                 return Dot15d4Domain.bound('send', self.proto_version).from_packet(
-                    packet, encrypt=packet.metadata.encrypt
+                    packet, channel=packet.metadata.channel
                 )
         else:
             # Error
@@ -236,7 +236,7 @@ class Dot15d4Domain(Registry):
             channel=channel
         )
 
-    def create_energy_dectection_mode(self, channel: int) -> HubMessage:
+    def create_energy_detection_mode(self, channel: int) -> HubMessage:
         """Create a EnergyDetectionMode message
 
         :param channel: Channel to detect

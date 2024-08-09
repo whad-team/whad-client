@@ -211,6 +211,7 @@ class Dot15d4(WhadDeviceConnector):
         if self.can_send():
             metadata = Dot15d4Metadata()
             metadata.raw = False
+            metadata.channel = channel
             if self.support_raw_pdu():
                 metadata.raw = True
                 if Dot15d4FCS not in pdu:
