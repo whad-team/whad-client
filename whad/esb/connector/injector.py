@@ -12,11 +12,10 @@ class Injector(PTX):
     """
     def __init__(self, device):
         super().__init__(device)
-        self._autosync = True
         self._synced = False
         self._configuration = InjectionConfiguration()
         self._injecting = False
-        self.start()
+        #self.start()
 
     @property
     def configuration(self) -> InjectionConfiguration:
@@ -28,11 +27,14 @@ class Injector(PTX):
     def configuration(self, new_configuration: InjectionConfiguration):
         """Set the injector configuration.
         """
+        self.stop()
         self.__configuration = new_configuration
         if self.__configuration.address is not None:
             self.address = self.__configuration.address
         if self.__configuration.channel is not None:
             self.channel = self.__configuration.channel
+
+        self.start()
 
     def on_pdu(self, pdu):
         if self._injecting:
@@ -42,8 +44,9 @@ class Injector(PTX):
 
     def inject(self, packet):
         if hasattr(packet, "address") and packet.address != self.address:
+            self.stop()
             self.address = packet.address
-
+            self.start()
         if self.__configuration.synchronize:
             if not self._synced:
                 self.synchronize()

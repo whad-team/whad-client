@@ -273,7 +273,7 @@ class WhadInjectApp(CommandLineApp):
                                 injector.inject(packet)
                             except Exception as e:
                                 self.error("Error during injection: " + repr(e))
-
+                            self.provided_count-=1
                 else:
                     self.error("You need to specify a domain.")
             else:
