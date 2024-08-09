@@ -86,4 +86,5 @@ exclude = [
 
 [project.urls]
 Homepage = "https://github.com/whad-team/whad-client"
+Documentation = "https://whad.readthedocs.io/en/stable/"
 Issues = "https://github.com/whad-team/whad-client/issues"
