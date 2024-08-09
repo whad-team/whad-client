@@ -112,7 +112,9 @@ class ESB(WhadDeviceConnector):
             packet.metadata = ESBMetadata()
             packet.metadata.channel = tx_channel
             packet.metadata.address = tx_address
-
+            packet.metadata.retransmission_count = retransmission_count
+            if self.support_raw_pdu():
+                packet.metadata.raw = True
             if bytes.fromhex(packet.address[:2])[0] >= 0x80:
                 packet.preamble = 0xAA
             else:

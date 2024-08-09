@@ -9,7 +9,7 @@ from typing import Generator, List
 from scapy.packet import Packet
 
 from whad.dot15d4.connector import Dot15d4
-from whad.zigbee.sniffing import SnifferConfiguration
+from whad.dot15d4.sniffing import SnifferConfiguration
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter, is_message_type
 from whad.common.sniffing import EventsManager

@@ -1,15 +1,14 @@
-from whad.unifying.connector import Unifying, Mouse
+from whad.esb.connector import ESB, PTX
 from whad.esb.stack import ESBStack
-from whad.unifying.stack import UnifyingApplicativeLayer
 from whad.exceptions import UnsupportedCapability, WhadDeviceDisconnected
-from whad.unifying.injecting import InjectionConfiguration
+from whad.esb.injecting import InjectionConfiguration
 from whad.helpers import message_filter, is_message_type
 from time import sleep, time
 
 
-class Injector(Mouse):
+class Injector(PTX):
     """
-    Logitech Unifying Injector interface.
+    Enhanced ShockBurst Injector interface.
     """
     def __init__(self, device):
         super().__init__(device)
@@ -32,6 +31,8 @@ class Injector(Mouse):
         self.__configuration = new_configuration
         if self.__configuration.address is not None:
             self.address = self.__configuration.address
+        if self.__configuration.channel is not None:
+            self.channel = self.__configuration.channel
 
     def on_pdu(self, pdu):
         if self._injecting:
@@ -45,14 +46,11 @@ class Injector(Mouse):
 
         if self.__configuration.synchronize:
             if not self._synced:
-                if self.synchronize():
-                    self.lock()
+                self.synchronize()
                 self._injecting = True
                 while not self.send(packet, channel=self.channel, address=self.address):
                     self._injecting = False
-                    self.unlock()
-                    if self.synchronize():
-                        self.lock()
+                    self.synchronize()
                 self._synced = True
                 return True
             else:

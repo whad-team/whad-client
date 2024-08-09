@@ -65,6 +65,13 @@ class WhadWiresharkApp(CommandLineApp):
                 connector = UnixConnector(interface)
                 if self.is_stdout_piped():
                     proxy = UnixConnector(UnixSocketServerDevice(parameters=self.args.__dict__))
+
+                    while not proxy.device.opened:
+                        if proxy.device.timedout:
+                            return
+                        else:
+                            sleep(0.1)
+
                     # Bridge both connectors and their respective interfaces
                     bridge = Bridge(connector, proxy)
 

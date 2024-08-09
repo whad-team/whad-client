@@ -199,6 +199,9 @@ class UnixSocketServerDevice(WhadDevice):
         """
         super().__init__()
 
+        # Indicate if a timeout occured during opening
+        self.__timedout = False
+
         # Create our Unix socket path
         if path is not None:
             # Use the provided Unix socket path
@@ -239,6 +242,22 @@ class UnixSocketServerDevice(WhadDevice):
         Returns the identifier of the device (e.g., socket path).
         '''
         return self.__path
+
+
+    @property
+    def opened(self):
+        '''
+        Returns if a client is connected on the UNIX socket.
+        '''
+        return self.__opened
+
+    @property
+    def timedout(self):
+        '''
+        Returns if a client timed out.
+        '''
+        return self.__timedout
+
 
     def add_parameter(self, key: str, value):
         """Add a parameter to this Unix Socket connector.
@@ -297,8 +316,12 @@ class UnixSocketServerDevice(WhadDevice):
             except BrokenPipeError as err:
                 logger.error('Broken pipe.')
                 self.__client = None
+            except TimeoutError as err:
+                logger.info('Timed out.')
+                self.__timedout = True
+                self.__client = None
             except Exception as other_err:
-                logger.error("Another exception occured !")
+                logger.error("Another exception occured: %s", other_err)
                 pass
 
     def read(self):

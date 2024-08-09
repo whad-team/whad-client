@@ -282,6 +282,13 @@ class WhadAnalyzeApp(CommandLineApp):
                         'format': self.args.format,
                         'metadata' : self.args.metadata
                     }))
+
+
+                    while not unix_server.device.opened:
+                        if unix_server.device.timedout:
+                            return
+                        else:
+                            sleep(0.1)
                     # Create our packet bridge
                     logger.info("[wanalyze] Starting our output pipe")
                     output_pipe = WhadAnalyzePipe(connector, unix_server, self.on_packet)

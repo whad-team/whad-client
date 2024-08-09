@@ -35,6 +35,7 @@ class SendPdu(PbMessageWrapper):
             channel=channel,
             pdu=pdu
         )
+        return msg
 
 @pb_bind(Dot15d4Domain, 'send_raw', 1)
 class SendRawPdu(PbMessageWrapper):
@@ -65,6 +66,7 @@ class SendRawPdu(PbMessageWrapper):
             pdu=pdu,
             fcs=packet.fcs
         )
+        return msg
 
 @pb_bind(Dot15d4Domain, 'pdu', 1)
 class PduReceived(PbMessageWrapper):

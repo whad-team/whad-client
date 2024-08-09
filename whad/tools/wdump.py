@@ -7,7 +7,7 @@ import os
 import logging
 import time
 
-from whad.cli.ui import wait, success
+from whad.cli.ui import wait, success, error
 from whad.cli.app import CommandLineApp, run_app
 from whad.device import Bridge, ProtocolHub
 from scapy.all import *
@@ -109,6 +109,14 @@ class WhadDumpApp(CommandLineApp):
 
                     if self.is_stdout_piped():
                         unix_server = UnixConnector(UnixSocketServerDevice(parameters=self.args.__dict__))
+
+
+                        while not unix_server.device.opened:
+                            if unix_server.device.timedout:
+                                return
+                            else:
+                                sleep(0.1)
+
                         # Create our packet bridge
                         logger.info("[wdump] Starting our output pipe")
                         output_pipe = WhadDumpPipe(connector, unix_server)

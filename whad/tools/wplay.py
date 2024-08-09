@@ -49,7 +49,7 @@ class WhadPlayApp(WhadSniffApp):
         if index_pcap_file is not None and not override_domain:
             if os.path.exists(self.pcap_file):
                 domain = extract_pcap_metadata(self.pcap_file)
-                if domain != "":
+                if domain in list_implemented_sniffers().keys():
                     sys.argv.insert(index_pcap_file + 1, domain)
                 else:
                     self.error("You need to provide a domain")

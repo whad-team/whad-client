@@ -8,11 +8,12 @@ import logging
 import time
 from argparse import ArgumentParser, Namespace
 
-from whad.exceptions import RequiredImplementation
-from whad.cli.ui import wait, warning, error, success, display_packet
+from whad.exceptions import RequiredImplementation, UnsupportedDomain, UnsupportedCapability
+from whad.cli.ui import wait, warning, error, success, info, display_packet
 from whad.cli.app import CommandLineApp, run_app
 from whad.device import Bridge, ProtocolHub
 from scapy.all import *
+from whad.scapy.layers.rf4ce import *
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.tools.utils import list_implemented_injectors, get_injector_parameters, gen_option_name, build_configuration_from_args
 #from whad.unifying import Injector
@@ -147,28 +148,60 @@ class WhadInjectApp(CommandLineApp):
                         help=parameter_help
                     )
 
+            self.environment[domain_name]["subparser"].add_argument(
+                dest='packet',
+                nargs="*",
+                help='packet to inject'
+            )
+
     def on_incoming_packet(self, packet):
         self._input_queue.put(packet)
 
+    def generate_packets(self):
+        self.provided_count = 0
+        if hasattr(self.args, "packet"):
+            for p in self.args.packet:
+                try:
+                    pkt = eval(p)
+                    self._input_queue.put(pkt)
+                    self.provided_count += 1
+                except Exception as e:
+                    error("Failure during packet interpretation: " + str(p) + " -> " + str(e))
+
     def pre_run(self):
-        """Pre-run operations: configure scapy theme.
+        """Pre-run operations: rewrite arguments to allow skipping domain name when a pipe is configured.
         """
+
         try:
             try:
                 index = sys.argv.index("--interface")
             except ValueError:
                 index = sys.argv.index("-i")
         except ValueError:
+            if "-h" in sys.argv or "--help" in sys.argv:
+                self.print_help()
+                exit(1)
             error("You need to provide an interface.")
             exit(1)
 
         start_argv = sys.argv[:index + 2]
         end_argv =  sys.argv[index + 2:]
+
+        if len(sys.argv) == 1 or "-h" in start_argv or "--help" in start_argv:
+            self.print_help()
+            exit(1)
+
+
         error_func = self.error
         if self.subparsers is None:
             self.error  = lambda m : None
         super().pre_run()
-        domain = self.args.domain
+        try:
+            domain = self.args.domain
+        except AttributeError:
+            self.error("You have to provide a domain.")
+            exit(1)
+
         if self.subparsers is None:
             self.error  = error_func
 
@@ -184,7 +217,11 @@ class WhadInjectApp(CommandLineApp):
 
             self.build_subparsers(self.subparsers)
 
-            sys.argv = start_argv + [domain] + end_argv
+            if domain not in start_argv and domain not in end_argv:
+                sys.argv = start_argv + [domain] + end_argv
+            else:
+                sys.argv = start_argv + end_argv
+
             for k, v in self.parse_args().__dict__.items():
                 setattr(self.args, k, v)
 
@@ -192,6 +229,7 @@ class WhadInjectApp(CommandLineApp):
         if not self.args.nocolor:
             conf.color_theme = BrightTheme()
 
+        self.generate_packets()
 
     def run(self):
         monitors = []
@@ -210,7 +248,32 @@ class WhadInjectApp(CommandLineApp):
                     # Generate an injector based on the selected domain
                     injector = self.environment[self.args.domain]["injector_class"](self.interface)
 
-                    print(injector, configuration)
+
+                    if self.is_piped_interface():
+
+                        connector = UnixConnector(self.input_interface)
+
+                        connector.domain = self.args.domain
+                        hub = ProtocolHub(2)
+                        connector.format = hub.get(self.args.domain).format
+                        connector.on_packet = self.on_incoming_packet
+
+                    try:
+                        injector.configuration = configuration
+                    except Exception as e:
+                        self.error("Error during configuration: " +repr(e))
+
+
+                    while (self.input_interface is not None and self.input_interface.opened) or self.provided_count > 0 or not self._input_queue.empty():
+                        if not self._input_queue.empty():
+                            packet = self._input_queue.get()
+                            try:
+                                info("Transmitting: ")
+                                display_packet(packet)
+                                injector.inject(packet)
+                            except Exception as e:
+                                self.error("Error during injection: " + repr(e))
+
                 else:
                     self.error("You need to specify a domain.")
             else:
@@ -227,37 +290,6 @@ class WhadInjectApp(CommandLineApp):
             injector.stop()
             injector.close()
             exit()
-
-            '''
-            if self.is_piped_interface():
-                if self.interface is not None:
-                    if not self.args.nocolor:
-                        conf.color_theme = BrightTheme()
-
-                    parameters = self.args.__dict__
-
-
-                    connector = UnixConnector(self.input_interface)
-
-                    connector.domain = self.args.domain
-                    hub = ProtocolHub(2)
-                    connector.format = hub.get(self.args.domain).format
-                    #connector.translator = get_translator(self.args.domain)(connector.hub)
-                    #connector.format = connector.translator.format
-
-                    connector.on_packet = self.on_incoming_packet
-                    self.injector = Injector(self.interface)
-                    #self.injector.autosync = True
-                    #self.injector.attach_callback(lambda p:p.show())
-                    while True:
-                        #sleep(1)
-                        if not self._input_queue.empty():
-                            packet = self._input_queue.get()
-                            print(packet.metadata, repr(packet))
-                            self.injector.inject(packet)
-                else:
-                    raise RequiredImplementation()
-            '''
 
 
 def winject_main():

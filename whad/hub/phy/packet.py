@@ -179,19 +179,19 @@ class ExtendedPacketReceived(PacketReceived):
             msg.timestamp = packet.metadata.timestamp
 
         if packet.metadata.endianness is not None:
-            msg.endian = endianness
+            msg.endian = packet.metadata.endianness
 
         if packet.metadata.datarate is not None:
-            msg.datarate = datarate
+            msg.datarate = packet.metadata.datarate
 
         if packet.metadata.deviation is not None:
-            msg.deviation = int(deviation)
+            msg.deviation = int(packet.metadata.deviation)
 
         if packet.metadata.modulation is not None:
-            msg.modulation = int(modulation)
+            msg.modulation = int(packet.metadata.modulation)
 
         if packet.metadata.syncword is not None:
-            msg.syncword = bytes(syncword)
+            msg.syncword = bytes(packet.metadata.syncword)
 
         return msg
 
