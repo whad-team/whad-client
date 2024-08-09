@@ -15,7 +15,7 @@ class Injector(Mouse):
         super().__init__(device)
         self._autosync = True
         self._synced = False
-        self._configuration = InjectionConfiguration()
+        self.__configuration = InjectionConfiguration()
         self._injecting = False
         self.start()
 
