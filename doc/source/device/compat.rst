@@ -169,6 +169,7 @@ ESP32-WROOM are widely available, sold on Amazon or AliExpress for around $10 US
 Install a WHAD-compatible firmware
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. attention::
+.. warning::
 
-    This section will be completed pretty soon, firmware is available in our `NodeMCU dedicated repository <https://github.com/whad-team/nodemcu-esp32-firmware>`_. Build instructions included in README, well for what it's worth.
+    We are currently reworking the source code of the ESP32 NodeMCU to make it use our C/C++ library
+    and the latest version of our WHAD protocol. It will be updated here as soon as possible.
