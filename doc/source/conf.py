@@ -21,7 +21,7 @@ print(sys.path)
 # -- Project information -----------------------------------------------------
 
 project = 'WHAD'
-copyright = '2022, Damien Cauquil, Romain Cayre'
+copyright = '2024, Damien Cauquil, Romain Cayre'
 author = 'Damien Cauquil, Romain Cayre'
 
 # The short X.Y version
