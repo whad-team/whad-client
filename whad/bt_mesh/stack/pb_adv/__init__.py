@@ -8,6 +8,7 @@ import logging
 from random import randbytes
 from whad.common.stack import Layer, alias, source, instance
 from whad.scapy.layers.bt_mesh import EIR_PB_ADV_PDU, BTMesh_Unprovisioned_Device_Beacon
+from scapy.layers.bluetooth import EIR_Hdr
 from whad.bt_mesh.stack.gen_prov import (
     GenericProvisioningLayerDevice,
     GenericProvisioningLayerProvisioner,
@@ -38,7 +39,7 @@ class PBAdvBearerLayer(Layer):
         """
         transaction_number = packet.transaction_number
         link_id = packet.link_id
-        message = GenericProvisioningMessage(packet[1], transaction_number)
+        message = GenericProvisioningMessage(packet.data, transaction_number)
         self.send(self.state.gen_prov_dict[link_id].name, message)
 
     def get_link_id_from_instance_name(self, search_instance_name):
@@ -52,7 +53,7 @@ class PBAdvBearerLayer(Layer):
             if gen_prov_instance.name == search_instance_name:
                 return link_id
 
-    def instantiate_gen_prov(self, link_id, peer_uuid):
+    def instantiate_gen_prov(self, link_id, peer_uuid=None):
         new_gen_prov = self.instantiate(self.state.generic_prov_layer_class)
         new_gen_prov.state.peer_uuid = peer_uuid
         self.state.gen_prov_dict[link_id] = new_gen_prov
@@ -94,9 +95,8 @@ class PBAdvBearerLayer(Layer):
         """
         packet = message.gen_prov_pkt
         transaction_number = message.transaction_number
-        packet.show2()
         link_id = self.get_link_id_from_instance_name(source)
         self.__connector.send_raw(
-            EIR_PB_ADV_PDU(link_id=link_id, transaction_number=transaction_number)
-            / packet
+            EIR_Hdr(type=0x29)
+            / EIR_PB_ADV_PDU(link_id=link_id, transaction_number=transaction_number, data=packet)
         )
