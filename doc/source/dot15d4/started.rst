@@ -35,4 +35,23 @@ channel and sniff packets:
 Sending packets
 ---------------
 
+Sending IEEE 802.15.4 packets is as easy as it sounds, simply use the
+:func:`whad.dot15d4.connector.Dot15d4.send` as follows:
+
+.. code-block:: python
+
+    from whad.device import WhadDevice
+    from whad.dot15d4 import Sniffer
+
+    # Create a compatible device instance
+    device = WhadDevice.create("uart0")
+
+    # Use a default Dot15d4 connector
+    connector = Dot15d4(device)
+
+    # Send 802.15.4 packet
+    connector.send(b"Hello World !")
+
+
+
 

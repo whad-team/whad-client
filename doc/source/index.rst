@@ -34,6 +34,20 @@ Welcome to WHAD's documentation!
 
 .. toctree::
     :maxdepth: 1
+    :caption: IEEE 802.15.4 API
+
+    dot15d4/started
+
+.. toctree::
+    :maxdepth: 1
+    :caption: ZigBee API
+
+    zigbee/started
+    zigbee/coordinator
+    zigbee/enddevice
+
+.. toctree::
+    :maxdepth: 1
     :caption: LoRaWAN API
 
     lorawan/started
