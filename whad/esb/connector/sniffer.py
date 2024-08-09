@@ -58,6 +58,7 @@ class Sniffer(ESB, EventsManager):
         address = self.__configuration.address
 
         super().sniff(channel=channel, show_acknowledgements=ack, address=address)
+        self.start()
 
     @property
     def configuration(self) -> SnifferConfiguration:
@@ -94,10 +95,6 @@ class Sniffer(ESB, EventsManager):
         self.__configuration.channel = channel
         self._enable_sniffing()
 
-
-    def available_actions(self, filter=None):
-        actions = []
-        return [action for action in actions if filter is None or isinstance(action, filter)]
 
     def sniff(self, channel: int = None, address: str = None, show_acknowledgements: bool = False,
               timeout: float = None) -> Generator[Packet, None, None]:
@@ -152,6 +149,7 @@ class Sniffer(ESB, EventsManager):
                     message_type = PduReceived
 
                 message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
+
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
                     self.monitor_packet_rx(packet)
