@@ -2,19 +2,18 @@ from whad import WhadDomain, WhadCapability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter
 from whad.phy.utils.definitions import OOKModulationScheme, ASKModulationScheme, \
-    OQPSKModulationScheme, QPSKModulationScheme, BPSKModulationScheme, \
+    QPSKModulationScheme, BPSKModulationScheme, \
     FSKModulationScheme, GFSKModulationScheme, QFSKModulationScheme
 from whad.phy.utils.helpers import lora_sf, lora_cr
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.scapy.layers.phy import Phy_Packet
-from whad.phy.exceptions import UnsupportedFrequency, NoModulation, NoDatarate, NoFrequency, \
-    NoSyncWord, NoEndianess, NoPacketSize, InvalidParameter, ScheduleFifoFull, \
+from whad.phy.exceptions import UnsupportedFrequency, InvalidParameter, ScheduleFifoFull, \
     UnknownPhysicalLayer, UnknownPhysicalLayerFunction
 from whad.phy.connector.translator import PhyMessageTranslator
 
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.phy import Commands, TxPower, Endianness, SupportedFreqRanges, \
-    SchedulePacketResponse, PacketReceived, RawPacketReceived
+    SchedulePacketResponse, PhyMetadata
 
 class Phy(WhadDeviceConnector):
     """
