@@ -53,7 +53,7 @@ class Injector(Phy):
         elif self.__configuration.bfsk:
             self.set_bfsk(deviation=self.__configuration.fsk_configuration.deviation)
         elif self.__configuration.qfsk:
-            self.set_qfsk(deviation=self.__configuration.fsk_configuration.deviation)
+            self.set_4fsk(deviation=self.__configuration.fsk_configuration.deviation)
         elif self.__configuration.ask:
             self.set_ask()
         elif self.__configuration.bpsk:
@@ -98,7 +98,7 @@ class Injector(Phy):
                     elif (packet.metadata.modulation == PhyModulation.GFSK or packet.metadata.modulation == PhyModulation.MSK) and deviation is not None:
                         self.set_gfsk(deviation=deviation)
                     elif packet.metadata.modulation == PhyModulation.FOURFSK and deviation is not None:
-                        self.set_qfsk(deviation=deviation)
+                        self.set_4fsk(deviation=deviation)
                     elif packet.metadata.modulation == PhyModulation.BPSK:
                         self.set_bpsk()
                     elif packet.metadata.modulation == PhyModulation.QPSK:

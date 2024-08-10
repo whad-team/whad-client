@@ -46,7 +46,7 @@ class Sniffer(Phy, EventsManager):
         elif self.__configuration.bfsk:
             self.set_bfsk(deviation=self.__configuration.fsk_configuration.deviation)
         elif self.__configuration.qfsk:
-            self.set_qfsk(deviation=self.__configuration.fsk_configuration.deviation)
+            self.set_4fsk(deviation=self.__configuration.fsk_configuration.deviation)
         elif self.__configuration.ask:
             self.set_ask()
         elif self.__configuration.bpsk:
@@ -112,7 +112,7 @@ class Sniffer(Phy, EventsManager):
                 else:
                     message_type = PacketReceived
                 message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
-                
+
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
                     self.monitor_packet_rx(packet)
