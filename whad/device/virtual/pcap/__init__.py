@@ -10,10 +10,11 @@ from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, 
 from scapy.utils import PcapReader, PcapWriter
 from struct import unpack, pack
 from scapy.layers.bluetooth4LE import BTLE
+from whad.scapy.layers.phy import Phy_Packet
 from whad.hub.dot15d4 import Dot15d4Metadata
 from whad.hub.ble import BLEMetadata
 from whad.hub.esb import ESBMetadata
-from whad.hub.phy import PhyMetadata
+from whad.hub.phy import PhyMetadata, Modulation, Endianness
 from whad.hub.unifying import UnifyingMetadata
 from time import sleep
 from whad import WhadDomain
@@ -171,7 +172,6 @@ class PCAPDevice(VirtualDevice):
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
-            #pkt.show()
             self._send_whad_zigbee_raw_pdu(bytes(pkt[Dot15d4]), channel=metadata.channel, lqi=metadata.lqi, rssi=metadata.rssi, timestamp=metadata.timestamp)
         elif self.__domain == WhadDomain.BtLE:
             metadata = self._generate_metadata(pkt)
@@ -196,11 +196,17 @@ class PCAPDevice(VirtualDevice):
 
 
     def _send_whad_phy_pdu(self, packet, metadata):
+        #packet.show()
         msg = self.hub.phy.create_packet_received(
             metadata.frequency, # TODO: frequency,
-            bytes(packet),
+            bytes(packet[Phy_Packet]),
             metadata.rssi, # TODO: rssi
-            metadata.timestamp
+            metadata.timestamp,
+            metadata.syncword,
+            metadata.datarate,
+            metadata.deviation,
+            Modulation(metadata.modulation),
+            Endianness(metadata.endianness)
         )
         # Send message
         self._send_whad_message(msg)

@@ -65,6 +65,13 @@ class WhadWiresharkApp(CommandLineApp):
                 connector = UnixConnector(interface)
                 if self.is_stdout_piped():
                     proxy = UnixConnector(UnixSocketServerDevice(parameters=self.args.__dict__))
+
+                    while not proxy.device.opened:
+                        if proxy.device.timedout:
+                            return
+                        else:
+                            sleep(0.1)
+
                     # Bridge both connectors and their respective interfaces
                     bridge = Bridge(connector, proxy)
 
@@ -77,7 +84,7 @@ class WhadWiresharkApp(CommandLineApp):
 
                 # Query our protocol hub to gather the correct format function
                 # based on the provided domain
-                hub = ProtocolHub(1)
+                hub = ProtocolHub(2)
                 self.connector.format = hub.get(self.args.domain).format
 
                 # Attack a wireshark monitor

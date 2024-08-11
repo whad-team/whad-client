@@ -42,6 +42,15 @@ class NotConnected(Exception):
         super().__init__()
         self.peripheral = peripheral
 
+class NotSynchronized(Exception):
+    """This exception is raised when a connection is used while not synchronized.
+    """
+    def __init__(self):
+        super().__init__()
+
+    def __repr__(self):
+        return "NotSynchronized"
+        
 class ConnectionLostException(Exception):
     """This exception is raised when a connection is unexpectedly terminated.
     """

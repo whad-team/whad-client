@@ -33,6 +33,7 @@ class SendPdu(PbMessageWrapper):
             channel=channel,
             pdu=pdu
         )
+        return msg
 
         return msg
 
@@ -65,6 +66,7 @@ class SendRawPdu(PbMessageWrapper):
             pdu=pdu,
             fcs=packet.fcs
         )
+        return msg
 
         return msg
 

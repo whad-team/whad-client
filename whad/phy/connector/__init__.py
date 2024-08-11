@@ -62,6 +62,7 @@ class Phy(WhadDeviceConnector):
 
         # Initialize translator
         self.translator = PhyMessageTranslator(self.hub)
+        self.format = self.hub.phy.format
 
         # Check if device supports Logitech Unifying
         if not self.device.has_domain(WhadDomain.Phy):

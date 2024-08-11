@@ -97,7 +97,7 @@ class WhadExtractApp(CommandLineApp):
                     connector.add_parameter(parameter_name, parameter_value)
 
                 connector.domain = self.args.domain
-                hub = ProtocolHub(1)
+                hub = ProtocolHub(2)
                 connector.format = hub.get(self.args.domain).format
 
                 #connector.translator = get_translator(self.args.domain)(connector.hub)

@@ -227,10 +227,8 @@ class Dot15d4(WhadDeviceConnector):
 
             # Set metadata
             packet.metadata = metadata
-
             # Send packet
             return super().send_packet(packet)
-
         else:
             return False
 

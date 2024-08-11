@@ -22,6 +22,21 @@ class Hijacker(BLE):
         if not self.can_hijack_slave() and not self.can_hijack_master():
             raise UnsupportedCapability("Hijack")
 
+    @property
+    def central(self):
+        available_actions = self.available_actions(Central)
+        if len(available_actions) == 1:
+            return available_actions[0]
+        return None
+
+
+    @property
+    def peripheral(self):
+        available_actions = self.available_actions(Peripheral)
+        if len(available_actions) == 1:
+            return available_actions[0]
+        return None
+
     def available_actions(self, filter=None):
         actions = []
         if self.__status:
@@ -41,14 +56,11 @@ class Hijacker(BLE):
                 pseudo_connection.init_addr_type = 0
                 pseudo_connection.advertiser = b"\x00\x00\x00\x00\x00\x00"
                 pseudo_connection.adv_addr_type = 0
-                with open("lightbulb2.json", "r") as f:
-                    data = f.read()
 
                 actions.append(
                     Peripheral(
                         self.device,
-                        existing_connection = pseudo_connection,
-                        profile = GenericProfile(from_json=data)
+                        existing_connection = pseudo_connection
                     )
                 )
         return [action for action in actions if filter is None or isinstance(action, filter)]

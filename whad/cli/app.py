@@ -611,9 +611,9 @@ class CommandLineApp(ArgumentParser):
         """Display an error message in red (if color is enabled)
         """
         try:
-            print_formatted_text(HTML('<ansired>[!] <b>%s</b></ansired>' % message))
-        except:
-            print_formatted_text(HTML('<ansired>[!] <b>an unknown error occured</b></ansired>'))
+            print_formatted_text(HTML('<ansired>[!] <b>{message}</b></ansired>').format(message=message))
+        except Exception as err:
+            logger.error('[!] an unknown error occured: %s',err)
 
 
 class CommandLineSource(CommandLineApp):

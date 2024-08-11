@@ -189,6 +189,13 @@ class WhadSniffApp(CommandLineApp):
                             'metadata':self.args.metadata,
                             'domain': self.args.domain
                         }))
+
+                        while not unix_server.device.opened:
+                            if unix_server.device.timedout:
+                                return
+                            else:
+                                sleep(0.1)
+
                         # Create our packet bridge
                         logger.info("[wsniff] Starting our output pipe")
                         output_pipe = WhadSniffOutputPipe(sniffer, unix_server)

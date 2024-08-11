@@ -192,7 +192,11 @@ class CommunicatingDevicesDB(object):
         :type   filter_addr:    str
         """
         address = ESBAddress(packet.metadata.address)
-        pdu = packet[ESB_Payload_Hdr:]
+        if ESB_Payload_Hdr in packet:
+            pdu = packet[ESB_Payload_Hdr:]
+        else:
+            pdu = ESB_Payload_Hdr()
+
         channel = packet.metadata.channel
         if ESB_Ack_Response in pdu or len(bytes(pdu)) == 0:
             role = ESBRole.PRX

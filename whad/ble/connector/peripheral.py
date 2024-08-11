@@ -102,18 +102,18 @@ class Peripheral(BLE):
                 logger.info('Set BD address to %s' % bd_address)
                 self.set_bd_address(bd_address, public=public)
 
-            # Enable peripheral mode
-            logger.info('Enable peripheral mode with advertising data: %s' % adv_data)
-            self.enable_peripheral_mode(adv_data, scan_data)
-
             # If an existing connection is hijacked, simulate a connection
             if existing_connection is not None:
                 self.on_connected(existing_connection)
+            else:    
+                # Enable peripheral mode
+                logger.info('Enable peripheral mode with advertising data: %s' % adv_data)
+                self.enable_peripheral_mode(adv_data, scan_data)
 
     @property
     def local_peer(self):
         return self.__local_peer
-    
+
     @property
     def remote_peer(self):
         return self.__remote_peer

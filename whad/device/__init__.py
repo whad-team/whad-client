@@ -973,7 +973,7 @@ class WhadDevice(object):
         self.__tx_lock = Lock()
 
         # Protocol hub
-        self.__hub = ProtocolHub(1)
+        self.__hub = ProtocolHub(2)
 
     @property
     def hub(self):

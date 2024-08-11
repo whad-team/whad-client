@@ -248,7 +248,7 @@ class WhadFilterApp(CommandLineApp):
                 connector = UnixConnector(interface)
 
                 connector.domain = self.args.domain
-                hub = ProtocolHub(1)
+                hub = ProtocolHub(2)
                 connector.format = hub.get(self.args.domain).format
 
                 #connector.translator = get_translator(self.args.domain)(connector.hub)
@@ -260,6 +260,13 @@ class WhadFilterApp(CommandLineApp):
                         'format': self.args.format,
                         'metadata' : self.args.metadata
                     }))
+
+
+                    while not unix_server.device.opened:
+                        if unix_server.device.timedout:
+                            return
+                        else:
+                            sleep(0.1)
                     # Create our packet bridge
                     logger.info("[wfilter] Starting our output pipe")
                     output_pipe = WhadFilterPipe(connector, unix_server, self.on_rx_packet, self.on_tx_packet)

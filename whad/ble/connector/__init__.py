@@ -717,7 +717,7 @@ class BLE(WhadDeviceConnector):
         """
         logger.debug('[BLE connector] on_packet')
         # discard processed packets or if we're not ready
-        if packet.metadata.processed or not self.__ready:
+        if hasattr(packet, "processed") and packet.metadata.processed or not self.__ready:
             return
 
         if BTLE_ADV in packet:
