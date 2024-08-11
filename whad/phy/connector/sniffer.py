@@ -27,8 +27,6 @@ class Sniffer(Phy, EventsManager):
 
         self.__configuration = SnifferConfiguration()
 
-        self.__packet_queue = Queue()
-
         # Check if device can perform sniffing
         if not self.can_sniff():
             raise UnsupportedCapability("Sniff")
@@ -98,11 +96,6 @@ class Sniffer(Phy, EventsManager):
     def available_actions(self, filter=None):
         actions = []
         return [action for action in actions if filter is None or isinstance(action, filter)]
-
-    def on_packet(self, packet):
-        '''Called whenever a packet is received.
-        '''
-        self.__packet_queue.put(packet)
 
     def sniff(self):
         try:

@@ -533,6 +533,7 @@ class PhyDomain(Registry):
         if timestamp is not None:
             msg.timestamp = timestamp
 
+        # Add modulation parameters
         if syncword is not None:
             msg.syncword = syncword
         if datarate is not None:
@@ -548,7 +549,10 @@ class PhyDomain(Registry):
         return msg
 
     def create_raw_packet_received(self, frequency: int, packet: bytes, rssi: int = None, \
-                             timestamp: int = None, iq: List[int] = None) -> HubMessage:
+                             timestamp: int = None, iq: List[int] = None, \
+                             syncword : bytes = None, datarate : int = None, \
+                             deviation : int = None, modulation : Modulation = None, \
+                             endianness : Endianness = None) -> HubMessage:
         """Create a RawPacketReceived notification message
 
         :param frequency: Frequency on which the packet has been received
@@ -574,6 +578,18 @@ class PhyDomain(Registry):
         if iq is not None:
             for sample in iq:
                 msg.iq.append(sample)
+
+        # Add modulation parameters
+        if syncword is not None:
+            msg.syncword = syncword
+        if datarate is not None:
+            msg.datarate = datarate
+        if deviation is not None:
+            msg.deviation = deviation
+        if endianness is not None:
+            msg.endian = endianness
+        if modulation is not None:
+            msg.modulation = modulation
 
         # Success
         return msg
