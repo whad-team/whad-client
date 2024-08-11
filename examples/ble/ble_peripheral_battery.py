@@ -1,17 +1,17 @@
-from struct import pack, unpack
-from time import sleep
+"""
+Example of an emulated BLE peripheral exposing a Battery service with a
+single characteristic (battery level).
+
+Each time the battery level characteristic value is read, this level decreases
+by 10%.
+"""
+
 from whad.device import WhadDevice
 from whad.ble import Peripheral
 from whad.ble.profile.advdata import AdvCompleteLocalName, \
                                      AdvDataFieldList, AdvFlagsField
-from whad.ble.profile.attribute import UUID
 from whad.ble.profile.services import BatteryService
-from whad.ble.profile import PrimaryService, Characteristic
-from whad.ble.profile import read, written, subscribed, GenericProfile
-from whad.ble.stack.smp import Pairing, IOCAP_NOINPUT_NOOUTPUT, CryptographicDatabase
-
-
-NAME = 'WHAD BLE Peripheral Guess Demo'
+from whad.ble.profile import read, GenericProfile
 
 class BatteryDevice(GenericProfile, BatteryService):
     """Device exposing a battery service
