@@ -10,7 +10,7 @@ testpaths = [
 
 [project]
 name = "whad"
-version = "1.0.2"
+version = "1.1.0"
 authors = [
     { name="Damien CAUQUIL" },
     { name="Romain CAYRE" },
