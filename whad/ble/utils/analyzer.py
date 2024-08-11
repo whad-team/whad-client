@@ -29,14 +29,14 @@ class PeripheralInformation(TrafficAnalyzer):
             return {
                 "adv_data" : self.adv_data,
                 "bd_addr" : str(self.address),
-                "addr_type" : self.address.type
+                "addr_type" : self.address.type if self.address is not None else None
             }
         else:
             return {
                 "adv_data" : self.adv_data,
                 "scan_rsp" : self.scan_rsp,
                 "bd_addr" : str(self.address),
-                "addr_type" : self.address.type
+                "addr_type" : self.address.type if self.address is not None else None
             }
     def process_packet(self, packet):
         if BTLE_ADV_IND in packet:
