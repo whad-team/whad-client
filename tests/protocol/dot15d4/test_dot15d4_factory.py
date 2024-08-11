@@ -49,7 +49,7 @@ class TestDot15d4DomainFactory(object):
     def test_energy_detect_mode(self, factory: Dot15d4Domain):
         """Test creation of EnergyDetectionMode message
         """
-        msg = factory.create_energy_dectection_mode(26)
+        msg = factory.create_energy_detection_mode(26)
         assert isinstance(msg, EnergyDetectionMode)
         assert msg.channel == 26
 
