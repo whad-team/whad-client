@@ -155,7 +155,12 @@ class EsbDomain(Registry):
         the appropriate header and the timestamp in microseconds.
         """
         if ESB_Hdr not in packet:
-            packet = ESB_Hdr(address=None)/packet
+            if hasattr(packet, "metadata") and hasattr(packet.metadata, "address"):
+                address = packet.metadata.address
+            else:
+                address = "11:22:33:44:55"
+
+            packet = ESB_Hdr(address = address)/packet
 
         packet.preamble = 0xAA # force a rebuild
         formatted_packet = ESB_Pseudo_Packet(bytes(packet))

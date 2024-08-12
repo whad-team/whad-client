@@ -6,6 +6,7 @@ which can be used to access a device remotely.
 import os
 import logging
 import time
+import traceback
 from argparse import ArgumentParser, Namespace
 
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, UnsupportedCapability
@@ -274,6 +275,7 @@ class WhadInjectApp(CommandLineApp):
                                 injector.inject(packet)
                             except Exception as e:
                                 self.error("Error during injection: " + repr(e))
+                                traceback.print_exc()
                             self.provided_count-=1
                 else:
                     self.error("You need to specify a domain.")

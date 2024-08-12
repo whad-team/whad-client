@@ -443,8 +443,10 @@ class WhadDeviceConnector(object):
 
         # Convert packet into the corresponding message
         msg = self.hub.convert_packet(packet)
+
         if msg is not None:
             resp = self.send_command(msg, message_filter(CommandResult))
+            print(isinstance(resp, Success))
             logger.info('[connector] Command sent, result: %s' % resp)
             if resp is None:
                 raise WhadDeviceDisconnected()

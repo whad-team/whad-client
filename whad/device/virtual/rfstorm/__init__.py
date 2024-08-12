@@ -6,6 +6,7 @@ from whad.device.virtual.rfstorm.constants import RFStormId, RFStormCommands, \
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.esb import Commands as EsbCommands
 from whad.hub.phy import Commands as PhyCommands
+from whad.esb.esbaddr import ESBAddress
 from whad.hub.unifying import Commands as UniCommands
 from whad import WhadCapability, WhadDomain
 from whad.phy import Endianness
@@ -195,7 +196,6 @@ class RFStormDevice(VirtualDevice):
             return False
         response = self._rfstorm_read_response()
         self.__lock.release()
-        #print(">", response, command)
         if not no_response:
             return response
         else:
@@ -329,10 +329,10 @@ class RFStormDevice(VirtualDevice):
         msg = self.hub.esb.create_pdu_received(
             self.__channel,
             pdu,
-            address=address
+            address=ESBAddress(address)
         )
 
-        # Set timestamp if provided 
+        # Set timestamp if provided
         if timestamp is not None:
             msg.timestamp = timestamp
 
@@ -343,10 +343,10 @@ class RFStormDevice(VirtualDevice):
         msg = self.hub.unifying.create_pdu_received(
             self.__channel,
             pdu,
-            address=address
+            address=ESBAddress(address)
         )
 
-        # Set timestamp if provided 
+        # Set timestamp if provided
         if timestamp is not None:
             msg.timestamp = timestamp
 
@@ -444,11 +444,13 @@ class RFStormDevice(VirtualDevice):
         else:
             channel = message.channel if message.channel != 0xFF else self.__channel
             pdu = message.pdu
-            retransmission_count = message.retransmission_count
+            retransmission_count = message.retr_count
             if self.__acking:
                 self.__ack_payload = pdu
             else:
                 ack = self._rfstorm_transmit_payload(pdu, retransmits=retransmission_count)
+                self._send_whad_command_result(CommandResult.SUCCESS)
+
                 if self.__check_ack:
                     if ack:
                         self._send_whad_pdu(b"", address=self.__address)
@@ -521,7 +523,7 @@ class RFStormDevice(VirtualDevice):
             self._send_whad_command_result(CommandResult.SUCCESS)
         else:
             channel = message.channel
-            show_acknowledgements = message.show_acknowledgements
+            show_acknowledgements = message.show_acks
             address = message.address
             self.__ptx = False
             self.__channel = channel
