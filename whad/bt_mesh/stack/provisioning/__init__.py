@@ -126,10 +126,11 @@ class ProvisioningLayer(Layer):
     @instance("gen_prov")
     def on_packet_received(self, source, packet):
         """Process incoming packets from the Generic Provisioning Layer"""
-        packet_type = type(packet[1])
+        packet_type = type(packet.message)
         if packet_type not in self._handlers:
             raise UnknownProvisioningPacketTypeError(packet_type)
-        self._handlers[packet_type](packet[1])
+        packet.message.show()
+        self._handlers[packet_type](packet.message)
 
         # All handlers except Failed return errors here since we are in the generic layer. Needs implement in Provisioner/Device classes.
 
@@ -153,17 +154,17 @@ class ProvisioningLayer(Layer):
         pub_key_x = packet.public_key_x
         pub_key_y = packet.public_key_y
 
-        self.crypto_manager.add_peer_public_key(pub_key_x, pub_key_y)
+        self.state.crypto_manager.add_peer_public_key(pub_key_x, pub_key_y)
 
         # compute ECDH secret
-        self.crypto_manager.compute_ecdh_secret()
+        self.state.crypto_manager.compute_ecdh_secret()
 
         # compute Confirmation Salt, and confirmation key, and generate random value
-        self.crypto_manager.compute_confirmation_salt(
+        self.state.crypto_manager.compute_confirmation_salt(
             self.state.invite_pdu, self.state.capabilities_pdu, self.state.start_pdu
         )
-        self.crypto_manager.compute_confirmation_key()
-        self.crypto_manager.generate_random()
+        self.state.crypto_manager.compute_confirmation_key()
+        self.state.crypto_manager.generate_random()
 
     def on_input_complete(self, packet):
         self.send_error_response(0x07)
@@ -249,29 +250,13 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
             alg=_ALGS_FLAGS[params["algorithms"]]
         )
         # generate keys
-        self.state.crypto_manager.generate_p256_keypair()
-
-        # Size of coordinates in bytes depends on algorthim used
-        if params["algorithms"] == 0b01:
-            size_coord = 16
-        elif params["algorithms"] == 0b10:
-            size_coord = 32
+        self.state.crypto_manager.generate_keypair()
 
         # Send our public key to device
         self.send_to_gen_prov(
             BTMesh_Provisioning_Public_Key(
-                public_key_x=self.state.crypto_manager.public_key_coord_provisioner[
-                    0
-                ].to_bytes(
-                    size_coord,
-                    "big",
-                ),
-                public_key_y=self.state.crypto_manager.public_key_coord_provisioner[
-                    1
-                ].to_bytes(
-                    size_coord,
-                    "big",
-                ),
+                public_key_x=self.state.crypto_manager.public_key_coord_provisioner[0],
+                public_key_y=self.state.crypto_manager.public_key_coord_provisioner[1],
             )
         )
 
@@ -322,6 +307,23 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
             != self.state.crypto_manager.confirmation_device
         ):
             raise InvalidConfirmationError
+
+        # Compute session nonce and and key
+        self.state.crypto_manager.compute_provisioning_salt()
+        self.state.crypto_manager.compute_session_key()
+        self.state.crypto_manager.compute_session_nonce()
+
+        # encrypt Provisioning Data payload
+        plaintext = bytes.fromhex("efb2255e6422d330088e09bb015ed707056700010203040b0c")
+        print(plaintext)
+        cipher, mic = self.state.crypto_manager.encrypt(plaintext)
+
+        # send provisioning Data to provisionee
+        self.send_to_gen_prov(
+            BTMesh_Provisioning_Data(
+                encrypted_provisioning_data=cipher, provisioning_data_mic=mic
+            )
+        )
 
 
 class ProvisioningLayerDevice(ProvisioningLayer):
@@ -376,24 +378,14 @@ class ProvisioningLayerDevice(ProvisioningLayer):
         :type packet: [TODO:type]
         """
 
-        self.state.crypto_manager.add_peer_public_key(
-            packet.public_key_x, packet.public_key_y
-        )
-        self.state.crypto_manager.generate_p256_keypair()
+        self.state.crypto_manager.generate_keypair()
+
+        super().on_public_key(packet)
+
         self.send_to_gen_prov(
             BTMesh_Provisioning_Public_Key(
-                public_key_x=self.state.crypto_manager.public_key_coord_devicd[
-                    0
-                ].to_bytes(
-                    len(self.state.crypto_manager.public_key_coord_device[0]),
-                    "big",
-                ),
-                public_key_y=self.state.crypto_manager.public_key_coord_device[
-                    1
-                ].to_bytes(
-                    len(self.state.crypto_manager.public_key_coord_device[1]),
-                    "big",
-                ),
+                public_key_x=self.state.crypto_manager.public_key_coord_device[0],
+                public_key_y=self.state.crypto_manager.public_key_coord_device[1],
             )
         )
 
@@ -404,9 +396,11 @@ class ProvisioningLayerDevice(ProvisioningLayer):
         :param packet: [TODO:description]
         :type packet: [TODO:type]
         """
-        self.crypto_manager.received_confirmation_provisioner = packet.confirmation
+        self.state.crypto_manager.received_confirmation_provisioner = (
+            packet.confirmation
+        )
 
-        self.crypto_manager.compute_confirmation_device()
+        self.state.crypto_manager.compute_confirmation_device()
         self.send_to_gen_prov(
             BTMesh_Provisioning_Confirmation(
                 confirmation=self.state.crypto_manager.confirmation_device
@@ -437,3 +431,23 @@ class ProvisioningLayerDevice(ProvisioningLayer):
         self.send_to_gen_prov(
             BTMesh_Provisioning_Random(self.state.crypto_manager.rand_device)
         )
+
+    def on_data(self, packet):
+        """
+        Process a Provisioning Data sent by the provisioner. Decypher it and stores the keys
+
+        :param packet: [TODO:description]
+        :type packet: [TODO:type]
+        """
+
+        # Compute session key and nonce first
+        self.state.crypto_manager.compute_provisioning_salt()
+        self.state.crypto_manager.compute_session_key()
+        self.state.crypto_manager.compute_session_nonce()
+
+        # Get fields from packet
+        cipher = packet.encrypted_provisioning_data
+        mic = packet.provisioning_data_mic
+
+        plaintext, verify = self.state.crypto_manager.decrypt(cipher, mic)
+        print(plaintext)

@@ -179,7 +179,9 @@ _BTM_ECDH_P256_HMAC_SHA256_AES_CCM_values = dict(
     test_input=dict(
         alg="BTM_ECDH_P256_HMAC_SHA256_AES_CCM",
         private_key_provisioner=None,
-        private_key_device=bytes.fromhex("529aa0670d72cd6497502ed473502b037e8803b5c60829a5a3caa219505530ba"),
+        private_key_device=bytes.fromhex(
+            "529aa0670d72cd6497502ed473502b037e8803b5c60829a5a3caa219505530ba"
+        ),
         public_key_coord_device=(
             bytes.fromhex(
                 "f465e43ff23d3f1b9dc7dfc04da8758184dbc966204796eccf0d6cf5e16500cc"
@@ -196,9 +198,15 @@ _BTM_ECDH_P256_HMAC_SHA256_AES_CCM_values = dict(
                 "919512183898dfbecd52e2408e43871fd021109117bd3ed4eaf8437743715d4f"
             ),
         ),
-        rand_provisioner=bytes.fromhex("36f968b94a13000e64b223576390db6bcc6d62f02617c369ee3f5b3e89df7e1f"),
-        rand_device=bytes.fromhex("5b9b1fc6a64b2de8bece53187ee989c6566db1fc7dc8580a73dafdd6211d56a5"),
-        auth_value=bytes.fromhex("906d73a3c7a7cb3ff730dca68a46b9c18d673f50e078202311473ebbe253669f"),
+        rand_provisioner=bytes.fromhex(
+            "36f968b94a13000e64b223576390db6bcc6d62f02617c369ee3f5b3e89df7e1f"
+        ),
+        rand_device=bytes.fromhex(
+            "5b9b1fc6a64b2de8bece53187ee989c6566db1fc7dc8580a73dafdd6211d56a5"
+        ),
+        auth_value=bytes.fromhex(
+            "906d73a3c7a7cb3ff730dca68a46b9c18d673f50e078202311473ebbe253669f"
+        ),
     ),
     test_pdu_values=dict(
         provisioning_invite_pdu=bytes.fromhex("00"),
@@ -209,10 +217,18 @@ _BTM_ECDH_P256_HMAC_SHA256_AES_CCM_values = dict(
         ecdh_secret=bytes.fromhex(
             "ab85843a2f6d883f62e5684b38e307335fe6e1945ecd19604105c6f23221eb69"
         ),
-        confirmation_salt=bytes.fromhex("a71141ba8cb6b40f4f52b622e1c091614c73fc308f871b78ca775e769bc3ae69"),
-        confirmation_key=bytes.fromhex("210c3c448152e8d59ef742aa7d22ee5ba59a38648bda6bf05c74f3e46fc2c0bb"),
-        confirmation_provisioner=bytes.fromhex("c99b54617ae646f5f32cf7e1ea6fcc49fd69066078eba9580fa6c7031833e6c8"),
-        confirmation_device=bytes.fromhex("56e3722d291373d38c995d6f942c02928c96abb015c233557d7974b6e2df662b"),
+        confirmation_salt=bytes.fromhex(
+            "a71141ba8cb6b40f4f52b622e1c091614c73fc308f871b78ca775e769bc3ae69"
+        ),
+        confirmation_key=bytes.fromhex(
+            "210c3c448152e8d59ef742aa7d22ee5ba59a38648bda6bf05c74f3e46fc2c0bb"
+        ),
+        confirmation_provisioner=bytes.fromhex(
+            "c99b54617ae646f5f32cf7e1ea6fcc49fd69066078eba9580fa6c7031833e6c8"
+        ),
+        confirmation_device=bytes.fromhex(
+            "56e3722d291373d38c995d6f942c02928c96abb015c233557d7974b6e2df662b"
+        ),
         provisioning_salt=bytes.fromhex("d1cb10ad8d51286067e348fc4b692122"),
         session_key=bytes.fromhex("df4a494da3d45405e402f1d6a6cea338"),
         session_nonce=bytes.fromhex("11b987db2ae41fbb9e96b80446"),
@@ -224,9 +240,13 @@ _BTM_ECDH_P256_HMAC_SHA256_AES_CCM_values = dict(
 )
 
 
-
-
-@pytest.fixture(scope="class", params=[_BTM_ECDH_P256_CMAC_AES128_AES_CCM_values, _BTM_ECDH_P256_HMAC_SHA256_AES_CCM_values])
+@pytest.fixture(
+    scope="class",
+    params=[
+        _BTM_ECDH_P256_CMAC_AES128_AES_CCM_values,
+        _BTM_ECDH_P256_HMAC_SHA256_AES_CCM_values,
+    ],
+)
 def crypto_manager_setup(request):
     test_values = request.param
     test_input = test_values["test_input"]
@@ -255,13 +275,15 @@ class TestProvisioningBearerAdvCryptoManager(object):
     def test_confirmation_provisioner(self, crypto_manager_setup):
         crypto_manager, expected = crypto_manager_setup
         crypto_manager.compute_confirmation_provisioner()
-        assert crypto_manager.confirmation_provisioner == expected["confirmation_provisioner"]
+        assert (
+            crypto_manager.confirmation_provisioner
+            == expected["confirmation_provisioner"]
+        )
 
     def test_confirmation_device(self, crypto_manager_setup):
         crypto_manager, expected = crypto_manager_setup
         crypto_manager.compute_confirmation_device()
         assert crypto_manager.confirmation_device == expected["confirmation_device"]
-
 
     def test_provisioning_salt(self, crypto_manager_setup):
         crypto_manager, expected = crypto_manager_setup
@@ -280,10 +302,12 @@ class TestProvisioningBearerAdvCryptoManager(object):
 
     def test_decrypt(self, crypto_manager_setup):
         crypto_manager, expected = crypto_manager_setup
-        cipher = expected["cipher"]
-        assert crypto_manager.decrypt(cipher) == (expected["plaintext"], True)
+        cipher = expected["cipher"][:-8]
+        mic = expected["cipher"][-8:]
+        assert crypto_manager.decrypt(cipher, mic) == (expected["plaintext"], True)
 
     def test_encrypt(self, crypto_manager_setup):
         crypto_manager, expected = crypto_manager_setup
         plaintext = expected["plaintext"]
-        assert crypto_manager.encrypt(plaintext) == expected["cipher"]
+        cipher, mic = crypto_manager.encrypt(plaintext)
+        assert cipher + mic == expected["cipher"]

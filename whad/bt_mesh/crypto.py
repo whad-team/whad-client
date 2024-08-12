@@ -147,6 +147,11 @@ class ProvisioningBearerAdvCryptoManager:
         self.confirmation_provisioner = None
         self.confirmation_device = None
 
+        if alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
+            self.key_coord_size = 16
+        elif alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
+            self.key_coord_size = 32
+
         # if in test mode, we directly compute the ecdh secret
         if test:
             self.compute_ecdh_secret()
@@ -199,6 +204,7 @@ class ProvisioningBearerAdvCryptoManager:
         Computes the Confirmation Salt, defined in Mesh Protocol Specification, p. 593, Section 5.4.2.4.1
         pub_keys are concat of x and y coordinates
         """
+
         confirmation_inputs = (
             provisioning_invite_pdu
             + provisioning_capabilities_pdu
@@ -277,27 +283,25 @@ class ProvisioningBearerAdvCryptoManager:
         """
         self.session_nonce = k1(self.ecdh_secret, self.provisioning_salt, b"prsn")[-13:]
 
-    def encrypt(self, payload):
+    def encrypt(self, plaintext):
         """
         Encrypts the Provisioning Data, process defined in Mesh Protocol Specification, p. 603, Section 5.4.2.5
         """
         aes_ccm = AES.new(
             self.session_key, AES.MODE_CCM, nonce=self.session_nonce, mac_len=8
         )
-        cipher = aes_ccm.encrypt(payload)
+        cipher = aes_ccm.encrypt(plaintext)
         mic = aes_ccm.digest()
-        return cipher + mic
+        return cipher, mic
 
-    def decrypt(self, payload):
+    def decrypt(self, cipher, mic):
         """
         Encrypts the Provisioning Data, process defined in Mesh Protocol Specification, p. 603, Section 5.4.2.5
         """
         aes_ccm = AES.new(
             self.session_key, AES.MODE_CCM, nonce=self.session_nonce, mac_len=8
         )
-        cipher = payload[:-8]
         plaintext = aes_ccm.decrypt(cipher)
-        mic = payload[-8:]
         try:
             aes_ccm.verify(mic)
             return (plaintext, True)
@@ -312,14 +316,16 @@ class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoM
         self.public_key_provisioner = None
         self.received_confirmation_device = None
 
-    def generate_p256_keypair(self):
+    def generate_keypair(self):
         """Generate the P256 private key / public key"""
         self.private_key_provisioner, self.public_key_provisioner = (
             generate_p256_keypair()
         )
-        # Get coordinates format for the Provisioning Packets
         public_key_numbers = self.public_key_provisioner.public_numbers()
-        self.public_key_coord_provisioner = (public_key_numbers.x, public_key_numbers.y)
+        self.public_key_coord_provisioner = (
+            public_key_numbers.x.to_bytes(self.key_coord_size, "big"),
+            public_key_numbers.y.to_bytes(self.key_coord_size, "big"),
+        )
 
     def compute_ecdh_secret(self):
         """
@@ -331,10 +337,11 @@ class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoM
 
     def add_peer_public_key(self, public_key_x, public_key_y):
         self.public_key_device = generate_public_key_from_coordinates(
-            int.from_bytes(self.public_key_coord_device[0], "big"),
             int.from_bytes(public_key_x, "big"),
-            int.from_bytes(public_key_y),
+            int.from_bytes(public_key_y, "big"),
         )
+
+        self.public_key_coord_device = (public_key_x, public_key_y)
 
     def generate_random(self):
         """
@@ -354,13 +361,16 @@ class ProvisioningBearerAdvCryptoManagerDevice(ProvisioningBearerAdvCryptoManage
         self.public_key_provisioner = None
         self.received_confirmation_provisioner = None
 
-    def generate_p256_keypair(self):
+    def generate_keypair(self):
         """Generate the P256 private key / public key"""
         self.private_key_device, self.public_key_device = generate_p256_keypair()
 
         # Get coordinates format for the Provisioning Packets
         public_key_numbers = self.public_key_device.public_numbers()
-        self.public_key_coord_device = (public_key_numbers.x, public_key_numbers.y)
+        self.public_key_coord_device = (
+            public_key_numbers.x.to_bytes(self.key_coord_size, "big"),
+            public_key_numbers.y.to_bytes(self.key_coord_size, "big"),
+        )
 
     def compute_ecdh_secret(self):
         """
@@ -372,10 +382,11 @@ class ProvisioningBearerAdvCryptoManagerDevice(ProvisioningBearerAdvCryptoManage
 
     def add_peer_public_key(self, public_key_x, public_key_y):
         self.public_key_provisioner = generate_public_key_from_coordinates(
-            int.from_bytes(self.public_key_coord_device[0], "big"),
             int.from_bytes(public_key_x, "big"),
-            int.from_bytes(public_key_y),
+            int.from_bytes(public_key_y, "big"),
         )
+
+        self.public_key_coord_provisioner = (public_key_x, public_key_y)
 
     def generate_random(self):
         """

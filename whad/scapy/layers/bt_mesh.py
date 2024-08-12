@@ -26,9 +26,10 @@ from scapy.fields import (
     MultipleTypeField,
     LenField,
     XNBytesField,
+    StrLenField,
 )
 from scapy.layers.bluetooth import EIR_Element, EIR_Hdr, EIR_Raw
-from scapy.all import Raw
+from scapy.all import Raw, raw, RawVal
 
 MESSAGE_MODEL_OPCODES = {
     0x8201: "Generic_OnOff_Get",
@@ -230,6 +231,30 @@ MESSAGE_MODEL_OPCODES = {
 }
 
 
+class PublicKeyField(StrField):
+    """
+    Custom field type to have the x and y coordinates of the public key (Provisioning) stored.
+    Automatically split the payload in 2 equal parts since x and y are the same size, but we cannot know in advance 16 or 32 bytes.
+    """
+
+    def __init__(self, name, default):
+        super(PublicKeyField, self).__init__(name, default)
+        print("coucou")
+
+    def getfield(self, pkt, s):
+        # Determine the length of each field
+        length = len(s) // 2
+        if length > 0 and len(s) >= length * 2:
+            # If there's enough data, split it in half
+            return s[length:], (s[:length], s[length : length * 2])
+        # If not enough data or if in the process of building the packet
+        return s, ("", "")
+
+    def addfield(self, pkt, s, val):
+        # When adding the field to a packet, join the two strings
+        return s + val[0] + val[1]
+
+
 """
 PROVISIONING PDU LAYER
 ================================
@@ -389,25 +414,18 @@ class BTMesh_Provisioning_Start(Packet):
 
 
 class BTMesh_Provisioning_Public_Key(Packet):
-    """
-    Public Key Provisioning Packet
-    Should have two 16 bytes values OR two 32 bytes values (depends on algorithm used)
-    """
-
     name = "Bluetooth Mesh Provisioning Public Key"
-
     fields_desc = [
-        StrField("public_key_x", None),
-        MultipleTypeField(
-            [
-                (
-                    StrFixedLenField("public_key_y", None, length=16),
-                    lambda pkt: len(pkt.public_key_x) == 16,
-                ),
-            ],
-            (StrFixedLenField("public_key_y", None, length=32)),
-        ),
+        StrLenField("public_key_x", None, length_from=lambda pkt: pkt.tmp_len // 2),
+        StrLenField("public_key_y", None, length_from=lambda pkt: pkt.tmp_len // 2),
     ]
+
+    def pre_dissect(self, s):
+        """
+        Need to compute the raw size of packet in ordrer to compute the size of fields (since its 16 or 32 bytes ...)
+        """
+        self.tmp_len = len(s)
+        return s
 
 
 class BTMesh_Provisioning_Input_Complete(Packet):
@@ -434,7 +452,7 @@ class BTMesh_Provisioning_Data(Packet):
     name = "Bluetooth Mesh Provisioning Data"
     fields_desc = [
         XStrFixedLenField("encrypted_provisioning_data", None, length=25),
-        XLongField("provisioning_data_mic", None),
+        XStrFixedLenField("provisioning_data_mic", None, length=8),
     ]
 
 

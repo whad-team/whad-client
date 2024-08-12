@@ -155,8 +155,8 @@ class GenericProvisioningLayer(ContextualLayer):
         """
         Transfer packet to the Provisioning Layer
 
-        :param packet:
-        :type packet: BTMesh_Provisioning_Hdr
+        :param packet: Provisioning packet (no header)
+        :type packet: Packet
         """
         self.send("provisioning", packet)
 
@@ -249,8 +249,12 @@ class GenericProvisioningLayer(ContextualLayer):
             prov_pkt = BTMesh_Provisioning_Hdr(
                 b"".join(self.state.current_transaction.fragments)
             )
-            prov_pkt.show()
-            self.send_to_peer(BTMesh_Generic_Provisioning_Transaction_Ack())
+
+            self.state.in_transaction = False
+            self.send_to_peer(
+                self.state.current_transaction.transaction_number,
+                BTMesh_Generic_Provisioning_Transaction_Ack(),
+            )
             self.send_to_upper_layer(prov_pkt)
             self.check_queue()
 
