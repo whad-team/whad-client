@@ -41,7 +41,7 @@ class CommandResult(HubMessage):
         """Return the CommandResult result code.
         """
         return self.__result_code
-    
+
     @result_code.setter
     def result_code(self, result_code: int):
         self.__result_code = result_code
@@ -77,7 +77,7 @@ class CommandResult(HubMessage):
 class Error(CommandResult):
     """Generic error message.
     """
-    
+
     def __init__(self, message: Message = None):
         """Create a CommandResult message with result code ERROR.
         """
@@ -121,7 +121,7 @@ class WrongMode(CommandResult):
     def __init__(self, message: Message = None):
         """Create a CommandResult message with result code WRONG_MODE.
         """
-        super().__init__(result_code=CommandResult.WRONG_MODE, message=message) 
+        super().__init__(result_code=CommandResult.WRONG_MODE, message=message)
 
 @pb_bind(Generic, 'cmd_result_unsupported_domain', 1)
 class UnsupportedDomain(CommandResult):

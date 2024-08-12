@@ -6,6 +6,7 @@ which can be used to access a device remotely.
 import os
 import logging
 import time
+import traceback
 from argparse import ArgumentParser, Namespace
 
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, UnsupportedCapability
@@ -14,6 +15,7 @@ from whad.cli.app import CommandLineApp, run_app
 from whad.device import Bridge, ProtocolHub
 from scapy.all import *
 from whad.scapy.layers.rf4ce import *
+from whad.scapy.layers.phy import *
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.tools.utils import list_implemented_injectors, get_injector_parameters, gen_option_name, build_configuration_from_args
 #from whad.unifying import Injector
@@ -273,6 +275,7 @@ class WhadInjectApp(CommandLineApp):
                                 injector.inject(packet)
                             except Exception as e:
                                 self.error("Error during injection: " + repr(e))
+                                traceback.print_exc()
                             self.provided_count-=1
                 else:
                     self.error("You need to specify a domain.")

@@ -184,8 +184,13 @@ class UniScanApp(CommandLineDeviceSink):
         print_formatted_text(HTML((
             "<ansicyan>[{channel:03d}]</ansicyan><ansicyan>[{addr}]</ansicyan> "
             "<b>{payload}</b> %s" % comment
-        )).format(channel=packet.metadata.channel, addr=str(packet.address),
-                  payload=bytes(payload).hex()))
+        )).format(channel=packet.metadata.channel,
+                    addr=str(
+                        packet.address if
+                        hasattr(packet, "address") else
+                        packet.metadata.address
+                    ),
+                    payload=bytes(payload).hex()))
 
 
 def wuni_scan_main():

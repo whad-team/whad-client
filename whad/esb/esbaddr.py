@@ -16,6 +16,8 @@ class ESBAddress(object):
                 self.__value = unhexlify(address)
             else:
                 raise InvalidESBAddressException
+        elif isinstance(address, bytes) and len(address) > 1 and len(address) <= 5:
+            self.__value = address
         else:
             raise InvalidESBAddressException
 

@@ -122,15 +122,16 @@ class Unifying(WhadDeviceConnector):
         packet.metadata.channel = tx_channel
         packet.metadata.address = tx_address
 
-        # Set packet preamble depending on address
-        if bytes.fromhex(packet.address[:2])[0] >= 0x80:
-            packet.preamble = 0xAA
-        else:
-            packet.preamble = 0x55
+        if self.support_raw_pdu():
+            # Set packet preamble depending on address
+            if bytes.fromhex(packet.address[:2])[0] >= 0x80:
+                packet.preamble = 0xAA
+            else:
+                packet.preamble = 0x55
 
         # Send packet
-        return super().send_packet(packet)
-
+        ret = super().send_packet(packet)
+        return ret
 
     def support_raw_pdu(self):
         """

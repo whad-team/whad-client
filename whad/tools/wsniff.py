@@ -159,8 +159,9 @@ class WhadSniffApp(CommandLineApp):
                     # Add an event listener to display incoming events
                     # sniffer.add_event_listener(display_event)
 
+                    sniffer.configuration = configuration
                     try:
-                        sniffer.configuration = configuration
+                        pass
                     except Exception as e:
                         self.error("Error during configuration: " +repr(e))
                         raise KeyboardInterrupt

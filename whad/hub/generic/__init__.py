@@ -22,7 +22,7 @@ class Generic(Registry):
         message_type = message.generic.WhichOneof('msg')
         message_clazz = Generic.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
-    
+
     def create_command_result(self, result_code: int) -> HubMessage:
         """Create a generic command result.
         """
@@ -51,27 +51,27 @@ class Generic(Registry):
         """Create a generic success result.
         """
         return Generic.bound('cmd_result_success', self.proto_version)()
-    
+
     def create_param_error(self) -> HubMessage:
         """Create a parameter error message.
         """
         return Generic.bound('cmd_result_param_error', self.proto_version)()
-    
+
     def create_disconnected(self) -> HubMessage:
         """Create a disconnected error message.
         """
-        return Generic.bound('cmd_result_disconnected', self.proto_version)() 
+        return Generic.bound('cmd_result_disconnected', self.proto_version)()
 
     def create_wrong_mode(self) -> HubMessage:
         """Create a wrong mode error message.
         """
         return Generic.bound('cmd_result_wrong_mode', self.proto_version)()
-    
+
     def create_unsupported_domain(self) -> HubMessage:
         """Create an unsupported domain error message.
         """
         return Generic.bound('cmd_result_unsupported_domain', self.proto_version)()
-    
+
     def create_busy(self) -> HubMessage:
         """Create a busy error message.
         """
@@ -83,14 +83,14 @@ class Generic(Registry):
         return Generic.bound('debug', self.proto_version)(
             debug_level=level, debug_msg=message
         )
-    
+
     def create_verbose(self, message: bytes) -> HubMessage:
         """Create a verbose message.
         """
         return Generic.bound('verbose', self.proto_version)(
             data=message
         )
-    
+
     def create_progress(self, value: int) -> HubMessage:
         """Create a progress message.
         """

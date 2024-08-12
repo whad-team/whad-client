@@ -42,6 +42,8 @@ class Injector(Mouse):
     def inject(self, packet):
         if hasattr(packet, "address") and packet.address != self.address:
             self.address = packet.address
+        elif hasattr(packet, "metadata") and hasattr(packet.metadata, "address"):
+            self.address = packet.metadata.address
 
         if self.__configuration.synchronize:
             if not self._synced:
