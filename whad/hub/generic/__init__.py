@@ -26,10 +26,22 @@ class Generic(Registry):
     def create_command_result(self, result_code: int) -> HubMessage:
         """Create a generic command result.
         """
-        return Generic.bound('cmd_result', self.proto_version)(
-            result_code = result_code
-        )
-    
+        # Map our result code to our dedicated methods
+        result_types = {
+            CommandResult.SUCCESS: self.create_success,
+            CommandResult.ERROR: self.create_error,
+            CommandResult.PARAMETER_ERROR: self.create_param_error,
+            CommandResult.BUSY: self.create_busy,
+            CommandResult.DISCONNECTED: self.create_disconnected,
+            CommandResult.WRONG_MODE: self.create_wrong_mode,
+        }
+
+        # Dispatch to our specific factory methods for command result.
+        if result_code in result_types:
+            return result_types[result_code]()
+        else:
+            raise ValueError()
+
     def create_error(self) -> HubMessage:
         """Create a generic error message.
         """
