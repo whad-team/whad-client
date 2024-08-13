@@ -68,8 +68,16 @@ try:
     device.configure(advertisements=True, connection=False)
     device.start()
     device.send_raw(pkt_beacon)
+    device.send_raw(pkt_beacon)
+    device.send_raw(pkt_beacon)
+    device.send_raw(pkt_beacon)
+    device.send_raw(pkt_beacon)
+    device.send_raw(pkt_beacon)
+    device.send_raw(pkt_beacon)
 
     while True:
+
+        #device.send_raw(pkt_beacon)
         device.polling_rx_packets()
         sleep(0.1)
 except ConnectionLostException as e:

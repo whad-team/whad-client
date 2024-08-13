@@ -118,6 +118,8 @@ class ProvisioningLayer(Layer):
         self.send_to_gen_prov(BTMesh_Provisioning_Failed(error_code=error_code))
 
     def send_to_gen_prov(self, packet):
+        print("#### SENDING ####")
+        packet.show()
         hdr = BTMesh_Provisioning_Hdr(
             type=PROVISIONING_TYPES[type(packet)], message=packet
         )
@@ -153,6 +155,7 @@ class ProvisioningLayer(Layer):
         """
         pub_key_x = packet.public_key_x
         pub_key_y = packet.public_key_y
+        print(pub_key_x)
 
         self.state.crypto_manager.add_peer_public_key(pub_key_x, pub_key_y)
 
@@ -314,9 +317,15 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         self.state.crypto_manager.compute_session_nonce()
 
         # encrypt Provisioning Data payload
+        # from sample data Spec p. 713
+        # ""
         plaintext = bytes.fromhex("efb2255e6422d330088e09bb015ed707056700010203040b0c")
-        print(plaintext)
         cipher, mic = self.state.crypto_manager.encrypt(plaintext)
+        print("NetworkKey = " + "efb2255e6422d330088e09bb015ed707")
+        print("KeyIndex = " + "0567")
+        print("Flags = " + "00")
+        print("IV Index = " + "01020304")
+        print("UnicastAddr = " + "0b0c")
 
         # send provisioning Data to provisionee
         self.send_to_gen_prov(
@@ -345,7 +354,7 @@ class ProvisioningLayerDevice(ProvisioningLayer):
         nb_input_oob_action = sum([
             capabilities["input_oob_action"] & 0b01 << i for i in range(5)
         ])
-        number_of_elements = nb_input_oob_action + nb_output_oob_action
+        number_of_elements = nb_input_oob_action + nb_output_oob_action + 1
 
         # store for Confirmation Inputs
         self.state.invite_pdu = raw(packet)
@@ -450,4 +459,8 @@ class ProvisioningLayerDevice(ProvisioningLayer):
         mic = packet.provisioning_data_mic
 
         plaintext, verify = self.state.crypto_manager.decrypt(cipher, mic)
-        print(plaintext)
+        print("NetworkKey = " + plaintext[:16].hex())
+        print("KeyIndex = " + plaintext[16:18].hex())
+        print("Flags = " + plaintext[18:19].hex())
+        print("IV Index = " + plaintext[19:23].hex())
+        print("UnicastAddr = " + plaintext[23:].hex())
