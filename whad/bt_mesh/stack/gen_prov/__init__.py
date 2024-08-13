@@ -6,6 +6,8 @@ Handles the creaton of a Link, acks and fragmentation for the Provisoning Layer
 
 import logging
 from queue import Queue
+from threading import Thread
+from random import uniform
 
 from whad.scapy.layers.bt_mesh import (
     BTMesh_Generic_Provisioning_Link_Ack,
@@ -29,6 +31,8 @@ from whad.bt_mesh.stack.provisioning import (
 )
 from time import sleep
 
+from whad.bt_mesh.stack.gen_prov.constants import CRC_TABLE
+
 
 logger = logging.getLogger(__name__)
 
@@ -38,22 +42,44 @@ class Transaction(object):
     Represents a transaction (one provisioning packet) currently sent OR received by the Generic Provisioning Layer.
     """
 
-    def __init__(self, transaction_number, fragments, total_nb_fragements):
+    def __init__(self, transaction_number):
         self.transaction_number = transaction_number
-        self.fragments = fragments
-        self.total_nb_fragements = total_nb_fragements
-        self.next_fragment_number = -1
+        self.fragments = []
 
-    def get_next_fragment_to_send(self):
-        """
-        When transaction in send mode
-        """
-        self.next_fragment_number += 1
-        return self.fragments.pop()
+
+class SendingTransaction(Transaction):
+    """
+    Transaction object used for the Sender (initiator that sends the Transaction Start)
+    Also used to monitor and manage Link Open packets
+    """
+
+    def __init__(self, transaction_number, packet, fcs):
+        super().__init__(transaction_number)
+
+        raw_packet = raw(packet)
+        fragments = [raw_packet[i : i + 23] for i in range(0, len(raw_packet), 23)]
+        self.fragments = fragments
+        self.total_nb_fragements = len(fragments)
+        self.fcs = fcs
+        self.sending_thread = None
+        self.is_thread_running = False
+
+
+class ReceivingTransaction(Transaction):
+    """
+    Transaction object used for the Receiver of a Transaction (receiving the Transaction Start)
+    """
+
+    def __init__(self, transaction_number, total_nb_fragements, expected_fcs):
+        super().__init__(transaction_number)
+        self.expected_fcs = expected_fcs
+
+        # Last segment index expected
+        self.total_nb_fragements = total_nb_fragements
 
     def add_fragment(self, fragement):
         """
-        When transaction in receive mode
+        When transaction in receive mode, add a received fragment
         """
         self.fragments.append(fragement)
 
@@ -81,12 +107,95 @@ class GenericProvisioningLayer(ContextualLayer):
 
         self.state.is_link_open = False
 
-        self.state.last_packet_sent = None
+        # stores the current thread sending fragments
+        self.state.sending_thread = None
 
-        self.state.expected_class = None
+        # Transaction number of last received provsioning PDU
+        self.state.last_received_transaction_number = -100000000
 
         # Simple FIFO queue for Provisioning messages. Since Provisioning Layer can send  2 packets back to back, need to make sure that all fragments/acks of first packet get there before seinding next one.
         self._queue = Queue()
+
+    def send_ack(self, transaction_number):
+        """
+        Sends one ack to the peer. Is resent when we receive again a packet from a transaction from which we have received all segments
+        """
+        self.send_to_peer(
+            transaction_number, BTMesh_Generic_Provisioning_Transaction_Ack()
+        )
+
+    def send_packet_thread(self):
+        """
+        Send each with a random delay between 20 and 50 ms (SPEC)
+        Resends the whole transaction if ack not received in 1sec, resends all.
+        Starts Ack timer of 30 seconds from the first sending. If no Ack after timer expires, closes the connexion
+        """
+        transaction_number = self.state.current_transaction.transaction_number
+        while self.state.current_transaction.is_thread_running:
+            for index in range(0, len(self.state.current_transaction.fragments)):
+                if index == 0:
+                    self.send_to_peer(
+                        transaction_number,
+                        BTMesh_Generic_Provisioning_Transaction_Start(
+                            segment_number=self.state.current_transaction.total_nb_fragements
+                            - 1,
+                            frame_check_sequence=self.state.current_transaction.fcs,
+                        )
+                        / Raw(self.state.current_transaction.fragments[index]),
+                    )
+                else:
+                    self.send_to_peer(
+                        transaction_number,
+                        BTMesh_Generic_Provisioning_Transaction_Continuation(
+                            segment_index=index,
+                            generic_provisioning_payload_fragment=self.state.current_transaction.fragments[
+                                index
+                            ],
+                        ),
+                    )
+
+                # random delay between 20 and 50 ms
+                sleep(uniform(0.02, 0.05))
+
+            sleep(1)
+
+    def send_link_open_thread(self):
+        while self.state.current_transaction.is_thread_running:
+            self.send_to_peer(
+                transaction_number=0x00,
+                packet=BTMesh_Generic_Provisioning_Link_Open(
+                    device_uuid=self.state.peer_uuid
+                ),
+            )
+            sleep(uniform(0.5, 0.9))
+
+    def create_sending_thread(self):
+        """
+        Activate thread that sends all the fragments (Start and Continuation).
+        """
+        self.state.current_transaction.is_thread_running = True
+        self.state.current_transaction.sending_thread = Thread(
+            target=self.send_packet_thread
+        )
+        self.state.current_transaction.sending_thread.start()
+
+    def create_sending_thread_link_open(self):
+        """
+        Activate thread to send Link Open packets
+        """
+        self.state.current_transaction.is_thread_running = True
+        self.state.current_transaction.sending_thread = Thread(
+            target=self.send_link_open_thread
+        )
+        self.state.current_transaction.sending_thread.start()
+
+    def stop_sending_thread(self):
+        """
+        Stops the thead sending the packet for the current transaction.
+        """
+        if self.state.current_transaction is not None:
+            self.state.current_transaction.is_thread_running = False
+            self.state.current_transaction.sending_thread.join()
 
     @source("provisioning")
     def on_provisioning_packet(self, packet):
@@ -107,33 +216,6 @@ class GenericProvisioningLayer(ContextualLayer):
     @source("pb_adv")
     def on_pb_adv_packet(self, message: GenericProvisioningMessage):
         pkt = message.gen_prov_pkt
-        transaction_number = message.transaction_number
-        if isinstance(pkt, BTMesh_Generic_Provisioning_Link_Close):
-            self._handlers[BTMesh_Generic_Provisioning_Link_Close](message)
-            return
-
-        if self.state.expected_class is None or not isinstance(
-            pkt, self.state.expected_class
-        ):
-            logger.warning(
-                "Unexpected pkt received in Generic Provisoning Layer RECEIVED : %s EXPECTED : %s TRANSACTION_NB :  %d"
-                % (
-                    pkt.__class__.__name__,
-                    self.state.expected_class,
-                    transaction_number,
-                )
-            )
-            raise UnexepectedGenericProvisioningPacketError(type(pkt))
-        if (
-            self.state.current_transaction is not None
-            and self.state.current_transaction.transaction_number != transaction_number
-        ):
-            logger.warning(
-                "Unexpected transaction number for pkt received in Generic Provisoning Layer %s %d"
-                % (pkt.__class__.__name__, transaction_number)
-            )
-            raise UnexepectedGenericProvisioningPacketError(type(pkt))
-
         # if we get here, we have the packet we were waiting for
         self._handlers[type(pkt)](message)
 
@@ -146,10 +228,8 @@ class GenericProvisioningLayer(ContextualLayer):
         :param packet: [TODO:description]
         :type packet: [TODO:type]
         """
-        sleep(0.01)
         message = GenericProvisioningMessage(packet, transaction_number)
         self.send("pb_adv", message)
-        self.state.last_packet_sent = packet
 
     def send_to_upper_layer(self, packet):
         """
@@ -168,8 +248,6 @@ class GenericProvisioningLayer(ContextualLayer):
             return
         if not self._queue.empty():
             self.process_provisioning_packet(self._queue.get_nowait())
-        else:
-            self.state.expected_class = BTMesh_Generic_Provisioning_Transaction_Start
 
     def open_link(self):
         """
@@ -189,9 +267,26 @@ class GenericProvisioningLayer(ContextualLayer):
         self.state.is_link_open = False
 
     def on_transaction_start(self, message):
-        self.state.in_transaction = True
         pkt = message.gen_prov_pkt
         transaction_number = message.transaction_number
+
+        # if we receive a Start from a previous finished Transaction, send ack again
+        if transaction_number <= self.state.last_received_transaction_number:
+            self.send_ack(transaction_number)
+            return
+
+        # ignore packet if already in a transaction otherwise
+        if self.state.in_transaction:
+            return
+
+        self.state.in_transaction = True
+
+        # Create Transaction object for this transaction
+        self.state.current_transaction = ReceivingTransaction(
+            transaction_number=transaction_number,
+            total_nb_fragements=pkt.segment_number,
+            expected_fcs=pkt.frame_check_sequence,
+        )
 
         # only one fragment, send to upper layer and send ack if all good
         if pkt.segment_number == 0:
@@ -201,41 +296,46 @@ class GenericProvisioningLayer(ContextualLayer):
                 logger.error("Missing upper layer in Transaction Start packet")
                 pkt.show()
 
-            # check FCS
-            fcs = self.compute_frame_check_sequence(raw(prov_packet))
+            # check FCS (we dont use the Hdr)
+            fcs = self.compute_fcs(raw(prov_packet))
+            prov_packet.show()
 
             if fcs != pkt.frame_check_sequence:
                 raise InvalidFrameCheckSequenceError
 
             # Send ack since only one fragment
-            self.state.in_transaction = False
-            self.send_to_peer(
-                transaction_number, BTMesh_Generic_Provisioning_Transaction_Ack()
+            self.state.last_received_transaction_number = (
+                self.state.current_transaction.transaction_number
             )
+            self.state.in_transaction = False
+            self.send_ack(transaction_number)
             self.send_to_upper_layer(prov_packet)
 
+        # if more fragmentx expected, add the first one to the list
         else:
-            # Create Transaction object to follow next fragments sent
-            self.state.current_transaction = Transaction(
-                transaction_number=transaction_number,
-                fragments=[pkt.getlayer(Raw).load],
-                total_nb_fragements=pkt.segment_number,
-            )
-            self.state.expected_class = (
-                BTMesh_Generic_Provisioning_Transaction_Continuation
-            )
+            self.state.current_transaction.add_fragment(pkt.getlayer(Raw).load)
 
     def on_transaction_continuation(self, message):
         pkt = message.gen_prov_pkt
+        transaction_number = message.transaction_number
+
+        # if we receive a Continuation for an already finished Transaction, send ack again
+        if transaction_number <= self.state.last_received_transaction_number:
+            self.send_ack(transaction_number)
+            return
+
+        # else if we receive in a weird case (no current transaction), we ignore it
+        if (
+            not self.state.in_transaction
+            or self.state.current_transaction.transaction_number != transaction_number
+        ):
+            return
 
         # on wrong segment nb, reset Transaction and wait for resent (in spec)
         if pkt.segment_index != len(self.state.current_transaction.fragments):
             self.state.current_transaction = None
-            self.state.expected_class = BTMesh_Generic_Provisioning_Transaction_Start
             logger.warning(
-                "Received Transaction Continuation with wrong segment_index (received/expected : %d/%d)"
-                % pkt.segment_index,
-                len(self.state.current_transaction.fragments),
+                f"Received Transaction Continuation with wrong segment_index (received,expected : {pkt.segment_index}, {len(self.state.current_transaction.fragments)})"
             )
             return
 
@@ -250,19 +350,33 @@ class GenericProvisioningLayer(ContextualLayer):
                 b"".join(self.state.current_transaction.fragments)
             )
 
+            # compute fcs to check with the one we received at the start
+            fcs = self.compute_fcs(raw(prov_pkt))
+
+            if fcs != self.state.current_transaction.expected_fcs:
+                raise InvalidFrameCheckSequenceError
+
             self.state.in_transaction = False
-            self.send_to_peer(
-                self.state.current_transaction.transaction_number,
-                BTMesh_Generic_Provisioning_Transaction_Ack(),
+            self.state.last_received_transaction_number = (
+                self.state.current_transaction.transaction_number
             )
+            self.send_ack(transaction_number)
             self.send_to_upper_layer(prov_pkt)
             self.check_queue()
 
     def on_transaction_ack(self, message):
-        # check if current transaction is not finished. If not, resend all fragments since ack re
+        # Check if ack for the correct transaction
+        if (
+            self.state.current_transaction.transaction_number
+            != message.transaction_number
+        ):
+            logger.warning(
+                f"Received Ack for wrong transaction. Current transaction : {self.state.current_transaction.transaction_number}. Pkt transaction : {message.transaction_number}"
+            )
+            return
+
+        self.stop_sending_thread()
         self.state.last_sent_transaction_number += 1
-        self.state.expected_class = BTMesh_Generic_Provisioning_Transaction_Start
-        self.state.current_transaction = None
         self.state.in_transaction = False
         self.check_queue()
 
@@ -272,74 +386,31 @@ class GenericProvisioningLayer(ContextualLayer):
         """
         # limit size of a fragment is 23 bytes
         self.state.in_transaction = True
-        raw_packet = raw(packet)
-        fragments = [raw_packet[i : i + 23] for i in range(0, len(raw_packet), 23)]
-        fragments.reverse()
 
-        self.state.current_transaction = Transaction(
+        # compute fcs (dont use the Hdr)
+        fcs = self.compute_fcs(raw(packet))
+
+        self.state.current_transaction = SendingTransaction(
             transaction_number=self.state.last_sent_transaction_number + 1,
-            fragments=fragments,
-            total_nb_fragements=len(fragments),
+            packet=packet,
+            fcs=fcs,
         )
 
-        # Send the first fragment in a Transaction Start
-        fragment = self.state.current_transaction.get_next_fragment_to_send()
+        # activate sending thread for this packet
+        self.create_sending_thread()
 
-        frame_check_sequence = self.compute_frame_check_sequence(raw_packet)
-
-        # if only one fragment, we expect the Ack right after the Transaction Start
-        if len(self.state.current_transaction.fragments) == 0:
-            self.state.expected_class = BTMesh_Generic_Provisioning_Transaction_Ack
-
-        self.send_to_peer(
-            self.state.current_transaction.transaction_number,
-            BTMesh_Generic_Provisioning_Transaction_Start(
-                segment_number=self.state.current_transaction.total_nb_fragements - 1,
-                frame_check_sequence=frame_check_sequence,
-            )
-            / Raw(fragment),
-        )
-
-        # if other fragments to send, send them
-        while len(self.state.current_transaction.fragments) != 0:
-            self.send_next_fragment()
-
-    def send_next_fragment(self):
-        """
-        Send the next fragment in the current transaction
-        """
-        fragment = self.state.current_transaction.get_next_fragment_to_send()
-
-        # if last fragment, expect Ack after the last Transaction Continuation
-        if len(self.state.current_transaction.fragments) == 0:
-            self.state.expected_class = BTMesh_Generic_Provisioning_Transaction_Ack
-        self.send_to_peer(
-            self.state.current_transaction.transaction_number,
-            BTMesh_Generic_Provisioning_Transaction_Continuation(
-                segment_index=self.state.current_transaction.next_fragment_number,
-                generic_provisioning_payload_fragment=fragment,
-            ),
-        )
-
-    def compute_frame_check_sequence(self, data):
-        """
-        Comptute the Frame Chack sequence on all the Provisioning PDU
-
-        :param data: Raw Bytes of the Provisioning PDU
-        :type data: Bytes
-        """
+    def compute_fcs(self, data):
+        # Initialize FCS to 0xFF
         fcs = 0xFF
-        polynomial = 0x107
 
+        # Iterate over each byte in the data
         for byte in data:
-            fcs ^= byte
-            for _ in range(8):
-                if fcs & 1:
-                    fcs = (fcs >> 1) ^ polynomial
-                else:
-                    fcs >>= 1
+            # Use the current byte to index into the crc_table
+            # This effectively does fcs = crc_table[fcs ^ byte]
+            fcs = CRC_TABLE[fcs ^ byte]
 
-        return fcs & 0xFF
+        # The FCS is the one's complement of the result
+        return 0xFF - fcs
 
 
 class GenericProvisioningLayerProvisioner(GenericProvisioningLayer):
@@ -348,23 +419,21 @@ class GenericProvisioningLayerProvisioner(GenericProvisioningLayer):
     def configure(self, options):
         super().configure(options)
 
-        self.state.expected_class = None
         self.state.last_sent_transaction_number = -1
 
     def on_link_ack(self, message):
         if not self.state.is_link_open:
+            self.stop_sending_thread()
             self.state.is_link_open = True
-            self.state.expected_class = None
             self.check_queue()
 
     def open_link(self):
-        self.state.expected_class = BTMesh_Generic_Provisioning_Link_Ack
-        self.send_to_peer(
+        self.state.current_transaction = SendingTransaction(
             transaction_number=0x00,
-            packet=BTMesh_Generic_Provisioning_Link_Open(
-                device_uuid=self.state.peer_uuid
-            ),
+            packet=BTMesh_Generic_Provisioning_Link_Open(),
+            fcs=None,
         )
+        self.create_sending_thread_link_open()
 
 
 class GenericProvisioningLayerDevice(GenericProvisioningLayer):
@@ -373,15 +442,13 @@ class GenericProvisioningLayerDevice(GenericProvisioningLayer):
     def configure(self, options):
         super().configure(options)
 
-        self.state.expected_class = BTMesh_Generic_Provisioning_Link_Open
         self.state.last_sent_transaction_number = 0x7F
 
     def on_link_open(self, message):
-        self.state.is_link_open = True
-        self.state.expected_class = BTMesh_Generic_Provisioning_Transaction_Start
         self.send_to_peer(
             transaction_number=0x00, packet=BTMesh_Generic_Provisioning_Link_Ack()
         )
+        self.state.is_link_open = True
 
 
 GenericProvisioningLayerDevice.add(ProvisioningLayerDevice)

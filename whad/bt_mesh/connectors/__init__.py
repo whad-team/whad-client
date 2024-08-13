@@ -67,7 +67,7 @@ class BTMesh(Sniffer):
         Process an received advertising Mesh packet.
         Adds it to queue
         """
-        #packet.show()
+        packet.show()
         self.__queue.put_nowait(packet)
 
     def polling_rx_packets(self):

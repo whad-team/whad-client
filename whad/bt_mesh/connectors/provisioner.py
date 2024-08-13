@@ -32,6 +32,7 @@ class UnprovisionedDeviceList:
     def __init__(self):
         super().__init__()
         self.__devices = {}
+        self.__provisioned_node = []
 
     def update(self, dev_uuid):
         """
@@ -45,11 +46,16 @@ class UnprovisionedDeviceList:
     def check(self, dev_uuid):
         """
         Returns True if devices has sent an Unprovisioned Mesh beacon in the last 30 sec
+        and not already provisioned/in provisioning process
 
         :param dev_uuid: [TODO:description]
         :type dev_uuid: [TODO:type]
         """
-        return dev_uuid in self.__devices and (time() - self.__devices[dev_uuid] < 30)
+        return (
+            dev_uuid in self.__devices
+            and (time() - self.__devices[dev_uuid] < 30)
+            and dev_uuid not in self.__provisioned_node
+        )
 
     def remove(self, dev_uuid):
         if dev_uuid in self.__devices:
@@ -63,17 +69,27 @@ class UnprovisionedDeviceList:
 
         return dev_list
 
+    def add_provisioned_node(self, dev_uuid):
+        """
+        Add a node to the already provisioned list
+
+        :param dev_uuid: [TODO:description]
+        :type dev_uuid: [TODO:type]
+        """
+        self.__provisioned_node.append(dev_uuid)
+
 
 class Provisioner(BTMesh):
     def __init__(self, device, connection=None):
         """Create a Provisioner Device"""
-        super().__init__(device, stack=PBAdvBearerLayer, options={"role": "provisioner"})
+        super().__init__(
+            device, stack=PBAdvBearerLayer, options={"role": "provisioner"}
+        )
         self.__unprovisioned_devices = UnprovisionedDeviceList()
-
 
     def process_rx_packets(self, packet):
         """
-        Process a received Mesh Packet. Sends to stack if provisioning PDU OR 
+        Process a received Mesh Packet. Sends to stack if provisioning PDU OR
         initiates provisioning if unprovisioned beacon
 
         :param packet: Packet received
@@ -83,7 +99,6 @@ class Provisioner(BTMesh):
             self.process_beacon(packet.getlayer(EIR_BTMesh_Beacon))
         elif packet.haslayer(EIR_PB_ADV_PDU):
             self._stack.on_provisioning_pdu(packet.getlayer(EIR_PB_ADV_PDU))
-
 
     def process_beacon(self, packet):
         """
@@ -95,7 +110,11 @@ class Provisioner(BTMesh):
         if packet.mesh_beacon_type == 0x00:
             beacon_data = packet.unprovisioned_device_beacon_data
             self.__unprovisioned_devices.update(beacon_data.device_uuid)
-            print("UNPROVISIONED BEACON RECEIVED FOR > " + str(beacon_data.device_uuid))
-            choice = input("PROVISION DEVICE ? Y/N :")
-            if choice == "Y":
-                self._stack.on_new_unprovisoned_device(beacon_data.device_uuid)
+            if self.__unprovisioned_devices.check(beacon_data.device_uuid):
+                print("UNPROVISIONED BEACON RECEIVED FOR > " + str(beacon_data.device_uuid))
+                choice = input("PROVISION DEVICE ? Y/N :")
+                if choice == "Y":
+                    self.__unprovisioned_devices.add_provisioned_node(
+                        beacon_data.device_uuid
+                    )
+                    self._stack.on_new_unprovisoned_device(beacon_data.device_uuid)

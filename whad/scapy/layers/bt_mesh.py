@@ -416,16 +416,9 @@ class BTMesh_Provisioning_Start(Packet):
 class BTMesh_Provisioning_Public_Key(Packet):
     name = "Bluetooth Mesh Provisioning Public Key"
     fields_desc = [
-        StrLenField("public_key_x", None, length_from=lambda pkt: pkt.tmp_len // 2),
-        StrLenField("public_key_y", None, length_from=lambda pkt: pkt.tmp_len // 2),
+        XNBytesField("public_key_x", None, sz=32),
+        XNBytesField("public_key_y", None, sz=32),
     ]
-
-    def pre_dissect(self, s):
-        """
-        Need to compute the raw size of packet in ordrer to compute the size of fields (since its 16 or 32 bytes ...)
-        """
-        self.tmp_len = len(s)
-        return s
 
 
 class BTMesh_Provisioning_Input_Complete(Packet):

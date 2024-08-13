@@ -147,11 +147,6 @@ class ProvisioningBearerAdvCryptoManager:
         self.confirmation_provisioner = None
         self.confirmation_device = None
 
-        if alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
-            self.key_coord_size = 16
-        elif alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
-            self.key_coord_size = 32
-
         # if in test mode, we directly compute the ecdh secret
         if test:
             self.compute_ecdh_secret()
@@ -323,8 +318,8 @@ class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoM
         )
         public_key_numbers = self.public_key_provisioner.public_numbers()
         self.public_key_coord_provisioner = (
-            public_key_numbers.x.to_bytes(self.key_coord_size, "big"),
-            public_key_numbers.y.to_bytes(self.key_coord_size, "big"),
+            public_key_numbers.x.to_bytes(32, "big"),
+            public_key_numbers.y.to_bytes(32, "big"),
         )
 
     def compute_ecdh_secret(self):
@@ -368,8 +363,8 @@ class ProvisioningBearerAdvCryptoManagerDevice(ProvisioningBearerAdvCryptoManage
         # Get coordinates format for the Provisioning Packets
         public_key_numbers = self.public_key_device.public_numbers()
         self.public_key_coord_device = (
-            public_key_numbers.x.to_bytes(self.key_coord_size, "big"),
-            public_key_numbers.y.to_bytes(self.key_coord_size, "big"),
+            public_key_numbers.x.to_bytes(32, "big"),
+            public_key_numbers.y.to_bytes(32, "big"),
         )
 
     def compute_ecdh_secret(self):
@@ -382,8 +377,7 @@ class ProvisioningBearerAdvCryptoManagerDevice(ProvisioningBearerAdvCryptoManage
 
     def add_peer_public_key(self, public_key_x, public_key_y):
         self.public_key_provisioner = generate_public_key_from_coordinates(
-            int.from_bytes(public_key_x, "big"),
-            int.from_bytes(public_key_y, "big"),
+            public_key_x, public_key_y
         )
 
         self.public_key_coord_provisioner = (public_key_x, public_key_y)
