@@ -115,12 +115,12 @@ class ProvisioningBearerAdvCryptoManager:
     def __init__(
         self,
         alg="BTM_ECDH_P256_HMAC_SHA256_AES_CCM",
-        private_key_device=None,
+        private_key_provisionee=None,
         private_key_provisioner=None,
-        public_key_coord_device=None,
+        public_key_coord_provisionee=None,
         public_key_coord_provisioner=None,
         rand_provisioner=None,
-        rand_device=None,
+        rand_provisionee=None,
         auth_value=None,
         *,
         test=False,
@@ -131,12 +131,12 @@ class ProvisioningBearerAdvCryptoManager:
 
         # if not intancited for test, do nothing
         self.alg = alg
-        self.private_key_device = private_key_device
+        self.private_key_provisionee = private_key_provisionee
         self.private_key_provisioner = private_key_provisioner
-        self.public_key_coord_device = public_key_coord_device
+        self.public_key_coord_provisionee = public_key_coord_provisionee
         self.public_key_coord_provisioner = public_key_coord_provisioner
         self.rand_provisioner = rand_provisioner
-        self.rand_device = rand_device
+        self.rand_provisionee = rand_provisionee
         self.auth_value = auth_value
 
         self.session_key = None
@@ -145,7 +145,7 @@ class ProvisioningBearerAdvCryptoManager:
         self.provisioning_salt = None
         self.confirmation_key = None
         self.confirmation_provisioner = None
-        self.confirmation_device = None
+        self.confirmation_provisionee = None
 
         # if in test mode, we directly compute the ecdh secret
         if test:
@@ -166,27 +166,27 @@ class ProvisioningBearerAdvCryptoManager:
         Only for test we need to process like this, overwritten in subclasses
         """
         if self.private_key_provisioner is not None:
-            public_key_device = generate_public_key_from_coordinates(
-                int.from_bytes(self.public_key_coord_device[0], "big"),
-                int.from_bytes(self.public_key_coord_device[1], "big"),
+            public_key_provisionee = generate_public_key_from_coordinates(
+                int.from_bytes(self.public_key_coord_provisionee[0], "big"),
+                int.from_bytes(self.public_key_coord_provisionee[1], "big"),
             )
             self.private_key_provisioner = generate_private_key_from_bytes(
                 self.private_key_provisioner
             )
             self.ecdh_secret = generate_diffie_hellman_shared_secret(
-                self.private_key_provisioner, public_key_device
+                self.private_key_provisioner, public_key_provisionee
             )
 
-        elif self.private_key_device is not None:
+        elif self.private_key_provisionee is not None:
             public_key_provisioner = generate_public_key_from_coordinates(
                 int.from_bytes(self.public_key_coord_provisioner[0], "big"),
                 int.from_bytes(self.public_key_coord_provisioner[1], "big"),
             )
-            self.private_key_device = generate_private_key_from_bytes(
-                self.private_key_device
+            self.private_key_provisionee = generate_private_key_from_bytes(
+                self.private_key_provisionee
             )
             self.ecdh_secret = generate_diffie_hellman_shared_secret(
-                self.private_key_device, public_key_provisioner
+                self.private_key_provisionee, public_key_provisioner
             )
 
     def compute_confirmation_salt(
@@ -206,8 +206,8 @@ class ProvisioningBearerAdvCryptoManager:
             + provisioning_start_pdu
             + self.public_key_coord_provisioner[0]
             + self.public_key_coord_provisioner[1]
-            + self.public_key_coord_device[0]
-            + self.public_key_coord_device[1]
+            + self.public_key_coord_provisionee[0]
+            + self.public_key_coord_provisionee[1]
         )
 
         if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
@@ -244,18 +244,18 @@ class ProvisioningBearerAdvCryptoManager:
                 self.confirmation_key, self.rand_provisioner
             )
 
-    def compute_confirmation_device(self):
+    def compute_confirmation_provisionee(self):
         """
-        Computes Confirmation Device, defined in Mesh Protocol Specification, p. 593, Section 5.4.2.4.1
+        Computes Confirmation Provisionee, defined in Mesh Protocol Specification, p. 593, Section 5.4.2.4.1
         """
         if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
-            self.confirmation_device = aes_cmac(
-                self.confirmation_key, self.rand_device + self.auth_value
+            self.confirmation_provisionee = aes_cmac(
+                self.confirmation_key, self.rand_provisionee + self.auth_value
             )
 
         elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
-            self.confirmation_device = hmac_sha256(
-                self.confirmation_key, self.rand_device
+            self.confirmation_provisionee = hmac_sha256(
+                self.confirmation_key, self.rand_provisionee
             )
 
     def compute_provisioning_salt(self):
@@ -263,7 +263,7 @@ class ProvisioningBearerAdvCryptoManager:
         Computes the Provisioning Salt, defined in Mesh Protocol Specification, p. 602, Section 5.4.2.5
         """
         self.provisioning_salt = s1(
-            self.confirmation_salt + self.rand_provisioner + self.rand_device
+            self.confirmation_salt + self.rand_provisioner + self.rand_provisionee
         )
 
     def compute_session_key(self):
@@ -307,9 +307,9 @@ class ProvisioningBearerAdvCryptoManager:
 class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoManager):
     def __init__(self, alg):
         super().__init__(alg=alg)  # does nothing, but better to have super...
-        self.public_key_device = None
+        self.public_key_provisionee = None
         self.public_key_provisioner = None
-        self.received_confirmation_device = None
+        self.received_confirmation_provisionee = None
 
     def generate_keypair(self):
         """Generate the P256 private key / public key"""
@@ -327,16 +327,16 @@ class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoM
         Get the keys in the correct format to compute ECDH shared secret
         """
         self.ecdh_secret = generate_diffie_hellman_shared_secret(
-            self.private_key_provisioner, self.public_key_device
+            self.private_key_provisioner, self.public_key_provisionee
         )
 
     def add_peer_public_key(self, public_key_x, public_key_y):
-        self.public_key_device = generate_public_key_from_coordinates(
+        self.public_key_provisionee = generate_public_key_from_coordinates(
             int.from_bytes(public_key_x, "big"),
             int.from_bytes(public_key_y, "big"),
         )
 
-        self.public_key_coord_device = (public_key_x, public_key_y)
+        self.public_key_coord_provisionee = (public_key_x, public_key_y)
 
     def generate_random(self):
         """
@@ -349,20 +349,20 @@ class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoM
             self.rand_provisioner = randbytes(32)
 
 
-class ProvisioningBearerAdvCryptoManagerDevice(ProvisioningBearerAdvCryptoManager):
+class ProvisioningBearerAdvCryptoManagerProvisionee(ProvisioningBearerAdvCryptoManager):
     def __init__(self, alg):
         super().__init__(alg=alg)  # does nothing, but better to have super...
-        self.public_key_device = None
+        self.public_key_provisionee = None
         self.public_key_provisioner = None
         self.received_confirmation_provisioner = None
 
     def generate_keypair(self):
         """Generate the P256 private key / public key"""
-        self.private_key_device, self.public_key_device = generate_p256_keypair()
+        self.private_key_provisionee, self.public_key_provisionee = generate_p256_keypair()
 
         # Get coordinates format for the Provisioning Packets
-        public_key_numbers = self.public_key_device.public_numbers()
-        self.public_key_coord_device = (
+        public_key_numbers = self.public_key_provisionee.public_numbers()
+        self.public_key_coord_provisionee = (
             public_key_numbers.x.to_bytes(32, "big"),
             public_key_numbers.y.to_bytes(32, "big"),
         )
@@ -372,12 +372,12 @@ class ProvisioningBearerAdvCryptoManagerDevice(ProvisioningBearerAdvCryptoManage
         Get the keys in the correct format to compute ECDH shared secret
         """
         self.ecdh_secret = generate_diffie_hellman_shared_secret(
-            self.private_key_device, self.public_key_provisioner
+            self.private_key_provisionee, self.public_key_provisioner
         )
 
     def add_peer_public_key(self, public_key_x, public_key_y):
         self.public_key_provisioner = generate_public_key_from_coordinates(
-            public_key_x, public_key_y
+            int.from_bytes(public_key_x, "big"), int.from_bytes(public_key_y, "big")
         )
 
         self.public_key_coord_provisioner = (public_key_x, public_key_y)
@@ -388,6 +388,6 @@ class ProvisioningBearerAdvCryptoManagerDevice(ProvisioningBearerAdvCryptoManage
         NOT SAFE
         """
         if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
-            self.rand_device = randbytes(16)
+            self.rand_provisionee = randbytes(16)
         elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
-            self.rand_device = randbytes(32)
+            self.rand_provisionee = randbytes(32)

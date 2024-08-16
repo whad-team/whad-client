@@ -67,7 +67,6 @@ class BTMesh(Sniffer):
         Process an received advertising Mesh packet.
         Adds it to queue
         """
-        packet.show()
         self.__queue.put_nowait(packet)
 
     def polling_rx_packets(self):
@@ -83,7 +82,7 @@ class BTMesh(Sniffer):
         :param packet: Packet received
         :type packet: Packet
         """
-        #packet.show()
+        # packet.show()
         pass
 
     def send_raw(self, packet, channel=37):
@@ -98,7 +97,6 @@ class BTMesh(Sniffer):
 
         AdvA = randbytes(6).hex(":")  # random in spec
         adv_pkt = BTLE_ADV(TxAdd=1) / BTLE_ADV_NONCONN_IND(AdvA=AdvA, data=packet)
-
         return self.send_pdu(
             adv_pkt,
             access_address=0x8E89BED6,
