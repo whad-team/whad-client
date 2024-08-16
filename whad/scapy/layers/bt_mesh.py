@@ -231,30 +231,6 @@ MESSAGE_MODEL_OPCODES = {
 }
 
 
-class PublicKeyField(StrField):
-    """
-    Custom field type to have the x and y coordinates of the public key (Provisioning) stored.
-    Automatically split the payload in 2 equal parts since x and y are the same size, but we cannot know in advance 16 or 32 bytes.
-    """
-
-    def __init__(self, name, default):
-        super(PublicKeyField, self).__init__(name, default)
-        print("coucou")
-
-    def getfield(self, pkt, s):
-        # Determine the length of each field
-        length = len(s) // 2
-        if length > 0 and len(s) >= length * 2:
-            # If there's enough data, split it in half
-            return s[length:], (s[:length], s[length : length * 2])
-        # If not enough data or if in the process of building the packet
-        return s, ("", "")
-
-    def addfield(self, pkt, s, val):
-        # When adding the field to a packet, join the two strings
-        return s + val[0] + val[1]
-
-
 """
 PROVISIONING PDU LAYER
 ================================
@@ -416,8 +392,8 @@ class BTMesh_Provisioning_Start(Packet):
 class BTMesh_Provisioning_Public_Key(Packet):
     name = "Bluetooth Mesh Provisioning Public Key"
     fields_desc = [
-        XNBytesField("public_key_x", None, sz=32),
-        XNBytesField("public_key_y", None, sz=32),
+        StrFixedLenField("public_key_x", None, length=32),
+        StrFixedLenField("public_key_y", None, length=32),
     ]
 
 
@@ -702,7 +678,7 @@ class BTMesh_Generic_Provisioning_Transaction_Start(BTMesh_Generic_Provisioning_
                 0b11: "Provisioning Bearer Control",
             },
         ),
-        LenField("total_length", None, fmt="H"),  # Add bytes mark  # noqa: E501
+        ShortField("total_length", None), 
         XByteField(
             "frame_check_sequence", None
         ),  # TO COMPUTE IN LOGIC, ON THE WHOLE PROVISIONING PDU IN PAYLOAD (not just the 1st fragment)

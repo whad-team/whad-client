@@ -1,8 +1,8 @@
 """
 BT Mesh Provisioning Layer (Provisioning Protocol, common to all Bearers)
 
-Manages the actual exchange of information between the Provisioner and the Device.
-Implements both the Provisioner and Device side.
+Manages the actual exchange of information between the Provisioner and the Provisionee.
+Implements both the Provisioner and Provisionee side.
 """
 
 import logging
@@ -36,15 +36,15 @@ from whad.bt_mesh.stack.exceptions import (
 from whad.bt_mesh.stack.provisioning.constants import PROVISIONING_TYPES
 from whad.bt_mesh.crypto import (
     ProvisioningBearerAdvCryptoManagerProvisioner,
-    ProvisioningBearerAdvCryptoManagerDevice,
+    ProvisioningBearerAdvCryptoManagerProvisionee,
 )
 from scapy.all import raw
 
 logger = logging.getLogger(__name__)
 
 _ALGS_FLAGS = {
-    0b01: "BTM_ECDH_P256_CMAC_AES128_AES_CCM",
-    0b10: "BTM_ECDH_P256_HMAC_SHA256_AES_CCM",
+    0x00: "BTM_ECDH_P256_CMAC_AES128_AES_CCM",
+    0x01: "BTM_ECDH_P256_HMAC_SHA256_AES_CCM",
 }
 
 
@@ -87,7 +87,7 @@ class ProvisioningState(LayerState):
 @state(ProvisioningState)
 @alias("provisioning")
 class ProvisioningLayer(Layer):
-    """Provisioning Provisioner/Device base class"""
+    """Provisioning Provisioner/Provisionee base class"""
 
     def configure(self, options):
         """Configure the Provisioning Layer"""
@@ -118,8 +118,6 @@ class ProvisioningLayer(Layer):
         self.send_to_gen_prov(BTMesh_Provisioning_Failed(error_code=error_code))
 
     def send_to_gen_prov(self, packet):
-        print("#### SENDING ####")
-        packet.show()
         hdr = BTMesh_Provisioning_Hdr(
             type=PROVISIONING_TYPES[type(packet)], message=packet
         )
@@ -134,7 +132,7 @@ class ProvisioningLayer(Layer):
         packet.message.show()
         self._handlers[packet_type](packet.message)
 
-        # All handlers except Failed return errors here since we are in the generic layer. Needs implement in Provisioner/Device classes.
+        # All handlers except Failed return errors here since we are in the generic layer. Needs implement in Provisioner/Provisionee classes.
 
     def on_failed(self, packet):
         raise FailedProvisioningReceivedError(packet.error_code)
@@ -151,11 +149,10 @@ class ProvisioningLayer(Layer):
     def on_public_key(self, packet):
         """
         On receiving Peer Public Key
-        Same first actions for Provisioner and Device. See subclasses for the rest
+        Same first actions for Provisioner and Provisionee. See subclasses for the rest
         """
         pub_key_x = packet.public_key_x
         pub_key_y = packet.public_key_y
-        print(pub_key_x)
 
         self.state.crypto_manager.add_peer_public_key(pub_key_x, pub_key_y)
 
@@ -219,7 +216,7 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
 
     def on_capabilities(self, packet):
         """
-        Retrieve capabilities of Device to choose what we want
+        Retrieve capabilities of Provisionee to choose what we want
         (for now static choice)
         Send Start pdu after
         """
@@ -228,9 +225,9 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         self.state.capabilities_pdu = raw(packet)
 
         if packet.algorithms & 0b10 and self.state.capabilities["algorithms"] & 0b10:
-            self.state.chosen_parameters["algorithms"] = 0b10
+            self.state.chosen_parameters["algorithms"] = 0x01
         elif packet.algorithms & 0b01 and self.state.capabilities["algorithms"] & 0b01:
-            self.state.chosen_parameters["algorithms"] = 0b01
+            self.state.chosen_parameters["algorithms"] = 0x00
         else:
             raise UncompatibleAlgorithmsAvailableError
 
@@ -255,7 +252,7 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         # generate keys
         self.state.crypto_manager.generate_keypair()
 
-        # Send our public key to device
+        # Send our public key to provisionee
         self.send_to_gen_prov(
             BTMesh_Provisioning_Public_Key(
                 public_key_x=self.state.crypto_manager.public_key_coord_provisioner[0],
@@ -263,9 +260,16 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
             )
         )
 
+    def on_complete(self, packet):
+        """
+        On receiving Provisionee Complete packet
+        """
+        # notify gen_prov to close the link by sending None
+        self.send("gen_prov", "CLOSE_LINK")
+
     def on_public_key(self, packet):
         """
-        On receiving Device Public Key.
+        On receiving Provisionee Public Key.
         """
         super().on_public_key(packet)
 
@@ -279,13 +283,15 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
 
     def on_confirmation(self, packet):
         """
-        Process a Confirmation packet from the Device. Stores it for later verification.
+        Process a Confirmation packet from the Provisionee. Stores it for later verification.
         Sends the random value used for the Provisioner Confirmation computation.
 
         :param packet: [TODO:description]
         :type packet: [TODO:type]
         """
-        self.state.crypto_manager.received_confirmation_device = packet.confirmation
+        self.state.crypto_manager.received_confirmation_provisionee = (
+            packet.confirmation
+        )
 
         self.send_to_gen_prov(
             BTMesh_Provisioning_Random(
@@ -295,19 +301,19 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
 
     def on_random(self, packet):
         """
-        Process the random packet from device. Verifies the confirmation value previouly received.
+        Process the random packet from provisionee. Verifies the confirmation value previouly received.
 
         :param packet: [TODO:description]
         :type packet: [TODO:type]
         """
-        self.state.crypto_manager.rand_device = packet.random
+        self.state.crypto_manager.rand_provisionee = packet.random
 
-        # compute confirmation device and verifies if it matches received one
-        self.state.crypto_manager.compute_confirmation_device()
+        # compute confirmation provisionee and verifies if it matches received one
+        self.state.crypto_manager.compute_confirmation_provisionee()
 
         if (
-            self.state.crypto_manager.received_confirmation_device
-            != self.state.crypto_manager.confirmation_device
+            self.state.crypto_manager.received_confirmation_provisionee
+            != self.state.crypto_manager.confirmation_provisionee
         ):
             raise InvalidConfirmationError
 
@@ -335,7 +341,7 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         )
 
 
-class ProvisioningLayerDevice(ProvisioningLayer):
+class ProvisioningLayerProvisionee(ProvisioningLayer):
     def __init__(self, parent=None, layer_name=None, options={}):
         super().__init__(parent=parent, layer_name=layer_name, options=options)
 
@@ -372,7 +378,7 @@ class ProvisioningLayerDevice(ProvisioningLayer):
         # for now the rest is default ... so we dont even use it
         self.state.chosen_parameters["algorithms"] = packet.algorithms
 
-        self.state.crypto_manager = ProvisioningBearerAdvCryptoManagerDevice(
+        self.state.crypto_manager = ProvisioningBearerAdvCryptoManagerProvisionee(
             alg=_ALGS_FLAGS[self.state.chosen_parameters["algorithms"]]
         )
 
@@ -381,7 +387,7 @@ class ProvisioningLayerDevice(ProvisioningLayer):
 
     def on_public_key(self, packet):
         """
-        Process the Provisoner Public Key by storing it and send the device public key
+        Process the Provisoner Public Key by storing it and send the provisionee public key
 
         :param packet: [TODO:description]
         :type packet: [TODO:type]
@@ -393,14 +399,14 @@ class ProvisioningLayerDevice(ProvisioningLayer):
 
         self.send_to_gen_prov(
             BTMesh_Provisioning_Public_Key(
-                public_key_x=self.state.crypto_manager.public_key_coord_device[0],
-                public_key_y=self.state.crypto_manager.public_key_coord_device[1],
+                public_key_x=self.state.crypto_manager.public_key_coord_provisionee[0],
+                public_key_y=self.state.crypto_manager.public_key_coord_provisionee[1],
             )
         )
 
     def on_confirmation(self, packet):
         """
-        Process a Confirmation packet from the Provisioner. Stores the value for later verification and sends device Confirmation
+        Process a Confirmation packet from the Provisioner. Stores the value for later verification and sends provisionee Confirmation
 
         :param packet: [TODO:description]
         :type packet: [TODO:type]
@@ -409,17 +415,17 @@ class ProvisioningLayerDevice(ProvisioningLayer):
             packet.confirmation
         )
 
-        self.state.crypto_manager.compute_confirmation_device()
+        self.state.crypto_manager.compute_confirmation_provisionee()
         self.send_to_gen_prov(
             BTMesh_Provisioning_Confirmation(
-                confirmation=self.state.crypto_manager.confirmation_device
+                confirmation=self.state.crypto_manager.confirmation_provisionee
             )
         )
 
     def on_random(self, packet):
         """
         Process a Confirmation packet from the Provisioner. Verify the confirmation provisioner value with it
-        Sends the random value used for the Device Confirmation computation.
+        Sends the random value used for the Provisionee Confirmation computation.
 
         :param packet: [TODO:description]
         :type packet: [TODO:type]
@@ -435,10 +441,10 @@ class ProvisioningLayerDevice(ProvisioningLayer):
         ):
             raise InvalidConfirmationError
 
-        # send device random value
+        # send provisionee random value
 
         self.send_to_gen_prov(
-            BTMesh_Provisioning_Random(self.state.crypto_manager.rand_device)
+            BTMesh_Provisioning_Random(self.state.crypto_manager.rand_provisionee)
         )
 
     def on_data(self, packet):
@@ -464,3 +470,6 @@ class ProvisioningLayerDevice(ProvisioningLayer):
         print("Flags = " + plaintext[18:19].hex())
         print("IV Index = " + plaintext[19:23].hex())
         print("UnicastAddr = " + plaintext[23:].hex())
+
+        # send complete
+        self.send_to_gen_prov(BTMesh_Provisioning_Complete())

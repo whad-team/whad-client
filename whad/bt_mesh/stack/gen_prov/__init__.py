@@ -26,7 +26,7 @@ from whad.bt_mesh.stack.exceptions import (
 )
 from scapy.all import raw, Raw
 from whad.bt_mesh.stack.provisioning import (
-    ProvisioningLayerDevice,
+    ProvisioningLayerProvisionee,
     ProvisioningLayerProvisioner,
 )
 from time import sleep
@@ -57,12 +57,21 @@ class SendingTransaction(Transaction):
         super().__init__(transaction_number)
 
         raw_packet = raw(packet)
-        fragments = [raw_packet[i : i + 23] for i in range(0, len(raw_packet), 23)]
+
+        self.total_length = len(raw_packet)
+
+        # max payload size in start is 20 bytes, 23 in a continuation (adv MTU)
+        if self.total_length > 20:
+            first_fragment = raw_packet[0:20]
+            raw_packet = raw_packet[20:]
+            fragments = [raw_packet[i : i + 23] for i in range(0, len(raw_packet), 23)]
+            fragments.insert(0, first_fragment)
+        else:
+            fragments = [raw_packet]
+
         self.fragments = fragments
         self.total_nb_fragements = len(fragments)
         self.fcs = fcs
-        self.sending_thread = None
-        self.is_thread_running = False
 
 
 class ReceivingTransaction(Transaction):
@@ -86,7 +95,7 @@ class ReceivingTransaction(Transaction):
 
 @alias("gen_prov")
 class GenericProvisioningLayer(ContextualLayer):
-    """Generic Provisioning Provisioner/Device base class"""
+    """Generic Provisioning Provisioner/Provisionee base class"""
 
     def configure(self, options):
         """Configure the Generic Provisioning Layer"""
@@ -107,8 +116,11 @@ class GenericProvisioningLayer(ContextualLayer):
 
         self.state.is_link_open = False
 
+        self.state.is_thread_running = False
+
         # stores the current thread sending fragments
-        self.state.sending_thread = None
+        self.state.sending_thread = Thread(target=self.send_packet_thread)
+        self.state.sending_thread.start()
 
         # Transaction number of last received provsioning PDU
         self.state.last_received_transaction_number = -100000000
@@ -120,6 +132,10 @@ class GenericProvisioningLayer(ContextualLayer):
         """
         Sends one ack to the peer. Is resent when we receive again a packet from a transaction from which we have received all segments
         """
+        print("SENDING ACK FOR TRANSACTION " + hex(transaction_number))
+        self.send_to_peer(
+            transaction_number, BTMesh_Generic_Provisioning_Transaction_Ack()
+        )
         self.send_to_peer(
             transaction_number, BTMesh_Generic_Provisioning_Transaction_Ack()
         )
@@ -130,72 +146,45 @@ class GenericProvisioningLayer(ContextualLayer):
         Resends the whole transaction if ack not received in 1sec, resends all.
         Starts Ack timer of 30 seconds from the first sending. If no Ack after timer expires, closes the connexion
         """
-        transaction_number = self.state.current_transaction.transaction_number
-        while self.state.current_transaction.is_thread_running:
-            for index in range(0, len(self.state.current_transaction.fragments)):
-                if index == 0:
-                    self.send_to_peer(
-                        transaction_number,
-                        BTMesh_Generic_Provisioning_Transaction_Start(
-                            segment_number=self.state.current_transaction.total_nb_fragements
-                            - 1,
-                            frame_check_sequence=self.state.current_transaction.fcs,
+        while True:
+            if self.state.is_thread_running:
+                transaction_number = self.state.current_transaction.transaction_number
+                for index in range(0, len(self.state.current_transaction.fragments)):
+                    if index == 0:
+                        self.send_to_peer(
+                            transaction_number,
+                            BTMesh_Generic_Provisioning_Transaction_Start(
+                                segment_number=self.state.current_transaction.total_nb_fragements
+                                - 1,
+                                frame_check_sequence=self.state.current_transaction.fcs,
+                                total_length=self.state.current_transaction.total_length,
+                            )
+                            / Raw(self.state.current_transaction.fragments[index]),
                         )
-                        / Raw(self.state.current_transaction.fragments[index]),
-                    )
-                else:
-                    self.send_to_peer(
-                        transaction_number,
-                        BTMesh_Generic_Provisioning_Transaction_Continuation(
-                            segment_index=index,
-                            generic_provisioning_payload_fragment=self.state.current_transaction.fragments[
-                                index
-                            ],
-                        ),
-                    )
+                    else:
+                        self.send_to_peer(
+                            transaction_number,
+                            BTMesh_Generic_Provisioning_Transaction_Continuation(
+                                segment_index=index,
+                                generic_provisioning_payload_fragment=self.state.current_transaction.fragments[
+                                    index
+                                ],
+                            ),
+                        )
 
-                # random delay between 20 and 50 ms
-                sleep(uniform(0.02, 0.05))
+            sleep(0.4)
 
-            sleep(1)
-
-    def send_link_open_thread(self):
-        while self.state.current_transaction.is_thread_running:
-            self.send_to_peer(
-                transaction_number=0x00,
-                packet=BTMesh_Generic_Provisioning_Link_Open(
-                    device_uuid=self.state.peer_uuid
-                ),
-            )
-            sleep(uniform(0.5, 0.9))
-
-    def create_sending_thread(self):
+    def activate_sending_thread(self):
         """
         Activate thread that sends all the fragments (Start and Continuation).
         """
-        self.state.current_transaction.is_thread_running = True
-        self.state.current_transaction.sending_thread = Thread(
-            target=self.send_packet_thread
-        )
-        self.state.current_transaction.sending_thread.start()
-
-    def create_sending_thread_link_open(self):
-        """
-        Activate thread to send Link Open packets
-        """
-        self.state.current_transaction.is_thread_running = True
-        self.state.current_transaction.sending_thread = Thread(
-            target=self.send_link_open_thread
-        )
-        self.state.current_transaction.sending_thread.start()
+        self.state.is_thread_running = True
 
     def stop_sending_thread(self):
         """
         Stops the thead sending the packet for the current transaction.
         """
-        if self.state.current_transaction is not None:
-            self.state.current_transaction.is_thread_running = False
-            self.state.current_transaction.sending_thread.join()
+        self.state.is_thread_running = False
 
     @source("provisioning")
     def on_provisioning_packet(self, packet):
@@ -229,6 +218,8 @@ class GenericProvisioningLayer(ContextualLayer):
         :type packet: [TODO:type]
         """
         message = GenericProvisioningMessage(packet, transaction_number)
+        # random delay between 20 and 50 ms
+        sleep(uniform(0.01, 0.04))
         self.send("pb_adv", message)
 
     def send_to_upper_layer(self, packet):
@@ -260,7 +251,7 @@ class GenericProvisioningLayer(ContextualLayer):
         pass
 
     def on_link_ack(self, message):
-        """IN subclass, device should never receieve this"""
+        """IN subclass, provisionee should never receieve this"""
         pass
 
     def on_link_close(self, message):
@@ -367,7 +358,8 @@ class GenericProvisioningLayer(ContextualLayer):
     def on_transaction_ack(self, message):
         # Check if ack for the correct transaction
         if (
-            self.state.current_transaction.transaction_number
+            not self.state.in_transaction
+            or self.state.current_transaction.transaction_number
             != message.transaction_number
         ):
             logger.warning(
@@ -376,16 +368,30 @@ class GenericProvisioningLayer(ContextualLayer):
             return
 
         self.stop_sending_thread()
-        self.state.last_sent_transaction_number += 1
         self.state.in_transaction = False
+        self.state.last_sent_transaction_number += 1
         self.check_queue()
 
     def process_provisioning_packet(self, packet):
         """
         Process a Provisioning packet to divide it into fragments, set the expected next packets, and send the first fragment
+        If packet is None, means we close the link
         """
+
+        # if packet is CLOSE_LINK, signal from the Provisioning Layer that we need to close on complete
+        if packet == "CLOSE_LINK":
+            self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
+            self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
+            self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
+            return
+
         # limit size of a fragment is 23 bytes
         self.state.in_transaction = True
+        print(
+            "SENDING, Transaction Nb : "
+            + hex(self.state.last_sent_transaction_number + 1)
+        )
+        packet.show()
 
         # compute fcs (dont use the Hdr)
         fcs = self.compute_fcs(raw(packet))
@@ -397,7 +403,7 @@ class GenericProvisioningLayer(ContextualLayer):
         )
 
         # activate sending thread for this packet
-        self.create_sending_thread()
+        self.activate_sending_thread()
 
     def compute_fcs(self, data):
         # Initialize FCS to 0xFF
@@ -420,10 +426,43 @@ class GenericProvisioningLayerProvisioner(GenericProvisioningLayer):
         super().configure(options)
 
         self.state.last_sent_transaction_number = -1
+        self.state.is_link_open_thread_running = False
+        # Link Open sending thread
+        self.state.link_open_thread = None
+
+    def send_link_open_thread(self):
+        while self.state.is_link_open_thread_running:
+            self.send_to_peer(
+                transaction_number=0x00,
+                packet=BTMesh_Generic_Provisioning_Link_Open(
+                    device_uuid=self.state.peer_uuid
+                ),
+            )
+            sleep(uniform(0.1, 0.2))
+
+    def stop_link_open_thread(self):
+        """
+        Stops the thead sending the packet for the current transaction.
+        """
+        self.state.is_link_open_thread_running = False
+
+    def create_sending_thread_link_open(self):
+        """
+        Activate thread to send Link Open packets
+        """
+        self.state.is_link_open_thread_running = True
+        self.state.link_open_thread = Thread(target=self.send_link_open_thread)
+        self.state.link_open_thread.start()
+
+    def on_link_close(self, message):
+        super().on_link_close(message)
+        print(
+            f"LINK CLOSE, reason : {message.gen_prov_pkt.reason}, peer UUID : {self.state.peer_uuid}"
+        )
 
     def on_link_ack(self, message):
         if not self.state.is_link_open:
-            self.stop_sending_thread()
+            self.stop_link_open_thread()
             self.state.is_link_open = True
             self.check_queue()
 
@@ -436,8 +475,8 @@ class GenericProvisioningLayerProvisioner(GenericProvisioningLayer):
         self.create_sending_thread_link_open()
 
 
-class GenericProvisioningLayerDevice(GenericProvisioningLayer):
-    """Device (provisionee) subclass"""
+class GenericProvisioningLayerProvisionee(GenericProvisioningLayer):
+    """Provisionee subclass"""
 
     def configure(self, options):
         super().configure(options)
@@ -451,5 +490,5 @@ class GenericProvisioningLayerDevice(GenericProvisioningLayer):
         self.state.is_link_open = True
 
 
-GenericProvisioningLayerDevice.add(ProvisioningLayerDevice)
+GenericProvisioningLayerProvisionee.add(ProvisioningLayerProvisionee)
 GenericProvisioningLayerProvisioner.add(ProvisioningLayerProvisioner)

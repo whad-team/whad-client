@@ -101,7 +101,7 @@ class UnknownProvisioningPacketTypeError(Exception):
 
 class UncompatibleAlgorithmsAvailableError(Exception):
     """
-    Raised when a Provisioner and a Device dont have any alg in common
+    Raised when a Provisioner and a Provisionee dont have any alg in common
     """
 
     def __init__(self):

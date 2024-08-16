@@ -1,7 +1,7 @@
 """
 PB-ADV bearer Layer
 
-Mostly instanciate a generic provisioning layer. Only once for a device, and one per peer for a provisioner (one per link id)
+Mostly instanciate a generic provisioning layer. Only once for a provisionee, and one per peer for a provisioner (one per link id)
 """
 
 import logging
@@ -10,7 +10,7 @@ from whad.common.stack import Layer, alias, source, instance
 from whad.scapy.layers.bt_mesh import EIR_PB_ADV_PDU, BTMesh_Unprovisioned_Device_Beacon
 from scapy.layers.bluetooth import EIR_Hdr
 from whad.bt_mesh.stack.gen_prov import (
-    GenericProvisioningLayerDevice,
+    GenericProvisioningLayerProvisionee,
     GenericProvisioningLayerProvisioner,
 )
 from whad.bt_mesh.stack.gen_prov.message import GenericProvisioningMessage
@@ -29,7 +29,7 @@ class PBAdvBearerLayer(Layer):
         if "role" in options and options["role"] == "provisioner":
             self.state.generic_prov_layer_class = GenericProvisioningLayerProvisioner
         else:
-            self.state.generic_prov_layer_class = GenericProvisioningLayerDevice
+            self.state.generic_prov_layer_class = GenericProvisioningLayerProvisionee
 
     def send_to_gen_prov(self, packet: EIR_PB_ADV_PDU):
         """

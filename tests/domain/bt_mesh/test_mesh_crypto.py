@@ -131,8 +131,8 @@ _BTM_ECDH_P256_CMAC_AES128_AES_CCM_values = dict(
         private_key_provisioner=bytes.fromhex(
             "06a516693c9aa31a6084545d0c5db641b48572b97203ddffb7ac73f7d0457663"
         ),
-        private_key_device=None,
-        public_key_coord_device=(
+        private_key_provisionee=None,
+        public_key_coord_provisionee=(
             bytes.fromhex(
                 "f465e43ff23d3f1b9dc7dfc04da8758184dbc966204796eccf0d6cf5e16500cc"
             ),
@@ -149,7 +149,7 @@ _BTM_ECDH_P256_CMAC_AES128_AES_CCM_values = dict(
             ),
         ),
         rand_provisioner=bytes.fromhex("8b19ac31d58b124c946209b5db1021b9"),
-        rand_device=bytes.fromhex("55a2a2bca04cd32ff6f346bd0a0c1a3a"),
+        rand_provisionee=bytes.fromhex("55a2a2bca04cd32ff6f346bd0a0c1a3a"),
         auth_value=bytes.fromhex("00000000000000000000000000000000"),
     ),
     test_pdu_values=dict(
@@ -164,7 +164,7 @@ _BTM_ECDH_P256_CMAC_AES128_AES_CCM_values = dict(
         confirmation_salt=bytes.fromhex("5faabe187337c71cc6c973369dcaa79a"),
         confirmation_key=bytes.fromhex("e31fe046c68ec339c425fc6629f0336f"),
         confirmation_provisioner=bytes.fromhex("b38a114dfdca1fe153bd2c1e0dc46ac2"),
-        confirmation_device=bytes.fromhex("eeba521c196b52cc2e37aa40329f554e"),
+        confirmation_provisionee=bytes.fromhex("eeba521c196b52cc2e37aa40329f554e"),
         provisioning_salt=bytes.fromhex("a21c7d45f201cf9489a2fb57145015b4"),
         session_key=bytes.fromhex("c80253af86b33dfa450bbdb2a191fea3"),
         session_nonce=bytes.fromhex("da7ddbe78b5f62b81d6847487e"),
@@ -179,10 +179,10 @@ _BTM_ECDH_P256_HMAC_SHA256_AES_CCM_values = dict(
     test_input=dict(
         alg="BTM_ECDH_P256_HMAC_SHA256_AES_CCM",
         private_key_provisioner=None,
-        private_key_device=bytes.fromhex(
+        private_key_provisionee=bytes.fromhex(
             "529aa0670d72cd6497502ed473502b037e8803b5c60829a5a3caa219505530ba"
         ),
-        public_key_coord_device=(
+        public_key_coord_provisionee=(
             bytes.fromhex(
                 "f465e43ff23d3f1b9dc7dfc04da8758184dbc966204796eccf0d6cf5e16500cc"
             ),
@@ -201,7 +201,7 @@ _BTM_ECDH_P256_HMAC_SHA256_AES_CCM_values = dict(
         rand_provisioner=bytes.fromhex(
             "36f968b94a13000e64b223576390db6bcc6d62f02617c369ee3f5b3e89df7e1f"
         ),
-        rand_device=bytes.fromhex(
+        rand_provisionee=bytes.fromhex(
             "5b9b1fc6a64b2de8bece53187ee989c6566db1fc7dc8580a73dafdd6211d56a5"
         ),
         auth_value=bytes.fromhex(
@@ -226,7 +226,7 @@ _BTM_ECDH_P256_HMAC_SHA256_AES_CCM_values = dict(
         confirmation_provisioner=bytes.fromhex(
             "c99b54617ae646f5f32cf7e1ea6fcc49fd69066078eba9580fa6c7031833e6c8"
         ),
-        confirmation_device=bytes.fromhex(
+        confirmation_provisionee=bytes.fromhex(
             "56e3722d291373d38c995d6f942c02928c96abb015c233557d7974b6e2df662b"
         ),
         provisioning_salt=bytes.fromhex("d1cb10ad8d51286067e348fc4b692122"),
@@ -280,10 +280,10 @@ class TestProvisioningBearerAdvCryptoManager(object):
             == expected["confirmation_provisioner"]
         )
 
-    def test_confirmation_device(self, crypto_manager_setup):
+    def test_confirmation_provisionee(self, crypto_manager_setup):
         crypto_manager, expected = crypto_manager_setup
-        crypto_manager.compute_confirmation_device()
-        assert crypto_manager.confirmation_device == expected["confirmation_device"]
+        crypto_manager.compute_confirmation_provisionee()
+        assert crypto_manager.confirmation_provisionee == expected["confirmation_provisionee"]
 
     def test_provisioning_salt(self, crypto_manager_setup):
         crypto_manager, expected = crypto_manager_setup

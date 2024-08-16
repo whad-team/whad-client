@@ -63,10 +63,6 @@ class ProvisioningState(LayerState):
         self.status = None
 
 
-    @property
-    def capabilities(self):
-        return self._capabilities
-
 
     def set_crypto_manager(self, crypto_manager):
         self.crypto_manager = crypto_manager
