@@ -186,7 +186,7 @@ class AdvFlagsField(AdvDataField):
         :rtype: AdvFlagsField 
         """
 
-        if len(ad_record) > 1:
+        if len(ad_record) != 1:
             raise AdvDataError
         else:
             limited_disc = ((ad_record[0] & 0x01) != 0)
