@@ -1,7 +1,8 @@
 import pytest
 from whad.ble.profile.advdata import AdvDataFieldList, \
     AdvManufacturerSpecificData, AdvFlagsField, AdvCompleteLocalName, \
-    AdvDataFieldListOverflow, AdvShortenedLocalName, AdvTxPowerLevel
+    AdvDataFieldListOverflow, AdvShortenedLocalName, AdvTxPowerLevel, \
+    AdvDataError
 
 #######################################
 # Test advertising data serialization
@@ -35,3 +36,17 @@ def test_adv_overflow():
         ad_list.add(AdvFlagsField())
         ad_list.add(AdvManufacturerSpecificData(0x1234, b'A'*30))
         ad_records = ad_list.to_bytes()
+
+def test_faulty_flags_1():
+    """Test if a faulty flags advertisement records generate the expected
+    exception
+    """
+    with pytest.raises(AdvDataError):
+        AdvFlagsField.from_bytes(b"\x06\x00")
+
+def test_faulty_flags_2():
+    """Test if a faulty flags advertisement records generate the expected
+    exception
+    """
+    with pytest.raises(AdvDataError):
+        AdvFlagsField.from_bytes(b"")
