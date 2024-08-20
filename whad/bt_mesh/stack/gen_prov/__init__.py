@@ -1,5 +1,6 @@
 """
 Generic Provisioning Layer
+(Network Layer pendant for Provisioning)
 
 Handles the creaton of a Link, acks and fragmentation for the Provisoning Layer
 """

@@ -6,7 +6,7 @@ Manages basic Tx/Rx. (Based on BLE sniffer because it works)
 """
 
 from random import randbytes
-from whad.ble.connector import Sniffer
+from whad.ble.connector import Sniffer, BLE
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_ADV_NONCONN_IND, EIR_Hdr
 from whad.ble import UnsupportedCapability, message_filter, BleDirection
 from queue import Queue, Empty
@@ -103,3 +103,20 @@ class BTMesh(Sniffer):
             conn_handle=channel,
             direction=BleDirection.UNKNOWN,
         )
+
+
+class BTMeshHCI(BLE):
+    """
+    Creates a Mesh generic Node, only using HCI commands
+
+    :param device: Whad device handle
+    :type device: WhadDeviceConnector
+    :param stack: Stack to use, defaults to PBAdvBearerLayer
+    :type stack: Stack, optional
+    :param options: options de pass to stack, defaults to {}
+    :type options: dict, optional
+    :raises UnsupportedCapability: Device Cannot sniff or inject
+    """
+
+    def __init__(self, device, stack=PBAdvBearerLayer, options={}):
+        super().__init__(device)
