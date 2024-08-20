@@ -7,8 +7,6 @@ import sys
 from whad.bt_mesh.connectors.provisionee import Provisionee
 from time import sleep
 
-from whad.scapy.layers.bt_mesh import *
-
 from scapy.all import EIR_Hdr
 
 

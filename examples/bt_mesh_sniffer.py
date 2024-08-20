@@ -34,6 +34,7 @@ if __name__ == '__main__':
 
             dev = WhadDevice.create(interface)
             sniffer = Sniffer(dev)
+            sniffer.channel = 37
             sniffer.configure(advertisements=True, connection=False)
             sniffer.start()
             for i in sniffer.sniff():

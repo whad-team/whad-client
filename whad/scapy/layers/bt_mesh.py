@@ -678,7 +678,7 @@ class BTMesh_Generic_Provisioning_Transaction_Start(BTMesh_Generic_Provisioning_
                 0b11: "Provisioning Bearer Control",
             },
         ),
-        ShortField("total_length", None), 
+        ShortField("total_length", None),
         XByteField(
             "frame_check_sequence", None
         ),  # TO COMPUTE IN LOGIC, ON THE WHOLE PROVISIONING PDU IN PAYLOAD (not just the 1st fragment)
@@ -985,6 +985,11 @@ class BTMesh_Model_Generic_Move_Set(Packet):
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Generic_Delta_Set, opcode=0x820B)
 
 
+# TODO
+class BTMesh_Upper_Transport_Control_Message(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message"
+
+
 class BTMesh_Unsegmented_Access_Message(Packet):
     name = "Bluetooth Mesh Unsegmented Access Message"
     fields_desc = [
@@ -993,12 +998,69 @@ class BTMesh_Unsegmented_Access_Message(Packet):
     ]
 
 
+class BTMesh_Segmented_Access_Message(Packet):
+    name = "Bluetooth Mesg Segmented Access Message"
+    fields_desc = [
+        BitField("application_key_flag", None, 1),
+        BitField("application_key_id", None, 6),
+        BitField("size_trans_mic", None, 1),
+        BitField("seq_zero", None, 13),
+        BitField("seg_offset", None, 5),
+        BitField("last_seg_number", None, 5),
+    ]
+
+
+class BTMesh_Segment_Acknoledgment_Message(Packet):
+    name = "Bluetooth Mesh Segment Acknowledgment Message"
+    fields_desc = [
+        BitField("obo", None, 1),
+        BitField("seq_zero", None, 13),
+        BitField("RFU", None, 0),
+        BitField("acked_segments", 0, 32),
+    ]
+
+
+class BTMesh_Unsegmented_Control_Message(Packet):
+    name = "Bluetooth Mesh Unsegmented Control Message"
+    fields_desc = [
+        BitField("opcode", None, 7),
+        ConditionalField(
+            PacketField(
+                "parameters",
+                BTMesh_Segment_Acknoledgment_Message(),
+                BTMesh_Segment_Acknoledgment_Message,
+            ),
+            lambda pkt: pkt.opcode == 0x00,
+        ),
+    ]
+
+    # We only have an Upper Layer PDU as payloas if opcode is not 0
+    def guess_payload_class(self, payload):
+        if self.opcode != 0:
+            return BTMesh_Upper_Transport_Control_Message
+        else:
+            return None
+
+
+class BTMesh_Segmented_Control_Message(Packet):
+    name = "Bluetooth Mesh Segmented Control Message"
+    fields_desc = [
+        BitField("opcode", None, 7),
+        BitField("RFU", 0, 1),
+        BitField("seq_zero", None, 13),
+        BitField("seg_offset", None, 5),
+        BitField("last_seg_number", None, 5),
+    ]
+
+
+# i think we cannot use it, since we need that bitfield to have a 8 bits object in subclasses
 class BTMesh_Lower_Transport_PDU(Packet):
     name = "Bluetooth Mesh Lower Transport PDU"
     fields_desc = [
         BitField("lower_transport_seg", None, 1),
     ]
 
+    # Does not work since we need to decipher first ?
     def guess_payload_class(self, payload):
         if self.underlayer.network_ctl == 0 and self.lower_transport_seg == 0:
             return BTMesh_Unsegmented_Access_Message
@@ -1092,8 +1154,8 @@ class EIR_BTMesh_Beacon(EIR_Element):
     ]
 
 
-class BTMesh_Mesh_Message(Packet):
-    name = "Bluetooth Mesh Message"
+class BTMesh_Network_PDU(Packet):
+    name = "Bluetooth Network PDU"
     fields_desc = [
         BitField("iv_index", 0, 1),
         BitField("network_id", 0, 7),
@@ -1116,17 +1178,58 @@ class BTMesh_Mesh_Message(Packet):
             + (s[9:-4] if (s[1] >> 7) else s[9:-8])
         )
 
+    def do_build(self):
+        built_fields = [
+            (self.iv_index << 7 | self.network_id).to_bytes(1, "big"),
+            (self.network_ctl << 7 | self.ttl).to_bytes(1, "big"),
+            self.seq_number.to_bytes(3, "big"),
+            self.src_addr.to_bytes(2, "big"),
+            self.dst_addr.to_bytes(2, "big"),
+        ]
+
+        print(built_fields)
+        if self.payload:
+            built_fields.append(raw(self.payload))
+
+        built_fields.append(self.network_mic)
+
+        return b"".join(f for f in built_fields)
+
+
+class BTMesh_Network_PDU_Bis(Packet):
+    """
+    Simpler version of Network PDU, with one field for
+    the encrypted lower_transport_pdu and the following MIC
+    """
+
+    name = "Bluetooth Network PDU"
+    fields_desc = [
+        BitField("iv_index", 0, 1),
+        BitField("network_id", 0, 7),
+        BitEnumField(
+            "network_ctl", 0, 1, {0b0: "Access Message", 0b1: "Control message"}
+        ),
+        BitField("ttl", 0, 7),
+        ThreeBytesField("seq_number", None),
+        XShortField("src_addr", None),
+        XShortField("dst_addr", None),
+        XStrField(
+            "enc_lower_transport_pdu_mic",
+            None,
+        ),
+    ]
+
 
 class EIR_BTMesh_Message(EIR_Element):
     name = "EIR Bluetooth Mesh Message"
-    fields_desc = [PacketField("mesh_message", None, pkt_cls=BTMesh_Mesh_Message)]
+    fields_desc = [PacketField("mesh_message", None, pkt_cls=BTMesh_Network_PDU)]
 
 
 split_layers(EIR_Hdr, EIR_Raw)
 bind_layers(EIR_Hdr, EIR_BTMesh_Message, type=0x2A)
 bind_layers(EIR_Hdr, EIR_BTMesh_Beacon, type=0x2B)
 bind_layers(EIR_Hdr, EIR_PB_ADV_PDU, type=0x29)
-bind_layers(BTMesh_Mesh_Message, BTMesh_Lower_Transport_PDU)
+bind_layers(BTMesh_Network_PDU, BTMesh_Lower_Transport_PDU)
 bind_layers(BTMesh_Unsegmented_Access_Message, BTMesh_Model_Message)
 bind_layers(BTMesh_Proxy_Hdr, BTMesh_Provisioning_Hdr, message_type=0x03)
 
