@@ -99,7 +99,6 @@ def update_number():
 
 if __name__ == '__main__':
     print(f'======== {NAME} ===========')
-    print("coucou")
     my_profile = MyPeripheral() #GenericProfile(from_json="lightbulb2.json")
     pairing = Pairing(
         lesc=True,
@@ -116,6 +115,7 @@ if __name__ == '__main__':
 
     periph = Peripheral(WhadDevice.create('uart0'), profile=my_profile, pairing=pairing)
     periph.attach_callback(callback=show)
+    print('coucou')
     periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
         AdvCompleteLocalName(b'Guess Me!'),
         AdvFlagsField()

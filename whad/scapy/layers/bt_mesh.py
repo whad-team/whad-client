@@ -3,7 +3,6 @@ from scapy.fields import (
     ByteEnumField,
     ShortEnumField,
     IntField,
-    LongField,
     XShortField,
     UUIDField,
     StrFixedLenField,
@@ -14,7 +13,6 @@ from scapy.fields import (
     BitEnumField,
     BitField,
     FlagsField,
-    BoundStrLenField,
     XStrField,
     ByteField,
     XByteField,
@@ -24,12 +22,13 @@ from scapy.fields import (
     XStrFixedLenField,
     StrField,
     MultipleTypeField,
-    LenField,
-    XNBytesField,
-    StrLenField,
+    XBitField,
+    PacketLenField,
+    PacketListField,
 )
 from scapy.layers.bluetooth import EIR_Element, EIR_Hdr, EIR_Raw
 from scapy.all import Raw, raw, RawVal
+from scapy.config import conf
 
 MESSAGE_MODEL_OPCODES = {
     0x8201: "Generic_OnOff_Get",
@@ -985,22 +984,314 @@ class BTMesh_Model_Generic_Move_Set(Packet):
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Generic_Delta_Set, opcode=0x820B)
 
 
-# TODO
-class BTMesh_Upper_Transport_Control_Message(Packet):
-    name = "Bluetooth Mesh Upper Transport Control Message"
+"""
+UPPER TRANSPORT
+=================
+"""
 
 
-class BTMesh_Unsegmented_Access_Message(Packet):
-    name = "Bluetooth Mesh Unsegmented Access Message"
+class UnicastAddr(Packet):
+    """
+    Describes a Unicast Addr, as specifiied in Spec p. 55 Section 3.4.2.2.1
+    """
+
+    name = "Bluetooth Mesh Unicast Addr"
     fields_desc = [
+        BitField("length_present", 0, 1),
+        XBitField("range_start", 0, 15),
+        ConditionalField(
+            ByteField("range_length", None),
+            lambda pkt: pkt.length_present == 1,
+        ),
+    ]
+
+
+class BTMesh_Upper_Transport_Control_Friend_Poll(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Friend Poll"
+    fields_desc = [BitField("padding", 0, 7), BitField("friend_sequence_number", 0, 0)]
+
+
+class BTMesh_Upper_Transport_Control_Friend_Update(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Friend Update"
+    field_desc = [
+        BitEnumField(
+            "key_refresh_flag", None, 1, {0b0: "Not-In-Phase2", 0b1: "In-Phase2"}
+        ),
+        BitEnumField(
+            "iv_update_flag",
+            None,
+            1,
+            {0b0: "Normal Operation", 0b1: "IV Update in Progress"},
+        ),
+        BitField("RFU", None, 6),
+        XIntField("iv_index", None),
+        ByteEnumField(
+            "md",
+            None,
+            {0x00: "Friend Queue is Empty", 0x01: "Friend Queue is not Empty"},
+        ),
+    ]
+
+
+class BTMesh_Upper_Transport_Control_Friend_Request(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Friend Request"
+    fields_desc = [
+        BitField("RFU", 0, 1),
+        BitEnumField(
+            "rssi_factor", 0, 2, {0b00: "1", 0b01: "1.5", 0b10: "2", 0b11: "2.5"}
+        ),
+        BitEnumField(
+            "receive_window_factor",
+            0,
+            2,
+            {0b00: "1", 0b01: "1.5", 0b10: "2", 0b11: "2.5"},
+        ),
+        BitEnumField(
+            "min_queue_size_log",
+            0,
+            3,
+            {
+                0b000: "Prohibited",
+                0b001: "N=2",
+                0b010: "N=4",
+                0b011: "N=8",
+                0b100: "N=16",
+                0b101: "N=32",
+                0b110: "N=64",
+                0b111: "N=128",
+            },
+        ),
+        ByteField("receive_delay", None),
+        ThreeBytesField("poll_timeout", None),
+        XShortField("previous_address", None),
+        ByteField("number_elements", None),
+        ShortField("lpn_counter", None),
+    ]
+
+
+class BTMesh_Upper_Transport_Control_Friend_Offer(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Friend Offer"
+    fields_desc = [
+        ByteField("receive_window", None),
+        ByteField("queue_size", None),
+        ByteField("subscription_list_size", None),
+        ByteField("rssi", None),
+        ShortField("friend_counter", None),
+    ]
+
+
+class BTMesh_Upper_Transport_Control_Friend_Clear(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Friend Clear"
+    fields_desc = [XShortField("lpn_address", None), XShortField("lpn_counter", None)]
+
+
+class BTMesh_Upper_Transport_Control_Friend_Clear_Confirm(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Friend Clear Confirm"
+    fields_desc = [XShortField("lpn_address", None), XShortField("lpn_counter", None)]
+
+
+class BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Friend Subscription List Add"
+    fields_desc = [
+        ByteField("transaction_number", None),
+        StrField("address_list", None),
+    ]
+
+
+class BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove(Packet):
+    name = (
+        "Bluetooth Mesh Upper Transport Control Message Friend Subscription List Remove"
+    )
+    fields_desc = [
+        ByteField("transaction_number", None),
+        StrField("address_list", None),
+    ]
+
+
+class BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Friend Subscription List Confirm"
+    fields_desc = [ByteField("transaction_number", None)]
+
+
+class BTMesh_Upper_Transport_Control_Heartbeat(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Hearbeat"
+    fields_desc = [
+        BitField("RFU", None, 1),
+        BitField("init_ttl", None, 7),
+        FlagsField(
+            "features",
+            0,
+            16,
+            ["Relay", "Proxy", "Friend", "Low Power"] + ["RFU" for i in range(4, 16)],
+        ),
+    ]
+
+
+class BTMesh_Upper_Transport_Control_Path_Request(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Path Request"
+    fields_desc = [
+        BitField("on_behalf_of_dependent_origin", None, 1),
+        BitField("path_origin_path_metric_type", None, 3),
+        BitField("path_origin_path_lifetime", None, 2),
+        BitField("path_discovery_interval", None, 1),
+        BitField("prohibited", None, 1),
+        ByteField("path_origin_forwarding_number", None),
+        ByteField("path_origin_path_metric", None),
+        XShortField("destination", None),
+        PacketLenField(
+            "path_origin_unicast_addr_range",
+            None,
+            cls=UnicastAddr,
+            length_from=lambda pkt: 3
+            if pkt.original[5] >> 7 == 1
+            else 2,  # check value of length_present directly to determine length of PacketLenField
+        ),
+        ConditionalField(
+            PacketField(
+                name="dependent_origin_unicast_addr_range",
+                default=None,
+                pkt_cls=UnicastAddr,
+            ),
+            lambda pkt: pkt.on_behalf_of_dependent_origin == 1,
+        ),
+    ]
+
+
+class BTMesh_Upper_Transport_Control_Path_Reply(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Path Reply"
+    field_desc = [
+        BitField("unicast_destination", None, 1),
+        BitField("on_behalf_of_dependent_target", None, 1),
+        BitField("confirmation_request", None, 1),
+        BitField("prohibited", None, 5),
+        ByteField("path_origin_forwarding_number", None),
+        ConditionalField(
+            PacketLenField(
+                "path_target_unicast_addr_range",
+                None,
+                pkt_cls=UnicastAddr,
+                length_from=lambda pkt: 3
+                if pkt.original[2] >> 7 == 1
+                else 2,  # check value of length_present directly to determine length of PacketLenField
+            ),
+            lambda pkt: pkt.unicast_destination == 1,
+        ),
+        ConditionalField(
+            PacketField(
+                "dependent_target_unicast_addr_range", None, pkt_cls=UnicastAddr
+            ),
+            lambda pkt: pkt.on_behalf_of_dependent_target == 1,
+        ),
+    ]
+
+
+class BTMesh_Upper_Transport_Control_Path_Confirmation(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Path Confirmation"
+    fields_desc = [XShortField("path_origin", None), XShortField("path_target", None)]
+
+
+class BTMesh_Upper_Transport_Control_Path_Echo_Request(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Path Echo Request"
+    field_desc = []
+
+
+class BTMesh_Upper_Transport_Control_Path_Echo_Reply(Packet):
+    name = "Bluetooth Mesh Upper Transport Control Message Path Echo Reply"
+    fields_desc = [XShortField("destination", None)]
+
+
+class BTMesh_Upper_Transport_Control_Dependent_Node_Update(Packet):
+    name = "Bluetooth Upper Transport Control Dependent Node Update"
+    fields_desc = [
+        BitEnumField(
+            "type",
+            None,
+            1,
+            {
+                0b0: "The dependent node addr is removed",
+                0b1: "The dependent node addr is added",
+            },
+        ),
+        BitField("prohibited", 0, 7),
+        XShortField("path_endpoint", None),
+        # dependent_node_unicast_addr_range
+        PacketField("dependent_node_unicast_addr_range", None, pkt_cls=UnicastAddr),
+    ]
+
+
+class BTMesh_Upper_Transport_Control_Path_Request_Solicitation(Packet):
+    name = "Bluetooth Upper Transport Control Message Path Request Solicitation"
+    fields_desc = [
+        StrField("addr_list", None),
+    ]
+
+
+"""
+LOWER TRANSPORT
+====================
+"""
+
+OPCODE_TP_PAYLOAD_CLASS_LOWER_TRANSPORT = {
+    0x01: BTMesh_Upper_Transport_Control_Friend_Poll,
+    0x02: BTMesh_Upper_Transport_Control_Friend_Update,
+    0x03: BTMesh_Upper_Transport_Control_Friend_Request,
+    0x04: BTMesh_Upper_Transport_Control_Friend_Offer,
+    0x05: BTMesh_Upper_Transport_Control_Friend_Clear,
+    0x06: BTMesh_Upper_Transport_Control_Friend_Clear_Confirm,
+    0x07: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add,
+    0x08: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove,
+    0x09: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm,
+    0x0A: BTMesh_Upper_Transport_Control_Heartbeat,
+    0x0B: BTMesh_Upper_Transport_Control_Path_Request,
+    0x0C: BTMesh_Upper_Transport_Control_Path_Reply,
+    0x0D: BTMesh_Upper_Transport_Control_Path_Confirmation,
+    0x0E: BTMesh_Upper_Transport_Control_Path_Echo_Request,
+    0x0F: BTMesh_Upper_Transport_Control_Path_Echo_Reply,
+    0x10: BTMesh_Upper_Transport_Control_Dependent_Node_Update,
+    0x11: BTMesh_Upper_Transport_Control_Path_Request_Solicitation,
+}
+
+
+class BTMesh_Lower_Transport_Unsegmented_Control_Message(Packet):
+    name = "Bluetooth Mesh Unsegmented Control Message"
+    fields_desc = [
+        BitField("lower_transport_seg", None, 1),
+        BitField("opcode", None, 7),
+    ]
+
+    # Binding to Upper Transport PDUS depending on opcode (same as bind_layers but les verbose)
+    def guess_payload_class(self, payload):
+        opcode = self.getfieldval("opcode")
+        if opcode not in OPCODE_TP_PAYLOAD_CLASS_LOWER_TRANSPORT:
+            return None
+        else:
+            return OPCODE_TP_PAYLOAD_CLASS_LOWER_TRANSPORT[opcode]
+
+
+class BTMesh_Lower_Transport_Segment_Acknoledgment_Message(Packet):
+    name = "Bluetooth Mesh Lower Transport Segment Acknowledgment Message"
+    fields_desc = [
+        BitField("lower_transport_seg", None, 1),
+        BitField("obo", None, 1),
+        BitField("seq_zero", None, 13),
+        BitField("RFU", None, 0),
+        BitField("acked_segments", 0, 32),
+    ]
+
+
+class BTMesh_Lower_Transport_Unsegmented_Access_Message(Packet):
+    name = "Bluetooth Mesh Lower Transport Unsegmented Access Message"
+    fields_desc = [
+        BitField("lower_transport_seg", None, 1),
         BitField("application_key_flag", None, 1),
         BitField("application_key_id", None, 6),
     ]
 
 
-class BTMesh_Segmented_Access_Message(Packet):
-    name = "Bluetooth Mesg Segmented Access Message"
+class BTMesh_Lower_Transport_Segmented_Access_Message(Packet):
+    name = "Bluetooth Mesh Lower Transport Segmented Access Message"
     fields_desc = [
+        BitField("lower_transport_seg", None, 1),
         BitField("application_key_flag", None, 1),
         BitField("application_key_id", None, 6),
         BitField("size_trans_mic", None, 1),
@@ -1010,41 +1301,10 @@ class BTMesh_Segmented_Access_Message(Packet):
     ]
 
 
-class BTMesh_Segment_Acknoledgment_Message(Packet):
-    name = "Bluetooth Mesh Segment Acknowledgment Message"
+class BTMesh_Lower_Transport_Segmented_Control_Message(Packet):
+    name = "Bluetooth Mesh Lower Transport Segmented Control Message"
     fields_desc = [
-        BitField("obo", None, 1),
-        BitField("seq_zero", None, 13),
-        BitField("RFU", None, 0),
-        BitField("acked_segments", 0, 32),
-    ]
-
-
-class BTMesh_Unsegmented_Control_Message(Packet):
-    name = "Bluetooth Mesh Unsegmented Control Message"
-    fields_desc = [
-        BitField("opcode", None, 7),
-        ConditionalField(
-            PacketField(
-                "parameters",
-                BTMesh_Segment_Acknoledgment_Message(),
-                BTMesh_Segment_Acknoledgment_Message,
-            ),
-            lambda pkt: pkt.opcode == 0x00,
-        ),
-    ]
-
-    # We only have an Upper Layer PDU as payloas if opcode is not 0
-    def guess_payload_class(self, payload):
-        if self.opcode != 0:
-            return BTMesh_Upper_Transport_Control_Message
-        else:
-            return None
-
-
-class BTMesh_Segmented_Control_Message(Packet):
-    name = "Bluetooth Mesh Segmented Control Message"
-    fields_desc = [
+        BitField("lower_transport_seg", None, 1),
         BitField("opcode", None, 7),
         BitField("RFU", 0, 1),
         BitField("seq_zero", None, 13),
@@ -1053,19 +1313,88 @@ class BTMesh_Segmented_Control_Message(Packet):
     ]
 
 
-# i think we cannot use it, since we need that bitfield to have a 8 bits object in subclasses
-class BTMesh_Lower_Transport_PDU(Packet):
-    name = "Bluetooth Mesh Lower Transport PDU"
+bind_layers(
+    BTMesh_Lower_Transport_Unsegmented_Control_Message,
+    BTMesh_Lower_Transport_Segment_Acknoledgment_Message,
+    opcode=0x00,
+)
+
+"""
+NETWORK
+================
+"""
+
+
+class BTMesh_Network_PDU(Packet):
+    name = "Bluetooth Network PDU"
     fields_desc = [
-        BitField("lower_transport_seg", None, 1),
+        BitField("iv_index", 0, 1),
+        BitField("network_id", 0, 7),
+        BitField("network_ctl", 0, 1),
+        BitField("ttl", 0, 7),
+        ThreeBytesField("seq_number", None),
+        XShortField("src_addr", None),
+        XShortField("dst_addr", None),
+        XStrLenField(
+            "network_mic",
+            None,
+            length_from=lambda pkt: 4 if pkt.network_ctl == 0 else 8,
+        ),
     ]
 
-    # Does not work since we need to decipher first ?
-    def guess_payload_class(self, payload):
-        if self.underlayer.network_ctl == 0 and self.lower_transport_seg == 0:
-            return BTMesh_Unsegmented_Access_Message
-        else:
-            return Packet.guess_payload_class(self, payload)
+    def pre_dissect(self, s):
+        return (
+            s[:9]
+            + (s[-4:] if (s[1] >> 7) == 0 else s[-8:])
+            + (s[9:-4] if (s[1] >> 7) else s[9:-8])
+        )
+
+    def do_build(self):
+        built_fields = [
+            (self.iv_index << 7 | self.network_id).to_bytes(1, "big"),
+            (self.network_ctl << 7 | self.ttl).to_bytes(1, "big"),
+            self.seq_number.to_bytes(3, "big"),
+            self.src_addr.to_bytes(2, "big"),
+            self.dst_addr.to_bytes(2, "big"),
+        ]
+
+        print(built_fields)
+        if self.payload:
+            built_fields.append(raw(self.payload))
+
+        built_fields.append(self.network_mic)
+
+        return b"".join(f for f in built_fields)
+
+
+class BTMesh_Network_PDU_Bis(Packet):
+    """
+    Simpler version of Network PDU, with one field for
+    the encrypted lower_transport_pdu and the following MIC
+    """
+
+    name = "Bluetooth Network PDU"
+    fields_desc = [
+        BitField("iv_index", 0, 1),
+        BitField("network_id", 0, 7),
+        BitEnumField(
+            "network_ctl", 0, 1, {0b0: "Access Message", 0b1: "Control message"}
+        ),
+        BitField("ttl", 0, 7),
+        ThreeBytesField("seq_number", None),
+        XShortField("src_addr", None),
+        XShortField("dst_addr", None),
+        XStrField(
+            "enc_lower_transport_pdu_mic",
+            None,
+        ),
+    ]
+
+
+"""
+BEACONS
+=================
+"""
 
 
 class BTMesh_Unprovisioned_Device_Beacon(Packet):
@@ -1154,72 +1483,6 @@ class EIR_BTMesh_Beacon(EIR_Element):
     ]
 
 
-class BTMesh_Network_PDU(Packet):
-    name = "Bluetooth Network PDU"
-    fields_desc = [
-        BitField("iv_index", 0, 1),
-        BitField("network_id", 0, 7),
-        BitField("network_ctl", 0, 1),
-        BitField("ttl", 0, 7),
-        ThreeBytesField("seq_number", None),
-        XShortField("src_addr", None),
-        XShortField("dst_addr", None),
-        XStrLenField(
-            "network_mic",
-            None,
-            length_from=lambda pkt: 4 if pkt.network_ctl == 0 else 8,
-        ),
-    ]
-
-    def pre_dissect(self, s):
-        return (
-            s[:9]
-            + (s[-4:] if (s[1] >> 7) == 0 else s[-8:])
-            + (s[9:-4] if (s[1] >> 7) else s[9:-8])
-        )
-
-    def do_build(self):
-        built_fields = [
-            (self.iv_index << 7 | self.network_id).to_bytes(1, "big"),
-            (self.network_ctl << 7 | self.ttl).to_bytes(1, "big"),
-            self.seq_number.to_bytes(3, "big"),
-            self.src_addr.to_bytes(2, "big"),
-            self.dst_addr.to_bytes(2, "big"),
-        ]
-
-        print(built_fields)
-        if self.payload:
-            built_fields.append(raw(self.payload))
-
-        built_fields.append(self.network_mic)
-
-        return b"".join(f for f in built_fields)
-
-
-class BTMesh_Network_PDU_Bis(Packet):
-    """
-    Simpler version of Network PDU, with one field for
-    the encrypted lower_transport_pdu and the following MIC
-    """
-
-    name = "Bluetooth Network PDU"
-    fields_desc = [
-        BitField("iv_index", 0, 1),
-        BitField("network_id", 0, 7),
-        BitEnumField(
-            "network_ctl", 0, 1, {0b0: "Access Message", 0b1: "Control message"}
-        ),
-        BitField("ttl", 0, 7),
-        ThreeBytesField("seq_number", None),
-        XShortField("src_addr", None),
-        XShortField("dst_addr", None),
-        XStrField(
-            "enc_lower_transport_pdu_mic",
-            None,
-        ),
-    ]
-
-
 class EIR_BTMesh_Message(EIR_Element):
     name = "EIR Bluetooth Mesh Message"
     fields_desc = [PacketField("mesh_message", None, pkt_cls=BTMesh_Network_PDU)]
@@ -1229,8 +1492,7 @@ split_layers(EIR_Hdr, EIR_Raw)
 bind_layers(EIR_Hdr, EIR_BTMesh_Message, type=0x2A)
 bind_layers(EIR_Hdr, EIR_BTMesh_Beacon, type=0x2B)
 bind_layers(EIR_Hdr, EIR_PB_ADV_PDU, type=0x29)
-bind_layers(BTMesh_Network_PDU, BTMesh_Lower_Transport_PDU)
-bind_layers(BTMesh_Unsegmented_Access_Message, BTMesh_Model_Message)
+bind_layers(BTMesh_Lower_Transport_Unsegmented_Access_Message, BTMesh_Model_Message)
 bind_layers(BTMesh_Proxy_Hdr, BTMesh_Provisioning_Hdr, message_type=0x03)
 
 # need to remove this one, fragments and all ...
