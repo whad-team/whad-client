@@ -24,7 +24,8 @@ from scapy.fields import (
     MultipleTypeField,
     XBitField,
     PacketLenField,
-    PacketListField,
+    FieldListField,
+    X3BytesField,
 )
 from scapy.layers.bluetooth import EIR_Element, EIR_Hdr, EIR_Raw
 from scapy.all import Raw, raw, RawVal
@@ -985,6 +986,58 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Generic_Delta_Set, opcode=0x820B)
 
 
 """
+ACCESS LAYER
+=================
+"""
+
+
+class BTMesh_Access_Message(Packet):
+    name = "Bluetooth Mesh Access Message"
+    fields_desc = [
+        # Will be changed in post_build ! size depend on value of first 2 bits
+        XShortField("opcode", None),
+    ]
+
+    def post_build(self, pkt, pay):
+        # The first byte of the packet, we need to determine the size of the opcode based on its first two bits
+        first_byte = pkt[0]
+
+        # Determine the size based on the first two bits
+        if first_byte & 0b10000000 == 0 and first_byte != 0b01111111:
+            sz = 1
+        elif first_byte & 0b11000000 == 0b10000000:
+            sz = 2
+        elif first_byte & 0b11000000 == 0b11000000:
+            sz = 3
+        else:
+            raise ValueError("Invalid opcode format")
+
+        # Modify the opcode field to have the correct size
+        pkt = pkt[:sz] + pay  # Rebuild the packet with the correct size
+
+        return pkt
+
+    def do_dissect(self, s):
+        first_byte = s[0]
+
+        # Determine the size of the opcode based on the first two bits
+        if first_byte & 0b10000000 == 0 and first_byte != 0b01111111:
+            field_type = XByteField  # 0xxxxxxx -> sz = 1
+        elif first_byte & 0b11000000 == 0b10000000:
+            field_type = XShortField  # 10xxxxxx -> sz = 2
+        elif first_byte & 0b11000000 == 0b11000000:
+            field_type = X3BytesField  # 11xxxxxx -> sz = 3
+        else:
+            raise ValueError("Invalid opcode format")
+
+        # Set the correct size for the opcode field
+        self.fields_desc[0] = field_type("opcode", None)
+
+        # Now call super to perform the actual dissection with the correct size
+        return super(BTMesh_Access_Message, self).do_dissect(s)
+
+
+"""
 UPPER TRANSPORT
 =================
 """
@@ -1003,6 +1056,14 @@ class UnicastAddr(Packet):
             ByteField("range_length", None),
             lambda pkt: pkt.length_present == 1,
         ),
+    ]
+
+
+class BTMesh_Upper_Transport_Access_PDU(Packet):
+    # 2 fields (cipher and MIC) since too complicated to guess the size of MIC from scapy ...
+    name = "Bluetooth Mesh Upper Transport Access Message"
+    fields_desc = [
+        StrField("enc_access_message_and_mic", None),
     ]
 
 
@@ -1094,7 +1155,11 @@ class BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add(Packet):
     name = "Bluetooth Mesh Upper Transport Control Message Friend Subscription List Add"
     fields_desc = [
         ByteField("transaction_number", None),
-        StrField("address_list", None),
+        FieldListField(
+            "addr_list",
+            [],
+            XShortField("addr", None),
+        ),
     ]
 
 
@@ -1104,7 +1169,11 @@ class BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove(Packet):
     )
     fields_desc = [
         ByteField("transaction_number", None),
-        StrField("address_list", None),
+        FieldListField(
+            "addr_list",
+            [],
+            XShortField("addr", None),
+        ),
     ]
 
 
@@ -1159,19 +1228,20 @@ class BTMesh_Upper_Transport_Control_Path_Request(Packet):
 
 class BTMesh_Upper_Transport_Control_Path_Reply(Packet):
     name = "Bluetooth Mesh Upper Transport Control Message Path Reply"
-    field_desc = [
+    fields_desc = [
         BitField("unicast_destination", None, 1),
         BitField("on_behalf_of_dependent_target", None, 1),
         BitField("confirmation_request", None, 1),
         BitField("prohibited", None, 5),
+        XShortField("path_origin", None),
         ByteField("path_origin_forwarding_number", None),
         ConditionalField(
             PacketLenField(
                 "path_target_unicast_addr_range",
                 None,
-                pkt_cls=UnicastAddr,
+                cls=UnicastAddr,
                 length_from=lambda pkt: 3
-                if pkt.original[2] >> 7 == 1
+                if pkt.original[4] >> 7 == 1
                 else 2,  # check value of length_present directly to determine length of PacketLenField
             ),
             lambda pkt: pkt.unicast_destination == 1,
@@ -1222,7 +1292,11 @@ class BTMesh_Upper_Transport_Control_Dependent_Node_Update(Packet):
 class BTMesh_Upper_Transport_Control_Path_Request_Solicitation(Packet):
     name = "Bluetooth Upper Transport Control Message Path Request Solicitation"
     fields_desc = [
-        StrField("addr_list", None),
+        FieldListField(
+            "addr_list",
+            [],
+            XShortField("addr", None),
+        ),
     ]
 
 
@@ -1253,7 +1327,7 @@ OPCODE_TP_PAYLOAD_CLASS_LOWER_TRANSPORT = {
 
 
 class BTMesh_Lower_Transport_Unsegmented_Control_Message(Packet):
-    name = "Bluetooth Mesh Unsegmented Control Message"
+    name = "Bluetooth Mesh Lower Transport Unsegmented Control Message"
     fields_desc = [
         BitField("lower_transport_seg", None, 1),
         BitField("opcode", None, 7),
@@ -1263,9 +1337,15 @@ class BTMesh_Lower_Transport_Unsegmented_Control_Message(Packet):
     def guess_payload_class(self, payload):
         opcode = self.getfieldval("opcode")
         if opcode not in OPCODE_TP_PAYLOAD_CLASS_LOWER_TRANSPORT:
-            return None
+            return Packet.guess_payload_class(self, payload)
         else:
             return OPCODE_TP_PAYLOAD_CLASS_LOWER_TRANSPORT[opcode]
+
+    # Added to have an empty packet Echo Request payload (otherwise we get nothing after Lower Transport)
+    # Since Echo Request is empty
+    def dissection_done(self, pkt):
+        if self.opcode == 0x0E:
+            self.add_payload(BTMesh_Upper_Transport_Control_Path_Echo_Request())
 
 
 class BTMesh_Lower_Transport_Segment_Acknoledgment_Message(Packet):
@@ -1286,6 +1366,11 @@ class BTMesh_Lower_Transport_Unsegmented_Access_Message(Packet):
         BitField("application_key_flag", None, 1),
         BitField("application_key_id", None, 6),
     ]
+
+
+bind_layers(
+    BTMesh_Lower_Transport_Unsegmented_Access_Message, BTMesh_Upper_Transport_Access_PDU
+)
 
 
 class BTMesh_Lower_Transport_Segmented_Access_Message(Packet):
@@ -1325,11 +1410,11 @@ NETWORK
 """
 
 
-class BTMesh_Network_PDU(Packet):
+class BTMesh_Network_PDU_Bis(Packet):
     name = "Bluetooth Network PDU"
     fields_desc = [
-        BitField("iv_index", 0, 1),
-        BitField("network_id", 0, 7),
+        BitField("ivi", 0, 1),
+        BitField("nid", 0, 7),
         BitField("network_ctl", 0, 1),
         BitField("ttl", 0, 7),
         ThreeBytesField("seq_number", None),
@@ -1367,27 +1452,38 @@ class BTMesh_Network_PDU(Packet):
         return b"".join(f for f in built_fields)
 
 
-class BTMesh_Network_PDU_Bis(Packet):
+class BTMesh_Network_PDU(Packet):
     """
     Simpler version of Network PDU, with one field for
     the encrypted lower_transport_pdu and the following MIC
     """
 
-    name = "Bluetooth Network PDU"
+    name = "Bluetooth Network PDU (no obfuscation)"
     fields_desc = [
-        BitField("iv_index", 0, 1),
-        BitField("network_id", 0, 7),
+        BitField("ivi", 0, 1),
+        BitField("nid", 0, 7),
         BitEnumField(
             "network_ctl", 0, 1, {0b0: "Access Message", 0b1: "Control message"}
         ),
         BitField("ttl", 0, 7),
         ThreeBytesField("seq_number", None),
         XShortField("src_addr", None),
-        XShortField("dst_addr", None),
-        XStrField(
-            "enc_lower_transport_pdu_mic",
+        # EncDST||EncTransport||MIC
+        StrField(
+            "enc_dst_enc_transport_pdu_mic",
             None,
         ),
+    ]
+
+
+class BTMesh_Obfuscated_Network_PDU(Packet):
+    name = "Bluetooth Mesh Obfuscated/Encrypted Network PDU"
+    fields_desc = [
+        BitField("ivi", 0, 1),
+        BitField("nid", 0, 7),
+        StrFixedLenField("obfuscated_data", None, length=6),
+        # EncDST||EncTransport||MIC
+        StrField("enc_dst_enc_transport_pdu_mic", None),
     ]
 
 
@@ -1435,17 +1531,31 @@ class BTMesh_Secure_Network_Beacon(Packet):
             "iv_update_flag", 0, 1, ["normal_operation", "iv_update_in_progress"]
         ),
         BitField("unused", 0, 6),
-        XLongField("network_id", None),
-        XIntField("iv_index", None),
+        XLongField("nid", None),
+        XIntField("ivi", None),
         XLongField("authentication_value", None),
     ]
 
 
-class BTMesh_Private_Beacon(Packet):
-    name = "Bluetooth Mesh Private Beacon"
+class BTMesh_Obfuscated_Private_Beacon(Packet):
+    name = "Bluetooth Mesh Obfuscated Private Beacon"
     fields_desc = [
         StrFixedLenField("random", None, length=13),
         StrFixedLenField("obfuscated_private_beacon_data", None, length=5),
+        XLongField("authentication_tag", None),
+    ]
+
+
+class BTMesh_Private_Beacon(Packet):
+    name = "Bluetooth Mesh Private Beacon (no obfuscation)"
+    fields_desc = [
+        StrFixedLenField("random", None, length=13),
+        BitEnumField("key_refresh_flag", 0, 1, [False, True]),
+        BitEnumField(
+            "iv_update_flag", 0, 1, ["normal_operation", "iv_update_in_progress"]
+        ),
+        BitField("unused", 0, 6),
+        XIntField("ivi", None),
         XLongField("authentication_tag", None),
     ]
 
@@ -1477,7 +1587,9 @@ class EIR_BTMesh_Beacon(EIR_Element):
             lambda pkt: pkt.mesh_beacon_type == 1,
         ),
         ConditionalField(
-            PacketField("private_beacon_data", None, pkt_cls=BTMesh_Private_Beacon),
+            PacketField(
+                "private_beacon_data", None, pkt_cls=BTMesh_Obfuscated_Private_Beacon
+            ),
             lambda pkt: pkt.mesh_beacon_type == 2,
         ),
     ]

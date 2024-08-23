@@ -5,6 +5,9 @@ from whad.ble.crypto import (
     generate_diffie_hellman_shared_secret,
     generate_public_key_from_coordinates,
     generate_p256_keypair,
+    generate_random_value,
+    e,
+    xor,
 )
 from cryptography.hazmat.primitives.asymmetric.ec import derive_private_key, SECP256R1
 from random import randbytes
@@ -105,6 +108,11 @@ def generate_private_key_from_bytes(hex_key):
         int.from_bytes(hex_key, byteorder="big"),
         SECP256R1(),  # You can change this to the appropriate curve if needed
     )
+
+
+"""
+PROVISIONING SECURITY
+"""
 
 
 class ProvisioningBearerAdvCryptoManager:
@@ -358,7 +366,9 @@ class ProvisioningBearerAdvCryptoManagerProvisionee(ProvisioningBearerAdvCryptoM
 
     def generate_keypair(self):
         """Generate the P256 private key / public key"""
-        self.private_key_provisionee, self.public_key_provisionee = generate_p256_keypair()
+        self.private_key_provisionee, self.public_key_provisionee = (
+            generate_p256_keypair()
+        )
 
         # Get coordinates format for the Provisioning Packets
         public_key_numbers = self.public_key_provisionee.public_numbers()
@@ -391,3 +401,282 @@ class ProvisioningBearerAdvCryptoManagerProvisionee(ProvisioningBearerAdvCryptoM
             self.rand_provisionee = randbytes(16)
         elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
             self.rand_provisionee = randbytes(32)
+
+
+"""
+NETWORK LAYER SECURITY
+"""
+
+
+class NetworkLayerCryptoManager:
+    """
+    Manages one network bound to ONE network key and its key id.
+    Handles crypto for Network PDUs as well as Secure Network Beacons and Mesh Private Beacons
+    bound to this network.
+    """
+
+    def __init__(self, key_index, net_key=None, iv_index=b"\x00\x00\x00\x00"):
+        # if no net_key given
+        if net_key is None:
+            self.net_key = generate_random_value(128)
+        else:
+            self.net_key = net_key
+
+        self.key_index = key_index
+        self.iv_index = iv_index
+
+        self.__compute_sub_keys()
+
+    def __compute_sub_keys(self):
+        """
+        Computes all keys binded to the network key. Mesh Spec Section 3.9.6.3 p.201
+        """
+
+        # NID, EncryptionKey and PrivacyKey
+        self.nid, self.enc_key, self.privacy_key = (
+            self.__compute_nid_enc_key_privacy_key()
+        )
+
+        # NetworkID
+        self.network_id = self.__compute_network_id()
+
+        # IdentityKey
+        self.identity_key = self.__compute_identity_key()
+
+        # BeaconKey
+        self.beacon_key = self.__compute_beacon_key()
+
+        # PrivateBeaconKey
+        self.private_beacon_key = self.__compute_private_beacon_key()
+
+    def __compute_identity_key(self):
+        """
+        Computes IdentityKey, Mesh Spec Section 3.9.6.3.3 p. 202
+        """
+        salt = s1(b"nkik")
+        p = b"id128" + b"\x01"
+        return k1(self.net_key, salt, p)
+
+    def __compute_beacon_key(self):
+        """
+        Computes the BeaconKey, Mesh Spec Section 3.9.6.3.4 p. 203
+        """
+        salt = s1(b"nkbk")
+        p = b"id128" + b"\x01"
+        return k1(self.net_key, salt, p)
+
+    def __compute_private_beacon_key(self):
+        """
+        Computes the PrivateBeaconKey, Mesh Spec Section 3.9.6.3.5 p. 203
+        """
+        salt = s1(b"nkpk")
+        p = b"id128" + b"\x01"
+        return k1(self.net_key, salt, p)
+
+    def __compute_nid_enc_key_privacy_key(self):
+        """
+        Computes the NID, Encryption Key and PrivacyKey. Mesh Spec Section 3.9.6.3.1 p. 201
+        ONLY FOR MANAGED FLOODING SO FAR
+        """
+        key = k2(self.net_key, b"\x00")
+        nid = key[0]
+        enc_key = key[1:17]
+        privacy_key = key[17:33]
+        return nid, enc_key, privacy_key
+
+    def __compute_network_id(self):
+        """
+        Computes the Network ID. Mesh Spec Section 3.9.6.3.2 p. 202
+        """
+        return k3(self.net_key)
+
+    def encrypt(self, raw_transport_pdu, net_pdu):
+        """
+        Encrypts the transport PDU. Mesh Spec Section 3.9.7.2 p. 206
+
+        :param raw_transport_pdu: Plaintext transport PDU
+        :type raw_transport_pdu: Bytes
+        :param net_pdu Partial Network PDU with information to compute the NetworkNonce and the dest addr
+        :type net_pdu: BTMesh_Network_PDU
+        """
+
+        # Mesh Spec Section 3.9.5.1 p. 194
+        nonce = (
+            b"\x00"
+            + (net_pdu.network_ctl << 7 | net_pdu.ttl).to_bytes(1, "big")
+            + net_pdu.seq_number
+            + net_pdu.src_addr
+            + b"\x00" * 2
+            + self.iv_index
+        )
+
+        if net_pdu.network_ctl == 1:
+            mac_len = 8
+        else:
+            mac_len = 4
+
+        aes_ccm = AES.new(self.enc_key, AES.MODE_CCM, nonce=nonce, mac_len=mac_len)
+        cipher = aes_ccm.encrypt(net_pdu.dst_addr + raw_transport_pdu)
+        mic = aes_ccm.digest()
+        # First 2 bytes -> enc_dst. Rest is enc Transport PDU and MIC
+        return cipher + mic
+
+    def decrypt(self, net_pdu):
+        """
+        Decrypts the transport PDU. Mesh Spec Section 3.9.7.2 p. 206
+
+        :param net_pdu: Net_pdu received (after deobfuscation)
+        :type net_pdu: BTMesh_Network_PDU
+        :returns:  The plaintext of Network PDU and boolean for the MIC check
+        :rtype: (Bytes, boolean)
+        """
+
+        # Mesh Spec Section 3.9.5.1 p. 194
+        nonce = (
+            b"\x00"
+            + (net_pdu.network_ctl << 7 | net_pdu.ttl).to_bytes(1, "big")
+            + net_pdu.seq_number.to_bytes(3, "big")
+            + net_pdu.src_addr
+            + b"\x00" * 2
+            + self.iv_index
+        )
+
+        if net_pdu.network_ctl == 1:
+            mac_len = 8
+        else:
+            mac_len = 4
+        mic = net_pdu.enc_dst_enc_transport_pdu_mic[-mac_len:]
+        cipher = net_pdu.enc_dst_enc_transport_pdu_mic[:-mac_len]
+        aes_ccm = AES.new(self.enc_key, AES.MODE_CCM, nonce=nonce, mac_len=mac_len)
+        plaintext = aes_ccm.decrypt(cipher)
+        try:
+            aes_ccm.verify(mic)
+            return (plaintext, True)
+        except ValueError:
+            return (plaintext, False)
+
+    def obfuscate_net_pdu(self, net_pdu):
+        """
+        Obfuscates the network_pdu (a complete one with encrypted transport PDU and MIC).
+        Mesh Spec Section 3.9.7.3 p. 206
+
+        :param net_pdu: Network PDU to be obfuscated
+        :type net_pdu: BTMesh_Network_PDU
+        :returns: Obfuscated part of Network PDU
+        :rtype: Bytes
+        """
+        privacy_random = net_pdu.enc_dst_enc_transport_pdu_mic[0:7]
+        privacy_plaintext = b"\x00" * 5 + self.iv_index + privacy_random
+        pecb = e(self.privacy_key, privacy_plaintext)
+        obfuscated_data = xor(
+            (net_pdu.network_ctl << 7 | net_pdu.ttl).to_bytes(1, "big")
+            + net_pdu.seq_number.to_bytes(3, "big")
+            + net_pdu.src_addr.to_bytes(2, "big"),
+            pecb[0:6],
+        )
+        return obfuscated_data
+
+    def deobfuscate_net_pdu(self, obf_net_pdu):
+        """
+        Obfuscates the network_pdu (an obfuscated one).
+        Mesh Spec Section 3.9.7.3 p. 206
+
+        :param obf_net_pdu: Network PDU to be deobfuscated
+        :type obf_net_pdu: BTMesh_Obsfucated_Network_PDU
+        :returns: The raw blob of deobfuscated data
+        :type: Bytes
+        """
+        obf_net_pdu.show()
+        print(obf_net_pdu.obfuscated_data)
+        privacy_random = obf_net_pdu.enc_dst_enc_transport_pdu_mic[0:7]
+        privacy_plaintext = b"\x00" * 5 + self.iv_index + privacy_random
+        pecb = e(self.privacy_key, privacy_plaintext)
+        plaintext = xor(obf_net_pdu.obfuscated_data, pecb[0:6])
+        return plaintext
+
+    def check_secure_beacon_auth_value(self, security_beacon):
+        """
+        Checks if a received Secure Beacon of the Network as a correct Authentication Value.
+        Mesh Specification Section 3.10.3 p. 214
+
+        :param security_beacon: The received Secure Network Beacon
+        :type security_beacon: BTMesh_Secure_Network_Beacon
+        :returns: True if check ok, Flase otherwise
+        :rtype: boolean
+        """
+        data = (
+            (
+                security_beacon.key_refresh_flag << 7
+                | security_beacon.iv_update_flag << 6
+                | security_beacon.unused
+            ).to_bytes(1, "big")
+            + security_beacon.nid
+            + security_beacon.ivi
+        )
+        expected_auth_value = aes_cmac(self.beacon_key, data)
+        return expected_auth_value == security_beacon.authentication_value
+
+    def obfuscate_private_beacon(self, clear_private_beacon):
+        """
+        Obfuscates the Private Beacon Data. Generates the Random as well
+        Mesh Spec Section 3.10.4.1 p. 217
+
+        :param clear_private_beacon: The private Beacon to be obfuscated
+        :type clear_private_beacon: BTMesh_Private_Beacon
+        :returns: Raw blobs of obfuscated private beacon data, random data and authentication_tag
+        :rtype: (Bytes, Bytes, Bytes)
+        """
+        private_beacon_data = (
+            clear_private_beacon.key_refresh_flag << 7
+            | clear_private_beacon.iv_update_flag << 6
+            | clear_private_beacon.unused
+        ).to_bytes(1, "big")
+
+        # setup intermidiate values
+        random = generate_random_value(104)
+        b0 = b"\x19" + random + "b\x00\x05"
+        c0 = b"\x00" + random + b"\x00\x00"
+        c1 = b"\x01" + random + b"\x00\x01"
+
+        p = private_beacon_data + b"\x00" * 11
+
+        # authentication_tag computation
+        t0 = e(self.private_beacon_key, b0)
+        t1 = e(self.private_beacon_key, xor(t0, p))
+        t2 = xor(t1, e(self.private_beacon_key, c0))
+        authentication_tag = t2[0:8]
+
+        # computation of obfuscated_data
+        s = e(self.private_beacon_key, c1)
+        obfuscated_data = xor(s[0:5], private_beacon_data)
+        return random, obfuscated_data, authentication_tag
+
+    def deobfuscate_private_beacon(self, private_beacon):
+        """
+        Deobfuscate an obfuscated private beacon.
+        Mesh Spec Section 3.10.4.1 p. 217
+
+        :param private_beacon: Private beacon to be deobfuscated
+        :type private_beacon: BTMesh_Obsfucated_Private_Beacon
+        :returns: Clear private_beacon_data and result of authentication_tag check
+        :rtype: (Bytes, boolean)
+        """
+
+        # setup intermidiate values
+        random = private_beacon.random
+        b0 = b"\x19" + random + "b\x00\x05"
+        c0 = b"\x00" + random + b"\x00\x00"
+        c1 = b"\x01" + random + b"\x00\x01"
+
+        # deobfuscate
+        s = e(self.private_beacon_key, c1)
+        private_beacon_data = xor(s[0:5], private_beacon.obfuscated_private_beacon_data)
+        # Check authentication_tag
+        p = private_beacon_data + b"\x00" * 11
+
+        t0 = e(self.private_beacon_key, b0)
+        t1 = e(self.private_beacon_key, xor(t0, p))
+        t2 = xor(t1, e(self.private_beacon_key, c0))
+        authentication_tag = t2[0:8]
+        is_auth_tag_valid = authentication_tag == private_beacon.authentication_tag
+        return private_beacon_data, is_auth_tag_valid
