@@ -1,4 +1,18 @@
-from whad.bt_mesh.crypto import s1, k1, k2, k3, k4, ProvisioningBearerAdvCryptoManager
+from whad.bt_mesh.crypto import (
+    s1,
+    k1,
+    k2,
+    k3,
+    k4,
+    ProvisioningBearerAdvCryptoManager,
+    NetworkLayerCryptoManager,
+)
+from whad.scapy.layers.bt_mesh import (
+    BTMesh_Obfuscated_Network_PDU,
+    BTMesh_Network_PDU,
+    BTMesh_Lower_Transport_Unsegmented_Control_Message,
+)
+from scapy.all import raw
 import pytest
 
 
@@ -122,7 +136,7 @@ def test_k4(test_input, expected):
 
 
 """
-For new test values, copy this dict, fill it with values, and add it in the params of the fixture crypto_manager_setup below, it should use it
+For new test values, copy this dict, fill it with values, and add it in the params of the fixture pbadv_crypto_manager_setup below, it should use it
 """
 
 _BTM_ECDH_P256_CMAC_AES128_AES_CCM_values = dict(
@@ -247,7 +261,7 @@ _BTM_ECDH_P256_HMAC_SHA256_AES_CCM_values = dict(
         _BTM_ECDH_P256_HMAC_SHA256_AES_CCM_values,
     ],
 )
-def crypto_manager_setup(request):
+def pbadv_crypto_manager_setup(request):
     test_values = request.param
     test_input = test_values["test_input"]
     test_pdu_values = test_values["test_pdu_values"]
@@ -259,55 +273,163 @@ def crypto_manager_setup(request):
 
 
 class TestProvisioningBearerAdvCryptoManager(object):
-    def test_ECDH(self, crypto_manager_setup):
-        crypto_manager, expected = crypto_manager_setup
+    def test_ECDH(self, pbadv_crypto_manager_setup):
+        crypto_manager, expected = pbadv_crypto_manager_setup
         assert crypto_manager.ecdh_secret == expected["ecdh_secret"]
 
-    def test_confirmation_salt(self, crypto_manager_setup):
-        crypto_manager, expected = crypto_manager_setup
+    def test_confirmation_salt(self, pbadv_crypto_manager_setup):
+        crypto_manager, expected = pbadv_crypto_manager_setup
         assert crypto_manager.confirmation_salt == expected["confirmation_salt"]
 
-    def test_confirmation_key(self, crypto_manager_setup):
-        crypto_manager, expected = crypto_manager_setup
+    def test_confirmation_key(self, pbadv_crypto_manager_setup):
+        crypto_manager, expected = pbadv_crypto_manager_setup
         crypto_manager.compute_confirmation_key()
         assert crypto_manager.confirmation_key == expected["confirmation_key"]
 
-    def test_confirmation_provisioner(self, crypto_manager_setup):
-        crypto_manager, expected = crypto_manager_setup
+    def test_confirmation_provisioner(self, pbadv_crypto_manager_setup):
+        crypto_manager, expected = pbadv_crypto_manager_setup
         crypto_manager.compute_confirmation_provisioner()
         assert (
             crypto_manager.confirmation_provisioner
             == expected["confirmation_provisioner"]
         )
 
-    def test_confirmation_provisionee(self, crypto_manager_setup):
-        crypto_manager, expected = crypto_manager_setup
+    def test_confirmation_provisionee(self, pbadv_crypto_manager_setup):
+        crypto_manager, expected = pbadv_crypto_manager_setup
         crypto_manager.compute_confirmation_provisionee()
-        assert crypto_manager.confirmation_provisionee == expected["confirmation_provisionee"]
+        assert (
+            crypto_manager.confirmation_provisionee
+            == expected["confirmation_provisionee"]
+        )
 
-    def test_provisioning_salt(self, crypto_manager_setup):
-        crypto_manager, expected = crypto_manager_setup
+    def test_provisioning_salt(self, pbadv_crypto_manager_setup):
+        crypto_manager, expected = pbadv_crypto_manager_setup
         crypto_manager.compute_provisioning_salt()
         assert crypto_manager.provisioning_salt == expected["provisioning_salt"]
 
-    def test_session_key(self, crypto_manager_setup):
-        crypto_manager, expected = crypto_manager_setup
+    def test_session_key(self, pbadv_crypto_manager_setup):
+        crypto_manager, expected = pbadv_crypto_manager_setup
         crypto_manager.compute_session_key()
         assert crypto_manager.session_key == expected["session_key"]
 
-    def test_session_nonce(self, crypto_manager_setup):
-        crypto_manager, expected = crypto_manager_setup
+    def test_session_nonce(self, pbadv_crypto_manager_setup):
+        crypto_manager, expected = pbadv_crypto_manager_setup
         crypto_manager.compute_session_nonce()
         assert crypto_manager.session_nonce == expected["session_nonce"]
 
-    def test_decrypt(self, crypto_manager_setup):
-        crypto_manager, expected = crypto_manager_setup
+    def test_decrypt(self, pbadv_crypto_manager_setup):
+        crypto_manager, expected = pbadv_crypto_manager_setup
         cipher = expected["cipher"][:-8]
         mic = expected["cipher"][-8:]
         assert crypto_manager.decrypt(cipher, mic) == (expected["plaintext"], True)
 
-    def test_encrypt(self, crypto_manager_setup):
-        crypto_manager, expected = crypto_manager_setup
+    def test_encrypt(self, pbadv_crypto_manager_setup):
+        crypto_manager, expected = pbadv_crypto_manager_setup
         plaintext = expected["plaintext"]
         cipher, mic = crypto_manager.encrypt(plaintext)
         assert cipher + mic == expected["cipher"]
+
+
+"""
+Network Layer Crypto Tests
+"""
+
+_NETKEY_INPUT1 = dict(
+    net_key=bytes.fromhex("7dd7364cd842ad18c17c2b820c84c3d6"),
+    iv_index=bytes.fromhex("12345678"),
+    pdus=dict(
+        obf_net_pdu=(
+            BTMesh_Obfuscated_Network_PDU(
+                bytes.fromhex(
+                    "68eca487516765b5e5bfdacbaf6cb7fb6bff871f035444ce83a670df"
+                )
+            )
+        ),
+        not_obf_net_pdu=BTMesh_Network_PDU(
+            ivi=0,
+            nid=0x68,
+            network_ctl=1,
+            ttl=0,
+            seq_number=1,
+            src_addr=0x1201,
+            enc_dst_enc_transport_pdu_mic=bytes.fromhex(
+                "b5e5bfdacbaf6cb7fb6bff871f035444ce83a670df"
+            ),
+        ),
+        lower_transport_pdu=BTMesh_Lower_Transport_Unsegmented_Control_Message(
+            bytes.fromhex("034b50057e400000010000")
+        ),
+    ),
+    expected=dict(
+        nid=bytes.fromhex("68"),
+        enc_key=bytes.fromhex("0953fa93e7caac9638f58820220a398e"),
+        privacy_key=bytes.fromhex("8b84eedec100067d670971dd2aa700cf"),
+        network_id=bytes.fromhex("3ecaff672f673370"),
+        identity_key=bytes.fromhex("84396c435ac48560b5965385253e210c"),
+        beacon_key=bytes.fromhex("5423d967da639a99cb02231a83f7d254"),
+    ),
+)
+
+
+@pytest.fixture(
+    scope="class",
+    params=[_NETKEY_INPUT1],
+)
+def network_crypto_manager_setup(request):
+    test_values = request.param
+    crypto_manager = NetworkLayerCryptoManager(
+        key_index=0x00, net_key=test_values["net_key"], iv_index=test_values["iv_index"]
+    )
+
+    return (crypto_manager, test_values["expected"], test_values["pdus"])
+
+
+class TestNetworkLayerCryptoManager(object):
+    def test_nid(self, network_crypto_manager_setup):
+        crypto_manager, expected, pdus = network_crypto_manager_setup
+        assert crypto_manager.nid.to_bytes(1, "big") == expected["nid"]
+
+    def test_enc_key(self, network_crypto_manager_setup):
+        crypto_manager, expected, pdus = network_crypto_manager_setup
+        assert crypto_manager.enc_key == expected["enc_key"]
+
+    def test_privacy_key(self, network_crypto_manager_setup):
+        crypto_manager, expected, pdus = network_crypto_manager_setup
+        assert crypto_manager.privacy_key == expected["privacy_key"]
+
+    def test_network_id(self, network_crypto_manager_setup):
+        crypto_manager, expected, pdus = network_crypto_manager_setup
+        assert crypto_manager.network_id == expected["network_id"]
+
+    def test_identity_key(self, network_crypto_manager_setup):
+        crypto_manager, expected, pdus = network_crypto_manager_setup
+        assert crypto_manager.identity_key == expected["identity_key"]
+
+    def test_beacon_key(self, network_crypto_manager_setup):
+        crypto_manager, expected, pdus = network_crypto_manager_setup
+        assert crypto_manager.beacon_key == expected["beacon_key"]
+
+    def test_deobfuscation(self, network_crypto_manager_setup):
+        crypto_manager, expected, pdus = network_crypto_manager_setup
+        net_pdu = pdus["obf_net_pdu"]
+        result = crypto_manager.deobfuscate_net_pdu(net_pdu)
+        network_ctl = (result[0]) >> 7
+        ttl = result[0] & 0x7F
+        seq_number = result[1:4]
+        src_addr = result[4:6]
+        assert raw(
+            BTMesh_Network_PDU(
+                ivi=crypto_manager.iv_index[0] & 0b01,
+                nid=crypto_manager.nid,
+                network_ctl=network_ctl,
+                ttl=ttl,
+                seq_number=int.from_bytes(seq_number, "big"),
+                src_addr=int.from_bytes(src_addr, "big"),
+                enc_dst_enc_transport_pdu_mic=net_pdu.enc_dst_enc_transport_pdu_mic,
+            )
+        ) == raw(pdus["not_obf_net_pdu"])
+
+    def test_obfuscation(self, network_crypto_manager_setup):
+        crypto_manager, expected, pdus = network_crypto_manager_setup
+        obfuscated_data = crypto_manager.obfuscate_net_pdu(pdus["not_obf_net_pdu"])
+        assert obfuscated_data == pdus["obf_net_pdu"].obfuscated_data
