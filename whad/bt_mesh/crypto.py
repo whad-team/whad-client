@@ -490,12 +490,14 @@ class NetworkLayerCryptoManager:
         """
         return k3(self.net_key)
 
-    def encrypt(self, raw_transport_pdu, net_pdu):
+    def encrypt(self, raw_transport_pdu, clear_dst_addr, net_pdu):
         """
         Encrypts the transport PDU. Mesh Spec Section 3.9.7.2 p. 206
 
         :param raw_transport_pdu: Plaintext transport PDU
         :type raw_transport_pdu: Bytes
+        :param clear_dst_addr: The plaintext dst_addr to be encrypted
+        :type clear_dst_addr: Bytes
         :param net_pdu Partial Network PDU with information to compute the NetworkNonce and the dest addr
         :type net_pdu: BTMesh_Network_PDU
         """
@@ -504,8 +506,8 @@ class NetworkLayerCryptoManager:
         nonce = (
             b"\x00"
             + (net_pdu.network_ctl << 7 | net_pdu.ttl).to_bytes(1, "big")
-            + net_pdu.seq_number
-            + net_pdu.src_addr
+            + net_pdu.seq_number.to_bytes(3, "big")
+            + net_pdu.src_addr.to_bytes(2, "big")
             + b"\x00" * 2
             + self.iv_index
         )
@@ -516,7 +518,7 @@ class NetworkLayerCryptoManager:
             mac_len = 4
 
         aes_ccm = AES.new(self.enc_key, AES.MODE_CCM, nonce=nonce, mac_len=mac_len)
-        cipher = aes_ccm.encrypt(net_pdu.dst_addr + raw_transport_pdu)
+        cipher = aes_ccm.encrypt(clear_dst_addr + raw_transport_pdu)
         mic = aes_ccm.digest()
         # First 2 bytes -> enc_dst. Rest is enc Transport PDU and MIC
         return cipher + mic
@@ -536,7 +538,7 @@ class NetworkLayerCryptoManager:
             b"\x00"
             + (net_pdu.network_ctl << 7 | net_pdu.ttl).to_bytes(1, "big")
             + net_pdu.seq_number.to_bytes(3, "big")
-            + net_pdu.src_addr
+            + net_pdu.src_addr.to_bytes(2, "big")
             + b"\x00" * 2
             + self.iv_index
         )
@@ -594,6 +596,27 @@ class NetworkLayerCryptoManager:
         plaintext = xor(obf_net_pdu.obfuscated_data, pecb[0:6])
         return plaintext
 
+    def compute_secure_beacon_auth_value(self, security_beacon):
+        """
+        Computes the authentication value of the Security Mesh Beacon. Can be to verify it or to compute in order to send it.
+        Mesh Specification Section 3.10.3 p. 214
+
+        :param security_beacon: The partiel Secure Network Beacon (no authentication_value)
+        :type security_beacon: BTMesh_Secure_Network_Beacon
+        :returns: Authentication Value
+        :rtype: Bytes
+        """
+        data = (
+            (
+                security_beacon.key_refresh_flag
+                | security_beacon.iv_update_flag << 1
+            ).to_bytes(1, "big")
+            + security_beacon.nid.to_bytes(8, "big")
+            + security_beacon.ivi.to_bytes(4, "big")
+        )
+        expected_auth_value = aes_cmac(self.beacon_key, data)
+        return expected_auth_value[0:8]
+
     def check_secure_beacon_auth_value(self, security_beacon):
         """
         Checks if a received Secure Beacon of the Network as a correct Authentication Value.
@@ -604,38 +627,30 @@ class NetworkLayerCryptoManager:
         :returns: True if check ok, Flase otherwise
         :rtype: boolean
         """
-        data = (
-            (
-                security_beacon.key_refresh_flag << 7
-                | security_beacon.iv_update_flag << 6
-                | security_beacon.unused
-            ).to_bytes(1, "big")
-            + security_beacon.nid
-            + security_beacon.ivi
-        )
-        expected_auth_value = aes_cmac(self.beacon_key, data)
+        expected_auth_value = self.compute_secure_beacon_auth_value(security_beacon)
         return expected_auth_value == security_beacon.authentication_value
 
-    def obfuscate_private_beacon(self, clear_private_beacon):
+    def obfuscate_private_beacon(self, clear_private_beacon, random=None):
         """
         Obfuscates the Private Beacon Data. Generates the Random as well
         Mesh Spec Section 3.10.4.1 p. 217
 
-        :param clear_private_beacon: The private Beacon to be obfuscated
+        :param clear_private_beacon: The private Beacon to be obfuscated (no random or authentication_tag, only flags)
         :type clear_private_beacon: BTMesh_Private_Beacon
-        :returns: Raw blobs of obfuscated private beacon data, random data and authentication_tag
+        :param random: Set fixed random, TESTS ONLY
+        :returns: Raw blobs of (in order) random data, obfuscated private beacon data and authentication_tag
         :rtype: (Bytes, Bytes, Bytes)
         """
         private_beacon_data = (
-            clear_private_beacon.key_refresh_flag << 7
-            | clear_private_beacon.iv_update_flag << 6
-            | clear_private_beacon.unused
-        ).to_bytes(1, "big")
+            clear_private_beacon.key_refresh_flag
+            | clear_private_beacon.iv_update_flag << 1
+        ).to_bytes(1, "big") + clear_private_beacon.ivi.to_bytes(4, "big")
 
         # setup intermidiate values
-        random = generate_random_value(104)
-        b0 = b"\x19" + random + "b\x00\x05"
-        c0 = b"\x00" + random + b"\x00\x00"
+        if random is None:
+            random = generate_random_value(104)
+        b0 = b"\x19" + random + b"\x00\x05"
+        c0 = b"\x01" + random + b"\x00\x00"
         c1 = b"\x01" + random + b"\x00\x01"
 
         p = private_beacon_data + b"\x00" * 11
@@ -664,8 +679,8 @@ class NetworkLayerCryptoManager:
 
         # setup intermidiate values
         random = private_beacon.random
-        b0 = b"\x19" + random + "b\x00\x05"
-        c0 = b"\x00" + random + b"\x00\x00"
+        b0 = b"\x19" + random + b"\x00\x05"
+        c0 = b"\x01" + random + b"\x00\x00"
         c1 = b"\x01" + random + b"\x00\x01"
 
         # deobfuscate

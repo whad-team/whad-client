@@ -1526,14 +1526,14 @@ class BTMesh_Unprovisioned_Device_Beacon(Packet):
 class BTMesh_Secure_Network_Beacon(Packet):
     name = "Bluetooth Mesh Secure Network Beacon"
     fields_desc = [
-        BitEnumField("key_refresh_flag", 0, 1, [False, True]),
+        BitField("unused", 0, 6),
         BitEnumField(
             "iv_update_flag", 0, 1, ["normal_operation", "iv_update_in_progress"]
         ),
-        BitField("unused", 0, 6),
+        BitEnumField("key_refresh_flag", 0, 1, [False, True]),
         XLongField("nid", None),
         XIntField("ivi", None),
-        XLongField("authentication_value", None),
+        StrFixedLenField("authentication_value", None, length=8),
     ]
 
 
@@ -1542,7 +1542,7 @@ class BTMesh_Obfuscated_Private_Beacon(Packet):
     fields_desc = [
         StrFixedLenField("random", None, length=13),
         StrFixedLenField("obfuscated_private_beacon_data", None, length=5),
-        XLongField("authentication_tag", None),
+        StrFixedLenField("authentication_tag", None, length=8),
     ]
 
 
@@ -1550,13 +1550,13 @@ class BTMesh_Private_Beacon(Packet):
     name = "Bluetooth Mesh Private Beacon (no obfuscation)"
     fields_desc = [
         StrFixedLenField("random", None, length=13),
-        BitEnumField("key_refresh_flag", 0, 1, [False, True]),
+        BitField("unused", 0, 6),
         BitEnumField(
             "iv_update_flag", 0, 1, ["normal_operation", "iv_update_in_progress"]
         ),
-        BitField("unused", 0, 6),
+        BitEnumField("key_refresh_flag", 0, 1, [False, True]),
         XIntField("ivi", None),
-        XLongField("authentication_tag", None),
+        StrFixedLenField("authentication_tag", None, length=8),
     ]
 
 
