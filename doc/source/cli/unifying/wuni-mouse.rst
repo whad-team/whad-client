@@ -99,4 +99,4 @@ X and Y and then send a right-button click.
 
     $ echo "100,100,0,0,R" | wuni-mouse -i uart0 -a 49:f9:51:2e:a4
 
-.. warning:: This tool cannot be used in conjunction with ``whadserver``, due to extra latency induced by the TCP connection
+.. warning:: This tool cannot be used in conjunction with ``wserver``, due to extra latency induced by the TCP connection

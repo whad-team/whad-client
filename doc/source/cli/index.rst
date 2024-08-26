@@ -25,7 +25,7 @@ Generic tools
     generic/wextract
     generic/wdump
     generic/wshark
-    generic/whadserver
+    generic/wserver
 
 Bluetooth Low Energy tools
 --------------------------
@@ -122,7 +122,7 @@ Once this socket server is active, ``wshark`` will connect to it and spawns anot
 Unix socket server of its own, providing ``wble-central`` with the information
 it needs to connect to its Unix socket server. ``wble-connect`` connects
 to ``wshark``'s Unix socket server and is now able to send BLE PDUs into the
-already established connection. Packets can travel from ``wble-central`` to 
+already established connection. Packets can travel from ``wble-central`` to
 ``wble-connect`` back and forth, while ``wshark`` simply monitor them and acts
 as a basic proxy.
 

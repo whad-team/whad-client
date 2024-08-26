@@ -77,8 +77,8 @@ Sending encrypted keypresses
 ----------------------------
 
 Specifying an encryption key with ``--key`` enables encryption and will allow
-``wuni-keyboard`` to send encrypted keypresses using the ``--payload`` or 
-``--ducky`` options. 
+``wuni-keyboard`` to send encrypted keypresses using the ``--payload`` or
+``--ducky`` options.
 
 The encryption key must be provided as a 128-bit hex-encoded value:
 
@@ -96,4 +96,4 @@ to the target wireless keyboard dongle. The following dispositions are supported
 *pt*, *ru*, *si*, *sv*, *tr*, *us*. The default locale is *us*.
 
 
-.. warning:: This tool cannot be used in conjunction with ``whadserver``, due to extra latency induced by the TCP connection
+.. warning:: This tool cannot be used in conjunction with ``wserver``, due to extra latency induced by the TCP connection
