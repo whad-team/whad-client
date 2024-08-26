@@ -11,6 +11,9 @@ from whad.scapy.layers.bt_mesh import (
     BTMesh_Obfuscated_Network_PDU,
     BTMesh_Network_PDU,
     BTMesh_Lower_Transport_Unsegmented_Control_Message,
+    BTMesh_Secure_Network_Beacon,
+    BTMesh_Private_Beacon,
+    BTMesh_Obfuscated_Private_Beacon,
 )
 from scapy.all import raw
 import pytest
@@ -359,6 +362,9 @@ _NETKEY_INPUT1 = dict(
         lower_transport_pdu=BTMesh_Lower_Transport_Unsegmented_Control_Message(
             bytes.fromhex("034b50057e400000010000")
         ),
+        secure_net_beacon=BTMesh_Secure_Network_Beacon(
+            bytes.fromhex("003ecaff672f673370123456788ea261582f364f6f"),
+        ),
     ),
     expected=dict(
         nid=bytes.fromhex("68"),
@@ -367,6 +373,7 @@ _NETKEY_INPUT1 = dict(
         network_id=bytes.fromhex("3ecaff672f673370"),
         identity_key=bytes.fromhex("84396c435ac48560b5965385253e210c"),
         beacon_key=bytes.fromhex("5423d967da639a99cb02231a83f7d254"),
+        clear_dst_addr=bytes.fromhex("fffd"),
     ),
 )
 
@@ -409,7 +416,7 @@ class TestNetworkLayerCryptoManager(object):
         crypto_manager, expected, pdus = network_crypto_manager_setup
         assert crypto_manager.beacon_key == expected["beacon_key"]
 
-    def test_deobfuscation(self, network_crypto_manager_setup):
+    def test_net_deobfuscation(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
         net_pdu = pdus["obf_net_pdu"]
         result = crypto_manager.deobfuscate_net_pdu(net_pdu)
@@ -429,7 +436,121 @@ class TestNetworkLayerCryptoManager(object):
             )
         ) == raw(pdus["not_obf_net_pdu"])
 
-    def test_obfuscation(self, network_crypto_manager_setup):
+    def test_net_obfuscation(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
         obfuscated_data = crypto_manager.obfuscate_net_pdu(pdus["not_obf_net_pdu"])
         assert obfuscated_data == pdus["obf_net_pdu"].obfuscated_data
+
+    def test_net_decrypt(self, network_crypto_manager_setup):
+        crypto_manager, expected, pdus = network_crypto_manager_setup
+        net_pdu = pdus["not_obf_net_pdu"]
+        plaintext, is_auth_tag_valid = crypto_manager.decrypt(net_pdu)
+        dst_addr = plaintext[:2]
+        lower_transport_pdu = BTMesh_Lower_Transport_Unsegmented_Control_Message(
+            plaintext[2:]
+        )
+        assert (
+            dst_addr == expected["clear_dst_addr"]
+            and raw(lower_transport_pdu) == raw(pdus["lower_transport_pdu"])
+            and is_auth_tag_valid
+        )
+
+    def test_net_encrypt(self, network_crypto_manager_setup):
+        crypto_manager, expected, pdus = network_crypto_manager_setup
+        lower_transport_pdu = pdus["lower_transport_pdu"]
+        # Need the information in the net PDU to encrypt, like address and seq_number. encrypted value not used (we dont have it in theory ...)
+        net_pdu = pdus["not_obf_net_pdu"]
+        enc_transport = crypto_manager.encrypt(
+            raw(lower_transport_pdu), expected["clear_dst_addr"], net_pdu
+        )
+        assert enc_transport == net_pdu.enc_dst_enc_transport_pdu_mic
+
+    def test_secure_net_beacon_auth_check(self, network_crypto_manager_setup):
+        crypto_manager, expected, pdus = network_crypto_manager_setup
+        secure_net_beacon = pdus["secure_net_beacon"]
+        assert crypto_manager.check_secure_beacon_auth_value(secure_net_beacon)
+
+
+"""
+Mesh Private Beacon Tests (part of Network Layer crypto)
+Seperated because sample data alwayes uses different net_key for this ...
+"""
+
+
+_PRIVATE_BEACON_INPUT1 = dict(
+    net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
+    iv_index=bytes.fromhex("12345679"),
+    obf_private_beacon=BTMesh_Obfuscated_Private_Beacon(
+        bytes.fromhex("435f18f85cf78a3121f58478a561e488e7cbf3174f022a514741")
+    ),
+    expected=dict(
+        private_beacon_key=bytes.fromhex("6be76842460b2d3a5850d4698409f1bb"),
+        private_beacon=BTMesh_Private_Beacon(
+            random=bytes.fromhex("435f18f85cf78a3121f58478a5"),
+            key_refresh_flag=0,
+            iv_update_flag=1,
+            ivi=0x1010ABCD,
+            authentication_tag=bytes.fromhex("F3174F022A514741"),
+        ),
+    ),
+)
+
+
+@pytest.fixture(
+    scope="class",
+    params=[_PRIVATE_BEACON_INPUT1],
+)
+def network_crypto_manager_setup_private_beacon(request):
+    test_values = request.param
+    crypto_manager = NetworkLayerCryptoManager(
+        key_index=0x00, net_key=test_values["net_key"], iv_index=test_values["iv_index"]
+    )
+
+    return (crypto_manager, test_values["expected"], test_values["obf_private_beacon"])
+
+
+class TestNetworkLayerCryptoManagerPrivateBeacon:
+    def test_private_beacon_key(self, network_crypto_manager_setup_private_beacon):
+        crypto_manager, expected, obf_private_beacon = (
+            network_crypto_manager_setup_private_beacon
+        )
+        assert expected["private_beacon_key"] == crypto_manager.private_beacon_key
+
+    def test_private_beacon_deobfuscate(
+        self, network_crypto_manager_setup_private_beacon
+    ):
+        crypto_manager, expected, obf_private_beacon = (
+            network_crypto_manager_setup_private_beacon
+        )
+        private_beacon_data, is_auth_tag_valid = (
+            crypto_manager.deobfuscate_private_beacon(obf_private_beacon)
+        )
+        result_packet = BTMesh_Private_Beacon(
+            random=obf_private_beacon.random,
+            key_refresh_flag=private_beacon_data[0] & 0b01,
+            iv_update_flag=(private_beacon_data[0] >> 1) & 0b01,
+            ivi=int.from_bytes(private_beacon_data[1:], "big"),
+            authentication_tag=obf_private_beacon.authentication_tag,
+        )
+        assert (
+            raw(result_packet) == raw(expected["private_beacon"]) and is_auth_tag_valid
+        )
+
+    def test_private_beacon_obfuscation(
+        self, network_crypto_manager_setup_private_beacon
+    ):
+        crypto_manager, expected, obf_private_beacon = (
+            network_crypto_manager_setup_private_beacon
+        )
+        clear_private_beacon = expected["private_beacon"]
+        random, obfuscated_private_data, authentication_tag = (
+            crypto_manager.obfuscate_private_beacon(
+                clear_private_beacon, random=clear_private_beacon.random
+            )
+        )
+        private_beacon = BTMesh_Obfuscated_Private_Beacon(
+            random=random,
+            obfuscated_private_beacon_data=obfuscated_private_data,
+            authentication_tag=authentication_tag,
+        )
+        assert obf_private_beacon == private_beacon
