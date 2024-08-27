@@ -7,6 +7,7 @@ import os
 import logging
 import time
 import traceback
+import string
 from argparse import ArgumentParser, Namespace
 
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, UnsupportedCapability
@@ -16,6 +17,8 @@ from whad.device import Bridge, ProtocolHub
 from scapy.all import *
 from whad.scapy.layers.rf4ce import *
 from whad.scapy.layers.phy import *
+from whad.scapy.layers.esb import *
+from whad.scapy.layers.unifying import *
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.tools.utils import list_implemented_injectors, get_injector_parameters, gen_option_name, build_configuration_from_args
 #from whad.unifying import Injector
@@ -54,7 +57,26 @@ class WhadInjectApp(CommandLineApp):
             output=CommandLineApp.OUTPUT_WHAD
         )
 
+        self.add_argument(
+            '-r',
+            '--repeat',
+            dest='repeat',
+            action='store_true',
+            default=False,
+            help="Repeat the transmission of packets"
+        )
+
+
+        self.add_argument(
+            '-d',
+            '--delay',
+            dest='delay',
+            default=0,
+            help="Delay between the transmission of two consecutive packets"
+        )
+
         self._input_queue = Queue()
+        self._repeat_queue = Queue()
 
         # Don't build yet if piped
         if not self.is_stdin_piped():
@@ -168,7 +190,16 @@ class WhadInjectApp(CommandLineApp):
                     self._input_queue.put(pkt)
                     self.provided_count += 1
                 except Exception as e:
-                    error("Failure during packet interpretation: " + str(p) + " -> " + str(e))
+                    # If hexadecimal only, try to interpret as bytes
+                    if all(c in string.hexdigits for c in p):
+                        try:
+                            pkt = bytes.fromhex(p)
+                            self._input_queue.put(pkt)
+                            self.provided_count += 1
+                        except Exception as e:
+                            error("Failure during packet interpretation: " + str(p) + " -> " + str(e))
+                    else:
+                        error("Failure during packet interpretation: " + str(p) + " -> " + str(e))
 
     def pre_run(self):
         """Pre-run operations: rewrite arguments to allow skipping domain name when a pipe is configured.
@@ -265,18 +296,34 @@ class WhadInjectApp(CommandLineApp):
                     except Exception as e:
                         self.error("Error during configuration: " +repr(e))
 
+                    while True:
+                        while (self.input_interface is not None and self.input_interface.opened) or self.provided_count > 0 or not self._input_queue.empty():
+                            if not self._input_queue.empty():
+                                packet = self._input_queue.get()
+                                try:
+                                    if isinstance(packet, bytes):
+                                        packet = injector.format(packet)[0]
+                                        # patch for BLE only
+                                        if BTLE_RF in packet:
+                                            packet = packet[BTLE]
+                                    info("Transmitting: ")
+                                    display_packet(packet)
+                                    injector.inject(packet)
+                                    if float(self.args.delay) > 0:
+                                        time.sleep(float(self.args.delay))
+                                    if self.args.repeat:
+                                        self._repeat_queue.put(packet)
+                                except Exception as e:
+                                    self.error("Error during injection: " + repr(e))
+                                    traceback.print_exc()
+                                self.provided_count-=1
 
-                    while (self.input_interface is not None and self.input_interface.opened) or self.provided_count > 0 or not self._input_queue.empty():
-                        if not self._input_queue.empty():
-                            packet = self._input_queue.get()
-                            try:
-                                info("Transmitting: ")
-                                display_packet(packet)
-                                injector.inject(packet)
-                            except Exception as e:
-                                self.error("Error during injection: " + repr(e))
-                                traceback.print_exc()
-                            self.provided_count-=1
+                        if not self.args.repeat:
+                            break
+
+                        while not self._repeat_queue.empty():
+                            self._input_queue.put(self._repeat_queue.get())
+                            self.provided_count += 1
                 else:
                     self.error("You need to specify a domain.")
             else:

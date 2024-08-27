@@ -51,6 +51,8 @@ class BLE(WhadDeviceConnector):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
+        if isinstance(packet, bytes):
+            packet = BTLE(packet)
         return self.hub.ble.format(packet)
 
     def __init__(self, device=None, synchronous=False):

@@ -101,6 +101,7 @@ class Injector(BLE):
             channel = packet.metadata.channel
         else:
             channel = 37 # fallback to channel 37
+
         return self.send_pdu(packet, access_address=access_address, conn_handle=channel, direction=BleDirection.UNKNOWN)
 
     def inject_to_slave(self, packet):

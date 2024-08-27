@@ -67,6 +67,8 @@ class Dot15d4(WhadDeviceConnector):
         """
         Format a packet using the underlying translator.
         """
+        if isinstance(packet, bytes):
+            packet = Dot15d4FCS(packet)
         return self.hub.dot15d4.format(packet)
 
     def can_sniff(self) -> bool:

@@ -29,6 +29,8 @@ class ESB(WhadDeviceConnector):
         Converts a scapy packet with its metadata to a tuple containing a scapy packet with
         the appropriate header and the timestamp in microseconds.
         """
+        if isinstance(packet, bytes):
+            packet = ESB_Hdr(packet)
         return self.hub.esb.format(packet)
 
     def __init__(self, device=None, synchronous=False):
