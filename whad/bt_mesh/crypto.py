@@ -608,8 +608,7 @@ class NetworkLayerCryptoManager:
         """
         data = (
             (
-                security_beacon.key_refresh_flag
-                | security_beacon.iv_update_flag << 1
+                security_beacon.key_refresh_flag | security_beacon.iv_update_flag << 1
             ).to_bytes(1, "big")
             + security_beacon.nid.to_bytes(8, "big")
             + security_beacon.ivi.to_bytes(4, "big")
@@ -649,6 +648,7 @@ class NetworkLayerCryptoManager:
         # setup intermidiate values
         if random is None:
             random = generate_random_value(104)
+
         b0 = b"\x19" + random + b"\x00\x05"
         c0 = b"\x01" + random + b"\x00\x00"
         c1 = b"\x01" + random + b"\x00\x01"
@@ -695,3 +695,326 @@ class NetworkLayerCryptoManager:
         authentication_tag = t2[0:8]
         is_auth_tag_valid = authentication_tag == private_beacon.authentication_tag
         return private_beacon_data, is_auth_tag_valid
+
+
+class UpperTransportLayerAppKeyCryptoManager:
+    """
+    Manages upper layer cyptography (application keys). All keys for one network are managed here.
+    This manages ONE application key.
+    The UpperTransportLayer state manages all the application keys bound to the network it sits in.
+    """
+
+    def __init__(self, app_key=None):
+        if app_key is None:
+            self.app_key = generate_random_value(128)
+        else:
+            self.app_key = app_key
+
+        # Application Key Identifier
+        self.aid = self.__compute_aid()
+
+    def __compute_aid(self):
+        return k4(self.app_key)
+
+    """
+    Need to have an encrypting/decrypting function for each combination of :
+    - type of destination address
+    - unsegmeneted/segmented on lower transport
+    For encryption -> always size_trans_mic = 32 bits (since we can either choose OR forced to 32 so ...)
+    For decryption -> depends if unseg/seg. If unseg, 32 bits. If seg, depends on field in Lower Transport
+    """
+
+    def __compute_seq_auth(self, iv_index, seq_number):
+        """
+        Compute the SeqAuth value (Mesh Spec Section 3.5.3.1)
+
+        :param iv_index: [TODO:description]
+        :type iv_index: [TODO:type]
+        :param seq_number: [TODO:description]
+        :type seq_number: [TODO:type]
+        """
+        return iv_index + seq_number
+
+    def __compute_nonce(self, aszmic, seq_auth, src_addr, dst_addr, iv_index):
+        return (
+            b"\x01"
+            + ((int.from_bytes(aszmic, "big") << 7) & 0x80).to_bytes(1, "big")
+            + seq_auth[-3:]
+            + src_addr
+            + dst_addr
+            + iv_index
+        )
+
+    def encrypt(
+        self,
+        access_message,
+        aszmic,
+        seq_number,
+        src_addr,
+        dst_addr,
+        iv_index,
+        label_uuid=None,
+    ):
+        """
+        Encrypts the access_message with this application key.
+        Mesh Spec Section 3.9.7.1 p. 205
+
+        :param access_message: Raw Access message to be encrypted
+        :type access_message: Bytes
+        :param aszmic: Size of MIC value (0 or 1). For Nonce
+        :type aszmic: int
+        :param seq_number: segment number Value (of first segment)
+        :type seq_number: Bytes
+        :param src_addr: Source addr of the packet
+        :type src_addr: Bytes
+        :param dst_addr: Destination addr of the packet
+        :type dst_addr: Bytes
+        :param iv_index: Current IV index
+        :type iv_index: Bytes
+        :param label_uuid: Label UUID associated with the virtual addr (Mesh Spec Section 3.4.2.3) if dst_addr is virtual addr
+        :type label_uuid: Bytes
+        :returns: The encrypted message concatenated with mic
+        :rtype: Bytes
+        """
+        seq_auth = self.__compute_seq_auth(iv_index, seq_number)
+        nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
+
+        if aszmic == 1:
+            mac_len = 8
+        else:
+            mac_len = 4
+
+        # check if dst_addr is virtual
+        if (dst_addr[0] >> 6) & 0b11 == 0b10:
+            aes_ccm = AES.new(
+                self.app_key,
+                AES.MODE_CCM,
+                nonce=nonce,
+                mac_len=mac_len,
+                assoc_len=len(label_uuid),
+            )
+            aes_ccm.update(label_uuid)
+
+        else:
+            aes_ccm = AES.new(
+                self.app_key,
+                AES.MODE_CCM,
+                nonce=nonce,
+                mac_len=mac_len,
+            )
+
+        cipher = aes_ccm.encrypt(access_message)
+        mic = aes_ccm.digest()
+        return cipher + mic
+
+    def decrypt(
+        self,
+        enc_data,
+        aszmic,
+        seq_number,
+        src_addr,
+        dst_addr,
+        iv_index,
+        label_uuid=None,
+    ):
+        """
+        Encrypts the access_message with this application key.
+        Mesh Spec Section 3.9.7.1 p. 205
+
+        :param enc_data: Raw encrypted access message and mic
+        :type enc_data: Bytes
+        :param aszmic: Size of MIC value (0 or 1). For Nonce
+        :type aszmic: int
+        :param seq_number: segment number Value (of first segment)
+        :type seq_number: Bytes
+        :param src_addr: Source addr of the packet
+        :type src_addr: Bytes
+        :param dst_addr: Destination addr of the packet
+        :type dst_addr: Bytes
+        :param iv_index: Current IV index
+        :type iv_index: Bytes
+        :param label_uuid: List of Label UUID that match with the virtual addr (Mesh Spec Section 3.4.2.3) if dst_addr is virtual addr.
+        :type label_uuid: list(Bytes)
+        :returns: The plaintext, wether authentication was valid and in case of virtual addr, the matching lable UUID that worked for the authentication
+        :rtype: (Byte|None, boolean, Bytes|None)
+        """
+
+        seq_auth = self.__compute_seq_auth(iv_index, seq_number)
+        nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
+
+        if aszmic == 1:
+            mac_len = 8
+        else:
+            mac_len = 4
+
+        mic = enc_data[-mac_len:]
+        cipher = enc_data[:-mac_len]
+
+        # check if dst_addr is not virtual, simple decipher
+        if (dst_addr[0] >> 6) & 0b11 != 0b10:
+            aes_ccm = AES.new(
+                self.app_key,
+                AES.MODE_CCM,
+                nonce=nonce,
+                mac_len=mac_len,
+            )
+            plaintext = aes_ccm.decrypt(cipher)
+            try:
+                aes_ccm.verify(mic)
+                return (plaintext, True, None)
+            except ValueError:
+                return (plaintext, False, None)
+
+        # if dst_addr is virtual, need to check for all valid label UUID
+        # check for each label UUID if it works for the authentication
+        for label in label_uuid:
+            aes_ccm = AES.new(
+                self.app_key,
+                AES.MODE_CCM,
+                nonce=nonce,
+                mac_len=mac_len,
+                assoc_len=len(label),
+            )
+            aes_ccm.update(label)
+            plaintext = aes_ccm.decrypt(cipher)
+            try:
+                aes_ccm.verify(mic)
+                return (plaintext, True, label)
+            except ValueError:
+                continue
+
+        # if no match when virtual addr, return False
+        return (None, False, None)
+
+
+class UpperTransportLayerDevKeyCryptoManager:
+    """
+    This manages the Device Key (that sits in the UpperTransportLayer).
+    ONE PER DEVICE (bound to all networks). Every instance of Upper Transport Layer will have a reference to this object.
+    Generated after provisioning complete.
+    """
+
+    def __init__(self, provisioning_crypto_manager=None, device_key=None):
+        """
+        Either takes the ProvisioningBearerAdvCryptoManager object used during provisioning to derive the dev_key
+        Or give directly the Device Key if already known.
+
+        :param provisioning_capabilities_pdu: Provisioning Layer crypto manager (after provisioning is finished)
+        :type net_key: Bytes
+        :param device_key: Device Key (only for tests)
+        :type device_key: ProvisioningBearerAdvCryptoManager
+        """
+
+        if device_key is not None:
+            self.device_key = device_key
+        elif provisioning_crypto_manager is not None:
+            self.device_key = k1(
+                provisioning_crypto_manager.ecdh_secret,
+                provisioning_crypto_manager.provisioning_salt,
+                b"prdk",
+            )
+
+    def __compute_nonce(self, aszmic, seq_auth, src_addr, dst_addr, iv_index):
+        return (
+            b"\x02"
+            + ((int.from_bytes(aszmic, "big") << 7) & 0x80).to_bytes(1, "big")
+            + seq_auth[-3:]
+            + src_addr
+            + dst_addr
+            + iv_index
+        )
+
+    def __compute_seq_auth(self, iv_index, seq_number):
+        """
+        Compute the SeqAuth value (Mesh Spec Section 3.5.3.1)
+
+        :param iv_index: [TODO:description]
+        :type iv_index: [TODO:type]
+        :param seq_number: [TODO:description]
+        :type seq_number: [TODO:type]
+        """
+        return iv_index + seq_number
+
+    def encrypt(self, access_message, aszmic, seq_number, src_addr, dst_addr, iv_index):
+        """
+        Encrypts the access_message with the Device Key
+        Mesh Spec Section 3.9.7.1 p. 205
+
+        :param access_message: Raw Access message to be encrypted
+        :type access_message: Bytes
+        :param aszmic: Size of MIC value (0 or 1). For Nonce
+        :type aszmic: int
+        :param seq_number: segment number Value (of first segment)
+        :type seq_number: Bytes
+        :param src_addr: Source addr of the packet
+        :type src_addr: Bytes
+        :param dst_addr: Destination addr of the packet
+        :type dst_addr: Bytes
+        :param iv_index: Current IV index
+        :type iv_index: Bytes
+        :returns: The encrypted message concatenated with mic
+        :rtype: Bytes
+        """
+
+        seq_auth = self.__compute_seq_auth(iv_index, seq_number)
+        nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
+
+        if aszmic == 1:
+            mac_len = 8
+        else:
+            mac_len = 4
+
+        aes_ccm = AES.new(
+            self.device_key,
+            AES.MODE_CCM,
+            nonce=nonce,
+            mac_len=mac_len,
+        )
+
+        cipher = aes_ccm.encrypt(access_message)
+        mic = aes_ccm.digest()
+        return cipher + mic
+
+    def decrypt(self, enc_data, aszmic, seq_number, src_addr, dst_addr, iv_index):
+        """
+        Decrypts the access_message with the Device Key
+        Mesh Spec Section 3.9.7.1 p. 205
+
+        :param enc_data: Raw encrypted data and mic
+        :type enc_data: Bytes
+        :param aszmic: Size of MIC value (0 or 1). For Nonce
+        :type aszmic: int
+        :param seq_number: segment number Value (of first segment)
+        :type seq_number: Bytes
+        :param src_addr: Source addr of the packet
+        :type src_addr: Bytes
+        :param dst_addr: Destination addr of the packet
+        :type dst_addr: Bytes
+        :param iv_index: Current IV index
+        :type iv_index: Bytes
+        :returns: The plaintext, wether authentication was valid.
+        :rtype: (Byte, boolean)
+        """
+        seq_auth = self.__compute_seq_auth(iv_index, seq_number)
+        nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
+
+        if aszmic == 1:
+            mac_len = 8
+        else:
+            mac_len = 4
+
+        mic = enc_data[-mac_len:]
+        cipher = enc_data[:-mac_len]
+
+        aes_ccm = AES.new(
+            self.device_key,
+            AES.MODE_CCM,
+            nonce=nonce,
+            mac_len=mac_len,
+        )
+        plaintext = aes_ccm.decrypt(cipher)
+        try:
+            aes_ccm.verify(mic)
+            return (plaintext, True)
+        except ValueError:
+            return (plaintext, False)
