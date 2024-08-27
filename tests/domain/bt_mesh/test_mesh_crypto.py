@@ -6,6 +6,8 @@ from whad.bt_mesh.crypto import (
     k4,
     ProvisioningBearerAdvCryptoManager,
     NetworkLayerCryptoManager,
+    UpperTransportLayerAppKeyCryptoManager,
+    UpperTransportLayerDevKeyCryptoManager,
 )
 from whad.scapy.layers.bt_mesh import (
     BTMesh_Obfuscated_Network_PDU,
@@ -554,3 +556,155 @@ class TestNetworkLayerCryptoManagerPrivateBeacon:
             authentication_tag=authentication_tag,
         )
         assert obf_private_beacon == private_beacon
+
+
+"""
+UpperLayerAppKeyCrypto Tests
+One input = one app key and one message with associated data
+Input is encrypted -> plaintext but since we do it in both direction it's just a convention.
+Expected is just raw plaintext
+"""
+
+
+__APP_KEY_INPUT1 = dict(
+    # Mesh Spec Section 8.3.18
+    app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
+    test_input=dict(
+        enc_data=bytes.fromhex("5a8bde6d9106ea078a"),
+        iv_index=bytes.fromhex("12345678"),
+        seq_number=bytes.fromhex("000007"),
+        src_addr=bytes.fromhex("1201"),
+        dst_addr=bytes.fromhex("ffff"),
+        aszmic=bytes.fromhex("00"),
+        # first one is the one we want to match in the list
+        label_uuid=None,
+    ),
+    expected=bytes.fromhex("0400000000"),
+)
+__APP_KEY_INPUT2 = dict(
+    # Mesh Spec Section 8.3.23
+    app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
+    test_input=dict(
+        enc_data=bytes.fromhex("2456db5e3100eef65daa7a38"),
+        iv_index=bytes.fromhex("12345677"),
+        seq_number=bytes.fromhex("07080c"),
+        src_addr=bytes.fromhex("1234"),
+        dst_addr=bytes.fromhex("9736"),
+        aszmic=bytes.fromhex("00"),
+        # first one is the one we want to match in the list
+        label_uuid=[bytes.fromhex("f4a002c7fb1e4ca0a469a021de0db875")],
+    ),
+    expected=bytes.fromhex("d50a0048656c6c6f"),
+)
+
+
+@pytest.fixture(
+    scope="class",
+    params=[__APP_KEY_INPUT1, __APP_KEY_INPUT2],
+)
+def upper_layer_app_key_setup_crypto_manager(request):
+    test_values = request.param
+    crypto_manager = UpperTransportLayerAppKeyCryptoManager(
+        app_key=test_values["app_key"]
+    )
+
+    return (crypto_manager, test_values["test_input"], test_values["expected"])
+
+
+class TestUpperLayerAppKeyCryptoManager:
+    def test_decrypt(self, upper_layer_app_key_setup_crypto_manager):
+        crypto_manager, test_input, expected = upper_layer_app_key_setup_crypto_manager
+        plaintext, is_mic_ok, label_uuid = crypto_manager.decrypt(
+            test_input["enc_data"],
+            test_input["aszmic"],
+            test_input["seq_number"],
+            test_input["src_addr"],
+            test_input["dst_addr"],
+            test_input["iv_index"],
+            test_input["label_uuid"],
+        )
+        if test_input["label_uuid"] is not None:
+            assert (plaintext, is_mic_ok, label_uuid) == (
+                expected,
+                True,
+                test_input["label_uuid"][0],
+            )
+        else:
+            assert (plaintext, is_mic_ok, label_uuid) == (expected, True, None)
+
+    def test_encrypt(self, upper_layer_app_key_setup_crypto_manager):
+        crypto_manager, test_input, expected = upper_layer_app_key_setup_crypto_manager
+        if test_input["label_uuid"] is not None:
+            enc_data = crypto_manager.encrypt(
+                expected,
+                test_input["aszmic"],
+                test_input["seq_number"],
+                test_input["src_addr"],
+                test_input["dst_addr"],
+                test_input["iv_index"],
+                test_input["label_uuid"][0],
+            )
+        else:
+            enc_data = crypto_manager.encrypt(
+                expected,
+                test_input["aszmic"],
+                test_input["seq_number"],
+                test_input["src_addr"],
+                test_input["dst_addr"],
+                test_input["iv_index"],
+            )
+        assert enc_data == test_input["enc_data"]
+
+
+__DEV_KEY_INPUT1 = dict(
+    # Mesh Spec Section 8.12.1
+    device_key=bytes.fromhex("9d6dd0e96eb25dc19a40ed9914f8f03f"),
+    test_input=dict(
+        enc_data=bytes.fromhex("18b0b6618b2b"),
+        iv_index=bytes.fromhex("12345678"),
+        seq_number=bytes.fromhex("df0410"),
+        src_addr=bytes.fromhex("0405"),
+        dst_addr=bytes.fromhex("0607"),
+        aszmic=bytes.fromhex("00"),
+    ),
+    expected=bytes.fromhex("80b1"),
+)
+
+
+@pytest.fixture(
+    scope="class",
+    params=[__DEV_KEY_INPUT1],
+)
+def upper_layer_dev_key_setup_crypto_manager(request):
+    test_values = request.param
+    crypto_manager = UpperTransportLayerDevKeyCryptoManager(
+        device_key=test_values["device_key"]
+    )
+
+    return (crypto_manager, test_values["test_input"], test_values["expected"])
+
+
+class TestUpperLayerDevKeyCryptoManager:
+    def test_decrypt(self, upper_layer_dev_key_setup_crypto_manager):
+        crypto_manager, test_input, expected = upper_layer_dev_key_setup_crypto_manager
+        plaintext, is_mic_ok = crypto_manager.decrypt(
+            test_input["enc_data"],
+            test_input["aszmic"],
+            test_input["seq_number"],
+            test_input["src_addr"],
+            test_input["dst_addr"],
+            test_input["iv_index"],
+        )
+        assert (plaintext, is_mic_ok) == (expected, True)
+
+    def test_encrypt(self, upper_layer_dev_key_setup_crypto_manager):
+        crypto_manager, test_input, expected = upper_layer_dev_key_setup_crypto_manager
+        enc_data = crypto_manager.encrypt(
+            expected,
+            test_input["aszmic"],
+            test_input["seq_number"],
+            test_input["src_addr"],
+            test_input["dst_addr"],
+            test_input["iv_index"],
+        )
+        assert enc_data == test_input["enc_data"]

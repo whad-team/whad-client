@@ -994,7 +994,7 @@ ACCESS LAYER
 class BTMesh_Access_Message(Packet):
     name = "Bluetooth Mesh Access Message"
     fields_desc = [
-        # Will be changed in post_build ! size depend on value of first 2 bits
+        # Size Will be changed in post_build ! size depend on value of first 2 bits
         XShortField("opcode", None),
     ]
 
