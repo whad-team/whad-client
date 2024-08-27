@@ -25,6 +25,7 @@ Generic tools
     generic/wextract
     generic/wdump
     generic/wshark
+    generic/winject
     generic/wserver
 
 Bluetooth Low Energy tools
