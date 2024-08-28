@@ -25,6 +25,7 @@ Generic tools
     generic/wextract
     generic/wdump
     generic/wshark
+    generic/wanalyze
     generic/winject
     generic/wserver
 
