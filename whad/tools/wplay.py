@@ -72,6 +72,11 @@ class WhadPlayApp(WhadSniffApp):
         if self.args.pcap is not None:
             self.interface = WhadDevice.create("pcap:" + ("flush:" if self.args.flush else "") + self.args.pcap )
 
+    def run(self):
+        try:
+            super().run()
+        except WhadDeviceNotFound:
+            self.error("PCAP file not found")
 
 from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound
 def wplay_main():
