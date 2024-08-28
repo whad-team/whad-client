@@ -62,7 +62,6 @@ class Phy(WhadDeviceConnector):
 
         # Initialize translator
         self.translator = PhyMessageTranslator(self.hub)
-        self.format = self.hub.phy.format
 
         # Check if device supports Logitech Unifying
         if not self.device.has_domain(WhadDomain.Phy):
@@ -70,6 +69,15 @@ class Phy(WhadDeviceConnector):
         else:
             self.__ready = True
 
+
+    def format(self, packet):
+        """
+        Format a packet for PCAP export.
+        """
+        if isinstance(packet, bytes):
+            packet = Phy_Packet(packet)
+        packet.metadata = PhyMetadata(syncword=b"")
+        return self.hub.phy.format(packet)
 
     def close(self):
         self.stop()
