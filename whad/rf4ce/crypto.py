@@ -350,8 +350,8 @@ class RF4CEDecryptor:
             (
                 len(self.addresses) == 0 and
                 (
-                    pkt.fcf_srcaddrmode != 3 or
-                    pkt.fcf_destaddrmode != 3
+                    packet.fcf_srcaddrmode != 3 or
+                    packet.fcf_destaddrmode != 3
                 )
             )
         ):
