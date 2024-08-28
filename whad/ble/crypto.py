@@ -654,7 +654,7 @@ class LegacyPairingCracking(TrafficAnalyzer):
 
                 if res2 == confirm[::-1]:
 
-                    stk = s1(tk, self.slave_random[::-1], self.master_random[::-1])[::-1]
+                    stk = s1(tk, self.slave_random[::-1], self.master_random[::-1])
                     self.tk = tk
                     self.stk = stk
                     return (tk, stk)

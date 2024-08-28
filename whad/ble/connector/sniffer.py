@@ -247,7 +247,7 @@ class Sniffer(BLE, EventsManager):
                     logger.info("[i] New temporary key extracted: ", tk.hex())
                     logger.info("[i] New short term key extracted: ", stk.hex())
                     self.trigger_event(KeyExtractedEvent(stk))
-                    self.__decryptor.add_key(stk[::-1])
+                    self.__decryptor.add_key(stk)
                     self.__legacy_pairing_cracking.reset()
 
         return packet
