@@ -324,7 +324,6 @@ class PeripheralCharacteristic:
 
                 return True
             else:
-                print('descriptor not found')
                 return False
         elif indication:
             # Look for CCCD
