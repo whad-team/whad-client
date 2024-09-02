@@ -125,7 +125,7 @@ class Injector(Phy):
                 if hasattr(packet, "metadata") and hasattr(packet.metadata, "syncword") and self.__configuration.sync_word is None:
                     self.set_sync_word(packet.metadata.syncword)
 
-                if hasattr(packet, "metadata") and hasattr(packet.metadata, "endianness") and self.__configuration.endianness:
+                if hasattr(packet, "metadata") and hasattr(packet.metadata, "endianness"):
                     self.set_endianness(
                         Endianness.LITTLE if
                         packet.metadata.endianness == PhyEndianness.LITTLE else
