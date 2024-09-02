@@ -737,7 +737,7 @@ class BleCentralShell(InteractiveShell):
             offset = None
             uuid = None
 
-        # Figure out what the handle is
+        # figure out what the handle is
         if args[0].lower().startswith('0x'):
             try:
                 handle = int(args[0].lower(), 16)
@@ -749,7 +749,7 @@ class BleCentralShell(InteractiveShell):
                 handle = int(args[0])
             except ValueError:
                 try:
-                    handle = UUID(args[0].replace('-',''))
+                    handle = UUID(args[0])
                 except ValueError:
                     self.error(f"Wrong UUID: {args[0]}")
                     return
@@ -1037,7 +1037,7 @@ class BleCentralShell(InteractiveShell):
                     self.error(f"No characteristic found with handle {handle}")
                     return
 
-            def on_charac_notified(charac, value, indication):
+            def on_charac_notified(_, value, indication):
                 if indication:
                     print_formatted_text(HTML(
                         f"<ansimagenta>Indication</ansimagenta> received from characteristic with handle {handle}"
@@ -1053,22 +1053,32 @@ class BleCentralShell(InteractiveShell):
                 try:
                     if not target_charac.can_notify():
                         if target_charac.can_indicate():
-                            target_charac.subscribe(
+                            result = target_charac.subscribe(
                                 indication=True,
                                 callback=on_charac_notified
                             )
-                            print_formatted_text(HTML(
-                             f"Successfully subscribed to notification for characteristic {target_charac.uuid}"
-                            ))
+                            if result:
+                                print_formatted_text(HTML(
+                                f"Successfully subscribed to notification for characteristic {target_charac.uuid}"
+                                ))
+                            else:
+                                print_formatted_text(HTML(
+                                f"An error occurred when subscribing to notification for characteristic {target_charac.uuid}"
+                                ))
                         else:
                             self.error("Characteristic does not send notification nor indication.")
                     else:
-                        target_charac.subscribe(
+                        result = target_charac.subscribe(
                             callback=on_charac_notified
                         )
-                        print_formatted_text(HTML(
-                             f"Successfully subscribed to notification for characteristic {target_charac.uuid}"
-                        ))
+                        if result:
+                            print_formatted_text(HTML(
+                                f"Successfully subscribed to notification for characteristic {target_charac.uuid}"
+                            ))
+                        else:
+                            print_formatted_text(HTML(
+                                f"An error occurred when subscribing to notification for characteristic {target_charac.uuid}"
+                            ))
                 except AttError as att_err:
                     self.show_att_error(att_err)
                 except GattTimeoutException:
