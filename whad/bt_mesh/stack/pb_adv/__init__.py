@@ -4,10 +4,9 @@ PB-ADV bearer Layer
 Mostly instanciate a generic provisioning layer. Only once for a provisionee, and one per peer for a provisioner (one per link id)
 """
 
-import logging
 from random import randbytes
-from whad.common.stack import Layer, alias, source, instance
-from whad.scapy.layers.bt_mesh import EIR_PB_ADV_PDU, BTMesh_Unprovisioned_Device_Beacon
+from whad.common.stack import Layer, alias, instance
+from whad.scapy.layers.bt_mesh import EIR_PB_ADV_PDU
 from scapy.layers.bluetooth import EIR_Hdr
 from whad.bt_mesh.stack.gen_prov import (
     GenericProvisioningLayerProvisionee,
