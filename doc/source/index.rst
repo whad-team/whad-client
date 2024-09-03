@@ -14,6 +14,8 @@ Welcome to WHAD's documentation!
     device/protocol
     device/compat
     cli/index
+    protocol/index
+    protocol/reference
 
 .. toctree::
     :maxdepth: 1
@@ -79,7 +81,4 @@ Welcome to WHAD's documentation!
     :maxdepth: 1
     :caption: Contributing
 
-    device/index
-    device/protocol
-    protocol/index
-    protocol/reference
+    device/firmware
