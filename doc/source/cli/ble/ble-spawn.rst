@@ -25,7 +25,7 @@ the emulated device appear the same way the original does.
 Example
 -------
 
-The following example first creates a JSON profile file using :ref:`ble-central <whad-wble-central>`,
+The following example first creates a JSON profile file using :ref:`wble-central <whad-wble-central>`,
 then connects to the same device, launches *Wireshark* to monitor BLE packets and spawns a
 device based on the `mydevice.json` profile.
 
@@ -34,6 +34,6 @@ will be logged by *Wireshark*.
 
 .. code-block:: text
 
-    # ble-central -i hci0 -b 11:22:33:44:55:66 profile mydevice.json
-    # wble-connect -i hci0 11:22:33:44:55:66 | ble-wireshark | wble-spawn -i hci1 -p mydevice.json
+    # wble-central -i hci0 -b 11:22:33:44:55:66 profile mydevice.json
+    # wble-connect -i hci0 11:22:33:44:55:66 | wshark | wble-spawn -i hci1 -p mydevice.json
 
