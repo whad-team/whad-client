@@ -32,4 +32,3 @@ tox
 
 (Obviously, you need to install python interpreter from 3.6 to 3.10 included to run tox).
 The tests are automatically run by github actions when something is pushed to main branch or when a pull request is merged.
-
