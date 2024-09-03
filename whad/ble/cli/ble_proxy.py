@@ -208,7 +208,7 @@ class BleProxyApp(CommandLineDeviceSource):
                 self.error("You need to specify an interface with option --interface.")
 
         except KeyboardInterrupt as keybd:
-            self.warning("ble-proxy stopped (CTL-C)")
+            self.warning("wble-proxy stopped (CTL-C)")
 
         # Launch post-run tasks
         self.post_run()
