@@ -67,7 +67,7 @@ from prompt_toolkit import print_formatted_text, HTML
 from prompt_toolkit.output import create_output
 from prompt_toolkit.application.current import get_app_session
 
-
+from whad.version import get_version
 from whad.device import WhadDevice, UnixSocketDevice
 from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound, \
     WhadDeviceNotReady, WhadDeviceTimeout, UnsupportedDomain
@@ -347,6 +347,12 @@ class CommandLineApp(ArgumentParser):
             metavar='LOGFILE_PATH',
             default=None,
             help='write the log output into LOGFILE_PATH'
+        )
+
+        self.add_argument(
+            '--version',
+            action='version',
+            version='%(prog)s {version}'.format(version=get_version())
         )
 
         # Save application type
