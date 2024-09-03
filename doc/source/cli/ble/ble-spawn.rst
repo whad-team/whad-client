@@ -17,11 +17,6 @@ populate the BLE device with the corresponding services and characteristics. It
 will also allow `wble-spawn` to use the same advertising data, in order to make
 the emulated device appear the same way the original does.
 
-.. warning::
-
-    This tool is still in development and this feature may be merged with `ble-periph`
-    in a near future.
-
 Example
 -------
 
