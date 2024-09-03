@@ -28,11 +28,11 @@ Command-line options
 Example usage
 -------------
 
-The following example shows a pretty simple usage of `wble-connect` combined with `ble-central`:
+The following example shows a pretty simple usage of `wble-connect` combined with `wble-central`:
 
 .. code-block:: text
 
     
-    # wble-connect -i hci0 -r 40:d8:81:a1:a7:82 | ble-central read 3
+    # wble-connect -i hci0 -r 40:d8:81:a1:a7:82 | wble-central read 3
     00000000: 4A 61 62 72 61 20 45 6C  69 74 65 20 37 35 74     Jabra Elite 75t
 
