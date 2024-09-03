@@ -10,7 +10,10 @@ testpaths = [
 
 [project]
 name = "whad"
+
+# Attention: the following version number must match the one in whad/version.py !
 version = "1.2.0"
+
 authors = [
     { name="Damien CAUQUIL" },
     { name="Romain CAYRE" },
