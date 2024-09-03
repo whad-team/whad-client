@@ -221,16 +221,16 @@ help
 
 .. code-block:: text
 
-    $ ble-central help [command]
+    $ wble-periph help [command]
 
-The ``help`` command provides useful help about any command implemented in ``ble-central``.
+The ``help`` command provides useful help about any command implemented in ``wble-periph``.
 
 interactive
 ~~~~~~~~~~~
 
 .. code-block:: text
 
-    $ ble-central -i <interface> interactive
+    $ wble-periph -i <interface> interactive
 
 The ``interactive`` command provides an interactive shell allowing the user to
 scan, connect and access a Bluetooth Low Energy device in an interactive way.
