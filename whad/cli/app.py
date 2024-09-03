@@ -726,11 +726,13 @@ def run_app(application: CommandLineApp):
     except KeyboardInterrupt:
         application.warning("Interrupted by user (CTL-C)")
     except WhadDeviceTimeout:
-        application.error("WHAD adapter has timed out.")
+        application.error("WHAD interface has timed out.")
+    except WhadDeviceNotReady:
+        application.error("WHAD interface seems unresponsive.")
     except WhadDeviceAccessDenied:
-        application.error("Cannot access WHAD adapter, check permissions.")
+        application.error("Cannot access WHAD interface, check permissions.")
     except UnsupportedDomain as domain_err:
-        application.error("WHAD adapter does not support %s." % domain_err.domain)
+        application.error("WHAD interface does not support %s." % domain_err.domain)
     except Exception as exc:
         application.error("An unexpected exception occured:")
         traceback.print_exception(exc)

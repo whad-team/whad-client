@@ -235,6 +235,13 @@ class UartDevice(WhadDevice):
         # Handle incoming messages if any
         if len(readers) > 0 and self.__fileno is not None:
             data = os.read(self.__fileno, 1024)
+
+            # Make sure data is not empty (detect device disconnection/malfunction)
+            if len(data) == 0 :
+                # Device does not behave as expected, may not be ready.
+                raise WhadDeviceNotReady()
+            
+            # Feed our IO thread with received data
             self.on_data_received(data)
 
     def change_transport_speed(self, speed):
