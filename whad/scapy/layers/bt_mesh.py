@@ -34,6 +34,7 @@ from scapy.fields import (
     XLEShortField,
     XNBytesField,
     PacketListField,
+    LEFieldLenField,
 )
 
 
@@ -485,6 +486,22 @@ class LittleEndianPacketLenField(PacketLenField):
         return data[::-1]
 
 
+class XLEStrField(XStrField):
+    """
+    Unbound byte fields with little endian internal representation
+    """
+
+    def i2m(self, pkt, x):
+        # type: (Optional[Packet], Optional[bytes]) -> bytes
+        if not x:
+            return b""
+        return x[::-1]
+
+    def m2i(self, pkt, x):
+        # type: (Optional[Packet], bytes) -> bytes
+        return x[::-1]
+
+
 class UnicastAddr(Packet):
     """
     Describes a Unicast Addr, as specifiied in Spec p. 55 Section 3.4.2.2.1
@@ -659,6 +676,71 @@ class ForwardingTableEntry(Packet):
             lambda pkt: pkt.forwarding_table_entry_header.bearer_toward_path_target_indicator
             == 1,
         ),
+    ]
+
+    def extract_padding(self, s):
+        """
+        Pass the remaining data of the Packet the the next Layer (tricky).
+        We use this packet in a PacketField so we need to have the remaining data passed to the parent.
+        """
+        return "", s
+
+
+class OpcodeAggregatorItem(Packet):
+    name = "Opcode Aggregator Item"
+    fields_desc = [
+        ConditionalField(
+            XBitField("length_short", 0, 7), lambda pkt: pkt.length_format == 0
+        ),
+        ConditionalField(
+            BitField("length_long", 0, 15, tot_size=-2),
+            lambda pkt: pkt.length_format == 1,
+        ),
+        XBitField("length_format", 0, 1, end_tot_size=-2),
+    ]
+
+    def pre_dissect(self, s):
+        # Extract the length_format value before dissection
+        self.length_format = s[0] & 1
+        return s
+
+    def extract_padding(self, s):
+        """
+        Pass the remaining data of the Packet the the next Layer (tricky).
+        We use this packet in a PacketField so we need to have the remaining data passed to the parent.
+        """
+        return "", s
+
+
+class NetKeyIndexPair(Packet):
+    """
+    Represents a key inex pair as defined in Mesh Protocol Spec Section 4.3.11.8 (for Bridge Model)
+    """
+
+    name = "Net Key Index Pair"
+    fields_desc = [
+        XBitField("net_key_index_2", 0, 12, tot_size=-3),
+        XBitField("net_key_index_1", 0, 12, end_tot_size=-3),
+    ]
+
+    def extract_padding(self, s):
+        """
+        Pass the remaining data of the Packet the the next Layer (tricky).
+        We use this packet in a PacketField so we need to have the remaining data passed to the parent.
+        """
+        return "", s
+
+
+class BridgeAddresses(Packet):
+    """
+    Represents a pair of addresses and the direction of Bridge as defined in Mesh Protocol Spec Section 4.3.11.10 (for Bridge Model)
+    """
+
+    name = "Net Key Index Pair"
+    fields_desc = [
+        XLEShortField("addr1", None),
+        XLEShortField("addr2", None),
+        ByteField("directions", None),
     ]
 
     def extract_padding(self, s):
@@ -1518,6 +1600,29 @@ class BTMesh_Model_Config_Default_TTL_Status(Packet):
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Default_TTL_Status, opcode=0x800E)
 
 
+class BTMesh_Model_Config_Gatt_Proxy_Get(Packet):
+    name = "Bluetooth Mesh Config Model Gatt Proxy Get"
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Gatt_Proxy_Get, opcode=0x8012)
+
+
+class BTMesh_Model_Config_Gatt_Proxy_Set(Packet):
+    name = "Bluetooth Mesh Config Model Gatt Proxy Set"
+    fields_desc = [ByteField("gatt_proxy", None)]
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Gatt_Proxy_Set, opcode=0x8013)
+
+
+class BTMesh_Model_Config_Gatt_Proxy_Status(Packet):
+    name = "Bluetooth Mesh Config Model Gatt Proxy Status"
+    fields_desc = [ByteField("gatt_proxy", None)]
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Gatt_Proxy_Status, opcode=0x8014)
+
+
 class BTMesh_Model_Config_Relay_Get(Packet):
     name = "Bluetooth Mesh Config Model Default Relay Get"
 
@@ -1553,7 +1658,7 @@ class BTMesh_Model_Config_Publication_Get(Packet):
     name = "Bluetooth Mesh Config Model Publication Get"
     fields_desc = [
         XLEShortField("element_addr", None),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1572,7 +1677,7 @@ class BTMesh_Model_Config_Publication_Set(Packet):
         ByteField("publish_period", None),
         BitField("publish_retransmit_interval_steps", None, 5),
         BitField("publish_retransmit_count", None, 3),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1591,7 +1696,7 @@ class BTMesh_Model_Config_Publication_Virtual_Addr_Set(Packet):
         ByteField("publish_period", None),
         BitField("publish_retransmit_interval_steps", None, 5),
         BitField("publish_retransmit_count", None, 3),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1615,7 +1720,7 @@ class BTMesh_Model_Config_Publication_Status(Packet):
         ByteField("publish_period", None),
         BitField("publish_retransmit_interval_steps", None, 5),
         BitField("publish_retransmit_count", None, 3),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1627,7 +1732,7 @@ class BTMesh_Model_Config_Subscription_Add(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XLEShortField("address", None),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1639,7 +1744,7 @@ class BTMesh_Model_Config_Subscription_Virtual_Addr_Add(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XNBytesField("label", None, sz=16),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1655,7 +1760,7 @@ class BTMesh_Model_Config_Subscription_Delete(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XLEShortField("address", None),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1669,7 +1774,7 @@ class BTMesh_Model_Config_Subscription_Virtual_Addr_Delete(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XNBytesField("label", None, sz=16),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1685,7 +1790,7 @@ class BTMesh_Model_Config_Subscription_Overwrite(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XLEShortField("address", None),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1699,7 +1804,7 @@ class BTMesh_Model_Config_Subscription_Virtual_Addr_Overwrite(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XNBytesField("label", None, sz=16),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1714,7 +1819,7 @@ class BTMesh_Model_Config_Subscription_Delete_All(Packet):
     name = "Bluetooth Mesh Config Subscription Delete All"
     fields_desc = [
         XLEShortField("element_addr", None),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1729,7 +1834,7 @@ class BTMesh_Model_Config_Subscription_Status(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         XLEShortField("address", None),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1757,7 +1862,7 @@ class BTMesh_Model_Config_SIG_Model_Subscription_List(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         XLEShortField("model_identifier", None),
-        StrField("addresses", None),
+        XLEStrField("addresses", None),
     ]
 
 
@@ -1787,7 +1892,7 @@ class BTMesh_Model_Config_Vendor_Model_Subscription_List(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         LEIntField("model_identifier", None),
-        StrField("address", None),
+        XLEStrField("address", None),
     ]
 
 
@@ -1838,7 +1943,7 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Net_Key_Status, opcode=0x8
 
 class BTMesh_Model_Config_Net_Key_List(Packet):
     name = "Bluetooth Mesh Model Config NetKey List"
-    fields_desc = [StrField("net_key_indexes", None)]
+    fields_desc = [XLEStrField("net_key_indexes", None)]
 
 
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Net_Key_List, opcode=0x8043)
@@ -1847,9 +1952,9 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Net_Key_List, opcode=0x804
 class BTMesh_Model_Config_App_Key_Add(Packet):
     name = "Bluetooth Mesh Model Config AppKey Add"
     fields_desc = [
-        # weird formatting so raw data, handle of dissection/endianess in logic
-        StrFixedLenField("net_key_index_and_app_key_index", None, length=3),
-        XNBytesField("app_key", None, sz=16),
+        XBitField("app_key_index", None, 12, tot_size=-3),
+        XBitField("net_key_index", None, 12, end_tot_size=-3),
+        StrField("app_key", None),  # for some reason not in LE ...
     ]
 
 
@@ -1859,9 +1964,9 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_App_Key_Add, opcode=0x00)
 class BTMesh_Model_Config_App_Key_Update(Packet):
     name = "Bluetooth Mesh Model Config AppKey Update"
     fields_desc = [
-        # weird formatting so raw data, handle of dissection/endianess in logic
-        StrFixedLenField("net_key_index_and_app_key_index", None, length=3),
-        XNBytesField("app_key", None, sz=16),
+        XBitField("app_key_index", None, 12, tot_size=-3),
+        XBitField("net_key_index", None, 12, end_tot_size=-3),
+        StrField("app_key", None),  # for some reason not in LE ...
     ]
 
 
@@ -1871,8 +1976,8 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_App_Key_Update, opcode=0x0
 class BTMesh_Model_Config_App_Key_Delete(Packet):
     name = "Bluetooth Mesh Model Config AppKey Delete"
     fields_desc = [
-        # weird formatting so raw data, handle of dissection/endianess in logic
-        StrFixedLenField("net_key_index_and_app_key_index", None, length=3),
+        XBitField("app_key_index", None, 12, tot_size=-3),
+        XBitField("net_key_index", None, 12, end_tot_size=-3),
     ]
 
 
@@ -1883,8 +1988,8 @@ class BTMesh_Model_Config_App_Key_Status(Packet):
     name = "Bluetooth Mesh Model Config AppKey Status"
     fields_desc = [
         ByteField("status", None),
-        # weird formatting so raw data, handle of dissection/endianess in logic
-        StrFixedLenField("net_key_index_and_app_key_index", None, length=3),
+        XBitField("app_key_index", None, 12, tot_size=-3),
+        XBitField("net_key_index", None, 12, end_tot_size=-3),
     ]
 
 
@@ -1946,7 +2051,7 @@ class BTMesh_Model_Config_Model_App_Bind(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XLEShortField("app_key_index", None),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1958,7 +2063,7 @@ class BTMesh_Model_Config_Model_App_Unbind(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XLEShortField("app_key_index", None),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1971,7 +2076,7 @@ class BTMesh_Model_Config_Model_App_Status(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         XLEShortField("app_key_index", None),
-        StrField("model_identifier", None),
+        XLEStrField("model_identifier", None),
     ]
 
 
@@ -1995,7 +2100,7 @@ class BTMesh_Model_Config_SIG_Model_App_List(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         XLEShortField("model_identifier", None),
-        StrField("app_key_indexes", None),
+        XLEStrField("app_key_indexes", None),
     ]
 
 
@@ -2021,7 +2126,7 @@ class BTMesh_Model_Config_Vendor_Model_App_List(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         LEIntField("model_identifier", None),
-        StrField("app_key_indexes", None),
+        XLEStrField("app_key_indexes", None),
     ]
 
 
@@ -2373,6 +2478,238 @@ class BTMesh_Model_Health_Attention_Status(Packet):
 
 
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Health_Attention_Status, opcode=0x8007)
+
+
+### REMOTE PROVISIONING MESSAGES
+
+
+class BTMesh_Model_Remote_Provisioning_Scan_Capabilities_Get(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Scan Capabilities Get"
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Remote_Provisioning_Scan_Capabilities_Get,
+    opcode=0x804F,
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Scan_Capabilities_Status(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Scan Capabilities Status"
+    fields_desc = [ByteField("max_scanned_items", None), ByteField("active_scan", None)]
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Remote_Provisioning_Scan_Capabilities_Status,
+    opcode=0x8050,
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Scan_Get(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Scan Get"
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Scan_Get, opcode=0x8051
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Scan_Start(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Scan Start"
+    fields_desc = [
+        ByteField("scanned_items_limit", None),
+        ByteField("timeout", None),
+        UUIDField("uuid", None, uuid_fmt=UUIDField.FORMAT_LE),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Scan_Start, opcode=0x8052
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Scan_Stop(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Scan Stop"
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Scan_Stop, opcode=0x8053
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Scan_Status(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Scan Status"
+    fields_desc = [
+        ByteField("status", None),
+        ByteField("rp_scanning_state", None),
+        ByteField("scanned_items_limit", None),
+        ByteField("timemout", None),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Scan_Status, opcode=0x8054
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Scan_Report(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Scan Report"
+    fields_desc = [
+        ByteField("rssi", None),
+        UUIDField("uuid", None, uuid_fmt=UUIDField.FORMAT_LE),
+        LEShortField("oob", None),
+        LEIntField("uri_hash", None),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Scan_Report, opcode=0x8055
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Extended_Scan_Start(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Extented Scan Start"
+    fields_desc = [
+        ByteField("ad_type_filter_count", 1),  # set manually
+        StrFixedLenField(
+            "ad_type_filter", None, length_from=lambda pkt: pkt.ad_type_filter_count
+        ),
+        UUIDField("uuid", None, uuid_fmt=UUIDField.FORMAT_LE),
+        ByteField("timeout", None),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Remote_Provisioning_Extended_Scan_Start,
+    opcode=0x8056,
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Extended_Scan_Report(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Extented Scan Report"
+    fields_desc = [
+        ByteField("status", None),
+        UUIDField("uuid", None, uuid_fmt=UUIDField.FORMAT_LE),
+        XLEShortField("oob_information", None),
+        StrField("adv_structures", None),  # CHECK IF LE OR NOT
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Remote_Provisioning_Extended_Scan_Report,
+    opcode=0x8057,
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Link_Get(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Link Get"
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Link_Get, opcode=0x8058
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Link_Open(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Link Open"
+
+    fields_desc = [
+        UUIDField("uuid", None, uuid_fmt=UUIDField.FORMAT_LE),
+        ByteField("link_open_timout", None),
+        ByteEnumField(
+            "nppi_procedure",
+            None,
+            {
+                0x00: "Device Key refresh procedure",
+                0x01: "Node Address refresh procedure",
+                0x02: "Node Composition Refresh Procedure",
+            },
+        ),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Link_Open, opcode=0x8059
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Link_Close(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Link Close"
+    fields_desc = [ByteEnumField("reason", None, {0: "Success", 2: "Fail"})]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Link_Close, opcode=0x805A
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Link_Status(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Link Status"
+    fields_desc = [ByteField("status", None), ByteField("rp_state", None)]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Link_Status, opcode=0x805B
+)
+
+
+class BTMesh_Model_Remote_Provisioning_Link_Report(Packet):
+    name = "Bluetooth Mesh Model Remote Provisioning Link Close"
+    fields_desc = [
+        ByteField("status", None),
+        ByteField("rp_state", None),
+        ByteEnumField("reason", None, {0: "Success", 2: "Fail"}),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Link_Report, opcode=0x805C
+)
+
+
+class BTMesh_Model_Remote_Provisioning_PDU_Send(Packet):
+    name = "Bluetooth Mesh Remote Provisioning PDU Send"
+    fields_desc = [
+        ByteField("outbound_pdu_number", None),
+        PacketField(
+            "provisioning_pdu", None, pkt_cls=BTMesh_Provisioning_Hdr
+        ),  # CHECK IF LE OR NOT (BE in ZEPHYR )
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_PDU_Send, opcode=0x805D
+)
+
+
+class BTMesh_Model_Remote_Provisioning_PDU_Outbound_Report(Packet):
+    name = "Bluetooth Mesh Remote Provisioning PDU Outbound Report"
+    fields_desc = [ByteField("outbound_pdu_number", None)]
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Remote_Provisioning_PDU_Outbound_Report,
+    opcode=0x805E,
+)
+
+
+class BTMesh_Model_Remote_Provisioning_PDU_Report(Packet):
+    name = "Bluetooth Mesh Remote Provisioning PDU Report"
+    fields_desc = [
+        ByteField("inbound_pdu_number", None),
+        PacketField(
+            "provisioning_pdu", None, pkt_cls=BTMesh_Provisioning_Hdr
+        ),  # CHECK IF LE OR NOT (BE in ZEPHYR )
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_PDU_Report, opcode=0x805F
+)
 
 ### DIRECTED FORWARDING MODEL
 
@@ -3133,6 +3470,7 @@ bind_layers(
     opcode=0x80A1,
 )
 
+
 class BTMesh_Model_Directed_Forwarding_Directed_Paths_Get(Packet):
     name = "Bluetooth Mesh Model Directed Forwarding Directed Paths Get"
 
@@ -3163,7 +3501,7 @@ bind_layers(
 
 class BTMesh_Model_Directed_Forwarding_Directed_Publish_Policy_Get(Packet):
     name = "Bluetooth Mesh Model Directed Forwarding Directed Publish Policy Get"
-    fields_desc = [XLEShortField("element_addr", None), StrField("model_id", None)]
+    fields_desc = [XLEShortField("element_addr", None), XLEStrField("model_id", None)]
 
 
 bind_layers(
@@ -3178,7 +3516,7 @@ class BTMesh_Model_Directed_Forwarding_Directed_Publish_Policy_Set(Packet):
     fields_desc = [
         XByteField("directed_publish_policy", None),
         XLEShortField("element_addr", None),
-        StrField("model_id", None),
+        XLEStrField("model_id", None),
     ]
 
 
@@ -3195,7 +3533,7 @@ class BTMesh_Model_Directed_Forwarding_Directed_Publish_Policy_Status(Packet):
         ByteField("status", None),
         XByteField("directed_publish_policy", None),
         XLEShortField("element_addr", None),
-        StrField("model_id", None),
+        XLEStrField("model_id", None),
     ]
 
 
@@ -3347,33 +3685,67 @@ bind_layers(
 )
 
 
+# ON-DEMAND PRIVATE GATT Proxy MESSAGES
+
+
+class BTMesh_Model_On_Demand_Private_Gatt_Proxy_Get(Packet):
+    name = "Bluetooth Mesh Model On Demand Private Gatt Proxy Get"
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_On_Demand_Private_Gatt_Proxy_Get, opcode=0x8063
+)
+
+
+class BTMesh_Model_On_Demand_Private_Gatt_Proxy_Set(Packet):
+    name = "Bluetooth Mesh Model On Demand Private Gatt Proxy Set"
+    fields_desc = [ByteField("on_demand_private_gatt_proxy", None)]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_On_Demand_Private_Gatt_Proxy_Set, opcode=0x8064
+)
+
+
+class BTMesh_Model_On_Demand_Private_Gatt_Proxy_Status(Packet):
+    name = "Bluetooth Mesh Model On Demand Private Gatt Proxy Status"
+    fields_desc = [ByteField("on_demand_private_gatt_proxy", None)]
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Gatt_Proxy_Status, opcode=0x8065)
+
+
 ### SOLICITATION PDU RPL (REPLAY PROTECTION LIST MGMT) MESSAGES
 
 
 class BTMesh_Model_Solicitation_Pdu_Rpl_Items_Clear(Packet):
     name = "Blutooth Mesh Model Solicitation PDU RPL Items Clear"
-    fields_desc = [
-        PacketField("address_range", None,pkt_cls=LEUnicastAddr)
-    ]
+    fields_desc = [PacketField("address_range", None, pkt_cls=LEUnicastAddr)]
 
-bind_layers(BTMesh_Model_Message, BTMesh_Model_Solicitation_Pdu_Rpl_Items_Clear, opcode=0x8078)
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Solicitation_Pdu_Rpl_Items_Clear, opcode=0x8078
+)
+
 
 class BTMesh_Model_Solicitation_Pdu_Rpl_Items_Clear_Unacknowledged(Packet):
     name = "Blutooth Mesh Model Solicitation PDU RPL Items Clear Unacknowledged"
-    fields_desc = [
-        PacketField("address_range", None,pkt_cls=LEUnicastAddr)
-    ]
+    fields_desc = [PacketField("address_range", None, pkt_cls=LEUnicastAddr)]
 
-bind_layers(BTMesh_Model_Message, BTMesh_Model_Solicitation_Pdu_Rpl_Items_Clear, opcode=0x8079)
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Solicitation_Pdu_Rpl_Items_Clear, opcode=0x8079
+)
 
 
 class BTMesh_Model_Solicitation_Pdu_Rpl_Items_Status(Packet):
     name = "Blutooth Mesh Model Solicitation PDU RPL Items Status"
-    fields_desc = [
-        PacketField("address_range", None,pkt_cls=LEUnicastAddr)
-    ]
+    fields_desc = [PacketField("address_range", None, pkt_cls=LEUnicastAddr)]
 
-bind_layers(BTMesh_Model_Message, BTMesh_Model_Solicitation_Pdu_Rpl_Items_Clear, opcode=0x807A)
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Solicitation_Pdu_Rpl_Items_Clear, opcode=0x807A
+)
 
 
 ### SAR Configuration (Segment and Reassembly) MESSAGES
@@ -3382,45 +3754,50 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Solicitation_Pdu_Rpl_Items_Clear,
 class BTMesh_SAR_Transmitter_Get(Packet):
     name = "Bluetooth Mesh Model SAR Transmitter Get"
 
+
 bind_layers(BTMesh_Model_Message, BTMesh_SAR_Transmitter_Get, opcode=0x806C)
+
 
 class BTMesh_SAR_Transmitter_Set(Packet):
     name = "Bluetooth Mesh Model SAR Transmitter Set"
     fields_desc = [
-        BitField("sar_unicast_retransmissions_count",0, 4),
-        BitField("sar_segment_interval_step", 0,4),
-        BitField("sar_unicast_restransmissions_interval_step", 0,4),
-        BitField("sar_unicast_restransmissions_without_progess_count", 0,4),
-        BitField("sar_multicast_retransmissions_count", 0,4),
-        BitField("sar_unicast_retransmissions_interval_increment",0,4),
-        BitField("RFU", 0,4),
-        BitField("sar_multicast_retransmissions_interval_step", 0,4)
+        BitField("sar_unicast_retransmissions_count", 0, 4),
+        BitField("sar_segment_interval_step", 0, 4),
+        BitField("sar_unicast_restransmissions_interval_step", 0, 4),
+        BitField("sar_unicast_restransmissions_without_progess_count", 0, 4),
+        BitField("sar_multicast_retransmissions_count", 0, 4),
+        BitField("sar_unicast_retransmissions_interval_increment", 0, 4),
+        BitField("RFU", 0, 4),
+        BitField("sar_multicast_retransmissions_interval_step", 0, 4),
     ]
 
 
 bind_layers(BTMesh_Model_Message, BTMesh_SAR_Transmitter_Set, opcode=0x806D)
 
+
 class BTMesh_SAR_Transmitter_Status(Packet):
     name = "Bluetooth Mesh Model SAR Transmitter Status"
     fields_desc = [
-        BitField("sar_unicast_retransmissions_count",0, 4),
-        BitField("sar_segment_interval_step", 0,4),
-        BitField("sar_unicast_restransmissions_interval_step", 0,4),
-        BitField("sar_unicast_restransmissions_without_progess_count", 0,4),
-        BitField("sar_multicast_retransmissions_count", 0,4),
-        BitField("sar_unicast_retransmissions_interval_increment",0,4),
-        BitField("RFU", 0,4),
-        BitField("sar_multicast_retransmissions_interval_step", 0,4)
+        BitField("sar_unicast_retransmissions_count", 0, 4),
+        BitField("sar_segment_interval_step", 0, 4),
+        BitField("sar_unicast_restransmissions_interval_step", 0, 4),
+        BitField("sar_unicast_restransmissions_without_progess_count", 0, 4),
+        BitField("sar_multicast_retransmissions_count", 0, 4),
+        BitField("sar_unicast_retransmissions_interval_increment", 0, 4),
+        BitField("RFU", 0, 4),
+        BitField("sar_multicast_retransmissions_interval_step", 0, 4),
     ]
 
 
 bind_layers(BTMesh_Model_Message, BTMesh_SAR_Transmitter_Status, opcode=0x806E)
+
 
 class BTMesh_SAR_Receiver_Get(Packet):
     name = "Bluetooth Mesh Model SAR Receiver Get"
 
 
 bind_layers(BTMesh_Model_Message, BTMesh_SAR_Receiver_Get, opcode=0x806F)
+
 
 class BTMesh_SAR_Receiver_Set(Packet):
     name = "Bluetooth Mesh Model SAR Receiver Set"
@@ -3430,10 +3807,12 @@ class BTMesh_SAR_Receiver_Set(Packet):
         BitField("sar_receiver_segment_interval_step", 0, 4),
         BitField("sar_discard_timout", 0, 4),
         BitField("RFU", 0, 6),
-        BitField("sar_acknowledgment_retransmission_count", 0,2)
+        BitField("sar_acknowledgment_retransmission_count", 0, 2),
     ]
 
+
 bind_layers(BTMesh_Model_Message, BTMesh_SAR_Receiver_Set, opcode=0x8070)
+
 
 class BTMesh_SAR_Receiver_Status(Packet):
     name = "Bluetooth Mesh Model SAR Receiver Status"
@@ -3443,22 +3822,378 @@ class BTMesh_SAR_Receiver_Status(Packet):
         BitField("sar_receiver_segment_interval_step", 0, 4),
         BitField("sar_discard_timout", 0, 4),
         BitField("RFU", 0, 6),
-        BitField("sar_acknowledgment_retransmission_count", 0,2)
+        BitField("sar_acknowledgment_retransmission_count", 0, 2),
     ]
+
 
 bind_layers(BTMesh_Model_Message, BTMesh_SAR_Receiver_Status, opcode=0x8071)
 
 
+# OPCODE AGGREGATOR MESSAGES
 
 
+class BTMesh_Model_Opcode_Aggregator_Sequence(Packet):
+    name = "Blutooth Mesh Model Opcode Aggregator Sequence"
+    fields_desc = [
+        XLEShortField("element_addr", None),
+        PacketListField("items", None, pkt_cls=OpcodeAggregatorItem),
+    ]
 
 
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Opcode_Aggregator_Sequence, opcode=0x8072
+)
 
 
-"""
-ACCESS LAYER
-=================
-"""
+class BTMesh_Model_Opcode_Aggregator_Status(Packet):
+    name = "Bluetooth Mesh Model Opcode Aggregator Status"
+    fields_desc = [
+        ByteField("status", None),
+        XLEShortField("element_addr", None),
+        PacketListField("items", None, pkt_cls=OpcodeAggregatorItem),
+    ]
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Opcode_Aggregator_Status, opcode=0x8073)
+# LARGE COMPOSITION DATA MESSAGES
+
+
+class BTMesh_Model_Large_Composition_Data_Get(Packet):
+    name = "Bluetooth Mesh Model Large Composition Data Get"
+    fields_desc = [ByteField("page", None), LEShortField("offset", None)]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Large_Composition_Data_Get, opcode=0x8074
+)
+
+
+class BTMesh_Model_Large_Composition_Data_Status(Packet):
+    name = "Bluetooth Mesh Model Large Composition Data Status"
+    fields_desc = [
+        ByteField("page", None),
+        LEShortField("offset", None),
+        LEFieldLenField("total_size", 0, length_of="data"),
+        XLEStrField("data", None),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Large_Composition_Data_Status, opcode=0x8075
+)
+
+
+class BTMesh_Model_Large_Composition_Data_Models_Metadata_Get(Packet):
+    name = "Bluetooth Mesh Model Large Composition Data Models Metadata Get"
+    fields_desc = [ByteField("metadata_page", None), LEShortField("offset", None)]
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Large_Composition_Data_Models_Metadata_Get,
+    opcode=0x8076,
+)
+
+
+class BTMesh_Model_Large_Composition_Data_Models_Metadata_Status(Packet):
+    name = "Bluetooth Mesh Model Large Composition Data Models Metadata Get"
+    fields_desc = [
+        ByteField("metadata_page", None),
+        LEShortField("offset", None),
+        LEFieldLenField("total_size", 0, length_of="data"),
+        XLEStrField("data", None),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Large_Composition_Data_Models_Metadata_Status,
+    opcode=0x8077,
+)
+
+
+# BRIDGE MESSAGES
+
+
+class BTMesh_Model_Bridge_Subnet_Bridge_Get(Packet):
+    name = "Bluetooth Mesh Model Bridge Subnet Bridge Get"
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Bridge_Subnet_Bridge_Get, opcode=0x80B1)
+
+
+class BTMesh_Model_Bridge_Subnet_Bridge_Set(Packet):
+    name = "Bluetooth Mesh Model Bridge Subnet Bridge Set"
+    fields_desc = [ByteField("subnet_bridge_state", None)]
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Bridge_Subnet_Bridge_Set, opcode=0x80B2)
+
+
+class BTMesh_Model_Bridge_Subnet_Bridge_Status(Packet):
+    name = "Bluetooth Mesh Model Bridge Subnet Bridge Status"
+    fields_desc = [ByteField("subnet_bridge_state", None)]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Bridge_Subnet_Bridge_Status, opcode=0x80B3
+)
+
+
+class BTMesh_Model_Bridge_Bridging_Table_Add(Packet):
+    name = "Bluetooth Mesh Model Bridge Bridging Table Add"
+    fields_desc = [
+        ByteField("directions", None),
+        XBitField("net_key_index_2", 0, 12, tot_size=-3),
+        XBitField("net_key_index_1", 0, 12, end_tot_size=-3),
+        XLEShortField("address1", None),
+        XLEShortField("address2", None),
+    ]
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Bridge_Bridging_Table_Add, opcode=0x80B4)
+
+
+class BTMesh_Model_Bridge_Bridging_Table_Remove(Packet):
+    name = "Bluetooth Mesh Model Bridge Bridging Table Remove"
+    fields_desc = [
+        XBitField("net_key_index_2", 0, 12, tot_size=-3),
+        XBitField("net_key_index_1", 0, 12, end_tot_size=-3),
+        XLEShortField("address1", None),
+        XLEShortField("address2", None),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Bridge_Bridging_Table_Remove, opcode=0x80B5
+)
+
+
+class BTMesh_Model_Bridge_Bridging_Table_Status(Packet):
+    name = "Bluetooth Mesh Model Bridge Bridging Table Status"
+    fields_desc = [
+        ByteField("status", None),
+        ByteField("current_directions", None),
+        XBitField("net_key_index_2", 0, 12, tot_size=-3),
+        XBitField("net_key_index_1", 0, 12, end_tot_size=-3),
+        XLEShortField("address1", None),
+        XLEShortField("address2", None),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Bridge_Bridging_Table_Status, opcode=0x80B6
+)
+
+
+class BTMesh_Model_Bridge_Bridged_Subnets_Get(Packet):
+    name = "Bluetooth Mesh Model Bridge Bridged Subnets Get"
+    fields_desc = [
+        XBitField("net_key_index", 0, 12, tot_size=-2),
+        BitField("prohibited", 0, 2),
+        BitEnumField(
+            "filter",
+            0,
+            2,
+            {
+                0b00: "Report all pairs of NetKeyIndexes",
+                0b01: "Report pairs of NetKeyIndexes in which net_key_index matches NetKeyIndex1",
+                0b10: "Report pairs of NetKeyIndexes in which net_key_index matches NetKeyIndex2",
+                0b11: "Report pairs of NetKeyIndexes in which net_key_index matches NetKeyIndex1 or NetKeyIndex2",
+            },
+            end_tot_size=-2,
+        ),
+        ByteField("start_index", None),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Bridge_Bridged_Subnets_Get, opcode=0x80B7
+)
+
+
+class BTMesh_Model_Bridge_Bridged_Subnets_List(Packet):
+    name = "Bluetooth Mesh Model Bridged Subnets List"
+    fields_desc = [
+        XBitField("net_key_index", 0, 12, tot_size=-2),
+        BitField("prohibited", 0, 2),
+        BitEnumField(
+            "filter",
+            0,
+            2,
+            {
+                0b00: "Report all pairs of NetKeyIndexes",
+                0b01: "Report pairs of NetKeyIndexes in which net_key_index matches NetKeyIndex1",
+                0b10: "Report pairs of NetKeyIndexes in which net_key_index matches NetKeyIndex2",
+                0b11: "Report pairs of NetKeyIndexes in which net_key_index matches NetKeyIndex1 or NetKeyIndex2",
+            },
+            end_tot_size=-2,
+        ),
+        ByteField("start_index", None),
+        PacketListField("bridged_subnets_list", None, pkt_cls=NetKeyIndexPair),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Bridge_Bridged_Subnets_List, opcode=0x80B8
+)
+
+
+class BTMesh_Model_Bridge_Bridging_Table_Get(Packet):
+    name = "Bluetooth Mesh Model Bridge Bridging Table Get"
+    fields_desc = [
+        XBitField("net_key_index_2", 0, 12, tot_size=-3),
+        XBitField("net_key_index_1", 0, 12, end_tot_size=-3),
+        LEShortField("start_index", 0),
+    ]
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Bridge_Bridging_Table_Get, opcode=0x80B9)
+
+
+class BTMesh_Model_Bridge_Bridging_Table_List(Packet):
+    name = "Bluetooth Mesh Model Bridge Bridging Table List"
+    fields_desc = [
+        ByteField("status", None),
+        XBitField("net_key_index_2", 0, 12, tot_size=-3),
+        XBitField("net_key_index_1", 0, 12, end_tot_size=-3),
+        LEShortField("start_index", 0),
+        PacketListField("bridged_addresses_list", None, pkt_cls=BridgeAddresses),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Bridge_Bridging_Table_List, opcode=0x80BA
+)
+
+
+class BTMesh_Model_Bridge_Bridging_Table_Size_Get(Packet):
+    name = "Bluetooth Mesh Model Bridge Bridging Table Size Status"
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Bridge_Bridging_Table_Size_Get, opcode=0x80BB
+)
+
+
+class BTMesh_Model_Bridge_Bridging_Table_Size_Status(Packet):
+    name = "Bluetooth Mesh Model Bridge Bridging Table Size Status"
+    fields_desc = [LEShortField("bridging_table_size", None)]
+
+
+bind_layers(
+    BTMesh_Model_Message, BTMesh_Model_Bridge_Bridging_Table_Size_Status, opcode=0x80BC
+)
+
+
+# PRIVATE BEACON MESSAGES (MODEL MESSAGE ! to configure actual private beacons basically)
+
+
+class BTMesh_Model_Private_Beacon_Get(Packet):
+    name = "Bluetooth Mesh Model Private Beacon Get"
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Private_Beacon_Get, opcode=0x8060)
+
+
+class BTMesh_Model_Private_Beacon_Set(Packet):
+    name = "Bluetooth Mesh Model Private Beacon Set"
+    fields_desc = [
+        ByteField("private_beacon", None),
+        ByteField("random_update_interval_steps", None),
+    ]
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Private_Beacon_Set, opcode=0x8061)
+
+
+class BTMesh_Model_Private_Beacon_Status(Packet):
+    name = "Bluetooth Mesh Model Private Beacon Status"
+    fields_desc = [
+        ByteField("private_beacon", None),
+        ByteField("random_update_interval_steps", None),
+    ]
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Private_Beacon_Status, opcode=0x8062)
+
+
+class BTMesh_Model_Private_Beacon_Private_Gatt_Proxy_Get(Packet):
+    name = "Bluetooth Mesh Private Beacon Private Gatt Proxy Get"
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Private_Beacon_Private_Gatt_Proxy_Get,
+    opcode=0x8063,
+)
+
+
+class BTMesh_Model_Private_Beacon_Private_Gatt_Proxy_Set(Packet):
+    name = "Bluetooth Mesh Private Beacon Private Gatt Proxy Set"
+    fields_desc = [ByteField("private_gatt_proxy", None)]
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Private_Beacon_Private_Gatt_Proxy_Set,
+    opcode=0x8064,
+)
+
+
+class BTMesh_Model_Private_Beacon_Private_Gatt_Proxy_Status(Packet):
+    name = "Bluetooth Mesh Private Beacon Private Gatt Proxy Status"
+    fields_desc = [ByteField("private_gatt_proxy", None)]
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Private_Beacon_Private_Gatt_Proxy_Status,
+    opcode=0x8065,
+)
+
+
+class BTMesh_Model_Private_Beacon_Private_Node_Identity_Get(Packet):
+    name = "Bluetooth Mesh Private Beacon Private Node Identity Get"
+    fields_desc = [XLEShortField("net_key_index", None)]
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Private_Beacon_Private_Node_Identity_Get,
+    opcode=0x8066,
+)
+
+
+class BTMesh_Model_Private_Beacon_Private_Node_Identity_Set(Packet):
+    name = "Bluetooth Mesh Private Beacon Private Node Identity Set"
+    fields_desc = [
+        XLEShortField("net_key_index", None),
+        XByteField("private_identity", None),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Private_Beacon_Private_Node_Identity_Set,
+    opcode=0x8067,
+)
+
+
+class BTMesh_Model_Private_Beacon_Private_Node_Identity_Status(Packet):
+    name = "Bluetooth Mesh Private Beacon Private Node Identity Status"
+    fields_desc = [
+        ByteField("status", None),
+        XLEShortField("net_key_index", None),
+        XByteField("private_identity", None),
+    ]
+
+
+bind_layers(
+    BTMesh_Model_Message,
+    BTMesh_Model_Private_Beacon_Private_Node_Identity_Status,
+    opcode=0x8068,
+)
 
 
 """
