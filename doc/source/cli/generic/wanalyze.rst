@@ -121,7 +121,7 @@ We can easily replay this PCAP file using ``wplay`` tool, with option ``--flush`
 
     [...]
 
-Let's analyze this traffic with *"legacy_pairing_cracking"* analyzer:
+Let's analyze this traffic with our *"legacy_pairing_cracking"* analyzer:
 
 .. code-block:: text
 
