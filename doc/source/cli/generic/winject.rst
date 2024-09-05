@@ -166,7 +166,7 @@ For example, let's implement a basic Logitech Unifying replay attack. Let's star
 
     wsniff -i uart0 unifying -s -f ca:e9:06:ec:a4 | wdump /tmp/mouse.pcap
 
-Once the packet have been captured, we can easily replay them from the PCAP file and inject them using the following command:
+Once packets have been captured, we can easily replay them from the PCAP file and inject them using the following command:
 
 .. code-block:: text
 
