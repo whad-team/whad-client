@@ -363,8 +363,10 @@ class InteractiveShell(object):
 
         Print <i>TEXT</i> to the standard output.
         """
+        # If at least one argument is provided
         if len(args)>=1:
-            print(args[0])
+            # Concatenate text arguments if multiple are provided
+            print("".join(args))
 
 
     def success(self, message):
