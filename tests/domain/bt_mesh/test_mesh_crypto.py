@@ -12,7 +12,7 @@ from whad.bt_mesh.crypto import (
 from whad.scapy.layers.bt_mesh import (
     BTMesh_Obfuscated_Network_PDU,
     BTMesh_Network_PDU,
-    BTMesh_Lower_Transport_Unsegmented_Control_Message,
+    BTMesh_Lower_Transport_Control_Message,
     BTMesh_Secure_Network_Beacon,
     BTMesh_Private_Beacon,
     BTMesh_Obfuscated_Private_Beacon,
@@ -361,7 +361,7 @@ _NETKEY_INPUT1 = dict(
                 "b5e5bfdacbaf6cb7fb6bff871f035444ce83a670df"
             ),
         ),
-        lower_transport_pdu=BTMesh_Lower_Transport_Unsegmented_Control_Message(
+        lower_transport_pdu=BTMesh_Lower_Transport_Control_Message(
             bytes.fromhex("034b50057e400000010000")
         ),
         secure_net_beacon=BTMesh_Secure_Network_Beacon(
@@ -448,7 +448,7 @@ class TestNetworkLayerCryptoManager(object):
         net_pdu = pdus["not_obf_net_pdu"]
         plaintext, is_auth_tag_valid = crypto_manager.decrypt(net_pdu)
         dst_addr = plaintext[:2]
-        lower_transport_pdu = BTMesh_Lower_Transport_Unsegmented_Control_Message(
+        lower_transport_pdu = BTMesh_Lower_Transport_Control_Message(
             plaintext[2:]
         )
         assert (
