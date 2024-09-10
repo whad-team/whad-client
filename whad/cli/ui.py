@@ -1,5 +1,5 @@
 from prompt_toolkit import print_formatted_text, HTML
-from scapy.all import Packet
+from scapy.all import Packet, tcpdump , conf
 from hexdump import hexdump
 import sys
 import time
@@ -26,6 +26,7 @@ def info(message):
     """
     print_formatted_text(HTML('<ansicyan>[!] <b>%s</b></ansicyan>' % message))
 
+pkts = []
 
 def display_packet(pkt, show_metadata=True, format='repr'):
     """
@@ -35,11 +36,13 @@ def display_packet(pkt, show_metadata=True, format='repr'):
         * repr: scapy packet repr method (default)
         * show: scapy show method, "field" representation
         * hexdump: hexdump representation of the packet content
+        * tshark: tshark representation of the packet
         * raw: raw received bytes
 
     :param  pkt:        Received Signal Strength Indicator
     :type   pkt:        :class:`scapy.packet.packet`
     """
+    global tshark_count
     if isinstance(show_metadata, str):
         show_metadata = show_metadata == 'True'
     if isinstance(pkt, Packet):
@@ -98,6 +101,10 @@ def display_packet(pkt, show_metadata=True, format='repr'):
                 print_formatted_text(
                     HTML("<i>{pkthex}</i>").format(pkthex=hexdump(bytes(pkt.decrypted), result="return"))
                 )
+        elif format == "tshark":
+            pkts.append(pkt)
+            tcpdump_line = tcpdump(pkts, prog=conf.prog.tshark, dump=True)[:-1].decode('utf-8')
+            print(tcpdump_line.split("\n")[-1], end="")
         # Process scapy repr format
         elif format == "repr":
             if show_metadata:
