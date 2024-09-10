@@ -28,6 +28,9 @@ class BleSpawnOutputPipe(Bridge):
     def __init__(self, input_connector, output_connector):
         super().__init__(input_connector, output_connector)
 
+    def on_disconnect(self):
+        logger.warning("Unix client has disconnected")
+
 class BleSpawnInputPipe(Bridge):
     """ble-spawn input pipe
 
@@ -270,9 +273,8 @@ class BleSpawnApp(CommandLineDevicePipe):
         input_pipe.set_in_conn_handle(conn_handle)
 
         # Loop until the user hits CTL-C
-        while True:
-            sleep(1)
-
+        while self.input_interface.opened:
+            sleep(.2)
 
     def create_output_proxy(self, adv_data, scan_data, profile_json):
         """Create an output proxy that will relay packets from our emulated BLE
@@ -292,8 +294,10 @@ class BleSpawnApp(CommandLineDevicePipe):
         output_pipe = BleSpawnOutputPipe(peripheral, unix_server)
 
         # Loop until the user hits CTL-C
-        while True:
-            sleep(1)
+        while unix_server.device.opened:
+            sleep(.2)
+
+        logger.warning("Unix socket client disconnected")
 
 def ble_spawn_main():
     """BLE device spawning tool main routine.
