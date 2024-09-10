@@ -396,7 +396,9 @@ class UnixSocketServerDevice(WhadDevice):
         """Close connection.
         """
         if self.__client is not None:
+            logger.debug("Closing UnixSocketServer client ...")
             self.__client.close()
+            logger.debug("Client closed")
         self.__fileno = None
 
     def reset(self):

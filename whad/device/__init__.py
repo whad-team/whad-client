@@ -182,6 +182,10 @@ class WhadDeviceConnector(object):
         self.__transmission_callbacks = {}
         self.__error_callbacks = []
 
+        # Connector lock mode
+        self.__locked = False
+        self.__locked_pdus = Queue()
+
         # Synchronous mode (not enabled by default)
         self.__synchronous = False
         self.__pending_pdus = Queue()
@@ -395,6 +399,61 @@ class WhadDeviceConnector(object):
         else:
             return None
 
+    def lock(self):
+        """Lock connector. A locked connector will not dispatch packets/pdus like
+        in synchronous mode and will keep them in a waiting queue, but will dispatch
+        them all at once when unlocked.
+        """
+        self.__locked = True
+
+        # Clear pending PDUs queue
+        with self.__locked_pdus.mutex:
+            self.__locked_pdus.queue.clear()
+
+    def unlock(self, dispatch_callback=None):
+        """Unlock connector and dispatch pending PDUs.
+
+        :param  dispatch_callback: PDU dispatch callback that overrides the internal dispatch routine
+        :type   dispatch_callback: callable
+        """
+        # Mark connector as unlocked
+        self.__locked = False
+
+        # Dispatch PDUs
+        try:
+            while True:
+                # Retrieve PDU
+                pdu = self.__locked_pdus.get(block=False, timeout=0.2)
+
+                if dispatch_callback is None:
+                    # If connector is in synchronous mode, move PDUs to our pending queue
+                    if self.__synchronous:
+                        self.add_pending_packet(pdu)
+                    else:
+                        # Else forward PDU to our standard PDU processing method
+                        self.on_packet(pdu)
+                else:
+                    # Call the provided dispatch callback
+                    dispatch_callback(pdu)
+        except Empty:
+            # Processing done, continue.
+            pass
+
+    def is_locked(self) -> bool:
+        """Determine if the connector is locked.
+
+        :return: `True` if lock mode is enabled, `False` otherwise.
+        """
+        return self.__locked
+    
+    def add_locked_pdu(self, pdu):
+        """Add a pending Protocol Data Unit (PDU) to our locked pdus queue.
+
+        :param  Packet pdu:  Packet to add to locked packets queue
+        :type   pdu: scapy.packet.Packet
+        """
+        self.__locked_pdus.put(pdu)
+
     # Device interaction
     def send_message(self, message, filter=None):
         """Sends a message to the underlying device without waiting for an answer.
@@ -594,6 +653,13 @@ class Bridge(object):
         self.__in_wrapper = BridgeIfaceWrapper(self.__in_device, self)
         self.__out_wrapper = BridgeIfaceWrapper(self.__out_device, self)
 
+    def detach(self):
+        """Detach BridgeIfaceWrappers from bridge's devices.
+        """
+        self.__in_device.set_connector(self.__in)
+        self.__out_device.set_connector(self.__out)
+
+
     @property
     def input(self):
         return self.__in
@@ -687,6 +753,7 @@ class WhadDeviceInputThread(Thread):
                 break
         logger.info('Device IO thread canceled and stopped.')
         self.__io_thread.on_disconnection()
+        logger.info('on_disconnection done.')
 
 class WhadDeviceMessageThread(Thread):
 
@@ -714,7 +781,7 @@ class WhadDeviceMessageThread(Thread):
         while self.__device.process_messages(timeout=.1):
             pass
 
-        logger.info('Device message thread canceled and stopped, closing device.')
+        logger.info('Device message thread canceled and stopped, closing device %s.', self.__device)
         self.__device.close()
 
 class WhadDeviceIOThread(object):
@@ -747,10 +814,18 @@ class WhadDeviceIOThread(object):
     def join(self):
         logger.info('waiting for WhadDevice IO management thread to finish ...')
         while not self.__disconnected: #and (self.__input.is_alive() or self.__processing.is_alive()):
-            logger.info("Waiting for io thread ...")
-            self.__input.join(1.0)
-            logger.info("Waiting for processing thread ...")
-            self.__processing.join(1.0)
+            try:
+                logger.info("Waiting for io thread ...")
+                self.__input.join(1.0)
+            except RuntimeError:
+                logger.debug("RuntimeError raised while joining input thread, we may try to wait for our thread to finish :/")
+                pass
+            try:
+                logger.info("Waiting for processing thread ...")
+                self.__processing.join(1.0)
+            except RuntimeError:
+                logger.debug("RuntimeError raised while joining processing thread, we may try to wait for our thread to finish :/")
+                pass
 
         logger.info('WhadDevice IO management thread finished.')
         self.__alive = False
@@ -763,6 +838,7 @@ class WhadDeviceIOThread(object):
         """
         logger.debug('[device::io_thread] Adapter has disconnected')
         self.__disconnected = True
+        self.__input.cancel()
         #self.__device.close()
         self.__processing.cancel()
 
@@ -1077,7 +1153,9 @@ class WhadDevice(object):
             self.__connector.on_disconnection()
 
     def wait(self):
+        logger.debug("[WhadDevice] waiting for background thread to gracefully stop")
         self.__io_thread.join()
+        logger.debug("[WhadDevice] background threads stopped")
 
     def is_open(self):
         """Determine if the device has been opened or not.
@@ -1584,7 +1662,11 @@ class WhadDevice(object):
                     self.__connector.monitor_packet_rx(packet)
 
                     # Forward to our connector
-                    if self.__connector.is_synchronous():
+                    if self.__connector.is_locked():
+                        # If we are locked, then add packet to our locked packets
+                        self.__connector.add_locked_pdu(packet)
+                    elif self.__connector.is_synchronous():
+                        # If we are in synchronous mode, add packet as pending
                         self.__connector.add_pending_packet(packet)
                     else:
                         #logger.debug('[WhadDevice] on_domain_msg() for device %s: %s' % (self.interface, message))

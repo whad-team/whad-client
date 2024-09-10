@@ -616,7 +616,7 @@ class BLE(WhadDeviceConnector):
         """
         Stop currently enabled mode.
         """
-
+        logger.debug("Stopping BLE connector ...")
         # Create a Stop message
         msg = self.hub.ble.create_stop()
 
