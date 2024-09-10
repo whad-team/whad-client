@@ -48,6 +48,7 @@ dependencies = [
     "Sphinx>=5.3.0",
     "sphinx-rtd-theme==2.0.0",
     "sphinxcontrib-mermaid==0.9.2",
+    "requests==2.27.1"
 ]
 
 [project.scripts]
@@ -79,13 +80,21 @@ wuni-keyboard = "whad.unifying.cli.wuni_keyboard:wuni_kb_main"
 zip-safe = false
 
 [tool.setuptools.packages.find]
+
 include = [
     "whad*",
 ]
 exclude = [
     "test*",
-    "ressource*",
     "doc*",
+]
+
+[tool.setuptools.package-data]
+whad = [
+  "ressources/pcaps/*.pcap",
+  "ressources/rules/*.rules",
+  "ressources/wireshark/*.lua",
+
 ]
 
 [project.urls]
