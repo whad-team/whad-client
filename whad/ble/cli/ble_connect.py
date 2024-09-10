@@ -3,10 +3,16 @@
 This utility will configure a compatible whad device to connect to a given
 BLE device, and chain this with another tool.
 """
+import sys
+
 # Logging
 import logging
 
 from time import sleep
+from queue import Queue, Empty
+
+# Scapy
+from scapy.packet import Packet
 
 # WHAD device classes
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
@@ -14,6 +20,7 @@ from whad.device import Bridge
 
 # WHAD BLE interfaces
 from whad.ble import BLE, Central
+from whad.hub.events import DisconnectionEvt
 from whad.ble.exceptions import PeripheralNotFound
 
 # WHAD BLE messages
@@ -36,6 +43,39 @@ class BleConnectOutputPipe(Bridge):
     There is not specific process to be applied, we are just bridging a
     unix socket server device to the central connector and that's it.
     """
+
+    def __init__(self, input_connector, output_connector):
+        """Custom output pipe, will make sure to forward queued PDUs from
+        input_connector to output_connector.
+        """
+        # Retrieve an instance of our protocol hub
+        self.hub = input_connector.hub
+
+        # Do we get raw PDUs ?
+        if input_connector.support_raw_pdu():
+            self.support_raw_pdu = True
+        else:
+            self.support_raw_pdu = False
+
+        # This will dissociate the underlying devices from our connectors.
+        # Our central proxy will no more store queued packets, so we are left
+        # with the ones we already captured.
+        super().__init__(input_connector, output_connector)
+
+        # Unlock connector, causing packets to be sent to the output connector
+        input_connector.unlock(dispatch_callback=self.dispatch_pending_pdu)
+
+
+    def dispatch_pending_pdu(self, pdu):
+        # Convert packet back to message and forward to output
+        if self.support_raw_pdu:
+            message = BleRawPduReceived.from_packet(pdu)
+        else:
+            message = BlePduReceived.from_packet(pdu)
+
+        # Send message to our chained tool
+        self.output.send_message(message)
+
 
 class BleConnectInputPipe(Bridge):
     """wble-connect input pipe
@@ -168,10 +208,24 @@ class BleConnectInputPipe(Bridge):
                 command = self.convert_packet_message(message, self.__in_conn_handle, True)
                 self.input.send_command(command)
         elif isinstance(message, Disconnected):
-            # Central device has disconnected, we don't care but we don't send this
-            # notification to our chained tool.
-            logger.debug("[wble-connect][output-pipe] received a disconnection notification, todo")
-            return
+            # Central device has disconnected, we need to stop wble-connect.
+            logger.debug("[wble-connect][output-pipe] received a disconnection notification, exiting wble-connect")
+
+            # Detach interfaces from our bridge
+            self.detach()
+
+            # Forward the disconnection event to our central connector
+            self.output.on_event(DisconnectionEvt(
+                reason=message.reason,
+                conn_handle=message.conn_handle
+            ))
+
+            # Close device
+            self.output.close()
+            self.input.close()
+
+            # Exit process
+            sys.exit(-1)
         elif isinstance(message, Connected):
             logger.debug("[wble-connect][output-pipe] received a connection notification, discard")
             return
@@ -296,6 +350,7 @@ class BleConnectApp(CommandLineDevicePipe):
         # Make sure the bd address is valid
         if BDAddress.check(bdaddr):
             central = Central(self.interface)
+            central.lock()
 
             # Spoof source BD address if required
             if self.args.bdaddr_pub_src is not None:
@@ -310,7 +365,7 @@ class BleConnectApp(CommandLineDevicePipe):
                 output_pipe.set_out_conn_handle(central.conn_handle)
 
                 while self.input_interface.opened:
-                    sleep(1)
+                    sleep(.2)
 
             except PeripheralNotFound:
                 # Could not connect
@@ -321,8 +376,10 @@ class BleConnectApp(CommandLineDevicePipe):
         """
         # Make sure the bd address is valid
         if BDAddress.check(bdaddr):
-            # Configure our interface
+            # Configure our interface (Central with PDU queue)
+            logger.debug("Using CentralProxy")
             central = Central(self.interface)
+            central.lock()
 
             # Spoof source BD address if required
             if self.args.bdaddr_pub_src is not None:
@@ -346,6 +403,8 @@ class BleConnectApp(CommandLineDevicePipe):
                     'target_bdaddr':str(central.target_peer),
                     'target_addrtype': str(central.target_peer.type)
                 }))
+
+                # Create our custom pipe
                 BleConnectOutputPipe(central, proxy)
 
                 # Wait for device to disconnect (or user CTL-C)
