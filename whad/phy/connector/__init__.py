@@ -289,7 +289,7 @@ class Phy(WhadDeviceConnector):
         if cr not in range(45, 49):
             raise InvalidParameter('coding rate')
 
-        if bw not in [125000, 250000, 500000]:
+        if bw not in [62500, 125000, 250000, 500000]:
             raise InvalidParameter('bandwidth')
 
         # Create a SetLoRaMod message.

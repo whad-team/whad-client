@@ -3,8 +3,6 @@ This module provides the :class:`whad.phy.connector.lora.LoRa` connector that wr
 default :class:`whad.phy.connector.Phy` connector and make it easier to receive
 and send LoRa packets.
 '''
-from queue import Queue, Empty
-from scapy.packet import Packet
 from whad.device import WhadDevice
 from whad.exceptions import UnsupportedCapability
 from whad.phy.connector import Phy
@@ -39,8 +37,6 @@ class LoRa(Phy):
         self.__explicit_mode = False            # Explicit mode is disabled by default
         self.__invert_iq = False                # Invert IQ is disabled by default
         self.__syncword = LoRa.SYNCWORD_M2M     # LoRa M2M by default
-
-        self.__pkt_queue = Queue()
 
 
     ##
@@ -92,7 +88,7 @@ class LoRa(Phy):
     def bw(self, value: int):
         '''Bandwidth setter.
         '''
-        if value in [125000, 250000, 500000]:
+        if value in [62500, 125000, 250000, 500000]:
             self.__bandwidth = value
         else:
             raise InvalidParameter('bw')
@@ -193,25 +189,3 @@ class LoRa(Phy):
 
         # Start RX
         super().start()
-
-
-    def on_packet(self, packet):
-        """Incoming packet handler.
-        """
-        # Add packet to our packet queue
-        self.__pkt_queue.put(packet)
-
-
-    def wait_packet(self, timeout: float = None) -> Packet:
-        """Wait for a LoRa packet.
-
-        :param timeout: if set, wait ``timeout`` seconds until returning
-        :type timeout: float
-        :return: received packet if any, ``None`` otherwise
-        :rtype: :class:`scapy.packet.Packet`
-        """
-        try:
-            packet = self.__pkt_queue.get(block=True, timeout=timeout)
-            return packet
-        except Empty:
-            return None
