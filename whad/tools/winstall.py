@@ -1,4 +1,5 @@
-"""WHAD install tool
+"""
+WHAD install tool
 
 This utility is a simple helper facilitating the install of devices.
 """
