@@ -90,7 +90,7 @@ class WhadSniffApp(CommandLineApp):
             dest='format',
             action="store",
             default='repr',
-            choices=['repr', 'show', 'raw', 'hexdump'],
+            choices=['repr', 'show', 'raw', 'hexdump', 'tshark'],
             help='Indicate format to display packet'
         )
 
