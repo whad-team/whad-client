@@ -11,11 +11,13 @@ import stat
 import distro
 import shlex
 import inspect
+import usb
+from serial.tools.list_ports import comports
 from shutil import copy, which
 from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.ui import info, error, warning, success
 from whad.cli.app import CommandLineApp, ApplicationError
-from subprocess import Popen, DEVNULL, PIPE
+from subprocess import check_output, Popen, DEVNULL, PIPE
 from grp import getgrall
 from pathlib import Path
 
@@ -32,6 +34,16 @@ class WhadInstallApp(CommandLineApp):
             description='WHAD install tool',
             interface=False,
             commands=False
+        )
+
+
+        self.add_argument(
+            '--list',
+            '-l',
+            dest='list',
+            action="store_true",
+            default=False,
+            help='List existing devices'
         )
 
         self.add_argument(
@@ -64,7 +76,7 @@ class WhadInstallApp(CommandLineApp):
         self.add_argument(
             'device',
             nargs="*",
-            default=["hci", "butterfly", "esp", "lorae5mini", "rfstorm", "ubertooth", "apimote", "nucleowl55", "rzusbstick", "yardstickone"],
+            default=[],
             help='Select a specific device'
         )
 
@@ -243,6 +255,11 @@ class WhadInstallApp(CommandLineApp):
         if r != 0:
             return False
 
+        r, _, _ = self.run_command("pip install future")
+        if r != 0:
+            return False
+
+
         warning("For some reason, latest build from rfcat repo crashes the dongle, let's get the latest functional build.")
         r, _, _ = self.run_command("wget https://gist.githubusercontent.com/mossmann/7b816680df2ac513df3835f3cb9eaa1b/raw/2f33a76a86c8f6ee71dacb385537386486fe633a/RfCatYS1CCBootloader.hex -O /tmp/ys1.hex")
         if r != 0:
@@ -368,7 +385,7 @@ class WhadInstallApp(CommandLineApp):
         if r != 0:
             return False
 
-        os.environ.update(dict(line.decode().partition('=')[::2] for line in o.split(b'\n')[:-1]))
+        os.environ.update(dict(line.decode().partition('=   ')[::2] for line in o.split(b'\n')[:-1]))
 
         r, o, e = self.run_command("idf.py --version", force_env=os.environ,  cwd="/tmp/esp/esp-idf")
         if r != 0:
@@ -605,6 +622,60 @@ class WhadInstallApp(CommandLineApp):
         else:
             return True
 
+    def list_devices(self):
+        info("Detected devices:")
+        print()
+        for dev in comports():
+            if (dev.vid == 0x10c4 and dev.pid == 0xea60) or dev.vid == 0x303a:
+                print_formatted_text(HTML("  - <b>Espressif ESP-32 board: </b> {}".format(dev.device)))
+                print_formatted_text(HTML("    <u>Command (install rules):</u> <i>winstall --rules esp</i>"))
+                print_formatted_text(HTML("    <u>Command (flash firmware):</u> <i>winstall --flash esp --port {}</i>".format(dev.device)))
+                print()
+            elif dev.vid == 0xc0ff and dev.pid == 0xeeee:
+                print_formatted_text(HTML("  - <b>WHAD ButteRFly dongle: </b> {}".format(dev.device)))
+                print_formatted_text(HTML("    <u>Command (install rules):</u> <i>winstall --rules butterfly</i>"))
+                print_formatted_text(HTML("    <u>Command (flash firmware):</u> <i>winstall --flash butterfly --port {}</i>".format(dev.device)))
+                print()
+            elif dev.vid == 0x0483 and dev.pid == 0x374e:
+                print_formatted_text(HTML("  - <b>Nucleo STM32WL55: </b> {}".format(dev.device)))
+                print_formatted_text(HTML("    <u>Command (install rules):</u> <i>winstall --rules nucleowl55</i>"))
+                print_formatted_text(HTML("    <u>Command (flash firmware):</u> <i>winstall --flash nucleowl55 --port {}</i>".format(dev.device)))
+                print()
+
+        ubertooth_count = 0
+        yardstickone_count = 0
+        rfstorm_count = 0
+        rzusbstick_count = 0
+        for device in usb.core.find(find_all=1):
+            vid, pid = device.idVendor, device.idProduct
+            if (vid == 0xffff and pid == 0x0004) or (vid == 0x1d50 and pid >= 0x6000 and pid <= 0x6003):
+                print_formatted_text(HTML("  - <b>Ubertooth One: </b> {}".format(ubertooth_count)))
+                print_formatted_text(HTML("    <u>Command (install rules):</u> <i>winstall --rules ubertooth </i>"))
+                print_formatted_text(HTML("    <u>Command (flash firmware):</u> <i>winstall --flash ubertooth --port {}</i>".format(ubertooth_count)))
+                ubertooth_count += 1
+                print()
+            elif (vid == 0x1d50 and pid in (0x605b, 0x6047, 0x6048, 0xecc1, 0x6049, 0x604a, 0x605c, 0xecc0)):
+                print_formatted_text(HTML("  - <b>Yard Stick One: </b> {}".format(yardstickone_count)))
+                print_formatted_text(HTML("    <u>Command (install rules):</u> <i>winstall --rules yardstickone </i>"))
+                print_formatted_text(HTML("    <u>Command (flash firmware):</u> <i>winstall --flash yardstickone --port {}</i>".format(yardstickone_count)))
+                yardstickone_count += 1
+                print()
+            elif (vid == 0x046d and pid in (0xc52b, 0xaaaa)) or (vid == 0x1915 and pid in (0x0102, 0x7777, 0x0101)):
+                print_formatted_text(HTML("  - <b>RFStorm compatible dongle: </b> {}".format(rfstorm_count)))
+                print_formatted_text(HTML("    <u>Command (install rules):</u> <i>winstall --rules rfstorm </i>"))
+                print_formatted_text(HTML("    <u>Command (flash firmware):</u> <i>winstall --flash rfstorm --port {}</i>".format(rfstorm_count)))
+                rfstorm_count += 1
+                print()
+            elif (vid == 0x03eb and pid == 0x210a):
+                print_formatted_text(HTML("  - <b>RZUSBStick: </b> {}".format(rzusbstick_count)))
+                print_formatted_text(HTML("    <u>Command (install rules):</u> <i>winstall --rules rzusbstick </i>"))
+                rzusbstick_count += 1
+                print()
+
+        for device in os.listdir("/sys/class/bluetooth"):
+            print_formatted_text(HTML("  - <b>HCI device: </b> {}".format(device)))
+            print_formatted_text(HTML("    <u>Command (install rules):</u> <i>winstall --rules hci </i>"))
+            print()
 
     def run(self):
         try:
@@ -616,12 +687,30 @@ class WhadInstallApp(CommandLineApp):
 
             if not self.args.rules and not self.args.flash:
                 # By default, if no option is provided, only use rules
-                rules = True
+                self.args.list = True
+
+            if self.args.list or len(self.args.device) == 0:
+                self.list_devices()
+                return
 
             # We need root, let's ask
             if not self.ask_for_privileges():
                 error("Login failed, aborting.")
                 exit(1)
+
+            if  "all" in self.args.device:
+                self.args.device = [
+                    "hci",
+                    "butterfly",
+                    "esp",
+                    "lorae5mini",
+                    "rfstorm",
+                    "ubertooth",
+                    "apimote",
+                    "nucleowl55",
+                    "rzusbstick",
+                    "yardstickone"
+                ]
 
             # Iterate over devices
             for device in self.args.device:
