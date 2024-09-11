@@ -48,7 +48,8 @@ dependencies = [
     "Sphinx>=5.3.0",
     "sphinx-rtd-theme==2.0.0",
     "sphinxcontrib-mermaid==0.9.2",
-    "requests==2.27.1"
+    "requests==2.27.1",
+    "distro==1.6.0"
 ]
 
 [project.scripts]
