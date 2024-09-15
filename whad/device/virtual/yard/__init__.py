@@ -17,7 +17,8 @@ from time import sleep,time
 from whad.helpers import swap_bits
 from queue import Queue, Empty
 
-
+import logging
+logger = logging.getLogger(__name__)
 
 # Helpers functions
 def get_yardstickone(id=0,bus=None, address=None):
@@ -47,8 +48,12 @@ class YardStickOneDevice(VirtualDevice):
         Returns a list of available RZUSBStick devices.
         '''
         available_devices = []
-        for yard in find(idVendor=YardStickOneId.YARD_ID_VENDOR, idProduct=YardStickOneId.YARD_ID_PRODUCT,find_all=True):
-            available_devices.append(YardStickOneDevice(bus=yard.bus, address=yard.address))
+        try:
+            for yard in find(idVendor=YardStickOneId.YARD_ID_VENDOR, idProduct=YardStickOneId.YARD_ID_PRODUCT,find_all=True):
+                available_devices.append(YardStickOneDevice(bus=yard.bus, address=yard.address))
+        except ValueError as err:
+            logger.warning("Cannot access YardStickOne, root privileges may be required.")
+
         return available_devices
 
     @property
