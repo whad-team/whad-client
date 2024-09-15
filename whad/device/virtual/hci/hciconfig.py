@@ -14,12 +14,16 @@ class HCIConfig(object):
 
     @classmethod
     def list(cls):
-        sock = socket(31, SOCK_RAW, 1)
+        # if raw HCI socket is not available, return an empty list
+        try:
+            sock = socket(31, SOCK_RAW, 1)
 
-        # Get number of devices
-        arg = pack('I', 16) +  b"\x00" * (8*16)
-        output = ioctl(sock.fileno(), cls.HCIGETDEVLIST, arg)
-        number_of_devices = unpack('H', output[:2])[0]
+            # Get number of devices
+            arg = pack('I', 16) +  b"\x00" * (8*16)
+            output = ioctl(sock.fileno(), cls.HCIGETDEVLIST, arg)
+            number_of_devices = unpack('H', output[:2])[0]
+        except Exception:
+            number_of_devices = 0
 
         device_ids = []
         for device_number in range(number_of_devices):

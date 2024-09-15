@@ -89,7 +89,7 @@ class UartDevice(WhadDevice):
         if port_info is None:
             raise WhadDeviceNotFound
         else:
-            self.__is_acm = (port_info.subsystem == 'usb')
+            self.__is_acm = (port_info.usb_info is not None)
 
     @property
     def identifier(self):
