@@ -113,7 +113,7 @@ class LowLevelPeripheral(Peripheral):
         if len(self.__pending_control_pdus) > 0:
             for _pdu in self.__pending_control_pdus:
                 if self.__proxy is not None:
-                    pdu = self.__proxy.on_ctl_pdu(_pdu)
+                    pdu = self.__proxy.on_ctl_pdu(_pdu, _pdu.direction)
                     if pdu is not None:
                         self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
                 else:
