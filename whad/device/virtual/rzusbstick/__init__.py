@@ -14,6 +14,9 @@ from usb.util import get_string
 from struct import unpack, pack
 from time import sleep
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Helpers functions
 def get_rzusbstick(id=0,bus=None, address=None):
     '''
@@ -42,8 +45,12 @@ class RZUSBStickDevice(VirtualDevice):
         Returns a list of available RZUSBStick devices.
         '''
         available_devices = []
-        for rzusbstick in find(idVendor=RZUSBStickId.RZUSBSTICK_ID_VENDOR, idProduct=RZUSBStickId.RZUSBSTICK_ID_PRODUCT,find_all=True):
-            available_devices.append(RZUSBStickDevice(bus=rzusbstick.bus, address=rzusbstick.address))
+        try:
+            for rzusbstick in find(idVendor=RZUSBStickId.RZUSBSTICK_ID_VENDOR, idProduct=RZUSBStickId.RZUSBSTICK_ID_PRODUCT,find_all=True):
+                available_devices.append(RZUSBStickDevice(bus=rzusbstick.bus, address=rzusbstick.address))
+        except ValueError as err:
+            logger.warning("Cannot access RZUSBStick, root privileges may be required.")
+            
         return available_devices
 
     @property

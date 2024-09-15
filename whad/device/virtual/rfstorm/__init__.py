@@ -14,6 +14,9 @@ from threading import Thread, Lock
 from time import sleep, time
 from whad.helpers import swap_bits
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Helpers functions
 def get_rfstorm(id=0,bus=None, address=None):
     '''
@@ -43,8 +46,12 @@ class RFStormDevice(VirtualDevice):
         Returns a list of available RFStorm devices.
         '''
         available_devices = []
-        for rfstorm in find(idVendor=RFStormId.RFSTORM_ID_VENDOR, idProduct=RFStormId.RFSTORM_ID_PRODUCT,find_all=True):
-            available_devices.append(RFStormDevice(bus=rfstorm.bus, address=rfstorm.address))
+        try:
+            for rfstorm in find(idVendor=RFStormId.RFSTORM_ID_VENDOR, idProduct=RFStormId.RFSTORM_ID_PRODUCT,find_all=True):
+                available_devices.append(RFStormDevice(bus=rfstorm.bus, address=rfstorm.address))
+        except ValueError as err:
+            logger.warning("Cannot access RFStorm, root privileges may be required.")
+            
         return available_devices
 
     @property
