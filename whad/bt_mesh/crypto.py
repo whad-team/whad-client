@@ -110,6 +110,20 @@ def generate_private_key_from_bytes(hex_key):
     )
 
 
+def compute_virtual_addr_from_label_uuid(label):
+    """
+    Computes the virtual addr based on the label UUID
+    Mesh Prt Specification Section 3.4.2.3
+
+    :param label: Label UUID
+    :type label: Bytes
+    """
+    salt = s1(b"vtad")
+    va = int.from_bytes(aes_cmac(salt, label), "big") % (2**14)
+    va = (va & 0b10 << 14).to_bytes(2, "big")
+    return va
+
+
 """
 PROVISIONING SECURITY
 """
@@ -425,6 +439,9 @@ class NetworkLayerCryptoManager:
         self.key_index = key_index
         self.iv_index = iv_index
 
+        # List of bound app key indexes to this network key
+        self.app_key_indexes = []
+
         self.__compute_sub_keys()
 
     def __compute_sub_keys(self):
@@ -489,6 +506,16 @@ class NetworkLayerCryptoManager:
         Computes the Network ID. Mesh Spec Section 3.9.6.3.2 p. 202
         """
         return k3(self.net_key)
+
+    def add_app_key_index(self, app_key_index):
+        """
+        Adds an AppKey index bounded to this network key
+
+        :param app_key_crypto_manager: The App key index
+        :type app_key_crypto_manager: index
+        """
+        if app_key_index not in self.app_key_indexes:
+            self.app_key_indexes.append(app_key_index)
 
     def encrypt(self, raw_transport_pdu, clear_dst_addr, net_pdu):
         """
@@ -704,7 +731,17 @@ class UpperTransportLayerAppKeyCryptoManager:
     The UpperTransportLayer state manages all the application keys bound to the network it sits in.
     """
 
-    def __init__(self, app_key=None):
+    def __init__(self, app_key=None, key_index=0, net_key_index=0):
+        """
+        Creates the app key from a given value (or random generation)
+
+        :param app_key: Value of the app key, defaults to None
+        :type app_key: Bytes, optional
+        :param key_index: app_key_index of the key, defaults to 0
+        :type key_index: int, optional
+        :param net_key_index: Index of the net_key this app_key is bound to, defaults to 0
+        :type net_key_index: int, optional
+        """
         if app_key is None:
             self.app_key = generate_random_value(128)
         else:
@@ -712,6 +749,11 @@ class UpperTransportLayerAppKeyCryptoManager:
 
         # Application Key Identifier
         self.aid = self.__compute_aid()
+
+        # index of the net key this app key in bound to
+        self.net_key_index = net_key_index
+
+        self.key_index = key_index
 
     def __compute_aid(self):
         return k4(self.app_key)

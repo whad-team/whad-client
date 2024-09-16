@@ -14,15 +14,17 @@ Model Publication Composition State
 
 class ModelPublicationAddressState(ModelState):
     def __init__(self):
-        super().__init__(name="model_publication_publish_address", default_value=0x0000)
+        super().__init__(
+            name="model_publication_publish_address", default_value=b"\x00\x00"
+        )
 
 
 class ModelPublicationPeriodState(ModelState):
     def __init__(self):
         super().__init__(name="model_publication_publish_period", default_value=None)
 
-        self.values["nb_of_steps"] = 0b01
-        self.values["step_resolution"] = 0x00
+        self.values["nb_of_steps"] = 0b00
+        self.values["step_resolution"] = 0x01
 
     def get_publish_period(self):
         return self.get_state("nb_of_steps") * self.get_state("step_resolution")
@@ -91,21 +93,25 @@ class SubscriptionListState(ModelState):
     """
     Should have one per Model.
     Extended and base model share one List !
+    One list for label UUIDs (for virtual addresses)
+    One for groups addrs
     """
 
     def __init__(self):
-        super().__init__(name="subscription_list", default_value={})
+        super().__init__(
+            name="subscription_list", default_value=None
+        )
+
+        self.values["label_uuids"] = []
+        self.values["group_addrs"] = []
 
 
 class NetKeyListState(ModelState):
-    def __init__(self, primary_net_key):
+    def __init__(self):
         """
         NetKey List State
         Each field has a NetworkLayerCryptoManager object
         Field name = net_key_index
-
-        :param primary_net_key: [TODO:description]
-        :type primary_net_key: [TODO:type]
         """
         super().__init__(
             name="net_key_list",
@@ -114,11 +120,11 @@ class NetKeyListState(ModelState):
 
 
 class AppKeyListState(ModelState):
-    def __init__(self, primary_net_key):
+    def __init__(self):
         """
         AppKey List State
 
-        Each field has a AppLayerCryptoManager object
+        Each field has a UpperLayerAppKeyCryptoManager object
         Field name = app_key_index
         """
         super().__init__(
@@ -175,7 +181,9 @@ class GattProxyState(ModelState):
 
 class NodeIdentityState(ModelState):
     def __init__(self):
-        super().__init__(name="node_identity", default_value=0x02)
+        super().__init__(
+            name="node_identity", default_value=0x02
+        )
 
 
 class FriendState(ModelState):
@@ -197,7 +205,9 @@ class FriendState(ModelState):
 
 class KeyRefreshPhaseState(ModelState):
     def __init__(self):
-        super().__init__(name="key_refresh_phase", default_value=0x00)
+        super().__init__(
+            name="key_refresh_phase", default_value=0x00
+        )
 
 
 """
@@ -246,7 +256,9 @@ HEARTBEAT PUBLICATION COMPOSITE STATE
 
 class HeartbeatPublicationDestinationState(ModelState):
     def __init__(self):
-        super().__init__(name="heartbeat_publication_destination", default_value=0x0000)
+        super().__init__(
+            name="heartbeat_publication_destination", default_value=b"\x00\x00"
+        )
 
 
 class HeartbeatPublicationCountState(ModelState):
@@ -301,13 +313,15 @@ Hearbeat Subscription COMPOSITE STATE
 
 class HeartbeatSubscriptionSourceState(ModelState):
     def __init__(self):
-        super().__init__(name="heartbeat_subscription_source", default_value=0x0000)
+        super().__init__(
+            name="heartbeat_subscription_source", default_value=b"\x00\x00"
+        )
 
 
 class HeartbeatSubscriptionDestinationState(ModelState):
     def __init__(self):
         super().__init__(
-            name="heartbeat_subscription_destination", default_value=0x0000
+            name="heartbeat_subscription_destination", default_value=b"\x00\x00"
         )
 
 
@@ -386,21 +400,24 @@ RELAY TRANSMIT COMPOSITE STATE
 """
 
 
-class RelayTransmitCountState(ModelState):
+class RelayRetransmitCountState(ModelState):
     def __init__(self):
-        super().__init__(name="relay_transmit_count", default_value=0b000)
+        super().__init__(name="relay_retransmit_count", default_value=0b000)
 
 
-class RelayTransmitIntervalStepsState(ModelState):
+class RelayRetransmitIntervalStepsState(ModelState):
     def __init__(self):
-        super().__init__(name="relay_transmit_interval_steps", default_value=0b00000)
+        super().__init__(name="relay_retransmit_interval_steps", default_value=0b00000)
 
 
 class RelayTransmitCompositeState(CompositeModelState):
     def __init__(self):
         super().__init__(
-            name="relay_transmit",
-            sub_states_cls=[RelayTransmitCountState, RelayTransmitIntervalStepsState],
+            name="relay_retransmit",
+            sub_states_cls=[
+                RelayRetransmitCountState,
+                RelayRetransmitIntervalStepsState,
+            ],
         )
 
 
@@ -661,7 +678,8 @@ class PathLifetimeState(ModelState):
 class PathMetricCompositeState(CompositeModelState):
     def __init__(self):
         super().__init__(
-            name="path_metric", sub_states_cls=[PathMetricTypeState, PathLifetimeState]
+            name="path_metric",
+            sub_states_cls=[PathMetricTypeState, PathLifetimeState],
         )
 
 
@@ -721,11 +739,11 @@ class ForwardingTableEntry:
         fixed_path=1,
         backward_validated_path=1,
         path_not_ready=1,
-        path_origin=0x000,
+        path_origin=b"\x00\x00",
         path_origin_secondary_elements_count=0,
         dependent_origin_list=[],
         dependent_origin_secondary_elements_count_list=[],
-        destination=0x0000,
+        destination=b"\x00\x00",
         path_target_secondary_elements_count=0,
         dependent_target_list=[],
         dependent_target_secondary_elements_count_list=[],
@@ -779,6 +797,7 @@ FORWARDING TABLE COMPOSITE STATE END
 """
 
 
+# Thede 2 states I have no idea what they are bound to...
 class WantedLanesState(ModelState):
     def __init__(self):
         super().__init__(name="wanted_lanes", default_value=0x01)
