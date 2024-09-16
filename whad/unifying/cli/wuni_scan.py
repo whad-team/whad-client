@@ -116,6 +116,7 @@ class UniScanApp(CommandLineDeviceSink):
 
         # Start sniffing
         sniffer.channel = channel
+        sniffer.address = address.value
         sniffer.start()
 
         # If no channel is specified, then automatically loop on all channels.
@@ -154,7 +155,11 @@ class UniScanApp(CommandLineDeviceSink):
         sniffer.start()
 
         # Sniff packets and display them
-        print('Scanning for Unifying devices on channels 0-100 ...')
+        if channel is not None:
+            print(f"Scanning for Unifying devices on channel {channel}")
+        else:
+            print("Scanning for Unifying devices on channels 0-100 ...")
+
         while True:
             for packet in sniffer.sniff():
                 if Logitech_Unifying_Hdr in packet:
