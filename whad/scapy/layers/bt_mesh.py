@@ -1557,6 +1557,29 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Generic_Delta_Set, opcode=0x820B)
 ### CONFIG MESSAGES
 
 
+class BTMesh_Model_Config_Beacon_Get(Packet):
+    name = "Bluetooth Mesh Config Model Beacon Get"
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Beacon_Get, opcode=0x8009)
+
+
+class BTMesh_Model_Config_Beacon_Set(Packet):
+    name = "Bluetooth Mesh Config Model Beacon Set"
+    fields_desc = [ByteField("beacon", None)]
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Beacon_Set, opcode=0x800A)
+
+
+class BTMesh_Model_Config_Beacon_Status(Packet):
+    name = "Bluetooth Mesh Config Model Beacon Status"
+    fields_desc = [ByteField("beacon", None)]
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Beacon_Status, opcode=0x800B)
+
+
 class BTMesh_Model_Config_Composition_Data_Get(Packet):
     name = "Bluetooth Mesh Config Model Composition Data Get"
     fields_desc = [ByteField("page", None)]
@@ -1941,9 +1964,16 @@ class BTMesh_Model_Config_Net_Key_Status(Packet):
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Net_Key_Status, opcode=0x8044)
 
 
+class BTMesh_Model_Config_Net_Key_Get(Packet):
+    name = "Bluetooth Mesh Model Config NetKey Status"
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Net_Key_Get, opcode=0x8042)
+
+
 class BTMesh_Model_Config_Net_Key_List(Packet):
     name = "Bluetooth Mesh Model Config NetKey List"
-    fields_desc = [XLEStrField("net_key_indexes", None)]
+    fields_desc = [XStrField("net_key_indexes", None)] # packed with utils function in stack
 
 
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Net_Key_List, opcode=0x8043)
@@ -2009,7 +2039,7 @@ class BTMesh_Model_Config_App_Key_List(Packet):
     fields_desc = [
         ByteField("status", None),
         XLEShortField("net_key_index", None),
-        StrField("app_key_indexes", None),
+        StrField("app_key_indexes", None), # packed with utils function in Stack
     ]
 
 
@@ -2100,7 +2130,7 @@ class BTMesh_Model_Config_SIG_Model_App_List(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         XLEShortField("model_identifier", None),
-        XLEStrField("app_key_indexes", None),
+        XStrField("app_key_indexes", None), # packed with function in utils in Stack
     ]
 
 
@@ -2126,7 +2156,7 @@ class BTMesh_Model_Config_Vendor_Model_App_List(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         LEIntField("model_identifier", None),
-        XLEStrField("app_key_indexes", None),
+        XStrField("app_key_indexes", None), # packed with function in utils in Stack
     ]
 
 
