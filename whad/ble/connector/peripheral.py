@@ -20,7 +20,8 @@ from whad.ble.stack.att import ATTLayer
 from whad.ble.stack.smp import CryptographicDatabase, Pairing
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.device import PeripheralDevice
-from whad.protocol.ble.ble_pb2 import BleDirection
+from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField
+from whad.hub.ble import Direction as BleDirection
 from whad.exceptions import UnsupportedCapability
 from time import sleep
 
@@ -105,7 +106,12 @@ class Peripheral(BLE):
             # If an existing connection is hijacked, simulate a connection
             if existing_connection is not None:
                 self.on_connected(existing_connection)
-            else:    
+            else:
+                # If no advertising data has been set, initialize this peripheral
+                # with default flags.
+                if adv_data is None:
+                    adv_data = AdvDataFieldList(AdvFlagsField())
+                
                 # Enable peripheral mode
                 logger.info('Enable peripheral mode with advertising data: %s' % adv_data)
                 self.enable_peripheral_mode(adv_data, scan_data)
