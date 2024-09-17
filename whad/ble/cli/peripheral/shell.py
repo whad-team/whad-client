@@ -35,8 +35,25 @@ wble-periph, the WHAD Bluetooth Low Energy peripheral utility
 BDADDR_REGEXP = '^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$'
 
 ADRECORDS = {
-
 }
+
+def validate_uuid(uuid: str) -> str:
+    """Ensure a user-provided UUID is valid.
+
+    :param uuid: UUID to validate
+    :type uuid: str
+    :return-type: str
+    :return: Validated UUID
+    """
+    # Parse provided UUID
+    if uuid.lower().startswith("0x"):
+        uuid = str(UUID(int(uuid, 16)))
+    else:
+        uuid = str(UUID(uuid))
+
+    # Return the normalized UUID
+    return uuid
+
 
 class MonitoringProfile(GenericProfile):
 
@@ -155,7 +172,6 @@ class BlePeriphShell(InteractiveShell):
                 self.set_prompt(HTML('<b>wble-periph|<ansicyan>%s</ansicyan>></b> ' % self.__central_bd), force)
         elif self.__current_mode == self.MODE_STARTED:
             self.set_prompt(HTML('<b>wble-periph<ansimagenta>[running]</ansimagenta>></b>'))
-
 
 
     def switch_role(self, new_role):
@@ -286,7 +302,8 @@ class BlePeriphShell(InteractiveShell):
             if action == 'add':
                 if len(args) >= 2:
                     try:
-                        service_uuid = str(UUID(args[1]))
+                        # Validate UUID
+                        service_uuid = validate_uuid(args[1])
 
                         # If service already exists, error. 
                         if self.has_service(service_uuid):                        
@@ -312,7 +329,8 @@ class BlePeriphShell(InteractiveShell):
                 else:
                     if len(args) >= 2:
                         try:
-                            service_uuid = str(UUID(args[1]))
+                            # Validate UUID
+                            service_uuid = validate_uuid(args[1])
 
                             if self.has_service(service_uuid):
                                 self.unregister_service(service_uuid)
@@ -330,7 +348,8 @@ class BlePeriphShell(InteractiveShell):
 
                 if len(args) >= 2:
                     try:
-                        service_uuid = str(UUID(args[1]))
+                        # Validate UUID
+                        service_uuid = validate_uuid(args[1])
 
                         if self.has_service(service_uuid):
                             self.select_service(service_uuid)
@@ -578,7 +597,7 @@ class BlePeriphShell(InteractiveShell):
                     if len(args)>=2:
                         try:
                             # Retrieve characteristic UUID
-                            char_uuid = str(UUID(args[1]))
+                            char_uuid = validate_uuid(args[1])
 
                             # Parse permissions
                             if len(args) >= 3:
@@ -602,7 +621,7 @@ class BlePeriphShell(InteractiveShell):
                     if len(args)>=2:
                         try:
                             # Retrieve characteristic UUID
-                            char_uuid = str(UUID(args[1]))
+                            char_uuid = validate_uuid(args[1])
 
                             # Remove characteristic
                             if self.has_service_char(self.__selected_service, char_uuid):
