@@ -8,7 +8,7 @@ from scapy.packet import Packet
 
 # Device interface
 from whad.device import WhadDeviceConnector
-from whad import WhadDomain, WhadCapability
+from whad.hub.discovery import Domain, Capability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
 # Protocol hub
@@ -81,7 +81,7 @@ class BLE(WhadDeviceConnector):
         self.device.discover()
 
         # Check device supports BLE
-        if not self.device.has_domain(WhadDomain.BtLE):
+        if not self.device.has_domain(Domain.BtLE):
             raise UnsupportedDomain("Bluetooth Low Energy")
         else:
             self.__ready = True
@@ -99,8 +99,8 @@ class BLE(WhadDeviceConnector):
         Determine if the device supports raw PDU.
         """
         if self.__can_send_raw is None:
-            capabilities = self.device.get_domain_capability(WhadDomain.BtLE)
-            self.__can_send_raw = not (capabilities & WhadCapability.NoRawData)
+            capabilities = self.device.get_domain_capability(Domain.BtLE)
+            self.__can_send_raw = not (capabilities & Capability.NoRawData)
         return self.__can_send_raw
 
     def is_ll_encrypted(self):
@@ -116,7 +116,7 @@ class BLE(WhadDeviceConnector):
         """
         if self.__can_send is None:
             # Retrieve supported commands
-            commands = self.device.get_domain_commands(WhadDomain.BtLE)
+            commands = self.device.get_domain_commands(Domain.BtLE)
             self.__can_send = (
                 (commands & (1 << Commands.SendPDU))>0 or
                 (commands & (1 << Commands.SendRawPDU))
@@ -128,7 +128,7 @@ class BLE(WhadDeviceConnector):
         Determine if the device implements a scanner mode.
         """
         # Retrieve supported commands
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (
             (commands & (1 << Commands.ScanMode))>0 and
             (commands & (1 << Commands.Start))>0 and
@@ -140,7 +140,7 @@ class BLE(WhadDeviceConnector):
         Determine if the device can establish a connection as central.
         """
         # Retrieve supported commands
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.ConnectTo))>0
 
     def can_jam_advertisement_on_channel(self):
@@ -148,7 +148,7 @@ class BLE(WhadDeviceConnector):
         Determine if the device can jam advertisements on a specific channel.
         """
         # Retrieve supported commands
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.JamAdvOnChannel))>0
 
     def can_be_central(self):
@@ -156,7 +156,7 @@ class BLE(WhadDeviceConnector):
         Determine if the device implements a central mode.
         """
         # Retrieve supported commands
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (
             (commands & (1 << Commands.CentralMode))>0 and
             (commands & (1 << Commands.Start))>0 and
@@ -168,7 +168,7 @@ class BLE(WhadDeviceConnector):
         Determine if the device implements a peripheral mode.
         """
         # Retrieve supported commands
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (
             (commands & (1 << Commands.PeripheralMode))>0 and
             (commands & (1 << Commands.Start))>0 and
@@ -179,7 +179,7 @@ class BLE(WhadDeviceConnector):
         """
         Determine if the device implements an access addresses discovery mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (
             (commands & (1 << Commands.SniffAccessAddress)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -190,7 +190,7 @@ class BLE(WhadDeviceConnector):
         """
         Determine if the device allows to sniff an active connection.
         """
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (
             (commands & (1 << Commands.SniffActiveConn)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -201,7 +201,7 @@ class BLE(WhadDeviceConnector):
         """
         Determine if the device implements an advertisements sniffer mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (
             (commands & (1 << Commands.SniffAdv)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -213,7 +213,7 @@ class BLE(WhadDeviceConnector):
         """
         Determine if the device implements a new connection sniffer mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (
             (commands & (1 << Commands.SniffConnReq)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -224,29 +224,29 @@ class BLE(WhadDeviceConnector):
         """
         Determine if the device implements an injection mode.
         """
-        capabilities = self.device.get_domain_capability(WhadDomain.BtLE)
-        return self.can_send() and (capabilities & (1 << WhadCapability.Inject) > 0)
+        capabilities = self.device.get_domain_capability(Domain.BtLE)
+        return self.can_send() and (capabilities & (1 << Capability.Inject) > 0)
 
 
     def can_hijack_master(self):
         """
         Determine if the device implements a master hijacking mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.HijackMaster)) > 0
 
     def can_hijack_slave(self):
         """
         Determine if the device implements a slave hijacking mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.HijackSlave)) > 0
 
     def can_hijack_both(self):
         """
         Determine if the device implements a slave and master hijacking mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.HijackBoth)) > 0
 
 
@@ -254,7 +254,7 @@ class BLE(WhadDeviceConnector):
         """
         Determine if the device implements a reactive jamming mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.ReactiveJam)) > 0
 
 
@@ -262,14 +262,14 @@ class BLE(WhadDeviceConnector):
         """
         Determine if the device can prepare a sequence of packets associated with a trigger.
         """
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.PrepareSequence)) > 0
 
     def can_trigger(self):
         """
         Determine if the device can manually trigger a sequence of packets.
         """
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.TriggerSequence)) > 0
 
     def trigger(self, trigger):
@@ -293,7 +293,7 @@ class BLE(WhadDeviceConnector):
         """
         Determine if the device can delete a sequence of packets.
         """
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.DeleteSequence)) > 0
 
     def delete_sequence(self, trigger):
@@ -498,7 +498,7 @@ class BLE(WhadDeviceConnector):
         Set Bluetooth Low Energy BD address.
         """
         # Ensure we can spoof BD address
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
+        commands = self.device.get_domain_commands(Domain.BtLE)
         if (commands & (1 << Commands.SetBdAddress))>0:
 
             # Create a SetBdAddress message

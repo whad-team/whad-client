@@ -9,7 +9,7 @@ from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4Command
 from whad.protocol.esb.esb_pb2 import ESBCommand
 from whad.protocol.unifying.unifying_pb2 import UnifyingCommand
 from whad.protocol.phy.phy_pb2 import PhyCommand
-from whad import WhadDomain, WhadCapability
+from whad.hub.discovery import Domain, Capability
 from prompt_toolkit import print_formatted_text, HTML
 from html import escape
 
@@ -17,28 +17,28 @@ import logging
 #logging.basicConfig(level=logging.DEBUG)
 
 DOMAINS = {
-    WhadDomain.Phy: 'Physical Layer',
-    WhadDomain.ANT: 'ANT',
-    WhadDomain.ANT_FS: 'ANT FS',
-    WhadDomain.ANT_Plus: 'ANT+',
-    WhadDomain.BtClassic: 'Bluetooth Classic',
-    WhadDomain.BtLE: 'Bluetooth LE',
-    WhadDomain.Esb: 'Enhanced ShockBurst',
-    WhadDomain.LogitechUnifying: 'Logitech Unifying',
-    WhadDomain.Mosart: 'Mosart',
-    WhadDomain.SixLowPan: '6LowPan',
-    WhadDomain.Dot15d4: '802.15.4'
+    Domain.Phy: 'Physical Layer',
+    Domain.ANT: 'ANT',
+    Domain.ANT_FS: 'ANT FS',
+    Domain.ANT_Plus: 'ANT+',
+    Domain.BtClassic: 'Bluetooth Classic',
+    Domain.BtLE: 'Bluetooth LE',
+    Domain.Esb: 'Enhanced ShockBurst',
+    Domain.LogitechUnifying: 'Logitech Unifying',
+    Domain.Mosart: 'Mosart',
+    Domain.SixLowPan: '6LowPan',
+    Domain.Dot15d4: '802.15.4'
 }
 
 CAPABILITIES = {
-    WhadCapability.Scan: 'can scan devices',
-    WhadCapability.Hijack: 'can hijack communication',
-    WhadCapability.Hook: 'can hook packets',
-    WhadCapability.Inject: 'can inject packets',
-    WhadCapability.Jam: 'can jam communications',
-    WhadCapability.SimulateRole: 'can simulate a role in a communication',
-    WhadCapability.Sniff: 'can sniff data',
-    WhadCapability.NoRawData: 'can not read/write raw packet'
+    Capability.Scan: 'can scan devices',
+    Capability.Hijack: 'can hijack communication',
+    Capability.Hook: 'can hook packets',
+    Capability.Inject: 'can inject packets',
+    Capability.Jam: 'can jam communications',
+    Capability.SimulateRole: 'can simulate a role in a communication',
+    Capability.Sniff: 'can sniff data',
+    Capability.NoRawData: 'can not read/write raw packet'
 }
 
 BLE_COMMANDS = {
@@ -133,11 +133,11 @@ PHY_COMMANDS = {
     PhyCommand.Stop: "Stop: can stop depending on the current mode",
 }
 COMMANDS = {
-    WhadDomain.BtLE: BLE_COMMANDS,
-    WhadDomain.Esb: ESB_COMMANDS,
-    WhadDomain.Dot15d4: DOT15D4_COMMANDS,
-    WhadDomain.LogitechUnifying: UNIFYING_COMMANDS,
-    WhadDomain.Phy: PHY_COMMANDS
+    Domain.BtLE: BLE_COMMANDS,
+    Domain.Esb: ESB_COMMANDS,
+    Domain.Dot15d4: DOT15D4_COMMANDS,
+    Domain.LogitechUnifying: UNIFYING_COMMANDS,
+    Domain.Phy: PHY_COMMANDS
 
 }
 

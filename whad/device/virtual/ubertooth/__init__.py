@@ -2,7 +2,7 @@ from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAc
 from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
-from whad import WhadDomain, WhadCapability
+from whad.hub.discovery import Domain, Capability
 from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, FieldsSize, is_access_address_valid
 from whad.hub.ble import Direction, ChannelMap
 from whad.hub.generic.cmdresult import CommandResult
@@ -328,8 +328,8 @@ class UbertoothDevice(VirtualDevice):
     # Discovery related functions
     def _get_capabilities(self):
         capabilities = {
-            WhadDomain.BtLE : (
-                                (WhadCapability.Sniff | WhadCapability.Jam),
+            Domain.BtLE : (
+                                (Capability.Sniff | Capability.Jam),
                                 [SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveConn, Start, Stop]
             )
         }

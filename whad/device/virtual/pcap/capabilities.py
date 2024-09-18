@@ -1,4 +1,4 @@
-from whad import WhadDomain, WhadCapability
+from whad.hub.discovery import Domain, Capability
 from whad.hub.ble import Commands as BleCommands
 from whad.hub.dot15d4 import Commands as Dot15d4Commands
 from whad.hub.esb import Commands as EsbCommands
@@ -14,64 +14,64 @@ DLT_RESERVED_06                 = 152
 CAPABILITIES = {
     DLT_BLUETOOTH_LE_LL_WITH_PHDR : (
         {
-            WhadDomain.BtLE : (
-                (WhadCapability.Sniff),
+            Domain.BtLE : (
+                (Capability.Sniff),
                 [BleCommands.SniffConnReq, BleCommands.SniffAdv, BleCommands.Start, BleCommands.Stop]
             )
         },
         {
-            WhadDomain.BtLE : (
-                (WhadCapability.Inject),
+            Domain.BtLE : (
+                (Capability.Inject),
                 [BleCommands.SendPDU, BleCommands.Start, BleCommands.Stop]
             )
         }
     ),
     DLT_IEEE802_15_4_TAP : (
         {
-            WhadDomain.Dot15d4 : (
-                (WhadCapability.Sniff),
+            Domain.Dot15d4 : (
+                (Capability.Sniff),
                 [Dot15d4Commands.Sniff, Dot15d4Commands.Start, Dot15d4Commands.Stop]
             )
         },
         {
-            WhadDomain.Dot15d4 : (
-                (WhadCapability.Inject),
+            Domain.Dot15d4 : (
+                (Capability.Inject),
                 [Dot15d4Commands.Send,Dot15d4Commands.Start, Dot15d4Commands.Stop]
             )
         }
     ),
     DLT_RESERVED_02 : (
         {
-            WhadDomain.Esb : (
-                (WhadCapability.Sniff),
+            Domain.Esb : (
+                (Capability.Sniff),
                 [EsbCommands.Sniff, EsbCommands.Start, EsbCommands.Stop]
             ),
-            WhadDomain.LogitechUnifying : (
-                (WhadCapability.Sniff),
+            Domain.LogitechUnifying : (
+                (Capability.Sniff),
                 [UnifyingCommands.Sniff, UnifyingCommands.Start, UnifyingCommands.Stop]
             )
         },
         {
-            WhadDomain.Esb : (
-                (WhadCapability.Inject),
+            Domain.Esb : (
+                (Capability.Inject),
                 [EsbCommands.Send,EsbCommands.Start, EsbCommands.Stop]
             ),
-            WhadDomain.LogitechUnifying : (
-                (WhadCapability.Inject),
+            Domain.LogitechUnifying : (
+                (Capability.Inject),
                 [UnifyingCommands.Send,UnifyingCommands.Start, UnifyingCommands.Stop]
             )
         }
     ),
     DLT_RESERVED_06 : (
         {
-            WhadDomain.Phy : (
-                (WhadCapability.Sniff | WhadCapability.NoRawData),
+            Domain.Phy : (
+                (Capability.Sniff | Capability.NoRawData),
                 [PhyCommands.Sniff, PhyCommands.Start, PhyCommands.Stop, PhyCommands.SetFrequency, PhyCommands.GetSupportedFrequencies, PhyCommands.SetPacketSize, PhyCommands.SetDataRate, PhyCommands.SetEndianness, PhyCommands.SetSyncWord, PhyCommands.SetASKModulation, PhyCommands.SetFSKModulation, PhyCommands.SetGFSKModulation, PhyCommands.SetBPSKModulation, PhyCommands.SetQPSKModulation, PhyCommands.SetLoRaModulation]
             )
         },
         {
-            WhadDomain.Phy : (
-                (WhadCapability.Inject | WhadCapability.NoRawData),
+            Domain.Phy : (
+                (Capability.Inject | Capability.NoRawData),
                 [PhyCommands.Send,PhyCommands.Start, PhyCommands.Stop, PhyCommands.SetFrequency, PhyCommands.GetSupportedFrequencies, PhyCommands.SetPacketSize, PhyCommands.SetDataRate, PhyCommands.SetEndianness, PhyCommands.SetSyncWord, PhyCommands.SetASKModulation, PhyCommands.SetFSKModulation, PhyCommands.SetGFSKModulation, PhyCommands.SetBPSKModulation, PhyCommands.SetQPSKModulation, PhyCommands.SetLoRaModulation]
             )
         }

@@ -1,6 +1,6 @@
 from scapy.packet import Packet
 
-from whad import WhadDomain, WhadCapability
+from whad.hub.discovery import Domain, Capability
 from whad.device import WhadDeviceConnector
 from whad.esb.esbaddr import ESBAddress
 from whad.hub.esb import ESBMetadata
@@ -57,7 +57,7 @@ class ESB(WhadDeviceConnector):
         self.device.discover()
 
         # Check if device supports Enhanced ShockBurst
-        if not self.device.has_domain(WhadDomain.Esb):
+        if not self.device.has_domain(Domain.Esb):
             raise UnsupportedDomain("ESB")
         else:
             self.__ready = True
@@ -73,7 +73,7 @@ class ESB(WhadDeviceConnector):
         """
         Determine if the device implements a sniffer mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Esb)
+        commands = self.device.get_domain_commands(Domain.Esb)
         return (
             (commands & (1 << Commands.Sniff)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -85,7 +85,7 @@ class ESB(WhadDeviceConnector):
         Determine if the device can transmit packets.
         """
         if self.__can_send is None:
-            commands = self.device.get_domain_commands(WhadDomain.Esb)
+            commands = self.device.get_domain_commands(Domain.Esb)
             self.__can_send = ((commands & (1 << Commands.Send))>0 or (commands & (1 << Commands.SendRaw)))
         return self.__can_send
 
@@ -132,8 +132,8 @@ class ESB(WhadDeviceConnector):
         Determine if the device supports raw PDU.
         """
         if self.__can_send_raw is None:
-            capabilities = self.device.get_domain_capability(WhadDomain.Esb)
-            self.__can_send_raw = not (capabilities & WhadCapability.NoRawData)
+            capabilities = self.device.get_domain_capability(Domain.Esb)
+            self.__can_send_raw = not (capabilities & Capability.NoRawData)
         return self.__can_send_raw
 
 
@@ -141,7 +141,7 @@ class ESB(WhadDeviceConnector):
         """
         Determine if the device can configure a Node address.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Esb)
+        commands = self.device.get_domain_commands(Domain.Esb)
         return (
             (commands & (1 << Commands.SetNodeAddress)) > 0
         )
@@ -182,7 +182,7 @@ class ESB(WhadDeviceConnector):
         """
         Determine if the device implements a Primary Receiver (PRX) role mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Esb)
+        commands = self.device.get_domain_commands(Domain.Esb)
         return (
             (commands & (1 << Commands.PrimaryReceiverMode)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -214,7 +214,7 @@ class ESB(WhadDeviceConnector):
         """
         Determine if the device implements a Primary Transmitter (PTX) role mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Esb)
+        commands = self.device.get_domain_commands(Domain.Esb)
         return (
             (commands & (1 << Commands.PrimaryTransmitterMode)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -247,7 +247,7 @@ class ESB(WhadDeviceConnector):
         """
         Determine if the device can configure a Node address.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Esb)
+        commands = self.device.get_domain_commands(Domain.Esb)
         return (
             (commands & (1 << Commands.SetNodeAddress)) > 0
         )
