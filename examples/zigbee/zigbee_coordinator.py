@@ -21,10 +21,21 @@ if __name__ == '__main__':
 
             # Define a custom ON/OFF ZCL Server
             class CustomOnOffServer(OnOffServer):
+
                 @ZCLCluster.command_receive(0x00, "Off")
                 def on_off(self, command):
                     super().on_off(command)
                     print("-> Custom Off")
+
+                @ZCLCluster.command_receive(0x01, "On")
+                def on_on(self, command):
+                    super().on_on(command)
+                    print("-> Custom On")
+
+                @ZCLCluster.command_receive(0x02, "Toggle")
+                def on_toggle(self, command):
+                    super().on_toggle(command)
+                    print("-> Custom Toggle")
 
             # Instantiate the custom OnOff ZCL Server
             onoff = CustomOnOffServer()
