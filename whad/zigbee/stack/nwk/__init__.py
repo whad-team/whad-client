@@ -288,6 +288,7 @@ class NWKManagementService(NWKService):
         if association_type == NWKJoinMode.NEW_JOIN:
             # Try successively available neighbors that can be considered potential parents
             table = self.database.get("nwkNeighborTable")
+
             while True:
                 candidate_parents = table.select_suitable_parent(extended_pan_id, self.database.get("nwkUpdateId"))
                 if len(candidate_parents) == 0:
@@ -614,7 +615,7 @@ class NWKManagementService(NWKService):
             scan_duration=scan_duration
         )
 
-        print("[i] channel measurement")
+        logger.info("Channel measurement")
         if channel is None:
             minimal_measurement = None
             for ed_report in ed_reports:
@@ -628,7 +629,7 @@ class NWKManagementService(NWKService):
         else:
             best_channel = channel
 
-        print("[i] active scan")
+        logger.info("Active scan")
         if pan_id is None:
             # Perform an active scan to prevent the use of already in use PAN ID
             active_scan_reports = self.network_discovery(
@@ -1145,7 +1146,7 @@ class NWKManager(Dot15d4Manager):
             selected_key_material.add_incoming_frame_counter(sender_address, received_frame_count+1)
             return cleartext, True
         else:
-            print("Undecoded:", bytes(pdu).hex())
+            logger.warning("Undecoded:", bytes(pdu).hex())
             logger.info("[nwk] decryption failure - MIC not matching.")
             return pdu, False
 
@@ -1243,7 +1244,7 @@ class NWKManager(Dot15d4Manager):
                     )
                 return success
             else:
-                table.delete(node.address)
+                table.delete(node.address, node.extended_pan_id)
 
         new_address = self._address_assignment(
             depth=0, # we only consider a depth of 0 (coordinator) for now
