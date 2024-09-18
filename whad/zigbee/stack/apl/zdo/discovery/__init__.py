@@ -144,7 +144,8 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
 
             # If response indicates a successful statuts, return the Node Descriptor
             if asdu.status == 0:
-                return NodeDescriptor(
+
+                nd = NodeDescriptor(
                     logical_type=LogicalDeviceType(asdu.logical_type),
                     complex_descriptor_available=bool(asdu.complex_descriptor_available),
                     user_descriptor_available=bool(asdu.user_descriptor_available),
@@ -173,6 +174,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                     extended_active_endpoint_list_available = bool(asdu.extended_active_endpoint_list_available),
                     extended_simple_descriptors_list_available = bool(asdu.extended_simple_descriptors_list_available)
                 )
+                return nd
             return None
 
         except ZDODeviceAndServiceDiscoveryTimeoutException:
@@ -238,7 +240,6 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
                     filter_function=lambda pkt:ZDPIEEEAddrRsp in pkt# and pkt.trans_seqnum == self.transaction
                 )
                 (asdu, source_address, source_address_mode, security_status, link_quality) = response
-
                 # Get the node descriptor and generate an appropriate node wrapper
                 descriptor = self.get_node_descriptor(address)
 
@@ -523,7 +524,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
             )
             self.transaction += 1
 
-    def wait_for_response(self, filter_function=lambda pkt:True, timeout=1):
+    def wait_for_response(self, filter_function=lambda pkt:True, timeout=3):
         """
         Synchronous blocking method for processing data from input ZDP clusters.
         """

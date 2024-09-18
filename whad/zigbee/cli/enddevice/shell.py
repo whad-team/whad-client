@@ -22,6 +22,12 @@ from .helpers import create_enddevice
 INTRO='''
 zigbee-enddevice, the WHAD Zigbee end device utility
 '''
+import logging
+logging.getLogger("whad.zigbee.stack.nwk").setLevel(logging.DEBUG)
+logging.getLogger("whad.dot15d4.stack.mac").setLevel(logging.DEBUG)
+logging.getLogger("whad.zigbee.stack.apl.zdo.discovery").setLevel(logging.DEBUG)
+
+logging.basicConfig(level=logging.ERROR)
 
 class ZigbeeEndDeviceShell(InteractiveShell):
     """Zigbee End Device interactive shell
@@ -97,7 +103,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                     except ExternalToolNotFound:
                         self.error("Cannot launch Wireshark, please make sure it is installed.")
                 else:
-                    self.error("Wireshark is already launched, see <ansicyan>wireshark off</ansicyan>")
+                    self.error("Wireshark is already launched, see wireshark off")
             else:
                 # Detach monitor if any
                 if self.__wireshark is not None:
@@ -105,7 +111,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                     self.__wireshark.close()
                     self.__wireshark = None
         else:
-            self.error("Missing arguments, see <ansicyan>help wireshark</ansicyan>.")
+            self.error("Missing arguments, see help wireshark.")
 
     @category('Networks discovery')
     def do_scan(self, args):
@@ -593,3 +599,18 @@ class ZigbeeEndDeviceShell(InteractiveShell):
         else:
             self.error("You must join a network to perform a cluster command.")
             return
+
+
+    def do_quit(self, args):
+        """close wzb-enddevice
+        """
+        if self.__connector is not None:
+            self.__connector.stop()
+        if self.__interface is not None:
+            self.__interface.close()
+        return True
+
+    def do_exit(self, arg):
+        """alias for <ansicyan>quit</ansicyan>
+        """
+        return self.do_quit(arg)

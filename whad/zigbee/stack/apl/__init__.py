@@ -208,7 +208,7 @@ class APLManager(Dot15d4Manager):
         """
         Callback processing data PDU transmitted by the APS layer.
         """
-        asdu.show()
+
         # Checks if an endpoint matches
         if destination_endpoint not in self.endpoints:
             logger.info("[apl] destination endpoint not found.")

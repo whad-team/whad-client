@@ -180,7 +180,7 @@ class ZDONetworkManager(ZDOObject):
         aps_layer.database.set("apsUseExtendedPANID", network.extended_pan_id)
         apsUseExtendedPANID = aps_management.get("apsUseExtendedPANID")
         logger.info("[zdo_network_manager] Rejoining specific network: %s.", repr(network))
-        print(apsUseExtendedPANID)
+
         join_success = nwk_management.join(
             apsUseExtendedPANID,
             association_type=NWKJoinMode.REJOIN,

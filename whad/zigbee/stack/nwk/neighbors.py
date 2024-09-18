@@ -8,9 +8,12 @@ class NWKNeighborTable:
     def __init__(self):
         self.table = {}
 
-    def update(self, address, **kwargs):
-        if address in self.table:
-            device = self.table[address]
+    def update(self, address, device_type, extended_pan_id, **kwargs):
+        kwargs["device_type"] = device_type
+        kwargs["extended_pan_id"] = extended_pan_id
+
+        if (address, extended_pan_id) in self.table:
+            device = self.table[(address, extended_pan_id)]
             for name, value in kwargs.items():
                 if hasattr(device, name):
                     setattr(device, name, value)
@@ -20,40 +23,40 @@ class NWKNeighborTable:
                 return False
             if kwargs["device_type"] == ZigbeeDeviceType.END_DEVICE:
                 del kwargs["device_type"]
-                self.table[address] = ZigbeeEndDevice(address, **kwargs)
+                self.table[(address, extended_pan_id)] = ZigbeeEndDevice(address, **kwargs)
             elif kwargs["device_type"] == ZigbeeDeviceType.COORDINATOR:
                 del kwargs["device_type"]
-                self.table[address] = ZigbeeCoordinator(address, **kwargs)
+                self.table[(address, extended_pan_id)] = ZigbeeCoordinator(address, **kwargs)
             elif kwargs["device_type"] == ZigbeeDeviceType.ROUTER:
                 del kwargs["device_type"]
-                self.table[address] = ZigbeeRouter(address, **kwargs)
+                self.table[(address, extended_pan_id)] = ZigbeeRouter(address, **kwargs)
             else:
                 return False
             return True
 
     def select_by_extended_address(self, extended_address):
-        for address, node in self.table.items():
+        for (address, extended_pan_id), node in self.table.items():
             if node.extended_address == extended_address:
                 return node
         return None
 
     def select_routers_by_pan_id(self, pan_id):
         routers = []
-        for address, device in self.table.items():
+        for (address, extended_pan_id), device in self.table.items():
             if device.device_type == ZigbeeDeviceType.ROUTER and device.pan_id == pan_id:
                 routers.append(device)
         return routers
 
     def select_end_devices_by_pan_id(self, pan_id):
         end_devices = []
-        for address, device in self.table.items():
+        for (address, extended_pan_id), device in self.table.items():
             if device.device_type == ZigbeeDeviceType.END_DEVICE and device.pan_id == pan_id:
                 end_devices.append(device)
         return end_devices
 
     def select_suitable_parent(self, extended_pan_id, nwk_update_id, no_permit_check=False):
         selected_devices = []
-        for address, device in self.table.items():
+        for (address, extended_pan_id), device in self.table.items():
             if (
                 device.extended_pan_id == extended_pan_id and #the device belongs to the right network
                 (device.permit_joining or no_permit_check) and  # the device allows joining
@@ -70,8 +73,8 @@ class NWKNeighborTable:
                 return device
         return None
 
-    def delete(self, address):
-        del self.table[address]
+    def delete(self, address, extended_pan_id):
+        del self.table[(address, extended_pan_id)]
 
     def show(self):
         for _, device in self.table.items():
