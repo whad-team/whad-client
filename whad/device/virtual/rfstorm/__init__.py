@@ -8,7 +8,7 @@ from whad.hub.esb import Commands as EsbCommands
 from whad.hub.phy import Commands as PhyCommands
 from whad.esb.esbaddr import ESBAddress
 from whad.hub.unifying import Commands as UniCommands
-from whad import WhadCapability, WhadDomain
+from whad.hub.discovery import Capability, Domain
 from whad.phy import Endianness
 from threading import Thread, Lock
 from time import sleep, time
@@ -124,8 +124,8 @@ class RFStormDevice(VirtualDevice):
     # Discovery related functions
     def _get_capabilities(self):
         capabilities = {
-            WhadDomain.Esb : (
-                                (WhadCapability.Sniff | WhadCapability.Inject | WhadCapability.SimulateRole | WhadCapability.NoRawData),
+            Domain.Esb : (
+                                (Capability.Sniff | Capability.Inject | Capability.SimulateRole | Capability.NoRawData),
                                 [
                                     EsbCommands.Sniff,
                                     EsbCommands.Send,
@@ -136,8 +136,8 @@ class RFStormDevice(VirtualDevice):
                                     EsbCommands.PrimaryTransmitterMode
                                 ]
             ),
-            WhadDomain.LogitechUnifying : (
-                                (WhadCapability.Sniff | WhadCapability.Inject | WhadCapability.SimulateRole | WhadCapability.NoRawData),
+            Domain.LogitechUnifying : (
+                                (Capability.Sniff | Capability.Inject | Capability.SimulateRole | Capability.NoRawData),
                                 [
                                     UniCommands.Sniff,
                                     UniCommands.Send,
@@ -149,8 +149,8 @@ class RFStormDevice(VirtualDevice):
                                     UniCommands.LogitechDongleMode
                                 ]
             ),
-            WhadDomain.Phy: (
-                                (WhadCapability.Sniff | WhadCapability.Inject | WhadCapability.NoRawData),
+            Domain.Phy: (
+                                (Capability.Sniff | Capability.Inject | Capability.NoRawData),
                                 [
                                     PhyCommands.SetGFSKModulation,
                                     PhyCommands.GetSupportedFrequencies,

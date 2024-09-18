@@ -5,6 +5,23 @@ from whad.hub.message import HubMessage
 from whad.hub.message import pb_bind, Registry
 from whad.hub import ProtocolHub
 
+class Domain:
+    """
+    Supported domains.
+    """
+    DomainNone = 0x00000000
+    Phy = 0x01000000
+    BtClassic = 0x02000000
+    BtLE = 0x03000000
+    Dot15d4 = 0x04000000
+    SixLowPan = 0x05000000
+    Esb = 0x06000000
+    LogitechUnifying = 0x07000000
+    Mosart = 0x08000000
+    ANT = 0x09000000
+    ANT_Plus = 0x0A000000
+    ANT_FS = 0x0B000000
+
 class Capability:
     """Device capability
     """

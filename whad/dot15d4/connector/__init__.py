@@ -8,7 +8,7 @@ from scapy.layers.dot15d4 import Dot15d4FCS
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr
 from whad.hub.dot15d4 import Dot15d4Metadata
 # Main whad imports
-from whad import WhadDomain, WhadCapability
+from whad.hub.discovery import Domain, Capability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
@@ -48,7 +48,7 @@ class Dot15d4(WhadDeviceConnector):
         self.device.discover()
 
         # Check if device supports 802.15.4
-        if not self.device.has_domain(WhadDomain.Dot15d4):
+        if not self.device.has_domain(Domain.Dot15d4):
             raise UnsupportedDomain("IEEE 802.15.4")
         else:
             self.__ready = True
@@ -75,7 +75,7 @@ class Dot15d4(WhadDeviceConnector):
         """
         Determine if the device implements a sniffer mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Dot15d4)
+        commands = self.device.get_domain_commands(Domain.Dot15d4)
         return (
             (commands & (1 << Commands.Sniff)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -86,7 +86,7 @@ class Dot15d4(WhadDeviceConnector):
         """
         Determine if the device can configure a Node address.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Dot15d4)
+        commands = self.device.get_domain_commands(Domain.Dot15d4)
         return (
             (commands & (1 << Commands.SetNodeAddress)) > 0
         )
@@ -95,7 +95,7 @@ class Dot15d4(WhadDeviceConnector):
         """
         Determine if the device implements an End Device role mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Dot15d4)
+        commands = self.device.get_domain_commands(Domain.Dot15d4)
         return (
             (commands & (1 << Commands.EndDeviceMode)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -107,7 +107,7 @@ class Dot15d4(WhadDeviceConnector):
         Determine if the device can transmit packets.
         """
         if self.__can_send is None:
-            commands = self.device.get_domain_commands(WhadDomain.Dot15d4)
+            commands = self.device.get_domain_commands(Domain.Dot15d4)
             self.__can_send = ((commands & (1 << Commands.Send)) > 0 or (commands & (1 << Commands.SendRaw)) > 0)
         return self.__can_send
 
@@ -115,7 +115,7 @@ class Dot15d4(WhadDeviceConnector):
         """
         Determine if the device can perform energy detection scan.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Dot15d4)
+        commands = self.device.get_domain_commands(Domain.Dot15d4)
         return (
             (commands & (1 << Commands.EnergyDetection)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -127,8 +127,8 @@ class Dot15d4(WhadDeviceConnector):
         Determine if the device supports raw PDU.
         """
         if self.__can_send_raw is None:
-            capabilities = self.device.get_domain_capability(WhadDomain.Dot15d4)
-            self.__can_send_raw = not (capabilities & WhadCapability.NoRawData)
+            capabilities = self.device.get_domain_capability(Domain.Dot15d4)
+            self.__can_send_raw = not (capabilities & Capability.NoRawData)
         return self.__can_send_raw
 
     def sniff_dot15d4(self, channel:int = 11) -> bool:
@@ -178,7 +178,7 @@ class Dot15d4(WhadDeviceConnector):
         """
         Determine if the device implements a Coordinator role mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Dot15d4)
+        commands = self.device.get_domain_commands(Domain.Dot15d4)
         return (
             (commands & (1 << Commands.CoordinatorMode)) > 0 and
             (commands & (1 << Commands.Start))>0 and

@@ -6,7 +6,7 @@ from whad.device.virtual.yard.constants import YardStickOneId, YardStickOneEndPo
     YardNICCommands, YardVCOType, YardRegistersMasks, YardModulations, YardEncodings, \
     POSSIBLE_CHANNEL_BANDWIDTHS, NUM_PREAMBLE_LOOKUP_TABLE, YardUSBProperties, \
     YardInternalStates
-from whad import WhadDomain, WhadCapability
+from whad.hub.discovery import Domain, Capability
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.phy import Commands, TxPower, Endianness as PhyEndianness, Modulation as PhyModulation
 from usb.core import find, USBError, USBTimeoutError
@@ -400,8 +400,8 @@ class YardStickOneDevice(VirtualDevice):
     # Discovery related functions
     def _get_capabilities(self):
         capabilities = {
-            WhadDomain.Phy : (
-                                (WhadCapability.Sniff | WhadCapability.NoRawData),
+            Domain.Phy : (
+                                (Capability.Sniff | Capability.NoRawData),
                                 [
                                     Commands.GetSupportedFrequencies,
                                     Commands.SetASKModulation,

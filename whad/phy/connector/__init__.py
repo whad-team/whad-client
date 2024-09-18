@@ -1,4 +1,4 @@
-from whad import WhadDomain, WhadCapability
+from whad.hub.discovery import Domain, Capability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter
 from whad.phy.utils.definitions import OOKModulationScheme, ASKModulationScheme, \
@@ -64,7 +64,7 @@ class Phy(WhadDeviceConnector):
         self.translator = PhyMessageTranslator(self.hub)
 
         # Check if device supports Logitech Unifying
-        if not self.device.has_domain(WhadDomain.Phy):
+        if not self.device.has_domain(Domain.Phy):
             raise UnsupportedDomain("PHY")
         else:
             self.__ready = True
@@ -87,7 +87,7 @@ class Phy(WhadDeviceConnector):
         """
         Determine if the device can be configured to use Amplitude Shift Keying modulation scheme.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetASKModulation)) > 0
 
 
@@ -95,7 +95,7 @@ class Phy(WhadDeviceConnector):
         """
         Determine if the device can be configured to use Frequency Shift Keying modulation scheme.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetFSKModulation)) > 0
 
 
@@ -103,56 +103,56 @@ class Phy(WhadDeviceConnector):
         """
         Determine if the device can get a list of supported frequencies.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.GetSupportedFrequencies)) > 0
 
     def can_set_frequency(self):
         """
         Determine if the device can select a specific frequency.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetFrequency)) > 0
 
     def can_use_gfsk(self):
         """
         Determine if the device can be configured to use Gaussian Frequency Shift Keying modulation scheme.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetGFSKModulation)) > 0
 
     def can_use_4fsk(self):
         """
         Determine if the device can be configured to use 4-Frequency Shift Keying modulation scheme.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.Set4FSKModulation)) > 0
 
     def can_use_bpsk(self):
         """
         Determine if the device can be configured to use Binary Phase Shift Keying modulation scheme.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetBPSKModulation)) > 0
 
     def can_use_qpsk(self):
         """
         Determine if the device can be configured to use Quadrature Phase Shift Keying modulation scheme.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetQPSKModulation)) > 0
 
     def can_use_lora(self):
         """
         Determine if the device can be configured to use LoRa modulation scheme.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetLoRaModulation)) > 0
 
     def can_schedule_packets(self):
         """
         Determine if the device can send scheduled packets.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.ScheduleSend)) > 0
 
     def set_ask(self, on_off_keying=True):
@@ -355,7 +355,7 @@ class Phy(WhadDeviceConnector):
         """
         Checks if the device supports datarate configuration.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetDataRate)) > 0
 
     def set_datarate(self, rate=1000000):
@@ -379,7 +379,7 @@ class Phy(WhadDeviceConnector):
         """
         Checks if the device supports Endianness configuration.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetEndianness)) > 0
 
     def set_endianness(self, endianness=Endianness.BIG):
@@ -403,7 +403,7 @@ class Phy(WhadDeviceConnector):
         Determine if the device can transmit packets.
         """
         if self.__can_send is None:
-            commands = self.device.get_domain_commands(WhadDomain.Phy)
+            commands = self.device.get_domain_commands(Domain.Phy)
             self.__can_send = ((commands & (1 << Commands.Send))>0 or (commands & (1 << Commands.SendRaw)))
         return self.__can_send
 
@@ -411,7 +411,7 @@ class Phy(WhadDeviceConnector):
         """
         Checks if the device supports TX Power level configuration.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetTXPower)) > 0
 
 
@@ -433,7 +433,7 @@ class Phy(WhadDeviceConnector):
         """
         Checks if the device can configure packet size.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetPacketSize)) > 0
 
 
@@ -457,7 +457,7 @@ class Phy(WhadDeviceConnector):
         """
         Checks if the device can configure a synchronization word.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (commands & (1 << Commands.SetSyncWord)) > 0
 
 
@@ -481,7 +481,7 @@ class Phy(WhadDeviceConnector):
         """
         Determine if the device implements a sniffer mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.Phy)
+        commands = self.device.get_domain_commands(Domain.Phy)
         return (
             (commands & (1 << Commands.Sniff)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -494,8 +494,8 @@ class Phy(WhadDeviceConnector):
         Determine if the device supports raw IQ stream.
         """
         if self.__can_send_raw is None:
-            capabilities = self.device.get_domain_capability(WhadDomain.Phy)
-            self.__can_send_raw = not (capabilities & WhadCapability.NoRawData)
+            capabilities = self.device.get_domain_capability(Domain.Phy)
+            self.__can_send_raw = not (capabilities & Capability.NoRawData)
         return self.__can_send_raw
 
     def sniff_phy(self, iq_stream = False):

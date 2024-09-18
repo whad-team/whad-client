@@ -1,4 +1,4 @@
-from whad import WhadDomain, WhadCapability
+from whad.hub.discovery import Domain, Capability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
@@ -52,7 +52,7 @@ class Unifying(WhadDeviceConnector):
         self.device.discover()
 
         # Check if device supports Logitech Unifying
-        if not self.device.has_domain(WhadDomain.LogitechUnifying):
+        if not self.device.has_domain(Domain.LogitechUnifying):
             raise UnsupportedDomain("Logitech Unifying")
         else:
             self.__ready = True
@@ -70,7 +70,7 @@ class Unifying(WhadDeviceConnector):
         """
         Determine if the device implements a sniffer mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
+        commands = self.device.get_domain_commands(Domain.LogitechUnifying)
         return (
             (commands & (1 << Commands.Sniff)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -82,7 +82,7 @@ class Unifying(WhadDeviceConnector):
         Determine if the device can transmit packets.
         """
         if self.__can_send is None:
-            commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
+            commands = self.device.get_domain_commands(Domain.LogitechUnifying)
             self.__can_send = ((commands & (1 << Commands.Send))>0 or (commands & (1 << Commands.SendRaw)))
         return self.__can_send
 
@@ -138,8 +138,8 @@ class Unifying(WhadDeviceConnector):
         Determine if the device supports raw PDU.
         """
         if self.__can_send_raw is None:
-            capabilities = self.device.get_domain_capability(WhadDomain.LogitechUnifying)
-            self.__can_send_raw = not (capabilities & WhadCapability.NoRawData)
+            capabilities = self.device.get_domain_capability(Domain.LogitechUnifying)
+            self.__can_send_raw = not (capabilities & Capability.NoRawData)
         return self.__can_send_raw
 
 
@@ -147,7 +147,7 @@ class Unifying(WhadDeviceConnector):
         """
         Determine if the device can configure a Node address.
         """
-        commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
+        commands = self.device.get_domain_commands(Domain.LogitechUnifying)
         return (
             (commands & (1 << Commands.SetNodeAddress)) > 0
         )
@@ -182,7 +182,7 @@ class Unifying(WhadDeviceConnector):
         """
         Determine if the device implements a Logitech Dongle role mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
+        commands = self.device.get_domain_commands(Domain.LogitechUnifying)
         return (
             (commands & (1 << Commands.LogitechDongleMode)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -213,7 +213,7 @@ class Unifying(WhadDeviceConnector):
         """
         Determine if the device implements a Logitech Keyboard role mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
+        commands = self.device.get_domain_commands(Domain.LogitechUnifying)
         return (
             (commands & (1 << Commands.LogitechKeyboardMode)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -244,7 +244,7 @@ class Unifying(WhadDeviceConnector):
         """
         Determine if the device implements a Logitech Mouse role mode.
         """
-        commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
+        commands = self.device.get_domain_commands(Domain.LogitechUnifying)
         return (
             (commands & (1 << Commands.LogitechMouseMode)) > 0 and
             (commands & (1 << Commands.Start))>0 and
@@ -276,7 +276,7 @@ class Unifying(WhadDeviceConnector):
         """
         Determine if the device can configure a Node address.
         """
-        commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
+        commands = self.device.get_domain_commands(Domain.LogitechUnifying)
         return (
             (commands & (1 << Commands.SetNodeAddress)) > 0
         )
@@ -305,7 +305,7 @@ class Unifying(WhadDeviceConnector):
         """
         Determine if the device can follow a pairing procedure.
         """
-        commands = self.device.get_domain_commands(WhadDomain.LogitechUnifying)
+        commands = self.device.get_domain_commands(Domain.LogitechUnifying)
         return (
             (commands & (1 << Commands.SniffPairing)) > 0
         )

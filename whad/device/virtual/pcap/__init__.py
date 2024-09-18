@@ -17,7 +17,7 @@ from whad.hub.esb import ESBMetadata
 from whad.hub.phy import PhyMetadata, Modulation, Endianness
 from whad.hub.unifying import UnifyingMetadata
 from time import sleep
-from whad import WhadDomain
+from whad.hub.discovery import Domain
 from os.path import exists
 import logging
 import sys
@@ -143,15 +143,15 @@ class PCAPDevice(VirtualDevice):
         pass
 
     def _generate_metadata(self, pkt):
-        if self.__domain == WhadDomain.Dot15d4:
+        if self.__domain == Domain.Dot15d4:
             metadata = Dot15d4Metadata.convert_from_header(pkt)
-        elif self.__domain == WhadDomain.BtLE:
+        elif self.__domain == Domain.BtLE:
             metadata = BLEMetadata.convert_from_header(pkt)
-        elif self.__domain == WhadDomain.Esb:
+        elif self.__domain == Domain.Esb:
             metadata = ESBMetadata.convert_from_header(pkt)
-        elif self.__domain == WhadDomain.LogitechUnifying:
+        elif self.__domain == Domain.LogitechUnifying:
             metadata = UnifyingMetadata.convert_from_header(pkt)
-        elif self.__domain == WhadDomain.Phy:
+        elif self.__domain == Domain.Phy:
             metadata = PhyMetadata.convert_from_header(pkt)
 
         else:
@@ -168,27 +168,27 @@ class PCAPDevice(VirtualDevice):
             sleep((timestamp - self.__last_timestamp)/100000)
 
     def _send_packet(self, pkt):
-        if self.__domain == WhadDomain.Dot15d4:
+        if self.__domain == Domain.Dot15d4:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
             self._send_whad_zigbee_raw_pdu(bytes(pkt[Dot15d4]), channel=metadata.channel, lqi=metadata.lqi, rssi=metadata.rssi, timestamp=metadata.timestamp)
-        elif self.__domain == WhadDomain.BtLE:
+        elif self.__domain == Domain.BtLE:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
             self._send_whad_ble_raw_pdu(pkt, metadata)
-        elif self.__domain == WhadDomain.Esb:
+        elif self.__domain == Domain.Esb:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
             self._send_whad_esb_raw_pdu(pkt, metadata)
-        elif self.__domain == WhadDomain.LogitechUnifying:
+        elif self.__domain == Domain.LogitechUnifying:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
             self._send_whad_unifying_raw_pdu(pkt, metadata)
-        elif self.__domain == WhadDomain.Phy:
+        elif self.__domain == Domain.Phy:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
@@ -402,20 +402,20 @@ class PCAPDevice(VirtualDevice):
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_unifying_stop(self, message):
-        self.__domain = WhadDomain.LogitechUnifying
+        self.__domain = Domain.LogitechUnifying
         self.__started = False
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_unifying_send_raw(self, message):
-        self.__domain = WhadDomain.LogitechUnifying
+        self.__domain = Domain.LogitechUnifying
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_unifying_sniff(self, message):
-        self.__domain = WhadDomain.LogitechUnifying
+        self.__domain = Domain.LogitechUnifying
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_unifying_start(self, message):
-        self.__domain = WhadDomain.LogitechUnifying
+        self.__domain = Domain.LogitechUnifying
         self.__started = True
         self._send_whad_command_result(CommandResult.SUCCESS)
 

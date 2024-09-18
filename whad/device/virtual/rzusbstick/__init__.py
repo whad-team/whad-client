@@ -1,7 +1,7 @@
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device.virtual import VirtualDevice
 from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
-from whad import WhadDomain, WhadCapability
+from whad.hub.discovery import Domain, Capability
 
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.dot15d4 import Commands
@@ -200,15 +200,15 @@ class RZUSBStickDevice(VirtualDevice):
     def _get_capabilities(self):
         if "KILLERB" in self.__rzusbstick.product:
             capabilities = {
-                WhadDomain.Dot15d4 : (
-                                    (WhadCapability.Sniff | WhadCapability.Inject),
+                Domain.Dot15d4 : (
+                                    (Capability.Sniff | Capability.Inject),
                                     [Commands.Sniff, Commands.Send, Commands.Start, Commands.Stop]
                 )
             }
         else:
             capabilities = {
-                WhadDomain.Dot15d4 : (
-                                    (WhadCapability.Sniff),
+                Domain.Dot15d4 : (
+                                    (Capability.Sniff),
                                     [Commands.Sniff, Commands.Start, Commands.Stop]
                 )
             }

@@ -3,7 +3,7 @@ from whad.device.virtual.apimote.constants import APIMoteId, APIMoteRegisters, A
     APIMoteInternalStates
 from whad.device.virtual import VirtualDevice
 from whad.protocol.whad_pb2 import Message
-from whad import WhadDomain, WhadCapability
+from whad.hub.discovery import Domain, Capability
 from whad.zigbee.utils.phy import channel_to_frequency, frequency_to_channel
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.dot15d4.dot15d4_pb2 import Sniff, Send, Start, Stop
@@ -86,8 +86,8 @@ class APIMoteDevice(VirtualDevice):
     # Discovery related functions
     def _get_capabilities(self):
         capabilities = {
-            WhadDomain.Dot15d4 : (
-                                (WhadCapability.Sniff | WhadCapability.Inject),
+            Domain.Dot15d4 : (
+                                (Capability.Sniff | Capability.Inject),
                                 [Sniff, Send, Start, Stop]
             )
         }

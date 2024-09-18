@@ -1,4 +1,4 @@
-from whad import WhadCapability
+from whad.hub.discovery import Capability
 from whad.protocol.ble.ble_pb2 import Start, Stop, AdvMode, SetAdvData, \
     ScanMode, CentralMode, ConnectTo, SendPDU, PeripheralMode, Disconnect, \
     SetEncryption
@@ -14,12 +14,12 @@ class HCIInternalState(IntEnum):
 LE_STATES = {
     0 : ("Non-connectable Advertising State", 0 , [Start, Stop, AdvMode, SetAdvData]),
     1 : ("Scannable Advertising State", 0, [Start, Stop, AdvMode, SetAdvData]),
-    2 : ("Connectable Advertising State", WhadCapability.SimulateRole, [Start, Stop, AdvMode, SetAdvData]),
+    2 : ("Connectable Advertising State", Capability.SimulateRole, [Start, Stop, AdvMode, SetAdvData]),
     3 : ("High Duty Cycle Directed Advertising State", 0,  [Start, Stop, AdvMode, SetAdvData]),
-    4 : ("Passive Scanning State", WhadCapability.Scan, [Start, Stop, ScanMode]),
-    5 : ("Active Scanning State", WhadCapability.Scan,[Start, Stop, ScanMode]),
-    6 : ("Initiating State and Connection State (Central Role)", WhadCapability.SimulateRole, [Start, Stop, CentralMode, ConnectTo,Disconnect, SendPDU, SetEncryption]),
-    7 : ("Connection State (Peripheral Role)", WhadCapability.SimulateRole,  [Start, Stop, PeripheralMode, SendPDU, Disconnect, SetEncryption])
+    4 : ("Passive Scanning State", Capability.Scan, [Start, Stop, ScanMode]),
+    5 : ("Active Scanning State", Capability.Scan,[Start, Stop, ScanMode]),
+    6 : ("Initiating State and Connection State (Central Role)", Capability.SimulateRole, [Start, Stop, CentralMode, ConnectTo,Disconnect, SendPDU, SetEncryption]),
+    7 : ("Connection State (Peripheral Role)", Capability.SimulateRole,  [Start, Stop, PeripheralMode, SendPDU, Disconnect, SetEncryption])
 }
 
 ADDRESS_MODIFICATION_VENDORS = [

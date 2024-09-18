@@ -1,7 +1,7 @@
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceUnsupportedOperation
 from whad.device.virtual import VirtualDevice
-from whad import WhadDomain
+from whad.hub.discovery import Domain
 
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.discovery import Capability
@@ -280,7 +280,7 @@ class HCIDevice(VirtualDevice):
 
         supported_commands = list(set(supported_commands))
         capabilities = {
-            WhadDomain.BtLE : (
+            Domain.BtLE : (
                                 capabilities | Capability.NoRawData,
                                 supported_commands
             )
@@ -583,7 +583,7 @@ class HCIDevice(VirtualDevice):
 
     def _on_whad_ble_periph_mode(self, message):
         logger.debug('whad ble periph mode message')
-        if Commands.PeripheralMode in self._dev_capabilities[WhadDomain.BtLE][1]:
+        if Commands.PeripheralMode in self._dev_capabilities[Domain.BtLE][1]:
             success = True
             if len(message.scan_data) > 0:
                 success = success and self._set_advertising_data(message.scan_data)
@@ -606,7 +606,7 @@ class HCIDevice(VirtualDevice):
         self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_connect(self, message):
-        if Commands.ConnectTo in self._dev_capabilities[WhadDomain.BtLE][1]:
+        if Commands.ConnectTo in self._dev_capabilities[Domain.BtLE][1]:
             bd_address = message.bd_address
             bd_address_type = message.addr_type
             channel_map = message.channel_map if message.channel_map is not None else None
@@ -617,14 +617,14 @@ class HCIDevice(VirtualDevice):
         self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_central_mode(self, message):
-        if Commands.CentralMode in self._dev_capabilities[WhadDomain.BtLE][1]:
+        if Commands.CentralMode in self._dev_capabilities[Domain.BtLE][1]:
             self.__internal_state = HCIInternalState.CENTRAL
             self._send_whad_command_result(CommandResult.SUCCESS)
             return
         self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_scan_mode(self, message):
-        if Commands.ScanMode in self._dev_capabilities[WhadDomain.BtLE][1]:
+        if Commands.ScanMode in self._dev_capabilities[Domain.BtLE][1]:
             active_scan = message.active
             if self._set_scan_parameters(active_scan):
                 self.__internal_state = HCIInternalState.SCANNING
