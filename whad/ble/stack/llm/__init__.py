@@ -585,7 +585,7 @@ class LinkLayerState(LayerState):
 
     def is_version_sent(self, conn_handle):
         if conn_handle in self.connections:
-            self.connections[conn_handle]['version_sent']
+            return self.connections[conn_handle]['version_sent']
         return False
 
     def set_version_remote(self, conn_handle, version):
