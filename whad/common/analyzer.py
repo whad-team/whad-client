@@ -1,38 +1,81 @@
 
+"""
+WHAD traffic analyzer base module.
+"""
+from typing import List
+from scapy.packet import Packet
+
+
 class TrafficAnalyzer:
+    """
+    Traffic analyzer base class.
+
+    This class must be inherited by specialized traffic analyzers
+    in order to provide `wanalyze` with extracted and/or computed
+    data. 
+    """
+
     def __init__(self):
-        self.reset()
-        self._marked_packets = []
+        self.__triggered = False
+        self.__completed = False
+        self.__marked_packets = []
 
     def process_packet(self, packet):
-        pass
+        """Process a packet.
+        """
 
-    def mark_packet(self, pkt):
-        self._marked_packets.append(pkt)
+    def mark_packet(self, packet):
+        """Mark a specific packet.
+        """
+        self.__marked_packets.append(packet)
 
     def reset(self):
-        self._triggered = False
-        self._completed = False
-        self._marked_packets = []
+        """Reset traffic analyzer state.
+        """
+        self.__triggered = False
+        self.__completed = False
+        self.__marked_packets = []
 
     def trigger(self):
-        self._triggered = True
+        """Trigger this traffic analyzer.
+        """
+        self.__triggered = True
 
     def complete(self):
-        self._completed = True
+        """Mark this analyzer as completed.
+
+        Once a traffic analyzer is completed, its output
+        can be queried.
+        """
+        self.__completed = True
 
     @property
-    def marked_packets(self):
-        return self._marked_packets
-        
+    def marked_packets(self) -> List[Packet]:
+        """Returns marked packets.
+        """
+        return self.__marked_packets
+
     @property
     def output(self):
+        """Returns the traffic analyzer output.
+        """
         return None
 
     @property
-    def triggered(self):
-        return self._triggered
+    def triggered(self) -> bool:
+        """Determine if the traffic analyzer has been triggered.
+
+        :return-type: bool
+        :return: `True` if triggered, `False` otherwise.
+        """
+        return self.__triggered
 
     @property
-    def completed(self):
-        return self._completed
+    def completed(self) -> bool:
+        """Determine if the traffic analyzer has completed is
+        job.
+
+        :return-type: bool
+        :return: `True` if completed, `False` otherwise.
+        """
+        return self.__completed
