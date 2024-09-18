@@ -22,6 +22,12 @@ from .helpers import create_enddevice
 INTRO='''
 zigbee-enddevice, the WHAD Zigbee end device utility
 '''
+import logging
+logging.getLogger("whad.zigbee.stack.nwk").setLevel(logging.DEBUG)
+logging.getLogger("whad.dot15d4.stack.mac").setLevel(logging.DEBUG)
+logging.getLogger("whad.zigbee.stack.apl.zdo.discovery").setLevel(logging.DEBUG)
+
+logging.basicConfig(level=logging.ERROR)
 
 class ZigbeeEndDeviceShell(InteractiveShell):
     """Zigbee End Device interactive shell
