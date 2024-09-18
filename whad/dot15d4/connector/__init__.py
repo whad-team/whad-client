@@ -216,14 +216,17 @@ class Dot15d4(WhadDeviceConnector):
             metadata.channel = channel
             if self.support_raw_pdu():
                 metadata.raw = True
+
                 if Dot15d4FCS not in pdu:
-                    packet = Dot15d4FCS(raw(pdu)+Dot15d4FCS().compute_fcs(raw(pdu)))
+                    packet = Dot15d4FCS(raw(pdu) + Dot15d4FCS().compute_fcs(raw(pdu)))
                 else:
                     packet = pdu
+
             elif Dot15d4FCS in pdu:
                 packet = Dot15d4NoFCS(raw(pdu)[:-2])
             else:
                 packet = pdu
+            
             if hasattr(packet, "reserved"):
                 packet.reserved = packet.reserved
 

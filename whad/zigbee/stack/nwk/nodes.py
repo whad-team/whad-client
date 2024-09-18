@@ -56,7 +56,7 @@ class ZigbeeNode:
         pl = sum(self.lqis) / len(self.lqis)
         result = min(7,round(1/(pl ** 4)))
         self.__dict__["outgoing_cost"] = result
-        return link_cost
+        return result
 
     def __setattr__(self, name, value):
         if hasattr(self, "last_update"):
