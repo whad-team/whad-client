@@ -60,4 +60,4 @@ def test_raw_pdu_recv(factory):
     assert packet.metadata.timestamp == 1234
     assert packet.metadata.is_fcs_valid == True
     assert packet.metadata.lqi == 120
-    assert bytes(packet) == b"FOOBAR" + b'\x22\x11'
+    assert bytes(packet) == b"FOOBAR" + b'\x11\x22'
