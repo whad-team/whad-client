@@ -1,21 +1,26 @@
+"""
+WHAD general helpers
+"""
+
 from pkgutil import iter_modules
-from scapy.fields import StrField
 from scapy.packet import Packet_metaclass
 import whad
 
-"""
-def message_filter(category, message):
-    return lambda x: x.WhichOneof('msg') == category and getattr(x, category).WhichOneof('msg')==message
-"""
-
 def message_filter(message_class):
+    """Filter function to only keep messages that matches the provided class.
+
+    :param message_class: Message class to match
+    :type message_class: class
+    """
     return lambda x: isinstance(x, message_class)
 
 def is_message_type(message, category, message_type):
+    """Check message type is of a given category.
+    """
     if message.WhichOneof('msg') == category:
-        return (hasattr(message, category) and getattr(message, category).WhichOneof('msg') == message_type)
-    else:
-        return False
+        if hasattr(message, category):
+            return getattr(message, category).WhichOneof('msg') == message_type
+    return False
 
 def bd_addr_to_bytes(bd_addr):
     """
@@ -31,86 +36,94 @@ def bd_addr_to_bytes(bd_addr):
         for i in range(6):
             bd_addr_b.append(int(bd_addr[i*2:(i+1)*2], 16))
         return bytes(bd_addr_b[::-1])
-    else:
-        return None
 
-def asciiz(s):
+    # Error.
+    return None
+
+def asciiz(buf: bytes) -> str:
     """Convert a bytes buffer into ascii
     """
-    if not isinstance(s,bytes):
+    if not isinstance(buf, bytes):
         return None
 
     out=''
-    for c in s:
-        if s!=0:
-            out += chr(c)
+    for value in buf:
+        if buf!=0:
+            out += chr(value)
     return out
 
 def swap_bits(value):
     """
     Swap the bits of a byte or a sequence of bytes.
     """
+    # Value is an integer
     if isinstance(value, int):
         return (value * 0x0202020202 & 0x010884422010) % 1023
-    elif isinstance(value,bytes):
+
+    # Value is of type bytes
+    if isinstance(value,bytes):
         return bytes([(i * 0x0202020202 & 0x010884422010) % 1023 for i in value])
-    else:
-        return None
+
+    # Error.
+    return None
 
 def bytes_to_bits(data):
-	'''
-	This function converts bytes to the corresponding bits sequence (as string).
+    '''
+    This function converts bytes to the corresponding bits sequence (as string).
 
-	:param data: bytes to convert
-	:return: corresponding bits sequence
+    :param data: bytes to convert
+    :return: corresponding bits sequence
 
-	:Example:
-		>>> bytes_to_bits(b"\x01\x02\x03\xFF")
-		'00000001000000100000001111111111'
-		>>> bytes_to_bits(b"ABC")
-		'010000010100001001000011'
-	'''
-	return "".join(["{:08b}".format(i) for i in bytes(data)])
+    :Example:
+    	>>> bytes_to_bits(b"\x01\x02\x03\xFF")
+    	'00000001000000100000001111111111'
+    	>>> bytes_to_bits(b"ABC")
+    	'010000010100001001000011'
+    '''
+    return "".join([f"{i:08b}" for i in bytes(data)])
 
 def bits_to_bytes(bits):
-	'''
-	This function converts a sequence of bits (as string) to the corresponding bytes.
+    '''
+    This function converts a sequence of bits (as string) to the corresponding
+    bytes.
 
-	:param bits: string indicating a sequence of bits (e.g. "10110011")
-	:return: corresponding bytes
+    :param bits: string indicating a sequence of bits (e.g. "10110011")
+    :return: corresponding bytes
 
-	:Example:
-		>>> bits_to_bytes('00000001000000100000001111111111')
-		b'\x01\x02\x03\xff'
-		>>> bits_to_bytes('010000010100001001000011')
-		b'ABC'
-	'''
-	return bytes([int(j+((8-len(j))*"0"),2) for j in [bits[i:i + 8] for i in range(0, len(bits), 8)]])
+    :Example:
+    	>>> bits_to_bytes('00000001000000100000001111111111')
+    	b'\x01\x02\x03\xff'
+    	>>> bits_to_bytes('010000010100001001000011')
+    	b'ABC'
+    '''
+    bitstream = [bits[i:i + 8] for i in range(0, len(bits), 8)]
+    return bytes([int(j+((8-len(j))*"0"),2) for j in bitstream])
 
-def bitwise_xor(a,b):
-	'''
-	This function returns the result of a bitwise XOR operation applied to two sequences of bits (a and b);
+def bitwise_xor(bitseq_a, bitseq_b):
+    '''
+    This function returns the result of a bitwise XOR operation applied to two
+    sequences of bits (a and b);
 
-	:param a: string indicating a sequence of bits (e.g. "10101010")
-	:param b: string indicating a sequence of bits (e.g. "10101010")
-	:return: result of the XOR operation
+    :param a: string indicating a sequence of bits (e.g. "10101010")
+    :param b: string indicating a sequence of bits (e.g. "10101010")
+    :return: result of the XOR operation
 
-	:Example:
-		>>> bitwise_xor('11001111','10101010')
-		'01100101'
-		>>> bitwise_xor('11111111','00101010')
-		'11010101'
-		>>> bitwise_xor('11111111','11001100')
-		'00110011'
-	'''
-	if len(a) != len(b):
-		return None
-	result = ""
-	for i in range(len(a)):
-		valA = a[i] == "1"
-		valB = b[i] == "1"
-		result += "1" if valA ^ valB else "0"
-	return result
+    :Example:
+        >>> bitwise_xor('11001111','10101010')
+        '01100101'
+        >>> bitwise_xor('11111111','00101010')
+        '11010101'
+        >>> bitwise_xor('11111111','11001100')
+        '00110011'
+    '''
+    if len(bitseq_a) != len(bitseq_b):
+        return None
+    result = ""
+    for i in range(len(bitseq_a)):
+        val_a = bitseq_a[i] == "1"
+        val_b = bitseq_b[i] == "1"
+        result += "1" if val_a ^ val_b else "0"
+    return result
 
 def list_domains():
     '''
@@ -119,7 +132,7 @@ def list_domains():
     domains = []
     for submodule in iter_modules(whad.__path__):
         try:
-            candidate = __import__("whad.{}.connector".format(submodule.name))
+            __import__("whad.{submodule.name}.connector")
             domains.append(submodule.name)
         except ModuleNotFoundError:
             pass
@@ -150,7 +163,10 @@ def scapy_packet_to_pattern(packet, selected_fields=None, selected_layers=None):
         elif selected_layers is not None and layer in selected_layers:
             use_layer = True
         for field in layer.fields_desc:
-            field_size = int(field.sz*8) if not isinstance(getattr(packet, field.name), bytes) else len(getattr(packet, field.name))*8
+            if not isinstance(getattr(packet, field.name), bytes):
+                field_size = int(field.sz*8)
+            else:
+                field_size = len(getattr(packet, field.name))*8
             if use_layer:
                 mask += "1" * field_size
             else:
@@ -166,8 +182,8 @@ def scapy_packet_to_pattern(packet, selected_fields=None, selected_layers=None):
     mask = bits_to_bytes(mask)
 
     # Crop leading zero bytes and adjust offset
-    for i in range(len(mask)):
-        if mask[i] == 0:
+    for mask_bit in mask:
+        if mask_bit == 0:
             offset += 1
         else:
             break
