@@ -16,7 +16,6 @@ class Dot15d4Address(object):
         Adapt to input parameters to represent a 802.15.4 short or extended address.
         """
 
-
         if isinstance(address, str):
             if re.match(r'^([0-9a-fA-F]{2}\:){7}[0-9a-fA-F]{2}$', address) is not None:
                 self.__type = Dot15d4Address.EXTENDED

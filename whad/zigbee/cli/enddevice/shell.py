@@ -3,6 +3,9 @@ from whad.zigbee.connector.enddevice import EndDevice
 
 from prompt_toolkit import print_formatted_text, HTML
 
+from whad.common.monitors import WiresharkMonitor
+from whad.exceptions import ExternalToolNotFound
+
 from whad.cli.shell import InteractiveShell, category
 from whad.dot15d4.exceptions import InvalidDot15d4AddressException
 from whad.dot15d4.address import Dot15d4Address
@@ -61,6 +64,48 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                 )
             ), force)
 
+
+    def complete_wireshark(self):
+        """Autocomplete wireshark command
+        """
+        completions = {}
+        if self.__wireshark is not None:
+            completions['off'] = {}
+        else:
+            completions['on'] = {}
+        return completions
+
+
+    @category("Monitoring")
+    def do_wireshark(self, arg):
+        """launch wireshark to monitor packets
+
+        <ansicyan><b>wireshark</b> <i>["on" | "off"]</i></ansicyan>
+
+        This command launches a wireshark that will display all the packets sent
+        and received in the active connection.
+        """
+        if len(arg) >=1:
+            enabled = arg[0].lower()=="on"
+            if enabled:
+                if self.__wireshark is None:
+                    try:
+                        self.__wireshark = WiresharkMonitor()
+                        if self.__connector is not None:
+                            self.__wireshark.attach(self.__connector)
+                            self.__wireshark.start()
+                    except ExternalToolNotFound:
+                        self.error("Cannot launch Wireshark, please make sure it is installed.")
+                else:
+                    self.error("Wireshark is already launched, see <ansicyan>wireshark off</ansicyan>")
+            else:
+                # Detach monitor if any
+                if self.__wireshark is not None:
+                    self.__wireshark.detach()
+                    self.__wireshark.close()
+                    self.__wireshark = None
+        else:
+            self.error("Missing arguments, see <ansicyan>help wireshark</ansicyan>.")
 
     @category('Networks discovery')
     def do_scan(self, args):
@@ -236,7 +281,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                 print("Discovering surrounding nodes.")
                 nodes = self.__target_network['info'].discover()
                 self.__target_network['discovered'] = True
-
+                print([(node.address, node.extended_address) for node in nodes])
                 for node in nodes:
                     if isinstance(node, CoordinatorNode):
                         print("New Coordinator discovered (addr. = %s, ext. addr. = %s)" % (

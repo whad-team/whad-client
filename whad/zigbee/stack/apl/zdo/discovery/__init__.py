@@ -244,6 +244,7 @@ class ZDODeviceAndServiceDiscovery(ZDOObject):
 
                 if descriptor is not None:
                     if descriptor.logical_type == LogicalDeviceType.COORDINATOR:
+
                         new_device = CoordinatorNode(
                             address,
                             extended_address=asdu.ieee_addr,

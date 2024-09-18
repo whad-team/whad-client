@@ -54,10 +54,13 @@ class SendRawPdu(PbMessageWrapper):
     def from_packet(packet, channel: int = 11):
         """Convert a scapy packet to a SendPdu message
         """
-        if Dot15d4 in packet:
-            pdu = bytes(packet[Dot15d4])
-        elif Dot15d4FCS in packet:
+
+        if Dot15d4FCS in packet:
             pdu = bytes(packet[Dot15d4FCS])[:-2]
+
+        elif Dot15d4 in packet:
+            packet.show()
+            pdu = bytes(packet[Dot15d4])
         else:
             return None
 
@@ -151,7 +154,7 @@ class RawPduReceived(PbMessageWrapper):
 
         # Create packet
         #print('converting %s' % (self.pdu + bytes(pack(">H", self.fcs))).hex())
-        packet = Dot15d4FCS(bytes(self.pdu) + bytes(pack("<H", self.fcs)))
+        packet = Dot15d4FCS(bytes(self.pdu) + bytes(pack(">H", self.fcs)))
 
         # Set packet metadata
         packet.metadata = Dot15d4Metadata()
