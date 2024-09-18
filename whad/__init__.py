@@ -15,6 +15,8 @@ logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
 
 __all__ = [
+    'Domain',
+    'Capability',
     'UartDevice',
     'VirtualDevice',
     'RequiredImplementation',
