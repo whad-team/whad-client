@@ -1229,7 +1229,7 @@ class SARUnicastRetransmissionsIntervalStepState(ModelState):
             name="sar_unicast_restransmissions_intreval_step", default_value=0b0111
         )
 
-    def get_uncast_retransmission_interval_step(self):
+    def get_unicast_retransmission_interval_step(self):
         return (self.get_state() + 1) * 25
 
 

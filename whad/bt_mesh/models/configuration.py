@@ -622,10 +622,8 @@ class ConfigurationModelServer(ModelServer):
                 status=0x06, net_key_index=net_key_index
             )
         else:
-            # get iv_index from primary net_key
-            iv_index = net_key_list.get_value(0).iv_index
             net_key_crypto_manager = NetworkLayerCryptoManager(
-                key_index=net_key_index, net_key=net_key, iv_index=iv_index
+                key_index=net_key_index, net_key=net_key
             )
             net_key_list.set_value(
                 field_name=net_key_index, value=net_key_crypto_manager
@@ -647,9 +645,8 @@ class ConfigurationModelServer(ModelServer):
                 status=0x04, net_key_index=net_key_index
             )
         else:
-            iv_index = stored_net_key.iv_index
             net_key_crypto_manager = NetworkLayerCryptoManager(
-                key_index=net_key_index, net_key=net_key, iv_index=iv_index
+                key_index=net_key_index, net_key=net_key
             )
             net_key_list.set_value(
                 field_name=net_key_index, value=net_key_crypto_manager

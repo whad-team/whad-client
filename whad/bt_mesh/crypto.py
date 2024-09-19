@@ -429,7 +429,7 @@ class NetworkLayerCryptoManager:
     bound to this network.
     """
 
-    def __init__(self, key_index, net_key=None, iv_index=b"\x00\x00\x00\x00"):
+    def __init__(self, key_index, net_key=None):
         # if no net_key given
         if net_key is None:
             self.net_key = generate_random_value(128)
@@ -437,8 +437,6 @@ class NetworkLayerCryptoManager:
             self.net_key = net_key
 
         self.key_index = key_index
-        self.iv_index = iv_index
-
         # List of bound app key indexes to this network key
         self.app_key_indexes = []
 
@@ -517,7 +515,7 @@ class NetworkLayerCryptoManager:
         if app_key_index not in self.app_key_indexes:
             self.app_key_indexes.append(app_key_index)
 
-    def encrypt(self, raw_transport_pdu, clear_dst_addr, net_pdu):
+    def encrypt(self, raw_transport_pdu, clear_dst_addr, net_pdu, iv_index):
         """
         Encrypts the transport PDU. Mesh Spec Section 3.9.7.2 p. 206
 
@@ -527,6 +525,8 @@ class NetworkLayerCryptoManager:
         :type clear_dst_addr: Bytes
         :param net_pdu Partial Network PDU with information to compute the NetworkNonce and the dest addr
         :type net_pdu: BTMesh_Network_PDU
+        :param iv_index: The current iv_index
+        :type iv_index: Bytes
         """
 
         # Mesh Spec Section 3.9.5.1 p. 194
@@ -536,7 +536,7 @@ class NetworkLayerCryptoManager:
             + net_pdu.seq_number.to_bytes(3, "big")
             + net_pdu.src_addr.to_bytes(2, "big")
             + b"\x00" * 2
-            + self.iv_index
+            + iv_index
         )
 
         if net_pdu.network_ctl == 1:
@@ -550,12 +550,14 @@ class NetworkLayerCryptoManager:
         # First 2 bytes -> enc_dst. Rest is enc Transport PDU and MIC
         return cipher + mic
 
-    def decrypt(self, net_pdu):
+    def decrypt(self, net_pdu, iv_index):
         """
         Decrypts the transport PDU. Mesh Spec Section 3.9.7.2 p. 206
 
         :param net_pdu: Net_pdu received (after deobfuscation)
         :type net_pdu: BTMesh_Network_PDU
+        :param iv_index: The current IV_index
+        :type iv_index: Bytes
         :returns:  The plaintext of Network PDU and boolean for the MIC check
         :rtype: (Bytes, boolean)
         """
@@ -567,7 +569,7 @@ class NetworkLayerCryptoManager:
             + net_pdu.seq_number.to_bytes(3, "big")
             + net_pdu.src_addr.to_bytes(2, "big")
             + b"\x00" * 2
-            + self.iv_index
+            + iv_index
         )
 
         if net_pdu.network_ctl == 1:
@@ -584,18 +586,20 @@ class NetworkLayerCryptoManager:
         except ValueError:
             return (plaintext, False)
 
-    def obfuscate_net_pdu(self, net_pdu):
+    def obfuscate_net_pdu(self, net_pdu, iv_index):
         """
         Obfuscates the network_pdu (a complete one with encrypted transport PDU and MIC).
         Mesh Spec Section 3.9.7.3 p. 206
 
         :param net_pdu: Network PDU to be obfuscated
         :type net_pdu: BTMesh_Network_PDU
+        :param iv_index: The current IV_index
+        :type iv_index: Bytes
         :returns: Obfuscated part of Network PDU
         :rtype: Bytes
         """
         privacy_random = net_pdu.enc_dst_enc_transport_pdu_mic[0:7]
-        privacy_plaintext = b"\x00" * 5 + self.iv_index + privacy_random
+        privacy_plaintext = b"\x00" * 5 + iv_index + privacy_random
         pecb = e(self.privacy_key, privacy_plaintext)
         obfuscated_data = xor(
             (net_pdu.network_ctl << 7 | net_pdu.ttl).to_bytes(1, "big")
@@ -605,20 +609,22 @@ class NetworkLayerCryptoManager:
         )
         return obfuscated_data
 
-    def deobfuscate_net_pdu(self, obf_net_pdu):
+    def deobfuscate_net_pdu(self, obf_net_pdu, iv_index):
         """
         Obfuscates the network_pdu (an obfuscated one).
         Mesh Spec Section 3.9.7.3 p. 206
 
         :param obf_net_pdu: Network PDU to be deobfuscated
         :type obf_net_pdu: BTMesh_Obsfucated_Network_PDU
+        :param iv_index: The current IV_index
+        :type iv_index: Bytes
         :returns: The raw blob of deobfuscated data
         :type: Bytes
         """
         obf_net_pdu.show()
         print(obf_net_pdu.obfuscated_data)
         privacy_random = obf_net_pdu.enc_dst_enc_transport_pdu_mic[0:7]
-        privacy_plaintext = b"\x00" * 5 + self.iv_index + privacy_random
+        privacy_plaintext = b"\x00" * 5 + iv_index + privacy_random
         pecb = e(self.privacy_key, privacy_plaintext)
         plaintext = xor(obf_net_pdu.obfuscated_data, pecb[0:6])
         return plaintext
@@ -815,8 +821,8 @@ class UpperTransportLayerAppKeyCryptoManager:
         :type iv_index: Bytes
         :param label_uuid: Label UUID associated with the virtual addr (Mesh Spec Section 3.4.2.3) if dst_addr is virtual addr
         :type label_uuid: Bytes
-        :returns: The encrypted message concatenated with mic
-        :rtype: Bytes
+        :returns: The encrypted message concatenated with mic and the seq_auth value
+        :rtype: (Bytes, Bytes)
         """
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
         nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
@@ -847,7 +853,7 @@ class UpperTransportLayerAppKeyCryptoManager:
 
         cipher = aes_ccm.encrypt(access_message)
         mic = aes_ccm.digest()
-        return cipher + mic
+        return cipher + mic, seq_auth
 
     def decrypt(
         self,
@@ -994,8 +1000,8 @@ class UpperTransportLayerDevKeyCryptoManager:
         :type dst_addr: Bytes
         :param iv_index: Current IV index
         :type iv_index: Bytes
-        :returns: The encrypted message concatenated with mic
-        :rtype: Bytes
+        :returns: The encrypted message concatenated with mic and the seq_auth value
+        :rtype: (Bytes, Bytes)
         """
 
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
@@ -1015,7 +1021,7 @@ class UpperTransportLayerDevKeyCryptoManager:
 
         cipher = aes_ccm.encrypt(access_message)
         mic = aes_ccm.digest()
-        return cipher + mic
+        return cipher + mic, seq_auth
 
     def decrypt(self, enc_data, aszmic, seq_number, src_addr, dst_addr, iv_index):
         """
