@@ -15,15 +15,17 @@ class MeshMessageContext:
         self.src_addr = None
         self.dest_addr = None
 
-        # Should be equal to the segment segment number before the Upper Transport Layer.
-        # After that should be equal to the segment number of segment 0 (if segmented message)
+        # Should be equal to the sequence number of the PDU
         self.seq_number = None
 
-        # 1 if app_key used, 0 if devic key
-        self.application_key_flag = None
+        # if segmentention used in Lower transport layer, set to the segment number
+        self.segment_number = None
 
-        # AID of the app_key if app_key used, 0 id device_key used
+        # AID of the app_key if app_key used, -1 if device_key used
         self.application_key_id = None
+
+        # Net key id used
+        self.net_key_id = None
 
         # If src_addr is Virtual Addr
         self.uuid = None
@@ -31,8 +33,13 @@ class MeshMessageContext:
         # Either received TTL or sending TTL
         self.ttl = None
 
-        # Either received RSSI or sending RSSI
-        self.rssi = None
+        # Seq auth value set by the Upper Transport Layer when encrypting the access pdu
+        # Set by the Network layer on Rx messages
+        # int !
+        self.seq_auth = None
+
+        # Set by model layer, if the message is too small to be segmented but still want acknowlegment on network layer
+        self.force_segment = False
 
 
 def get_address_type(address):
@@ -159,3 +166,32 @@ def packet_encoding_to_key_indexes(packed_keys):
         ints.append(last_int)  # Append the last integer
 
     return ints
+
+
+def calculate_seq_auth(iv_index: bytes, seq: int, seq_zero: int) -> int:
+    """
+    Computes the SeqAuth value for a PDU received in the Lower Transport Layer
+
+    :param iv_index: The iv_index used
+    :type iv_index: Bytes
+    :param seq: The sequence number (network layer) of the segment PDU
+    :type seq: int
+    :param seq_zero: The seq_zero value (lower transport layer)
+    ;param seq_zero: int
+    :return: The seq_auth value
+    :rtype: int
+    """
+    iv_index_int = int.from_bytes(iv_index, byteorder="big")
+
+    # Compute the 14-bit and 13-bit masks
+    seq_mask_14 = (1 << 14) - 1  
+    seq_mask_13 = (1 << 13) - 1 
+
+    # Compute the sequence adjustment from seq_zero
+    seq_diff = ((seq & seq_mask_14) - seq_zero) & seq_mask_13
+
+    adjusted_seq = seq - seq_diff
+
+    seq_auth = (iv_index_int << 24) | adjusted_seq
+
+    return seq_auth

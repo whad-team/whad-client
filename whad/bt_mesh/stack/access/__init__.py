@@ -8,92 +8,20 @@ Allows other layers to internally fetch State data from Foundation Models (SAR i
 
 import logging
 from whad.common.stack import Layer, alias, source
-from whad.bt_mesh.stack.utils import MeshMessageContext
+from whad.bt_mesh.stack.utils import (
+    MeshMessageContext,
+    get_address_type,
+    UNICAST_ADDR_TYPE,
+    GROUP_ADDR_TYPE,
+    VIRTUAL_ADDR_TYPE,
+)
 from whad.bt_mesh.models import Element
+from queue import Queue
+
+from whad.bt_mesh.models import GlobalStatesManager
 
 
 logger = logging.getLogger(__name__)
-
-
-class CompositionData0(object):
-    """
-    Composition Data page 0 (Mesh PRT Spec Section 4.2.2.1).
-    Contain general information about the node
-    """
-
-    def __init__(
-        self,
-        cid=0x0059,
-        pid=0x01,
-        vid=0x02,
-        crpl=100,
-        is_relay=False,
-        is_proxy=False,
-        is_friend=False,
-        is_lpn=False,
-    ):
-        """
-        Initializes the Comoposition Data 0 object
-
-        :param cid: Company ID
-        :type cid: Int
-        :param pid: Product ID
-        :type pid: int
-        :param vid: Vendor ID
-        :type vid: int
-        :param crpl: Max number of replay protection entries
-        :type crpl: int
-        :param is_relay: Does this node support replay feature ?
-        :type is_relay: boolean
-        :param is_proxy: Does this node support proxy feature ?
-        :type is_proxy: boolean
-        :param is_friend: Does this node support friend feature ?
-        :type is_friend: boolean
-        :param is_lpn: Does this node support Low Power Node feature ?
-        :type is_lpn: boolean
-        """
-        self.cid = cid
-        self.pid = pid
-        self.vid = vid
-        self.crpl = crpl
-        self.is_relay = is_relay
-        self.is_proxy = is_proxy
-        self.is_friend = is_friend
-        self.is_lpn = is_lpn
-
-        # contain tuples of (loc, Element).
-        self.elements = []
-
-    def add_element(self, element: Element, loc):
-        """
-        Adds an element to the Composition Data page 0.
-
-        :param element: The element to add
-        :type element: Element
-        :param loc: Location Descriptor, defaults to 0
-        :type loc: int, optional
-        """
-        self.elements.append((loc, Element))
-
-    def get_composition_page0(self):
-        """
-        Retrieves the correctly formated Composition Page 0 for exchange (Data in a
-        Config Composition Data Status, Mesh PRT spec Section 4.3.2.5)
-        """
-        data = b""
-        data = self.cid.to_bytes(2, "little")
-        data += self.pid.to_bytes(2, "little")
-        data += self.vid.to_bytes(2, "little")
-        data += self.crpl.to_bytes(2, "little")
-        data += (
-            int(self.is_relay)
-            | (int(self.is_proxy) << 1)
-            | (int(self.is_friend) << 2)
-            | (int(self.is_lpn) << 3)
-        ).to_bytes(2, "little")
-        for loc,element in self.elements:
-            data += loc.to_bytes(2, "little")
-            data += loc.to_bytes("")
 
 
 @alias("access")
@@ -102,16 +30,86 @@ class AccessLayer(Layer):
         """
         AccessLayer. One for all the networks.
         """
-
         super().__init__(options=options)
 
         # List of elements of the Device. Addr -> element instance
         self.state.elements = {}
 
-    def config_primary_element(self, unicast_addr):
-        """
-        Configures the primary element of the device with necessary foundation models
+        # Rx message queue from UpperTransportLayer
+        self.__queue = Queue()
 
-        :param unicast_addr: [TODO:description]
-        :type unicast_addr: [TODO:type]
+        # Set to True when a handler for an Access Message is executed
+        self.state.__is_processing_message = False
+
+        self.state.global_states_manager = GlobalStatesManager()
+
+    def check_queue(self):
         """
+        If the queue is not empty, process the next Access Message
+        """
+        if not self.__queue.empty():
+            self.process_access_message(self.__queue.get_nowait())
+
+    @source("upper_transport")
+    def on_access_message(self, message):
+        """
+        Handler when Access Message is received
+
+        :param message: Message Received with its context
+        :type message: (Packet,MeshMessageContext)
+        """
+        self.__queue.put_nowait(message)
+        if not self.state.__is_processing_message:
+            self.check_queue()
+
+    def send_to_upper_transport(self, message):
+        """
+        Sends a message and its context to the upper transport layer to send on the network
+
+        :param message: Message and its context
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
+        """
+        self.send("upper_transport", message)
+
+    def process_access_message(self, message):
+        """
+        Function used to process an Access Message received from the network
+
+        :param message: Message received with context
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
+        """
+        packet, ctx = message
+        dst_addr = ctx.dst_addr
+        element = []
+
+        dst_addr_type = get_address_type(dst_addr)
+
+        # if dst addr is unicast, only need to use the relevent element
+        if dst_addr_type == UNICAST_ADDR_TYPE:
+            element.append(self.state.elements[dst_addr])
+        # Check which element have a model that subscribed to this address
+        elif dst_addr_type == GROUP_ADDR_TYPE:
+            for e in self.state.elements:
+                if e.check_group_subscription(dst_addr):
+                    element.append(e)
+        elif dst_addr_type == VIRTUAL_ADDR_TYPE:
+            for e in self.state.elements:
+                if e.check_virtual_subscription(dst_addr):
+                    element.append(e)
+
+        # for all the element that are supposed to receive the message, handle it
+        for e in element:
+            response = e.handle_message(message)
+            if response is not None:
+                new_ctx = MeshMessageContext()
+                new_ctx.application_key_id = ctx.application_key_id
+                new_ctx.src_addr = e.addr
+                new_ctx.dest_addr = ctx.src_addr
+                new_ctx.net_key_id = ctx.net_key_id
+                if ctx.ttl == 0:
+                    new_ctx.ttl = 0
+                else:
+                    new_ctx.ttl = self.state.global_states_manager.get_state(
+                        "default_ttl"
+                    ).get_value()
+                self.send_to_upper_transport((response, ctx))

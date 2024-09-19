@@ -341,7 +341,6 @@ Network Layer Crypto Tests
 
 _NETKEY_INPUT1 = dict(
     net_key=bytes.fromhex("7dd7364cd842ad18c17c2b820c84c3d6"),
-    iv_index=bytes.fromhex("12345678"),
     pdus=dict(
         obf_net_pdu=(
             BTMesh_Obfuscated_Network_PDU(
@@ -369,6 +368,7 @@ _NETKEY_INPUT1 = dict(
         ),
     ),
     expected=dict(
+        iv_index=bytes.fromhex("12345678"),  # not expected but input...
         nid=bytes.fromhex("68"),
         enc_key=bytes.fromhex("0953fa93e7caac9638f58820220a398e"),
         privacy_key=bytes.fromhex("8b84eedec100067d670971dd2aa700cf"),
@@ -387,7 +387,7 @@ _NETKEY_INPUT1 = dict(
 def network_crypto_manager_setup(request):
     test_values = request.param
     crypto_manager = NetworkLayerCryptoManager(
-        key_index=0x00, net_key=test_values["net_key"], iv_index=test_values["iv_index"]
+        key_index=0x00, net_key=test_values["net_key"]
     )
 
     return (crypto_manager, test_values["expected"], test_values["pdus"])
@@ -421,14 +421,14 @@ class TestNetworkLayerCryptoManager(object):
     def test_net_deobfuscation(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
         net_pdu = pdus["obf_net_pdu"]
-        result = crypto_manager.deobfuscate_net_pdu(net_pdu)
+        result = crypto_manager.deobfuscate_net_pdu(net_pdu, expected["iv_index"])
         network_ctl = (result[0]) >> 7
         ttl = result[0] & 0x7F
         seq_number = result[1:4]
         src_addr = result[4:6]
         assert raw(
             BTMesh_Network_PDU(
-                ivi=crypto_manager.iv_index[0] & 0b01,
+                ivi=expected["iv_index"][0] & 0b01,
                 nid=crypto_manager.nid,
                 network_ctl=network_ctl,
                 ttl=ttl,
@@ -440,17 +440,19 @@ class TestNetworkLayerCryptoManager(object):
 
     def test_net_obfuscation(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
-        obfuscated_data = crypto_manager.obfuscate_net_pdu(pdus["not_obf_net_pdu"])
+        obfuscated_data = crypto_manager.obfuscate_net_pdu(
+            pdus["not_obf_net_pdu"], expected["iv_index"]
+        )
         assert obfuscated_data == pdus["obf_net_pdu"].obfuscated_data
 
     def test_net_decrypt(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
         net_pdu = pdus["not_obf_net_pdu"]
-        plaintext, is_auth_tag_valid = crypto_manager.decrypt(net_pdu)
-        dst_addr = plaintext[:2]
-        lower_transport_pdu = BTMesh_Lower_Transport_Control_Message(
-            plaintext[2:]
+        plaintext, is_auth_tag_valid = crypto_manager.decrypt(
+            net_pdu, expected["iv_index"]
         )
+        dst_addr = plaintext[:2]
+        lower_transport_pdu = BTMesh_Lower_Transport_Control_Message(plaintext[2:])
         assert (
             dst_addr == expected["clear_dst_addr"]
             and raw(lower_transport_pdu) == raw(pdus["lower_transport_pdu"])
@@ -463,7 +465,10 @@ class TestNetworkLayerCryptoManager(object):
         # Need the information in the net PDU to encrypt, like address and seq_number. encrypted value not used (we dont have it in theory ...)
         net_pdu = pdus["not_obf_net_pdu"]
         enc_transport = crypto_manager.encrypt(
-            raw(lower_transport_pdu), expected["clear_dst_addr"], net_pdu
+            raw(lower_transport_pdu),
+            expected["clear_dst_addr"],
+            net_pdu,
+            expected["iv_index"],
         )
         assert enc_transport == net_pdu.enc_dst_enc_transport_pdu_mic
 
@@ -505,7 +510,7 @@ _PRIVATE_BEACON_INPUT1 = dict(
 def network_crypto_manager_setup_private_beacon(request):
     test_values = request.param
     crypto_manager = NetworkLayerCryptoManager(
-        key_index=0x00, net_key=test_values["net_key"], iv_index=test_values["iv_index"]
+        key_index=0x00, net_key=test_values["net_key"]
     )
 
     return (crypto_manager, test_values["expected"], test_values["obf_private_beacon"])
@@ -635,7 +640,7 @@ class TestUpperLayerAppKeyCryptoManager:
     def test_encrypt(self, upper_layer_app_key_setup_crypto_manager):
         crypto_manager, test_input, expected = upper_layer_app_key_setup_crypto_manager
         if test_input["label_uuid"] is not None:
-            enc_data = crypto_manager.encrypt(
+            enc_data, seq_auth = crypto_manager.encrypt(
                 expected,
                 test_input["aszmic"],
                 test_input["seq_number"],
@@ -645,7 +650,7 @@ class TestUpperLayerAppKeyCryptoManager:
                 test_input["label_uuid"][0],
             )
         else:
-            enc_data = crypto_manager.encrypt(
+            enc_data, seq_auth = crypto_manager.encrypt(
                 expected,
                 test_input["aszmic"],
                 test_input["seq_number"],
@@ -699,7 +704,7 @@ class TestUpperLayerDevKeyCryptoManager:
 
     def test_encrypt(self, upper_layer_dev_key_setup_crypto_manager):
         crypto_manager, test_input, expected = upper_layer_dev_key_setup_crypto_manager
-        enc_data = crypto_manager.encrypt(
+        enc_data, seq_auth = crypto_manager.encrypt(
             expected,
             test_input["aszmic"],
             test_input["seq_number"],

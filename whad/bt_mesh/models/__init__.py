@@ -4,23 +4,8 @@ Mesh Model Generic classes.
 
 from threading import Lock, Timer
 from whad.scapy.layers.bt_mesh import BTMesh_Model_Message
-
-
-def lock(f):
-    """
-    Deco rator to lock the State
-
-    :param f: [TODO:description]
-    :type f: [TODO:type]
-    """
-
-    def _wrapper(self, *args, **kwargs):
-        self.lock_state()
-        result = f(self, *args, **kwargs)
-        self.unlock_state()
-        return result
-
-    return _wrapper
+from whad.bt_mesh.crypto import compute_virtual_addr_from_label_uuid
+from whad.bt_mesh.stack.utils import MeshMessageContext
 
 
 class ModelState(object):
@@ -159,11 +144,30 @@ class SingletonMeta(type):
         return cls._instances[cls]
 
 
+def lock(f):
+    """
+    Decorator to lock the seq_number
+
+    :param f: [TODO:description]
+    :type f: [TODO:type]
+    """
+
+    def _wrapper(self, *args, **kwargs):
+        self.lock_seq()
+        result = f(self, *args, **kwargs)
+        self.unlock_seq()
+        return result
+
+    return _wrapper
+
+
 class GlobalStatesManager(metaclass=SingletonMeta):
     """
     This class manages ALL the states that live in the node
     Need to access them in the different layers of the protocol
     OR in the Configuration Server Model
+
+    ALSO MANAGES THE IV_INDEX ! (not an official state but its included here)
     """
 
     def __init__(self):
@@ -175,6 +179,21 @@ class GlobalStatesManager(metaclass=SingletonMeta):
 
         # address of primary element, used as an offset for the others
         self.primary_element_addr = 0
+
+        self.iv_index = b"\x00\x00\x00\x00"
+
+        # Sequence number of the device for the iv_index
+        # used by basically every layer ...
+        self.__seq_number = 0
+
+        # lock to access the seq_number
+        self.__seq_lock = Lock()
+
+    def lock_seq(self):
+        self.__seq_lock.acquire()
+
+    def unlock_seq(self):
+        self._seq_lock.release()
 
     def set_primary_element_addr(self, primary_element_addr):
         self.primary_element_addr = primary_element_addr
@@ -241,6 +260,12 @@ class GlobalStatesManager(metaclass=SingletonMeta):
         :type state_name: str
         """
         return [state for key, state in self.states.items() if key[0] == state_name]
+
+    @lock
+    def get_next_seq_number(self):
+        seq = self.__seq_number
+        self.__seq_number += 1
+        return seq
 
 
 class Model(object):
@@ -338,6 +363,8 @@ class Element(object):
         # Dictionary of opcode to model index (in self.models) that refers to the model that handle this message.
         self.opcode_to_model_index = {}
 
+        self.global_states_manager = GlobalStatesManager()
+
     def register_model(self, model):
         """
         Adds a model to this element. Associate the opcodes allowed in Rx to this model instance.
@@ -373,14 +400,65 @@ class Element(object):
         """
         Handles the message received from the Access Layer
 
-        :param message: Message received
-        :type message: BTMesh_Model_Message
+        :param message: Message received with its context
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
-        opcode = message.opcode
+        pkt, ctx = message
+        opcode = pkt.opcode
         try:
-            self.models[self.opcode_to_model_index[opcode]].handle_message(message)
+            model = self.models[self.opcode_to_model_index[opcode]]
+
+            # check if app_key used is bound to the model
+            app_key_indexes = self.global_states_manager.get_state(
+                "model_to_app_key_list"
+            ).get_value(model.model_id)
+
+            # if dev_key used, index is -1 ! (dont forget to add it when creating the model ...)
+            if ctx.application_key_id not in app_key_indexes:
+                raise Exception
+            return model.handle_message(pkt)
         except Exception:
-            print("OUch")
+            print("ouch, too lazy to code the error handling")
+            return None
+
+    def check_group_subscription(self, addr):
+        """
+        Checks if any model in the element is subscribed to the addr in parameter
+        THE ADDR IS A GROUP ADDR IN THIS FUNCTION
+
+        :param addr: Group Addr to check
+        :type addr: Bytes
+        :returns: True is one model in the Element is subscribed to the addr, False otherwise
+        """
+        res = False
+        for model in self.models:
+            sub_list = self.global_states_manager.get_state(
+                "subscription_list", element_addr=self.addr, model_id=model.model_id
+            ).get_value("group_addrs")
+            if addr in sub_list:
+                res = True
+                break
+        return res
+
+    def check_virt_subscription(self, addr):
+        """
+        Checks if any model in the element is subscribed to the addr in parameter
+        THE ADDR IS A VIRTUAL ADDR IN THIS FUNCTION
+
+        :param addr: Virtual Addr to check
+        :type addr: Bytes
+        :returns: True is one model in the Element is subscribed to the addr, False otherwise
+        """
+        res = False
+        for model in self.models:
+            sub_list = self.global_states_manager.get_state(
+                "subscription_list", element_addr=self.addr, model_id=model.model_id
+            ).get_value("label_uuids")
+            for label in sub_list:
+                if compute_virtual_addr_from_label_uuid(label) == addr:
+                    res = True
+                    break
+        return res
 
 
 class ModelRelationship(object):

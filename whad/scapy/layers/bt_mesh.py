@@ -4521,8 +4521,8 @@ class BTMesh_Lower_Transport_Segment_Acknoledgment_Message(Packet):
     fields_desc = [
         BitField("obo", None, 1),
         BitField("seq_zero", None, 13),
-        BitField("RFU", 0, 0),
-        BitField("acked_segments", 0, 32),
+        BitField("RFU", 0, 2),
+        IntField("acked_segments", 0),
     ]
 
 
