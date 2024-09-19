@@ -12,13 +12,11 @@ class TrafficAnalyzer:
 
     This class must be inherited by specialized traffic analyzers
     in order to provide `wanalyze` with extracted and/or computed
-    data. 
+    data.
     """
 
     def __init__(self):
-        self.__triggered = False
-        self.__completed = False
-        self.__marked_packets = []
+        self.reset()
 
     def process_packet(self, packet):
         """Process a packet.
