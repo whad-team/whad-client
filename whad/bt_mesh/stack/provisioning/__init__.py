@@ -25,6 +25,7 @@ from whad.scapy.layers.bt_mesh import (
     BTMesh_Provisioning_Hdr,
 )
 from time import sleep
+from whad.bt_mesh.stack.utils import ProvisioningCompleteData
 from whad.common.stack import Layer, alias, instance, state, LayerState
 from whad.bt_mesh.stack.exceptions import (
     UnknownParameterValueSendError,
@@ -465,6 +466,19 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
         mic = packet.provisioning_data_mic
 
         plaintext, verify = self.state.crypto_manager.decrypt(cipher, mic)
+        net_key = plaintext[:16]
+        key_index = plaintext[16:18]
+        flags = plaintext[18:19]  # ignored for now
+        iv_index = plaintext[23:]
+        unicast_addr = plaintext[23:]
+        prov_data = ProvisioningCompleteData(
+            net_key=net_key,
+            key_index=int.from_bytes(key_index, "little"),
+            flags=flags,
+            iv_index=iv_index,
+            unicast_addr=unicast_addr,
+            provisionning_crypto_manager=self.state.crypto_manager,
+        )
         print("NetworkKey = " + plaintext[:16].hex())
         print("KeyIndex = " + plaintext[16:18].hex())
         print("Flags = " + plaintext[18:19].hex())
@@ -473,3 +487,4 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
 
         # send complete
         self.send_to_gen_prov(BTMesh_Provisioning_Complete())
+        self.send("gen_prov", prov_data)

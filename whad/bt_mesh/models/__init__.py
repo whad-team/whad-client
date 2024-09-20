@@ -58,7 +58,7 @@ class ModelState(object):
         :param value: Value of the sub State
         :type value: Any
         :param field_name: Name of the field witin the State (if there are fields), defaults to "default"
-        :type field_name: str, optional
+        :type field_name: optional
         :param delay: Delay before initiating the set, in ms, defaults to 0
         :type delay: int, optional
         :param transition_time: transition_time to get to the target value, in ms, defaults to 0
@@ -85,7 +85,7 @@ class ModelState(object):
         """
         Returns the full list of values.
         """
-        return self.values.copy()
+        return self.values.values()
 
     def remove_value(self, field_name="default"):
         """

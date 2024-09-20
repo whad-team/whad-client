@@ -98,9 +98,7 @@ class SubscriptionListState(ModelState):
     """
 
     def __init__(self):
-        super().__init__(
-            name="subscription_list", default_value=None
-        )
+        super().__init__(name="subscription_list", default_value=None)
 
         self.values["label_uuids"] = []
         self.values["group_addrs"] = []
@@ -136,7 +134,7 @@ class AppKeyListState(ModelState):
 class ModelToAppKeyListState(ModelState):
     def __init__(self):
         """
-        Each field has a list of AppLayerCryptoManager
+        Each field has a list of app_key_indexes
         Field name is the model_id
         """
         super().__init__(name="model_to_app_key_list", default_value={})
@@ -181,9 +179,7 @@ class GattProxyState(ModelState):
 
 class NodeIdentityState(ModelState):
     def __init__(self):
-        super().__init__(
-            name="node_identity", default_value=0x02
-        )
+        super().__init__(name="node_identity", default_value=0x02)
 
 
 class FriendState(ModelState):
@@ -205,9 +201,7 @@ class FriendState(ModelState):
 
 class KeyRefreshPhaseState(ModelState):
     def __init__(self):
-        super().__init__(
-            name="key_refresh_phase", default_value=0x00
-        )
+        super().__init__(name="key_refresh_phase", default_value=0x00)
 
 
 """

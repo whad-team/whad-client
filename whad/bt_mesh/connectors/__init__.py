@@ -43,6 +43,9 @@ class BTMesh(Sniffer):
         # Queue of received messages, filled in on reception callback
         self.__queue = Queue()
 
+        # The stack used after provisioning (instanced after)
+        self._main_stack = None
+
     def bt_mesh_filter(self, packet, ignore_regular_adv):
         """
         Filter out non Mesh advertising packets

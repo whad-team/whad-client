@@ -1973,7 +1973,9 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Net_Key_Get, opcode=0x8042
 
 class BTMesh_Model_Config_Net_Key_List(Packet):
     name = "Bluetooth Mesh Model Config NetKey List"
-    fields_desc = [XStrField("net_key_indexes", None)] # packed with utils function in stack
+    fields_desc = [
+        XStrField("net_key_indexes", None)
+    ]  # packed with utils function in stack
 
 
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Net_Key_List, opcode=0x8043)
@@ -2039,7 +2041,7 @@ class BTMesh_Model_Config_App_Key_List(Packet):
     fields_desc = [
         ByteField("status", None),
         XLEShortField("net_key_index", None),
-        StrField("app_key_indexes", None), # packed with utils function in Stack
+        StrField("app_key_indexes", None),  # packed with utils function in Stack
     ]
 
 
@@ -2130,7 +2132,7 @@ class BTMesh_Model_Config_SIG_Model_App_List(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         XLEShortField("model_identifier", None),
-        XStrField("app_key_indexes", None), # packed with function in utils in Stack
+        XStrField("app_key_indexes", None),  # packed with function in utils in Stack
     ]
 
 
@@ -2156,7 +2158,7 @@ class BTMesh_Model_Config_Vendor_Model_App_List(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         LEIntField("model_identifier", None),
-        XStrField("app_key_indexes", None), # packed with function in utils in Stack
+        XStrField("app_key_indexes", None),  # packed with function in utils in Stack
     ]
 
 
@@ -4811,7 +4813,9 @@ class EIR_BTMesh_Beacon(EIR_Element):
 
 class EIR_BTMesh_Message(EIR_Element):
     name = "EIR Bluetooth Mesh Message"
-    fields_desc = [PacketField("mesh_message", None, pkt_cls=BTMesh_Network_PDU)]
+    fields_desc = [
+        PacketField("mesh_message", None, pkt_cls=BTMesh_Obfuscated_Network_PDU)
+    ]
 
 
 split_layers(EIR_Hdr, EIR_Raw)

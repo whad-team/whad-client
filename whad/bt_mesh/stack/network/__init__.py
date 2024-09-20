@@ -8,8 +8,10 @@ import logging
 from whad.common.stack import Layer, alias, source
 from whad.scapy.layers.bt_mesh import (
     BTMesh_Network_PDU,
+    BTMesh_Obfuscated_Network_PDU,
     BTMesh_Lower_Transport_Access_Message,
     BTMesh_Lower_Transport_Control_Message,
+    EIR_Hdr,
 )
 from whad.bt_mesh.crypto import NetworkLayerCryptoManager
 from whad.bt_mesh.stack.constants import (
@@ -18,28 +20,34 @@ from whad.bt_mesh.stack.constants import (
     UNASSIGNED_ADDR_TYPE,
 )
 from whad.bt_mesh.stack.utils import get_address_type, MeshMessageContext
+from whad.bt_mesh.stack.lower_transport import LowerTransportLayer
+from whad.bt_mesh.models import GlobalStatesManager
+from scapy.all import raw
 
 logger = logging.getLogger(__name__)
 
 
 @alias("network")
 class NetworkLayer(Layer):
-    def __init__(self, connector, options={}):
+    def configure(self, connector, options={}):
         """
         NetworkLayer. One for all the networks (does the filtering)
 
         :param connector: Connector handling the advertising bearer (or GATT later ?)
         :type connector: Connector
-        :param options: Options passed to the layer. Need at least a primary net_key (the CryptoManager) defaults to {}
+        :param options: Options passed to the layer. defaults to {}
         :type options: [TODO:type], optional
         """
-        super().__init__(options=options)
+        super().configure(options=options)
 
         # save connector (BLE phy stack, advertising Bearer (and GATT I guess ?))
-        self.__connector == connector
+        self.__connector = connector
 
-        # Network Key Crypto managers. one per network. Need at least the one for the primary index (0x0000) in options
-        self.state.net_keys = {0x0000: options["primary_net_key"]}
+        # Network Key Crypto managers. Correspondance between nid and net_key_index
+        self.state.nid_to_net_key_id = {}
+
+        self.state.global_states_manager = GlobalStatesManager()
+        self.update_net_keys()
 
         # Stores concatenation of seq_number and src_addr.
         self.state.cache = []
@@ -47,18 +55,37 @@ class NetworkLayer(Layer):
         # Check if relay feature is enabled on this device (proxy not implemented)
         self.state.is_relay_enabled = False
 
+        # Stores the next seq_number PDU we are waiting for to be sent
+        self.state.next_seq_to_send = 0
+
+        # Dict of packets to be sent. Key is seq_number
+        self.state.send_queue = {}
+
+    def update_net_keys(self):
+        """
+        Update the nid_to_net_key_id. Called when nid received that doesnt match anything
+        """
+        for net_key in self.state.global_states_manager.get_state(
+            "net_key_list"
+        ).get_all_values():
+            if net_key is not None:
+                self.state.nid_to_net_key_id[net_key.nid] = net_key.key_index
+
     def __check_nid(self, net_pdu):
         """
         Checks if any of the network keys has an NID matching with one in the packet
+        If yes, returns it
 
         :param net_pdu: [TODO:description]
         :type net_pdu: [TODO:type]
-        :returns: The network key index of the matching key, None if no match
-        :rtype: int|None
+        :returns: The network key of the matching key, None if no match
+        :rtype: NetworkLayerCryptoManager|None
         """
-        for index, key in self.state.net_keys.items():
-            if key.nid == net_pdu.nid:
-                return index
+        if net_pdu.nid in self.state.nid_to_net_key_id.keys():
+            key_id = self.state.nid_to_net_key_id[net_pdu.nid]
+            return self.state.global_states_manager.get_state("net_key_list").get_value(
+                key_id
+            )
 
         return None
 
@@ -97,9 +124,9 @@ class NetworkLayer(Layer):
         :returns: True if message is in cache, False otherwise
         :rtype: boolean
         """
-        cache_string = (
-            deobf_net_pdu.seq_number.to_bytes(3, "big") + deobf_net_pdu.src_addr
-        )
+        cache_string = deobf_net_pdu.seq_number.to_bytes(
+            3, "big"
+        ) + deobf_net_pdu.src_addr.to_bytes(2, "big")
         if cache_string in self.state.cache:
             return True
 
@@ -125,13 +152,15 @@ class NetworkLayer(Layer):
         :type net_pdu: BTMesh_Obfuscated_Network_PDU
         """
         # check if any network key matches the NID in the packet
-        net_key_index = self.__check_nid(net_pdu)
-        if net_key_index is None:
+        net_pdu.show()
+        net_key = self.__check_nid(net_pdu)
+        if net_key is None:
             return
 
-        net_key: NetworkLayerCryptoManager = self.state.net_keys[net_key_index]
         # Deobfucate the packet and reconstruct it
-        raw_deobf_net_pdu = net_key.deobfuscate_net_pdu(net_pdu)
+        raw_deobf_net_pdu = net_key.deobfuscate_net_pdu(
+            net_pdu, self.state.global_states_manager.iv_index
+        )
 
         network_ctl = (raw_deobf_net_pdu[0]) >> 7
         ttl = raw_deobf_net_pdu[0] & 0x7F
@@ -139,7 +168,7 @@ class NetworkLayer(Layer):
         src_addr = raw_deobf_net_pdu[4:6]
 
         deobf_net_pdu = BTMesh_Network_PDU(
-            ivi=net_key.iv_index[0] & 0b01,
+            ivi=self.state.global_states_manager.iv_index[0] & 0b01,
             nid=net_key.nid,
             network_ctl=network_ctl,
             ttl=ttl,
@@ -155,7 +184,10 @@ class NetworkLayer(Layer):
             return
 
         # decrypt the encrypted Lower Transport PDU
-        plaintext, is_auth_valid = net_key.decrypt(deobf_net_pdu)
+        net_key: NetworkLayerCryptoManager
+        plaintext, is_auth_valid = net_key.decrypt(
+            deobf_net_pdu, self.state.global_states_manager.iv_index
+        )
         if not is_auth_valid:
             logger.warning(
                 "Received Network PDU with wrong authentication value, dropping"
@@ -189,13 +221,64 @@ class NetworkLayer(Layer):
 
         self.send_to_lower_transport(msg_ctx, lower_transport_pdu)
 
-        @source("lower_transport")
-        def on_lower_transport_packet(self, lower_transport_pdu):
-            """
-            Callback for Lower Transport Packet sent by the Lower Transport Layer.
+    @source("lower_transport")
+    def on_lower_transport_packet(self, message):
+        """
+        Callback for Lower Transport Packet sent by the Lower Transport Layer.
 
-            :param self: [TODO:description]
-            :type self: [TODO:type]
-            :param lower_transport_pdu: Lower Transport PDU
-            :type lower_transport_pdu: BTMesh_Lower_Transport_Access_Message|BTMesh_Lower_Transport_Control_Message
-            """
+        :param message: Lower Transport PDU and its context
+        :type message: (BTMesh_Lower_Transport_Access_Message|BTMesh_Lower_Transport_Control_Message, MeshMessageContext)
+        """
+        pkt, ctx = message
+        pkt.show()
+        self.state.send_queue[ctx.seq_number] = message
+        self.check_sending_queue()
+
+    def check_sending_queue(self):
+        """
+        Checks if the next packet that needs to be sent is in the queue
+        """
+        if self.state.next_seq_to_send in self.state.send_queue:
+            pkt, ctx = self.state.send_queue.pop(self.state.next_seq_to_send)
+            ctx: MeshMessageContext
+            # TODO (encryption and all)
+            net_key = self.state.global_states_manager.get_state(
+                "net_key_list"
+            ).get_value(ctx.net_key_id)
+
+            net_pdu = BTMesh_Network_PDU(
+                ivi=self.state.global_states_manager.iv_index & 1,
+                nid=net_key.nid,
+                network_ctl=int(
+                    isinstance(pkt, BTMesh_Lower_Transport_Control_Message)
+                ),
+                ttl=ctx.ttl,
+                seq_number=ctx.seq_number,
+                src_addr=ctx.src_addr,
+            )
+
+            net_key: NetworkLayerCryptoManager
+            # encrypt the message
+            enc = net_key.encrypt(
+                raw(pkt),
+                ctx.dest_addr,
+                net_pdu,
+                self.state.global_states_manager.iv_index,
+            )
+
+            # obfuscate the payload
+            obfu_data = net_key.obfuscate_net_pdu(
+                net_pdu, self.state.global_states_manager.iv_index
+            )
+
+            pkt = BTMesh_Obfuscated_Network_PDU(
+                ivi=net_pdu.ivi,
+                nid=net_pdu.nid,
+                obfuscated_data=obfu_data,
+                enc_dst_enc_transport_pdu_mic=enc,
+            )
+            self.__connector.send_raw(EIR_Hdr(type=0x2A) / pkt)
+            self.state.next_seq_to_send += 1
+
+
+NetworkLayer.add(LowerTransportLayer)

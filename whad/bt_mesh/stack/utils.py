@@ -42,6 +42,37 @@ class MeshMessageContext:
         self.force_segment = False
 
 
+class ProvisioningCompleteData:
+    """
+    Message sent by Provisioning Layer through the provisioning stack in ordrer to send it to the connector with the provisioning data
+    """
+
+    def __init__(self, net_key, key_index, flags, iv_index, unicast_addr, provisionning_crypto_manager):
+        """
+        Init the Data with the received provisioning data
+        Also the provisionning_crypto_manager is sent to comptute the device_key
+
+        :param net_key: The value of the netkey
+        :type net_key: Bytes
+        :param key_index: The net key index
+        :type key_index: int
+        :param flags: Flags (unused for now)
+        :type flags: Any
+        :param iv_index: The iv_index
+        :type iv_index: Bytes
+        :param unicast_addr: Unicast addr of the device
+        :type unicast_addr: Bytes
+        :param provisionning_crypto_manager: The provisionning_crypto_manager used during provisioning
+        :type provisioning: ProvisioningBearerAdvCryptoManagerProvisionee
+        """
+        self.net_key = net_key
+        self.key_index = key_index
+        self.flags = flags
+        self.iv_index = iv_index
+        self.unicast_addr = unicast_addr
+        self.provisionning_crypto_manager = provisionning_crypto_manager
+
+
 def get_address_type(address):
     """
     Utils function returning the type of the address in argument (virtual, group or unicast)
@@ -184,8 +215,8 @@ def calculate_seq_auth(iv_index: bytes, seq: int, seq_zero: int) -> int:
     iv_index_int = int.from_bytes(iv_index, byteorder="big")
 
     # Compute the 14-bit and 13-bit masks
-    seq_mask_14 = (1 << 14) - 1  
-    seq_mask_13 = (1 << 13) - 1 
+    seq_mask_14 = (1 << 14) - 1
+    seq_mask_13 = (1 << 13) - 1
 
     # Compute the sequence adjustment from seq_zero
     seq_diff = ((seq & seq_mask_14) - seq_zero) & seq_mask_13

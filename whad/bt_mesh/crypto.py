@@ -523,7 +523,7 @@ class NetworkLayerCryptoManager:
         :type raw_transport_pdu: Bytes
         :param clear_dst_addr: The plaintext dst_addr to be encrypted
         :type clear_dst_addr: Bytes
-        :param net_pdu Partial Network PDU with information to compute the NetworkNonce and the dest addr
+        :param net_pdu: Partial Network PDU with information to compute the NetworkNonce and the dest addr
         :type net_pdu: BTMesh_Network_PDU
         :param iv_index: The current iv_index
         :type iv_index: Bytes

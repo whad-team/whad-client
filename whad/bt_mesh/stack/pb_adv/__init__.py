@@ -6,6 +6,7 @@ Mostly instanciate a generic provisioning layer. Only once for a provisionee, an
 
 from random import randbytes
 from whad.common.stack import Layer, alias, instance
+from whad.bt_mesh.stack.utils import ProvisioningCompleteData
 from whad.scapy.layers.bt_mesh import EIR_PB_ADV_PDU
 from scapy.layers.bluetooth import EIR_Hdr
 from whad.bt_mesh.stack.gen_prov import (
@@ -82,7 +83,7 @@ class PBAdvBearerLayer(Layer):
         new_gen_prov.get_layer("provisioning").initiate_provisioning()
 
     @instance("gen_prov")
-    def on_gen_prov_received(self, source, message: GenericProvisioningMessage):
+    def on_gen_prov_received(self, source, message):
         """
         Provess a packet sent by a Generic Provisining Layer Instance to be sent to peer
 
@@ -92,10 +93,17 @@ class PBAdvBearerLayer(Layer):
         :type source: [TODO:type]
         :param message: [TODO:description]
         """
+        # if message is ProvisioningCompleteData, we complete the provisonning
+        if isinstance(message, ProvisioningCompleteData):
+            self.__connector.provisionning_complete(message)
+            return
+
         packet = message.gen_prov_pkt
         transaction_number = message.transaction_number
         link_id = self.get_link_id_from_instance_name(source)
         self.__connector.send_raw(
             EIR_Hdr(type=0x29)
-            / EIR_PB_ADV_PDU(link_id=link_id, transaction_number=transaction_number, data=packet)
+            / EIR_PB_ADV_PDU(
+                link_id=link_id, transaction_number=transaction_number, data=packet
+            )
         )

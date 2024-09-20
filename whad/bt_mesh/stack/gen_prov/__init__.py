@@ -20,6 +20,7 @@ from whad.scapy.layers.bt_mesh import (
     BTMesh_Provisioning_Hdr,
 )
 from whad.common.stack import ContextualLayer, alias, source
+from whad.bt_mesh.stack.utils import ProvisioningCompleteData
 from whad.bt_mesh.stack.gen_prov.message import GenericProvisioningMessage
 from whad.bt_mesh.stack.exceptions import (
     InvalidFrameCheckSequenceError,
@@ -189,6 +190,11 @@ class GenericProvisioningLayer(ContextualLayer):
 
     @source("provisioning")
     def on_provisioning_packet(self, packet):
+        # check if is provisioning complete message
+        if isinstance(packet, ProvisioningCompleteData):
+            self.send("pb_adv", packet)
+            return
+
         # Check if link already open or not
         if not self.state.is_link_open:
             self.open_link()
