@@ -26,11 +26,11 @@ logger = logging.getLogger(__name__)
 
 @alias("access")
 class AccessLayer(Layer):
-    def __init__(self, options={}):
+    def configure(self, options={}):
         """
         AccessLayer. One for all the networks.
         """
-        super().__init__(options=options)
+        super().configure(options=options)
 
         # List of elements of the Device. Addr -> element instance
         self.state.elements = {}
@@ -58,6 +58,8 @@ class AccessLayer(Layer):
         :param message: Message Received with its context
         :type message: (Packet,MeshMessageContext)
         """
+        pkt, ctx = message
+        pkt.show()
         self.__queue.put_nowait(message)
         if not self.state.__is_processing_message:
             self.check_queue()

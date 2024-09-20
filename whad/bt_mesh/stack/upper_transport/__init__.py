@@ -16,19 +16,20 @@ from whad.scapy.layers.bt_mesh import (
     BTMesh_Upper_Transport_Access_PDU,
     BTMesh_Model_Message,
 )
+from whad.bt_mesh.stack.access import AccessLayer
 from scapy.all import raw
 
 logger = logging.getLogger(__name__)
 
 
 @alias("upper_transport")
-class UpperTransportlayer(Layer):
-    def __init__(self, options={}):
+class UpperTransportLayer(Layer):
+    def configure(self, options={}):
         """
         UpperTransportlayer. One for all the networks.
         For now we just discard the control messages since we dont support any of the features
         """
-        super().__init__(options=options)
+        super().configure(options=options)
         self.state.global_states_manager = GlobalStatesManager()
 
         self.__handlers = {}
@@ -63,6 +64,7 @@ class UpperTransportlayer(Layer):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         pkt, ctx = message
+        pkt.show()
 
         # encrypt the message with the key
         key = self.state.global_states_manager.get_state("app_key_list").get_value(
@@ -103,6 +105,7 @@ class UpperTransportlayer(Layer):
         :type message: (Packet, MeshMessageContext)
         """
         pkt, ctx = message
+        pkt.show()
 
         # if control message, just show it and bye
         if not isinstance(pkt, BTMesh_Upper_Transport_Access_PDU):
@@ -139,3 +142,6 @@ class UpperTransportlayer(Layer):
 
         pkt = BTMesh_Model_Message(plaintext_message)
         self.send_to_access_layer((pkt, ctx))
+
+
+UpperTransportLayer.add(AccessLayer)

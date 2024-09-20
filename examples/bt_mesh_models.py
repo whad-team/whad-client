@@ -1,11 +1,19 @@
 from whad.bt_mesh.models.states import *
 from whad.bt_mesh.models.configuration import ConfigurationModelServer
 from whad.bt_mesh.models import GlobalStatesManager, Element
+from whad.bt_mesh.stack.network import NetworkLayer
 from whad.bt_mesh.crypto import (
     NetworkLayerCryptoManager,
     UpperTransportLayerAppKeyCryptoManager,
 )
+from whad.bt_mesh.stack.utils import MeshMessageContext
 from whad.scapy.layers.bt_mesh import *
+
+
+class DummyConnector:
+    def send_raw(self, pkt):
+        pkt.show()
+
 
 # Example net_key and app_key
 primary_net_key = NetworkLayerCryptoManager(
@@ -47,6 +55,7 @@ global_states.add_state(conf_app_key_state)
 
 
 conf_model_to_app_key = ModelToAppKeyListState()
+conf_model_to_app_key.set_value(field_name=0, value=[0])
 global_states.add_state(conf_model_to_app_key)
 
 conf_ttl = DefaultTLLState()
@@ -73,12 +82,25 @@ global_states.add_state(conf_hb_pub)
 conf_hb_sub = HeartbeatSubscriptionCompositeState()
 global_states.add_state(conf_hb_sub)
 
+sar_receiver = SARReceiverCompositeState()
+global_states.add_state(sar_receiver)
+
+sar_transmitter = SARTransmitterCompositeState()
+global_states.add_state(sar_transmitter)
 
 primary_element.register_model(conf_model)
+
+
+connector = DummyConnector()
+stack = NetworkLayer(connector)
 
 pkt = BTMesh_Model_Message() / BTMesh_Model_Config_Model_App_Bind(
     element_addr=b"\x00\x01", app_key_index=0, model_identifier=0
 )
-primary_element.handle_message(pkt)
+net_pdu = BTMesh_Obfuscated_Network_PDU(bytes.fromhex("68eca487516765b5e5bfdacbaf6cb7fb6bff871f035444ce83a670df"))
+
+ctx = MeshMessageContext()
+ctx.application_key_id = 0
+primary_element.handle_message((pkt, ctx))
 
 print(global_states.get_state("model_to_app_key_list").get_value(0))
