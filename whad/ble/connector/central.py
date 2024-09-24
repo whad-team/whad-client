@@ -214,6 +214,7 @@ class Central(BLE):
         :param  disconnection_data: Disconnection data
         :type   disconnection_data: :class:`whad.protocol.ble_pb2.Disconnected`
         """
+        logger.debug("[central] Device disconnected, forward to stack")
         self.__stack.on_disconnection(
             disconnection_data.conn_handle,
             disconnection_data.reason
@@ -224,6 +225,7 @@ class Central(BLE):
         self.__target = None
 
         # Notify peripheral device about this disconnection
+        logger.debug("[central] Notify peripheral object that a disconnection occurred")
         if self.__peripheral is not None:
             self.__peripheral.on_disconnect(disconnection_data.conn_handle)
 
