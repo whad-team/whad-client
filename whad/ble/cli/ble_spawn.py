@@ -12,6 +12,7 @@ from whad.device import Bridge
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
 from whad.hub.ble import Connected, Disconnected, BlePduReceived, BleRawPduReceived
 from whad.ble.connector import Peripheral, Central
+from whad.hub.discovery import Capability, Domain
 
 
 import logging
@@ -276,6 +277,17 @@ class BleSpawnApp(CommandLineDevicePipe):
         # Create our peripheral
         logger.info("[ble-spawn] Creating peripheral ...")
         peripheral = Peripheral(self.interface)
+
+        # Query the input device to check if it supports raw BLE packets
+        self.input_interface.discover()
+        capabilities = self.input_interface.get_domain_capability(Domain.BtLE)
+        can_send_raw = not (capabilities & Capability.NoRawData)
+        if can_send_raw and not peripheral.support_raw_pdu():
+            self.warning((
+                "WHAD interface used as fake BLE device does not support raw PDUs, "
+                "while the other end does.\n    Some control PDUs may be lost in"
+                "this packet processing chain and may cause issues !"
+            ))
 
         # Create our packet bridge
         logger.info("[ble-spawn] Starting our input pipe")
