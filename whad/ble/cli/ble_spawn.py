@@ -158,6 +158,12 @@ class BleSpawnInputPipe(Bridge):
             # Central device has connected, update our output connection handle.
             self.set_out_conn_handle(message.conn_handle)
             self.__connected = True
+
+            # Send pending packets, if any
+            for message in self.__output_pending_packets:
+                logger.debug('[ble-spawn][input-pipe] process pending PDU message %s' % message)
+                command = self.convert_packet_message(message, self.__out_conn_handle, False)
+                self.output.send_command(command)
         else:
             logger.debug('[ble-spawn][input-pipe] forward default inbound message %s' % message)
             # Forward other messages
@@ -171,6 +177,10 @@ class BleSpawnInputPipe(Bridge):
                 logger.debug('[ble-spawn][input-pipe] received an outbound PDU message %s' % message)
                 command = self.convert_packet_message(message, self.__out_conn_handle, False)
                 self.output.send_command(command)
+            else:
+                logger.debug("[ble-spawn][input-pipe] not connected but received %s", message)
+                # Save packet as message in pending packets
+                self.__output_pending_packets.append(message)
         elif isinstance(message, Connected):
             # Don't forward this message.
             logger.debug('[ble-spawn][input-pipe] received a connection notification, discard')
