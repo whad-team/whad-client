@@ -404,6 +404,7 @@ class WhadDeviceConnector(object):
         in synchronous mode and will keep them in a waiting queue, but will dispatch
         them all at once when unlocked.
         """
+        logger.debug("[device] Device is now locked (PDUs will be kept in waiting list starting from now)")
         self.__locked = True
 
         # Clear pending PDUs queue
@@ -416,6 +417,8 @@ class WhadDeviceConnector(object):
         :param  dispatch_callback: PDU dispatch callback that overrides the internal dispatch routine
         :type   dispatch_callback: callable
         """
+        logger.debug("[device] Device is now unlocked")
+
         # Mark connector as unlocked
         self.__locked = False
 
@@ -428,15 +431,19 @@ class WhadDeviceConnector(object):
                 if dispatch_callback is None:
                     # If connector is in synchronous mode, move PDUs to our pending queue
                     if self.__synchronous:
+                        # logger.debug("[device] synchronous mode enabled, add PDU to pending packets")
                         self.add_pending_packet(pdu)
                     else:
                         # Else forward PDU to our standard PDU processing method
+                        # logger.debug("[device] synchronous mode disabled, forward packet to connector")
                         self.on_packet(pdu)
                 else:
                     # Call the provided dispatch callback
+                    # logger.debug("[device] forward locked PDU to dispatch callback")
                     dispatch_callback(pdu)
         except Empty:
             # Processing done, continue.
+            logger.debug("[device] locked PDUs queue is empty")
             pass
 
     def is_locked(self) -> bool:
@@ -1663,13 +1670,15 @@ class WhadDevice(object):
 
                     # Forward to our connector
                     if self.__connector.is_locked():
+                        logger.debug("[device] device locked, pdu added to locked PDUs list")
                         # If we are locked, then add packet to our locked packets
                         self.__connector.add_locked_pdu(packet)
                     elif self.__connector.is_synchronous():
                         # If we are in synchronous mode, add packet as pending
                         self.__connector.add_pending_packet(packet)
                     else:
-                        #logger.debug('[WhadDevice] on_domain_msg() for device %s: %s' % (self.interface, message))
+                        # logger.debug('[WhadDevice] on_domain_msg() for device %s: %s' % (self.interface, message))
+                        # logger.debug('[WhadDevice] current connector: %s', str(self.__connector))
                         self.__connector.on_packet(packet)
             elif issubclass(message, AbstractEvent):
                 # Convert message into event
