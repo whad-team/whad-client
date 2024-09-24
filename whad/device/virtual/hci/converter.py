@@ -202,6 +202,7 @@ class HCIConverter:
             processed = False
             conn_handle = event.handle
 
+            logger.debug("[hci] received PDU from remote device, forwarding to host")
             msg = self.__device.hub.ble.create_pdu_received(
                 direction,
                 raw(pdu),
@@ -274,6 +275,7 @@ class HCIConverter:
             self.__device._active_handles.remove(event.handle)
 
             # Send disconnection message to consumer.
+            logger.debug("[hci] sending Disconnect message to host")
             msg = self.__device.hub.ble.create_disconnected(
                 event.reason,
                 event.handle

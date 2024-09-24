@@ -604,7 +604,7 @@ class BLE(WhadDeviceConnector):
 
         :param int conn_handle: Connection handle of the connection to terminate.
         """
-
+        logger.debug("[ble] sending Disconnect message")
         # Create a Disconnect message
         msg = self.hub.ble.create_disconnect(conn_handle)
 
@@ -689,16 +689,21 @@ class BLE(WhadDeviceConnector):
         :param event: WHAD event to process
         :type event: :class:`whad.hub.events.WhadEvent`
         """
+
         # Don't process if connector is not ready
         if not self.__ready:
+            logger.debug("[ble connector] on_event() called, but connector is not ready")
             return
 
         # Dispatch event
         if isinstance(event, ConnectionEvt):
+            logger.debug("[ble connector] on_event() called: connection event")
             self.on_connected(event)
         elif isinstance(event, DisconnectionEvt):
+            logger.debug("[ble connector] on_event() called: disconnection event")
             self.on_disconnected(event)
         elif isinstance(event, SyncEvt):
+            logger.debug("[ble connector] on_event() called: sync event")
             self.on_synchronized(
                 access_address = event.access_address,
                 crc_init = event.crc_init,
@@ -707,9 +712,13 @@ class BLE(WhadDeviceConnector):
                 channel_map = event.channel_map
             )
         elif isinstance(event, DesyncEvt):
+            logger.debug("[ble connector] on_event() called: desync event")
             self.on_desynchronized(access_address=event.access_address)
         elif isinstance(event, TriggeredEvt):
+            logger.debug("[ble connector] on_event() called: triggered event")
             self.on_triggered(event.id)
+        else:
+            logger.error("[ble connector] on_event() called: unknown event !")
 
     def on_packet(self, packet: Packet):
         """Dispatch incoming packet.
