@@ -96,7 +96,7 @@ class BLE(WhadDeviceConnector):
         self.device.open()
         self.device.discover()
 
-        # Check device supports BLE
+        # Check device supports BLE
         if not self.device.has_domain(Domain.BtLE):
             raise UnsupportedDomain("Bluetooth Low Energy")
         else:
@@ -131,16 +131,9 @@ class BLE(WhadDeviceConnector):
         """
         if self.__can_send is None:
             # Retrieve supported commands
-<<<<<<< HEAD
             commands = self.device.get_domain_commands(Domain.BtLE)
-            self.__can_send = (
-                (commands & (1 << Commands.SendPDU))>0 or
-                (commands & (1 << Commands.SendRawPDU))
-=======
-            commands = self.device.get_domain_commands(WhadDomain.BtLE)
             self.__can_send = (commands & (1 << Commands.SendPDU)) > 0 or (
                 commands & (1 << Commands.SendRawPDU)
->>>>>>> fb2fa47 (Test HCI commands)
             )
         return self.__can_send
 
@@ -161,26 +154,16 @@ class BLE(WhadDeviceConnector):
         Determine if the device can establish a connection as central.
         """
         # Retrieve supported commands
-<<<<<<< HEAD
         commands = self.device.get_domain_commands(Domain.BtLE)
-        return (commands & (1 << Commands.ConnectTo))>0
-=======
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (commands & (1 << Commands.ConnectTo)) > 0
->>>>>>> fb2fa47 (Test HCI commands)
 
     def can_jam_advertisement_on_channel(self):
         """
         Determine if the device can jam advertisements on a specific channel.
         """
         # Retrieve supported commands
-<<<<<<< HEAD
         commands = self.device.get_domain_commands(Domain.BtLE)
-        return (commands & (1 << Commands.JamAdvOnChannel))>0
-=======
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
         return (commands & (1 << Commands.JamAdvOnChannel)) > 0
->>>>>>> fb2fa47 (Test HCI commands)
 
     def can_be_central(self):
         """
@@ -530,9 +513,9 @@ class BLE(WhadDeviceConnector):
         """
         Set Bluetooth Low Energy BD address.
         """
-        # Ensure we can spoof BD address
+        # Ensure we can spoof BD address
         commands = self.device.get_domain_commands(Domain.BtLE)
-        if (commands & (1 << Commands.SetBdAddress))>0:
+        if (commands & (1 << Commands.SetBdAddress)) > 0:
             # Create a SetBdAddress message
             msg = self.hub.ble.create_set_bd_address(
                 BDAddress(bd_address, random=(not public))
@@ -572,7 +555,6 @@ class BLE(WhadDeviceConnector):
             adv_data = adv_data.to_bytes()
         if isinstance(scan_data, AdvDataFieldList):
             scan_data = scan_data.to_bytes()
-
 
         # Create a AdvMode message
         msg = self.hub.ble.create_adv_mode(adv_data, scan_rsp=scan_data)
@@ -738,7 +720,9 @@ class BLE(WhadDeviceConnector):
 
         # Don't process if connector is not ready
         if not self.__ready:
-            logger.debug("[ble connector] on_event() called, but connector is not ready")
+            logger.debug(
+                "[ble connector] on_event() called, but connector is not ready"
+            )
             return
 
         # Dispatch event
@@ -774,7 +758,11 @@ class BLE(WhadDeviceConnector):
         """
         logger.debug("[BLE connector] on_packet")
         # discard processed packets or if we're not ready
-        if hasattr(packet, "processed") and packet.metadata.processed or not self.__ready:
+        if (
+            hasattr(packet, "processed")
+            and packet.metadata.processed
+            or not self.__ready
+        ):
             return
 
         if BTLE_ADV in packet:
