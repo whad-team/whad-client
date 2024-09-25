@@ -552,7 +552,7 @@ class LowerTransportLayer(Layer):
                     # create new context for the segment
                     segment_ctx = copy(transaction.ctx)
                     segment_ctx.segment_number = fragment_index
-                    segment_ctx.seq_number = transaction.ctx + fragment_index
+                    segment_ctx.seq_number = transaction.ctx.seq_number + fragment_index
                     if transaction.ctx.application_key_id == -1:
                         application_key_flag = 0
                         application_key_id = 0
@@ -614,9 +614,8 @@ class LowerTransportLayer(Layer):
                     # create new context for the segment
                     segment_ctx = copy(transaction.ctx)
                     segment_ctx.segment_number = fragment_index
-                    segment_ctx.seq_number = (
-                        self.global_states_manager.get_next_seq_number()
-                    )
+
+                    segment_ctx.seq_number = transaction.ctx.seq_number + fragment_index
 
                     self.send_to_network((
                         BTMesh_Lower_Transport_Access_Message(
