@@ -64,18 +64,20 @@ class CompositionDataState(object):
         :type elements: List[Elements]
         """
         # we compute the bytes object of the page to use in the scapy packet directly since it doesnt change
-        self.p0_data = cid + pid + vid + crpl + features
+        self.p0_data = cid + pid + vid + crpl.to_bytes(2, "big") + features
 
         elements_field = b""
         for element in elements:
             self.elements_fields = (
                 elements_field
                 + element.loc.to_bytes(2, "big")
-                + element.model_count.to_bytes(1)
-                + element.vnd_model_count.to_bytes(1)
+                + element.model_count.to_bytes(1, "big")
+                + element.vnd_model_count.to_bytes(1, "big")
             )
-            for model_id in element.models.keys():
-                self.elements_fields = elements_field + model_id
+            for model in element.models:
+                self.elements_fields = elements_field + model.model_id.to_bytes(
+                    2, "big"
+                )
             # no vendor models yet so nothing
 
         self.p0_data = self.p0_data + elements_field
@@ -120,7 +122,7 @@ class CompositionDataState(object):
                         1, "big", signed=True
                     ) + rel.elem_ext.get_index_of_model(rel.mod_ext).to_bytes(1, "big")
 
-                return model_data
+            return model_data
 
     def init_page1(self, elements: list[Element]):
         """
@@ -129,8 +131,6 @@ class CompositionDataState(object):
 
         :param elements: List of elements on the network (in order !!)
         :type elements: List[Elements]
-        :param model_relationships: All the model model_relationships on the network
-        :type model_relationships: List(ModelRelationship)
         """
 
         self.p1_data = b""
@@ -143,12 +143,11 @@ class CompositionDataState(object):
             fmt = 0
 
         for element in elements:
-            element_data = b""
             element_data = element.model_count.to_bytes(
-                1
-            ) + element.vnd_model_count.to_bytes(1)
+                1, "big"
+            ) + element.vnd_model_count.to_bytes(1, "big")
 
-            for model in element.models.values():
+            for model in element.models:
                 element_data += self.__p1_add_model(model, fmt)
 
             self.p1_data += element_data
@@ -209,6 +208,8 @@ class ConfigurationModelServer(ModelServer):
         self.handlers[0x8023] = self.on_network_transmit_get
         self.handlers[0x8024] = self.on_network_transmit_set
 
+        self.composition_data = CompositionDataState()
+
     def on_secure_beacon_get(self, message):
         value = self.global_states_manager.get_state(
             "secure_network_beacon"
@@ -229,10 +230,10 @@ class ConfigurationModelServer(ModelServer):
     # TODO
     def on_composition_data_get(self, message):
         if message.page == 0:
-            p0_data = self.states["composition_data"].get_p0_data()
+            p0_data = self.composition_data.get_p0_data()
             response = BTMesh_Model_Config_Composition_Data_Status(page=0, data=p0_data)
         elif message.page == 1:
-            p1_data = self.states["composition_data"].get_p1_data()
+            p1_data = self.composition_data.get_p1_data()
             response = BTMesh_Model_Config_Composition_Data_Status(page=1, data=p1_data)
         # if composition page not supported, send highest page number supported
         else:

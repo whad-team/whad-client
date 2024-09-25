@@ -27,6 +27,9 @@ class MeshMessageContext:
         # Net key id used
         self.net_key_id = None
 
+        # lower transport value (size of mic)
+        self.azsmic = 0
+
         # If src_addr is Virtual Addr
         self.uuid = None
 
@@ -41,13 +44,25 @@ class MeshMessageContext:
         # Set by model layer, if the message is too small to be segmented but still want acknowlegment on network layer
         self.force_segment = False
 
+    def print(self):
+        for attribute, value in self.__dict__.items():
+            print(attribute, "=", value)
+
 
 class ProvisioningCompleteData:
     """
     Message sent by Provisioning Layer through the provisioning stack in ordrer to send it to the connector with the provisioning data
     """
 
-    def __init__(self, net_key, key_index, flags, iv_index, unicast_addr, provisionning_crypto_manager):
+    def __init__(
+        self,
+        net_key,
+        key_index,
+        flags,
+        iv_index,
+        unicast_addr,
+        provisionning_crypto_manager,
+    ):
         """
         Init the Data with the received provisioning data
         Also the provisionning_crypto_manager is sent to comptute the device_key
@@ -214,6 +229,7 @@ def calculate_seq_auth(iv_index: bytes, seq: int, seq_zero: int) -> int:
     """
     iv_index_int = int.from_bytes(iv_index, byteorder="big")
 
+    """
     # Compute the 14-bit and 13-bit masks
     seq_mask_14 = (1 << 14) - 1
     seq_mask_13 = (1 << 13) - 1
@@ -222,6 +238,16 @@ def calculate_seq_auth(iv_index: bytes, seq: int, seq_zero: int) -> int:
     seq_diff = ((seq & seq_mask_14) - seq_zero) & seq_mask_13
 
     adjusted_seq = seq - seq_diff
+    """
+
+    TRANSPORT_SAR_SEQZERO_MASK = 0x1FFF
+    masked_seqnum = seq & TRANSPORT_SAR_SEQZERO_MASK
+    if masked_seqnum < seq_zero:
+        adjusted_seq = (
+            seq - (masked_seqnum - seq_zero) - (TRANSPORT_SAR_SEQZERO_MASK + 1)
+        )
+    else:
+        adjusted_seq = seq - (masked_seqnum - seq_zero)
 
     seq_auth = (iv_index_int << 24) | adjusted_seq
 

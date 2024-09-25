@@ -92,15 +92,30 @@ primary_element.register_model(conf_model)
 
 
 connector = DummyConnector()
-stack = NetworkLayer(connector)
+stack = NetworkLayer(connector, options={"base_unicast_addr": primary_element.addr})
 
 pkt = BTMesh_Model_Message() / BTMesh_Model_Config_Model_App_Bind(
     element_addr=b"\x00\x01", app_key_index=0, model_identifier=0
 )
-net_pdu = BTMesh_Obfuscated_Network_PDU(bytes.fromhex("68eca487516765b5e5bfdacbaf6cb7fb6bff871f035444ce83a670df"))
+net_pdu = BTMesh_Obfuscated_Network_PDU(
+    bytes.fromhex("68eca487516765b5e5bfdacbaf6cb7fb6bff871f035444ce83a670df")
+)
 
 ctx = MeshMessageContext()
 ctx.application_key_id = 0
 primary_element.handle_message((pkt, ctx))
 
 print(global_states.get_state("model_to_app_key_list").get_value(0))
+
+
+conf_model.composition_data.init_page0(
+    cid=b"\x00\x00",
+    pid=b"\x00\x00",
+    vid=b"\x00\x00",
+    crpl=10,
+    features=b"\x00\x00",
+    elements=[primary_element],
+)
+print(conf_model.composition_data.get_p0_data())
+conf_model.composition_data.init_page1([primary_element])
+print(conf_model.composition_data.get_p1_data())

@@ -35,6 +35,7 @@ from scapy.fields import (
     XNBytesField,
     PacketListField,
     LEFieldLenField,
+    Field,
 )
 
 
@@ -500,6 +501,58 @@ class XLEStrField(XStrField):
     def m2i(self, pkt, x):
         # type: (Optional[Packet], bytes) -> bytes
         return x[::-1]
+
+
+class VariableLengthOpcodeField(Field):
+    """
+    Used for Model opcodes
+    """
+
+    def __init__(self, name, default):
+        Field.__init__(
+            self, name, default, fmt="B"
+        )  # fmt="B" since the first byte is crucial
+
+    def getfield(self, pkt, s):
+        first_byte = s[0]  # Get the first byte to determine the opcode length
+        if first_byte & 0b10000000 == 0b00000000 and first_byte != 0b01111111:
+            # 0xxxxxxx -> 1-byte opcode (excluding 01111111)
+            return s[1:], first_byte
+        elif first_byte & 0b11000000 == 0b10000000:
+            # 10xxxxxx -> 2-byte opcode
+            return s[2:], struct.unpack("!H", s[:2])[0]
+        elif first_byte & 0b11000000 == 0b11000000:
+            # 11xxxxxx -> 3-byte opcode
+            return s[3:], struct.unpack("!I", b"\x00" + s[:3])[
+                0
+            ]  # Unpack 3 bytes as 4 bytes (prepend a 0 byte)
+        else:
+            # Reserved opcode (01111111)
+            raise ValueError("Reserved opcode encountered: 01111111")
+
+    def addfield(self, pkt, s, val):
+        # Now determine the number of bytes needed based on the value's MSB (first byte)
+        first_byte = (
+            (val >> 16) & 0xFF
+            if val > 0xFFFF
+            else (val >> 8) & 0xFF
+            if val > 0xFF
+            else val
+        )
+
+        if first_byte & 0b10000000 == 0b00000000 and first_byte != 0b01111111:
+            # 1-byte opcode (0xxxxxxx)
+            return s + struct.pack("!B", val)
+        elif first_byte & 0b11000000 == 0b10000000:
+            # 2-byte opcode (10xxxxxx xxxxxxxx)
+            return s + struct.pack("!H", val)
+        elif first_byte & 0b11000000 == 0b11000000:
+            # 3-byte opcode (11xxxxxx zzzzzzzz zzzzzzzz)
+            return (
+                s + struct.pack("!I", val)[1:]
+            )  # Only take the last 3 bytes of the 4-byte packed value
+        else:
+            raise ValueError("Reserved opcode (01111111) cannot be used")
 
 
 class UnicastAddr(Packet):
@@ -1388,7 +1441,7 @@ bind_layers(BTMesh_Proxy_Hdr, BTMesh_Provisioning_Hdr, message_type=0x03)
 MODEL LAYER
 ================================
 
-ALL FIELDS IN LITTLE ENDIAN ! 
+ALL FIELDS IN LITTLE ENDIAN ! (except opcode)
 IF FIELD IS RAW DATA (LIKE StrField), ENDIANESS NEED TO BE TAKEN CARE OF IN LOGIC
 """
 
@@ -1407,46 +1460,8 @@ class BTMesh_Model_Message(Packet):
     name = "Bluetooth Mesh Access Message"
     fields_desc = [
         # Size Will be changed in post_build ! size depend on value of first 2 bits
-        XShortField("opcode", None),
+        VariableLengthOpcodeField("opcode", None),
     ]
-
-    def post_build(self, pkt, pay):
-        # The first byte of the packet, we need to determine the size of the opcode based on its first two bits
-        first_byte = pkt[0]
-
-        # Determine the size based on the first two bits
-        if first_byte & 0b10000000 == 0 and first_byte != 0b01111111:
-            sz = 1
-        elif first_byte & 0b11000000 == 0b10000000:
-            sz = 2
-        elif first_byte & 0b11000000 == 0b11000000:
-            sz = 3
-        else:
-            raise ValueError("Invalid opcode format")
-
-        # Modify the opcode field to have the correct size
-        pkt = pkt[:sz] + pay  # Rebuild the packet with the correct size
-
-        return pkt
-
-    def do_dissect(self, s):
-        first_byte = s[0]
-
-        # Determine the size of the opcode based on the first two bits
-        if first_byte & 0b10000000 == 0 and first_byte != 0b01111111:
-            field_type = XByteField  # 0xxxxxxx -> sz = 1
-        elif first_byte & 0b11000000 == 0b10000000:
-            field_type = XShortField  # 10xxxxxx -> sz = 2
-        elif first_byte & 0b11000000 == 0b11000000:
-            field_type = X3BytesField  # 11xxxxxx -> sz = 3
-        else:
-            raise ValueError("Invalid opcode format")
-
-        # Set the correct size for the opcode field
-        self.fields_desc[0] = field_type("opcode", None)
-
-        # Now call super to perform the actual dissection with the correct size
-        return super(BTMesh_Model_Message, self).do_dissect(s)
 
 
 class BTMesh_Model_Generic_OnOff_Set(Packet):
@@ -4238,7 +4253,7 @@ class BTMesh_Upper_Transport_Access_PDU(Packet):
     # 2 fields (cipher and MIC) since too complicated to guess the size of MIC from scapy ...
     name = "Bluetooth Mesh Upper Transport Access Message"
     fields_desc = [
-        StrField("enc_access_message_and_mic", None),
+        XStrField("enc_access_message_and_mic", None),
     ]
 
 
@@ -4495,29 +4510,6 @@ OPCODE_TP_PAYLOAD_CLASS_LOWER_TRANSPORT = {
 }
 
 
-class BTMesh_Lower_Transport_Unsegmented_Control_Message(Packet):
-    name = "Bluetooth Mesh Lower Transport Unsegmented Control Message"
-    fields_desc = [
-        BitField("opcode", None, 7),
-    ]
-
-    # Binding to Upper Transport PDUS depending on opcode (same as bind_layers but les verbose)
-    def guess_payload_class(self, payload):
-        opcode = self.getfieldval("opcode")
-        if opcode == 0x00:
-            return BTMesh_Lower_Transport_Segment_Acknoledgment_Message
-        if opcode not in OPCODE_TP_PAYLOAD_CLASS_LOWER_TRANSPORT:
-            return Packet.guess_payload_class(self, payload)
-        else:
-            return OPCODE_TP_PAYLOAD_CLASS_LOWER_TRANSPORT[opcode]
-
-    # Added to have an empty packet Echo Request payload (otherwise we get nothing after Lower Transport)
-    # Since Echo Request is empty
-    def dissection_done(self, pkt):
-        if self.opcode == 0x0E:
-            self.add_payload(BTMesh_Upper_Transport_Control_Path_Echo_Request())
-
-
 class BTMesh_Lower_Transport_Segment_Acknoledgment_Message(Packet):
     name = "Bluetooth Mesh Lower Transport Segment Acknowledgment Message"
     fields_desc = [
@@ -4528,19 +4520,9 @@ class BTMesh_Lower_Transport_Segment_Acknoledgment_Message(Packet):
     ]
 
 
-class BTMesh_Lower_Transport_Unsegmented_Access_Message(Packet):
-    name = "Bluetooth Mesh Lower Transport Unsegmented Access Message"
-    fields_desc = [
-        BitField("application_key_flag", None, 1),
-        BitField("application_key_id", None, 6),
-    ]
-
-
 class BTMesh_Lower_Transport_Segmented_Access_Message(Packet):
     name = "Bluetooth Mesh Lower Transport Segmented Access Message"
     fields_desc = [
-        BitField("application_key_flag", None, 1),
-        BitField("application_key_id", None, 6),
         BitField("aszmic", None, 1),
         BitField("seq_zero", None, 13),
         BitField("seg_offset", None, 5),
@@ -4551,7 +4533,6 @@ class BTMesh_Lower_Transport_Segmented_Access_Message(Packet):
 class BTMesh_Lower_Transport_Segmented_Control_Message(Packet):
     name = "Bluetooth Mesh Lower Transport Segmented Control Message"
     fields_desc = [
-        BitField("opcode", None, 7),
         BitField("RFU", 0, 1),
         BitField("seq_zero", None, 13),
         BitField("seg_offset", None, 5),
@@ -4563,21 +4544,14 @@ class BTMesh_Lower_Transport_Segmented_Control_Message(Packet):
 class BTMesh_Lower_Transport_Access_Message(Packet):
     name = "Bluetooth Mesh Lower Transport Access Message"
     fields_desc = [
-        BitField("seg", None, 1),
-        MultipleTypeField(
-            [
-                (
-                    PacketField(
-                        "payload",
-                        None,
-                        BTMesh_Lower_Transport_Unsegmented_Access_Message,
-                    ),
-                    lambda pkt: pkt.seg == 0,
-                )
-            ],
+        BitField("seg", 0, 1),
+        BitField("application_key_flag", 0, 1),
+        BitField("application_key_id", 0, 6),
+        ConditionalField(
             PacketField(
-                "payload", None, BTMesh_Lower_Transport_Segmented_Access_Message
+                "payload_field", None, BTMesh_Lower_Transport_Segmented_Access_Message
             ),
+            lambda pkt: pkt.seg == 1,
         ),
     ]
 
@@ -4586,24 +4560,35 @@ class BTMesh_Lower_Transport_Access_Message(Packet):
 class BTMesh_Lower_Transport_Control_Message(Packet):
     name = "Bluetooth Mesh Lower Transport Control Message"
     fields_desc = [
-        BitField("seg", None, 1),
-        MultipleTypeField(
-            [
-                (
-                    PacketField(
-                        "payload",
-                        None,
-                        BTMesh_Lower_Transport_Unsegmented_Control_Message,
-                    ),
-                    lambda pkt: pkt.seg == 0,
-                )
-            ],
+        BitField("seg", 0, 1),
+        BitField("opcode", 0, 7),
+        ConditionalField(
             PacketField(
-                "payload", None, BTMesh_Lower_Transport_Segmented_Control_Message
+                "payload_field",
+                None,
+                pkt_cls=BTMesh_Lower_Transport_Segmented_Control_Message,
             ),
+            lambda pkt: pkt.seg == 1,
         ),
     ]
 
+    # Binding to Upper Transport PDUS depending on opcode (same as bind_layers but les verbose) for Unsegmented
+    def guess_payload_class(self, payload):
+        opcode = self.getfieldval("opcode")
+        seg = self.getfieldval("seg")
+        if opcode == 0x00 and seg == 0:
+            return BTMesh_Lower_Transport_Segment_Acknoledgment_Message
+        if opcode not in OPCODE_TP_PAYLOAD_CLASS_LOWER_TRANSPORT or seg == 1:
+            return Packet.guess_payload_class(self, payload)
+        else:
+            return OPCODE_TP_PAYLOAD_CLASS_LOWER_TRANSPORT[opcode]
+
+    # Added to have an empty packet Echo Request payload (otherwise we get nothing after Lower Transport)
+    # Since Echo Request is empty
+    def dissection_done(self, pkt):
+        if self.opcode == 0x0E and self.seg == 0:
+            self.add_payload(BTMesh_Upper_Transport_Control_Path_Echo_Request())
+
 
 bind_layers(
     BTMesh_Lower_Transport_Access_Message, BTMesh_Upper_Transport_Access_PDU, seg=0
@@ -4613,11 +4598,6 @@ bind_layers(
     BTMesh_Lower_Transport_Access_Message, BTMesh_Upper_Transport_Access_PDU, seg=0
 )
 
-bind_layers(
-    BTMesh_Lower_Transport_Unsegmented_Control_Message,
-    BTMesh_Lower_Transport_Segment_Acknoledgment_Message,
-    opcode=0x00,
-)
 
 """
 NETWORK
@@ -4822,7 +4802,6 @@ split_layers(EIR_Hdr, EIR_Raw)
 bind_layers(EIR_Hdr, EIR_BTMesh_Message, type=0x2A)
 bind_layers(EIR_Hdr, EIR_BTMesh_Beacon, type=0x2B)
 bind_layers(EIR_Hdr, EIR_PB_ADV_PDU, type=0x29)
-bind_layers(BTMesh_Lower_Transport_Unsegmented_Access_Message, BTMesh_Model_Message)
 bind_layers(BTMesh_Proxy_Hdr, BTMesh_Provisioning_Hdr, message_type=0x03)
 
 # need to remove this one, fragments and all ...
