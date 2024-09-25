@@ -530,16 +530,9 @@ class BLE(WhadDeviceConnector):
         """
         Set Bluetooth Low Energy BD address.
         """
-<<<<<<< HEAD
         # Ensure we can spoof BD address
         commands = self.device.get_domain_commands(Domain.BtLE)
         if (commands & (1 << Commands.SetBdAddress))>0:
-
-=======
-        # Ensure we can spoof BD address
-        commands = self.device.get_domain_commands(WhadDomain.BtLE)
-        if (commands & (1 << Commands.SetBdAddress)) > 0:
->>>>>>> fb2fa47 (Test HCI commands)
             # Create a SetBdAddress message
             msg = self.hub.ble.create_set_bd_address(
                 BDAddress(bd_address, random=(not public))
