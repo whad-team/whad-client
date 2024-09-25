@@ -27,7 +27,7 @@ class ModelPublicationPeriodState(ModelState):
         self.values["step_resolution"] = 0x01
 
     def get_publish_period(self):
-        return self.get_state("nb_of_steps") * self.get_state("step_resolution")
+        return self.get_value("nb_of_steps") * self.get_value("step_resolution")
 
 
 class ModelPublicationAppKeyIndexState(ModelState):
@@ -64,7 +64,7 @@ class ModelPublicationRetransmitIntervalStepsState(ModelState):
         )
 
     def get_retransmission_interval(self):
-        return (self.get_state() + 1) * 50
+        return (self.get_value() + 1) * 50
 
 
 # COMPOSITE STATE
@@ -169,10 +169,10 @@ class GattProxyState(ModelState):
         super().__init__(name="gatt_proxy", default_value=0x02)
 
     def commit_to_bound_states(self):
-        if self.get_state() == 0:
+        if self.get_value() == 0:
             try:
-                if self.bound_states["directed_proxy"].get_state() != 0x02:
-                    self.bound_states["directed_proxy"].set_state(0)
+                if self.bound_states["directed_proxy"].get_value() != 0x02:
+                    self.bound_states["directed_proxy"].set_value(0)
             except KeyError:
                 print("MISSING BOUND STATE IN GattProxyState")
 
@@ -191,10 +191,10 @@ class FriendState(ModelState):
         super().__init__(name="friend", default_value=0x02)
 
     def commit_to_bound_states(self):
-        if self.get_state() == 0x00:
+        if self.get_value() == 0x00:
             try:
-                if self.bound_states["directed_friend"].get_state() != 0x02:
-                    self.bound_states["directed_friend"].set_state(0)
+                if self.bound_states["directed_friend"].get_value() != 0x02:
+                    self.bound_states["directed_friend"].set_value(0)
             except KeyError:
                 print("MISSING BOUND STATE IN FriendState")
 
@@ -580,13 +580,13 @@ class DirectedForwardingState(ModelState):
         super().__init__(name="directed_forwarding", default_value=0x00)
 
     def commit_to_bound_states(self):
-        if self.get_state() == 0:
+        if self.get_value() == 0:
             try:
-                self.bound_states["directed_relay"].set_state(0)
-                if self.bound_states["directed_proxy"].get_state() != 0x02:
-                    self.bound_states["directed_proxy"].set_state(0)
-                if self.bound_states["directed_friend"].get_state() != 0x02:
-                    self.bound_states["directed_friend"].set_state(0)
+                self.bound_states["directed_relay"].set_value(0)
+                if self.bound_states["directed_proxy"].get_value() != 0x02:
+                    self.bound_states["directed_proxy"].set_value(0)
+                if self.bound_states["directed_friend"].get_value() != 0x02:
+                    self.bound_states["directed_friend"].set_value(0)
             except KeyError:
                 print("MISSING BOUND STATES IN DIRECTED FORWARDING STATE")
 
@@ -605,9 +605,9 @@ class DirectedProxyState(ModelState):
         super().__init__(name="directed_proxy", default_value=0x00)
 
     def commit_to_bound_states(self):
-        if self.get_state() == 0:
+        if self.get_value() == 0:
             try:
-                self.bound_states["directed_proxy_use_default"].set_state(0x02)
+                self.bound_states["directed_proxy_use_default"].set_value(0x02)
             except KeyError:
                 print("MISSING BOUND STATE IN DirectedProxyState")
 
@@ -847,7 +847,7 @@ class DirectedNetworkTransmitIntervalStepsState(ModelState):
         )
 
     def get_transmission_interval(self):
-        return (self.get_state() + 1) * 10
+        return (self.get_value() + 1) * 10
 
 
 class DirectedNetworkTransmitCompositeState(CompositeModelState):
@@ -882,7 +882,7 @@ class DirectedRelayRetransmitIntervalSteps(ModelState):
         )
 
     def get_transmission_interval(self):
-        return (self.get_state() + 1) * 10
+        return (self.get_value() + 1) * 10
 
 
 class DirectedRelayRetransmitCompositeState(CompositeModelState):
@@ -1037,7 +1037,7 @@ class DirectedControlNetworkTransmitIntervalSteps(ModelState):
         )
 
     def get_transmission_interval(self):
-        return (self.get_state() + 1) * 10
+        return (self.get_value() + 1) * 10
 
 
 class DirectedControlNetworkTransmitCompositeState(CompositeModelState):
@@ -1075,7 +1075,7 @@ class DirectedControlRelayTransmitIntervalSteps(ModelState):
         )
 
     def get_transmission_interval(self):
-        return (self.get_state() + 1) * 10
+        return (self.get_value() + 1) * 10
 
 
 class DirectedControlRelayTransmitCompositeState(CompositeModelState):
@@ -1201,7 +1201,7 @@ class SARSegmentIntervalStepState(ModelState):
         super().__init__(name="sar_segment_interval_step", default_value=0b0101)
 
     def get_segment_retransmission_interval(self):
-        return (self.get_state() + 1) * 10
+        return (self.get_value() + 1) * 10
 
 
 class SARUnicastRetransmissionsCountState(ModelState):
@@ -1224,7 +1224,7 @@ class SARUnicastRetransmissionsIntervalStepState(ModelState):
         )
 
     def get_unicast_retransmission_interval_step(self):
-        return (self.get_state() + 1) * 25
+        return (self.get_value() + 1) * 25
 
 
 class SARUnicastRetransmissionsIntervalIncrementState(ModelState):
@@ -1234,7 +1234,7 @@ class SARUnicastRetransmissionsIntervalIncrementState(ModelState):
         )
 
     def get_unicast_restransmission_interval_increment(self):
-        return (self.get_state() + 1) * 25
+        return (self.get_value() + 1) * 25
 
 
 class SARMulticastRetransmissionsCountState(ModelState):
@@ -1251,7 +1251,7 @@ class SARMulticastRetransmissionsIntervalStepState(ModelState):
         )
 
     def get_multicast_retransmissions_interval(self):
-        return (self.get_state() + 1) * 25
+        return (self.get_value() + 1) * 25
 
 
 class SARTransmitterCompositeState(CompositeModelState):
@@ -1289,7 +1289,7 @@ class SARAcknowledgmentDelayIncrementState(ModelState):
         super().__init__(name="sar_acknowledgment_delay_increment", default_value=0b001)
 
     def get_acknowledgement_increment(self):
-        return self.get_state() + 1.5
+        return self.get_value() + 1.5
 
 
 class SARAcknowledgmentRetransmissionsCountState(ModelState):
@@ -1304,7 +1304,7 @@ class SARDiscardTimeoutState(ModelState):
         super().__init__(name="sar_discard_timeout", default_value=0b0001)
 
     def get_discard_timeout(self):
-        return (self.get_state() + 1) * 5
+        return (self.get_value() + 1) * 5
 
 
 class SARReceiverSegmentIntervalStepState(ModelState):
@@ -1314,7 +1314,7 @@ class SARReceiverSegmentIntervalStepState(ModelState):
         )
 
     def get_segment_reception_interval(self):
-        return (self.get_state() + 1) * 10
+        return (self.get_value() + 1) * 10
 
 
 class SARReceiverCompositeState(CompositeModelState):

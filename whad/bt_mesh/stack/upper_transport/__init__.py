@@ -18,6 +18,7 @@ from whad.scapy.layers.bt_mesh import (
 )
 from whad.bt_mesh.stack.access import AccessLayer
 from scapy.all import raw
+from whad.bt_mesh.crypto import UpperTransportLayerAppKeyCryptoManager
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,6 @@ class UpperTransportLayer(Layer):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         pkt, ctx = message
-        pkt.show()
 
         # encrypt the message with the key
         key = self.state.global_states_manager.get_state("app_key_list").get_value(
@@ -72,7 +72,9 @@ class UpperTransportLayer(Layer):
         )
 
         # set the PDU sequence number
-        ctx.seq_number = self.state.global_states_manager.get_next_seq_number()
+        # max 4 fragments !
+        ctx.seq_number = self.state.global_states_manager.get_next_seq_number(inc=4)
+        print("SENDING ACCESS MSG WITH SEQ_NUMBER " + str(ctx.seq_number))
         if get_address_type(ctx.dest_addr) == VIRTUAL_ADDR_TYPE:
             encrypted_message, ctx.seq_auth = key.encrypt(
                 access_message=raw(pkt),
@@ -95,6 +97,7 @@ class UpperTransportLayer(Layer):
         pkt = BTMesh_Upper_Transport_Access_PDU(encrypted_message)
         self.send_to_lower_transport((pkt, ctx))
 
+    @source("lower_transport")
     def on_lower_transport_message(self, message):
         """
         Process a message sent by the Lower Transport Layer with its context
@@ -118,8 +121,8 @@ class UpperTransportLayer(Layer):
         )
         if get_address_type(ctx.dest_addr) == VIRTUAL_ADDR_TYPE:
             (plaintext_message, is_auth_valid) = key.decrypt(
-                access_message=raw(pkt),
-                aszmic=0,
+                enc_data=raw(pkt),
+                aszmic=ctx,
                 seq_number=ctx.seq_number,
                 src_addr=ctx.src_addr,
                 dst_addr=ctx.dest_addr,
@@ -128,7 +131,7 @@ class UpperTransportLayer(Layer):
             )
         else:
             (plaintext_message, is_auth_valid) = key.decrypt(
-                access_message=raw(pkt),
+                enc_data=raw(pkt),
                 aszmic=0,
                 seq_number=ctx.seq_number,
                 src_addr=ctx.src_addr,
@@ -138,6 +141,9 @@ class UpperTransportLayer(Layer):
 
         if not is_auth_valid:
             logger.warn("WRONG AUTHENTICATION VALUE IN UpperTransportlayer")
+            print(key)
+            print(is_auth_valid)
+            print(plaintext_message)
             return
 
         pkt = BTMesh_Model_Message(plaintext_message)

@@ -21,7 +21,7 @@ if len(sys.argv) != 2:
 interface = sys.argv[1]
 
 beacon_data = BTMesh_Unprovisioned_Device_Beacon(
-    device_uuid="7462d668-bc88-3473-0000-000000000012", uri_hash=1
+    device_uuid="7462d668-bc88-3473-0000-000000000014", uri_hash=1
 )
 
 pkt_beacon = EIR_Hdr(type=0x2B) / EIR_BTMesh_Beacon(

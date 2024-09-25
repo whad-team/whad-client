@@ -193,7 +193,7 @@ class GlobalStatesManager(metaclass=SingletonMeta):
         self.__seq_lock.acquire()
 
     def unlock_seq(self):
-        self._seq_lock.release()
+        self.__seq_lock.release()
 
     def set_primary_element_addr(self, primary_element_addr):
         self.primary_element_addr = primary_element_addr
@@ -262,9 +262,16 @@ class GlobalStatesManager(metaclass=SingletonMeta):
         return [state for key, state in self.states.items() if key[0] == state_name]
 
     @lock
-    def get_next_seq_number(self):
+    def get_next_seq_number(self, inc=1):
+        """
+        Reserves a number of seq num.
+        If inc > 1, used for multiple fragment packet
+
+        :param inc: [TODO:description], defaults to 1
+        :type inc: [TODO:type], optional
+        """
         seq = self.__seq_number
-        self.__seq_number += 1
+        self.__seq_number += inc
         return seq
 
 
@@ -296,9 +303,7 @@ class Model(object):
         model_message.show()
         if model_message.opcode in self.handlers.keys():
             response = self.handlers[model_message.opcode](model_message[1])
-            print("RESPONSE")
             response = BTMesh_Model_Message() / response
-            response.show()
             return response
         return None
 
@@ -378,6 +383,7 @@ class Element(object):
         model_index = len(self.models) - 1
         model_opcodes = model.handlers.keys()
         already_registered_opcodes = self.opcode_to_model_index.keys()
+        self.model_count = len(self.models)
         for opcode in model_opcodes:
             if opcode not in already_registered_opcodes:
                 self.opcode_to_model_index[opcode] = model_index

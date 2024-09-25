@@ -621,8 +621,6 @@ class NetworkLayerCryptoManager:
         :returns: The raw blob of deobfuscated data
         :type: Bytes
         """
-        obf_net_pdu.show()
-        print(obf_net_pdu.obfuscated_data)
         privacy_random = obf_net_pdu.enc_dst_enc_transport_pdu_mic[0:7]
         privacy_plaintext = b"\x00" * 5 + iv_index + privacy_random
         pecb = e(self.privacy_key, privacy_plaintext)
@@ -781,12 +779,12 @@ class UpperTransportLayerAppKeyCryptoManager:
         :param seq_number: [TODO:description]
         :type seq_number: [TODO:type]
         """
-        return iv_index + seq_number
+        return iv_index + seq_number.to_bytes(3, "big")
 
     def __compute_nonce(self, aszmic, seq_auth, src_addr, dst_addr, iv_index):
         return (
             b"\x01"
-            + ((int.from_bytes(aszmic, "big") << 7) & 0x80).to_bytes(1, "big")
+            + ((aszmic << 7) & 0x80).to_bytes(1, "big")
             + seq_auth[-3:]
             + src_addr
             + dst_addr
@@ -822,7 +820,7 @@ class UpperTransportLayerAppKeyCryptoManager:
         :param label_uuid: Label UUID associated with the virtual addr (Mesh Spec Section 3.4.2.3) if dst_addr is virtual addr
         :type label_uuid: Bytes
         :returns: The encrypted message concatenated with mic and the seq_auth value
-        :rtype: (Bytes, Bytes)
+        :rtype: (Bytes, int)
         """
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
         nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
@@ -853,7 +851,7 @@ class UpperTransportLayerAppKeyCryptoManager:
 
         cipher = aes_ccm.encrypt(access_message)
         mic = aes_ccm.digest()
-        return cipher + mic, seq_auth
+        return cipher + mic, int.from_bytes(seq_auth, "big")
 
     def decrypt(
         self,
@@ -961,11 +959,12 @@ class UpperTransportLayerDevKeyCryptoManager:
                 provisioning_crypto_manager.provisioning_salt,
                 b"prdk",
             )
+            print("DEV KEY : " + self.device_key.hex())
 
     def __compute_nonce(self, aszmic, seq_auth, src_addr, dst_addr, iv_index):
         return (
             b"\x02"
-            + ((int.from_bytes(aszmic, "big") << 7) & 0x80).to_bytes(1, "big")
+            + ((aszmic << 7) & 0x80).to_bytes(1, "big")
             + seq_auth[-3:]
             + src_addr
             + dst_addr
@@ -981,7 +980,7 @@ class UpperTransportLayerDevKeyCryptoManager:
         :param seq_number: [TODO:description]
         :type seq_number: [TODO:type]
         """
-        return iv_index + seq_number
+        return iv_index + seq_number.to_bytes(3, "big")
 
     def encrypt(self, access_message, aszmic, seq_number, src_addr, dst_addr, iv_index):
         """
@@ -1021,7 +1020,7 @@ class UpperTransportLayerDevKeyCryptoManager:
 
         cipher = aes_ccm.encrypt(access_message)
         mic = aes_ccm.digest()
-        return cipher + mic, seq_auth
+        return cipher + mic, int.from_bytes(seq_auth, "big")
 
     def decrypt(self, enc_data, aszmic, seq_number, src_addr, dst_addr, iv_index):
         """
@@ -1033,7 +1032,7 @@ class UpperTransportLayerDevKeyCryptoManager:
         :param aszmic: Size of MIC value (0 or 1). For Nonce
         :type aszmic: int
         :param seq_number: segment number Value (of first segment)
-        :type seq_number: Bytes
+        :type seq_number: int
         :param src_addr: Source addr of the packet
         :type src_addr: Bytes
         :param dst_addr: Destination addr of the packet
@@ -1045,6 +1044,15 @@ class UpperTransportLayerDevKeyCryptoManager:
         """
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
         nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
+        print("DECRYPT WITH DEV KEY")
+        print("aszmic : " + str(aszmic))
+        print("seq_number : " + str(seq_number))
+        print(b"src_addr : " + src_addr)
+        print(b"dst_addr : " + dst_addr)
+        print(b"iv_index : " + iv_index)
+        print("enc : " + enc_data.hex())
+
+        print("NONCE : " + nonce.hex())
 
         if aszmic == 1:
             mac_len = 8

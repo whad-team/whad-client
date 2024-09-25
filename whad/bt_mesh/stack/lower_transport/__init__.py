@@ -21,15 +21,14 @@ from whad.scapy.layers.bt_mesh import (
     BTMesh_Lower_Transport_Segmented_Access_Message,
     BTMesh_Lower_Transport_Access_Message,
     BTMesh_Lower_Transport_Segment_Acknoledgment_Message,
-    BTMesh_Lower_Transport_Unsegmented_Access_Message,
-    BTMesh_Lower_Transport_Unsegmented_Control_Message,
     BTMesh_Lower_Transport_Control_Message,
 )
-from scapy.all import raw
+from scapy.all import raw, Raw
 from whad.bt_mesh.models import GlobalStatesManager
 from threading import Thread, Event, Timer
 from time import sleep, time
 from random import uniform
+from copy import copy
 
 
 logger = logging.getLogger(__name__)
@@ -82,7 +81,7 @@ class TxTransaction(Transaction):
         :param message: The PDU we want to send received from the Upper Transport Layer and its context
         :type message: (BTMesh_Upper_Transport_Access_PDU, MeshMessageContext)
         """
-        super().__init__(self, message)
+        super().__init__(message)
 
         self.sending_thread = None
 
@@ -141,11 +140,8 @@ class TxTransaction(Transaction):
             logger.error("WRONG KEY ID USED FOR ACKED SEGEMENT MESSAGE")
             return
 
-        # check if seq auth derived from seq_zero of ack pdu matches the one stored
-        ctx.seq_auth = calculate_seq_auth(
-            self.iv_index, self.ctx.seq_number, pkt.seq_zero
-        )
-        if ctx.seq_auth != self.ctx.seq_auth:
+        # check if seq zero derived ack pdu matches the one stored
+        if pkt.seq_zero != self.ctx.seq_auth & 0x1FFF:
             logger.error("WRONG SEQ AUTH VALUE FOR ACKED SEGMENT MESSAGE")
             return
 
@@ -165,13 +161,14 @@ class TxTransaction(Transaction):
         if acked_segments != self.acked_segments:
             self.acked_received = True
 
+        self.acked_segments = acked_segments
+
         # check is all segments have been acked
         if len(acked_segments) == len(self.fragments):
             self.is_transaction_finished = True
             return
         # if segements left to be sent, reset timer
         else:
-            self.acked_segments = acked_segments
             self.event.set()
 
 
@@ -190,10 +187,7 @@ class RxTransaction(Transaction):
         :param first_message: The message received that initiated the transaction with its context
         :type first_message: (BTMesh_Lower_Transport_Segmented_Access_Message, MeshMessageContext)
         """
-        super().__init__(self, first_message)
-
-        # process the first message
-        pkt, ctx = first_message
+        super().__init__(first_message)
 
         # get the sar states
         sar_state = self.global_states_manager.get_state("sar_receiver")
@@ -202,7 +196,7 @@ class RxTransaction(Transaction):
         ).get_value()
         self.sar_ack_delay_inc = sar_state.get_sub_state(
             "sar_acknowledgment_delay_increment"
-        ).get_acknowledgment_increment()
+        ).get_acknowledgement_increment()
         self.sar_ack_retrans_count = (
             sar_state.get_sub_state(
                 "sar_acknowledgment_retransmissions_count"
@@ -211,15 +205,15 @@ class RxTransaction(Transaction):
         )
         self.sar_discard_timeout = sar_state.get_sub_state(
             "sar_discard_timeout"
-        ).get_discard_tiemout()
+        ).get_discard_timeout()
         self.sar_seg_reception_interval = sar_state.get_sub_state(
             "sar_receiver_segment_interval_step"
         ).get_segment_reception_interval()
 
-        self.min_ack_delay = self.sar_ack_delay_inc * self.sar_seg_reception_interval
+        # total number of fragments expected
+        self.seg_n = self.pkt.last_seg_number
 
-        # used to stop ack sending if necessary (transaction discarded for ex)
-        self.send_ack = True
+        self.min_ack_delay = self.sar_ack_delay_inc * self.sar_seg_reception_interval
 
         # main ack sending thread
         self.main_ack_thread = None
@@ -233,12 +227,9 @@ class RxTransaction(Transaction):
         # epoch time of last ack sent
         self.time_last_ack = None
 
-        # total number of fragmenrs expected
-        self.seg_n = pkt.last_seg_number
-
         # add the fragment to the dictionary
         self.fragments = {}
-        self.fragments[pkt.seg_offset] = bytes(pkt.lastlayer())
+        self.fragments[self.pkt.seg_offset] = self.pkt.getlayer(Raw).load
 
 
 @alias("lower_transport")
@@ -301,11 +292,10 @@ class LowerTransportLayer(Layer):
         """
         pkt, ctx = message
 
-        pkt.show()
         # if ack received
         if (
             isinstance(pkt, BTMesh_Lower_Transport_Control_Message)
-            and pkt.payload.opcode == 0
+            and pkt.payload_field.opcode == 0
         ):
             if ctx.src_addr in self.state.tx_transactions.keys():
                 self.state.tx_transactions[ctx.src_addr].process_ack((pkt[1], ctx))
@@ -313,10 +303,11 @@ class LowerTransportLayer(Layer):
         # if access message (segment or not) received
         elif isinstance(pkt, BTMesh_Lower_Transport_Access_Message):
             # set the application_key_id (-1 if device key)
-            if pkt.payload.application_key_flag == 0:
+            if pkt.application_key_flag == 0:
                 ctx.application_key_id = -1
             else:
-                ctx.application_key_id = pkt.payload.application_key_id
+                ctx.application_key_id = pkt.application_key_id
+
             self.dispatch_access_rx_pdu(message)
 
     def dispatch_access_rx_pdu(self, message):
@@ -325,14 +316,19 @@ class LowerTransportLayer(Layer):
         (for now only access messages)
 
         :param message: PDU and its context
-        :type message: (BTMesh_Upper_Transport_Access_PDU, MeshMessageContext)
+        :type message: (BTMesh_Lower_Transport_Access_Message, MeshMessageContext)
         """
         pkt, ctx = message
 
+        seg = pkt.seg
+
         # if unsegmented message, just transfer it to upper transport layer (calculate the seq_auth first and check)
-        if pkt.payload.seg == 0:
+        if seg == 0:
             iv_index = self.global_states_manager.iv_index
-            ctx.seq_auth = iv_index + ctx.seq_number.to_bytes(3, "big")
+            ctx.seq_auth = int.from_bytes(
+                iv_index + ctx.seq_number.to_bytes(3, "big"), "big"
+            )
+            ctx.seq_number = ctx.seq_auth & 0xFFFFFF
 
             # if seq_auth is lower or equal than the stored one, discard
             if (
@@ -343,12 +339,15 @@ class LowerTransportLayer(Layer):
                 return
 
             self.state.seq_auth_values[ctx.src_addr] = ctx.seq_auth
-            self.send_to_upper_transport(message)
+            self.send_to_upper_transport((pkt[1], ctx))
 
         else:
+            pkt = pkt.getlayer(BTMesh_Lower_Transport_Segmented_Access_Message)
             ctx.seq_auth = calculate_seq_auth(
-                self.global_states_manager.iv_index, ctx.seq_number, pkt[1].seq_zero
+                self.global_states_manager.iv_index, ctx.seq_number, pkt.seq_zero
             )
+            ctx.seq_zero = pkt.seq_zero
+            ctx.azsmic = pkt.aszmic
             if ctx.src_addr in self.state.seq_auth_values.keys():
                 # if segmented packet and lower seq_auth value, disacrd
                 if ctx.seq_auth < self.state.seq_auth_values[ctx.src_addr]:
@@ -363,27 +362,36 @@ class LowerTransportLayer(Layer):
                         self.process_rx_seg_message(
                             self.state.rx_transactions[ctx.src_addr],
                             (
-                                pkt[1],
+                                pkt,
                                 ctx,
                             ),
                         )
+                        return
                     else:
                         logger.warn("RECEIVED SEGMENT FOR UNSEGEMENTED SEQAUTH !")
                         return
 
-                # if received seq_auth higher, start new transaction
-                else:
-                    transaction = RxTransaction((
-                        pkt[1],
-                        ctx,
-                    ))
-                    self.state.rx_transactions[ctx.src_addr] = transaction
-                    transaction.main_ack_thread = Timer(
-                        transaction.initial_ack_delay,
-                        self.sending_ack_thread,
-                        args=(transaction, True, transaction.event),
-                    )
-                    self.state.seq_auth_values[ctx.src_addr] = ctx.seq_auth
+            # if received seq_auth higher/ not stored seq_auth, start new transaction
+            print("NEW TRANSACTION")
+            transaction = RxTransaction((
+                pkt,
+                ctx,
+            ))
+            self.state.rx_transactions[ctx.src_addr] = transaction
+            self.state.seq_auth_values[ctx.src_addr] = ctx.seq_auth
+            """
+            transaction.main_ack_thread = Timer(
+                transaction.initial_ack_delay / 1000,
+                self.sending_ack_thread,
+                args=(transaction, True, transaction.event),
+            )
+            """
+            transaction.main_ack_thread = Timer(
+                0,
+                self.sending_ack_thread,
+                args=(transaction, True, transaction.event),
+            )
+            transaction.main_ack_thread.start()
 
     def process_rx_seg_message(self, transaction, message):
         """
@@ -398,25 +406,64 @@ class LowerTransportLayer(Layer):
         # if transaction finished, resend ack after min delay
         pkt, ctx = message
         if transaction.is_transaction_finished:
-            self.acked_segments = Timer(
-                max(0, self.min_ack_delay - (time() - self.time_last_ack)),
+            if transaction.time_last_ack is not None:
+                delay = (
+                    max(
+                        0,
+                        transaction.min_ack_delay
+                        - (time() - transaction.time_last_ack),
+                    )
+                    / 1000
+                )
+            else:
+                delay = transaction.min_ack_delay / 1000
+            transaction.main_ack_thread = Timer(
+                delay,
                 self.sending_ack_thread,
                 args=(transaction, False, transaction.event),
             )
+            transaction.main_ack_thread.start()
 
         else:
             # check if segment is one we have already received
             if ctx.segment_number not in transaction.fragments.keys():
-                transaction.fragments[ctx.segment_number] = bytes(pkt.lastlayer())
+                transaction.fragments[pkt.seg_offset] = pkt.getlayer(Raw).load
 
-            # if all segments received, send ack
-            if len(transaction.fragments.keys()) == transaction.seg_n:
-                self.acked_segments = Timer(
-                    max(0, self.min_ack_delay - (time() - self.time_last_ack)),
+            # if all segments received, send ack and send to upper_transport
+            if len(transaction.fragments.keys()) == transaction.seg_n + 1:
+                print("RECEIVED ALL")
+                if transaction.time_last_ack is not None:
+                    delay = (
+                        max(
+                            0,
+                            transaction.min_ack_delay
+                            - (time() - transaction.time_last_ack),
+                        )
+                        / 1000
+                    )
+                else:
+                    delay = transaction.min_ack_delay / 1000
+
+                ctx.seq_number = ctx.seq_auth & 0xFFFFFF
+                """
+                transaction.main_ack_thread = Timer(
+                    delay,
                     self.sending_ack_thread,
                     args=(transaction, False, transaction.event),
                 )
+                """
+                transaction.main_ack_thread = Timer(
+                    0,
+                    self.sending_ack_thread,
+                    args=(transaction, False, transaction.event),
+                )
+                transaction.main_ack_thread.start()
                 transaction.is_transaction_finished = True
+                raw_upper_pkt = b""
+                for index, fragment in sorted(transaction.fragments.items()):
+                    raw_upper_pkt += fragment
+                pkt = BTMesh_Upper_Transport_Access_PDU(raw_upper_pkt)
+                self.send_to_upper_transport((pkt, transaction.ctx))
 
     @source("upper_transport")
     def on_upper_transport_layer_message(self, message):
@@ -427,7 +474,6 @@ class LowerTransportLayer(Layer):
         :type message: (Packet, MeshMessageContext)
         """
         pkt, ctx = message
-        pkt.show()
 
         # if one active Tx transaction is already here for the dest_addr, we store the message in in the queue
         if (
@@ -493,26 +539,33 @@ class LowerTransportLayer(Layer):
             transaction.unicast_retrans_count -= 1
             for fragment_index in range(len(transaction.fragments)):
                 if fragment_index not in transaction.acked_segments:
-                    payload = BTMesh_Lower_Transport_Segmented_Access_Message(
-                        application_key_flag=int(
-                            transaction.ctx.application_key_id == -1
-                        ),
-                        application_key_id=transaction.ctx.application_key_id,
-                        aszmic=0,
-                        seq_zero=transaction.ctx.seq_auth[-3:],
-                        seg_offset=fragment_index,
-                        last_seg_number=len(transaction.fragments),
+                    payload = (
+                        BTMesh_Lower_Transport_Segmented_Access_Message(
+                            aszmic=0,
+                            seq_zero=transaction.ctx.seq_auth & 0x1FFF,
+                            seg_offset=fragment_index,
+                            last_seg_number=len(transaction.fragments),
+                        )
+                        / transaction.fragments[fragment_index]
                     )
 
                     # create new context for the segment
-                    segment_ctx = transaction.ctx.copy()
+                    segment_ctx = copy(transaction.ctx)
                     segment_ctx.segment_number = fragment_index
-                    segment_ctx.seq_number = (
-                        self.global_states_manager.get_next_seq_number()
-                    )
-
+                    segment_ctx.seq_number = transaction.ctx + fragment_index
+                    if transaction.ctx.application_key_id == -1:
+                        application_key_flag = 0
+                        application_key_id = 0
+                    else:
+                        application_key_flag = 1
+                        application_key_id = transaction.ctx.application_key_id
                     self.send_to_network((
-                        BTMesh_Lower_Transport_Access_Message(seg=1, payload=payload),
+                        BTMesh_Lower_Transport_Access_Message(
+                            seg=1,
+                            application_key_flag=application_key_flag,
+                            application_key_id=application_key_id,
+                            payload_field=payload,
+                        ),
                         segment_ctx,
                     ))
                     sleep(transaction.interval_step / 1000)
@@ -541,26 +594,37 @@ class LowerTransportLayer(Layer):
             transaction.multicast_retrans_count -= 1
             for fragment_index in range(len(transaction.fragments)):
                 if fragment_index not in transaction.acked_segments:
-                    payload = BTMesh_Lower_Transport_Segmented_Access_Message(
-                        application_key_flag=int(
-                            transaction.ctx.application_key_id == -1
-                        ),
-                        application_key_id=transaction.ctx.application_key_id,
-                        aszmic=0,
-                        seq_zero=transaction.ctx.seq_auth[-3:],
-                        seg_offset=fragment_index,
-                        last_seg_number=len(transaction.fragments),
+                    if transaction.ctx.application_key_id == -1:
+                        application_key_flag = 0
+                        application_key_id = 0
+                    else:
+                        application_key_flag = 1
+                        application_key_id = transaction.ctx.application_key_id
+
+                    payload = (
+                        BTMesh_Lower_Transport_Segmented_Access_Message(
+                            aszmic=0,
+                            seq_zero=transaction.ctx.seq_zero,
+                            seg_offset=fragment_index,
+                            last_seg_number=len(transaction.fragments),
+                        )
+                        / transaction.fragments[fragment_index]
                     )
 
                     # create new context for the segment
-                    segment_ctx = transaction.ctx.copy()
+                    segment_ctx = copy(transaction.ctx)
                     segment_ctx.segment_number = fragment_index
                     segment_ctx.seq_number = (
                         self.global_states_manager.get_next_seq_number()
                     )
 
                     self.send_to_network((
-                        BTMesh_Lower_Transport_Access_Message(seg=1, payload=payload),
+                        BTMesh_Lower_Transport_Access_Message(
+                            seg=1,
+                            application_key_id=application_key_id,
+                            application_key_flag=application_key_flag,
+                            payload_field=payload,
+                        ),
                         segment_ctx,
                     ))
                     sleep(transaction.interval_step / 1000)
@@ -576,15 +640,20 @@ class LowerTransportLayer(Layer):
         :param event: Event object to received signal from main thread
         :type: Event
         """
-        payload = (
-            BTMesh_Lower_Transport_Unsegmented_Access_Message(
-                application_key_flag=int(transaction.ctx.application_key_id == -1),
-                application_key_id=transaction.ctx.application_key_id,
-            )
-            / transaction.pkt
-        )
+        if transaction.ctx.application_key_id == -1:
+            application_key_flag = 0
+            application_key_id = 0
+        else:
+            application_key_flag = 1
+            application_key_id = transaction.ctx.application_key_id
+
         self.send_to_network((
-            BTMesh_Lower_Transport_Access_Message(seg=1, payload=payload),
+            BTMesh_Lower_Transport_Access_Message(
+                seg=0,
+                application_key_flag=application_key_flag,
+                application_key_id=application_key_id,
+            )
+            / transaction.pkt,
             transaction.ctx,
         ))
         transaction.is_transaction_finished = True
@@ -602,18 +671,21 @@ class LowerTransportLayer(Layer):
         :type event: Event
         """
         is_sending = True
-        while is_sending and transaction.send_ack:
+        while is_sending:
             pkt = BTMesh_Lower_Transport_Segment_Acknoledgment_Message(
                 obo=0,
-                seq_zero=transaction.ctx.seq_auth & 0xFFFFFF,
-                acked_segments=sum(1 << num for num in transaction.acked_segments),
+                seq_zero=transaction.ctx.seq_zero,
+                acked_segments=sum(1 << num for num in transaction.fragments.keys()),
             )
-            pkt = BTMesh_Lower_Transport_Unsegmented_Control_Message(opcode=0) / pkt
-            pkt = BTMesh_Lower_Transport_Control_Message(seg=0, payload=pkt)
-            ctx = transaction.ctx.copy()
+            pkt = BTMesh_Lower_Transport_Control_Message(seg=0, opcode=0) / pkt
+            ctx = copy(transaction.ctx)
+            ctx.src_addr = transaction.ctx.dest_addr
+            ctx.dest_addr = transaction.ctx.src_addr
 
             # the sequence number of the ack is
             ctx.seq_number = self.global_states_manager.get_next_seq_number()
+            print("SENDING ACK WITH SEQ_NUMBER = " + str(ctx.seq_number))
+            pkt.show()
             self.send_to_network((pkt, ctx))
             transaction.time_last_ack = time()
 

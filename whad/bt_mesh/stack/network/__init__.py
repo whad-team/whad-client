@@ -23,22 +23,23 @@ from whad.bt_mesh.stack.utils import get_address_type, MeshMessageContext
 from whad.bt_mesh.stack.lower_transport import LowerTransportLayer
 from whad.bt_mesh.models import GlobalStatesManager
 from scapy.all import raw
+from time import sleep
 
 logger = logging.getLogger(__name__)
 
 
 @alias("network")
 class NetworkLayer(Layer):
-    def configure(self, connector, options={}):
+    def __init__(self, connector, options={}):
         """
         NetworkLayer. One for all the networks (does the filtering)
 
         :param connector: Connector handling the advertising bearer (or GATT later ?)
         :type connector: Connector
-        :param options: Options passed to the layer. defaults to {}
+        :param options: Options passed to the layer. defaults to {}. NEED THE "base_unicast_addr" set to primary element addr
         :type options: [TODO:type], optional
         """
-        super().configure(options=options)
+        super().__init__(options=options)
 
         # save connector (BLE phy stack, advertising Bearer (and GATT I guess ?))
         self.__connector = connector
@@ -60,6 +61,8 @@ class NetworkLayer(Layer):
 
         # Dict of packets to be sent. Key is seq_number
         self.state.send_queue = {}
+
+        self.base_unicast_addr = int.from_bytes(options["base_unicast_addr"], "big")
 
     def update_net_keys(self):
         """
@@ -93,6 +96,7 @@ class NetworkLayer(Layer):
         """
         Verifies the src_addr and dst_addr under the critierias defined in
         Mesh Spec Section 3.4.3. Does not check against Access layer key type criterias here.
+        Checks also is a unicast addr is within the range of this device
 
         :param src_addr: The source address in the network PDU
         :type src_addr: Bytes
@@ -111,6 +115,14 @@ class NetworkLayer(Layer):
         if dst_type == UNASSIGNED_ADDR_TYPE:
             return False
         if network_ctl == 1 and dst_type == VIRTUAL_ADDR_TYPE:
+            return False
+
+        int_dst_addr = int.from_bytes(dst_addr, "big")
+        if dst_type == UNICAST_ADDR_TYPE and (
+            int_dst_addr > self.base_unicast_addr + 254
+            or int_dst_addr < self.base_unicast_addr
+        ):
+            print("NOT FOR ME DEST ADDR")
             return False
 
         return True
@@ -142,7 +154,7 @@ class NetworkLayer(Layer):
         :param lower_transport_pdu: [TODO:description]
         :type lower_transport_pdu: [TODO:type]
         """
-        self.send("lower_transport", (msg_ctx, lower_transport_pdu))
+        self.send("lower_transport", (lower_transport_pdu, msg_ctx))
 
     def on_net_pdu_received(self, net_pdu):
         """
@@ -152,7 +164,6 @@ class NetworkLayer(Layer):
         :type net_pdu: BTMesh_Obfuscated_Network_PDU
         """
         # check if any network key matches the NID in the packet
-        net_pdu.show()
         net_key = self.__check_nid(net_pdu)
         if net_key is None:
             return
@@ -184,7 +195,6 @@ class NetworkLayer(Layer):
             return
 
         # decrypt the encrypted Lower Transport PDU
-        net_key: NetworkLayerCryptoManager
         plaintext, is_auth_valid = net_key.decrypt(
             deobf_net_pdu, self.state.global_states_manager.iv_index
         )
@@ -196,10 +206,10 @@ class NetworkLayer(Layer):
 
         # check address validity. Mesh Spec Section 3.4.3
         dst_addr = plaintext[:2]
-        are_addr_valid = self.__check_address_validity(src_addr, dst_addr)
+        are_addr_valid = self.__check_address_validity(src_addr, dst_addr, network_ctl)
         if not are_addr_valid:
             logger.warning(
-                "Received Network PDU with non compliant addr types, dropping"
+                "Received Network PDU with non compliant addr types or UNICAST addr not ours, dropping"
             )
             return
 
@@ -217,7 +227,9 @@ class NetworkLayer(Layer):
         msg_ctx = MeshMessageContext()
         msg_ctx.src_addr = src_addr
         msg_ctx.dest_addr = dst_addr
-        msg_ctx.seq_number = seq_number
+        msg_ctx.seq_number = int.from_bytes(seq_number, "big")
+        msg_ctx.net_key_id = net_key.key_index
+        msg_ctx.ttl = ttl
 
         self.send_to_lower_transport(msg_ctx, lower_transport_pdu)
 
@@ -230,7 +242,6 @@ class NetworkLayer(Layer):
         :type message: (BTMesh_Lower_Transport_Access_Message|BTMesh_Lower_Transport_Control_Message, MeshMessageContext)
         """
         pkt, ctx = message
-        pkt.show()
         self.state.send_queue[ctx.seq_number] = message
         self.check_sending_queue()
 
@@ -238,33 +249,34 @@ class NetworkLayer(Layer):
         """
         Checks if the next packet that needs to be sent is in the queue
         """
-        if self.state.next_seq_to_send in self.state.send_queue:
-            pkt, ctx = self.state.send_queue.pop(self.state.next_seq_to_send)
-            ctx: MeshMessageContext
-            # TODO (encryption and all)
+        smallest_seq_num = sorted(self.state.send_queue.keys())[0]
+        if self.state.next_seq_to_send >= smallest_seq_num:
+            pkt, ctx = self.state.send_queue.pop(smallest_seq_num)
             net_key = self.state.global_states_manager.get_state(
                 "net_key_list"
             ).get_value(ctx.net_key_id)
 
             net_pdu = BTMesh_Network_PDU(
-                ivi=self.state.global_states_manager.iv_index & 1,
+                ivi=self.state.global_states_manager.iv_index[0] & 1,
                 nid=net_key.nid,
                 network_ctl=int(
                     isinstance(pkt, BTMesh_Lower_Transport_Control_Message)
                 ),
                 ttl=ctx.ttl,
                 seq_number=ctx.seq_number,
-                src_addr=ctx.src_addr,
+                src_addr=int.from_bytes(ctx.src_addr, "big"),
             )
 
-            net_key: NetworkLayerCryptoManager
             # encrypt the message
+            net_key: NetworkLayerCryptoManager
             enc = net_key.encrypt(
                 raw(pkt),
                 ctx.dest_addr,
                 net_pdu,
                 self.state.global_states_manager.iv_index,
             )
+
+            net_pdu.enc_dst_enc_transport_pdu_mic = enc
 
             # obfuscate the payload
             obfu_data = net_key.obfuscate_net_pdu(
@@ -277,8 +289,19 @@ class NetworkLayer(Layer):
                 obfuscated_data=obfu_data,
                 enc_dst_enc_transport_pdu_mic=enc,
             )
+            print(
+                "SENDING NETWORK PACKET WITH SEQ_NUMBER : "
+                + str(ctx.seq_number)
+                + " AND SEQ_AUTH : "
+                + str(ctx.seq_auth)
+            )
+            net_pdu.show()
             self.__connector.send_raw(EIR_Hdr(type=0x2A) / pkt)
-            self.state.next_seq_to_send += 1
+            sleep(0.001)
+            self.__connector.send_raw(EIR_Hdr(type=0x2A) / pkt)
+
+            if smallest_seq_num == self.state.next_seq_to_send:
+                self.state.next_seq_to_send += 1
 
 
 NetworkLayer.add(LowerTransportLayer)

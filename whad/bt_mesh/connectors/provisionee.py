@@ -48,7 +48,6 @@ class Provisionee(BTMesh):
             if packet.haslayer(EIR_PB_ADV_PDU):
                 self._stack.on_provisioning_pdu(packet.getlayer(EIR_PB_ADV_PDU))
         elif packet.haslayer(BTMesh_Obfuscated_Network_PDU):
-            print("YEEEESSSSSSSS")
             self._main_stack.on_net_pdu_received(
                 packet.getlayer(BTMesh_Obfuscated_Network_PDU)
             )
@@ -135,6 +134,18 @@ class Provisionee(BTMesh):
         global_states.add_state(sar_transmitter)
 
         primary_element.register_model(conf_model)
+        conf_model.composition_data.init_page0(
+            cid=b"\x00\x00",
+            pid=b"\x00\x00",
+            vid=b"\x00\x00",
+            crpl=10,
+            features=b"\x00\x00",
+            elements=[primary_element],
+        )
+        conf_model.composition_data.init_page1([primary_element])
 
-        self._main_stack = NetworkLayer()
+        self._main_stack = NetworkLayer(
+            connector=self, options={"base_unicast_addr": primary_element.addr}
+        )
+        self._main_stack.get_layer("access").register_element(primary_element)
         self.is_provisioned = True

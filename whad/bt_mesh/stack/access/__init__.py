@@ -50,16 +50,23 @@ class AccessLayer(Layer):
         if not self.__queue.empty():
             self.process_access_message(self.__queue.get_nowait())
 
+    def register_element(self, element):
+        """
+        Adds an element to the device
+
+        :param element: Element to add
+        :type element: Element
+        """
+        self.state.elements[element.addr] = element
+
     @source("upper_transport")
     def on_access_message(self, message):
         """
-        Handler when Access Message is received
+        Handler when Access Message is received from network
 
         :param message: Message Received with its context
         :type message: (Packet,MeshMessageContext)
         """
-        pkt, ctx = message
-        pkt.show()
         self.__queue.put_nowait(message)
         if not self.state.__is_processing_message:
             self.check_queue()
@@ -81,10 +88,11 @@ class AccessLayer(Layer):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         packet, ctx = message
-        dst_addr = ctx.dst_addr
+        dst_addr = ctx.dest_addr
         element = []
 
         dst_addr_type = get_address_type(dst_addr)
+        print(self.state.elements)
 
         # if dst addr is unicast, only need to use the relevent element
         if dst_addr_type == UNICAST_ADDR_TYPE:
@@ -114,4 +122,4 @@ class AccessLayer(Layer):
                     new_ctx.ttl = self.state.global_states_manager.get_state(
                         "default_ttl"
                     ).get_value()
-                self.send_to_upper_transport((response, ctx))
+                self.send_to_upper_transport((response, new_ctx))
