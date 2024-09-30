@@ -292,6 +292,9 @@ class Model(object):
 
         self.supports_subscribe = False
 
+        # instance of singleton of GlobalStatesManager
+        self.global_states_manager = GlobalStatesManager()
+
     def handle_message(self, model_message):
         """
         Handles the received message based on the model handlers
@@ -303,7 +306,8 @@ class Model(object):
         model_message.show()
         if model_message.opcode in self.handlers.keys():
             response = self.handlers[model_message.opcode](model_message[1])
-            response = BTMesh_Model_Message() / response
+            if response is not None:
+                response = BTMesh_Model_Message() / response
             return response
         return None
 
@@ -322,15 +326,37 @@ class ModelServer(Model):
         # List of ModelRelationships object where this model is the base model (or any model if corresponding rel)
         self.relationships = []
 
-        # instance of singleton of GlobalStatesManager
-        self.global_states_manager = GlobalStatesManager()
-
     def add_relationship(self, model_relationship):
         self.relationships.append(model_relationship)
 
 
 class ModelClient(Model):
-    pass
+    def __init__(self, model_id, element_addr):
+        super().__init__(model_id, element_addr)
+
+    def handle_user_input(self, key_pressed=""):
+        """
+        Handle a user key press to use the Client Model to send a message
+        (WIP, hardcoded behaviour for tests)
+
+        For now, one key press = one model CLient does one particular thing
+
+        :param key_pressed: The key pressed (if useful ?)
+        :type key_pressed: str
+        """
+        print("KEY PRESS FOR MODELCLIENT")
+        pkt, ctx = self.registered_function_on_keypress(key_pressed)
+        return pkt, ctx
+
+    def registered_function_on_keypress(self, key_pressed):
+        """
+        Function to be overwritten if we send a message on user keypress
+
+        :param key_pressed: [TODO:description]
+        :type key_pressed: [TODO:type]
+        """
+        print("NO HANDLER FOR MODELCLIENT ON KEYPRESS")
+        return None
 
 
 class Element(object):
@@ -368,14 +394,18 @@ class Element(object):
         # Dictionary of opcode to model index (in self.models) that refers to the model that handle this message.
         self.opcode_to_model_index = {}
 
+        # index of model registred to send a message on key press
+        self.keypress_model = None
+
         self.global_states_manager = GlobalStatesManager()
 
-    def register_model(self, model):
+    def register_model(self, model, is_keypress_model=False):
         """
         Adds a model to this element. Associate the opcodes allowed in Rx to this model instance.
 
         :param model: The Model object to add
         :type model: Model
+        :param is_keypress_model: True if the model is the one registered to send messages on key_press
         """
 
         self.models.append(model)
@@ -387,6 +417,9 @@ class Element(object):
         for opcode in model_opcodes:
             if opcode not in already_registered_opcodes:
                 self.opcode_to_model_index[opcode] = model_index
+
+        if is_keypress_model:
+            self.keypress_model = model_index
 
     def get_index_of_model(self, model):
         """
@@ -411,21 +444,26 @@ class Element(object):
         """
         pkt, ctx = message
         opcode = pkt.opcode
-        try:
-            model = self.models[self.opcode_to_model_index[opcode]]
-
-            # check if app_key used is bound to the model
-            app_key_indexes = self.global_states_manager.get_state(
-                "model_to_app_key_list"
-            ).get_value(model.model_id)
-
-            # if dev_key used, index is -1 ! (dont forget to add it when creating the model ...)
-            if ctx.application_key_id not in app_key_indexes:
-                raise Exception
-            return model.handle_message(pkt)
-        except Exception:
-            print("ouch, too lazy to code the error handling")
+        if opcode not in self.opcode_to_model_index:
+            print(
+                "NO MODEL IN ELEMENT "
+                + self.addr.hex()
+                + " CAN HANDLE OPCODE "
+                + str(opcode)
+            )
             return None
+
+        model = self.models[self.opcode_to_model_index[opcode]]
+
+        # check if app_key used is bound to the model
+        app_key_indexes = self.global_states_manager.get_state(
+            "model_to_app_key_list"
+        ).get_value(model.model_id)
+
+        # if dev_key used, index is -1 ! (dont forget to add it when creating the model ...)
+        if ctx.application_key_index not in app_key_indexes:
+            raise Exception
+        return model.handle_message(pkt)
 
     def check_group_subscription(self, addr):
         """
@@ -465,6 +503,30 @@ class Element(object):
                     res = True
                     break
         return res
+
+    def handle_user_input(self, key_pressed=""):
+        """
+        Process a keypressed message from the user to send a message from a ModelClient
+
+        :param key_pressed: [TODO:description]
+        :type key_pressed: [TODO:type]
+        """
+        if self.keypress_model is None:
+            return
+        model = self.models[self.keypress_model]
+        pkt, ctx = model.handle_user_input(key_pressed)
+        app_key_index = self.global_states_manager.get_state(
+            "model_to_app_key_list"
+        ).get_value(model.model_id)[0]
+        ctx.application_key_index = app_key_index
+        aid = (
+            self.global_states_manager.get_state("app_key_list")
+            .get_value(app_key_index)
+            .aid
+        )
+        ctx.aid = aid
+        ctx.net_key_id = 0
+        return BTMesh_Model_Message() / pkt, ctx
 
 
 class ModelRelationship(object):

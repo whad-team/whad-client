@@ -760,7 +760,7 @@ class UpperTransportLayerAppKeyCryptoManager:
         self.key_index = key_index
 
     def __compute_aid(self):
-        return k4(self.app_key)
+        return int.from_bytes(k4(self.app_key), "big")
 
     """
     Need to have an encrypting/decrypting function for each combination of :
@@ -822,6 +822,7 @@ class UpperTransportLayerAppKeyCryptoManager:
         :returns: The encrypted message concatenated with mic and the seq_auth value
         :rtype: (Bytes, int)
         """
+        print("CIPHER WITH APP KEY !")
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
         nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
 
@@ -882,7 +883,7 @@ class UpperTransportLayerAppKeyCryptoManager:
         :param label_uuid: List of Label UUID that match with the virtual addr (Mesh Spec Section 3.4.2.3) if dst_addr is virtual addr.
         :type label_uuid: list(Bytes)
         :returns: The plaintext, wether authentication was valid and in case of virtual addr, the matching lable UUID that worked for the authentication
-        :rtype: (Byte|None, boolean, Bytes|None)
+        :rtype: (Byte|None, (boolean Bytes|None)) or (Byte|None, boolean)
         """
 
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
@@ -897,23 +898,65 @@ class UpperTransportLayerAppKeyCryptoManager:
         cipher = enc_data[:-mac_len]
 
         # check if dst_addr is not virtual, simple decipher
-        if (dst_addr[0] >> 6) & 0b11 != 0b10:
-            aes_ccm = AES.new(
-                self.app_key,
-                AES.MODE_CCM,
-                nonce=nonce,
-                mac_len=mac_len,
-            )
-            plaintext = aes_ccm.decrypt(cipher)
-            try:
-                aes_ccm.verify(mic)
-                return (plaintext, True, None)
-            except ValueError:
-                return (plaintext, False, None)
+        aes_ccm = AES.new(
+            self.app_key,
+            AES.MODE_CCM,
+            nonce=nonce,
+            mac_len=mac_len,
+        )
+        plaintext = aes_ccm.decrypt(cipher)
+        try:
+            aes_ccm.verify(mic)
+            return (plaintext, True)
+        except ValueError:
+            return (plaintext, False)
+
+    def decrypt_virtual(
+        self,
+        enc_data,
+        aszmic,
+        seq_number,
+        src_addr,
+        dst_addr,
+        iv_index,
+        label_uuids,
+    ):
+        """
+        Encrypts the access_message with this application key if dest address is virtual
+        Mesh Spec Section 3.9.7.1 p. 205
+
+        :param enc_data: Raw encrypted access message and mic
+        :type enc_data: Bytes
+        :param aszmic: Size of MIC value (0 or 1). For Nonce
+        :type aszmic: int
+        :param seq_number: segment number Value (of first segment)
+        :type seq_number: Bytes
+        :param src_addr: Source addr of the packet
+        :type src_addr: Bytes
+        :param dst_addr: Destination addr of the packet
+        :type dst_addr: Bytes
+        :param iv_index: Current IV index
+        :type iv_index: Bytes
+        :param label_uuids: List of Label UUID that match with the virtual addr (Mesh Spec Section 3.4.2.3) if dst_addr is virtual addr.
+        :type label_uuids: list(Bytes)
+        :returns: The plaintext, wether authentication was valid and in case of virtual addr, the matching lable UUID that worked for the authentication
+        :rtype: (Byte|None, boolean, Bytes|None)
+        """
+
+        seq_auth = self.__compute_seq_auth(iv_index, seq_number)
+        nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
+
+        if aszmic == 1:
+            mac_len = 8
+        else:
+            mac_len = 4
+
+        mic = enc_data[-mac_len:]
+        cipher = enc_data[:-mac_len]
 
         # if dst_addr is virtual, need to check for all valid label UUID
         # check for each label UUID if it works for the authentication
-        for label in label_uuid:
+        for label in label_uuids:
             aes_ccm = AES.new(
                 self.app_key,
                 AES.MODE_CCM,

@@ -619,23 +619,35 @@ def upper_layer_app_key_setup_crypto_manager(request):
 class TestUpperLayerAppKeyCryptoManager:
     def test_decrypt(self, upper_layer_app_key_setup_crypto_manager):
         crypto_manager, test_input, expected = upper_layer_app_key_setup_crypto_manager
-        plaintext, is_mic_ok, label_uuid = crypto_manager.decrypt(
-            test_input["enc_data"],
-            int.from_bytes(test_input["aszmic"], "big"),
-            int.from_bytes(test_input["seq_number"], "big"),
-            test_input["src_addr"],
-            test_input["dst_addr"],
-            test_input["iv_index"],
-            test_input["label_uuid"],
-        )
+
+        # if virtual dest addr
         if test_input["label_uuid"] is not None:
+            plaintext, is_mic_ok, label_uuid = crypto_manager.decrypt_virtual(
+                test_input["enc_data"],
+                int.from_bytes(test_input["aszmic"], "big"),
+                int.from_bytes(test_input["seq_number"], "big"),
+                test_input["src_addr"],
+                test_input["dst_addr"],
+                test_input["iv_index"],
+                test_input["label_uuid"],
+            )
             assert (plaintext, is_mic_ok, label_uuid) == (
                 expected,
                 True,
                 test_input["label_uuid"][0],
             )
+
+        # if not virtual dest addr
         else:
-            assert (plaintext, is_mic_ok, label_uuid) == (expected, True, None)
+            plaintext, is_mic_ok = crypto_manager.decrypt(
+                test_input["enc_data"],
+                int.from_bytes(test_input["aszmic"], "big"),
+                int.from_bytes(test_input["seq_number"], "big"),
+                test_input["src_addr"],
+                test_input["dst_addr"],
+                test_input["iv_index"],
+            )
+            assert (plaintext, is_mic_ok) == (expected, True)
 
     def test_encrypt(self, upper_layer_app_key_setup_crypto_manager):
         crypto_manager, test_input, expected = upper_layer_app_key_setup_crypto_manager

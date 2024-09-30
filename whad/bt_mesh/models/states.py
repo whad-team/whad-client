@@ -101,7 +101,7 @@ class SubscriptionListState(ModelState):
         super().__init__(name="subscription_list", default_value=None)
 
         self.values["label_uuids"] = []
-        self.values["group_addrs"] = []
+        self.values["group_addrs"] = [b"\xff\xff"]  # Add the all-nodes addr
 
 
 class NetKeyListState(ModelState):
@@ -127,7 +127,7 @@ class AppKeyListState(ModelState):
         """
         super().__init__(
             name="app_key_list",
-            default_value={},
+            default_value=None,
         )
 
 
@@ -137,7 +137,7 @@ class ModelToAppKeyListState(ModelState):
         Each field has a list of app_key_indexes
         Field name is the model_id
         """
-        super().__init__(name="model_to_app_key_list", default_value={})
+        super().__init__(name="model_to_app_key_list", default_value=None)
 
 
 class DefaultTLLState(ModelState):
@@ -1206,14 +1206,14 @@ class SARSegmentIntervalStepState(ModelState):
 
 class SARUnicastRetransmissionsCountState(ModelState):
     def __init__(self):
-        super().__init__(name="sar_unicast_retransmissions_count", default_value=0b0010)
+        super().__init__(name="sar_unicast_retransmissions_count", default_value=0b0011)
 
 
 class SATUnicastRetransmissionsWithoutProgressCountState(ModelState):
     def __init__(self):
         super().__init__(
             name="sar_unicast_retransmissions_without_progess_count",
-            default_value=0b0010,
+            default_value=0b0011,
         )
 
 
@@ -1335,3 +1335,8 @@ class SARReceiverCompositeState(CompositeModelState):
 """
 SAR RECEIVER COMPOSITE STATE END
 """
+
+
+class GenericOnOffState(ModelState):
+    def __init__(self):
+        super().__init__(name="generic_onoff", default_value=0x00)

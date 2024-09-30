@@ -56,6 +56,25 @@ class UpperTransportLayer(Layer):
         """
         self.send("access", message)
 
+    def __get_app_key_index_from_aid(self, aid):
+        """
+        Returns the application_key_index from the aid
+
+        :param aid: The aid in the received packet
+        :type aid: int
+        """
+        app_keys = self.state.global_states_manager.get_state(
+            "app_key_list"
+        ).get_all_values()
+        print(app_keys)
+        for key in app_keys:
+            if (
+                isinstance(key, UpperTransportLayerAppKeyCryptoManager)
+                and key.aid == aid
+            ):
+                return key.key_index
+        return None
+
     @source("access")
     def on_access_message(self, message):
         """
@@ -68,7 +87,7 @@ class UpperTransportLayer(Layer):
 
         # encrypt the message with the key
         key = self.state.global_states_manager.get_state("app_key_list").get_value(
-            ctx.application_key_id
+            ctx.application_key_index
         )
 
         # set the PDU sequence number
@@ -115,12 +134,16 @@ class UpperTransportLayer(Layer):
             pkt.show()
             return
 
+        # get the actual application_key_index from aid
+        if ctx.application_key_index != -1:
+            ctx.application_key_index = self.__get_app_key_index_from_aid(ctx.aid)
+
         # get the application or device key for the message
         key = self.state.global_states_manager.get_state("app_key_list").get_value(
-            ctx.application_key_id
+            ctx.application_key_index
         )
         if get_address_type(ctx.dest_addr) == VIRTUAL_ADDR_TYPE:
-            (plaintext_message, is_auth_valid) = key.decrypt(
+            (plaintext_message, is_auth_valid, label_uuid) = key.decrypt_virtual(
                 enc_data=raw(pkt),
                 aszmic=ctx,
                 seq_number=ctx.seq_number,
@@ -138,6 +161,8 @@ class UpperTransportLayer(Layer):
                 dst_addr=ctx.dest_addr,
                 iv_index=self.state.global_states_manager.iv_index,
             )
+
+        # TODO : PROCESS LABELS RESULT
 
         if not is_auth_valid:
             logger.warn("WRONG AUTHENTICATION VALUE IN UpperTransportlayer")

@@ -25,8 +25,11 @@ from whad.bt_mesh.crypto import (
 )
 from whad.bt_mesh.models.states import *
 from whad.bt_mesh.models.configuration import ConfigurationModelServer
+from whad.bt_mesh.models.generic_on_off import GenericOnOffServer, GenericOnOffClient
 from whad.bt_mesh.models import GlobalStatesManager, Element
 from whad.bt_mesh.stack.network import NetworkLayer
+from threading import Thread
+from time import sleep
 
 
 class Provisionee(BTMesh):
@@ -134,6 +137,18 @@ class Provisionee(BTMesh):
         global_states.add_state(sar_transmitter)
 
         primary_element.register_model(conf_model)
+        generic_onoff_state = GenericOnOffState()
+
+        global_states.add_state(
+            generic_onoff_state, element_addr=primary_element.addr, model_id=0x1000
+        )
+
+        generic_onoff_server = GenericOnOffServer(primary_element.addr)
+        primary_element.register_model(generic_onoff_server)
+
+        generic_onoff_client = GenericOnOffClient(primary_element.addr)
+        primary_element.register_model(generic_onoff_client, is_keypress_model=True)
+
         conf_model.composition_data.init_page0(
             cid=b"\x00\x00",
             pid=b"\x00\x00",
@@ -149,3 +164,14 @@ class Provisionee(BTMesh):
         )
         self._main_stack.get_layer("access").register_element(primary_element)
         self.is_provisioned = True
+
+        # COMMENT OUT IF NO GENERIC ONOFF WANTED
+        input_thread = Thread(target=self.handle_key_press, args=[primary_element])
+        input_thread.start()
+
+    def handle_key_press(self, primary_element):
+        while True:
+            key = input()
+            msg, ctx = primary_element.handle_user_input(key)
+            self._main_stack.get_layer("access").process_new_message((msg, ctx))
+            sleep(1)

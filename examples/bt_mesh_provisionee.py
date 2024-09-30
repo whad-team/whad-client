@@ -21,7 +21,7 @@ if len(sys.argv) != 2:
 interface = sys.argv[1]
 
 beacon_data = BTMesh_Unprovisioned_Device_Beacon(
-    device_uuid="7462d668-bc88-3473-0000-000000000014", uri_hash=1
+    device_uuid="7462d668-bc88-3473-0000-000000000020", uri_hash=1
 )
 
 pkt_beacon = EIR_Hdr(type=0x2B) / EIR_BTMesh_Beacon(
@@ -32,10 +32,7 @@ try:
     provisionee = Provisionee(dev)
     provisionee.configure(advertisements=True, connection=False)
     provisionee.start()
-    provisionee.send_raw(pkt_beacon)
-    provisionee.send_raw(pkt_beacon)
-    provisionee.send_raw(pkt_beacon)
-    provisionee.send_raw(pkt_beacon)
+    provisionee.sniffer_channel_switch_thread.start()
     provisionee.send_raw(pkt_beacon)
     provisionee.send_raw(pkt_beacon)
     provisionee.send_raw(pkt_beacon)
@@ -44,7 +41,6 @@ try:
         # provisionee.send_raw(pkt_beacon)
 
         provisionee.polling_rx_packets()
-        sleep(0.1)
 except ConnectionLostException as e:
     print("Connection lost", e)
 

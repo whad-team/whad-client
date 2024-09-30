@@ -11,8 +11,21 @@ from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_ADV_NONCONN_IND, EIR_
 from whad.ble import UnsupportedCapability, message_filter, BleDirection
 from queue import Queue, Empty
 import pdb
+from time import sleep
+from threading import Thread, Lock
 
 from whad.bt_mesh.stack import PBAdvBearerLayer
+
+
+# lock for sending to not jam ?
+def txlock(f):
+    def _wrapper(self, *args, **kwargs):
+        self.lock_tx()
+        result = f(self, *args, **kwargs)
+        self.unlock_tx()
+        return result
+
+    return _wrapper
 
 
 class BTMesh(Sniffer):
@@ -43,8 +56,18 @@ class BTMesh(Sniffer):
         # Queue of received messages, filled in on reception callback
         self.__queue = Queue()
 
+        self.__tx_lock = Lock()
+
         # The stack used after provisioning (instanced after)
         self._main_stack = None
+
+        self.sniffer_channel_switch_thread = Thread(target=self.change_sniffing_channel)
+
+    def lock_tx(self):
+        self.__tx_lock.acquire()
+
+    def unlock_tx(self):
+        self.__tx_lock.release()
 
     def bt_mesh_filter(self, packet, ignore_regular_adv):
         """
@@ -88,6 +111,7 @@ class BTMesh(Sniffer):
         # packet.show()
         pass
 
+    @txlock
     def send_raw(self, packet, channel=37):
         """
         Sends the packet through the BLE advertising bearer
@@ -97,15 +121,37 @@ class BTMesh(Sniffer):
         :param channel: [TODO:description], defaults to 37
         :type channel: [TODO:type], optional
         """
-
         AdvA = randbytes(6).hex(":")  # random in spec
         adv_pkt = BTLE_ADV(TxAdd=1) / BTLE_ADV_NONCONN_IND(AdvA=AdvA, data=packet)
-        return self.send_pdu(
+        self.send_pdu(
             adv_pkt,
             access_address=0x8E89BED6,
-            conn_handle=channel,
+            conn_handle=39,
             direction=BleDirection.UNKNOWN,
         )
+        sleep(0.01)
+        self.send_pdu(
+            adv_pkt,
+            access_address=0x8E89BED6,
+            conn_handle=37,
+            direction=BleDirection.UNKNOWN,
+        )
+        sleep(0.01)
+        res = self.send_pdu(
+            adv_pkt,
+            access_address=0x8E89BED6,
+            conn_handle=38,
+            direction=BleDirection.UNKNOWN,
+        )
+        return res
+
+    def change_sniffing_channel(self):
+        channels = [37, 38, 39]
+        i = 0
+        while True:
+            self.channel = channels[i]
+            i = (i + 1) % 3
+            sleep(0.03)
 
 
 class BTMeshHCI(BLE):

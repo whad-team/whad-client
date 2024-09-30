@@ -59,25 +59,23 @@ class CompositionDataState(object):
         :param crpl: Minimum number of Replay Protection List entries
         :type crpl: int
         :param features: Bit field of devices features (Mesh PRT spec Section Table 4.3)
-        :type features: bytesœ&
+        :type features: bytes
         :param elements: List of elements that live on the network
         :type elements: List[Elements]
         """
         # we compute the bytes object of the page to use in the scapy packet directly since it doesnt change
-        self.p0_data = cid + pid + vid + crpl.to_bytes(2, "big") + features
+        self.p0_data = cid + pid + vid + crpl.to_bytes(2, "little") + features
 
         elements_field = b""
         for element in elements:
-            self.elements_fields = (
+            elements_field = (
                 elements_field
-                + element.loc.to_bytes(2, "big")
-                + element.model_count.to_bytes(1, "big")
-                + element.vnd_model_count.to_bytes(1, "big")
+                + element.loc.to_bytes(2, "little")
+                + element.model_count.to_bytes(1, "little")
+                + element.vnd_model_count.to_bytes(1, "little")
             )
             for model in element.models:
-                self.elements_fields = elements_field + model.model_id.to_bytes(
-                    2, "big"
-                )
+                elements_field = elements_field + model.model_id.to_bytes(2, "little")
             # no vendor models yet so nothing
 
         self.p0_data = self.p0_data + elements_field
@@ -97,15 +95,15 @@ class CompositionDataState(object):
         """
 
         if not isinstance(model, ModelServer):
-            return int(0).to_bytes(1, "big")
+            return int(0).to_bytes(1, "little")
         else:
             model_data = (
                 (len(model.relationships) << 2)
                 + (fmt << 1)
                 + int(model.corresponding_group_id is not None)
-            ).to_bytes(1, "big")
+            ).to_bytes(1, "little")
             if model.corresponding_group_id is not None:
-                model_data += model.corresponding_group_id.to_bytes(1, "big")
+                model_data += model.corresponding_group_id.to_bytes(1, "little")
 
             for rel in model.relationships:
                 if fmt == 0:
@@ -115,12 +113,14 @@ class CompositionDataState(object):
                     model_data += (
                         (rel.elem_ext.get_index_of_model(rel.mod_ext) << 3)
                         + (offset & 0x07)
-                    ).to_bytes(1, "big")
+                    ).to_bytes(1, "little")
                 else:
                     offset = rel.elem_ext.element_addr - rel.elem_base.element_addr
                     model_data = offset.to_bytes(
-                        1, "big", signed=True
-                    ) + rel.elem_ext.get_index_of_model(rel.mod_ext).to_bytes(1, "big")
+                        1, "little", signed=True
+                    ) + rel.elem_ext.get_index_of_model(rel.mod_ext).to_bytes(
+                        1, "little"
+                    )
 
             return model_data
 
@@ -144,8 +144,8 @@ class CompositionDataState(object):
 
         for element in elements:
             element_data = element.model_count.to_bytes(
-                1, "big"
-            ) + element.vnd_model_count.to_bytes(1, "big")
+                1, "little"
+            ) + element.vnd_model_count.to_bytes(1, "little")
 
             for model in element.models:
                 element_data += self.__p1_add_model(model, fmt)
@@ -841,13 +841,14 @@ class ConfigurationModelServer(ModelServer):
 
     def on_model_to_app_key_bind(self, message):
         # checks for invalid model, invalid addr are checked on access layer
-        model_id = message.model_identifier
+        model_id = int.from_bytes(message.model_identifier, "big")
         app_key_index = message.app_key_index
         stored_app_key = self.global_states_manager.get_state("app_key_list").get_value(
             app_key_index
         )
         if stored_app_key is None:
             status = 0x03
+            print("NO APP KEY FOR BINDING")
 
         else:
             status = 0
@@ -865,13 +866,13 @@ class ConfigurationModelServer(ModelServer):
             status=status,
             element_addr=message.element_addr,
             app_key_index=app_key_index,
-            model_identifier=model_id,
+            model_identifier=message.model_identifier,
         )
         return response
 
     def on_model_to_app_key_unbind(self, message):
         # checks for invalid model, invalid addr are checked on access layer
-        model_id = message.model_identifier
+        model_id = int.from_bytes(message.model_identifier, "big")
         app_key_index = message.app_key_index
         stored_app_key = self.global_states_manager.get_state("app_key_list").get_value(
             app_key_index
@@ -891,7 +892,7 @@ class ConfigurationModelServer(ModelServer):
             status=status,
             element_addr=message.element_addr,
             app_key_index=app_key_index,
-            model_identifier=model_id,
+            model_identifier=message.model_identifier,
         )
         return response
 

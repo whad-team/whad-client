@@ -24,6 +24,7 @@ from whad.bt_mesh.stack.lower_transport import LowerTransportLayer
 from whad.bt_mesh.models import GlobalStatesManager
 from scapy.all import raw
 from time import sleep
+from threading import Thread
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +56,6 @@ class NetworkLayer(Layer):
 
         # Check if relay feature is enabled on this device (proxy not implemented)
         self.state.is_relay_enabled = False
-
-        # Stores the next seq_number PDU we are waiting for to be sent
-        self.state.next_seq_to_send = 0
-
-        # Dict of packets to be sent. Key is seq_number
-        self.state.send_queue = {}
 
         self.base_unicast_addr = int.from_bytes(options["base_unicast_addr"], "big")
 
@@ -118,9 +113,13 @@ class NetworkLayer(Layer):
             return False
 
         int_dst_addr = int.from_bytes(dst_addr, "big")
-        if dst_type == UNICAST_ADDR_TYPE and (
-            int_dst_addr > self.base_unicast_addr + 254
-            or int_dst_addr < self.base_unicast_addr
+        if (
+            dst_type == UNICAST_ADDR_TYPE
+            and (
+                int_dst_addr > self.base_unicast_addr + 254
+                or int_dst_addr < self.base_unicast_addr
+            )
+            and int_dst_addr != 0xFFFF
         ):
             print("NOT FOR ME DEST ADDR")
             return False
@@ -242,66 +241,53 @@ class NetworkLayer(Layer):
         :type message: (BTMesh_Lower_Transport_Access_Message|BTMesh_Lower_Transport_Control_Message, MeshMessageContext)
         """
         pkt, ctx = message
-        self.state.send_queue[ctx.seq_number] = message
-        self.check_sending_queue()
+        net_key = self.state.global_states_manager.get_state("net_key_list").get_value(
+            ctx.net_key_id
+        )
 
-    def check_sending_queue(self):
+        net_pdu = BTMesh_Network_PDU(
+            ivi=self.state.global_states_manager.iv_index[0] & 1,
+            nid=net_key.nid,
+            network_ctl=int(isinstance(pkt, BTMesh_Lower_Transport_Control_Message)),
+            ttl=ctx.ttl,
+            seq_number=ctx.seq_number,
+            src_addr=int.from_bytes(ctx.src_addr, "big"),
+        )
+
+        # encrypt the message
+        net_key: NetworkLayerCryptoManager
+        enc = net_key.encrypt(
+            raw(pkt),
+            ctx.dest_addr,
+            net_pdu,
+            self.state.global_states_manager.iv_index,
+        )
+
+        net_pdu.enc_dst_enc_transport_pdu_mic = enc
+
+        # obfuscate the payload
+        obfu_data = net_key.obfuscate_net_pdu(
+            net_pdu, self.state.global_states_manager.iv_index
+        )
+
+        pkt = BTMesh_Obfuscated_Network_PDU(
+            ivi=net_pdu.ivi,
+            nid=net_pdu.nid,
+            obfuscated_data=obfu_data,
+            enc_dst_enc_transport_pdu_mic=enc,
+        )
+        thread = Thread(target=self.sending_thread, args=EIR_Hdr(type=0x2A) / pkt)
+        thread.start()
+
         """
-        Checks if the next packet that needs to be sent is in the queue
+        if smallest_seq_num == self.state.next_seq_to_send:
+            self.state.next_seq_to_send += 1
         """
-        smallest_seq_num = sorted(self.state.send_queue.keys())[0]
-        if self.state.next_seq_to_send >= smallest_seq_num:
-            pkt, ctx = self.state.send_queue.pop(smallest_seq_num)
-            net_key = self.state.global_states_manager.get_state(
-                "net_key_list"
-            ).get_value(ctx.net_key_id)
 
-            net_pdu = BTMesh_Network_PDU(
-                ivi=self.state.global_states_manager.iv_index[0] & 1,
-                nid=net_key.nid,
-                network_ctl=int(
-                    isinstance(pkt, BTMesh_Lower_Transport_Control_Message)
-                ),
-                ttl=ctx.ttl,
-                seq_number=ctx.seq_number,
-                src_addr=int.from_bytes(ctx.src_addr, "big"),
-            )
-
-            # encrypt the message
-            net_key: NetworkLayerCryptoManager
-            enc = net_key.encrypt(
-                raw(pkt),
-                ctx.dest_addr,
-                net_pdu,
-                self.state.global_states_manager.iv_index,
-            )
-
-            net_pdu.enc_dst_enc_transport_pdu_mic = enc
-
-            # obfuscate the payload
-            obfu_data = net_key.obfuscate_net_pdu(
-                net_pdu, self.state.global_states_manager.iv_index
-            )
-
-            pkt = BTMesh_Obfuscated_Network_PDU(
-                ivi=net_pdu.ivi,
-                nid=net_pdu.nid,
-                obfuscated_data=obfu_data,
-                enc_dst_enc_transport_pdu_mic=enc,
-            )
-            print(
-                "SENDING NETWORK PACKET WITH SEQ_NUMBER : "
-                + str(ctx.seq_number)
-                + " AND SEQ_AUTH : "
-                + str(ctx.seq_auth)
-            )
-            net_pdu.show()
-            self.__connector.send_raw(EIR_Hdr(type=0x2A) / pkt)
-            sleep(0.001)
-            self.__connector.send_raw(EIR_Hdr(type=0x2A) / pkt)
-
-            if smallest_seq_num == self.state.next_seq_to_send:
-                self.state.next_seq_to_send += 1
+    def sending_thread(self, pkt):
+        self.__connector.send_raw(pkt)
+        sleep(0.001)
+        self.__connector.send_raw(pkt)
 
 
 NetworkLayer.add(LowerTransportLayer)

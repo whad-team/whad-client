@@ -1464,14 +1464,33 @@ class BTMesh_Model_Message(Packet):
     ]
 
 
+class BTMesh_Model_Generic_OnOff_Get(Packet):
+    name = "Bluetooth Mesh Model Generic OnOff Get"
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Generic_OnOff_Get, opcode=0x8201)
+
+
 class BTMesh_Model_Generic_OnOff_Set(Packet):
     name = "Bluetooth Mesh Model Generic OnOff Set"
     fields_desc = [
         ByteEnumField("onoff", None, {0: "off", 1: "on"}),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transaction_time", None), lambda pkt: len(pkt) > 2),
-        ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
+        ByteField("transition_time", None),
+        ConditionalField(
+            ByteField("delay", None),
+            lambda pkt: pkt.getfieldval("transition_time") is not None,
+        ),
     ]
+
+    def post_build(self, p, pay):
+        # Only add the transition_time field if it is set
+        if self.transition_time is None:
+            p = p[:2]  # Remove placeholder if transition_time is None
+        return super().post_build(p, pay)
+
+
+bind_layers(BTMesh_Model_Message, BTMesh_Model_Generic_OnOff_Set, opcode=0x8202)
 
 
 class BTMesh_Model_Generic_OnOff_Set_Unacknowledged(Packet):
@@ -1479,9 +1498,18 @@ class BTMesh_Model_Generic_OnOff_Set_Unacknowledged(Packet):
     fields_desc = [
         ByteEnumField("onoff", None, {0: "off", 1: "on"}),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transaction_time", None), lambda pkt: len(pkt) > 2),
-        ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
+        ByteField("transition_time", None),
+        ConditionalField(
+            ByteField("delay", None),
+            lambda pkt: pkt.getfieldval("transition_time") is not None,
+        ),
     ]
+
+    def post_build(self, p, pay):
+        # Only add the transition_time field if it is set
+        if self.transition_time is None:
+            p = p[:2]  # Remove placeholder if transition_time is None
+        return super().post_build(p, pay)
 
 
 bind_layers(
@@ -1493,12 +1521,18 @@ class BTMesh_Model_Generic_OnOff_Status(Packet):
     name = "Bluetooth Mesh Model Generic OnOff Status"
     fields_desc = [
         ByteEnumField("present_onoff", None, {0: "off", 1: "on"}),
+        ByteEnumField("target_onoff", None, {0: "off", 1: "on"}),
         ConditionalField(
-            ByteEnumField("target_onoff", None, {0: "off", 1: "on"}),
-            lambda pkt: len(pkt) > 2,
+            ByteField("remaining_time", None),
+            lambda pkt: pkt.getfieldval("target_onoff") is not None,
         ),
-        ConditionalField(ByteField("remaining_time", None), lambda pkt: len(pkt) > 2),
     ]
+
+    def post_build(self, p, pay):
+        # Only add the target_onoff field if it is set
+        if self.target_onoff is None:
+            p = p[:2]  # Remove placeholder if target_onoff is None
+        return super().post_build(p, pay)
 
 
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Generic_OnOff_Status, opcode=0x8204)
@@ -1509,7 +1543,7 @@ class BTMesh_Model_Generic_Level_Set(Packet):
     fields_desc = [
         ShortField("level", None),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transaction_time", None), lambda pkt: len(pkt) > 2),
+        ConditionalField(ByteField("transition_time", None), lambda pkt: len(pkt) > 2),
         ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
     ]
 
@@ -1522,7 +1556,7 @@ class BTMesh_Model_Generic_Level_Set_Unacknowledged(Packet):
     fields_desc = [
         ShortField("level", None),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transaction_time", None), lambda pkt: len(pkt) > 2),
+        ConditionalField(ByteField("transition_time", None), lambda pkt: len(pkt) > 2),
         ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
     ]
 
@@ -1535,7 +1569,7 @@ class BTMesh_Model_Generic_Delta_Set(Packet):
     fields_desc = [
         IntField("delta", None),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transaction_time", None), lambda pkt: len(pkt) > 2),
+        ConditionalField(ByteField("transition_time", None), lambda pkt: len(pkt) > 2),
         ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
     ]
 
@@ -1548,7 +1582,7 @@ class BTMesh_Model_Generic_Delta_Set_Unacknowledged(Packet):
     fields_desc = [
         IntField("delta", None),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transaction_time", None), lambda pkt: len(pkt) > 2),
+        ConditionalField(ByteField("transition_time", None), lambda pkt: len(pkt) > 2),
         ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
     ]
 
@@ -1561,7 +1595,7 @@ class BTMesh_Model_Generic_Move_Set(Packet):
     fields_desc = [
         ShortField("delta_level", None),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transaction_time", None), lambda pkt: len(pkt) > 2),
+        ConditionalField(ByteField("transition_time", None), lambda pkt: len(pkt) > 2),
         ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
     ]
 
