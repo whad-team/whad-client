@@ -86,6 +86,8 @@ class TxTransaction(Transaction):
         self.sending_thread = None
 
         raw_pkt = raw(self.pkt)
+        self.fragments = []
+
         if self.is_control_message and (len(raw_pkt) > 11):
             self.fragments = [raw_pkt[i : i + 8] for i in range(0, len(raw_pkt), 8)]
         elif len(raw(self.pkt)) > 15:
@@ -145,17 +147,18 @@ class TxTransaction(Transaction):
             logger.error("WRONG SEQ AUTH VALUE FOR ACKED SEGMENT MESSAGE")
             return
 
+        # if no acked segment at all, cancel transaction (specification)
+        if pkt.acked_segments == 0:
+            self.is_transaction_finished = True
+            return
+
         # reverse conversion : bitfield = sum(1 << num for num in acked_segments)
         acked_segments = [
             i
             for i in range(pkt.acked_segments.bit_length())
             if pkt.acked_segments & (1 << i)
-        ].sort()
-
-        # if no acked segment at all, cancel transaction (specification)
-        if acked_segments == []:
-            self.is_transaction_finished = True
-            return
+        ]
+        acked_segments.sort()
 
         # check if a new segment has been acked since last transmission.
         if acked_segments != self.acked_segments:
@@ -164,7 +167,7 @@ class TxTransaction(Transaction):
         self.acked_segments = acked_segments
 
         # check is all segments have been acked
-        if len(acked_segments) == len(self.fragments):
+        if len(acked_segments) == self.nb_of_segments:
             self.is_transaction_finished = True
             return
         # if segements left to be sent, reset timer
@@ -293,10 +296,8 @@ class LowerTransportLayer(Layer):
         pkt, ctx = message
 
         # if ack received
-        if (
-            isinstance(pkt, BTMesh_Lower_Transport_Control_Message)
-            and pkt.payload_field.opcode == 0
-        ):
+        if isinstance(pkt, BTMesh_Lower_Transport_Control_Message) and pkt.opcode == 0:
+            print("ACK RECEIVED")
             if ctx.src_addr in self.state.tx_transactions.keys():
                 self.state.tx_transactions[ctx.src_addr].process_ack((pkt[1], ctx))
 
@@ -304,9 +305,12 @@ class LowerTransportLayer(Layer):
         elif isinstance(pkt, BTMesh_Lower_Transport_Access_Message):
             # set the application_key_id (-1 if device key)
             if pkt.application_key_flag == 0:
-                ctx.application_key_id = -1
+                ctx.aid = 0
+                ctx.application_key_index = -1
             else:
-                ctx.application_key_id = pkt.application_key_id
+                ctx.aid = pkt.application_key_id
+                # to be changed in upper layer if needed
+                ctx.application_key_index = 0
 
             self.dispatch_access_rx_pdu(message)
 
@@ -379,7 +383,6 @@ class LowerTransportLayer(Layer):
             ))
             self.state.rx_transactions[ctx.src_addr] = transaction
             self.state.seq_auth_values[ctx.src_addr] = ctx.seq_auth
-            """
             transaction.main_ack_thread = Timer(
                 transaction.initial_ack_delay / 1000,
                 self.sending_ack_thread,
@@ -391,6 +394,7 @@ class LowerTransportLayer(Layer):
                 self.sending_ack_thread,
                 args=(transaction, True, transaction.event),
             )
+            """
             transaction.main_ack_thread.start()
 
     def process_rx_seg_message(self, transaction, message):
@@ -445,7 +449,6 @@ class LowerTransportLayer(Layer):
                     delay = transaction.min_ack_delay / 1000
 
                 ctx.seq_number = ctx.seq_auth & 0xFFFFFF
-                """
                 transaction.main_ack_thread = Timer(
                     delay,
                     self.sending_ack_thread,
@@ -457,6 +460,7 @@ class LowerTransportLayer(Layer):
                     self.sending_ack_thread,
                     args=(transaction, False, transaction.event),
                 )
+                """
                 transaction.main_ack_thread.start()
                 transaction.is_transaction_finished = True
                 raw_upper_pkt = b""
@@ -544,7 +548,7 @@ class LowerTransportLayer(Layer):
                             aszmic=0,
                             seq_zero=transaction.ctx.seq_auth & 0x1FFF,
                             seg_offset=fragment_index,
-                            last_seg_number=len(transaction.fragments),
+                            last_seg_number=len(transaction.fragments) - 1,
                         )
                         / transaction.fragments[fragment_index]
                     )
@@ -553,12 +557,16 @@ class LowerTransportLayer(Layer):
                     segment_ctx = copy(transaction.ctx)
                     segment_ctx.segment_number = fragment_index
                     segment_ctx.seq_number = transaction.ctx.seq_number + fragment_index
-                    if transaction.ctx.application_key_id == -1:
+                    if transaction.ctx.application_key_index == -1:
                         application_key_flag = 0
                         application_key_id = 0
                     else:
                         application_key_flag = 1
-                        application_key_id = transaction.ctx.application_key_id
+                        application_key_id = transaction.ctx.aid
+                    print(
+                        "SENDING UNICAST SEGMENT WITH SEQ NUMBER = "
+                        + str(transaction.ctx.seq_number)
+                    )
                     self.send_to_network((
                         BTMesh_Lower_Transport_Access_Message(
                             seg=1,
@@ -570,11 +578,14 @@ class LowerTransportLayer(Layer):
                     ))
                     sleep(transaction.interval_step / 1000)
             if transaction.ctx.ttl == 0:
-                event.wait(transaction.unicast_retrans_interval_step)
+                event.wait(transaction.unicast_retrans_interval_step / 1000)
             else:
                 event.wait(
-                    transaction.unicast_retrans_interval_step
-                    + (transaction.unicast_interval_inc * (transaction.ctx.ttl - 1))
+                    (
+                        transaction.unicast_retrans_interval_step
+                        + (transaction.unicast_interval_inc * (transaction.ctx.ttl - 1))
+                    )
+                    / 1000
                 )
 
     def sending_thread_multicast_segmented(self, transaction, event):
@@ -594,19 +605,19 @@ class LowerTransportLayer(Layer):
             transaction.multicast_retrans_count -= 1
             for fragment_index in range(len(transaction.fragments)):
                 if fragment_index not in transaction.acked_segments:
-                    if transaction.ctx.application_key_id == -1:
+                    if transaction.ctx.application_key_index == -1:
                         application_key_flag = 0
                         application_key_id = 0
                     else:
                         application_key_flag = 1
-                        application_key_id = transaction.ctx.application_key_id
+                        application_key_id = transaction.ctx.aid
 
                     payload = (
                         BTMesh_Lower_Transport_Segmented_Access_Message(
                             aszmic=0,
                             seq_zero=transaction.ctx.seq_zero,
                             seg_offset=fragment_index,
-                            last_seg_number=len(transaction.fragments),
+                            last_seg_number=len(transaction.fragments) - 1,
                         )
                         / transaction.fragments[fragment_index]
                     )
@@ -627,7 +638,7 @@ class LowerTransportLayer(Layer):
                         segment_ctx,
                     ))
                     sleep(transaction.interval_step / 1000)
-            sleep(transaction.multicast_retrans_interval_step)
+            sleep(transaction.multicast_retrans_interval_step / 1000)
 
     def sending_thread_unsegmented(self, transaction, event):
         """
@@ -639,12 +650,12 @@ class LowerTransportLayer(Layer):
         :param event: Event object to received signal from main thread
         :type: Event
         """
-        if transaction.ctx.application_key_id == -1:
+        if transaction.ctx.application_key_index == -1:
             application_key_flag = 0
             application_key_id = 0
         else:
             application_key_flag = 1
-            application_key_id = transaction.ctx.application_key_id
+            application_key_id = transaction.ctx.aid
 
         self.send_to_network((
             BTMesh_Lower_Transport_Access_Message(

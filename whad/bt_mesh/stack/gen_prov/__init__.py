@@ -333,7 +333,7 @@ class GenericProvisioningLayer(ContextualLayer):
         if pkt.segment_index != len(self.state.current_transaction.fragments):
             self.state.current_transaction = None
             logger.warning(
-                f"Received Transaction Continuation with wrong segment_index (received,expected : {pkt.segment_index}, {len(self.state.current_transaction.fragments)})"
+                f"Received Transaction Continuation with wrong segment_index (received: {pkt.segment_index})"
             )
             return
 

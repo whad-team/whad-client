@@ -22,7 +22,10 @@ class MeshMessageContext:
         self.segment_number = None
 
         # AID of the app_key if app_key used, -1 if device_key used
-        self.application_key_id = None
+        self.aid = None
+
+        # Index of the app key if not device_key used
+        self.application_key_index = None
 
         # Net key id used
         self.net_key_id = None

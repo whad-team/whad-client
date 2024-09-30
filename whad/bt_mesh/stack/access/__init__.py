@@ -94,11 +94,17 @@ class AccessLayer(Layer):
         dst_addr_type = get_address_type(dst_addr)
         print(self.state.elements)
 
+        # if all nodes address, send to all elements
+        if dst_addr == b"\xff\xff":
+            element = self.state.elements.values()
+
         # if dst addr is unicast, only need to use the relevent element
-        if dst_addr_type == UNICAST_ADDR_TYPE:
+        elif dst_addr_type == UNICAST_ADDR_TYPE:
             element.append(self.state.elements[dst_addr])
         # Check which element have a model that subscribed to this address
         elif dst_addr_type == GROUP_ADDR_TYPE:
+            print("GROUP ADDR MESSAGE")
+            print(dst_addr)
             for e in self.state.elements:
                 if e.check_group_subscription(dst_addr):
                     element.append(e)
@@ -112,7 +118,8 @@ class AccessLayer(Layer):
             response = e.handle_message(message)
             if response is not None:
                 new_ctx = MeshMessageContext()
-                new_ctx.application_key_id = ctx.application_key_id
+                new_ctx.aid = ctx.aid
+                new_ctx.application_key_index = ctx.application_key_index
                 new_ctx.src_addr = e.addr
                 new_ctx.dest_addr = ctx.src_addr
                 new_ctx.net_key_id = ctx.net_key_id
@@ -123,3 +130,13 @@ class AccessLayer(Layer):
                         "default_ttl"
                     ).get_value()
                 self.send_to_upper_transport((response, new_ctx))
+
+    def process_new_message(self, message):
+        """
+        Process a message originating from us directly (not in response from another message, usually a message from a keypress and a ModelClient)
+
+        :param message: [TODO:description]
+        :type message: [TODO:type]
+        """
+        pkt, ctx = message
+        self.send_to_upper_transport(message)

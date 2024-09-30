@@ -14,6 +14,7 @@ from whad.bt_mesh.stack.gen_prov import (
     GenericProvisioningLayerProvisioner,
 )
 from whad.bt_mesh.stack.gen_prov.message import GenericProvisioningMessage
+from threading import Thread
 
 
 @alias("pb_adv")
@@ -101,9 +102,16 @@ class PBAdvBearerLayer(Layer):
         packet = message.gen_prov_pkt
         transaction_number = message.transaction_number
         link_id = self.get_link_id_from_instance_name(source)
-        self.__connector.send_raw(
-            EIR_Hdr(type=0x29)
-            / EIR_PB_ADV_PDU(
-                link_id=link_id, transaction_number=transaction_number, data=packet
-            )
+        pkt = EIR_Hdr(type=0x29) / EIR_PB_ADV_PDU(
+            link_id=link_id, transaction_number=transaction_number, data=packet
         )
+        #self.__connector.send_raw(pkt)
+        thread = Thread(
+            target=self.sending_thread,
+            args=(pkt),
+        )
+
+        thread.start()
+
+    def sending_thread(self, pkt):
+        self.__connector.send_raw(pkt)
