@@ -75,6 +75,19 @@ class UpperTransportLayer(Layer):
                 return key.key_index
         return None
 
+    def __get_all_label_uuids(self):
+        """
+        Returns a set of all the label uuids of the device (one that at least one model is subscribed to)
+        """
+        label_uuids = []
+        subscription_states = self.state.global_states_manager.get_all_states(
+            "subscription_list"
+        )
+        for state in subscription_states:
+            label_uuids.extend(state.get_value("label_uuids"))
+
+        return list(set(label_uuids))
+
     @source("access")
     def on_access_message(self, message):
         """
@@ -142,7 +155,10 @@ class UpperTransportLayer(Layer):
         key = self.state.global_states_manager.get_state("app_key_list").get_value(
             ctx.application_key_index
         )
+
         if get_address_type(ctx.dest_addr) == VIRTUAL_ADDR_TYPE:
+            # get all the label uuids we know in the device (we cannot know the target model, so we need to get all of them ...)
+            label_uuids = self.__get_all_label_uuids()
             (plaintext_message, is_auth_valid, label_uuid) = key.decrypt_virtual(
                 enc_data=raw(pkt),
                 aszmic=ctx,
@@ -150,8 +166,9 @@ class UpperTransportLayer(Layer):
                 src_addr=ctx.src_addr,
                 dst_addr=ctx.dest_addr,
                 iv_index=self.state.global_states_manager.iv_index,
-                label_uuid=ctx.uuid,
+                label_uuid=label_uuids,
             )
+            ctx.uuid = label_uuid
         else:
             (plaintext_message, is_auth_valid) = key.decrypt(
                 enc_data=raw(pkt),
@@ -161,8 +178,6 @@ class UpperTransportLayer(Layer):
                 dst_addr=ctx.dest_addr,
                 iv_index=self.state.global_states_manager.iv_index,
             )
-
-        # TODO : PROCESS LABELS RESULT
 
         if not is_auth_valid:
             logger.warn("WRONG AUTHENTICATION VALUE IN UpperTransportlayer")

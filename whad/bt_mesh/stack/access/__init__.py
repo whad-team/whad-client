@@ -116,7 +116,9 @@ class AccessLayer(Layer):
         # for all the element that are supposed to receive the message, handle it
         for e in element:
             response = e.handle_message(message)
-            if response is not None:
+
+            # only send responses if unicast addr for destination
+            if dst_addr_type == UNICAST_ADDR_TYPE and response is not None:
                 new_ctx = MeshMessageContext()
                 new_ctx.aid = ctx.aid
                 new_ctx.application_key_index = ctx.application_key_index
