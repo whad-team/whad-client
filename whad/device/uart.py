@@ -89,7 +89,14 @@ class UartDevice(WhadDevice):
         if port_info is None:
             raise WhadDeviceNotFound
         else:
-            self.__is_acm = (port_info.subsystem == 'usb')
+            # 'subsystem' is only defined on Linux serial ports, we check if this property is missing to
+            # handle Mac OS (Windows system is marked as unsupported for now)
+            if not hasattr(port_info, "subsystem"):
+                # Determine if device is ACM on Mac OS
+                self.__is_acm = (port_info.usb_info is not None)
+            else:
+                # On Linux systems, ACM devices use the "usb" subsystem.
+                self.__is_acm = (port_info.subsystem == "usb")
 
     @property
     def identifier(self):
