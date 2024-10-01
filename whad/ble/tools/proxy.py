@@ -54,6 +54,7 @@ def reshape_pdu(pdu):
     :param Packet pdu: Bluetooth LE packet to process
     :return Packet: Clean Bluetooth LE packet
     """
+    # Reset SN/NESN/MD bits
     btle_data = pdu.getlayer(BTLE_DATA)
     payload = btle_data.payload
     return BTLE_DATA(
@@ -113,7 +114,7 @@ class LowLevelPeripheral(Peripheral):
         if len(self.__pending_control_pdus) > 0:
             for _pdu in self.__pending_control_pdus:
                 if self.__proxy is not None:
-                    pdu = self.__proxy.on_ctl_pdu(_pdu)
+                    pdu = self.__proxy.on_ctl_pdu(_pdu, BleDirection.MASTER_TO_SLAVE)
                     if pdu is not None:
                         self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
                 else:
@@ -463,7 +464,10 @@ class LinkLayerProxy(object):
         :returns: A PDU to be sent to the target device or None to avoid forwarding.
         :rtype: Packet, None
         """
-        logger.info('Received a Control PDU: %s' % hexlify(bytes(pdu)))
+        logger.info('Received a Control PDU: %s (Direction: %d)' % (
+            hexlify(bytes(pdu)),
+            direction
+        ))
         return pdu
 
 
@@ -477,7 +481,10 @@ class LinkLayerProxy(object):
         :returns: A PDU to be sent to the target device or None to avoid forwarding.
         :rtype: Packet, None
         """
-        logger.info('Received a Data PDU: %s' % hexlify(bytes(pdu)))
+        logger.info('Received a Data PDU: %s (Direction: %d)' % (
+            hexlify(bytes(pdu)),
+            direction
+        ))
         return pdu
 
 
