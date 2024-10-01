@@ -2,19 +2,22 @@
 Whad up ?
 """
 import sys
+
+# Whad device
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.device import WhadDevice
-from whad.protocol.ble.ble_pb2 import BleCommand
-from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4Command
-from whad.protocol.esb.esb_pb2 import ESBCommand
-from whad.protocol.unifying.unifying_pb2 import UnifyingCommand
-from whad.protocol.phy.phy_pb2 import PhyCommand
+
+# Whad hub
+from whad.hub.ble import Commands as BleCommands
+from whad.hub.dot15d4 import Commands as Dot15d4Commands
+from whad.hub.esb import Commands as ESBCommands
+from whad.hub.unifying import Commands as UnifyingCommands
+from whad.hub.phy import Commands as PhyCommands
 from whad.hub.discovery import Domain, Capability
+
+# Helpers
 from prompt_toolkit import print_formatted_text, HTML
 from html import escape
-
-import logging
-#logging.basicConfig(level=logging.DEBUG)
 
 DOMAINS = {
     Domain.Phy: 'Physical Layer',
@@ -42,96 +45,98 @@ CAPABILITIES = {
 }
 
 BLE_COMMANDS = {
-    BleCommand.SetBdAddress: 'SetBdAddress: can set BD address',
-    BleCommand.SniffAdv: 'SniffAdv: can sniff advertising PDUs',
-    BleCommand.JamAdv: 'JamAdv: can jam advertising PDUs',
-    BleCommand.JamAdvOnChannel: 'JamAdvOnChannel: can jam advertising PDUs on a single channel',
-    BleCommand.ReactiveJam: 'ReactiveJam: can reactively jam PDU on a single channel',
-    BleCommand.SniffConnReq: 'SniffConnReq: can sniff a new connection',
-    BleCommand.SniffAccessAddress: 'SniffAccessAddress: can detect active connections',
-    BleCommand.SniffActiveConn: 'SniffActiveConn: can sniff an active connection',
-    BleCommand.JamConn: 'JamConn: can jam an active connection',
-    BleCommand.ScanMode: 'ScanMode: can scan devices',
-    BleCommand.AdvMode: 'AdvMode: can advertise as a BLE device',
-    BleCommand.SetAdvData: 'SetAdvData: can set advertising PDU details',
-    BleCommand.CentralMode: 'CentralMode: can act as a Central device',
-    BleCommand.ConnectTo: 'ConnectTo: can initiate a BLE connection',
-    BleCommand.SendRawPDU: 'SendRawPDU: can send a raw PDU',
-    BleCommand.SendPDU: 'SendPDU: can send a PDU',
-    BleCommand.Disconnect: 'Disconnect: can terminate an active connection (in Central mode)',
-    BleCommand.PeripheralMode: 'PeripheralMode: can act as a peripheral',
-    BleCommand.Start: 'Start: can start depending on the current mode',
-    BleCommand.Stop: 'Stop: can stop depending on the current mode',
-    BleCommand.SetEncryption: 'SetEncryption: can enable encryption during a connection',
-    BleCommand.HijackMaster: 'HijackMaster: can hijack the Master role in an active connection',
-    BleCommand.HijackSlave: 'HijackSlave: can hijack the Slave role in an active connection',
-    BleCommand.HijackBoth: 'HijackBoth: can hijack the Master and the Slave role in an active connection',
-    BleCommand.PrepareSequence: 'PrepareSequence: can prepare a sequence of packets and associate a trigger',
-    BleCommand.TriggerSequence: 'TriggerSequence: can manually trigger the transmission of a sequence of packets',
-    BleCommand.DeleteSequence: 'DeleteSequence: can delete a prepared sequence of packets'
+    BleCommands.SetBdAddress: 'SetBdAddress: can set BD address',
+    BleCommands.SniffAdv: 'SniffAdv: can sniff advertising PDUs',
+    BleCommands.JamAdv: 'JamAdv: can jam advertising PDUs',
+    BleCommands.JamAdvOnChannel: 'JamAdvOnChannel: can jam advertising PDUs on a single channel',
+    BleCommands.ReactiveJam: 'ReactiveJam: can reactively jam PDU on a single channel',
+    BleCommands.SniffConnReq: 'SniffConnReq: can sniff a new connection',
+    BleCommands.SniffAccessAddress: 'SniffAccessAddress: can detect active connections',
+    BleCommands.SniffActiveConn: 'SniffActiveConn: can sniff an active connection',
+    BleCommands.JamConn: 'JamConn: can jam an active connection',
+    BleCommands.ScanMode: 'ScanMode: can scan devices',
+    BleCommands.AdvMode: 'AdvMode: can advertise as a BLE device',
+    BleCommands.SetAdvData: 'SetAdvData: can set advertising PDU details',
+    BleCommands.CentralMode: 'CentralMode: can act as a Central device',
+    BleCommands.ConnectTo: 'ConnectTo: can initiate a BLE connection',
+    BleCommands.SendRawPDU: 'SendRawPDU: can send a raw PDU',
+    BleCommands.SendPDU: 'SendPDU: can send a PDU',
+    BleCommands.Disconnect: 'Disconnect: can terminate an active connection (in Central mode)',
+    BleCommands.PeripheralMode: 'PeripheralMode: can act as a peripheral',
+    BleCommands.Start: 'Start: can start depending on the current mode',
+    BleCommands.Stop: 'Stop: can stop depending on the current mode',
+    BleCommands.SetEncryption: 'SetEncryption: can enable encryption during a connection',
+    BleCommands.HijackMaster: 'HijackMaster: can hijack the Master role in an active connection',
+    BleCommands.HijackSlave: 'HijackSlave: can hijack the Slave role in an active connection',
+    BleCommands.HijackBoth: 'HijackBoth: can hijack the Master and the Slave role in an active connection',
+    BleCommands.PrepareSequence: 'PrepareSequence: can prepare a sequence of packets and associate a trigger',
+    BleCommands.TriggerSequence: 'TriggerSequence: can manually trigger the transmission of a sequence of packets',
+    BleCommands.DeleteSequence: 'DeleteSequence: can delete a prepared sequence of packets'
 
 }
 
 DOT15D4_COMMANDS = {
-    Dot15d4Command.SetNodeAddress: "SetNodeAddress: can set Node address",
-    Dot15d4Command.Sniff: "Sniff: can sniff 802.15.4 packets",
-    Dot15d4Command.EnergyDetection: "EnergyDetection: can perform energy detection scans",
-    Dot15d4Command.Jam: "Jam: can jam 802.15.4 packets",
-    Dot15d4Command.Send: "Send: can transmit 802.15.4 packets",
-    Dot15d4Command.EndDeviceMode: "EndDeviceMode: can act as an End Device",
-    Dot15d4Command.CoordinatorMode: "CoordinatorMode: can act as a Coordinator",
-    Dot15d4Command.RouterMode: "RouterMode: can act as a Router",
-    Dot15d4Command.Start: "Start: can start depending on the current mode",
-    Dot15d4Command.Stop: "Stop: can stop depending on the current mode",
-    Dot15d4Command.ManInTheMiddle: "ManInTheMiddle: can perform a Man-in-the-Middle attack",
+    Dot15d4Commands.SetNodeAddress: "SetNodeAddress: can set Node address",
+    Dot15d4Commands.Sniff: "Sniff: can sniff 802.15.4 packets",
+    Dot15d4Commands.EnergyDetection: "EnergyDetection: can perform energy detection scans",
+    Dot15d4Commands.Jam: "Jam: can jam 802.15.4 packets",
+    Dot15d4Commands.Send: "Send: can transmit 802.15.4 packets",
+    Dot15d4Commands.EndDeviceMode: "EndDeviceMode: can act as an End Device",
+    Dot15d4Commands.CoordinatorMode: "CoordinatorMode: can act as a Coordinator",
+    Dot15d4Commands.RouterMode: "RouterMode: can act as a Router",
+    Dot15d4Commands.Start: "Start: can start depending on the current mode",
+    Dot15d4Commands.Stop: "Stop: can stop depending on the current mode",
+    Dot15d4Commands.ManInTheMiddle: "ManInTheMiddle: can perform a Man-in-the-Middle attack",
 }
 
 ESB_COMMANDS = {
-    ESBCommand.SetNodeAddress: "SetNodeAddress: can set Node address",
-    ESBCommand.Sniff: "Sniff: can sniff Enhanced ShockBurst packets",
-    ESBCommand.Jam: "Jam: can jam Enhanced ShockBurst packets",
-    ESBCommand.Send: "Send: can transmit Enhanced ShockBurst packets",
-    ESBCommand.PrimaryReceiverMode: "PrimaryReceiverMode: can act as a Primary Receiver (PRX)",
-    ESBCommand.PrimaryTransmitterMode: "PrimaryReceiverMode: can act as a Primary Receiver (PTX)",
-    ESBCommand.Start: "Start: can start depending on the current mode",
-    ESBCommand.Stop: "Stop: can stop depending on the current mode"
+    ESBCommands.SetNodeAddress: "SetNodeAddress: can set Node address",
+    ESBCommands.Sniff: "Sniff: can sniff Enhanced ShockBurst packets",
+    ESBCommands.Jam: "Jam: can jam Enhanced ShockBurst packets",
+    ESBCommands.Send: "Send: can transmit Enhanced ShockBurst packets",
+    ESBCommands.PrimaryReceiverMode: "PrimaryReceiverMode: can act as a Primary Receiver (PRX)",
+    ESBCommands.PrimaryTransmitterMode: "PrimaryReceiverMode: can act as a Primary Receiver (PTX)",
+    ESBCommands.Start: "Start: can start depending on the current mode",
+    ESBCommands.Stop: "Stop: can stop depending on the current mode"
 }
 
 UNIFYING_COMMANDS = {
-    UnifyingCommand.SetNodeAddress: "SetNodeAddress: can set Node address",
-    UnifyingCommand.Sniff: "Sniff: can sniff Logitech Unifying packets",
-    UnifyingCommand.Jam: "Jam: can jam Logitech Unifying packets",
-    UnifyingCommand.Send: "Send: can transmit Logitech Unifying packets",
-    UnifyingCommand.LogitechDongleMode: "PrimaryReceiverMode: can act as a Logitech Dongle (ESB PRX)",
-    UnifyingCommand.LogitechKeyboardMode: "PrimaryReceiverMode: can act as a Logitech Keyboard (ESB PTX)",
-    UnifyingCommand.LogitechMouseMode: "LogitechMouseMode: can act as a Logitech Mouse (ESB PTX)",
-    UnifyingCommand.Start: "Start: can start depending on the current mode",
-    UnifyingCommand.Stop: "Stop: can stop depending on the current mode",
-    UnifyingCommand.SniffPairing: "SniffPairing: can sniff a pairing process"
+    UnifyingCommands.SetNodeAddress: "SetNodeAddress: can set Node address",
+    UnifyingCommands.Sniff: "Sniff: can sniff Logitech Unifying packets",
+    UnifyingCommands.Jam: "Jam: can jam Logitech Unifying packets",
+    UnifyingCommands.Send: "Send: can transmit Logitech Unifying packets",
+    UnifyingCommands.LogitechDongleMode: "PrimaryReceiverMode: can act as a Logitech Dongle (ESB PRX)",
+    UnifyingCommands.LogitechKeyboardMode: "PrimaryReceiverMode: can act as a Logitech Keyboard (ESB PTX)",
+    UnifyingCommands.LogitechMouseMode: "LogitechMouseMode: can act as a Logitech Mouse (ESB PTX)",
+    UnifyingCommands.Start: "Start: can start depending on the current mode",
+    UnifyingCommands.Stop: "Stop: can stop depending on the current mode",
+    UnifyingCommands.SniffPairing: "SniffPairing: can sniff a pairing process"
 }
 
 PHY_COMMANDS = {
-    PhyCommand.SetASKModulation: "SetASKModulation: can use Amplitude Shift Keying modulation scheme",
-    PhyCommand.SetFSKModulation: "SetFSKModulation: can use Frequency Shift Keying modulation scheme",
-    PhyCommand.SetGFSKModulation: "SetGFSKModulation: can use Gaussian Frequency Shift Keying modulation scheme",
-    PhyCommand.SetBPSKModulation: "SetBPSKModulation: can use Binary Phase Shift Keying modulation scheme",
-    PhyCommand.SetQPSKModulation: "SetQPSKModulation: can use Quadrature Phase Shift Keying modulation scheme",
-    PhyCommand.GetSupportedFrequencies: "GetSupportedFrequencies: can return a list of supported frequency ranges",
-    PhyCommand.SetFrequency: "SetFrequency: can configure a given frequency",
-    PhyCommand.SetDataRate: "SetDataRate: can configure the datarate",
-    PhyCommand.SetEndianness: "SetEndianness: can configure the endianness",
-    PhyCommand.SetTXPower: "SetTXPower: can configure the transmission power level",
-    PhyCommand.SetPacketSize: "SetPacketSize: can configure the packet size",
-    PhyCommand.SetSyncWord: "SetSyncWord: can configure the synchronization word",
-    PhyCommand.Sniff: "Sniff: can receive arbitrary packets",
-    PhyCommand.Send: "Send: can transmit arbitrary packets",
-    PhyCommand.SendRaw: "SendRaw: can transmit arbitrary IQ streams" ,
-    PhyCommand.ScheduleSend: "ScheduleSend: can schedule a packet to be sent at a specific time",
-    PhyCommand.Jam: "Jam: can jam a physical medium",
-    PhyCommand.Monitor: "Monitor: can monitor a physical medium",
-    PhyCommand.Start: "Start: can start depending on the current mode",
-    PhyCommand.Stop: "Stop: can stop depending on the current mode",
+    PhyCommands.SetASKModulation: "SetASKModulation: can use Amplitude Shift Keying modulation scheme",
+    PhyCommands.SetFSKModulation: "SetFSKModulation: can use Frequency Shift Keying modulation scheme",
+    PhyCommands.SetGFSKModulation: "SetGFSKModulation: can use Gaussian Frequency Shift Keying modulation scheme",
+    PhyCommands.SetBPSKModulation: "SetBPSKModulation: can use Binary Phase Shift Keying modulation scheme",
+    PhyCommands.SetQPSKModulation: "SetQPSKModulation: can use Quadrature Phase Shift Keying modulation scheme",
+    PhyCommands.SetLoRaModulation: "SetLoRaModulation: can use LoRa modulation scheme",
+    PhyCommands.GetSupportedFrequencies: "GetSupportedFrequencies: can return a list of supported frequency ranges",
+    PhyCommands.SetFrequency: "SetFrequency: can configure a given frequency",
+    PhyCommands.SetDataRate: "SetDataRate: can configure the datarate",
+    PhyCommands.SetEndianness: "SetEndianness: can configure the endianness",
+    PhyCommands.SetTXPower: "SetTXPower: can configure the transmission power level",
+    PhyCommands.SetPacketSize: "SetPacketSize: can configure the packet size",
+    PhyCommands.SetSyncWord: "SetSyncWord: can configure the synchronization word",
+    PhyCommands.Sniff: "Sniff: can receive arbitrary packets",
+    PhyCommands.Send: "Send: can transmit arbitrary packets",
+    PhyCommands.SendRaw: "SendRaw: can transmit arbitrary IQ streams" ,
+    PhyCommands.ScheduleSend: "ScheduleSend: can schedule a packet to be sent at a specific time",
+    PhyCommands.Jam: "Jam: can jam a physical medium",
+    PhyCommands.Monitor: "Monitor: can monitor a physical medium",
+    PhyCommands.Start: "Start: can start depending on the current mode",
+    PhyCommands.Stop: "Stop: can stop depending on the current mode",
 }
+
 COMMANDS = {
     Domain.BtLE: BLE_COMMANDS,
     Domain.Esb: ESB_COMMANDS,
