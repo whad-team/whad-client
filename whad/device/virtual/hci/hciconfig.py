@@ -17,9 +17,13 @@ class HCIConfig(object):
         sock = socket(31, SOCK_RAW, 1)
 
         # Get number of devices
-        arg = pack('I', 16) +  b"\x00" * (8*16)
-        output = ioctl(sock.fileno(), cls.HCIGETDEVLIST, arg)
-        number_of_devices = unpack('H', output[:2])[0]
+        try:
+            arg = pack('I', 16) +  b"\x00" * (8*16)
+            output = ioctl(sock.fileno(), cls.HCIGETDEVLIST, arg)
+            number_of_devices = unpack('H', output[:2])[0]
+        except Exception:
+            # Not able to open a raw HCI socket, no device available
+            number_of_devices = 0
 
         device_ids = []
         for device_number in range(number_of_devices):
