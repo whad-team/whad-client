@@ -13,6 +13,7 @@ jobs:
     name: Release pushed tag
     runs-on: ubuntu-22.04
     steps:
+      - uses: actions/checkout@v2
       - name: Install pypa/build
         run: >-
           python3 -m
