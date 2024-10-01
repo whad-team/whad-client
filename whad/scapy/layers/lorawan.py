@@ -5,10 +5,6 @@ from scapy.packet import Packet, bind_layers
 from scapy.fields import StrFixedLenField, BitField, BitEnumField, FCSField, \
     XLEShortField, XLEIntField, LEThreeBytesField, ByteField, LEShortField, \
     StrLenField, XByteField
-from scapy.config import conf
-from struct import pack, unpack
-
-from whad.helpers import bits_to_bytes, bytes_to_bits, bitwise_xor
 
 class EUIField(StrFixedLenField):
     """LoRaWAN Extended Unique Identifier
