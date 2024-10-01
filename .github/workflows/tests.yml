@@ -1,4 +1,4 @@
-name: Tests
+name: Unit Tests
 
 on:
   push:
@@ -15,8 +15,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04, ubuntu-latest]
         python-version: ['3.7', '3.8', '3.9', '3.10']
+        exclude:
+          - os: ubuntu-22.04
+            python-version: '3.7'
 
     steps:
       - uses: actions/checkout@v2
