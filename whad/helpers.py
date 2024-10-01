@@ -118,12 +118,9 @@ def bitwise_xor(bitseq_a, bitseq_b):
     '''
     if len(bitseq_a) != len(bitseq_b):
         return None
-    result = ""
-    for i in range(len(bitseq_a)):
-        val_a = bitseq_a[i] == "1"
-        val_b = bitseq_b[i] == "1"
-        result += "1" if val_a ^ val_b else "0"
-    return result
+
+    return bin(int(bitseq_a, 2)^int(bitseq_b, 2))[2:].rjust(len(bitseq_a), "0")
+
 
 def list_domains():
     '''
@@ -138,6 +135,14 @@ def list_domains():
             pass
     return domains
 
+def scapy_field_bitsize(packet, field) -> int:
+    """Compute Scapy field size in bits.
+    """
+    if not isinstance(getattr(packet, field.name), bytes):
+        return int(field.sz*8)
+    return len(getattr(packet, field.name))*8
+
+
 def scapy_packet_to_pattern(packet, selected_fields=None, selected_layers=None):
     '''
     This function converts a scapy packet into a pattern, a mask and an offset.
@@ -149,6 +154,7 @@ def scapy_packet_to_pattern(packet, selected_fields=None, selected_layers=None):
 
     if isinstance(selected_layers, Packet_metaclass):
         selected_layers = (selected_layers, )
+
     # convert packet to bitstring
     pattern = bytes_to_bits(bytes(packet))
     mask = ""
@@ -158,15 +164,13 @@ def scapy_packet_to_pattern(packet, selected_fields=None, selected_layers=None):
     for layer in packet.layers():
         use_layer = False
 
-        if selected_layers is None and selected_fields is None:
-            use_layer = True
-        elif selected_layers is not None and layer in selected_layers:
-            use_layer = True
+        # Use layer if no selected layers or layer in selected layers
+        use_layer |= (selected_layers is None and selected_fields is None)
+        use_layer |= (selected_layers is not None and layer in selected_layers)
+
         for field in layer.fields_desc:
-            if not isinstance(getattr(packet, field.name), bytes):
-                field_size = int(field.sz*8)
-            else:
-                field_size = len(getattr(packet, field.name))*8
+            field_size = scapy_field_bitsize(packet, field)
+
             if use_layer:
                 mask += "1" * field_size
             else:
