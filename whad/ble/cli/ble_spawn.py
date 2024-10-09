@@ -276,7 +276,7 @@ class BleSpawnApp(CommandLineDevicePipe):
 
         # Create our peripheral
         logger.info("[ble-spawn] Creating peripheral ...")
-        peripheral = Peripheral(self.interface)
+        peripheral = Peripheral(self.interface, adv_data=adv_data, scan_data=scan_data)
 
         # Query the input device to check if it supports raw BLE packets
         self.input_interface.discover()
@@ -304,7 +304,7 @@ class BleSpawnApp(CommandLineDevicePipe):
         """
         # Create our peripheral
         logger.info("[ble-spawn] Creating peripheral ...")
-        peripheral = Peripheral(self.interface)
+        peripheral = Peripheral(self.interface, adv_data=adv_data, scan_data=scan_data)
 
         # Create our unix socket server
         unix_server = UnixConnector(UnixSocketServerDevice(parameters={
@@ -313,7 +313,7 @@ class BleSpawnApp(CommandLineDevicePipe):
 
         # Create our packet bridge
         # logger.info("[ble-spawn] Starting our output pipe")
-        output_pipe = BleSpawnOutputPipe(peripheral, unix_server)
+        _ = BleSpawnOutputPipe(peripheral, unix_server)
 
         # Loop until the user hits CTL-C
         while unix_server.device.opened:
