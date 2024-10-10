@@ -493,16 +493,19 @@ class HCIDevice(VirtualDevice):
         """
         Configure advertising data to use by HCI device.
         """
-        # pad data if less than 31 bytes
-        if len(data) < 31:
-            data += b'\x00'*(31 - len(data))
-
         # Send command
         if wait_response:
-            response = self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data))
+            response = self._write_command(HCI_Cmd_LE_Set_Advertising_Data(
+                data=data + (31 - len(data)) * b"\x00", len=len(data)
+                )
+            )
             return response is not None and response.status == 0x0
         else:
-            self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data), wait_response=False)
+            self._write_command(HCI_Cmd_LE_Set_Advertising_Data(
+                data=data + (31 - len(data)) * b"\x00", len=len(data)
+                ),
+                wait_response=False
+            )
             return True
 
     def _set_scan_response_data(self, data, wait_response=True):
@@ -531,12 +534,16 @@ class HCIDevice(VirtualDevice):
         if self._advertising and enable:
             return True
         else:
-            logger.debug('Enable advertising: %s' % enable)
+            logger.debug(f"Enable advertising: {enable}")
             if wait_response:
                 response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))
                 success = response.status == 0x00
             else:
-                self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)), wait_response=False)
+                self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(
+                    enable=int(enable)
+                    ),
+                    wait_response=False
+                )
                 success = True
             if success:
                 self._advertising = enable
