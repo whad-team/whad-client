@@ -332,6 +332,7 @@ class GenericProvisioningLayer(ContextualLayer):
         # on wrong segment nb, reset Transaction and wait for resent (in spec)
         if pkt.segment_index != len(self.state.current_transaction.fragments):
             self.state.current_transaction = None
+            self.state.in_transaction = False
             logger.warning(
                 f"Received Transaction Continuation with wrong segment_index (received: {pkt.segment_index})"
             )

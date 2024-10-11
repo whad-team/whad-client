@@ -39,6 +39,9 @@ class MeshMessageContext:
         # Either received TTL or sending TTL
         self.ttl = None
 
+        # True if Upper Transport Control Message/Ack messgae (network_ctl field to 1), false otherwise
+        self.is_ctl = None
+
         # Seq auth value set by the Upper Transport Layer when encrypting the access pdu
         # Set by the Network layer on Rx messages
         # int !
