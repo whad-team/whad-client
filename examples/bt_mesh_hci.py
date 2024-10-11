@@ -1,4 +1,4 @@
-from whad.scapy.layers.bt_mesh import *
+from whad.scapy.layers.bt_mesh import EIR_BTMesh_Beacon
 from whad.exceptions import WhadDeviceNotFound
 
 from whad.device import WhadDevice
@@ -6,6 +6,7 @@ from whad.ble.exceptions import ConnectionLostException
 import sys
 from time import sleep
 from whad.bt_mesh.connectors import BTMeshHCI
+from whad.ble import Peripheral
 
 from whad.ble.profile.advdata import (
     AdvCompleteLocalName,
@@ -13,6 +14,7 @@ from whad.ble.profile.advdata import (
     AdvFlagsField,
     AdvMeshBeacon,
 )
+from scapy.all import raw
 
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV_NONCONN_IND
 
@@ -36,17 +38,13 @@ pkt = BTLE(
 )
 adv_data = b"".join([bytes(record) for record in pkt[BTLE_ADV_NONCONN_IND].data])
 
+adv_data = AdvDataFieldList(AdvMeshBeacon(raw(pkt.getlayer(EIR_BTMesh_Beacon))))
+
 try:
     dev = WhadDevice.create(interface)
     hci = BTMeshHCI(dev)
     hci.attach_callback(callback=show)
-    print(
-        hci.enable_adv_mode(
-            adv_data=AdvDataFieldList(
-                AdvCompleteLocalName(b"Guess Me!"), AdvFlagsField()
-            )
-        )
-    )
+    print(hci.enable_adv_mode(adv_data=adv_data))
     print(hci.start())
     while True:
         pass

@@ -36,6 +36,8 @@ try:
     provisionee.send_raw(pkt_beacon)
     provisionee.send_raw(pkt_beacon)
     provisionee.send_raw(pkt_beacon)
+    provisionee.send_raw(pkt_beacon)
+    provisionee.send_raw(pkt_beacon)
 
     while True:
         # provisionee.send_raw(pkt_beacon)

@@ -8,7 +8,7 @@ Manages basic Tx/Rx. (Based on BLE sniffer because it works)
 from random import randbytes
 from whad.ble.connector import Sniffer, BLE
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_ADV_NONCONN_IND, EIR_Hdr
-from whad.ble import UnsupportedCapability, message_filter, BleDirection
+from whad.ble import UnsupportedCapability, message_filter, BleDirection, Peripheral
 from queue import Queue, Empty
 import pdb
 from time import sleep
@@ -123,26 +123,28 @@ class BTMesh(Sniffer):
         """
         AdvA = randbytes(6).hex(":")  # random in spec
         adv_pkt = BTLE_ADV(TxAdd=1) / BTLE_ADV_NONCONN_IND(AdvA=AdvA, data=packet)
-        self.send_pdu(
-            adv_pkt,
-            access_address=0x8E89BED6,
-            conn_handle=39,
-            direction=BleDirection.UNKNOWN,
-        )
-        sleep(0.01)
-        self.send_pdu(
-            adv_pkt,
-            access_address=0x8E89BED6,
-            conn_handle=37,
-            direction=BleDirection.UNKNOWN,
-        )
-        sleep(0.01)
-        res = self.send_pdu(
-            adv_pkt,
-            access_address=0x8E89BED6,
-            conn_handle=38,
-            direction=BleDirection.UNKNOWN,
-        )
+        for i in range(0, 2):
+            self.send_pdu(
+                adv_pkt,
+                access_address=0x8E89BED6,
+                conn_handle=39,
+                direction=BleDirection.UNKNOWN,
+            )
+            sleep(0.005)
+            self.send_pdu(
+                adv_pkt,
+                access_address=0x8E89BED6,
+                conn_handle=37,
+                direction=BleDirection.UNKNOWN,
+            )
+            sleep(0.005)
+            res = self.send_pdu(
+                adv_pkt,
+                access_address=0x8E89BED6,
+                conn_handle=38,
+                direction=BleDirection.UNKNOWN,
+            )
+            sleep(0.005)
         return res
 
     def change_sniffing_channel(self):
@@ -154,7 +156,7 @@ class BTMesh(Sniffer):
             sleep(0.03)
 
 
-class BTMeshHCI(BLE):
+class BTMeshHCI(Peripheral):
     """
     Creates a Mesh generic Node, only using HCI commands
 

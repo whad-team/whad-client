@@ -110,7 +110,7 @@ class NetworkLayer(Layer):
         if dst_type == UNASSIGNED_ADDR_TYPE:
             return False
         if network_ctl == 1 and dst_type == VIRTUAL_ADDR_TYPE:
-            return False
+            return True # Modified because inconcistency in Specification (Direct Forwarding may need dst_field VIRTUAL in ctl msg)
 
         int_dst_addr = int.from_bytes(dst_addr, "big")
         if (
@@ -229,6 +229,7 @@ class NetworkLayer(Layer):
         msg_ctx.seq_number = int.from_bytes(seq_number, "big")
         msg_ctx.net_key_id = net_key.key_index
         msg_ctx.ttl = ttl
+        msg_ctx.is_ctl = network_ctl == 1
 
         self.send_to_lower_transport(msg_ctx, lower_transport_pdu)
 
@@ -248,7 +249,7 @@ class NetworkLayer(Layer):
         net_pdu = BTMesh_Network_PDU(
             ivi=self.state.global_states_manager.iv_index[0] & 1,
             nid=net_key.nid,
-            network_ctl=int(isinstance(pkt, BTMesh_Lower_Transport_Control_Message)),
+            network_ctl=int(ctx.is_ctl),
             ttl=ctx.ttl,
             seq_number=ctx.seq_number,
             src_addr=int.from_bytes(ctx.src_addr, "big"),
@@ -285,8 +286,6 @@ class NetworkLayer(Layer):
         """
 
     def sending_thread(self, pkt):
-        self.__connector.send_raw(pkt)
-        sleep(0.001)
         self.__connector.send_raw(pkt)
 
 

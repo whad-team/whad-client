@@ -22,7 +22,27 @@ from whad.scapy.layers.bt_mesh import (
     BTMesh_Lower_Transport_Access_Message,
     BTMesh_Lower_Transport_Segment_Acknoledgment_Message,
     BTMesh_Lower_Transport_Control_Message,
+    BTMesh_Lower_Transport_Segmented_Control_Message,
+    BTMesh_Upper_Transport_Control_Friend_Poll,
+    BTMesh_Upper_Transport_Control_Friend_Update,
+    BTMesh_Upper_Transport_Control_Friend_Request,
+    BTMesh_Upper_Transport_Control_Friend_Offer,
+    BTMesh_Upper_Transport_Control_Friend_Clear,
+    BTMesh_Upper_Transport_Control_Friend_Clear_Confirm,
+    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add,
+    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove,
+    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm,
+    BTMesh_Upper_Transport_Control_Heartbeat,
+    BTMesh_Upper_Transport_Control_Path_Request,
+    BTMesh_Upper_Transport_Control_Path_Reply,
+    BTMesh_Upper_Transport_Control_Path_Confirmation,
+    BTMesh_Upper_Transport_Control_Path_Echo_Request,
+    BTMesh_Upper_Transport_Control_Path_Echo_Reply,
+    BTMesh_Upper_Transport_Control_Dependent_Node_Update,
+    BTMesh_Upper_Transport_Control_Path_Request_Solicitation,
 )
+
+
 from scapy.all import raw, Raw
 from whad.bt_mesh.models import GlobalStatesManager
 from threading import Thread, Event, Timer
@@ -31,7 +51,31 @@ from random import uniform
 from copy import copy
 
 
+# TODO :
+# CREATE SENDING THREADS FOR CTL MESSAGES
+
+
 logger = logging.getLogger(__name__)
+
+OPCODE_TO_PAYLOAD_CLASS_LOWER_TRANSPORT = {
+    0x01: BTMesh_Upper_Transport_Control_Friend_Poll,
+    0x02: BTMesh_Upper_Transport_Control_Friend_Update,
+    0x03: BTMesh_Upper_Transport_Control_Friend_Request,
+    0x04: BTMesh_Upper_Transport_Control_Friend_Offer,
+    0x05: BTMesh_Upper_Transport_Control_Friend_Clear,
+    0x06: BTMesh_Upper_Transport_Control_Friend_Clear_Confirm,
+    0x07: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add,
+    0x08: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove,
+    0x09: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm,
+    0x0A: BTMesh_Upper_Transport_Control_Heartbeat,
+    0x0B: BTMesh_Upper_Transport_Control_Path_Request,
+    0x0C: BTMesh_Upper_Transport_Control_Path_Reply,
+    0x0D: BTMesh_Upper_Transport_Control_Path_Confirmation,
+    0x0E: BTMesh_Upper_Transport_Control_Path_Echo_Request,
+    0x0F: BTMesh_Upper_Transport_Control_Path_Echo_Reply,
+    0x10: BTMesh_Upper_Transport_Control_Dependent_Node_Update,
+    0x11: BTMesh_Upper_Transport_Control_Path_Request_Solicitation,
+}
 
 
 class Transaction:
@@ -71,7 +115,6 @@ class Transaction:
 class TxTransaction(Transaction):
     """
     Initiates a Tx transaction of a PDU to the network Layer
-    No control messages for now (exepct use of Ack)
     """
 
     def __init__(self, message):
@@ -125,6 +168,14 @@ class TxTransaction(Transaction):
         self.multicast_retrans_interval_step = sar_state.get_sub_state(
             "sar_multicast_retransmissions_interval_step"
         ).get_multicast_retransmissions_interval()
+
+        # if control message, get the opcode
+        if self.ctx.is_ctl:
+            self.opcode = list(OPCODE_TO_PAYLOAD_CLASS_LOWER_TRANSPORT.keys())[
+                list(OPCODE_TO_PAYLOAD_CLASS_LOWER_TRANSPORT.values()).index(
+                    self.pkt.__class__
+                )
+            ]
 
     def process_ack(self, message):
         """
@@ -234,6 +285,10 @@ class RxTransaction(Transaction):
         self.fragments = {}
         self.fragments[self.pkt.seg_offset] = self.pkt.getlayer(Raw).load
 
+        # set opcode of ctl message
+        if self.ctx.is_ctl:
+            self.opcode = self.pkt.opcode
+
 
 @alias("lower_transport")
 class LowerTransportLayer(Layer):
@@ -296,10 +351,12 @@ class LowerTransportLayer(Layer):
         pkt, ctx = message
 
         # if ack received
-        if isinstance(pkt, BTMesh_Lower_Transport_Control_Message) and pkt.opcode == 0:
-            print("ACK RECEIVED")
-            if ctx.src_addr in self.state.tx_transactions.keys():
+        if isinstance(pkt, BTMesh_Lower_Transport_Control_Message):
+            if pkt.opcode == 0 and ctx.src_addr in self.state.tx_transactions.keys():
+                print("ACK RECEIVED")
                 self.state.tx_transactions[ctx.src_addr].process_ack((pkt[1], ctx))
+            else:
+                self.dispatch_control_rx_pdu(message)
 
         # if access message (segment or not) received
         elif isinstance(pkt, BTMesh_Lower_Transport_Access_Message):
@@ -313,6 +370,87 @@ class LowerTransportLayer(Layer):
                 ctx.application_key_index = 0
 
             self.dispatch_access_rx_pdu(message)
+
+    def dispatch_control_rx_pdu(self, message):
+        """
+        Checks validity of Control PDU and processes it if needed
+
+        :param message: The message received with its context
+        :type message: (BTMesh_Lower_Transport_Control_Message, MeshMessageContext)
+        """
+        pkt, ctx = message
+
+        seg = pkt.seg
+
+        if seg == 0:
+            iv_index = self.global_states_manager.iv_index
+            ctx.seq_auth = int.from_bytes(
+                iv_index + ctx.seq_number.to_bytes(3, "big"), "big"
+            )
+            ctx.seq_number = ctx.seq_auth & 0xFFFFFF
+
+            # if seq_auth is lower or equal than the stored one, discard
+            if (
+                ctx.src_addr in self.state.seq_auth_values.keys()
+                and ctx.seq_auth <= self.state.seq_auth_values[ctx.src_addr]
+            ):
+                logger.warn(
+                    "SEQAUTH VALUE LOWER OR EQUAL THAN STORED ONE IN CTL MESSAGE"
+                )
+                return
+
+            self.state.seq_auth_values[ctx.src_addr] = ctx.seq_auth
+            self.send_to_upper_transport((pkt[1], ctx))
+        else:
+            pkt = pkt.getlayer(BTMesh_Lower_Transport_Segmented_Control_Message)
+            ctx.seq_auth = calculate_seq_auth(
+                self.global_states_manager.iv_index, ctx.seq_number, pkt.seq_zero
+            )
+            ctx.seq_zero = pkt.seq_zero
+            ctx.azsmic = pkt.aszmic
+            if ctx.src_addr in self.state.seq_auth_values.keys():
+                # if segmented packet and lower seq_auth value, disacrd
+                if ctx.seq_auth < self.state.seq_auth_values[ctx.src_addr]:
+                    logger.warn(
+                        "SEGAUTH VALUE LOWER THAN STORED ONE FOR SEGMENT RECEIVED"
+                    )
+                    return
+
+                # if seq_auth equal, check if a Transaction exists with this seq auth (if it was an unsegmented there was no transaction)
+                elif ctx.seq_auth == self.state.seq_auth_values[ctx.src_addr]:
+                    if ctx.src_addr in self.state.rx_transactions.keys():
+                        self.process_rx_seg_message(
+                            self.state.rx_transactions[ctx.src_addr],
+                            (
+                                pkt,
+                                ctx,
+                            ),
+                        )
+                        return
+                    else:
+                        logger.warn("RECEIVED SEGMENT FOR UNSEGEMENTED SEQAUTH !")
+                        return
+            # if received seq_auth higher/ not stored seq_auth, start new transaction
+            print("NEW CONTROL TRANSACTION")
+            transaction = RxTransaction((
+                pkt,
+                ctx,
+            ))
+            self.state.rx_transactions[ctx.src_addr] = transaction
+            self.state.seq_auth_values[ctx.src_addr] = ctx.seq_auth
+            transaction.main_ack_thread = Timer(
+                transaction.initial_ack_delay / 1000,
+                self.sending_ack_thread,
+                args=(transaction, True, transaction.event),
+            )
+            """
+            transaction.main_ack_thread = Timer(
+                0,
+                self.sending_ack_thread,
+                args=(transaction, True, transaction.event),
+            )
+            """
+            transaction.main_ack_thread.start()
 
     def dispatch_access_rx_pdu(self, message):
         """
@@ -400,7 +538,6 @@ class LowerTransportLayer(Layer):
     def process_rx_seg_message(self, transaction, message):
         """
         Process an rx message containing a segment for the transaction
-        (no control PDU)
 
         :param transaction: the rx_transaction matching the segment
         :type transaction: RxTransaction
@@ -466,7 +603,12 @@ class LowerTransportLayer(Layer):
                 raw_upper_pkt = b""
                 for index, fragment in sorted(transaction.fragments.items()):
                     raw_upper_pkt += fragment
-                pkt = BTMesh_Upper_Transport_Access_PDU(raw_upper_pkt)
+                if transaction.ctx.is_ctl:
+                    pkt = OPCODE_TO_PAYLOAD_CLASS_LOWER_TRANSPORT(transaction.opcode)(
+                        raw_upper_pkt
+                    )
+                else:
+                    pkt = BTMesh_Upper_Transport_Access_PDU(raw_upper_pkt)
                 self.send_to_upper_transport((pkt, transaction.ctx))
 
     @source("upper_transport")
@@ -505,26 +647,104 @@ class LowerTransportLayer(Layer):
         transaction.event = Event()
         if len(transaction.fragments) > 1:
             if transaction.dst_addr_type == UNICAST_ADDR_TYPE:
+                if transaction.ctx.is_ctl:
+                    transaction.sending_thread = Thread(
+                        target=self.sending_thread_ctl_unicast_segmented,
+                        args=(transaction, transaction.event),
+                    )
+                else:
+                    transaction.sending_thread = Thread(
+                        target=self.sending_thread_access_unicast_segmented,
+                        args=(transaction, transaction.event),
+                    )
+            else:
+                if transaction.ctx.is_ctl:
+                    transaction.sending_thread = Thread(
+                        target=self.sending_thread_ctl_multicast_segmented,
+                        args=(transaction, transaction.event),
+                    )
+                else:
+                    transaction.sending_thread = Thread(
+                        target=self.sending_thread_access_multicast_segmented,
+                        args=(transaction, transaction.event),
+                    )
+        else:
+            if transaction.ctx.is_ctl:
                 transaction.sending_thread = Thread(
-                    target=self.sending_thread_unicast_segmented,
+                    target=self.sending_thread_ctl_unsegmented,
                     args=(transaction, transaction.event),
                 )
             else:
                 transaction.sending_thread = Thread(
-                    target=self.sending_thread_multicast_segmented,
+                    target=self.sending_thread_access_unsegmented,
                     args=(transaction, transaction.event),
                 )
-        else:
-            transaction.sending_thread = Thread(
-                target=self.sending_thread_unsegmented,
-                args=(transaction, transaction.event),
-            )
 
         transaction.sending_thread.start()
 
-    def sending_thread_unicast_segmented(self, transaction, event):
+    def sending_thread_ctl_unicast_segmented(self, transaction, event):
         """
         Function running in the sending thread to send each segment to the network layer for a unicast destination
+        FOR CONTROL MESSAGES
+
+        :param transacion: Tx Transaction for which we start the thread
+        :type transaction: TxTransaction
+        :param event: Event object to received signal from main thread
+        :type: Event
+        """
+        while (
+            transaction.unicast_retrans_count > 0
+            and transaction.unicast_retrans_no_progress_count > 0
+            and not transaction.is_transaction_finished
+        ):
+            if not transaction.acked_received:
+                transaction.unicast_retrans_no_progress_count -= 1
+
+            transaction.acked_received = False
+            transaction.unicast_retrans_count -= 1
+            for fragment_index in range(len(transaction.fragments)):
+                if fragment_index not in transaction.acked_segments:
+                    payload = (
+                        BTMesh_Lower_Transport_Segmented_Control_Message(
+                            seq_zero=transaction.ctx.seq_auth & 0x1FFF,
+                            seg_offset=fragment_index,
+                            last_seg_number=len(transaction.fragments) - 1,
+                        )
+                        / transaction.fragments[fragment_index]
+                    )
+
+                    # create new context for the segment
+                    segment_ctx = copy(transaction.ctx)
+                    segment_ctx.segment_number = fragment_index
+                    segment_ctx.seq_number = transaction.ctx.seq_number + fragment_index
+                    print(
+                        "SENDING UNICAST SEGMENT CTL WITH SEQ NUMBER = "
+                        + str(transaction.ctx.seq_number)
+                    )
+                    self.send_to_network((
+                        BTMesh_Lower_Transport_Control_Message(
+                            seg=1,
+                            opcode=transaction.opcode,
+                            payload_field=payload,
+                        ),
+                        segment_ctx,
+                    ))
+                    sleep(transaction.interval_step / 1000)
+            if transaction.ctx.ttl == 0:
+                event.wait(transaction.unicast_retrans_interval_step / 1000)
+            else:
+                event.wait(
+                    (
+                        transaction.unicast_retrans_interval_step
+                        + (transaction.unicast_interval_inc * (transaction.ctx.ttl - 1))
+                    )
+                    / 1000
+                )
+
+    def sending_thread_access_unicast_segmented(self, transaction, event):
+        """
+        Function running in the sending thread to send each segment to the network layer for a unicast destination
+        For Access messages
 
         :param transacion: Tx Transaction for which we start the thread
         :type transaction: TxTransaction
@@ -588,9 +808,10 @@ class LowerTransportLayer(Layer):
                     / 1000
                 )
 
-    def sending_thread_multicast_segmented(self, transaction, event):
+    def sending_thread_access_multicast_segmented(self, transaction, event):
         """
         Function running in the sending thread to send a segmented PDU to a multicast destination
+        For Access messages
         No ack needed
 
         :param transacion: Tx Transaction for which we start the thread
@@ -640,9 +861,54 @@ class LowerTransportLayer(Layer):
                     sleep(transaction.interval_step / 1000)
             sleep(transaction.multicast_retrans_interval_step / 1000)
 
-    def sending_thread_unsegmented(self, transaction, event):
+    def sending_thread_ctl_multicast_segmented(self, transaction, event):
+        """
+        Function running in the sending thread to send a segmented PDU to a multicast destination
+        For ctl messages
+        No ack needed
+
+        :param transacion: Tx Transaction for which we start the thread
+        :type transaction: TxTransaction
+        :param event: Event object to received signal from main thread
+        :type: Event
+        """
+        while (
+            transaction.multicast_retrans_count > 0
+            and not transaction.is_transaction_finished
+        ):
+            transaction.multicast_retrans_count -= 1
+            for fragment_index in range(len(transaction.fragments)):
+                if fragment_index not in transaction.acked_segments:
+                    payload = (
+                        BTMesh_Lower_Transport_Segmented_Control_Message(
+                            seq_zero=transaction.ctx.seq_zero,
+                            seg_offset=fragment_index,
+                            last_seg_number=len(transaction.fragments) - 1,
+                        )
+                        / transaction.fragments[fragment_index]
+                    )
+
+                    # create new context for the segment
+                    segment_ctx = copy(transaction.ctx)
+                    segment_ctx.segment_number = fragment_index
+
+                    segment_ctx.seq_number = transaction.ctx.seq_number + fragment_index
+
+                    self.send_to_network((
+                        BTMesh_Lower_Transport_Control_Message(
+                            seg=1,
+                            opcode=transaction.opcode,
+                            payload_field=payload,
+                        ),
+                        segment_ctx,
+                    ))
+                    sleep(transaction.interval_step / 1000)
+            sleep(transaction.multicast_retrans_interval_step / 1000)
+
+    def sending_thread_access_unsegmented(self, transaction, event):
         """
         Function running in a thread to send a unsegmented PDU
+        For Access messages
         No ack
 
         :param transacion: Tx Transaction for which we start the thread
@@ -663,6 +929,24 @@ class LowerTransportLayer(Layer):
                 application_key_flag=application_key_flag,
                 application_key_id=application_key_id,
             )
+            / transaction.pkt,
+            transaction.ctx,
+        ))
+        transaction.is_transaction_finished = True
+
+    def sending_thread_ctl_unsegmented(self, transaction, event):
+        """
+        Function running in a thread to send a unsegmented PDU
+        For control messages
+        No ack
+
+        :param transacion: Tx Transaction for which we start the thread
+        :type transaction: TxTransaction
+        :param event: Event object to received signal from main thread
+        :type: Event
+        """
+        self.send_to_network((
+            BTMesh_Lower_Transport_Control_Message(seg=0, opcode=transaction.opcode)
             / transaction.pkt,
             transaction.ctx,
         ))
@@ -691,6 +975,7 @@ class LowerTransportLayer(Layer):
             ctx = copy(transaction.ctx)
             ctx.src_addr = transaction.ctx.dest_addr
             ctx.dest_addr = transaction.ctx.src_addr
+            ctx.is_ctl = True
 
             # the sequence number of the ack is
             ctx.seq_number = self.global_states_manager.get_next_seq_number()

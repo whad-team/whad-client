@@ -15,6 +15,23 @@ from whad.bt_mesh.stack.utils import (
 from whad.scapy.layers.bt_mesh import (
     BTMesh_Upper_Transport_Access_PDU,
     BTMesh_Model_Message,
+    BTMesh_Upper_Transport_Control_Heartbeat,
+    BTMesh_Upper_Transport_Control_Path_Reply,
+    BTMesh_Upper_Transport_Control_Friend_Poll,
+    BTMesh_Upper_Transport_Control_Friend_Clear,
+    BTMesh_Upper_Transport_Control_Path_Request,
+    BTMesh_Upper_Transport_Control_Friend_Offer,
+    BTMesh_Upper_Transport_Control_Path_Echo_Reply,
+    BTMesh_Upper_Transport_Control_Friend_Update,
+    BTMesh_Upper_Transport_Control_Path_Confirmation,
+    BTMesh_Upper_Transport_Control_Friend_Request,
+    BTMesh_Upper_Transport_Control_Friend_Clear_Confirm,
+    BTMesh_Upper_Transport_Control_Path_Request_Solicitation,
+    BTMesh_Upper_Transport_Control_Dependent_Node_Update,
+    BTMesh_Upper_Transport_Control_Path_Echo_Request,
+    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add,
+    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove,
+    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm,
 )
 from whad.bt_mesh.stack.access import AccessLayer
 from scapy.all import raw
@@ -33,7 +50,26 @@ class UpperTransportLayer(Layer):
         super().configure(options=options)
         self.state.global_states_manager = GlobalStatesManager()
 
-        self.__handlers = {}
+        # handlers for the Upper Transport Control messages
+        self.__handlers = {
+            BTMesh_Upper_Transport_Control_Heartbeat: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Path_Reply: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Friend_Poll: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Friend_Clear: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Path_Request: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Friend_Offer: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Path_Echo_Reply: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Friend_Update: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Path_Confirmation: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Friend_Request: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Friend_Clear_Confirm: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Path_Request_Solicitation: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Dependent_Node_Update: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Path_Echo_Request: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove: self.default_ctl_handler,
+            BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm: self.default_ctl_handler,
+        }
 
         # we dont wrap around ataumatically, shouldnt be used for real applications thus should never overlflow
         self.state.seq_num = 0
@@ -142,9 +178,11 @@ class UpperTransportLayer(Layer):
         pkt, ctx = message
         pkt.show()
 
-        # if control message, just show it and bye
+        # if control message, get handler for message and run it
         if not isinstance(pkt, BTMesh_Upper_Transport_Access_PDU):
+            print("RECEIVED CTL Message")
             pkt.show()
+            self.__handlers[type(pkt)](message)
             return
 
         # get the actual application_key_index from aid
@@ -188,6 +226,16 @@ class UpperTransportLayer(Layer):
 
         pkt = BTMesh_Model_Message(plaintext_message)
         self.send_to_access_layer((pkt, ctx))
+
+    def default_ctl_handler(self, message):
+        """
+        Default Handler for received control messages
+
+        :param message: The ctl control message packet and its context
+        :type message: (Packet, MeshMessageContext)
+        """
+        print("DEFAULT CTL PACKET HANDLER, NOTHING TO DO")
+        return
 
 
 UpperTransportLayer.add(AccessLayer)

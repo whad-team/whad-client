@@ -125,6 +125,7 @@ class AccessLayer(Layer):
                 new_ctx.src_addr = e.addr
                 new_ctx.dest_addr = ctx.src_addr
                 new_ctx.net_key_id = ctx.net_key_id
+                new_ctx.is_ctl = False
                 if ctx.ttl == 0:
                     new_ctx.ttl = 0
                 else:
@@ -141,4 +142,5 @@ class AccessLayer(Layer):
         :type message: [TODO:type]
         """
         pkt, ctx = message
+        ctx.is_ctl = False
         self.send_to_upper_transport(message)
