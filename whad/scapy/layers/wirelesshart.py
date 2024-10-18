@@ -1,8 +1,8 @@
 from scapy.packet import Packet, bind_layers, split_layers
 from scapy.fields import Field, ByteEnumField, StrLenField, IntField, XShortField, LEShortField, \
-    FieldLenField, StrLenField, ConditionalField, PacketField, XLongField, XIntField,  XLEIntField, \
-    XLEShortField, BitEnumField, BitField, ByteField, ShortField, XShortField, PacketListField
-from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS, Dot15d4Data
+    FieldLenField, StrLenField, ConditionalField, PacketField, XByteField, XIntField,  SignedShortField, \
+    XLEShortField, BitEnumField, BitField, ByteField, ShortField, XShortField, PacketListField, FieldListField
+from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS, Dot15d4Data, MultipleTypeField
 from scapy.config import conf
 from scapy.utils import rdpcap
 from math import ceil
@@ -64,15 +64,15 @@ class Superframe(Packet):
         ByteField("superframe_id", None), 
         ShortField("superframe_number_of_slots", None), 
         FieldLenField("superframe_number_of_links", None, fmt="B", length_of="superframe_links"), 
-        PacketListField("superframe_links",[], Link, length_from=lambda p:3 * p.superframe_number_of_links)#, length_from=lambda p:p.number_of_links),
+        PacketListField("superframe_links",[], Link, length_from=lambda p:3 * p.superframe_number_of_links)
 
     ]
     
     def extract_padding(self, s):
         return b'', s
 
-class WirelessHart_DataLink_Advertisement_Hdr(Packet):
-    name = "Wireless Hart Data Link Advertisement header"
+class WirelessHart_DataLink_Advertisement(Packet):
+    name = "Wireless Hart Data Link Advertisement DLPDU"
     fields_desc = [
         FiveBytesField("asn", 0),
         BitEnumField("security_level_supported",0,4,{0 : "session_keyed", 1 : "join_keyed", 2 : "reserved", 3: "reserved"}), 
@@ -81,11 +81,135 @@ class WirelessHart_DataLink_Advertisement_Hdr(Packet):
         StrLenField("channel_map", None, length_from = lambda p: ceil(p.channel_count / 8)),
         XShortField("graph_id", None), 
         FieldLenField("number_of_superframes", None, fmt="B", count_of="superframes"),
-        PacketListField("superframes",[], Superframe, count_from=lambda p:p.number_of_superframes)#, length_from=lambda p:p.number_of_superframes),
+        PacketListField("superframes",[], Superframe, count_from=lambda p:p.number_of_superframes)
 
     ]
 
-bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_Advertisement_Hdr, pdu_type=1)
+class WirelessHart_DataLink_Acknowledgement(Packet):
+    name = "Wireless Hart Data Link Acknowledgement DLPDU"
+    fields_desc = [
+        ByteEnumField("response_code", None, 
+            {   
+                0 : "success",
+                61 : "error_no_buffers_available",
+                62 : "error_no_alarm_event_buffers_available",
+                63 : "error_priority_too_low"
+            }
+        ), 
+        SignedShortField("time_adjustment", None)
+        
+    ]
+
+class WirelessHart_DataLink_KeepAlive(Packet):
+    name = "Wireless Hart Data Link Keep Alive DLPDU"
+    fields_desc = [] # empty payload
+
+class WirelessHartAddressField(Field):
+    __slots__ = ["adjust", "length_of"]
+
+    def __init__(self, name, default, length_of=None, fmt="<H", adjust=None):
+        Field.__init__(self, name, default, fmt)
+        self.length_of = length_of
+        if adjust is not None:
+            self.adjust = adjust
+        else:
+            self.adjust = lambda pkt, x: self.lengthFromAddrMode(pkt, x)
+
+    def i2repr(self, pkt, x):
+        """Convert internal value to a nice representation"""
+        if len(hex(self.i2m(pkt, x))) < 7:  # short address
+            return hex(self.i2m(pkt, x))
+        else:  # long address
+            x = "%016x" % self.i2m(pkt, x)
+            return ":".join(["%s%s" % (x[i], x[i + 1]) for i in range(0, len(x), 2)])  # noqa: E501
+
+    def addfield(self, pkt, s, val):
+        """Add an internal value to a string"""
+        if self.adjust(pkt, self.length_of) == 2:
+            return s + pack(self.fmt[0] + "H", val)
+        elif self.adjust(pkt, self.length_of) == 8:
+            return s + pack(self.fmt[0] + "Q", val)
+        else:
+            return s
+
+    def getfield(self, pkt, s):
+        if self.adjust(pkt, self.length_of) == 2:
+            return s[2:], self.m2i(pkt, unpack(self.fmt[0] + "H", s[:2])[0])  # noqa: E501
+        elif self.adjust(pkt, self.length_of) == 8:
+            return s[8:], self.m2i(pkt, unpack(self.fmt[0] + "Q", s[:8])[0])  # noqa: E501
+        else:
+            raise Exception('impossible case')
+
+    def lengthFromAddrMode(self, pkt, x):
+        addrmode = 0
+        pkttop = pkt
+        if pkttop is None:
+            print("No underlayer to guess address mode")
+            return 0
+        while True:
+            try:
+                print(pkttop.getfieldval(x))
+                addrmode = pkttop.getfieldval(x)
+                break
+            except Exception:
+                if pkttop.underlayer is None:
+                    break
+                pkttop = pkttop.underlayer
+        
+        if addrmode == 0:
+            return 2
+        elif addrmode == 1:
+            return 8
+        return 0
+
+
+class WirelessHart_Network_Hdr(Packet):
+    name = "Wireless Hart Network Layer header"
+    fields_desc = [
+        BitEnumField("nwk_dest_addr_length", None, 1, {0 : "short", 1 : "long"}), 
+        BitEnumField("nwk_src_addr_length", None, 1, {0 : "short", 1 : "long"}), 
+        BitField("reserved", 0, 3), 
+        BitEnumField("proxy_route", None, 1, {0 : "no", 1 : "yes"}),
+        BitEnumField("second_src_route_segment", None, 1, {0 : "no", 1 : "yes"}),
+        BitEnumField("first_src_route_segment", None, 1, {0 : "no", 1 : "yes"}), 
+        ByteField("ttl", None), 
+        XShortField("asn_snippet", None), # least two significant bits of ASN : latency count
+        XShortField("graph_id", None),
+        WirelessHartAddressField("nwk_dest_addr", 0x0, length_of="nwk_dest_addr_length"),
+        WirelessHartAddressField("nwk_src_addr", 0x0, length_of="nwk_src_addr_length"),  
+        ConditionalField(
+            WirelessHartAddressField("parent_proxy_addr", None, adjust = lambda pkt, x : 2),
+            lambda pkt: pkt.proxy_route  == 1
+        ),
+          ConditionalField(
+            FieldListField("first_route_segment",[],WirelessHartAddressField("parent_proxy_addr", None, adjust = lambda pkt, x : 2), count_from=lambda p : 4),
+            lambda pkt:pkt.getfieldval("first_src_route_segment") == 1
+        ),
+          ConditionalField(
+            FieldListField("second_route_segment",[],WirelessHartAddressField("parent_proxy_addr", None, adjust = lambda pkt, x : 2), count_from=lambda p : 4),
+            lambda pkt:pkt.getfieldval("second_src_route_segment") == 1
+        ),
+        
+    ]
+
+class WirelessHart_Network_Security_SubLayer_Hdr(Packet):
+    name = "Wireless Hart Network Security sub-layer header"
+    fields_desc = [
+        BitField("reserved", 0, 4), 
+        BitEnumField("security_types", 0, 4,{0: 'session_keyed', 1: 'join_keyed', 2: 'reserved', 3: 'reserved', 4: 'reserved', 5: 'reserved', 6: 'reserved', 7: 'reserved', 8: 'reserved', 9: 'reserved', 10: 'reserved', 11: 'reserved', 12: 'reserved', 13: 'reserved', 14: 'reserved'}), 
+        MultipleTypeField(
+            [
+                (XByteField("counter", None), lambda p:p.security_types == 0),
+            ],
+            XIntField("counter", None)
+        ),
+]
+bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_Acknowledgement, pdu_type=0)
+bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_Advertisement, pdu_type=1)
+bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_KeepAlive, pdu_type=2)
+bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_Network_Hdr, pdu_type=7)
+
+bind_layers(WirelessHart_Network_Hdr, WirelessHart_Network_Security_SubLayer_Hdr)
 
 old_guess_payload_class = Dot15d4Data.guess_payload_class
 
@@ -105,9 +229,10 @@ pkts = rdpcap("whad/ressources/pcaps/wireless_hart_capture_channel_11_4142434441
 for pkt in pkts:
     dot15d4_bytes = bytes(pkt)[44:]
     dot15d4_pkt = Dot15d4FCS(dot15d4_bytes)
-    dot15d4_pkt.show()
-    print(dot15d4_bytes.hex())
-    print(bytes(dot15d4_pkt).hex())
+    if WirelessHart_DataLink_Advertisement not in dot15d4_pkt:
+        dot15d4_pkt.show()
+        print(dot15d4_bytes.hex())
+        print(bytes(dot15d4_pkt).hex())
     
 '''       
 from Cryptodome.Cipher import AES
