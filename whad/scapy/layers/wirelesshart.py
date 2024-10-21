@@ -148,7 +148,6 @@ class WirelessHartAddressField(Field):
             return 0
         while True:
             try:
-                print(pkttop.getfieldval(x))
                 addrmode = pkttop.getfieldval(x)
                 break
             except Exception:
@@ -196,14 +195,25 @@ class WirelessHart_Network_Security_SubLayer_Hdr(Packet):
     name = "Wireless Hart Network Security sub-layer header"
     fields_desc = [
         BitField("reserved", 0, 4), 
-        BitEnumField("security_types", 0, 4,{0: 'session_keyed', 1: 'join_keyed', 2: 'reserved', 3: 'reserved', 4: 'reserved', 5: 'reserved', 6: 'reserved', 7: 'reserved', 8: 'reserved', 9: 'reserved', 10: 'reserved', 11: 'reserved', 12: 'reserved', 13: 'reserved', 14: 'reserved'}), 
+        BitEnumField("security_types", 0, 4,{0: 'session_keyed', 1: 'join_keyed', 2: 'reserved', 3: 'reserved', 4: 'reserved', 5: 'reserved', 6: 'reserved', 7: 'reserved', 8: 'reserved', 9: 'reserved', 10: 'reserved', 11: 'reserved', 12: 'reserved', 13: 'reserved', 14: 'reserved', 15:'decrypted'}), 
         MultipleTypeField(
             [
                 (XByteField("counter", None), lambda p:p.security_types == 0),
             ],
             XIntField("counter", None)
         ),
+        XIntField("nwk_mic", None)
 ]
+    
+class WirelessHart_Transport_Layer_Hdr(Packet):
+    name = "Wireless Hart Transport Layer header"
+    fields_desc = [
+        BitEnumField('acknowledged', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('response', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('broadcast', 0, 1, {0 : "no", 1: "yes"}), 
+        BitField('tr_seq_num', 0, 5), 
+    ]
+    
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_Acknowledgement, pdu_type=0)
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_Advertisement, pdu_type=1)
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_KeepAlive, pdu_type=2)
@@ -221,7 +231,67 @@ def new_guess_payload_class(self, payload):
 
 Dot15d4Data.guess_payload_class = new_guess_payload_class
 
+from Cryptodome.Cipher import AES
+from copy import copy
 
+conf.dot15d4_protocol = "wirelesshart"
+
+def decrypt_nwk(pkt, key):
+    mic = pack(">I", pkt.nwk_mic)
+    
+    encrypted_pkt = copy(pkt)
+    encrypted_pkt.counter = 0
+    encrypted_pkt.ttl = 0
+    encrypted_pkt.nwk_mic = 0
+    
+    auth = bytes(encrypted_pkt[WirelessHart_Network_Hdr])
+    encrypted_payload = bytes(encrypted_pkt[WirelessHart_Network_Security_SubLayer_Hdr][1:])
+    auth = auth[:len(auth) - len(encrypted_payload)]
+    
+    try:
+        if pkt.security_types == 1:
+            if pkt.nwk_src_addr == 0x80f9:
+                addr = pkt.nwk_dest_addr
+                start_byte = b"\x01"
+            else:
+                addr = pkt.nwk_src_addr
+                start_byte = b"\x00"
+            nonce = start_byte + pack('>I', pkt.counter) + pack('<Q', addr)
+            
+        cipher = AES.new(key, AES.MODE_CCM, nonce=nonce, mac_len=4)
+        cipher.update(auth)
+        decrypted = cipher.decrypt_and_verify(encrypted_payload, received_mac_tag=mic)
+
+        return decrypted
+    
+    except ValueError:
+        print("authentication_failed: Incorrect MIC (recv:", mic.hex(), ")")
+        return None
+        
+
+if __name__ == "__main__":
+    count = 0
+    pkts = rdpcap("whad/ressources/pcaps/wireless_hart_capture_channel_13_41424344414243444142434441424344.pcap")
+    for pkt in pkts:
+        dot15d4_bytes = bytes(pkt)[44:]
+        dot15d4_pkt = Dot15d4FCS(dot15d4_bytes)
+        if WirelessHart_DataLink_Advertisement not in dot15d4_pkt:
+            if WirelessHart_Network_Security_SubLayer_Hdr in dot15d4_pkt and dot15d4_pkt.security_types == 1:
+                #dot15d4_pkt.show()
+                #nonce  = bytes.fromhex("0000000007") + bytes.fromhex("68d33200000d1700")[::-1]
+                nonce = bytes.fromhex("0100000007") + bytes.fromhex("68d33200000d1700")[::-1]
+                decrypted = decrypt_nwk(dot15d4_pkt, key=b"ABCDABCDABCDABCD")
+                
+                if decrypted is not None:
+                    print("decrypted:", decrypted.hex())
+                    WirelessHart_Transport_Layer_Hdr(decrypted).show()
+                    
+                    #del dot15d4_pkt[WirelessHart_Network_Security_SubLayer_Hdr]
+                    #dot15d4_pkt /= decrypted
+                    #dot15d4_pkt.show()
+                else:
+                    print("no decryption...")
+'''
 conf.dot15d4_protocol = "wirelesshart"
 
 
@@ -233,7 +303,7 @@ for pkt in pkts:
         dot15d4_pkt.show()
         print(dot15d4_bytes.hex())
         print(bytes(dot15d4_pkt).hex())
-    
+'''    
 '''       
 from Cryptodome.Cipher import AES
     
