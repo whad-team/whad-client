@@ -1,8 +1,14 @@
+"""
+WHAD Enhanced ShockBurst
+
+This module provides the `ESBAddress` class that represents
+an Enhanced ShockBurst device address.
+"""
 import re
 from binascii import hexlify, unhexlify
 from whad.esb.exceptions import InvalidESBAddressException
 
-class ESBAddress(object):
+class ESBAddress:
     """This class represents an Enhanced ShockBurst address.
     """
 
@@ -22,25 +28,40 @@ class ESBAddress(object):
             raise InvalidESBAddressException
 
     def __eq__(self, other):
-        return (self.__value == other.value)
+        return self.__value == other.value
 
     def __str__(self):
-        return ':'.join(['%02x' % b for b in self.__value])
+        return ":".join([f"{b:02x}" for b in self.__value])
 
     def __repr__(self):
-        return 'ESBAddress(%s)' % str(self)
+        return f"ESBAddress({self})"
 
     @property
-    def value(self):
+    def value(self) -> bytes:
+        """Return the address value
+
+        :return: ESB address as byte buffer
+        :return-type: bytes
+        """
         return self.__value
 
     @property
-    def base(self):
-        return ':'.join(['%02x' % b for b in self.__value[:4]])
+    def base(self) -> str:
+        """Return the 4 MSBytes of this ESB address as string
+
+        :return: ESB base address
+        :return-type: str
+        """
+        return ":".join([f"{b:02x}" % b for b in self.__value[:4]])
 
     @property
-    def prefix(self):
-        return "{:02x}".format(self.__value[4])
+    def prefix(self) -> str:
+        """Return the ESB address prefix
+
+        :return: ESB address prefix
+        :return-type: str
+        """
+        return f"{self.__value[4]:02x}"
 
     @staticmethod
     def from_bytes(esb_addr_bytes):
@@ -52,7 +73,8 @@ class ESBAddress(object):
         """
         if len(esb_addr_bytes) == 5:
             hex_address = hexlify(esb_addr_bytes)
-            address = b':'.join([hex_address[i*2:(i+1)*2] for i in range(int(len(hex_address)/2))])
-            return ESBAddress(address.decode('utf-8'))
-        else:
-            raise InvalidESBAddressException
+            address = b":".join([hex_address[i*2:(i+1)*2] for i in range(int(len(hex_address)/2))])
+            return ESBAddress(address.decode("utf-8"))
+
+        # Raise an error (invalid address size)
+        raise InvalidESBAddressException
