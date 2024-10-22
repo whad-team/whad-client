@@ -1,4 +1,10 @@
-from dataclasses import dataclass, field
+"""
+WHAD Enhanced ShockBurst injection configuration
+
+This module defines the ESB configuration class for
+packet injection.
+"""
+from dataclasses import dataclass
 
 @dataclass
 class InjectionConfiguration:
