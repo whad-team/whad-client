@@ -1,4 +1,10 @@
-from dataclasses import dataclass, field
+"""
+WHAD Enhanced ShockBurst sniffing configuration
+
+This module defines the ESB configuration class for
+packet sniffing.
+"""
+from dataclasses import dataclass
 
 @dataclass
 class SnifferConfiguration:
