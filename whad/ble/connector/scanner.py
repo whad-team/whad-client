@@ -26,7 +26,9 @@ If the underlying device does not support scanning, this connector will raise
 an :class:`UnsupportedCapability` exception.
 
 """
+from time import time
 from scapy.packet import Packet
+
 from typing import Iterator
 from whad.hub.ble import BleAdvPduReceived, BleRawPduReceived
 from whad.ble.connector import BLE
@@ -72,7 +74,7 @@ class Scanner(BLE):
         super().start()
 
 
-    def discover_devices(self, minimal_rssi = None, filter_address = None) -> Iterator[AdvertisingDevice]:
+    def discover_devices(self, minimal_rssi = None, filter_address = None, timeout: float = None) -> Iterator[AdvertisingDevice]:
         """
         Parse incoming advertisements and yield discovered devices.
 
@@ -80,7 +82,10 @@ class Scanner(BLE):
         :type   minimal_rssi:       float, optional
         :param  filter_address:     BD address of a device to discover
         :type   filter_address:     :class:`whad.ble.bdaddr.BDAddress`, optional
+        :param  timeout:            Timeout in seconds
+        :type   timeout:            float, optional
         """
+        start_time = time()
         for advertisement in self.sniff():
             if minimal_rssi is None or advertisement.metadata.rssi > minimal_rssi:
                 devices = self.__db.on_device_found(
@@ -91,6 +96,8 @@ class Scanner(BLE):
                 for device in devices:
                     if device is not None and device.scanned:
                         yield device
+            if (timeout is not None) and (time() - start_time > timeout):
+                break
 
 
     def sniff(self) -> Iterator[Packet]:
