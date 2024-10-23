@@ -26,6 +26,9 @@ from whad.device.virtual import HCIDevice, APIMoteDevice, RFStormDevice, RZUSBSt
 # Remove scapy deprecation warnings
 warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
 
+# Remove scapy deprecation warnings
+warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
+
 __all__ = [
     "Bridge",
     "WhadDeviceConnector",
