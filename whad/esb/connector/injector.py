@@ -1,10 +1,14 @@
-from whad.esb.connector import ESB, PTX
-from whad.esb.stack import ESBStack
-from whad.exceptions import UnsupportedCapability, WhadDeviceDisconnected
-from whad.esb.injecting import InjectionConfiguration
-from whad.helpers import message_filter, is_message_type
-from time import sleep, time
+"""
+WHAD Enhanced ShockBurst injection connector.
 
+This module provides the `Injector` class for ESB-enable devices.
+This class is used by `winject` to perform packet/PDU injection into an
+existing ESB connection, or simply send ESB packets in the air.
+"""
+from scapy.packet import Packet
+
+from whad.esb.connector import PTX
+from whad.esb.injecting import InjectionConfiguration
 
 class Injector(PTX):
     """
@@ -15,7 +19,6 @@ class Injector(PTX):
         self._synced = False
         self._configuration = InjectionConfiguration()
         self._injecting = False
-        #self.start()
 
     @property
     def configuration(self) -> InjectionConfiguration:
@@ -36,18 +39,32 @@ class Injector(PTX):
 
         self.start()
 
-    def on_pdu(self, pdu):
-        if self._injecting:
-            return
-        else:
-            return super().on_pdu(pdu)
+    def on_pdu(self, packet: Packet):
+        """Callback method to handle incoming packet
 
-    def inject(self, packet):
+        :param packet: Incoming packet
+        :type packet: Packet
+        """
+        # If we are injecting, do not process incoming packets.
+        if self._injecting:
+            return None
+
+        # Let ESB class process the incoming packet.
+        return super().on_pdu(packet)
+
+    def inject(self, packet: Packet):
+        """Perform packet injection.
+
+        :param packet: Packet to inject
+        :type packet: Packet
+        """
         if hasattr(packet, "address") and packet.address != self.address:
             self.stop()
             self.address = packet.address
             self.start()
+
         if self.__configuration.synchronize:
+            # Synchronize if not already sync'ed
             if not self._synced:
                 self.synchronize()
                 self._injecting = True
@@ -56,8 +73,8 @@ class Injector(PTX):
                     self.synchronize()
                 self._synced = True
                 return True
-            else:
-                success = self.send(packet, channel=self.channel, address=self.address)
-                return success
-        else:
-            success = self.send(packet, channel=self.__configuration.channel, address=self.address)
+
+            # If already synchronized, just send packet.
+            return self.send(packet, channel=self.channel, address=self.address)
+
+        return self.send(packet, channel=self.__configuration.channel, address=self.address)
