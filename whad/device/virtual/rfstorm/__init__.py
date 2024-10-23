@@ -1,4 +1,12 @@
+"""
+RFStorm adaptation layer for WHAD.
+"""
+import logging
+from threading import  Lock
+from time import sleep, time
+
 from usb.core import find, USBError, USBTimeoutError
+
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device.virtual import VirtualDevice
 from whad.device.virtual.rfstorm.constants import RFStormId, RFStormCommands, \
@@ -10,33 +18,33 @@ from whad.esb.esbaddr import ESBAddress
 from whad.hub.unifying import Commands as UniCommands
 from whad.hub.discovery import Capability, Domain
 from whad.phy import Endianness
-from threading import Thread, Lock
-from time import sleep, time
 from whad.helpers import swap_bits
 
-import logging
 logger = logging.getLogger(__name__)
 
 # Helpers functions
-def get_rfstorm(id=0,bus=None, address=None):
+def get_rfstorm(index=0,bus=None, address=None):
     '''
     Returns a RFStorm USB object based on index or bus and address.
     '''
-    devices = list(find(idVendor=RFStormId.RFSTORM_ID_VENDOR, idProduct=RFStormId.RFSTORM_ID_PRODUCT,find_all=True))
+    devices = list(find(idVendor=RFStormId.RFSTORM_ID_VENDOR,
+                        idProduct=RFStormId.RFSTORM_ID_PRODUCT,find_all=True))
     if bus is not None and address is not None:
         for device in devices:
             if device.bus == bus and device.address == address:
                 return (devices.index(device), device)
         # No device found with the corresponding bus/address, return None
         return None
-    else:
-        try:
-            return (id, devices[id])
-        except IndexError:
-            return None
+
+    try:
+        return (index, devices[index])
+    except IndexError:
+        return None
 
 
 class RFStormDevice(VirtualDevice):
+    """RFStorm virtual device implementation.
+    """
 
     INTERFACE_NAME = "rfstorm"
 
@@ -47,17 +55,19 @@ class RFStormDevice(VirtualDevice):
         '''
         available_devices = []
         try:
-            for rfstorm in find(idVendor=RFStormId.RFSTORM_ID_VENDOR, idProduct=RFStormId.RFSTORM_ID_PRODUCT,find_all=True):
+            for rfstorm in find(idVendor=RFStormId.RFSTORM_ID_VENDOR,
+                                idProduct=RFStormId.RFSTORM_ID_PRODUCT,find_all=True):
                 available_devices.append(RFStormDevice(bus=rfstorm.bus, address=rfstorm.address))
-        except ValueError as err:
+        except ValueError:
             logger.warning("Cannot access RFStorm, root privileges may be required.")
-            
+
         return available_devices
 
     @property
     def identifier(self):
         '''
-        Returns the identifier of the current device (e.g., bus + address in format "<bus>-<address>").
+        Returns the identifier of the current device (e.g., bus + address in
+        format "<bus>-<address>").
         '''
         return str(self.__rfstorm.bus)+"-"+str(self.__rfstorm.address)
 
@@ -71,6 +81,7 @@ class RFStormDevice(VirtualDevice):
             raise WhadDeviceNotFound
 
         self.__opened = False
+        self.__opened_stream = False
         self.__channel = 0
         self.__address = b"\xFF\xFF\xFF\xFF\xFF"
         self.__ptx = False
@@ -86,7 +97,7 @@ class RFStormDevice(VirtualDevice):
 
         self.__internal_state = RFStormInternalStates.NONE
         self.__domain = RFStormDomains.RFSTORM_RAW_ESB
-        self.__index, self.__rfstorm = device
+        _, self.__rfstorm = device
         self.__last_packet_timestamp = 0
 
         self.__supported_frequency_range = (2400000000, 2500000000)
@@ -101,9 +112,8 @@ class RFStormDevice(VirtualDevice):
             self.__rfstorm.set_configuration()
         except USBError as err:
             if err.errno == 13:
-                raise WhadDeviceAccessDenied("rfstorm")
-            else:
-                raise WhadDeviceNotReady()
+                raise WhadDeviceAccessDenied("rfstorm") from err
+            raise WhadDeviceNotReady() from err
 
         self._dev_id = self._get_serial_number()
         self._fw_author = self._get_manufacturer()
@@ -120,8 +130,8 @@ class RFStormDevice(VirtualDevice):
 
     def _get_serial_number(self):
         return bytes.fromhex(
-                                "{:02x}".format(self.__rfstorm.bus)*8 +
-                                "{:02x}".format(self.__rfstorm.address)*8
+            f"{self.__rfstorm.bus:02x}"*8 +
+            f"{self.__rfstorm.address:02x}"*8
         )
 
     def _get_manufacturer(self):
@@ -132,45 +142,47 @@ class RFStormDevice(VirtualDevice):
     def _get_capabilities(self):
         capabilities = {
             Domain.Esb : (
-                                (Capability.Sniff | Capability.Inject | Capability.SimulateRole | Capability.NoRawData),
-                                [
-                                    EsbCommands.Sniff,
-                                    EsbCommands.Send,
-                                    EsbCommands.Start,
-                                    EsbCommands.Stop,
-                                    EsbCommands.SetNodeAddress,
-                                    EsbCommands.PrimaryReceiverMode,
-                                    EsbCommands.PrimaryTransmitterMode
-                                ]
+                (Capability.Sniff | Capability.Inject | Capability.SimulateRole \
+                    | Capability.NoRawData),
+                [
+                    EsbCommands.Sniff,
+                    EsbCommands.Send,
+                    EsbCommands.Start,
+                    EsbCommands.Stop,
+                    EsbCommands.SetNodeAddress,
+                    EsbCommands.PrimaryReceiverMode,
+                    EsbCommands.PrimaryTransmitterMode
+                ]
             ),
             Domain.LogitechUnifying : (
-                                (Capability.Sniff | Capability.Inject | Capability.SimulateRole | Capability.NoRawData),
-                                [
-                                    UniCommands.Sniff,
-                                    UniCommands.Send,
-                                    UniCommands.Start,
-                                    UniCommands.Stop,
-                                    UniCommands.SetNodeAddress,
-                                    UniCommands.LogitechMouseMode,
-                                    UniCommands.LogitechKeyboardMode,
-                                    UniCommands.LogitechDongleMode
-                                ]
+                (Capability.Sniff | Capability.Inject | Capability.SimulateRole \
+                 | Capability.NoRawData),
+                [
+                    UniCommands.Sniff,
+                    UniCommands.Send,
+                    UniCommands.Start,
+                    UniCommands.Stop,
+                    UniCommands.SetNodeAddress,
+                    UniCommands.LogitechMouseMode,
+                    UniCommands.LogitechKeyboardMode,
+                    UniCommands.LogitechDongleMode
+                ]
             ),
             Domain.Phy: (
-                                (Capability.Sniff | Capability.Inject | Capability.NoRawData),
-                                [
-                                    PhyCommands.SetGFSKModulation,
-                                    PhyCommands.GetSupportedFrequencies,
-                                    PhyCommands.SetFrequency,
-                                    PhyCommands.SetDataRate,
-                                    PhyCommands.SetEndianness,
-                                    PhyCommands.SetPacketSize,
-                                    PhyCommands.SetSyncWord,
-                                    PhyCommands.Sniff,
-                                    PhyCommands.Send,
-                                    PhyCommands.Start,
-                                    PhyCommands.Stop
-                                ]
+                (Capability.Sniff | Capability.Inject | Capability.NoRawData),
+                [
+                    PhyCommands.SetGFSKModulation,
+                    PhyCommands.GetSupportedFrequencies,
+                    PhyCommands.SetFrequency,
+                    PhyCommands.SetDataRate,
+                    PhyCommands.SetEndianness,
+                    PhyCommands.SetPacketSize,
+                    PhyCommands.SetSyncWord,
+                    PhyCommands.Sniff,
+                    PhyCommands.Send,
+                    PhyCommands.Start,
+                    PhyCommands.Stop
+                ]
             ),
 
         }
@@ -195,22 +207,25 @@ class RFStormDevice(VirtualDevice):
 
     def _rfstorm_send_command(self, command, data=b"", timeout=200, no_response=False):
         data = [command] + list(data)
-        try:
-            self.__lock.acquire()
-            self.__rfstorm.write(RFStormEndPoints.RFSTORM_COMMAND_ENDPOINT, data, timeout=timeout)
-        except USBTimeoutError:
-            self.__lock.release()
-            return False
-        response = self._rfstorm_read_response()
-        self.__lock.release()
+        with self.__lock:
+            try:
+                self.__rfstorm.write(RFStormEndPoints.RFSTORM_COMMAND_ENDPOINT,
+                                     data, timeout=timeout)
+            except USBTimeoutError:
+                return False
+            response = self._rfstorm_read_response()
+
+        # If we have a response, return it
         if not no_response:
             return response
-        else:
-            return True
+
+        # Success
+        return True
 
     def _rfstorm_read_response(self, timeout=200):
         try:
-            return bytes(self.__rfstorm.read(RFStormEndPoints.RFSTORM_RESPONSE_ENDPOINT, 64, timeout=timeout))
+            return bytes(self.__rfstorm.read(RFStormEndPoints.RFSTORM_RESPONSE_ENDPOINT,
+                                             64, timeout=timeout))
         except USBTimeoutError:
             return None
 
@@ -222,18 +237,22 @@ class RFStormDevice(VirtualDevice):
 
     def _rfstorm_promiscuous_mode(self, prefix=b""):
         data = bytes([len(prefix)]) + prefix
-        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_PROMISCUOUS, data, no_response=True)
+        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_PROMISCUOUS,
+                                          data, no_response=True)
 
-    def _rfstorm_generic_promiscuous_mode(self, prefix=b"", rate=RFStormDataRate.RF_2MBPS, payload_length=32):
+    def _rfstorm_generic_promiscuous_mode(self, prefix=b"", rate=RFStormDataRate.RF_2MBPS,
+                                          payload_length=32):
         data = bytes([len(prefix), rate, payload_length]) + prefix
-        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_PROMISCUOUS_GENERIC, data, no_response=True)
+        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_PROMISCUOUS_GENERIC,
+                                          data, no_response=True)
 
     def _rfstorm_sniffer_mode(self, address=b""):
         data = bytes([len(address)]) + address
-        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_SNIFF, data, no_response=True)
+        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_SNIFF, data,
+                                          no_response=True)
 
     def _rfstorm_tone_mode(self):
-            return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_TONE)
+        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_TONE)
 
     def _rfstorm_transmit_payload(self, payload, timeout=4, retransmits=1):
         data = bytes([len(payload), timeout, retransmits]) + payload
@@ -248,7 +267,8 @@ class RFStormDevice(VirtualDevice):
 
     def _rfstorm_transmit_ack_payload(self, payload):
         data = bytes([len(payload)]) + payload
-        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_TRANSMIT_ACK, data, no_response=True)
+        return self._rfstorm_send_command(RFStormCommands.RFSTORM_CMD_TRANSMIT_ACK,
+                                          data, no_response=True)
 
     def _rfstorm_set_channel(self, channel):
         if channel < 0 or channel > 125:
@@ -268,6 +288,8 @@ class RFStormDevice(VirtualDevice):
             raise WhadDeviceNotReady()
 
     def read(self):
+        """Read incoming data
+        """
         if not self.__opened:
             raise WhadDeviceNotReady()
         if self.__opened_stream:
@@ -276,7 +298,8 @@ class RFStormDevice(VirtualDevice):
                     data = self._rfstorm_read_packet()
                 except USBTimeoutError:
                     data = b""
-                if data is not None and isinstance(data, bytes) and len(data) >= 1 and data != b"\xFF":
+                if data is not None and isinstance(data, bytes) and \
+                        len(data) >= 1 and data != b"\xFF":
                     self.__last_packet_timestamp = time()
                     if len(data[:5]) >= 3:
                         if self.__phy_endianness == Endianness.LITTLE:
@@ -305,7 +328,8 @@ class RFStormDevice(VirtualDevice):
                     except USBTimeoutError:
                         data = b""
 
-                    if data is not None and isinstance(data, bytes) and len(data) >= 1 and data != b"\xFF":
+                    if data is not None and isinstance(data, bytes) and \
+                            len(data) >= 1 and data != b"\xFF":
                         if self.__acking:
                             if self.__ack_payload is not None:
                                 self._rfstorm_transmit_ack_payload(self.__ack_payload)
@@ -391,7 +415,7 @@ class RFStormDevice(VirtualDevice):
         self._send_whad_message(msg)
 
     def _on_whad_phy_set_freq(self, message):
-        range_start, range_end = self.__supported_frequency_range[0], self.__supported_frequency_range[1]
+        range_start, range_end = self.__supported_frequency_range[0:2]
 
         if message.frequency >= range_start and message.frequency <= range_end:
             self.__channel = int(message.frequency / 1000000) - 2400
@@ -406,7 +430,7 @@ class RFStormDevice(VirtualDevice):
             1000000 : RFStormDataRate.RF_1MBPS,
             2000000 : RFStormDataRate.RF_2MBPS,
         }
-        if message.rate in list(rates.keys()):
+        if message.rate in rates:
             self.__phy_rate = rates[message.rate]
             self._send_whad_command_result(CommandResult.SUCCESS)
         else:
@@ -449,7 +473,7 @@ class RFStormDevice(VirtualDevice):
                 self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
         else:
-            channel = message.channel if message.channel != 0xFF else self.__channel
+            #channel = message.channel if message.channel != 0xFF else self.__channel
             pdu = message.pdu
             retransmission_count = message.retr_count
             if self.__acking:
@@ -578,7 +602,8 @@ class RFStormDevice(VirtualDevice):
                 sync = bytes([swap_bits(i) for i in self.__phy_sync])[::-1]
             else:
                 sync = self.__phy_sync
-            success = self._rfstorm_generic_promiscuous_mode(prefix=sync, rate=self.__phy_rate, payload_length=self.__phy_size)
+            success = self._rfstorm_generic_promiscuous_mode(prefix=sync, rate=self.__phy_rate,
+                                                             payload_length=self.__phy_size)
             if success:
                 self.__opened_stream = True
                 self._send_whad_command_result(CommandResult.SUCCESS)
