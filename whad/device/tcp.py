@@ -7,24 +7,25 @@ It also provides a dedicated connector to be used as a TCP socket server.
 This class handles device connection, disconnection and read/write operations. All the
 parsing magic is performed in our WhadDevice class.
 """
-import sys
-import os
+import logging
 import socket
 import select
 import re
-from threading import Thread
-from time import sleep
-from random import randint
 from binascii import hexlify
+from ipaddress import ip_address
 
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.exceptions import WhadDeviceNotReady, WhadDeviceDisconnected, WhadDeviceNotFound
-from whad.protocol.whad_pb2 import Message
-from ipaddress import ip_address
-import logging
 logger = logging.getLogger(__name__)
 
-def is_valid_hostname(hostname):
+def is_valid_hostname(hostname: str) -> bool:
+    """Determine if a hostname is valid.
+
+    :param hostname: Hostname to check
+    :type hostname: str
+    :return: `True` if hostname is valid, `False` otherwise.
+    :rtype: bool
+    """
     if hostname[-1] == ".":
         # strip exactly one dot from the right, if present
         hostname = hostname[:-1]
@@ -59,7 +60,7 @@ class TCPSocketDevice(WhadDevice):
         '''
         This method checks dynamically if the provided interface can be instantiated.
         '''
-        logger.info("Checking interface: %s" % str(interface))
+        logger.info("Checking interface: %s", str(interface))
         if ":" in interface:
             host, port = interface.split(":")
             try:
@@ -71,7 +72,7 @@ class TCPSocketDevice(WhadDevice):
             port = 12345
 
         try:
-            ip_addr = ip_address(host)
+            ip_address(host)
         except ValueError:
             # It is not a valid IP address, is it a valid hostname ?
             if not is_valid_hostname(host):
@@ -110,7 +111,7 @@ class TCPSocketDevice(WhadDevice):
             self.__address = None
             self.__port = None
         self.__socket = None
-        self.__client = None
+        self.__fileno = None
         self.__opened = False
 
     @property
@@ -134,16 +135,15 @@ class TCPSocketDevice(WhadDevice):
                 self.__opened = True
                 # Ask parent class to run a background I/O thread
                 super().open()
-            except ConnectionRefusedError:
+            except ConnectionRefusedError as conn_refused:
                 logger.error('Connection refused')
-                raise WhadDeviceNotFound
+                raise WhadDeviceNotFound from conn_refused
 
     def reset(self):
         """Reset device.
 
         This method is not supported by this type of device.
         """
-        pass
 
 
     def close(self):
@@ -168,16 +168,16 @@ class TCPSocketDevice(WhadDevice):
         if the device is not ready to be written to.
 
         :param bytes data: Data to write
-        :return: number of bytes written to the device
+        :returns: number of bytes written to the device
         """
-        logger.debug('sending data to TCP socket: %s' % hexlify(data))
+        logger.debug("sending data to TCP socket: %s", hexlify(data))
         if not self.__opened:
             raise WhadDeviceNotReady()
 
         nb_bytes_written = 0
         wlist = [self.__fileno]
         elist = [self.__fileno]
-        readers,writers,errors = select.select(
+        _, writers, __ = select.select(
             [],
             wlist,
             elist
@@ -201,7 +201,7 @@ class TCPSocketDevice(WhadDevice):
             wlist = []
             elist = [self.__fileno]
 
-            readers,writers,errors = select.select(
+            readers, _, __ = select.select(
                 rlist,
                 wlist,
                 elist,
@@ -216,15 +216,14 @@ class TCPSocketDevice(WhadDevice):
                 else:
                     #logger.error('No data received from device')
                     raise WhadDeviceDisconnected()
-        except ConnectionResetError as err:
+        except ConnectionResetError:
             logger.error('Connection reset by peer')
-        except Exception as err:
-            raise WhadDeviceDisconnected()
+        except Exception as exc:
+            raise WhadDeviceDisconnected() from exc
 
     def change_transport_speed(self, speed):
         """Not supported by TCP socket devices.
         """
-        pass
 
 
 class TCPSocketConnector(WhadDeviceConnector):
@@ -245,8 +244,8 @@ class TCPSocketConnector(WhadDeviceConnector):
         # Input pipes
         self.__inpipe = bytearray()
 
-        # Parameters
-        self.__parameters = {}
+        # Socket
+        self.__socket = None
 
         # Shutdown require (to force exit in  ̀`serve()`)
         self.__shutdown_required = False
@@ -258,12 +257,17 @@ class TCPSocketConnector(WhadDeviceConnector):
         self.__address = address
         self.__port = port
 
-        logger.debug('TCP socket address and port: %s (%s)' % (str(self.__address), str(self.__port)))
+        logger.debug("TCP socket address and port: %s (%s)", str(self.__address),
+                     str(self.__port))
 
 
-    def on_data_received(self, data):
-        logger.debug('received raw data from socket: %s' % hexlify(data))
-        messages = []
+    def on_data_received(self, data: bytes):
+        """Handle incoming data and parse it.
+
+        :param data: Incoming data
+        :type data: bytes
+        """
+        logger.debug("received raw data from socket: %s", hexlify(data))
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
             # Is the magic correct ?
@@ -282,7 +286,8 @@ class TCPSocketConnector(WhadDeviceConnector):
                         _msg = self.hub.parse(bytes(raw_message))
 
                         # Send to device
-                        logger.debug('WHAD message successfully parsed, forward to underlying device')
+                        logger.debug(("WHAD message successfully parsed, "
+                                      "forward to underlying device"))
                         self.device.send_message(_msg)
 
                         # Notify message
@@ -296,13 +301,15 @@ class TCPSocketConnector(WhadDeviceConnector):
                     break
             else:
                 # Nope, that's not a header
-                while (len(self.__inpipe) >= 2):
+                while len(self.__inpipe) >= 2:
                     if (self.__inpipe[0] != 0xAC) or (self.__inpipe[1] != 0xBE):
                         self.__inpipe = self.__inpipe[1:]
                     else:
                         break
 
     def shutdown(self):
+        """Shutdown TCP connection.
+        """
         self.__shutdown_required = True
 
     def serve(self, timeout=None):
@@ -318,7 +325,8 @@ class TCPSocketConnector(WhadDeviceConnector):
         self.__socket.bind((self.__address, self.__port))
         self.__socket.listen()
 
-        logger.debug('Waiting for TCP socket connection on %s (%s)' % (self.__address, self.__port))
+        logger.debug("Waiting for TCP socket connection on %s (%s)",
+                     self.__address, self.__port)
 
         try:
             while not self.__shutdown_required:
@@ -327,7 +335,7 @@ class TCPSocketConnector(WhadDeviceConnector):
                 try:
                     while not self.__shutdown_required:
                         rlist = [self.__client.fileno()]
-                        readers,writers,errors = select.select(rlist, [], rlist, timeout)
+                        readers, _, errors = select.select(rlist, [], rlist, timeout)
 
                         # Do we have pending data ?
                         if len(readers) > 0:
@@ -336,22 +344,23 @@ class TCPSocketConnector(WhadDeviceConnector):
                             if len(data) == 0:
                                 # Exit serve loop
                                 break
-                            else:
-                                self.on_data_received(data)
+
+                            # Process received data
+                            self.on_data_received(data)
                         elif len(errors) > 0:
                             logger.debug('Error detected on server socket, exiting.')
                             break
-                except ConnectionResetError as err:
+                except ConnectionResetError:
                     # Reset the underlying device
                     self.device.reset()
 
 
                 self.__client = None
 
-        except BrokenPipeError as err:
+        except BrokenPipeError:
             logger.error('Broken pipe.')
             self.__client = None
-        except Exception as other_err:
+        except Exception:
             pass
 
     # Message callbacks
@@ -383,31 +392,37 @@ class TCPSocketConnector(WhadDeviceConnector):
             logger.debug('Client socket disconnected')
 
     def on_packet(self, packet):
-        pass
+        """Incoming packet handler.
+        """
 
     def on_event(self, event):
-        pass
+        """Generic event handler.
+        """
 
     def on_msg_sent(self, message):
-        pass
+        """Called when a message has successfully been sent.
+        """
 
-    def on_generic_msg(self, generic_message):
+    def on_generic_msg(self, message):
         """Callback function to process incoming generic messages.
 
         This method MUST be overriden by inherited classes.
 
         :param message: Generic message
+        :type message: HubMessage
         """
-        pass
 
-    def on_discovery_msg(self, discovery_message):
-        pass
+    def on_discovery_msg(self, message):
+        """Callback method to process incoming discovery messages.
 
-    def on_domain_msg(self, domain, domain_message):
+        :param message: Discovery message
+        :type message: HubMessage
+        """
+
+    def on_domain_msg(self, domain, message):
         """Callback function to process incoming domain-related messages.
 
         This method MUST be overriden by inherited classes.
 
         :param message: Domain message
         """
-        pass
