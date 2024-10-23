@@ -336,7 +336,7 @@ class Central(BLE):
     def export_profile(self):
         """Export GATT profile of the existing connection.
 
-        :returns: Profile as a JSON string
+        :return: Profile as a JSON string
         :rtype: str
         """
         return self.connection.gatt.model.export_json()

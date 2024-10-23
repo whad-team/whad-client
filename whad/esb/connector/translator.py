@@ -50,7 +50,7 @@ class ESBMessageTranslator:
 
         :param message: WHAD message
         :return: Corresponding scapy packet
-        :return-type: Packet
+        :rtype: Packet
         """
         try:
             if isinstance(message, (EsbRawPduReceived, UniRawPduReceived)):
@@ -83,7 +83,7 @@ class ESBMessageTranslator:
         :param retransmission_count: Maximum number of retransmissions
         :type retransmission_count: int
         :return: Hub message
-        :return-type: HubMessage
+        :rtype: HubMessage
         """
         if ESB_Hdr in packet:
             # Force packet preamble to 0xAA

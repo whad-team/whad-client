@@ -155,7 +155,7 @@ class HCIDevice(VirtualDevice):
         if the device is not ready to be written to.
 
         :param bytes data: Data to write
-        :returns: number of bytes written to the device
+        :return: number of bytes written to the device
         """
         if not self.__opened:
             raise WhadDeviceNotReady()
