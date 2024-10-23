@@ -1,3 +1,6 @@
+"""
+WHAD ESB stack exceptions.
+"""
 class LinkLayerTimeoutException(Exception):
-    def __init__(self):
-        super().__init__()
+    """ESB Link-layer timeout exception
+    """
