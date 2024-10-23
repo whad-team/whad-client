@@ -22,7 +22,7 @@ class EUI(object):
     def value(self) -> bytes:
         """Return EUI as a packed value (bytes)
 
-        :returns: bytes
+        :return: bytes
         """
         return self.__packed
 

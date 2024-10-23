@@ -42,7 +42,7 @@ def validate_uuid(uuid: str) -> str:
 
     :param uuid: UUID to validate
     :type uuid: str
-    :return-type: str
+    :rtype: str
     :return: Validated UUID
     """
     # Parse provided UUID

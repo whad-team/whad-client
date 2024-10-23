@@ -63,7 +63,7 @@ class TrafficAnalyzer:
     def triggered(self) -> bool:
         """Determine if the traffic analyzer has been triggered.
 
-        :return-type: bool
+        :rtype: bool
         :return: `True` if triggered, `False` otherwise.
         """
         return self.__triggered
@@ -73,7 +73,7 @@ class TrafficAnalyzer:
         """Determine if the traffic analyzer has completed is
         job.
 
-        :return-type: bool
+        :rtype: bool
         :return: `True` if completed, `False` otherwise.
         """
         return self.__completed
