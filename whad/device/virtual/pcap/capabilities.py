@@ -1,3 +1,9 @@
+"""
+PCAP capabilities module.
+
+This module defines the PCAP virtual device capabilities for each supported
+DLT.
+"""
 from whad.hub.discovery import Domain, Capability
 from whad.hub.ble import Commands as BleCommands
 from whad.hub.dot15d4 import Commands as Dot15d4Commands
@@ -16,7 +22,10 @@ CAPABILITIES = {
         {
             Domain.BtLE : (
                 (Capability.Sniff),
-                [BleCommands.SniffConnReq, BleCommands.SniffAdv, BleCommands.Start, BleCommands.Stop]
+                [
+                    BleCommands.SniffConnReq, BleCommands.SniffAdv,
+                    BleCommands.Start, BleCommands.Stop
+                ]
             )
         },
         {
@@ -66,13 +75,29 @@ CAPABILITIES = {
         {
             Domain.Phy : (
                 (Capability.Sniff | Capability.NoRawData),
-                [PhyCommands.Sniff, PhyCommands.Start, PhyCommands.Stop, PhyCommands.SetFrequency, PhyCommands.GetSupportedFrequencies, PhyCommands.SetPacketSize, PhyCommands.SetDataRate, PhyCommands.SetEndianness, PhyCommands.SetSyncWord, PhyCommands.SetASKModulation, PhyCommands.SetFSKModulation, PhyCommands.SetGFSKModulation, PhyCommands.SetBPSKModulation, PhyCommands.SetQPSKModulation, PhyCommands.SetLoRaModulation]
+                [
+                    PhyCommands.Sniff, PhyCommands.Start, PhyCommands.Stop,
+                    PhyCommands.SetFrequency, PhyCommands.GetSupportedFrequencies,
+                    PhyCommands.SetPacketSize, PhyCommands.SetDataRate,
+                    PhyCommands.SetEndianness, PhyCommands.SetSyncWord,
+                    PhyCommands.SetASKModulation, PhyCommands.SetFSKModulation,
+                    PhyCommands.SetGFSKModulation, PhyCommands.SetBPSKModulation,
+                    PhyCommands.SetQPSKModulation, PhyCommands.SetLoRaModulation
+                ]
             )
         },
         {
             Domain.Phy : (
                 (Capability.Inject | Capability.NoRawData),
-                [PhyCommands.Send,PhyCommands.Start, PhyCommands.Stop, PhyCommands.SetFrequency, PhyCommands.GetSupportedFrequencies, PhyCommands.SetPacketSize, PhyCommands.SetDataRate, PhyCommands.SetEndianness, PhyCommands.SetSyncWord, PhyCommands.SetASKModulation, PhyCommands.SetFSKModulation, PhyCommands.SetGFSKModulation, PhyCommands.SetBPSKModulation, PhyCommands.SetQPSKModulation, PhyCommands.SetLoRaModulation]
+                [
+                    PhyCommands.Send,PhyCommands.Start, PhyCommands.Stop,
+                    PhyCommands.SetFrequency, PhyCommands.GetSupportedFrequencies,
+                    PhyCommands.SetPacketSize, PhyCommands.SetDataRate,
+                    PhyCommands.SetEndianness, PhyCommands.SetSyncWord,
+                    PhyCommands.SetASKModulation, PhyCommands.SetFSKModulation,
+                    PhyCommands.SetGFSKModulation, PhyCommands.SetBPSKModulation,
+                    PhyCommands.SetQPSKModulation, PhyCommands.SetLoRaModulation
+                ]
             )
         }
     )
