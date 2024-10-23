@@ -14,7 +14,7 @@ provide this behaviour and exposes some methods to send data.
 """
 from scapy.packet import Packet
 from whad.device import WhadDevice
-from whad.esb.connector import ESB
+from whad.esb.connector.base import ESB
 from whad.esb.stack import ESBStack
 from whad.exceptions import UnsupportedCapability
 
