@@ -5,25 +5,29 @@ This class handles device connection, disconnection and read/write operations. A
 parsing magic is performed in our WhadDevice class.
 """
 
-from asyncio import QueueEmpty
 import os
 import select
-from threading import Lock
-from serial import Serial
-from serial.tools.list_ports import comports
 from time import sleep
 from queue import Empty
 
+# Import serial
+from serial import Serial
+from serial.tools.list_ports import comports
+
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotReady, WhadDeviceError
-from whad.protocol.whad_pb2 import Message
 from whad.helpers import message_filter
-from whad.protocol.device_pb2 import DeviceResetQuery
-from whad.protocol.generic_pb2 import ResultCode
 from whad.exceptions import WhadDeviceNotFound
 
 from whad.hub.generic.cmdresult import CommandResult, Success
 from whad.hub.discovery import DeviceReady
+
+SUPPORTED_UART_DEVICES = (
+    (0xc0ff, 0xeeee, "WHAD", "ButteRFly dongle"), # Butterfly Dongle
+    (0x303A, None, None, None),   # Espressif ESP-32 board
+    (0x10C4, 0xEA60, None, None), # Espressif ESP-32 CP2102 board
+    (0x0483, 0x374e, None, None), # Nucleo WL55
+)
 
 def get_port_info(port):
     """Find information about a serial port
@@ -34,6 +38,17 @@ def get_port_info(port):
         if p.device == port:
             return p
     return None
+
+def is_device_supported(vid, pid, manufacturer, product):
+    """Check if a device is supported by WHAD.
+    """
+    for devinfo in SUPPORTED_UART_DEVICES:
+        if (vid, pid, manufacturer, product) == devinfo:
+            # Device is supported
+            return True
+
+    # Device is not supported
+    return False
 
 class UartDevice(WhadDevice):
     """
@@ -49,25 +64,13 @@ class UartDevice(WhadDevice):
         To prevent identifying serial ports which are not compatible with WHAD, it implements
         a filtering mechanism based on vid, pid, manufacturer and / or product.
         '''
-        supported_uart_devices = (
-            (0xc0ff, 0xeeee, "WHAD", "ButteRFly dongle"), # Butterfly Dongle
-            (0x303A, None, None, None),   # Espressif ESP-32 board
-            (0x10C4, 0xEA60, None, None), # Espressif ESP-32 CP2102 board
-            (0x0483, 0x374e, None, None), # Nucleo WL55
-        )
+
         devices = []
         for uart_dev in comports():
-            pid, vid, manufacturer, product = uart_dev.pid, uart_dev.vid,uart_dev.manufacturer, uart_dev.product
-            for (supported_vid, supported_pid, supported_manufacturer, supported_product) in supported_uart_devices:
-                if (
-                    (supported_pid is None or supported_pid == pid) and
-                    (supported_vid is None or supported_vid == vid) and
-                    (supported_manufacturer is None or supported_manufacturer == manufacturer) and
-                    (supported_product is None or supported_product == product)
-                ):
-                    dev = UartDevice(uart_dev.device, baudrate=115200)
-                    devices.append(dev)
-                    break
+            if is_device_supported(uart_dev.vid, uart_dev.pid, uart_dev.manufacturer,
+                                   uart_dev.product):
+                dev = UartDevice(uart_dev.device, baudrate=115200)
+                devices.append(dev)
         return devices
 
 
@@ -88,15 +91,16 @@ class UartDevice(WhadDevice):
         port_info = get_port_info(self.__port)
         if port_info is None:
             raise WhadDeviceNotFound
+
+        # 'subsystem' is only defined on Linux serial ports, we check if
+        # this property is missing to handle Mac OS (Windows system is
+        # marked as unsupported for now)
+        if not hasattr(port_info, "subsystem"):
+            # Determine if device is ACM on Mac OS
+            self.__is_acm = port_info.usb_info is not None
         else:
-            # 'subsystem' is only defined on Linux serial ports, we check if this property is missing to
-            # handle Mac OS (Windows system is marked as unsupported for now)
-            if not hasattr(port_info, "subsystem"):
-                # Determine if device is ACM on Mac OS
-                self.__is_acm = (port_info.usb_info is not None)
-            else:
-                # On Linux systems, ACM devices use the "usb" subsystem.
-                self.__is_acm = (port_info.subsystem == "usb")
+            # On Linux systems, ACM devices use the "usb" subsystem.
+            self.__is_acm = port_info.subsystem == "usb"
 
     @property
     def identifier(self):
@@ -194,7 +198,7 @@ class UartDevice(WhadDevice):
         if the device is not ready to be written to.
 
         :param bytes data: Data to write
-        :return: number of bytes written to the device
+        :returns: number of bytes written to the device
         """
         try:
             if not self.__opened:
@@ -203,7 +207,7 @@ class UartDevice(WhadDevice):
             nb_bytes_written = 0
             wlist = [self.__fileno]
             elist = [self.__fileno]
-            readers,writers,errors = select.select(
+            _, writers, __ = select.select(
                 [],
                 wlist,
                 elist
@@ -213,7 +217,7 @@ class UartDevice(WhadDevice):
                 nb_bytes_written = os.write(self.__fileno, data)
             return nb_bytes_written
         except OSError as os_error:
-            raise WhadDeviceError("Sending data to WHAD device failed.")
+            raise WhadDeviceError("Sending data to WHAD device failed.") from os_error
 
     def read(self):
         """Fetches data from the device, if there is any data to read. We call select()
@@ -229,7 +233,7 @@ class UartDevice(WhadDevice):
         wlist = []
         elist = [self.__fileno]
 
-        readers,writers,errors = select.select(
+        readers, _, __ = select.select(
             rlist,
             wlist,
             elist,
@@ -247,7 +251,7 @@ class UartDevice(WhadDevice):
             if len(data) == 0 :
                 # Device does not behave as expected, may not be ready.
                 raise WhadDeviceNotReady()
-            
+
             # Feed our IO thread with received data
             self.on_data_received(data)
 
