@@ -23,7 +23,7 @@ class WhadMonitor:
         Attachs the current monitor to a specific connector.
 
         :param connector: WhadConnector to monitor
-        :returns: boolean indicating the success of attach operation
+        :return: boolean indicating the success of attach operation
         """
         success = False
         if isinstance(connector, WhadDeviceConnector):
@@ -45,7 +45,7 @@ class WhadMonitor:
         """
         Detachs the current monitor from the previously attached connector.
 
-        :returns: boolean indicating the success of detach operation
+        :return: boolean indicating the success of detach operation
         """
         logger.debug("monitor: detaching callbacks.")
         success = False

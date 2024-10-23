@@ -50,7 +50,7 @@ class AdvDataField(object):
     def to_bytes(self):
         """Serialize record into a byte array
 
-        :returns: Serialized record
+        :return: Serialized record
         :rtype: bytes
         """
         return pack('<BB', len(self.__value) + 1, self.__type) + self.__value
@@ -182,7 +182,7 @@ class AdvFlagsField(AdvDataField):
         """Deserialize an AdvFlagsField AD record.
 
         :param bytes ad_record: AD record to deserialize
-        :returns: an AdvFlagsField object
+        :return: an AdvFlagsField object
         :rtype: AdvFlagsField 
         """
 
@@ -227,7 +227,7 @@ class AdvShortenedLocalName(AdvDataField):
         """Deserialize an AdvShortenedLocalName
 
         :param bytes ad_record: Serialized AdvShortenedLocalName AD record
-        :returns: An AdvShortenedLocalName object
+        :return: An AdvShortenedLocalName object
         :rtype: AdvShortenedLocalName
         """
         return AdvShortenedLocalName(ad_record)
@@ -255,7 +255,7 @@ class AdvCompleteLocalName(AdvDataField):
         """Deserialize an AdvShortenedLocalName
 
         :param bytes ad_record: Serialized AdvCompleteLocalName AD record
-        :returns: An AdvCompleteLocalName object
+        :return: An AdvCompleteLocalName object
         :rtype: AdvCompleteLocalName
         """
         return AdvCompleteLocalName(ad_record)
@@ -273,7 +273,7 @@ class AdvTxPowerLevel(AdvDataField):
         """Deserialize an AdvTxPowerLevel
 
         :param bytes ad_record: Serialized AdvTxPowerLevel AD record
-        :returns: An AdvTxPowerLevel object
+        :return: An AdvTxPowerLevel object
         :rtype: AdvTxPowerLevel
         """
         if len(ad_record) >= 1:
@@ -294,7 +294,7 @@ class AdvManufacturerSpecificData(AdvDataField):
         """Deserialize an AdvManufacturerSpecificData
 
         :param bytes ad_record: Serialized AdvManufacturerSpecificData AD record
-        :returns: An AdvManufacturerSpecificData object
+        :return: An AdvManufacturerSpecificData object
         :rtype: AdvManufacturerSpecificData
         """
         if len(ad_record) >= 2:
@@ -318,7 +318,7 @@ class AdvIncServiceUuid16List(AdvUuid16List):
         """Deserialize an AdvIncServiceUuid16List
 
         :param bytes ad_record: Serialized AdvIncServiceUuid16List AD record
-        :returns: An AdvIncServiceUuid16List object
+        :return: An AdvIncServiceUuid16List object
         :rtype: AdvIncServiceUuid16List
         """
         return AdvUuid16List.from_bytes(AdvIncServiceUuid16List, ad_record)
@@ -336,7 +336,7 @@ class AdvCompServiceUuid16List(AdvUuid16List):
         """Deserialize an AdvCompServiceUuid16List
 
         :param bytes ad_record: Serialized AdvCompServiceUuid16List AD record
-        :returns: An AdvCompServiceUuid16List object
+        :return: An AdvCompServiceUuid16List object
         :rtype: AdvCompServiceUuid16List
         """
         return AdvUuid16List.from_bytes(AdvCompServiceUuid16List, ad_record)
@@ -354,7 +354,7 @@ class AdvIncServiceUuid128List(AdvUuid128List):
         """Deserialize an AdvIncServiceUuid128List
 
         :param bytes ad_record: Serialized AdvIncServiceUuid128List AD record
-        :returns: An AdvIncServiceUuid128List object
+        :return: An AdvIncServiceUuid128List object
         :rtype: AdvIncServiceUuid128List
         """
         return AdvUuid128List.from_bytes(AdvIncServiceUuid128List, ad_record)
@@ -373,7 +373,7 @@ class AdvCompServiceUuid128List(AdvUuid128List):
         """Deserialize an AdvCompServiceUuid128List
 
         :param bytes ad_record: Serialized AdvCompServiceUuid128List AD record
-        :returns: An AdvCompServiceUuid128List object
+        :return: An AdvCompServiceUuid128List object
         :rtype: AdvCompServiceUuid128List
         """
         return AdvUuid128List.from_bytes(AdvCompServiceUuid128List, ad_record)
@@ -397,7 +397,7 @@ class AdvSlaveConnIntervalRange(AdvDataField):
         """Return the Slave connection interval range
 
         :rtype: list
-        :returns: Slave connection interval range
+        :return: Slave connection interval range
         """
         return self.__range
 
@@ -406,7 +406,7 @@ class AdvSlaveConnIntervalRange(AdvDataField):
         """Return the Slave connection minimal value.
 
         :rtype: int
-        :returns: Slave connection minimal value
+        :return: Slave connection minimal value
         """
         return self.__range[0]
 
@@ -415,7 +415,7 @@ class AdvSlaveConnIntervalRange(AdvDataField):
         """Return the Slave connection maximal value.
 
         :rtype: int
-        :returns: Slave connection maximal value
+        :return: Slave connection maximal value
         """
         return self.__range[1]
 
@@ -424,7 +424,7 @@ class AdvSlaveConnIntervalRange(AdvDataField):
         """Deserialize an AdvSlaveConnIntervalRange
 
         :param bytes ad_record: Serialized AdvSlaveConnIntervalRange AD record
-        :returns: An AdvSlaveConnIntervalRange object
+        :return: An AdvSlaveConnIntervalRange object
         :rtype: AdvSlaveConnIntervalRange
         """
         if len(ad_record) == 4:
@@ -450,7 +450,7 @@ class AdvServiceSollicitationUuid16List(AdvUuid16List):
         """Deserialize an AdvServiceSollicitationUuid16List
 
         :param bytes ad_record: Serialized AdvServiceSollicitationUuid16List AD record
-        :returns: An AdvServiceSollicitationUuid16List object
+        :return: An AdvServiceSollicitationUuid16List object
         :rtype: AdvServiceSollicitationUuid16List
         """
         return AdvUuid16List.from_bytes(AdvServiceSollicitationUuid16List, ad_record)
@@ -472,7 +472,7 @@ class AdvServiceSollicitationUuid128List(AdvUuid128List):
         """Deserialize an AdvServiceSollicitationUuid128List
 
         :param bytes ad_record: Serialized AdvServiceSollicitationUuid128List AD record
-        :returns: An AdvServiceSollicitationUuid128List object
+        :return: An AdvServiceSollicitationUuid128List object
         :rtype: AdvServiceSollicitationUuid128List
         """
         return AdvUuid128List.from_bytes(AdvServiceSollicitationUuid128List, ad_record)
@@ -491,7 +491,7 @@ class AdvServiceData16(AdvDataField):
     def uuid(self):
         """Return Service 16-bit UUID
 
-        :returns: Service 16-bit UUID
+        :return: Service 16-bit UUID
         :rtype: UUID
         """
         return self.__uuid
@@ -500,7 +500,7 @@ class AdvServiceData16(AdvDataField):
     def data(self):
         """Returns Service data
 
-        :returns: Service data
+        :return: Service data
         :rtype: bytes
         """
         return self.__data
@@ -510,7 +510,7 @@ class AdvServiceData16(AdvDataField):
         """Deserialize an AdvServiceData16
 
         :param bytes ad_record: Serialized AdvServiceData16 AD record
-        :returns: An AdvServiceData16 object
+        :return: An AdvServiceData16 object
         :rtype: AdvServiceData16
         """
         if len(ad_record) >= 2:
@@ -554,7 +554,7 @@ class AdvPublicTargetAddr(AdvDataField):
         """Deserialize an AdvPublicTargetAddr
 
         :param bytes ad_record: Serialized AdvPublicTargetAddr AD record
-        :returns: An AdvPublicTargetAddr object
+        :return: An AdvPublicTargetAddr object
         :rtype: AdvPublicTargetAddr
         """
         if len(ad_record) > 0 and ((len(ad_record) % 6) == 0):
@@ -602,7 +602,7 @@ class AdvRandomTargetAddr(AdvDataField):
         """Deserialize an AdvRandomTargetAddr
 
         :param bytes ad_record: Serialized AdvRandomTargetAddr AD record
-        :returns: An AdvRandomTargetAddr object
+        :return: An AdvRandomTargetAddr object
         :rtype: AdvRandomTargetAddr
         """
         if len(ad_record) > 0 and ((len(ad_record) % 6) == 0):
@@ -654,7 +654,7 @@ class AdvAppearance(AdvDataField):
 
         :param bytes ad_record: Serialized data record.
         :rtype: AdvAppearance
-        :returns: A new AdvAppearance object that represents the device appearance.
+        :return: A new AdvAppearance object that represents the device appearance.
         """
         if len(ad_record) == 2:
             appearance = unpack('<H', ad_record)[0]
@@ -720,7 +720,7 @@ class AdvURI(AdvDataField):
         """Deserialize an AdvURI
 
         :param bytes ad_record: Serialized AdvURI AD record
-        :returns: An AdvURI object
+        :return: An AdvURI object
         :rtype: AdvURI
         """
         if len(ad_record) >= 2:
@@ -770,7 +770,7 @@ class AdvAdvertisingInterval(AdvDataField):
 
         :param bytes ad_record: Serialized AdvAdvertisingInterval record
         :rtype: AdvAdvertisingInterval
-        :returns: An instance of AdvAdvertisingInterval
+        :return: An instance of AdvAdvertisingInterval
         """
         if len(ad_record) == 2:
             interval = unpack('<H', ad_record)[0]
@@ -837,7 +837,7 @@ class AdvBluetoothDeviceAddr(AdvDataField):
 
         :param bytes ad_record: Serialized AdvBluetoothDeviceAddr record
         :rtype: AdvBluetoothDeviceAddr
-        :returns: An instance of AdvBluetoothDeviceAddr
+        :return: An instance of AdvBluetoothDeviceAddr
         """
         if len(ad_record) == 7:
             public = (ad_record[6] == 0x00)
@@ -880,7 +880,7 @@ class AdvLeRole(AdvDataField):
 
         :param bytes ad_record: Serialized AdvLeRole record
         :rtype: AdvLeRole
-        :returns: An instance of AdvLeRole
+        :return: An instance of AdvLeRole
         """
         if len(ad_record) == 1:
             role = ad_record[0]
@@ -924,7 +924,7 @@ class AdvServiceDataUuid128(AdvDataField):
 
         :param bytes ad_record: Serialized AdvServiceDataUuid128 record
         :rtype: AdvServiceDataUuid128
-        :returns: An instance of AdvServiceDataUuid128
+        :return: An instance of AdvServiceDataUuid128
         """
         if len(ad_record) >= 16:
             uuid = UUID(ad_record[:16])
@@ -1020,7 +1020,7 @@ class AdvLeSupportedFeatures(AdvDataField):
         """Deserialize an AdvDataError
 
         :param bytes ad_record: Serialized AdvDataError AD record
-        :returns: An AdvDataError object
+        :return: An AdvDataError object
         :rtype: AdvDataError
         """
         if len(ad_record) >= 1:
@@ -1199,7 +1199,7 @@ class AdvDataFieldList(object):
 
         :param bytes adv_data: Raw advertising data
         :rtype: AdvDataFieldList
-        :returns: Instance of AdvDataFieldList populated with records
+        :return: Instance of AdvDataFieldList populated with records
         """
         if len(adv_data) > 31:
             raise AdvDataFieldListOverflow

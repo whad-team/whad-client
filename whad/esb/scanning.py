@@ -66,7 +66,7 @@ class CommunicatingDevice:
         """Channels used by the device.
 
         :return: list of channels used by the device in ascending order
-        :return-type: list
+        :rtype: list
         """
         channels = list(set(self.__channels))
         channels.sort()

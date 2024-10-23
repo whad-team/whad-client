@@ -16,7 +16,7 @@ def MIC(key : bytes, buffer : bytes) -> bytes:
 
     :param key: 128-bit key to use for MIC computation
     :type key: bytes
-    :returns: 
+    :return: 
     """
     c = CMAC.new(key, ciphermod=AES)
     c.update(buffer)

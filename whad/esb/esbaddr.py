@@ -41,7 +41,7 @@ class ESBAddress:
         """Return the address value
 
         :return: ESB address as byte buffer
-        :return-type: bytes
+        :rtype: bytes
         """
         return self.__value
 
@@ -50,7 +50,7 @@ class ESBAddress:
         """Return the 4 MSBytes of this ESB address as string
 
         :return: ESB base address
-        :return-type: str
+        :rtype: str
         """
         return ":".join([f"{b:02x}" % b for b in self.__value[:4]])
 
@@ -59,7 +59,7 @@ class ESBAddress:
         """Return the ESB address prefix
 
         :return: ESB address prefix
-        :return-type: str
+        :rtype: str
         """
         return f"{self.__value[4]:02x}"
 
@@ -69,7 +69,7 @@ class ESBAddress:
 
         :param bytes bd_addr_bytes: Enhanced ShockBurst address as a bytearray.
         :rtype: ESBAddress
-        :returns: An instance of ESBAddress representing the corresponding ESB address.
+        :return: An instance of ESBAddress representing the corresponding ESB address.
         """
         if len(esb_addr_bytes) == 5:
             hex_address = hexlify(esb_addr_bytes)
