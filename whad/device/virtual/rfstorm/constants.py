@@ -5,6 +5,8 @@ from enum import IntEnum
 
 # RFStorm Internal states
 class RFStormInternalStates(IntEnum):
+    """Internal state constants.
+    """
     NONE                            = 0
     SNIFFING                        = 1
     PROMISCUOUS_SNIFFING            = 2
@@ -14,16 +16,22 @@ class RFStormInternalStates(IntEnum):
 
 # USB identifiers
 class RFStormId(IntEnum):
+    """RFStorm USB ID contstants
+    """
     RFSTORM_ID_VENDOR    = 0x1915
     RFSTORM_ID_PRODUCT   = 0x0102
 
 # USB Endpoints
 class RFStormEndPoints(IntEnum):
+    """RFStorm USB endpoints numbers
+    """
     RFSTORM_COMMAND_ENDPOINT     = 0x01
     RFSTORM_RESPONSE_ENDPOINT    = 0x81
 
 # USB Commands
 class RFStormCommands(IntEnum):
+    """RFStorm commands
+    """
     RFSTORM_CMD_TRANSMIT = 0x04
     RFSTORM_CMD_SNIFF = 0x05
     RFSTORM_CMD_PROMISCUOUS = 0x06
@@ -38,12 +46,16 @@ class RFStormCommands(IntEnum):
 
 # RF Datarates
 class RFStormDataRate(IntEnum):
+    """RFStorm datarate constants
+    """
     RF_250KBPS = 0
     RF_1MBPS = 1
     RF_2MBPS = 2
 
 # Supported domains
 class RFStormDomains(IntEnum):
+    """RFStorm supported domains
+    """
     RFSTORM_RAW_ESB = 0
     RFSTORM_UNIFYING = 1
     RFSTORM_PHY = 2
