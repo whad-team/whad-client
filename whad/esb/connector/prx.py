@@ -12,7 +12,7 @@ to handle acknowledgements and pings automatically.
 """
 from typing import Generator
 from scapy.packet import Packet
-from whad.esb.connector import ESB
+from whad.esb.connector.base import ESB
 from whad.esb.stack import ESBStack
 from whad.exceptions import UnsupportedCapability
 
@@ -20,6 +20,9 @@ from whad.exceptions import UnsupportedCapability
 class PRX(ESB):
     """
     Enhanced ShockBurst Primary Receiver Role (PRX) implementation for compatible WHAD device.
+    
+    TODO: PRX and PTX shares a lot of code in common, it could be a good idea to
+    implement this code in a single class that PRX and PTX shall inherit.
     """
     def __init__(self, device):
         """Instantiate a new Primary Receiver connector.
@@ -131,5 +134,4 @@ class PRX(ESB):
     def stream(self) -> Generator[Packet, None, None]:
         """Stream received ESB packets
         """
-        for pdu in self.__stack.ll.data_stream():
-            yield pdu
+        yield from self.__stack.ll.data_stream()
