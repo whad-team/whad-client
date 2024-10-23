@@ -84,7 +84,7 @@ class Dot15d4Address(object):
 
         :param bytes addr_bytes: Network or Device address as a bytearray.
         :rtype: Dot15d4Address
-        :returns: An instance of Dot15d4Address representing the corresponding Dot15d4 address.
+        :return: An instance of Dot15d4Address representing the corresponding Dot15d4 address.
         """
         if len(addr_bytes) == 8:
             hex_address = hexlify(addr_bytes[::-1])

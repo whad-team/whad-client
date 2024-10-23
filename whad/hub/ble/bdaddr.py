@@ -86,7 +86,7 @@ class BDAddress(object):
         :param addr_type: Bluetooth Device Address type
         :type addr_type: int, optional
         :rtype: BDAddress
-        :returns: An instance of BDAddress representing the corresponding BD address.
+        :return: An instance of BDAddress representing the corresponding BD address.
         """
         if len(bd_addr_bytes) == 6:
             hex_address = hexlify(bd_addr_bytes[::-1])

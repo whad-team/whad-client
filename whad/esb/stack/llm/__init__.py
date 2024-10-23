@@ -67,7 +67,7 @@ class LinkLayer(Layer):
         """Return the current channel number
 
         :return: Current channel number
-        :return-type: int
+        :rtype: int
         """
         return self.get_layer('phy').channel
 
@@ -85,7 +85,7 @@ class LinkLayer(Layer):
         """Return the current ESB address.
 
         :return: Current ESB address
-        :return-type: str
+        :rtype: str
         """
         return self.get_layer('phy').address
 
@@ -103,7 +103,7 @@ class LinkLayer(Layer):
         """Return the associated application layer instance
 
         :return: Associated application layer instance
-        :return-type: Layer
+        :rtype: Layer
         """
         return self.get_layer('app')
 
@@ -112,7 +112,7 @@ class LinkLayer(Layer):
         """Determine if promiscuous mode is enabled or not
 
         :return: Promiscuous mode state
-        :return-type: bool
+        :rtype: bool
         """
         return self.state.promiscuous
 
@@ -131,7 +131,7 @@ class LinkLayer(Layer):
         """Determine if connection is synchronized or not.
 
         :return: Synchronization state
-        :return-type: bool
+        :rtype: bool
         """
         return self.state.synchronized
 
@@ -140,7 +140,7 @@ class LinkLayer(Layer):
         """Get the current role.
 
         :return: Current role as defined in `ESBRole` constants.
-        :return-type: int
+        :rtype: int
         """
         return self.state.role
 

@@ -65,7 +65,7 @@ class LWGatewayStack(Layer):
     def get_appkey(self):
         """Retrieve the current APPKey
 
-        :returns: Current APPKey
+        :return: Current APPKey
         :rtype: bytes
         """
         return self.state.appkey
@@ -73,7 +73,7 @@ class LWGatewayStack(Layer):
     def get_appeui(self):
         """Retrieve the current APP EUI
 
-        :returns: Current EUI
+        :return: Current EUI
         :rtype: str
         """
         return self.state.appeui
@@ -83,7 +83,7 @@ class LWGatewayStack(Layer):
 
         :param dev_eui: Device EUI
         :type dev_eui: str
-        :returns: True if device is allowed to join, False otherwise.
+        :return: True if device is allowed to join, False otherwise.
         :rtype: bool
         """
         return self.__connector.is_device_allowed(dev_eui)
@@ -142,7 +142,7 @@ class LWGatewayStack(Layer):
         :type data: bytes
         :param upcount: Uplink frame counter
         :type upcount: int
-        :returns: Data to send back to the device
+        :return: Data to send back to the device
         :rtype: bytes
         """
         return self.__connector.on_device_data(dev_eui, dev_addr, data, upcount)

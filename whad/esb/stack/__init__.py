@@ -45,7 +45,7 @@ class ESBStack(Layer):
         """Return the associated link-layer instance
 
         :return: Link-layer instance
-        :return-type: Layer
+        :rtype: Layer
         """
         return self.get_layer('ll')
 
@@ -55,7 +55,7 @@ class ESBStack(Layer):
         """Return the assiociated application layer
 
         :return: Application layer instance
-        :return-type: Layer
+        :rtype: Layer
         """
         return self.get_layer('app')
 
@@ -73,7 +73,7 @@ class ESBStack(Layer):
         """Return current channel number
 
         :return: Current channel number
-        :return-type: int
+        :rtype: int
         """
         return self.__connector.channel
 
@@ -91,7 +91,7 @@ class ESBStack(Layer):
         """Return current ESB address
 
         :return: Current connector address
-        :return-type: str
+        :rtype: str
         """
         return self.__connector.address
 
