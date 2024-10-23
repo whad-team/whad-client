@@ -35,7 +35,7 @@ def profile_discover(app: CommandLineApp, device) -> bool:
     :param device: Peripheral device to enumerate
     :type device: :class:`whad.ble.profile.PeripheralDevice`
     :return: `True` on success, `False` if an error occurred during profile discovery
-    :return-type: bool
+    :rtype: bool
     """
     try:
         device.discover()

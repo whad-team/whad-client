@@ -461,7 +461,7 @@ class LinkLayerProxy(object):
         PDU will be forwarded to the target device, or discarded if None is returned.
 
         :param Packet pdu: Scapy packet representing the BLE control PDU
-        :returns: A PDU to be sent to the target device or None to avoid forwarding.
+        :return: A PDU to be sent to the target device or None to avoid forwarding.
         :rtype: Packet, None
         """
         logger.info('Received a Control PDU: %s (Direction: %d)' % (
@@ -478,7 +478,7 @@ class LinkLayerProxy(object):
         PDU will be forwarded to the target device, or discarded if None is returned.
 
         :param Packet pdu: Scapy packet representing the BLE data PDU
-        :returns: A PDU to be sent to the target device or None to avoid forwarding.
+        :return: A PDU to be sent to the target device or None to avoid forwarding.
         :rtype: Packet, None
         """
         logger.info('Received a Data PDU: %s (Direction: %d)' % (

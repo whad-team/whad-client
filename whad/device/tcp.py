@@ -168,7 +168,7 @@ class TCPSocketDevice(WhadDevice):
         if the device is not ready to be written to.
 
         :param bytes data: Data to write
-        :returns: number of bytes written to the device
+        :return: number of bytes written to the device
         """
         logger.debug('sending data to TCP socket: %s' % hexlify(data))
         if not self.__opened:
