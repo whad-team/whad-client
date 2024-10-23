@@ -43,20 +43,11 @@ def is_device_supported(vid, pid, manufacturer, product):
     """Check if a device is supported by WHAD.
     """
     for devinfo in SUPPORTED_UART_DEVICES:
-        _vid, _pid, _manuf, _product = devinfo
-        if _vid is not None and _vid != vid:
-            continue
-        if _pid is not None and _pid != pid:
-            continue
-        if _manuf is not None and _manuf != manufacturer:
-            continue
-        if _product is not None and _product != product:
-            continue
+        if (vid, pid, manufacturer, product) == devinfo:
+            # Device is supported
+            return True
 
-        # Device is supported.
-        return True
-
-    # Device is not supported.
+    # Device is not supported
     return False
 
 class UartDevice(WhadDevice):
@@ -207,7 +198,7 @@ class UartDevice(WhadDevice):
         if the device is not ready to be written to.
 
         :param bytes data: Data to write
-        :return: number of bytes written to the device
+        :returns: number of bytes written to the device
         """
         try:
             if not self.__opened:
