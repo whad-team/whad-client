@@ -1,30 +1,39 @@
+"""
+PCAP virtual device for WHAD.
+
+This module provides a PCAP reader that behaves like a virtual WHAD device by
+replaying packets from a specific PCAP file like they were being received with
+some compatible hardware.
+"""
+import logging
+
+from os.path import exists
+from time import sleep
+from struct import unpack
+
+from scapy.layers.bluetooth4LE import BTLE
+from scapy.layers.dot15d4 import Dot15d4
+from scapy.utils import PcapReader
+
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceDisconnected
 from whad.device.virtual import VirtualDevice
-from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
 from whad.device.virtual.pcap.capabilities import CAPABILITIES
 from whad.hub.generic.cmdresult import CommandResult
-from whad.hub.dot15d4 import Commands
-from scapy.layers.dot15d4 import Dot15d4#, Dot15d4FCS
-from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, FieldsSize, is_access_address_valid
-from scapy.utils import PcapReader, PcapWriter
-from struct import unpack, pack
-from scapy.layers.bluetooth4LE import BTLE
 from whad.scapy.layers.phy import Phy_Packet
 from whad.hub.dot15d4 import Dot15d4Metadata
 from whad.hub.ble import BLEMetadata
 from whad.hub.esb import ESBMetadata
 from whad.hub.phy import PhyMetadata, Modulation, Endianness
 from whad.hub.unifying import UnifyingMetadata
-from time import sleep
 from whad.hub.discovery import Domain
-from os.path import exists
-import logging
-import sys
+from whad.ble.utils.phy import FieldsSize
 
 logger = logging.getLogger(__name__)
 
 class PCAPDevice(VirtualDevice):
+    """PCAP replay virtual device implementation.
+    """
 
     INTERFACE_NAME = "pcap"
 
@@ -40,16 +49,14 @@ class PCAPDevice(VirtualDevice):
         '''
         This method checks dynamically if the provided interface can be instantiated.
         '''
-        logger.info("Checking interface: %s" % str(interface))
-        if interface.endswith(".pcap") or interface.endswith(".pcapng"):
-            return True
-        else:
-            return False
+        logger.info("Checking interface: %s", str(interface))
+        return interface.endswith(".pcap") or interface.endswith(".pcapng")
 
     @property
     def identifier(self):
         '''
-        Returns the identifier of the current device (e.g., bus + address in format "<bus>-<address>").
+        Returns the identifier of the current device (e.g., bus + address in
+        format "<bus>-<address>").
         '''
         return "pcap:" + str(self.__filename)
 
@@ -63,7 +70,6 @@ class PCAPDevice(VirtualDevice):
         self.__flush = "flush:" in filename
         self.__filename = filename.replace("flush:", "")
         self.__pcap_reader = None
-        self.__pcap_writer = None
         self.__dlt = None
         self.__domain = None
         self.__start_timestamp, self.__last_timestamp = None, None
@@ -94,12 +100,14 @@ class PCAPDevice(VirtualDevice):
                 self.__pcap_reader = PcapReader(self.__filename)
             return dlt
 
+        # No DLT
+        return None
+
     def _get_domain(self):
         return list(CAPABILITIES[self.__dlt][0].keys())[0]
 
     def open(self):
         try:
-            #print("Opening:", self.__filename)
             if exists(self.__filename):
                 logger.info("Existing PCAP file")
                 self.__pcap_reader = PcapReader(self.__filename)
@@ -109,8 +117,8 @@ class PCAPDevice(VirtualDevice):
                 logger.info("No PCAP file")
                 raise WhadDeviceNotFound("pcap")
 
-        except:
-            raise WhadDeviceAccessDenied("pcap")
+        except Exception as access_error:
+            raise WhadDeviceAccessDenied("pcap") from access_error
 
         self._dev_id = self._get_serial_number()
         self._fw_author = self._get_manufacturer()
@@ -127,6 +135,8 @@ class PCAPDevice(VirtualDevice):
             raise WhadDeviceNotReady()
 
     def read(self):
+        """Read packets from PCAP file and replay them
+        """
         if not self.__opened:
             raise WhadDeviceNotReady()
         while self.__started:
@@ -134,10 +144,10 @@ class PCAPDevice(VirtualDevice):
                 if self._is_reader():
                     pkt = self.__pcap_reader.read_packet()
                     self._send_packet(pkt)
-            except EOFError:
+            except EOFError as eof:
                 # TODO: add an event to indicate end of stream ?
-                logger.debug('[PCAPDevice] EOF reached')
-                raise WhadDeviceDisconnected()
+                logger.debug("[PCAPDevice] EOF reached")
+                raise WhadDeviceDisconnected() from eof
 
     def reset(self):
         pass
@@ -172,7 +182,9 @@ class PCAPDevice(VirtualDevice):
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
-            self._send_whad_zigbee_raw_pdu(bytes(pkt[Dot15d4]), channel=metadata.channel, lqi=metadata.lqi, rssi=metadata.rssi, timestamp=metadata.timestamp)
+            self._send_whad_zigbee_raw_pdu(bytes(pkt[Dot15d4]), channel=metadata.channel,
+                                           lqi=metadata.lqi, rssi=metadata.rssi,
+                                           timestamp=metadata.timestamp)
         elif self.__domain == Domain.BtLE:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
@@ -264,7 +276,8 @@ class PCAPDevice(VirtualDevice):
 
 
     # Virtual device whad message builder
-    def _send_whad_zigbee_raw_pdu(self, packet, channel=None, rssi=None, lqi=None, is_fcs_valid=True, timestamp=None):
+    def _send_whad_zigbee_raw_pdu(self, packet, channel=None, rssi=None, lqi=None,
+                                  is_fcs_valid=True, timestamp=None):
         pdu = packet[:-2]
         fcs = unpack("<H",packet[-2:])[0]
 
@@ -288,37 +301,37 @@ class PCAPDevice(VirtualDevice):
 
 
     # Virtual device whad message callbacks
-    def _on_whad_ble_stop(self, message):
+    def _on_whad_ble_stop(self, message): # pylint: disable=W0613
         self.__started = False
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_ble_start(self, message):
+    def _on_whad_ble_start(self, message): # pylint: disable=W0613
         self.__started = True
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_ble_sniff_adv(self, message):
+    def _on_whad_ble_sniff_adv(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_ble_sniff_conn(self, message):
+    def _on_whad_ble_sniff_conn(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
 
-    def _on_whad_phy_stop(self, message):
+    def _on_whad_phy_stop(self, message): # pylint: disable=W0613
         self.__started = False
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_send_raw(self, message):
+    def _on_whad_phy_send_raw(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_sniff(self, message):
+    def _on_whad_phy_sniff(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_start(self, message):
+    def _on_whad_phy_start(self, message): # pylint: disable=W0613
         self.__started = True
         self._send_whad_command_result(CommandResult.SUCCESS)
 
 
-    def _on_whad_phy_get_supported_freq(self, message):
+    def _on_whad_phy_get_supported_freq(self, message): # pylint: disable=W0613
         # Create a SupportedFreqRanges
         msg = self.hub.phy.create_supported_freq_ranges(
             self.__supported_frequency_range
@@ -340,81 +353,80 @@ class PCAPDevice(VirtualDevice):
                 found = True
                 break
         if found:
-            self.__frequency = message.frequency
             self._send_whad_command_result(CommandResult.SUCCESS)
         else:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
-    def _on_whad_phy_datarate(self, message):
+    def _on_whad_phy_datarate(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_packet_size(self, message):
+    def _on_whad_phy_packet_size(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_endianness(self, message):
+    def _on_whad_phy_endianness(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_tx_power(self, message):
+    def _on_whad_phy_tx_power(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_mod_ask(self, message):
+    def _on_whad_phy_mod_ask(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_mod_4fsk(self, message):
+    def _on_whad_phy_mod_4fsk(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_mod_fsk(self, message):
+    def _on_whad_phy_mod_fsk(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_mod_gfsk(self, message):
+    def _on_whad_phy_mod_gfsk(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_phy_sync_word(self, message):
+    def _on_whad_phy_sync_word(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
 
-    def _on_whad_dot15d4_stop(self, message):
+    def _on_whad_dot15d4_stop(self, message): # pylint: disable=W0613
         self.__started = False
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_dot15d4_send_raw(self, message):
+    def _on_whad_dot15d4_send_raw(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_dot15d4_sniff(self, message):
+    def _on_whad_dot15d4_sniff(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_dot15d4_start(self, message):
+    def _on_whad_dot15d4_start(self, message): # pylint: disable=W0613
         self.__started = True
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_esb_stop(self, message):
+    def _on_whad_esb_stop(self, message): # pylint: disable=W0613
         self.__started = False
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_esb_send_raw(self, message):
+    def _on_whad_esb_send_raw(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_esb_sniff(self, message):
+    def _on_whad_esb_sniff(self, message): # pylint: disable=W0613
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_esb_start(self, message):
+    def _on_whad_esb_start(self, message): # pylint: disable=W0613
         self.__started = True
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_unifying_stop(self, message):
+    def _on_whad_unifying_stop(self, message): # pylint: disable=W0613
         self.__domain = Domain.LogitechUnifying
         self.__started = False
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_unifying_send_raw(self, message):
+    def _on_whad_unifying_send_raw(self, message): # pylint: disable=W0613
         self.__domain = Domain.LogitechUnifying
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_unifying_sniff(self, message):
+    def _on_whad_unifying_sniff(self, message): # pylint: disable=W0613
         self.__domain = Domain.LogitechUnifying
         self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_unifying_start(self, message):
+    def _on_whad_unifying_start(self, message): # pylint: disable=W0613
         self.__domain = Domain.LogitechUnifying
         self.__started = True
         self._send_whad_command_result(CommandResult.SUCCESS)
