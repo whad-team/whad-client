@@ -7,7 +7,7 @@ from struct import unpack, pack
 from usb.core import find, USBError, USBTimeoutError
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.device import VirtualDevice
+from whad.device.virtual import VirtualDevice
 from whad.hub.discovery import Domain, Capability
 
 from whad.hub.generic.cmdresult import CommandResult
