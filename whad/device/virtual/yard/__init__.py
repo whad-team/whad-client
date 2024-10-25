@@ -427,7 +427,6 @@ class YardStickOneDevice(VirtualDevice):
         message = bytes([app, command]) + pack("<H", len(data)) + data
         if no_response:
             return None
-
         recv_app, recv_verb, recv_data = None, None, None
         while (recv_app != app and recv_verb != command):
             self.__yard.write(YardStickOneEndPoints.OUT_ENDPOINT, message, timeout=timeout)
