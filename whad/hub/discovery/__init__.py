@@ -35,6 +35,14 @@ class Capability:
     SimulateRole = 0x40
     NoRawData = 0x80
 
+class DeviceType:
+    """Device type
+    """
+    Esp32Blefuzzer = 0
+    Butterfly = 1
+    Btlejack = 2
+    VirtualDevice = 4
+
 
 @pb_bind(ProtocolHub, name='discovery', version=1)
 class Discovery(Registry):
