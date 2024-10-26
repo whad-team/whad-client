@@ -8,12 +8,10 @@ parsing magic is performed in our WhadDevice class.
 import logging
 
 from threading import Lock
-from time import sleep
-from queue import Empty
 
 from whad.device import WhadDevice
-from whad.protocol.device_pb2 import DeviceType
-from whad.protocol.generic_pb2 import ResultCode
+from whad.hub.discovery import DeviceType
+from whad.hub.generic import ResultCode
 
 logger = logging.getLogger(__name__)
 
