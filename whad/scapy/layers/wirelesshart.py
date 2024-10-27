@@ -212,14 +212,53 @@ class WirelessHart_Transport_Layer_Hdr(Packet):
         BitEnumField('response', 0, 1, {0 : "no", 1: "yes"}), 
         BitEnumField('broadcast', 0, 1, {0 : "no", 1: "yes"}), 
         BitField('tr_seq_num', 0, 5), 
+
+        # Device status byte
+        BitEnumField('device_malfunction', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('configuration_changed', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('cold_start', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('more_status_available', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('loop_current_fixed', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('loop_current_saturated', 0, 1, {0 : "no", 1: "yes"}),
+        BitEnumField('non_primary_variable_out_of_limit', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('primary_variable_out_of_limit', 0, 1, {0 : "no", 1: "yes"}),  
+
+        # Extended Device status byte
+        BitField('reserved', 0, 2), 
+        BitEnumField('function_check', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('out_of_specification', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('failure', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('critical_power_failure', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('device_variable_alert', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('maintenance_required', 0, 1, {0 : "no", 1: "yes"}), 
+
     ]
     
+    
+class WirelessHart_Command_Hdr(Packet):
+    name = "Wireless Hart Command header"
+    fields_desc = [
+        XShortField("command_number", None), 
+        ByteField("len", None)
+    ]
+            
+    def post_build(self, p, pay):
+        p += pay
+        if self.len is None:
+            p = p[:2] + pack("B", len(pay)) + p[3:]
+        return p
+
+
+class WirelessHart_Write_Modify_Session_Cmd(Packet):
+    name = "Write / modify session command"
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_Acknowledgement, pdu_type=0)
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_Advertisement, pdu_type=1)
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_KeepAlive, pdu_type=2)
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_Network_Hdr, pdu_type=7)
 
 bind_layers(WirelessHart_Network_Hdr, WirelessHart_Network_Security_SubLayer_Hdr)
+
+bind_layers(WirelessHart_Transport_Layer_Hdr, WirelessHart_Command_Hdr)
 
 old_guess_payload_class = Dot15d4Data.guess_payload_class
 
