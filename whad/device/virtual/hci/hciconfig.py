@@ -1,11 +1,15 @@
+"""
+HCI configuration class.
+"""
+
 from fcntl import ioctl
 from socket import socket, SOCK_RAW
 from struct import pack, unpack
 
-class HCIConfig(object):
-    '''
+class HCIConfig:
+    """
     This class allows to easily configure an HCI Interface.
-    '''
+    """
     HCIDEVDOWN = 0x400448ca
     HCIDEVRESET = 0x400448cb
     HCIDEVUP = 0x400448c9
@@ -14,6 +18,8 @@ class HCIConfig(object):
 
     @classmethod
     def list(cls):
+        """Enumerate HCI devices
+        """
         sock = socket(31, SOCK_RAW, 1)
 
         # Get number of devices
@@ -34,7 +40,7 @@ class HCIConfig(object):
 
     @classmethod
     def down(cls, index):
-        '''
+        """
         This class method stops an HCI interface.
         Its role is equivalent to the following command : ``hciconfig hci<index> down``
 
@@ -45,7 +51,7 @@ class HCIConfig(object):
 
         >>> HCIConfig.down(0)
 
-        '''
+        """
 
         #try:
         sock = socket(31, SOCK_RAW, 1)
@@ -57,7 +63,7 @@ class HCIConfig(object):
 
     @classmethod
     def reset(cls, index):
-        '''
+        """
         This class method resets an HCI interface.
         Its role is equivalent to the following command : ``hciconfig hci<index> reset``
 
@@ -68,7 +74,7 @@ class HCIConfig(object):
 
         >>> HCIConfig.reset(0)
 
-        '''
+        """
         try:
             sock = socket(31, SOCK_RAW, 1)
             ioctl(sock.fileno(), cls.HCIDEVRESET, index)
@@ -79,7 +85,7 @@ class HCIConfig(object):
 
     @classmethod
     def up(cls, index):
-        '''
+        """
         This class method starts an HCI interface.
         Its role is equivalent to the following command : ``hciconfig hci<index> up``
 
@@ -90,7 +96,7 @@ class HCIConfig(object):
 
         >>> HCIConfig.up(0)
 
-        '''
+        """
         try:
             sock = socket(31, SOCK_RAW, 1)
             ioctl(sock.fileno(), cls.HCIDEVUP, index)

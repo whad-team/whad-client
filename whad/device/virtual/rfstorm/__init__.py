@@ -8,7 +8,7 @@ from time import sleep, time
 from usb.core import find, USBError, USBTimeoutError
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.device.virtual import VirtualDevice
+from whad.device import VirtualDevice
 from whad.device.virtual.rfstorm.constants import RFStormId, RFStormCommands, \
     RFStormDataRate, RFStormEndPoints, RFStormInternalStates, RFStormDomains
 from whad.hub.generic.cmdresult import CommandResult
