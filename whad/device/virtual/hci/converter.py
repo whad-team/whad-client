@@ -1,22 +1,32 @@
-from scapy.layers.bluetooth import HCI_Event_LE_Meta, HCI_LE_Meta_Advertising_Reports, \
-    HCI_LE_Meta_Connection_Complete, L2CAP_Hdr, HCI_Hdr, HCI_ACL_Hdr, HCI_Event_Disconnection_Complete, \
-    HCI_LE_Meta_Long_Term_Key_Request, HCI_Event_Encryption_Change
-from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL, LL_ENC_REQ, LL_ENC_RSP, LL_START_ENC_RSP, \
-    LL_START_ENC_REQ
-from whad.scapy.layers.hci import HCI_LE_Meta_Enhanced_Connection_Complete
-from scapy.compat import raw
-from whad.exceptions import WhadDeviceUnsupportedOperation
-from whad.protocol.whad_pb2 import Message
-from whad.protocol.ble.ble_pb2 import BleAdvType, BleAddrType, BleDirection
-from whad.hub.ble import BDAddress, AdvType
-from struct import pack, unpack
+"""
+HCI/WHAD messages converter.
+"""
+import logging
+
+from struct import unpack
 from queue import Queue
 from enum import IntEnum
+from typing import List
 
-import logging
+# Scapy
+from scapy.layers.bluetooth import HCI_Event_LE_Meta, HCI_LE_Meta_Advertising_Reports, \
+    HCI_LE_Meta_Connection_Complete, L2CAP_Hdr, HCI_Hdr, HCI_ACL_Hdr, \
+    HCI_Event_Disconnection_Complete, HCI_LE_Meta_Long_Term_Key_Request, \
+    HCI_Event_Encryption_Change
+from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL, LL_ENC_REQ, \
+    LL_ENC_RSP, LL_START_ENC_RSP, LL_START_ENC_REQ
+from scapy.compat import raw
+
+# Whad
+from whad.scapy.layers.hci import HCI_LE_Meta_Enhanced_Connection_Complete
+from whad.exceptions import WhadDeviceUnsupportedOperation
+from whad.hub.ble import BleAddrType, BleDirection, BDAddress, AdvType, HubMessage
+
 logger = logging.getLogger(__name__)
 
 class HCIRole(IntEnum):
+    """HCI role.
+    """
     NONE = 0
     CENTRAL = 1
     PERIPHERAL = 2
@@ -40,28 +50,45 @@ class HCIConverter:
         self.cached_l2cap_length = 0
         self.waiting_l2cap_fragments = False
 
-    def process_message(self, message):
+    def process_message(self, message: HubMessage):
+        """This function turns a BLE hub message into the corresponding HCI
+        packet.
+
+        :param message: Hub message to convert.
+        :type message: HubMessage
+        """
         ll_packet = BTLE_DATA(message.pdu)
 
+        # L2CAP packet reassembly
         if L2CAP_Hdr in ll_packet or self.waiting_l2cap_fragments:
+            if not self.waiting_l2cap_fragments and (
+                    len(raw(ll_packet[L2CAP_Hdr:])) < ll_packet[L2CAP_Hdr:].len):
 
-            if not self.waiting_l2cap_fragments and len(raw(ll_packet[L2CAP_Hdr:])) < ll_packet[L2CAP_Hdr:].len:
                 self.waiting_l2cap_fragments = True
                 self.cached_l2cap_payload = raw(ll_packet[BTLE_DATA:][1:])
                 self.cached_l2cap_length = ll_packet[L2CAP_Hdr:].len
+
+                # No HCI packet to send for now (data queued)
                 return []
-            elif self.waiting_l2cap_fragments:
+
+            if self.waiting_l2cap_fragments:
                 self.cached_l2cap_payload += raw(ll_packet[BTLE_DATA:][1:])
                 if self.cached_l2cap_length == (len(self.cached_l2cap_payload) - 4):
                     L2CAP_Hdr(self.cached_l2cap_payload).show()
-                    hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle) / L2CAP_Hdr(self.cached_l2cap_payload)
+                    hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle)
+                    hci_packet = hci_packet / L2CAP_Hdr(self.cached_l2cap_payload)
                     self.waiting_l2cap_fragments = False
                     return [hci_packet]
-                else:
-                    return []
-            hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle) / ll_packet[L2CAP_Hdr:]
+
+                # No HCI packet for now.
+                return []
+
+            # No fragmentation, send data as-is.
+            hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle)
+            hci_packet = hci_packet / ll_packet[L2CAP_Hdr:]
             return [hci_packet]
-        elif ll_packet.LLID == 3:
+
+        if ll_packet.LLID == 3:
             if LL_ENC_REQ in ll_packet:
                 pdu = BTLE_DATA() / BTLE_CTRL() / LL_ENC_RSP(skds=0, ivs=0)
 
@@ -81,7 +108,6 @@ class HCIConverter:
 
                 self.add_pending_message(msg)
 
-                msg = Message()
                 pdu = BTLE_DATA() / BTLE_CTRL() / LL_START_ENC_REQ()
 
                 direction = (BleDirection.SLAVE_TO_MASTER if
@@ -101,14 +127,29 @@ class HCIConverter:
                 self.add_pending_message(msg)
 
                 return []
-            else:
-                #logger.warning("HCI devices cannot send control PDU.")
-                raise WhadDeviceUnsupportedOperation("send_pdu", "Device cannot send control PDU, only data PDU.")
+
+            #logger.warning("HCI devices cannot send control PDU.")
+            raise WhadDeviceUnsupportedOperation(
+                "send_pdu", "Device cannot send control PDU, only data PDU."
+            )
+
+        # No HCI packet to send
+        return []
 
     def add_pending_message(self, event):
+        """Add pending message to queue.
+
+        :param event: Event message to add to queue
+        :type event: HubMessage
+        """
         self.pending_messages_queue.put(event)
 
-    def get_pending_messages(self):
+    def get_pending_messages(self) -> List[HubMessage]:
+        """Get pending messages.
+
+        :return: List of pending hub messages
+        :rtype: list
+        """
         events = []
         while not self.pending_messages_queue.empty():
             events.append(self.pending_messages_queue.get())
@@ -121,20 +162,37 @@ class HCIConverter:
         if HCI_Event_LE_Meta in event:
             if HCI_LE_Meta_Advertising_Reports in event:
                 return self.process_advertising_reports(event[HCI_LE_Meta_Advertising_Reports:])
-            elif HCI_LE_Meta_Connection_Complete in event:
+
+            if HCI_LE_Meta_Connection_Complete in event:
                 return self.process_connection_complete(event[HCI_LE_Meta_Connection_Complete:])
-            elif HCI_LE_Meta_Enhanced_Connection_Complete in event:
-                return self.process_connection_complete(event[HCI_LE_Meta_Enhanced_Connection_Complete:])
-            elif HCI_LE_Meta_Long_Term_Key_Request in event:
+
+            if HCI_LE_Meta_Enhanced_Connection_Complete in event:
+                return self.process_connection_complete(
+                    event[HCI_LE_Meta_Enhanced_Connection_Complete:]
+                )
+
+            if HCI_LE_Meta_Long_Term_Key_Request in event:
                 return self.process_long_term_key_request(event[HCI_LE_Meta_Long_Term_Key_Request:])
-        elif HCI_Event_Encryption_Change in event:
+
+        if HCI_Event_Encryption_Change in event:
             return self.process_encryption_change_event(event[HCI_Event_Encryption_Change:])
-        elif HCI_ACL_Hdr in event:
+
+        if HCI_ACL_Hdr in event:
             return self.process_acl_data(event[HCI_ACL_Hdr:])
-        elif HCI_Event_Disconnection_Complete in event:
+
+        if HCI_Event_Disconnection_Complete in event:
             return self.process_disconnection_complete(event[HCI_Event_Disconnection_Complete:])
 
-    def process_encryption_change_event(self, event):
+        # Return no messages on unknown events
+        return []
+
+    def process_encryption_change_event(self, event) -> List[HubMessage]:
+        """Process encryption change.
+
+        :param event: HCI event to process
+        :return: list of hub messages
+        :rtype: list
+        """
         pdu = BTLE_DATA()/BTLE_CTRL()/LL_START_ENC_RSP()
 
         direction = (BleDirection.SLAVE_TO_MASTER if
@@ -154,8 +212,8 @@ class HCIConverter:
         return [msg]
 
     def process_long_term_key_request(self, event):
-
-        msg = Message()
+        """Process long-term key request event.
+        """
         pdu = BTLE_DATA()/BTLE_CTRL()/LL_ENC_REQ(
             rand = unpack('<Q', event.rand)[0],
             ediv = event.ediv,
@@ -185,8 +243,9 @@ class HCIConverter:
         return [msg]
 
     def process_acl_data(self, event):
+        """Process ACL data event.
+        """
         if event.PB == 2 and L2CAP_Hdr in event:
-            msg = Message()
             pdu = BTLE_DATA()/event[L2CAP_Hdr:]
 
             # If HCI ACL Data PB flag==1 then it is a continued fragment.
@@ -212,8 +271,7 @@ class HCIConverter:
 
             return [msg]
 
-        elif event.PB == 1:
-            msg = Message()
+        if event.PB == 1:
             pdu = BTLE_DATA()/event[HCI_ACL_Hdr:].payload
 
             # If HCI ACL Data PB flag==1 then it is a continued fragment.
@@ -237,7 +295,12 @@ class HCIConverter:
 
             return [msg]
 
+        # Unsupported event, no messages.
+        return []
+
     def process_connection_complete(self, event):
+        """Process connection complete HCI event.
+        """
         if event.status == 0x00:
 
             # Mark device as connected and register handle.
@@ -251,14 +314,18 @@ class HCIConverter:
                 initiator_address = bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
                 initiator_address_type = self.__device._bd_address_type
                 responder_address = bytes.fromhex(event.paddr.replace(":",""))[::-1]
-                responder_address_type = BleAddrType.PUBLIC if event.patype == 0 else BleAddrType.RANDOM
+                responder_address_type = (
+                    BleAddrType.PUBLIC if event.patype == 0 else BleAddrType.RANDOM
+                )
             else:
                 self.role = HCIRole.PERIPHERAL
                 initiator_address = bytes.fromhex(event.paddr.replace(":",""))[::-1]
-                initiator_address_type = BleAddrType.PUBLIC if event.patype == 0 else BleAddrType.RANDOM
+                initiator_address_type = (
+                    BleAddrType.PUBLIC if event.patype == 0 else BleAddrType.RANDOM
+                )
                 responder_address = bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
                 responder_address_type = self.__device._bd_address_type
-            
+
             msg = self.__device.hub.ble.create_connected(
                 BDAddress(initiator_address, addr_type=initiator_address_type),
                 BDAddress(responder_address, addr_type=responder_address_type),
@@ -267,8 +334,13 @@ class HCIConverter:
             )
 
             return [msg]
+        
+        # Nothing to convert
+        return []
 
     def process_disconnection_complete(self, event):
+        """Process HCI disconnection event.
+        """
         if event.status == 0x00:
             # Mark device as disconnected and remove handle
             self.__device._connected = False
@@ -284,6 +356,8 @@ class HCIConverter:
             return [msg]
 
     def process_advertising_reports(self, reports):
+        """Process HCI advertising reports.
+        """
         messages = []
         for report in reports.reports:
 
@@ -307,7 +381,7 @@ class HCIConverter:
             msg = self.__device.hub.ble.create_adv_pdu_received(
                 adv_type,
                 report.rssi if hasattr(report, "rssi") else 0,
-                BDAddress(report.addr, random = not (report.atype == 0)),
+                BDAddress(report.addr, random = not report.atype == 0),
                 bytes(eir_data)
             )
 
