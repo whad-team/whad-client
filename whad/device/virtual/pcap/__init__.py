@@ -17,7 +17,7 @@ from scapy.utils import PcapReader
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceDisconnected
-from whad.device.virtual import VirtualDevice
+from whad.device import VirtualDevice
 from whad.device.virtual.pcap.capabilities import CAPABILITIES
 from whad.hub.generic.cmdresult import CommandResult
 from whad.scapy.layers.phy import Phy_Packet

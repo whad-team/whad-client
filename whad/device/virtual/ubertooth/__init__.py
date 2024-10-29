@@ -1,69 +1,80 @@
+"""Ubertooth adaptation layer.
+"""
+import logging
+
+from struct import unpack, pack
+from time import sleep
+from usb.core import find, USBError
+from usb.util import get_string
+
+from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_CONNECT_REQ, BTLE_DATA
+from scapy.compat import raw
+
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.device.virtual import VirtualDevice
-from whad.protocol.whad_pb2 import Message
-from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
+from whad.device import VirtualDevice
 from whad.hub.discovery import Domain, Capability
-from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc, FieldsSize, is_access_address_valid
+from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc,\
+    FieldsSize, is_access_address_valid
 from whad.hub.ble import Direction, ChannelMap
 from whad.hub.generic.cmdresult import CommandResult
-from whad.protocol.generic_pb2 import ResultCode
-from whad.protocol.ble.ble_pb2 import SniffAdv,SniffConnReq, SniffAccessAddress, Start, Stop, SniffActiveConn
+from whad.hub.ble import Commands
 from whad.device.virtual.ubertooth.constants import UbertoothId, \
     UbertoothTransfers, UbertoothModulations, UbertoothCommands, \
     UbertoothInternalState, UbertoothModes, UbertoothJammingModes
 from whad.scapy.layers.ubertooth import Ubertooth_Hdr,UBERTOOTH_PACKET_TYPES, \
     BTLE_Promiscuous_Access_Address, BTLE_Promiscuous_CRCInit, BTLE_Promiscuous_Hop_Interval, \
     BTLE_Promiscuous_Hop_Increment
-from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_CONNECT_REQ, BTLE_DATA
-from scapy.compat import raw
-from usb.core import find, USBError
-from usb.util import get_string
-from struct import unpack, pack
-from time import sleep
 
-import logging
 logger = logging.getLogger(__name__)
 
 # Helpers functions
-def get_ubertooth(id=0,serial=None):
-    '''
+def get_ubertooth(index: int = 0, serial: str = None):
+    """
     Returns an ubertooth USB object based on index or serial number.
-    '''
-    devices = list(find(idVendor=UbertoothId.UBERTOOTH_ID_VENDOR, idProduct=UbertoothId.UBERTOOTH_ID_PRODUCT,find_all=True))
+    """
+    devices = list(find(idVendor=UbertoothId.UBERTOOTH_ID_VENDOR,
+                        idProduct=UbertoothId.UBERTOOTH_ID_PRODUCT,
+                        find_all=True))
     if serial is not None:
         for device in devices:
             if serial.lower() == get_string(device, device.iSerialNumber):
                 return (devices.index(device), device)
         # No device found with the corresponding serial, return None
         return None
-    else:
-        try:
-            return (id, devices[id])
-        except IndexError:
-            return None
+
+    try:
+        return (index, devices[index])
+    except IndexError:
+        return None
 
 class UbertoothDevice(VirtualDevice):
+    """Ubertooth virtual device implementation.
+    """
 
     INTERFACE_NAME = "ubertooth"
 
     @classmethod
     def list(cls):
-        '''
+        """
         Returns a list of available Ubertooth devices.
-        '''
+        """
         available_devices = []
         try:
-            for ubertooth in find(idVendor=UbertoothId.UBERTOOTH_ID_VENDOR, idProduct=UbertoothId.UBERTOOTH_ID_PRODUCT,find_all=True):
-                available_devices.append(UbertoothDevice(serial=get_string(ubertooth, ubertooth.iSerialNumber)))
-        except ValueError as err:
+            for ubertooth in find(idVendor=UbertoothId.UBERTOOTH_ID_VENDOR,
+                                  idProduct=UbertoothId.UBERTOOTH_ID_PRODUCT,
+                                  find_all=True):
+                available_devices.append(
+                    UbertoothDevice(serial=get_string(ubertooth, ubertooth.iSerialNumber)
+                ))
+        except ValueError:
             logger.warning("Cannot access Ubertooth, root privileges may be required.")
         return available_devices
 
     @property
     def identifier(self):
-        '''
+        """
         Returns the identifier of the current device (e.g., serial number).
-        '''
+        """
         return get_string(self.__ubertooth, self.__ubertooth.iSerialNumber)
 
 
@@ -93,10 +104,13 @@ class UbertoothDevice(VirtualDevice):
         try:
             self.__ubertooth.set_configuration()
         except USBError as err:
+            # Access denied ?
             if err.errno == 13:
-                raise WhadDeviceAccessDenied("ubertooth")
-            else:
-                raise WhadDeviceNotReady()
+                raise WhadDeviceAccessDenied("ubertooth") from err
+            
+            # Device not ready
+            raise WhadDeviceNotReady() from err
+
         self._dev_id = self._get_serial_number()
         self._fw_author = self._get_manufacturer()
         self._fw_url = self._get_url()
@@ -107,11 +121,19 @@ class UbertoothDevice(VirtualDevice):
         # Ask parent class to run a background I/O thread
         super().open()
 
-    def write(self, data):
+    def write(self, data: bytes):
+        """handle write operation.
+
+        :param data: Data to write
+        :type data: bytes
+        :raises: WhadDeviceNotReady
+        """
         if not self.__opened:
             raise WhadDeviceNotReady()
 
     def read(self):
+        """Process incoming data.
+        """
         if not self.__opened:
             raise WhadDeviceNotReady()
         if self.__internal_state != UbertoothInternalState.NONE:
@@ -246,7 +268,8 @@ class UbertoothDevice(VirtualDevice):
 
     def _on_whad_ble_sniff_adv(self, message):
         channel = message.channel
-        # Address filtering is performed in python, ubertooth doesn't support it natively for adv only mode
+        # Address filtering is performed in python, ubertooth doesn't support
+        # it natively for adv only mode
         self.__address_filter = message.bd_address
 
         self.__access_address = 0x8e89bed6
@@ -283,10 +306,8 @@ class UbertoothDevice(VirtualDevice):
         elif self.__internal_state == UbertoothInternalState.NEW_CONNECTION_SNIFFING:
             self._enable_connection_sniffing()
             self._send_whad_command_result(CommandResult.SUCCESS)
-        elif (
-                self.__internal_state == UbertoothInternalState.ACCESS_ADDRESS_SNIFFING or
-                self.__internal_state == UbertoothInternalState.EXISTING_CONNECTION_SNIFFING
-            ):
+        elif self.__internal_state in (UbertoothInternalState.ACCESS_ADDRESS_SNIFFING,
+                                       UbertoothInternalState.EXISTING_CONNECTION_SNIFFING):
             self._enable_promiscuous_mode()
             self._send_whad_command_result(CommandResult.SUCCESS)
         else:
@@ -296,20 +317,27 @@ class UbertoothDevice(VirtualDevice):
     def _filter(self, packet):
         if BTLE_DATA in packet and packet.len == 0 and not self.__show_empty_packets:
             return False
+        
         if BTLE_ADV in packet and not self.__show_advertisements:
             return False
+        
         # No filtering if address is FF:FF:FF:FF:FF:FF
         if self.__address_filter == b"\xFF\xFF\xFF\xFF\xFF\xFF":
             return True
-        elif hasattr(packet, "AdvA"):
+        
+        # Ensure packet has the expected advertiser address.
+        if hasattr(packet, "AdvA"):
             return packet.AdvA == self.__address_filter
-        else:
-            return False
+
+        # Packet must be discarded.
+        return False
 
     # Ubertooth low level communication primitives
     def _ubertooth_ctrl_transfer_in(self, request, size, timeout=100):
         try:
-            received_data = self.__ubertooth.ctrl_transfer(UbertoothTransfers.CTRL_IN, request, 0, 0, size, timeout=timeout)
+            received_data = self.__ubertooth.ctrl_transfer(UbertoothTransfers.CTRL_IN,
+                                                           request, 0, 0, size,
+                                                           timeout=timeout)
             received_data = received_data.tobytes()
             if len(received_data) == 1:
                 received_data = b""
@@ -320,7 +348,14 @@ class UbertoothDevice(VirtualDevice):
 
     def _ubertooth_ctrl_transfer_out(self, request, value=0, data=None, timeout=100):
         try:
-            self.__ubertooth.ctrl_transfer(UbertoothTransfers.CTRL_OUT, request, value, 0, data, timeout=timeout)
+            self.__ubertooth.ctrl_transfer(
+                UbertoothTransfers.CTRL_OUT,
+                request,
+                value,
+                0,
+                data,
+                timeout=timeout
+            )
             return True
         except USBError:
             return False
@@ -329,14 +364,20 @@ class UbertoothDevice(VirtualDevice):
     def _get_capabilities(self):
         capabilities = {
             Domain.BtLE : (
-                                (Capability.Sniff | Capability.Jam),
-                                [SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveConn, Start, Stop]
+                (Capability.Sniff | Capability.Jam),
+                [
+                    Commands.SniffAdv, Commands.SniffConnReq,
+                    Commands.SniffAccessAddress, Commands.SniffActiveConn,
+                    Commands.Start, Commands.Stop
+                ]
             )
         }
         return capabilities
 
     def _get_serial_number(self):
-        serial_number = self._ubertooth_ctrl_transfer_in(UbertoothCommands.UBERTOOTH_GET_SERIAL, 17)
+        serial_number = self._ubertooth_ctrl_transfer_in(
+            UbertoothCommands.UBERTOOTH_GET_SERIAL, 17
+        )
         return serial_number
 
     def _get_url(self):
@@ -347,7 +388,9 @@ class UbertoothDevice(VirtualDevice):
         return get_string(self.__ubertooth, self.__ubertooth.iManufacturer).encode("utf-8")
 
     def _get_firmware_version(self):
-        firmware_version = self._ubertooth_ctrl_transfer_in(UbertoothCommands.UBERTOOTH_GET_REV_NUM,20)[2:].decode("utf-8")
+        firmware_version = self._ubertooth_ctrl_transfer_in(
+            UbertoothCommands.UBERTOOTH_GET_REV_NUM,20
+        )[2:].decode("utf-8")
         if "git" in firmware_version:
             try:
                 major, minor, revision = 1, 7, int(firmware_version.split("-")[1], 16)
@@ -370,34 +413,54 @@ class UbertoothDevice(VirtualDevice):
         self._ubertooth_ctrl_transfer_out(UbertoothCommands.UBERTOOTH_JAM_MODE, mode)
 
     def _reset_clock(self):
-        self._ubertooth_ctrl_transfer_out(UbertoothCommands.UBERTOOTH_SET_CLOCK, data=b"\x00\x00\x00\x00\x00\x00")
+        self._ubertooth_ctrl_transfer_out(
+            UbertoothCommands.UBERTOOTH_SET_CLOCK,
+            data=b"\x00\x00\x00\x00\x00\x00"
+        )
 
     def _set_crc_checking(self, enable=True):
-        self._ubertooth_ctrl_transfer_out(UbertoothCommands.UBERTOOTH_SET_CRC_VERIFY, int(enable))
+        self._ubertooth_ctrl_transfer_out(
+            UbertoothCommands.UBERTOOTH_SET_CRC_VERIFY,
+            int(enable)
+        )
 
     def _set_target(self, address=b"\x00\x00\x00\x00\x00\x00"):
         data = address + b"\x30"
         self._ubertooth_ctrl_transfer_out(UbertoothCommands.UBERTOOTH_BTLE_SET_TARGET, data=data)
 
-    def _set_channel(self, channel=37):
+    def _set_channel(self, channel: int = 37) -> bool:
+        """Set channel.
+
+        :param channel: Channel number to use
+        :type channel: int
+        :return: `True` on success, `False` otherwise
+        :rtype: bool
+        """
         frequency = channel_to_frequency(channel)
         if frequency is not None:
             self.__channel = channel
             self._ubertooth_ctrl_transfer_out(UbertoothCommands.UBERTOOTH_SET_CHANNEL, frequency)
             return True
-        else:
-            return False
+        
+        # Error while setting channel.
+        return False
 
     def _get_channel(self):
-        frequency = unpack('H', self._ubertooth_ctrl_transfer_in(UbertoothCommands.UBERTOOTH_GET_CHANNEL, 2))[0]
+        frequency = unpack('H', self._ubertooth_ctrl_transfer_in(
+            UbertoothCommands.UBERTOOTH_GET_CHANNEL, 2)
+        )[0]
         return frequency_to_channel(frequency)
 
     def _set_access_address(self, access_address):
         data = pack("<I", access_address)
-        self._ubertooth_ctrl_transfer_out(UbertoothCommands.UBERTOOTH_SET_ACCESS_ADDRESS, data=data)
+        self._ubertooth_ctrl_transfer_out(
+            UbertoothCommands.UBERTOOTH_SET_ACCESS_ADDRESS, data=data
+        )
 
     def _get_access_address(self):
-        access_address = unpack("<I",self._ubertooth_ctrl_transfer_in(UbertoothCommands.UBERTOOTH_GET_ACCESS_ADDRESS, 4))[0]
+        access_address = unpack("<I",self._ubertooth_ctrl_transfer_in(
+            UbertoothCommands.UBERTOOTH_GET_ACCESS_ADDRESS, 4)
+        )[0]
         return access_address
 
     def _enable_promiscuous_mode(self):

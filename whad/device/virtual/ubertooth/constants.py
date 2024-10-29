@@ -4,31 +4,37 @@ This module provides some constants used by WHAD to communicate with the Ubertoo
 from enum import IntEnum
 
 class UbertoothInternalState(IntEnum):
+    """Internal states.
+    """
     NONE = 0
     ADVERTISEMENT_SNIFFING = 1
     NEW_CONNECTION_SNIFFING = 2
     EXISTING_CONNECTION_SNIFFING = 3
     ACCESS_ADDRESS_SNIFFING = 4
 
-# USB device Identifiers
 class UbertoothId(IntEnum):
+    """USB vendor and product IDs.
+    """
     UBERTOOTH_ID_VENDOR         = 0x1D50
     UBERTOOTH_ID_PRODUCT        = 0x6002
 
-# Input / Output constants
 class UbertoothTransfers(IntEnum):
+    """Input/Output constants.
+    """
     CTRL_IN                     = 0xC0
     CTRL_OUT                    = 0x40
 
 
-# Modulations
 class UbertoothModulations(IntEnum):
+    """Supported modulations.
+    """
     MOD_BT_BASIC_RATE           = 0
     MOD_BT_LOW_ENERGY           = 1
     MOD_80211_FHSS              = 2
 
-# Commands (opcode)
 class UbertoothCommands(IntEnum):
+    """Ubertooth supported commands.
+    """
     UBERTOOTH_PING              = 0
     UBERTOOTH_RX_SYMBOLS        = 1
     UBERTOOTH_TX_SYMBOLS        = 2
@@ -101,8 +107,9 @@ class UbertoothCommands(IntEnum):
     UBERTOOTH_CANCEL_FOLLOW     = 70
     UBERTOOTH_LE_SET_ADV_DATA   = 71
 
-# Modes
 class UbertoothModes(IntEnum):
+    """Ubertooth modes.
+    """
     MODE_IDLE                   = 0
     MODE_RX_SYMBOLS             = 1
     MODE_TX_SYMBOLS             = 2
@@ -117,9 +124,9 @@ class UbertoothModes(IntEnum):
     MODE_RESET                  = 11
     MODE_BT_SLAVE_LE            = 12
 
-
-# Jamming modes
 class UbertoothJammingModes(IntEnum):
+    """Jamming modes.
+    """
     JAM_NONE                    = 0
     JAM_ONCE                    = 1
     JAM_CONTINUOUS              = 2
