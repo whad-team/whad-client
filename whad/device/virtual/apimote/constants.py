@@ -1,27 +1,34 @@
 """
 This module provides some constants used by WHAD to communicate with the APIMote.
 """
-from enum import IntEnum,Enum
+from enum import IntEnum
 from dataclasses import dataclass
 
 
 @dataclass
 class RegisterMask:
+    """Register mask class
+    """
     mask : int = 0
     offset : int = 0
 
 class APIMoteId(IntEnum):
+    """USB product and vendor IDs.
+    """
     APIMOTE_ID_VENDOR    = 0x0403
     APIMOTE_ID_PRODUCT   = 0x6015
 
-# APIMote internal states
 class APIMoteInternalStates(IntEnum):
+    """APIMote internal states.
+    """
     NONE                    = 0
     SNIFFING                = 1
     TRANSMITTING            = 2
 
 
 class APIMoteRegisters(IntEnum):
+    """APIMote registers offsets.
+    """
     # Status registers: initiate the change of an internal state or mode
     SNOP            = 0x00        # No operation
     SXOSCON         = 0x01        # Crystal oscillator
@@ -77,17 +84,25 @@ class APIMoteRegisters(IntEnum):
     RXFIFO          = 0x3F        # Receiver FIFO Byte Register
 
 class APIMoteRegistersMasks:
+    """APIMote registers masks definition.
+    """
 
     class MCSM0:
+        """Mode control register 0
+        """
         CLOSE_IN_RX = RegisterMask(mask=0b11, offset=0)
         FS_AUTOCAL = RegisterMask(mask=0b11, offset=4)
 
     class MCSM1:
+        """Mode control register 1
+        """
         TX_OFF_MODE = RegisterMask(mask=0b11, offset=0)
         RX_OFF_MODE = RegisterMask(mask=0b11, offset=2)
         CCA_MODE = RegisterMask(mask=0b11, offset=4)
 
     class MDMCTRL0:
+        """Modem control register 0
+        """
         PREAMBLE_LENGTH = RegisterMask(mask=0b1111, offset=0)
         AUTO_ACK = RegisterMask(mask=0b1, offset=4)
         AUTO_CRC = RegisterMask(mask=0b1, offset=5)
@@ -98,6 +113,8 @@ class APIMoteRegistersMasks:
         RESERVED_FRAME_MODE = RegisterMask(mask=0b1, offset=13)
 
     class MDMCTRL1:
+        """Modem control register 1
+        """
         RX_MODE = RegisterMask(mask=0b11, offset=0)
         TX_MODE = RegisterMask(mask=0b11, offset=2)
         MODULATION_MODE = RegisterMask(mask=0b1, offset=4)
@@ -105,6 +122,8 @@ class APIMoteRegistersMasks:
         CORR_THR = RegisterMask(mask=0b11111, offset=6)
 
     class IOCFG0:
+        """Input/Output configuration control register 0
+        """
         FIFOP_THR = RegisterMask(mask=0b1111111, offset=0)
         CCA_POLARITY = RegisterMask(mask=0b1, offset=7)
         SFD_POLARITY = RegisterMask(mask=0b1, offset=8)
@@ -113,6 +132,8 @@ class APIMoteRegistersMasks:
         BCN_ACCEPT = RegisterMask(mask=0b1, offset=11)
 
     class SECCTRL0:
+        """Security Controller control register 0
+        """
         SEC_MODE = RegisterMask(mask=0b11, offset=0)
         SEC_M = RegisterMask(mask=0b111, offset=2)
         SEC_RXKEYSEL = RegisterMask(mask=0b1, offset=5)
@@ -122,6 +143,8 @@ class APIMoteRegistersMasks:
         RXFIFO_PROTECTION = RegisterMask(mask=0b1, offset=9)
 
     class FSCTRL:
+        """Frequency Selection Control register
+        """
         FREQ = RegisterMask(mask=0b1111111111, offset=0)
         LOCK_STATUS = RegisterMask(mask=0b1, offset=10)
         LOCK_LENGTH = RegisterMask(mask=0b1, offset=11)

@@ -1,25 +1,51 @@
-from whad.hub.discovery import Capability
-from whad.protocol.ble.ble_pb2 import Start, Stop, AdvMode, SetAdvData, \
-    ScanMode, CentralMode, ConnectTo, SendPDU, PeripheralMode, Disconnect, \
-    SetEncryption
-from whad.ble.stack.constants import BT_MANUFACTURERS
+"""
+Host/Controller interface constants.
+"""
 from enum import IntEnum
 
+from whad.hub.discovery import Capability
+from whad.hub.ble import Commands
+from whad.ble.stack.constants import BT_MANUFACTURERS
+
 class HCIInternalState(IntEnum):
+    """Host/controller interface state enumeration.
+    """
     NONE = 0
     SCANNING = 1
     CENTRAL = 2
     PERIPHERAL = 3
 
 LE_STATES = {
-    0 : ("Non-connectable Advertising State", 0 , [Start, Stop, AdvMode, SetAdvData]),
-    1 : ("Scannable Advertising State", 0, [Start, Stop, AdvMode, SetAdvData]),
-    2 : ("Connectable Advertising State", Capability.SimulateRole, [Start, Stop, AdvMode, SetAdvData]),
-    3 : ("High Duty Cycle Directed Advertising State", 0,  [Start, Stop, AdvMode, SetAdvData]),
-    4 : ("Passive Scanning State", Capability.Scan, [Start, Stop, ScanMode]),
-    5 : ("Active Scanning State", Capability.Scan,[Start, Stop, ScanMode]),
-    6 : ("Initiating State and Connection State (Central Role)", Capability.SimulateRole, [Start, Stop, CentralMode, ConnectTo,Disconnect, SendPDU, SetEncryption]),
-    7 : ("Connection State (Peripheral Role)", Capability.SimulateRole,  [Start, Stop, PeripheralMode, SendPDU, Disconnect, SetEncryption])
+    0 : ("Non-connectable Advertising State", 0 ,
+         [Commands.Start, Commands.Stop, Commands.AdvMode, Commands.SetAdvData]
+        ),
+    1 : ("Scannable Advertising State", 0,
+         [Commands.Start, Commands.Stop, Commands.AdvMode, Commands.SetAdvData]
+        ),
+    2 : ("Connectable Advertising State", Capability.SimulateRole,
+         [Commands.Start, Commands.Stop, Commands.AdvMode, Commands.SetAdvData]
+        ),
+    3 : ("High Duty Cycle Directed Advertising State", 0,
+         [Commands.Start, Commands.Stop, Commands.AdvMode, Commands.SetAdvData]
+        ),
+    4 : ("Passive Scanning State", Capability.Scan,
+         [Commands.Start, Commands.Stop, Commands.ScanMode]
+        ),
+    5 : ("Active Scanning State", Capability.Scan,
+         [Commands.Start, Commands.Stop, Commands.ScanMode]
+        ),
+    6 : ("Initiating State and Connection State (Central Role)", Capability.SimulateRole,
+         [
+             Commands.Start, Commands.Stop, Commands.CentralMode, Commands.ConnectTo,
+             Commands.Disconnect, Commands.SendPDU, Commands.SetEncryption
+         ]
+        ),
+    7 : ("Connection State (Peripheral Role)", Capability.SimulateRole,
+         [
+            Commands.Start, Commands.Stop, Commands.PeripheralMode, Commands.SendPDU,
+            Commands.Disconnect, Commands.SetEncryption
+         ]
+        )
 }
 
 ADDRESS_MODIFICATION_VENDORS = [
