@@ -14,12 +14,11 @@ from cryptography.utils import CryptographyDeprecationWarning
 from whad.device.info import WhadDeviceInfo
 from whad.device.connector import WhadDeviceConnector
 from whad.device.bridge import Bridge
-from whad.device.device import WhadDevice
+from whad.device.device import WhadDevice, VirtualDevice
 
 # Import derived classes
 from whad.device.uart import UartDevice
 from whad.device.tcp import TCPSocketDevice
-from whad.device.virtual import VirtualDevice
 from whad.device.unix import UnixSocketDevice
 
 # Remove scapy deprecation warnings
