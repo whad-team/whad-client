@@ -2,24 +2,23 @@
 
 This utility implements a generic sniffer module, automatically adapted to every domain.
 """
+import sys
 import logging
+from time import sleep
 from argparse import ArgumentParser
-from prompt_toolkit import print_formatted_text, HTML
-from whad.cli.app import CommandLineApp, ApplicationError, run_app
-from whad.cli.ui import error, warning, success, info, display_event, display_packet
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
+
+from scapy.config import conf
+from scapy.all import BrightTheme
+
+from whad.cli.app import CommandLineApp, run_app
+from whad.cli.ui import error, warning, display_packet
+from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
-from whad.tools.utils import list_implemented_sniffers, get_sniffer_parameters, build_configuration_from_args, gen_option_name
+from whad.tools.utils import list_implemented_sniffers, get_sniffer_parameters, \
+    build_configuration_from_args, gen_option_name
 from whad.device import Bridge
-from scapy.config import conf
-from html import escape
-from hexdump import hexdump
-from scapy.all import BrightTheme, Packet
-from time import sleep
-import sys
-
-import whad
+from whad.phy.exceptions import UnsupportedFrequency
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +30,6 @@ class WhadSniffOutputPipe(Bridge):
     based on the specified profile using the specified WHAD adapter and forward
     it to the chained tool. The chained tool will then forward packets back and forth.
     """
-    def __init__(self, input_connector, output_connector):
-        super().__init__(input_connector, output_connector)
 
     def on_outbound(self, message):
         """Process outbound messages.
@@ -46,7 +43,7 @@ class WhadSniffOutputPipe(Bridge):
             msg = message.from_packet(pkt)
             super().on_outbound(msg)
         else:
-            logger.debug('[wsniff][input-pipe] forward default outbound message %s' % message)
+            logger.debug('[wsniff][input-pipe] forward default outbound message %s', message)
             # Forward other messages
             super().on_outbound(message)
 
@@ -65,12 +62,15 @@ class WhadDomainSubParser(ArgumentParser):
         """Display an error message in red (if color is enabled)
         """
         error(message)
-        exit(1)
+        sys.exit(1)
 
 
 class WhadSniffApp(CommandLineApp):
+    """Main WHAD sniffing application class.
+    """
 
-    def __init__(self, interface=True, description='WHAD generic sniffing tool', pcap_argument=False):
+    def __init__(self, interface=True, description='WHAD generic sniffing tool',
+                 pcap_argument=False):
         """Application uses an interface and has commands.
         """
         super().__init__(
@@ -139,6 +139,8 @@ class WhadSniffApp(CommandLineApp):
             conf.color_theme = BrightTheme()
 
     def run(self):
+        """Application main routine.
+        """
         monitors = []
         sniffer = None
         # Launch pre-run tasks
@@ -164,7 +166,7 @@ class WhadSniffApp(CommandLineApp):
                         pass
                     except Exception as e:
                         self.error("Error during configuration: " +repr(e))
-                        raise KeyboardInterrupt
+                        raise KeyboardInterrupt from e
                     # If output parameter is selected, add a PCAP Writer monitor
                     if self.args.output is not None:
                         monitor_pcap = PcapWriterMonitor(self.args.output)
@@ -191,15 +193,15 @@ class WhadSniffApp(CommandLineApp):
                             'domain': self.args.domain
                         }))
 
+                        # Wait for device to time out.
                         while not unix_server.device.opened:
                             if unix_server.device.timedout:
                                 return
-                            else:
-                                sleep(0.1)
+                            sleep(0.1)
 
                         # Create our packet bridge
                         logger.info("[wsniff] Starting our output pipe")
-                        output_pipe = WhadSniffOutputPipe(sniffer, unix_server)
+                        _ = WhadSniffOutputPipe(sniffer, unix_server)
                         # Start the sniffer
                         sniffer.start()
 
@@ -226,21 +228,22 @@ class WhadSniffApp(CommandLineApp):
                 else:
                     self.error("You need to specify a domain.")
             else:
-                self.error('You need to specify an interface with option --interface.')
+                self.error("You need to specify an interface with option --interface.")
 
-        except UnsupportedDomain as unsupported_domain:
-            self.error('WHAD device doesn\'t support selected domain ({})'.format(self.args.domain))
+        except UnsupportedDomain:
+            self.error(f"WHAD device doesn\'t support selected domain ({self.args.domain})")
 
-        except UnsupportedCapability as unsupported_capability:
-            self.error('WHAD device doesn\'t support selected capability ({})'.format(unsupported_capability.capability))
-
-        except KeyboardInterrupt as keybd:
-            self.warning('sniffer stopped (CTRL-C)')
+        except UnsupportedCapability:
+            self.error("WHAD device doesn't support selected capability ({unsupported_capability.capability})")
+        except UnsupportedFrequency:
+            self.error("WHAD interface doesn't support the requested frequency.")
+        except KeyboardInterrupt:
+            self.warning("sniffer stopped (CTRL-C)")
             sniffer.stop()
             sniffer.close()
             for monitor in monitors:
                 monitor.close()
-            exit()
+            sys.exit(1)
 
     def build_subparsers(self, subparsers):
         """
@@ -258,7 +261,7 @@ class WhadSniffApp(CommandLineApp):
 
             self.environment[domain_name]["subparser"] = subparsers.add_parser(
                 domain_name,
-                description="WHAD {} Sniffing tool".format(domain_name.capitalize())
+                description=f"WHAD {domain_name.capitalize()} Sniffing tool"
             )
 
             # Iterate over every parameters, and add arguments to subparsers
@@ -271,14 +274,14 @@ class WhadSniffApp(CommandLineApp):
 
                 # If parameter is based on a dataclass, process a subparameter
                 if parameter_base_class is not None:
-                    parameter_base, parameter_name = parameter_name.split(".")
+                    _, parameter_name = parameter_name.split(".")
 
                 parameter_name = gen_option_name(parameter_name)
 
                 # Process parameter help and shortname
                 if parameter_help is not None and "(" in parameter_help:
                     parameter_shortnames = [
-                        "-{}".format(i) for i in
+                        f"-{i}" for i in
                         parameter_help.split("(")[1].replace(")","").split(",")
                     ]
                     parameter_help = parameter_help.split("(")[0]
