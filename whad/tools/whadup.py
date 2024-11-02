@@ -232,7 +232,7 @@ def main():
                             pass
 
                     print('')
-            except Exception as err:
+            except Exception:
                 error('[e] An error occured while requesting this device.' +
                       'We were not able to retrieve the supported domains.')
 
