@@ -128,7 +128,7 @@ class UnixSocketDevice(WhadDevice):
         if the device is not ready to be written to.
 
         :param bytes data: Data to write
-        :return: number of bytes written to the device
+        :returns: number of bytes written to the device
         """
         logger.debug("sending data to unix socket: %s", hexlify(data))
         if not self.__opened:
@@ -362,7 +362,7 @@ class UnixSocketServerDevice(WhadDevice):
         if the device is not ready to be written to.
 
         :param bytes data: Data to write
-        :return: number of bytes written to the device
+        :returns: number of bytes written to the device
         """
         logger.debug("sending data to unix server client socket: %s", hexlify(data))
         if not self.__opened:
