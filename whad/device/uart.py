@@ -198,7 +198,7 @@ class UartDevice(WhadDevice):
         if the device is not ready to be written to.
 
         :param bytes data: Data to write
-        :return: number of bytes written to the device
+        :returns: number of bytes written to the device
         """
         try:
             if not self.__opened:
