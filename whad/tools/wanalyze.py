@@ -3,29 +3,34 @@
 This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
-from prompt_toolkit import print_formatted_text, HTML
+import sys
+from time import sleep
+import logging
+from typing import List, Union, Tuple
 
-from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLineApp, ApplicationError, run_app
-from scapy.all import *
+
+from prompt_toolkit import print_formatted_text, HTML
+from scapy.packet import Packet
+from scapy.config import conf
+from scapy.themes import BrightTheme
+
+from whad.cli.app import CommandLineApp, run_app
 from whad.device.unix import  UnixSocketConnector, UnixConnector, UnixSocketServerDevice
-from whad.device import Bridge, ProtocolHub
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
-from whad.cli.ui import error, warning, success, info, display_event, display_packet, format_analyzer_output
+from whad.device import Bridge
+from whad.hub import ProtocolHub
+from whad.cli.ui import error, success, info, display_packet, format_analyzer_output
 from whad.tools.utils import get_analyzers
 
-import logging
-import time
-import sys
-import json
 
 logger = logging.getLogger(__name__)
 #logging.basicConfig(level=logging.DEBUG)
 
-class WhadAnalyzeUnixSocketConnector(UnixSocketConnector):
-    pass
-
 class WhadAnalyzePipe(Bridge):
+    """
+    WHAD analyzer main pipe.
+
+    This pipe processes outbound packets.
+    """
 
     def __init__(self, input_connector, output_connector, processing_function):
         super().__init__(input_connector, output_connector)
@@ -45,20 +50,30 @@ class WhadAnalyzePipe(Bridge):
                     msg = message.from_packet(forwarded)
                     super().on_outbound(msg)
         else:
-            logger.debug('[wfilter][input-pipe] forward default outbound message %s' % message)
+            logger.debug("[wfilter][input-pipe] forward default outbound message %s", message)
             # Forward other messages
             super().on_outbound(message)
 
 
-def display_analyzers(analyzers):
+def display_analyzers(analyzers: dict):
+    """Show available analyzers.
+    """
     for domain, analyzers_list in analyzers.items():
-        print_formatted_text(HTML("<b><ansicyan>Available analyzers: </ansicyan> {domain}</b>".format(domain=domain)))
+        print_formatted_text(HTML(
+            f"<b><ansicyan>Available analyzers: </ansicyan> {domain}</b>"
+        ))
         for analyzer_name, analyzer_class in analyzers_list.items():
-            print_formatted_text(HTML("  <b>- {analyzer_name}</b> : {output}".format(analyzer_name=analyzer_name, output=", ".join(analyzer_class().output.keys()))))
+            output=", ".join(analyzer_class().output.keys())
+            print_formatted_text(HTML(
+                f"  <b>- {analyzer_name}</b> : {output}"
+            ))
 
         print()
 
 class WhadAnalyzeApp(CommandLineApp):
+    """
+    Main `wanalyze` CLI application class.
+    """
 
     def __init__(self):
         """Application uses an interface and has commands.
@@ -136,7 +151,20 @@ class WhadAnalyzeApp(CommandLineApp):
             help='List of available analyzers'
         )
 
-    def on_packet(self, pkt, piped=False):
+        # Initialize analyzers and parameters.
+        self.provided_analyzers = []
+        self.provided_parameters = {}
+        self.selected_analyzers = {}
+
+    def on_packet(self, pkt: Packet, piped: bool = False) -> Union[List[Packet], None]:
+        """
+        Packet processing callback.
+
+        :param pkt: Packet to process.
+        :type pkt: Packet
+        :param piped: `True` if packet comes from a pipe, `False` otherwise.
+        :type piped: bool, optional
+        """
         for analyzer_name, analyzer in self.selected_analyzers.items():
             analyzer.process_packet(pkt)
 
@@ -157,30 +185,34 @@ class WhadAnalyzeApp(CommandLineApp):
                             try:
                                 out.append(
                                     ((parameter + ": ") if self.args.label else "") +
-                                    format_analyzer_output(analyzer.output[parameter], mode="human_readable")
+                                    format_analyzer_output(analyzer.output[parameter],
+                                                           mode="human_readable")
                                 )
                             except KeyError:
-                                error("Unknown output parameter {param}, ignoring.".format(param=parameter))
+                                error(f"Unknown output parameter {parameter}, ignoring.")
                         print(self.args.delimiter.join(out))
                     elif self.args.raw:
                         for parameter in self.provided_parameters[analyzer_name]:
                             try:
-                                sys.stdout.buffer.write(format_analyzer_output(analyzer.output[parameter], mode="raw"))
+                                sys.stdout.buffer.write(format_analyzer_output(
+                                    analyzer.output[parameter], mode="raw"))
                             except KeyError:
-                                error("Unknown output parameter {param}, ignoring.".format(param=parameter))
+                                error(f"Unknown output parameter {parameter}, ignoring.")
                     elif self.args.json:
                         for parameter in self.provided_parameters[analyzer_name]:
                             try:
-                                json_value = format_analyzer_output(analyzer.output[parameter], mode="json")
+                                json_value = format_analyzer_output(analyzer.output[parameter],
+                                                                    mode="json")
                                 if json_value is not None:
                                     if self.args.label:
                                         print("{\"" + parameter + "\": " + json_value + "}")
                                     else:
                                         print(json_value)
                                 else:
-                                    error("Parameter {param} not serializable in JSON, ignoring.".format(param=parameter))
+                                    error((f"Parameter {parameter} not serializable "
+                                           f"in JSON, ignoring."))
                             except KeyError:
-                                error("Unknown output parameter {param}, ignoring.".format(param=parameter))
+                                error(f"Unknown output parameter {parameter}, ignoring.")
 
                     sys.stdout.flush()
 
@@ -188,35 +220,40 @@ class WhadAnalyzeApp(CommandLineApp):
                     if not self.args.json:
                         success("[✓] " + analyzer_name + " → " + "completed")
                         for output_name, output_value in analyzer.output.items():
-                            print_formatted_text(
-                                HTML("  - <b>{name}: </b> {value}".format(
-                                        name=output_name,
-                                        value=format_analyzer_output(output_value,mode="human_readable")
-                                    )
-                                )
-                            )
+                            value=format_analyzer_output(output_value, mode="human_readable")
+                            print_formatted_text(HTML(f"  - <b>{output_name}: </b> {value}"))
                         if self.args.packets:
                             print()
-                            print_formatted_text(HTML("  - <b>{count} packets analyzed: </b>".format(count=len(analyzer.marked_packets))))
+                            print_formatted_text(HTML(
+                                f"  - <b>{len(analyzer.marked_packets)} packets analyzed: </b>"
+                            ))
 
                             for packet in analyzer.marked_packets:
                                 display_packet(
-                                    pkt,
+                                    packet,
                                     show_metadata = self.args.metadata,
                                     format = self.args.format
                                 )
                         print()
                     else:
-                            out = "{"
-                            for output_name, output_value in analyzer.output.items():
-                                json_value = format_analyzer_output(output_value,mode="json")
-                                out += "\"" + output_name + "\": " + json_value + ", "
-                            out = out[:-2] + "}"
-                            print(out)
+                        out = "{"
+                        for output_name, output_value in analyzer.output.items():
+                            json_value = format_analyzer_output(output_value,mode="json")
+                            out += "\"" + output_name + "\": " + json_value + ", "
+                        out = out[:-2] + "}"
+                        print(out)
                     analyzer._displayed = False
                 analyzer.reset()
 
-    def get_provided_analyzers(self):
+            # No packets returned
+            return None
+
+    def get_provided_analyzers(self) -> Tuple[list, dict]:
+        """Retrieve a list of analyzers with their corresponding parameters.
+
+        :return: list of available analyzers and their associated parameters.
+        :rtype: tuple
+        """
         available_analyzers = list(get_analyzers(self.args.domain).keys())
         analyzers = []
         parameters = {}
@@ -230,14 +267,14 @@ class WhadAnalyzeApp(CommandLineApp):
                     else:
                         parameters[name] = [param]
                 else:
-                    error("Unknown analyzer ({analyzer}).".format(analyzer=name))
-                    exit(1)
+                    error(f"Unknown analyzer ({name}).")
+                    sys.exit(1)
             else:
                 if analyzer in available_analyzers:
                     analyzers.append(analyzer)
                 else:
-                    error("Unknown analyzer ({analyzer}).".format(analyzer=analyzer))
-                    exit(1)
+                    error(f"Unknown analyzer ({analyzer}).")
+                    sys.exit(1)
         return list(set(analyzers)), parameters
 
     def run(self):
@@ -260,16 +297,16 @@ class WhadAnalyzeApp(CommandLineApp):
 
                 parameters = self.args.__dict__
 
-                connector = WhadAnalyzeUnixSocketConnector(interface)
+                connector = UnixSocketConnector(interface)
                 for parameter_name, parameter_value in parameters.items():
                     connector.add_parameter(parameter_name, parameter_value)
 
                 self.provided_analyzers, self.provided_parameters = self.get_provided_analyzers()
                 self.selected_analyzers = {}
-                for analyzer_name, analyzer_class in get_analyzers(self.args.domain).items():
-                    if analyzer_name in self.provided_analyzers or len(self.provided_analyzers) == 0:
-                        self.selected_analyzers[analyzer_name] = analyzer_class()
-                        self.selected_analyzers[analyzer_name]._displayed = False
+                for name, clazz in get_analyzers(self.args.domain).items():
+                    if name in self.provided_analyzers or len(self.provided_analyzers) == 0:
+                        self.selected_analyzers[name] = clazz()
+                        self.selected_analyzers[name]._displayed = False
 
                 connector.domain = self.args.domain
                 hub = ProtocolHub(2)
@@ -287,16 +324,16 @@ class WhadAnalyzeApp(CommandLineApp):
                     while not unix_server.device.opened:
                         if unix_server.device.timedout:
                             return
-                        else:
-                            sleep(0.1)
+                        sleep(0.1)
+
                     # Create our packet bridge
                     logger.info("[wanalyze] Starting our output pipe")
-                    output_pipe = WhadAnalyzePipe(connector, unix_server, self.on_packet)
+                    _ = WhadAnalyzePipe(connector, unix_server, self.on_packet)
                 else:
                     connector.on_packet = self.on_packet
 
                 while interface.opened:
-                    time.sleep(.1)
+                    sleep(.1)
 
         except KeyboardInterrupt:
             # Launch post-run tasks
@@ -304,5 +341,7 @@ class WhadAnalyzeApp(CommandLineApp):
 
 
 def wanalyze_main():
+    """Launcher for wanalyze CLI application.
+    """
     app = WhadAnalyzeApp()
     run_app(app)
