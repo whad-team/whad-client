@@ -225,7 +225,15 @@ def get_injector_parameters(configuration_class):
     return parameters
 
 
-def get_analyzers(protocol=None):
+def get_analyzers(protocol: str = None) -> dict:
+    """Retrieve every protocol analyzer available or a subset if a specific
+    protocol name is provided.
+
+    :param protocol: Consider only analyzers for the specified protocol.
+    :type protocol: str
+    :return: a dictionnary of protocol analyzers indexed by their protocol name.
+    :rtype: dict
+    """
     analyzers = {}
     for _, candidate_protocol,_ in iter_modules(whad.__path__):
         # If the module contains a list of analyzers,
