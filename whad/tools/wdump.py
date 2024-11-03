@@ -5,22 +5,25 @@ which can be used to access a device remotely.
 """
 import os
 import logging
-import time
+from time import sleep
+
+from scapy.config import conf
+from scapy.themes import BrightTheme
 
 from whad.cli.ui import wait, success, error
 from whad.cli.app import CommandLineApp, run_app
-from whad.device import Bridge, ProtocolHub
-from scapy.all import *
+from whad.device import Bridge
+from whad.hub import ProtocolHub
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.common.monitors import PcapWriterMonitor
-from whad.common.monitors.pcap import PcapWriterMonitor
 
 logger = logging.getLogger(__name__)
 
-class WhadDumpPipe(Bridge):
-    pass
-
 class WhadDumpApp(CommandLineApp):
+    """
+    Main `wdump` CLI application class.
+    """
+
     connector = None
     def __init__(self):
         """Application uses an interface and has commands.
@@ -56,6 +59,9 @@ class WhadDumpApp(CommandLineApp):
             help='Pcap file to export'
         )
 
+        # Initialize our monitor.
+        self.monitor = None
+
 
     def run(self):
         # Launch pre-run tasks
@@ -71,16 +77,18 @@ class WhadDumpApp(CommandLineApp):
                     if os.path.isfile(self.args.pcap):
                         if not self.args.append:
                             if not self.args.force:
-                                self.warning('PCAP file already exists, use --append to add packets to it or --force to force overwriting')
+                                self.warning((
+                                    "PCAP file already exists, use --append to add packets"
+                                    " to it or --force to force overwriting"))
                                 return
-                            else:
-                                try:
-                                    # Remove file
-                                    os.unlink(self.args.pcap)
-                                except IOError:
-                                    self.error("Cannot create PCAP file")
+
+                            try:
+                                # Remove file
+                                os.unlink(self.args.pcap)
+                            except IOError:
+                                self.error("Cannot create PCAP file")
                     else:
-                        self.error('Cannot write to PCAP file (not a regular file)')
+                        self.error("Cannot write to PCAP file (not a regular file)")
                         return
 
                 if self.is_piped_interface():
@@ -92,15 +100,10 @@ class WhadDumpApp(CommandLineApp):
                     if not self.args.nocolor:
                         conf.color_theme = BrightTheme()
 
-                    parameters = self.args.__dict__
-
-
                     connector = UnixConnector(interface)
                     connector.domain = self.args.domain
                     hub = ProtocolHub(2)
                     connector.format = hub.get(self.args.domain).format
-                    #connector.translator = get_translator(self.args.domain)(connector.hub)
-                    #connector.format = connector.translator.format
 
                     self.connector = connector
                     self.monitor = PcapWriterMonitor(self.args.pcap)
@@ -108,28 +111,26 @@ class WhadDumpApp(CommandLineApp):
                     self.monitor.start()
 
                     if self.is_stdout_piped():
-                        unix_server = UnixConnector(UnixSocketServerDevice(parameters=self.args.__dict__))
-
+                        unix_server = UnixConnector(UnixSocketServerDevice(
+                            parameters=self.args.__dict__
+                        ))
 
                         while not unix_server.device.opened:
                             if unix_server.device.timedout:
                                 return
-                            else:
-                                sleep(0.1)
+                            sleep(0.1)
 
                         # Create our packet bridge
                         logger.info("[wdump] Starting our output pipe")
-                        output_pipe = WhadDumpPipe(connector, unix_server)
+                        _ = Bridge(connector, unix_server)
                         while interface.opened:
-                            time.sleep(.1)
+                            sleep(.1)
                     else:
                         while interface.opened:
-                            wait("Dumping {count} packets into pcap file: ".format(
-                                    count=str(self.monitor.packets_written)
-                                ),
+                            wait(f"Dumping {self.monitor.packets_written} packets into pcap file: ",
                                 suffix = self.args.pcap
                             )
-                            time.sleep(.2)
+                            sleep(.2)
             else:
                 error("You must provide a pcap file.")
         except KeyboardInterrupt:
@@ -141,19 +142,18 @@ class WhadDumpApp(CommandLineApp):
 
     def post_run(self):
         if not self.is_stdout_piped():
-            wait("Dumping {count} packets into pcap file: ".format(
-                    count=str(self.monitor.packets_written)
-                ),
+            wait(
+                f"Dumping {self.monitor.packets_written} packets into pcap file: ",
                 suffix = self.args.pcap,
                 end = True
             )
-            success("{count} packets have been dumped into {pcap}".format(
-                    count = str(self.monitor.packets_written),
-                    pcap = self.args.pcap
-                )
+            success(
+                f"{self.monitor.packets_written} packets have been dumped into {self.args.pcap}"
             )
         super().post_run()
 
 def wdump_main():
+    """Launcher for `wdump` CLI application.
+    """
     app = WhadDumpApp()
     run_app(app)
