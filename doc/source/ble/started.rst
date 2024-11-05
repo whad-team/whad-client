@@ -198,8 +198,8 @@ and :py:class:`whad.ble.connector.Central` connector provides a nifty way to do 
     # Make sure connection has succeeded
     if device is not None:
         
-        # Disable auto mode
-        central.auto(False)
+        # Enable synchronous packet processing
+        central.enable_synchronous(True)
 
         # Send a LL_VERSION_PDU
         central.send_pdu(BTLE_DATA()/BTLE_CTRL()/LL_VERSION_IND(
@@ -210,7 +210,7 @@ and :py:class:`whad.ble.connector.Central` connector provides a nifty way to do 
 
         # Wait for a PDU
         while central.is_connected():
-            pdu = central.wait_pdu()
+            pdu = central.wait_packet()
             if pdu.haslayer(LL_VERSION_IND):
                 pdu[LL_VERSION_IND].show()
                 break
@@ -226,7 +226,7 @@ connector is used it relies on a protocol stack to handle outgoing and ingoing
 PDUs. By doing so, there is no way to get access to the received PDUs and avoid
 them to be forwarded to the connector's internal stack.
 
-However, these connectors expose a method called :meth:`whad.ble.connector.Central.auto`
+However, these connectors expose a method called :meth:`whad.device.WhadDeviceConnector.enable_synchronous`
 that can enable or disable this automatic processing of PDUs. By default, the
 PDUs are passed to the underlying protocol stack, but a simple line of code
 can disable this behavior:
@@ -234,9 +234,9 @@ can disable this behavior:
 .. code:: python
 
     # Disable automatic PDU processing
-    central.auto(False)
+    central.enable_synchronous(True)
 
 Once this automatic processing disabled, every received PDU is then stored by
 the connector in a dedicated queue, and can be retrieved using a method called
-:py:meth:`whad.ble.connector.Central.wait_pdu`. This method is by default synchronous
+:py:meth:`whad.device.WhadDeviceConnector.wait_packet`. This method is by default synchronous
 and will return only when a PDU has been received and put in queue.
