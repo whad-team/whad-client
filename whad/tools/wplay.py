@@ -3,22 +3,26 @@
 This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
+import sys
+import os
 import logging
-from prompt_toolkit import print_formatted_text, HTML
-import time
-from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLinePipe, CommandLineApp, ApplicationError, run_app
-from scapy.all import *
+
+from scapy.config import conf
+from scapy.themes import BrightTheme
+
+from whad.cli.app import run_app
 from whad.common.pcap import extract_pcap_metadata
-import sys, os, stat
+
 from whad.device import WhadDevice
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
-from whad.tools.utils import list_implemented_sniffers, build_configuration_from_args
-from whad.tools.wsniff import WhadSniffApp, WhadDomainSubParser
+from whad.exceptions import WhadDeviceNotFound
+from whad.tools.utils import list_implemented_sniffers
+from whad.tools.wsniff import WhadSniffApp
 
 logger = logging.getLogger(__name__)
 
 class WhadPlayApp(WhadSniffApp):
+    """wsniff main CLI application class.
+    """
 
     def __init__(self):
         """Application uses an interface and has commands.
@@ -36,27 +40,42 @@ class WhadPlayApp(WhadSniffApp):
 
         )
 
+        # Initialize PCAP file path.
+        self.pcap_file = None
+
     def infer_domain_from_pcap(self):
+        """Infer target domain from PCAP file.
+
+        PCAP file `reserved1` field is used by WHAD to store the domain name
+        in order to use it later for replay or injection. If this information
+        is not present in the provided PCAP file, user is requested to specify
+        it through command-line.
+        """
         self.pcap_file = None
         index_pcap_file = None
         override_domain = False
-        for i in range(len(sys.argv)):
-            if ".pcap" in sys.argv[i]:
-                self.pcap_file = sys.argv[i]
+        for i, arg in enumerate(sys.argv):
+            if ".pcap" in arg:
+                self.pcap_file = arg
                 index_pcap_file = i
-            elif sys.argv[i] in list_implemented_sniffers().keys():
+            elif arg in list_implemented_sniffers():
                 override_domain = True
         if index_pcap_file is not None and not override_domain:
             if os.path.exists(self.pcap_file):
                 domain = extract_pcap_metadata(self.pcap_file)
-                if domain in list_implemented_sniffers().keys():
+                if domain in list_implemented_sniffers():
                     sys.argv.insert(index_pcap_file + 1, domain)
                 else:
                     self.error("You need to provide a domain")
-                    exit(1)
+                    sys.exit(1)
             else:
                 self.error("PCAP file not found")
-                exit(1)
+                sys.exit(1)
+
+    def build_device_path(self):
+        """Create our device path based on provided parameters.
+        """
+        return "pcap:" + ("flush:" if self.args.flush else "") + self.args.pcap
 
     def pre_run(self):
         """Pre-run operations: configure scapy theme.
@@ -70,15 +89,19 @@ class WhadPlayApp(WhadSniffApp):
             conf.color_theme = BrightTheme()
 
         if self.args.pcap is not None:
-            self.interface = WhadDevice.create("pcap:" + ("flush:" if self.args.flush else "") + self.args.pcap )
+            self.interface = WhadDevice.create(self.build_device_path())
 
     def run(self):
+        """Wrapper for our wplay utility, since we use a PCAP file rather than
+        a compatible WHAD interface.
+        """
         try:
             super().run()
         except WhadDeviceNotFound:
             self.error("PCAP file not found")
 
-from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound
 def wplay_main():
+    """Launcher for wplay.
+    """
     app = WhadPlayApp()
     run_app(app)
