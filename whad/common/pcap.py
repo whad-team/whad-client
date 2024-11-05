@@ -15,12 +15,21 @@ def patch_pcap_metadata(filename, domain):
     with open(filename, "wb") as f:
         f.write(dump)
 
-def extract_pcap_metadata(filename):
+def extract_pcap_metadata(filename: str) -> str:
+    """Extract metadata from a PCAP file (incompatible with PCAPng).
+
+    :param filename: PCAP file path
+    :type filename: str
+    :return: Metadata
+    :rtype: str
+    """
     with open(filename, "rb") as f:
         dump = f.read()
     return dump[8:16].replace(b"\x00", b"").decode('ascii')
 
 class PCAPReader(object):
+    """PCAP reader class.
+    """
 
     def __init__(self, pcapfile : str):
         """Initialize a multi-domain PCAP layer
