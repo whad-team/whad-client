@@ -6,42 +6,51 @@ which can be used to access a device remotely.
 import logging
 from prompt_toolkit import print_formatted_text, HTML
 
-from whad.cli.app import CommandLineApp, ApplicationError
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
+from whad.cli.app import CommandLineApp, run_app
 from whad.device.tcp import TCPSocketConnector
+
 logger = logging.getLogger(__name__)
-#logging.basicConfig(level=logging.DEBUG)
+
 
 class WhadServerApp(CommandLineApp):
+    """Main wserver CLI application class.
+    """
 
     def __init__(self):
         """Application uses an interface and has commands.
         """
         super().__init__(
-            description='WHAD server tool',
+            description="WHAD server tool",
             interface=True,
             commands=False
         )
 
         self.add_argument(
-            '--address',
-            '-a',
-            dest='address',
+            "--address",
+            "-a",
+            dest="address",
             action="store",
             default="127.0.0.1",
-            help='IP address to use'
+            help="IP address to use"
         )
 
         self.add_argument(
-            '--port',
-            '-p',
-            dest='port',
+            "--port",
+            "-p",
+            dest="port",
             action="store",
             default="12345",
-            help='Port to use'
+            help="Port to use"
         )
 
+        # Initialize properties.
+        self.address = None
+        self.port = None
+        self.server = None
+
     def run(self):
+        """CLI application main routine.
+        """
         try:
             # Launch pre-run tasks
             self.pre_run()
@@ -59,10 +68,10 @@ class WhadServerApp(CommandLineApp):
             if interface is not None:
                 self.serve(interface)
             else:
-                self.error('You have to provide an interface to proxify.')
+                self.error("You have to provide an interface to proxify.")
 
-        except KeyboardInterrupt as keybd:
-            self.warning('Server stopped (CTRL-C)')
+        except KeyboardInterrupt:
+            self.warning("Server stopped (CTRL-C)")
 
         if self.server is not None:
             self.server.shutdown()
@@ -71,21 +80,19 @@ class WhadServerApp(CommandLineApp):
         self.post_run()
 
     def serve(self, device):
-        '''
+        """
         Create a TCP proxy device according to provided address and port and serve forever.
-        '''
-        print_formatted_text(
-            HTML(
-                "<ansicyan>[i] Device proxy running on %s:%s </ansicyan>" %
-                (self.address, str(self.port))
-            )
-        )
+        """
+        print_formatted_text(HTML(
+            f"<ansicyan>[i] Device proxy running on {self.address}:{self.port} </ansicyan>"
+        ))
+
+        # Setup a TCP server and await connections.
         self.server = TCPSocketConnector(device, self.address, self.port)
         self.server.serve()
 
 def wserver_main():
-    try:
-        app = WhadServerApp()
-        app.run()
-    except ApplicationError as err:
-        err.show()
+    """Launcher for wserver.
+    """
+    app = WhadServerApp()
+    run_app(app)
