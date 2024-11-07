@@ -4,12 +4,14 @@ This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
 import logging
-import time
+from time import sleep
 
-from scapy.all import *
 from scapy.config import conf
+from scapy.themes import BrightTheme
+
 from whad.cli.ui import wait, success
-from whad.device import Bridge, ProtocolHub
+from whad.hub import ProtocolHub
+from whad.device import Bridge
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.common.monitors import WiresharkMonitor
 from whad.cli.app import CommandLineApp, run_app
@@ -35,6 +37,9 @@ class WhadWiresharkApp(CommandLineApp):
             input=CommandLineApp.INPUT_WHAD,
             output=CommandLineApp.OUTPUT_WHAD
         )
+
+        # Initialize parameters.
+        self.monitor = None
 
     def run(self):
         """Application main() routine
@@ -69,11 +74,10 @@ class WhadWiresharkApp(CommandLineApp):
                     while not proxy.device.opened:
                         if proxy.device.timedout:
                             return
-                        else:
-                            sleep(0.1)
+                        sleep(0.1)
 
                     # Bridge both connectors and their respective interfaces
-                    bridge = Bridge(connector, proxy)
+                    _ = Bridge(connector, proxy)
 
                 # Save our connector and force its domain
                 self.connector = connector
@@ -95,14 +99,11 @@ class WhadWiresharkApp(CommandLineApp):
                 if self.is_stdout_piped():
                     # Wait for the user to CTL-C
                     while interface.opened:
-                        time.sleep(.1)
+                        sleep(.1)
                 else:
                     while interface.opened:
-                        wait("Forwarding {count} packets to wireshark".format(
-                                count=str(self.monitor.packets_written)
-                            )
-                        )
-                        time.sleep(.2)
+                        wait("Forwarding {self.monitor.packets_written} packets to wireshark")
+                        sleep(.2)
 
 
         except KeyboardInterrupt:
@@ -114,18 +115,15 @@ class WhadWiresharkApp(CommandLineApp):
 
     def post_run(self):
         if not self.is_stdout_piped():
-            wait("Forwarding {count} packets to wireshark".format(
-                    count=str(self.monitor.packets_written)
-                ),
+            wait(f"Forwarding {self.monitor.packets_written} packets to wireshark",
                 end=True
             )
-            success("{count} packets have been forwarded to wireshark".format(
-                    count = str(self.monitor.packets_written)
-                )
-            )
+            success(f"{self.monitor.packets_written} packets have been forwarded to wireshark")
         super().post_run()
 
 
 def wshark_main():
+    """Launcher for wshark.
+    """
     app = WhadWiresharkApp()
     run_app(app)
