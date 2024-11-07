@@ -6,23 +6,30 @@ a compatible WHAD device.
 """
 import logging
 from argparse import ArgumentParser
-from prompt_toolkit import print_formatted_text, HTML
-from whad.cli.app import CommandLineSink
-from importlib import import_module
-from whad.common.replay import ReplayRole
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, UnsupportedDomain, UnsupportedCapability
-from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor, WhadMonitor
-from whad.common.pcap import PCAPReader
 from dataclasses import fields, is_dataclass
 from pkgutil import iter_modules
 from inspect import getdoc
-from scapy.config import conf
 from html import escape
-from hexdump import hexdump
-from scapy.all import BrightTheme, Packet
-import whad
+from importlib import import_module
 
-from time import sleep
+# Scapy
+from scapy.packet import Packet
+from scapy.config import conf
+from scapy.themes import BrightTheme
+
+# Prompt
+from prompt_toolkit import print_formatted_text, HTML
+
+# Hexdump
+from hexdump import hexdump
+
+# WHAD
+import whad
+from whad.cli import CommandLineApp
+from whad.common.replay import ReplayRole
+from whad.exceptions import UnsupportedDomain, UnsupportedCapability
+from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor, WhadMonitor
+from whad.common.pcap import PCAPReader
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +45,7 @@ def list_implemented_replays():
         # If the module contains a replay connector and configuration,
         # store the associated classes in the environment dictionary
         try:
-            module = import_module("whad.{}.connector.replay".format(candidate_protocol))
+            module = import_module(f"whad.{candidate_protocol}.connector.replay")
             environment[candidate_protocol] = {
                 "replay_class":module.Replay,
                 "configuration_class":module.ReplayConfiguration
@@ -50,7 +57,8 @@ def list_implemented_replays():
 
 def get_replay_parameters(configuration_class):
     """
-    Extract all parameters from a replay configuration class, with their name and associated documentation.
+    Extract all parameters from a replay configuration class, with their name
+    and associated documentation.
 
     :param configuration_class: replay configuration class
     :return: dict containing parameters for a given configuration class
@@ -77,7 +85,7 @@ def get_replay_parameters(configuration_class):
 
             # Populate parameters dict with subfields configuration
             for subfield in fields(field.type):
-                parameters["{}.{}".format(field.name,subfield.name)] = (
+                parameters[f"{field.name}.{subfield.name}"] = (
                     subfield.type,
                     subfield.default,
                     field.type,
@@ -127,17 +135,16 @@ def build_configuration_from_args(environment, args):
                 subfields[main] = base_class()
             setattr(subfields[main], sub, getattr(args, parameter))
 
-
-    for subfield in subfields:
+    for name, subfield in subfields.items():
         create = False
-        for item in fields(subfields[subfield]):
-            if getattr(subfields[subfield], item.name) is not None:
+        for item in fields(subfield):
+            if getattr(subfield, item.name) is not None:
                 create = True
                 break
         if create:
-            setattr(configuration, subfield, subfields[subfield])
+            setattr(configuration, name, subfield)
         else:
-            setattr(configuration, subfield, None)
+            setattr(configuration, name, None)
     return configuration
 
 class WhadDomainSubParser(ArgumentParser):
@@ -148,19 +155,23 @@ class WhadDomainSubParser(ArgumentParser):
         """Display a warning message in orange (if color is enabled)
         """
         print_formatted_text(
-            HTML('<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % message)
+            HTML(f"<aaa fg=\"#e97f11\">/!\\ <b>{message}</b></aaa>")
         )
 
     def error(self, message):
         """Display an error message in red (if color is enabled)
         """
         print_formatted_text(
-            HTML('<ansired>[!] <b>%s</b></ansired>' % message)
+            HTML(f"<ansired>[!] <b>{message}</b></ansired>")
         )
 
 class WhadReplayApp(CommandLineApp):
+    """WHAD replay CLI application class.
+    """
 
     class WhadReplayMonitor(WhadMonitor):
+        """Custom packet monitor for wreplay.
+        """
         def __init__(self, replay_app):
             super().__init__()
             self.__replay_app = replay_app
@@ -292,7 +303,7 @@ class WhadReplayApp(CommandLineApp):
 
     def display(self, pkt):
         """
-        Display an packet according to the selected format.
+        Display a packet according to the selected format.
 
         Four main types of formats can be used:
             * repr: scapy packet repr method (default)
@@ -311,77 +322,52 @@ class WhadReplayApp(CommandLineApp):
 
             # Process scapy show method format
             if self.args.format == "show":
-                print_formatted_text(
-                    HTML(
-                        '<b><ansipurple>%s</ansipurple></b>' % (
-                            metadata
-                        )
-                    )
-                )
+                print_formatted_text(HTML(
+                    f"<b><ansipurple>{metadata}</ansipurple></b>"
+                ))
                 pkt.show()
 
                 if hasattr(pkt, "decrypted"):
-                    print_formatted_text(
-                        HTML(
-                            "<ansicyan>[i] Decrypted payload:</ansicyan>"
-                        )
-                    )
+                    print_formatted_text(HTML(
+                        "<ansicyan>[i] Decrypted payload:</ansicyan>"
+                    ))
                     pkt.decrypted.show()
 
             # Process raw bytes format
             elif self.args.format == "raw":
-                print_formatted_text(
-                    HTML(
-                        '<b><ansipurple>%s</ansipurple></b> %s' % (
-                            metadata,
-                            bytes(pkt).hex()
-                        )
-                    )
-                )
+                print_formatted_text(HTML(
+                    f"<b><ansipurple>{metadata}</ansipurple></b> {bytes(pkt).hex()}"
+                ))
 
                 if hasattr(pkt, "decrypted"):
-                    print_formatted_text(
-                        HTML(
-                            "<ansicyan>[i] Decrypted payload:</ansicyan> %s" %
-                            bytes(pkt.decrypted).hex()
-                        )
-                    )
+                    print_formatted_text(HTML(
+                        f"<ansicyan>[i] Decrypted payload:</ansicyan> {bytes(pkt.decrypted).hex()}"
+                    ))
 
             # Process hexdump format
             elif self.args.format == "hexdump":
-                print_formatted_text(
-                    HTML(
-                        '<b><ansipurple>%s</ansipurple></b>' % (
-                            metadata
-                        )
-                    )
-                )
-                print_formatted_text(
-                    HTML("<i>%s</i>" %
-                        escape(hexdump(bytes(pkt), result="return"))
-                    )
-                )
+                print_formatted_text(HTML(
+                    f"<b><ansipurple>{metadata}</ansipurple></b>"
+                ))
+
+                pkt_bytes = escape(hexdump(bytes(pkt), result="return"))
+                print_formatted_text(HTML(f"<i>{pkt_bytes}</i>"))
+
                 if hasattr(pkt, "decrypted"):
                     print_formatted_text(
                         HTML(
                             "<ansicyan>[i] Decrypted payload:</ansicyan>"
                         )
                     )
-                    print_formatted_text(
-                            HTML("<i>%s</i>" %
-                                escape(hexdump(bytes(pkt.decrypted), result="return")
-                            )
-                        )
-                    )
+
+                    pkt_decrypted = escape(hexdump(bytes(pkt.decrypted), result="return"))
+                    print_formatted_text(HTML(f"<i>{pkt_decrypted}</i>"))
+
             # Process scapy repr format
             else:
-                print_formatted_text(
-                    HTML(
-                        '<b><ansipurple>%s</ansipurple></b>' % (
-                            metadata
-                        )
-                    )
-                )
+                print_formatted_text(HTML(
+                    f"<b><ansipurple>{metadata}</ansipurple></b>"
+                ))
                 print(repr(pkt))
                 if hasattr(pkt, "decrypted"):
                     print_formatted_text(
@@ -396,14 +382,10 @@ class WhadReplayApp(CommandLineApp):
     def display_event(self, event):
         """Display an event generated from a replay.
         """
-        print_formatted_text(
-            HTML(
-                "<ansicyan>[i] event: <b>%s</b></ansicyan> %s" % (
-                    event.name,
-                    "("+event.message +")" if event.message is not None else ""
-                )
-            )
-        )
+        event_details = "("+event.message +")" if event.message is not None else ""
+        print_formatted_text(HTML(
+            f"<ansicyan>[i] event: <b>{event.name}</b></ansicyan> {event_details}"
+        ))
 
     def pre_run(self):
         """Pre-run operations: configure scapy theme.
@@ -480,10 +462,12 @@ class WhadReplayApp(CommandLineApp):
                             else:
                                 count = None
 
-                            # PCAPReader will send back packets in a timely manner, according to PCAP timestamps.
+                            # PCAPReader will send back packets in a timely manner,
+                            # according to PCAP timestamps.
                             reader = PCAPReader(self.args.pcapfile)
                             for packet in reader.packets(start=self.args.start_pos, count=count,
-                                                        offset=self.args.offset/1000., exclude=self.args.exclude):
+                                                        offset=self.args.offset/1000.,
+                                                        exclude=self.args.exclude):
                                 replay.send_packet(packet)
 
                         # Stop our replay instance
@@ -498,17 +482,18 @@ class WhadReplayApp(CommandLineApp):
                 else:
                     self.error("You need to specify a domain.")
             else:
-                self.error('You need to specify an interface with option --interface.')
+                self.error("You need to specify an interface with option --interface.")
 
 
-        except UnsupportedDomain as unsupported_domain:
-            self.error('WHAD device doesn\'t support selected domain ({})'.format(self.args.domain))
+        except UnsupportedDomain:
+            self.error(f"WHAD device doesn\'t support selected domain ({self.args.domain})")
 
         except UnsupportedCapability as unsupported_capability:
-            self.error('WHAD device doesn\'t support selected capability ({})'.format(unsupported_capability.capability))
+            self.error((f"WHAD device doesn\'t support selected capability "
+                       f"({unsupported_capability.capability})"))
 
-        except KeyboardInterrupt as keybd:
-            self.warning('replay stopped (CTRL-C)')
+        except KeyboardInterrupt:
+            self.warning("replay stopped (CTRL-C)")
             replay.stop()
             replay.close()
             for monitor in monitors:
@@ -523,31 +508,30 @@ class WhadReplayApp(CommandLineApp):
         self.environment = list_implemented_replays()
 
         # Iterate over domain, and get the associated replay parameters
-        for domain_name in self.environment:
-            self.environment[domain_name]["parameters"] = get_replay_parameters(
-                self.environment[domain_name]["configuration_class"]
+        for name, domain in self.environment.items():
+            domain["parameters"] = get_replay_parameters(
+                domain["configuration_class"]
             )
 
-
-            self.environment[domain_name]["subparser"] = subparsers.add_parser(
-                domain_name,
-                description="WHAD {} Replay tool".format(domain_name.capitalize())
+            domain["subparser"] = subparsers.add_parser(
+                name,
+                description=f"WHAD {name.capitalize()} Replay tool"
             )
             # Iterate over every parameters, and add arguments to subparsers
             for (
                     parameter_name,
                     (parameter_type, parameter_default, parameter_base_class, parameter_help)
-                ) in self.environment[domain_name]["parameters"].items():
+                ) in domain["parameters"].items():
 
                 dest = parameter_name
                 # If parameter is based on a dataclass, process a subparameter
                 if parameter_base_class is not None:
-                    parameter_base, parameter_name = parameter_name.split(".")
+                    _, parameter_name = parameter_name.split(".")
 
                 # Process parameter help and shortname
                 if parameter_help is not None and "(" in parameter_help:
                     parameter_shortnames = [
-                        "-{}".format(i) for i in
+                        f"-{i}" for i in
                         parameter_help.split("(")[1].replace(")","").split(",")
                     ]
                     parameter_help = parameter_help.split("(")[0]
@@ -557,7 +541,6 @@ class WhadReplayApp(CommandLineApp):
 
                 # Process parameter type
                 if parameter_type != bool:
-                    choices = []
                     # If we got an int
                     if parameter_type == int:
                         # allow to provide hex arguments
@@ -573,7 +556,7 @@ class WhadReplayApp(CommandLineApp):
                     else:
                         action = "store"
                     # Add non-boolean argument to corresponding subparser
-                    self.environment[domain_name]["subparser"].add_argument(
+                    domain["subparser"].add_argument(
                         "--"+parameter_name,
                         *parameter_shortnames,
                         default=parameter_default,
@@ -584,15 +567,17 @@ class WhadReplayApp(CommandLineApp):
                     )
                 else:
                     # Add boolean argument to corresponding subparser
-                    self.environment[domain_name]["subparser"].add_argument(
+                    domain["subparser"].add_argument(
                         "--"+parameter_name,
                         *parameter_shortnames,
-                        action='store_true',
+                        action="store_true",
                         dest=dest,
                         help=parameter_help
                     )
 
 
 def whadreplay_main():
+    """Launcher for wreplay.
+    """
     app = WhadReplayApp()
     app.run()
