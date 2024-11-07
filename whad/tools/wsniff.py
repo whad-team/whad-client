@@ -233,8 +233,9 @@ class WhadSniffApp(CommandLineApp):
         except UnsupportedDomain:
             self.error(f"WHAD device doesn\'t support selected domain ({self.args.domain})")
 
-        except UnsupportedCapability:
-            self.error("WHAD device doesn't support selected capability ({unsupported_capability.capability})")
+        except UnsupportedCapability as unsupported_capability:
+            self.error((f"WHAD device doesn't support selected capability"
+                       f"({unsupported_capability.capability})"))
         except UnsupportedFrequency:
             self.error("WHAD interface doesn't support the requested frequency.")
         except KeyboardInterrupt:
@@ -253,22 +254,22 @@ class WhadSniffApp(CommandLineApp):
         self.environment = list_implemented_sniffers()
 
         # Iterate over domain, and get the associated sniffer parameters
-        for domain_name in self.environment:
-            self.environment[domain_name]["parameters"] = get_sniffer_parameters(
-                self.environment[domain_name]["configuration_class"]
+        for name, domain in self.environment.items():
+            domain["parameters"] = get_sniffer_parameters(
+                domain["configuration_class"]
             )
 
 
-            self.environment[domain_name]["subparser"] = subparsers.add_parser(
-                domain_name,
-                description=f"WHAD {domain_name.capitalize()} Sniffing tool"
+            domain["subparser"] = subparsers.add_parser(
+                name,
+                description=f"WHAD {name.capitalize()} Sniffing tool"
             )
 
             # Iterate over every parameters, and add arguments to subparsers
             for (
                     parameter_name,
                     (parameter_type, parameter_default, parameter_base_class, parameter_help)
-                ) in self.environment[domain_name]["parameters"].items():
+                ) in domain["parameters"].items():
 
                 dest = parameter_name
 
@@ -291,7 +292,6 @@ class WhadSniffApp(CommandLineApp):
 
                 # Process parameter type
                 if parameter_type != bool:
-                    choices = []
                     # If we got an int
                     if parameter_type == int:
                         # allow to provide hex arguments
@@ -307,7 +307,7 @@ class WhadSniffApp(CommandLineApp):
                     else:
                         action = "store"
                     # Add non-boolean argument to corresponding subparser
-                    self.environment[domain_name]["subparser"].add_argument(
+                    domain["subparser"].add_argument(
                         "--"+parameter_name,
                         *parameter_shortnames,
                         default=parameter_default,
@@ -318,7 +318,7 @@ class WhadSniffApp(CommandLineApp):
                     )
                 else:
                     # Add boolean argument to corresponding subparser
-                    self.environment[domain_name]["subparser"].add_argument(
+                    domain["subparser"].add_argument(
                         "--"+parameter_name,
                         *parameter_shortnames,
                         action='store_true',
