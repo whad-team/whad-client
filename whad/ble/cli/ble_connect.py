@@ -4,15 +4,8 @@ This utility will configure a compatible whad device to connect to a given
 BLE device, and chain this with another tool.
 """
 import sys
-
-# Logging
 import logging
-
 from time import sleep
-from queue import Queue, Empty
-
-# Scapy
-from scapy.packet import Packet
 
 # WHAD device classes
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
@@ -67,6 +60,8 @@ class BleConnectOutputPipe(Bridge):
 
 
     def dispatch_pending_pdu(self, pdu):
+        """Dispatch pending PDU.
+        """
         # Convert packet back to message and forward to output
         if self.support_raw_pdu:
             message = BleRawPduReceived.from_packet(pdu)
@@ -194,7 +189,7 @@ class BleConnectInputPipe(Bridge):
         be connected and know the connection handle corresponding to this
         connection.
         """
-        if isinstance(message, BleRawPduReceived) or isinstance(message, BlePduReceived):
+        if isinstance(message, (BleRawPduReceived, BlePduReceived)):
             if not self.__connected:
                 logger.debug(
                     "[wble-connect][output-pipe] add pending inbound PDU message %s to queue",
@@ -209,7 +204,10 @@ class BleConnectInputPipe(Bridge):
                 self.input.send_command(command)
         elif isinstance(message, Disconnected):
             # Central device has disconnected, we need to stop wble-connect.
-            logger.debug("[wble-connect][output-pipe] received a disconnection notification, exiting wble-connect")
+            logger.debug((
+                "[wble-connect][output-pipe] received a disconnection notification,"
+                " exiting wble-connect"
+            ))
 
             # Detach interfaces from our bridge
             self.detach()
@@ -240,9 +238,12 @@ class BleConnectInputPipe(Bridge):
         We monitor these messages to catch the connection handle used by our chained
         tool (upstream) in order to send valid commands.
         """
-        if isinstance(message, BleRawPduReceived) or isinstance(message, BlePduReceived):
+        if isinstance(message, (BleRawPduReceived, BlePduReceived)):
             if self.__out_conn_handle is not None:
-                logger.debug("[wble-connect][output-pipe] received an outbound PDU message %s", message)
+                logger.debug(
+                    "[wble-connect][output-pipe] received an outbound PDU message %s",
+                    message
+                )
                 command = self.convert_packet_message(message, self.__out_conn_handle, False)
                 self.output.send_command(command)
         elif isinstance(message, Connected):
@@ -252,10 +253,16 @@ class BleConnectInputPipe(Bridge):
             return
         elif isinstance(message, Disconnected):
             # Chained tool has lost connection, we must handle it
-            logger.debug("[wble-connect][output-pipe] received a disconnection notification, discard")
+            logger.debug((
+                "[wble-connect][output-pipe] received a disconnection notification, "
+                "discard"
+            ))
             return
         else:
-            logger.debug("[wble-connect][output-pipe] forward default outbound message %s", message)
+            logger.debug(
+                "[wble-connect][output-pipe] forward default outbound message %s",
+                message
+            )
             # Forward other messages
             super().on_outbound(message)
 
@@ -338,7 +345,10 @@ class BleConnectApp(CommandLineDevicePipe):
         if BDAddress.check(bdaddr):
             # Set the BD address
             if not central.set_bd_address(bdaddr, public=public):
-                self.warning("Cannot spoof BD address, please make sure your WHAD interface supports this feature.")
+                self.warning((
+                    "Cannot spoof BD address, please make sure your WHAD interface "
+                    "supports this feature."
+                ))
         else:
             self.error(f"Invalid spoofed BD address: {bdaddr}")
 
