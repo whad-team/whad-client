@@ -1,20 +1,18 @@
 """BLE emulate command handler
 """
-from time import time, sleep
-from json import loads, dumps
-from binascii import unhexlify
+from json import loads
+
+from binascii import unhexlify, Error as BinasciiError
 from prompt_toolkit import print_formatted_text, HTML
-from whad.ble.profile.characteristic import CharacteristicProperties
+
+from hexdump import hexdump
+
 from whad.cli.app import command
 from whad.ble import Peripheral, GenericProfile, AdvDataFieldList
-from hexdump import hexdump
-from whad.ble.profile.attribute import UUID
-from whad.ble.stack.att.exceptions import AttError
-from whad.ble.stack.gatt.exceptions import GattTimeoutException
-from whad.ble.cli.central.helpers import show_att_error
 
 class MonitoringProfile(GenericProfile):
-
+    """GATT monitoring profile.
+    """
 
     def on_characteristic_read(self, service, characteristic, offset=0, length=0):
         """Characteristic read hook.
@@ -31,59 +29,63 @@ class MonitoringProfile(GenericProfile):
         :param int length: Max read length
         :return: Value to return to the GATT client
         """
-        print_formatted_text(HTML(
-            '<ansigreen>Reading</ansigreen> characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
-                characteristic.uuid,
-                service.uuid
-            )
-        ))
+        print_formatted_text(HTML((
+            f"<ansigreen>Reading</ansigreen> characteristic "
+            f"<ansicyan>{characteristic.uuid}</ansicyan>"
+            f" of service <ansicyan>{service.uuid}</ansicyan>"
+        )))
         hexdump(characteristic.value)
 
     def on_connect(self, conn_handle):
-        print_formatted_text(HTML('<ansired>New connection</ansired> handle:%d' % conn_handle))
+        print_formatted_text(HTML(f"<ansired>New connection</ansired> handle:{conn_handle}"))
 
     def on_disconnect(self, conn_handle):
-        print_formatted_text(HTML('<ansired>Disconnection</ansired> handle:%d' % conn_handle))
+        print_formatted_text(HTML(f"<ansired>Disconnection</ansired> handle:{conn_handle}"))
 
-    def on_characteristic_written(self, service, characteristic, offset=0, value=b'', without_response=False):
+    def on_characteristic_written(self, service, characteristic, offset=0, value=b'',
+                                  without_response=False):
         """Characteristic written hook
 
         This hook is called whenever a charactertistic has been written by a GATT
         client.
         """
-        print_formatted_text(HTML(
-            '<ansimagenta>Wrote</ansimagenta> to characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
-                characteristic.uuid,
-                service.uuid
-            )
-        ))
+        print_formatted_text(HTML((
+            f"<ansimagenta>Wrote</ansimagenta> to characteristic"
+            f"<ansicyan>{characteristic.uuid}</ansicyan>"
+            f" of service <ansicyan>{service.uuid}</ansicyan>"
+        )))
         hexdump(value)
 
-        
-    def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
+
+    def on_characteristic_subscribed(self, service, characteristic, notification=False,
+                                     indication=False):
         # Check if we have a hook to call
-        print_formatted_text(HTML('<ansicyan>Subscribed</ansicyan> to characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
-            characteristic.uuid,
-            service.uuid
+        print_formatted_text(HTML((
+            f"<ansicyan>Subscribed</ansicyan> to characteristic"
+            f"<ansicyan>{characteristic.uuid}</ansicyan>"
+            f" of service <ansicyan>{service.uuid}</ansicyan>"
         )))
 
     def on_characteristic_unsubscribed(self, service, characteristic):
-        print_formatted_text(HTML('<ansicyan>Unsubscribed</ansicyan> to characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
-            characteristic.uuid,
-            service.uuid
+        print_formatted_text(HTML((
+            f"<ansicyan>Unsubscribed</ansicyan> to characteristic"
+            f"<ansicyan>{characteristic.uuid}</ansicyan>"
+            f" of service <ansicyan>{service.uuid}</ansicyan>"
         )))
 
     def on_notification(self, service, characteristic, value):
-        print_formatted_text(HTML('<ansicyan>Notification</ansicyan> from characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
-            characteristic.uuid,
-            service.uuid
+        print_formatted_text(HTML((
+            f"<ansicyan>Notification</ansicyan> from characteristic"
+            f"<ansicyan>{characteristic.uuid}</ansicyan>"
+            f" of service <ansicyan>{service.uuid}</ansicyan>"
         )))
         hexdump(value)
 
     def on_indication(self, service, characteristic, value):
-        print_formatted_text(HTML('<ansicyan>Indication</ansicyan> from characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
-            characteristic.uuid,
-            service.uuid
+        print_formatted_text(HTML((
+            f"<ansicyan>Indication</ansicyan> from characteristic"
+            f"<ansicyan>{characteristic.uuid}</ansicyan>"
+            f" of service <ansicyan>{service.uuid}</ansicyan>"
         )))
         hexdump(value)
 
@@ -102,7 +104,7 @@ def check_profile(profile):
         return False
     try:
         unhexlify(profile['devinfo']['adv_data'])
-    except Exception as err:
+    except BinasciiError:
         return False
 
     # Make sure we have a valid scan_rsp entry (if provided)
@@ -111,7 +113,7 @@ def check_profile(profile):
     if profile['devinfo']['scan_rsp'] is not None:
         try:
             unhexlify(profile['devinfo']['scan_rsp'])
-        except Exception as err:
+        except BinasciiError:
             return False
 
     # Make sure we have a BD address
@@ -120,7 +122,7 @@ def check_profile(profile):
 
     # OK
     return True
-        
+
 
 
 @command('emulate')
@@ -140,8 +142,9 @@ def emulate_handler(app, command_args):
     if app.interface is not None:
         if len(command_args) >= 1:
             # Import profile JSON
-            profile_json = open(command_args[0],'r').read()
-            profile = loads(profile_json)
+            with open(command_args[0],'r', encoding="utf-8") as dev_profile:
+                profile_json = dev_profile.read()
+                profile = loads(profile_json)
 
             # Check profile and emulate if everything is OK
             if check_profile(profile):
@@ -159,16 +162,15 @@ def emulate_handler(app, command_args):
                     bd_address=profile['devinfo']['bd_addr']
                 )
                 periph.start()
-                print('Emulation of device %s is active, press any key to stop...' % (
-                    profile['devinfo']['bd_addr']
-                ))
+                print((f"Emulation of device {profile['devinfo']['bd_addr']} is active,"
+                       f" press any key to stop..."))
                 try:
                     input()
-                except KeyboardInterrupt as kbd_stop:
+                except KeyboardInterrupt:
                     pass
-                print('\rStopping emulation ...')
+                print("\rStopping emulation ...")
                 periph.stop()
             else:
-                app.error('Bad JSON file format')
+                app.error("Bad JSON file format")
         else:
-            app.error('You must provide an exported profile file (JSON).')
+            app.error("You must provide an exported profile file (JSON).")

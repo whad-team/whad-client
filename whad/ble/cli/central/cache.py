@@ -6,7 +6,7 @@ of discovered devices and their information.
 from whad.ble.scanning import AdvertisingDevice
 from whad.ble.profile.device import PeripheralDevice
 
-class BleDevicesCache(object):
+class BleDevicesCache:
     """Bluetooth Low Energy devices cache.
     """
 
@@ -28,8 +28,8 @@ class BleDevicesCache(object):
     def iterate(self):
         """Iterate over cached devices.
         """
-        for address in self.__devices:
-            yield self.__devices[address]
+        for _, device in self.__devices.items():
+            yield device
 
     def add(self, device: AdvertisingDevice):
         """Add a discovered device to our cache.
@@ -49,13 +49,12 @@ class BleDevicesCache(object):
         """
         if address in self.__devices:
             return self.__devices[address.lower()]
-        else:
-            # If not found, look into devices names
-            for addr in self.__devices:
-                dev = self.__devices[addr]
-                if dev['info'].name is not None and dev['info'].name == address:
-                    return self.__devices[addr]
-            raise IndexError
+
+        # If not found, look into devices names
+        for _, dev in self.__devices.items():
+            if dev['info'].name is not None and dev['info'].name == address:
+                return dev
+        raise IndexError
 
     def add_profile(self, address: str, profile: PeripheralDevice):
         """Add profile to a cached device.
@@ -76,10 +75,13 @@ class BleDevicesCache(object):
         if address in self.__devices:
             # Device found, check if we have a cached profile
             return self.__devices[address]['profile']
-        else:
-            raise IndexError
 
-    def mark_as_discovered(self, address):
+        # Not found
+        raise IndexError
+
+    def mark_as_discovered(self, address: str):
+        """Mark device as discovered.
+        """
         address = address.lower()
         if address in self.__devices:
             # Device found, check if we have a cached profile
@@ -87,10 +89,13 @@ class BleDevicesCache(object):
         else:
             raise IndexError
 
-    def is_discovered(self, address):
+    def is_discovered(self, address) -> bool:
+        """Determine if a device has already been discovered.
+        """
         address = address.lower()
         if address in self.__devices:
             # Device found, check if we have a cached profile
             return self.__devices[address]['discovered']
-        else:
-            raise IndexError
+
+        # Device is not in our database
+        raise IndexError

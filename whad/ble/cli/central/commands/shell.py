@@ -1,13 +1,10 @@
 """BLE Interactive shell
 """
-
-from prompt_toolkit import print_formatted_text, HTML
 from whad.cli.app import command
-from whad.ble import Scanner
 from whad.ble.cli.central.shell import BleCentralShell
 
 @command('interactive')
-def interactive_handler(app, command_args):
+def interactive_handler(app, _):
     """interactive BLE shell
 
     <ansicyan><b>interactive</b></ansicyan>

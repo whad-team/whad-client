@@ -1,4 +1,7 @@
+"""Helpers for BLE GATT central CLI tool.
+"""
 import json
+from typing import Tuple
 from argparse import Namespace
 from prompt_toolkit import print_formatted_text, HTML
 from whad.hub.ble.bdaddr import BDAddress
@@ -47,20 +50,31 @@ def set_bd_address(app, central: Central):
 
     # Set the BD address
     if central.set_bd_address(bd_addr, public=is_public):
-        print_formatted_text(HTML('BLE source address set to <b>%s</b>' % app.args.bdaddr_src.lower()))
+        print_formatted_text(HTML(
+            f"BLE source address set to <b>{app.args.bdaddr_src.lower()}</b>"
+        ))
     else:
-        app.warning('Cannot spoof BD address, please make sure your WHAD interface supports this feature.')
+        app.warning(("Cannot spoof BD address, please make sure your WHAD "
+                     "interface supports this feature."))
 
 
-def create_central(app, piped=False):
+def create_central(app, piped: bool = False) -> Tuple[Central, dict]:
+    """Create central connector.
+    """
     central = None
     profile_loaded = False
 
     # Is app stdin piped ?
     if piped:
         # Create connection structure
-        initiator = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
-        advertiser = BDAddress(str(app.args.initiator_bdaddr), addr_type=int(app.args.initiator_addrtype))
+        initiator = BDAddress(
+            str(app.args.initiator_bdaddr),
+            addr_type=int(app.args.initiator_addrtype)
+        )
+        advertiser = BDAddress(
+            str(app.args.initiator_bdaddr),
+            addr_type=int(app.args.initiator_addrtype)
+        )
         existing_connection = Namespace(
             initiator=initiator.value,
             init_addr_type=int(app.args.initiator_addrtype),
@@ -74,8 +88,8 @@ def create_central(app, piped=False):
             # Load profile
             try:
                 # Load file content
-                profile_json = open(app.args.profile,'rb').read()
-                profile = json.loads(profile_json)
+                with open(app.args.profile,'rb') as profile:
+                    profile_json = profile.read()
 
                 # Create central with GATT profile information and current
                 # connection information
@@ -83,10 +97,10 @@ def create_central(app, piped=False):
 
                 # Profile has been successfully loaded from JSON
                 profile_loaded = True
-            except IOError as err:
-                app.error('Cannot access profile file (%s)' % app.args.profile)
-            except Exception as err:
-                app.error('Cannot parse profile file (%s)' % app.args.profile)
+            except IOError:
+                app.error(f"Cannot access profile file ({app.args.profile})")
+            except json.decoder.JSONDecodeError:
+                app.error(f"Cannot parse profile file ({app.args.profile})")
         else:
             # No GATT profile, create a classic Central connector with current
             # connection information
@@ -96,8 +110,8 @@ def create_central(app, piped=False):
             # Load profile
             try:
                 # Load file content
-                profile_json = open(app.args.profile,'rb').read()
-                profile = json.loads(profile_json)
+                with open(app.args.profile,'rb') as profile:
+                    profile_json = profile.read()
 
                 # Create Central connector with provided GATT profile
                 central = Central(app.interface, from_json=profile_json)
@@ -108,10 +122,10 @@ def create_central(app, piped=False):
 
                 # Profile has been successfully loaded from JSON
                 profile_loaded = True
-            except IOError as err:
-                app.error('Cannot access profile file (%s)' % app.args.profile)
-            except Exception as err:
-                app.error('Cannot parse profile file (%s)' % app.args.profile)
+            except IOError:
+                app.error(f"Cannot access profile file ({app.args.profile})")
+            except json.decoder.JSONDecodeError:
+                app.error(f"Cannot parse profile file ({app.args.profile})")
         else:
             # Create classic Central connector
             central = Central(app.interface)

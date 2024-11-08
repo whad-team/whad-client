@@ -1,13 +1,20 @@
+"""BLE GATT Central tool interactive shell.
+"""
 import re
-import json
-
 from typing import List
+from binascii import unhexlify, Error as BinasciiError
 
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
-from binascii import unhexlify, Error as BinasciiError
 
+# We need to import all ATT/L2CAP layers that may be used in python code evaluation
+# through `spdu` shell command.
+# pylint: disable-next=wildcard-import,unused-wildcard-import
 from scapy.layers.bluetooth import *
+
+# We need to import all BTLE layers that may be used in python code evaluation
+# through `spdu` shell command.
+# pylint: disable-next=wildcard-import,unused-wildcard-import
 from scapy.layers.bluetooth4LE import *
 
 from whad.ble.exceptions import InvalidHandleValueException, ConnectionLostException, \
@@ -47,11 +54,10 @@ def show_adv_record(offset, raw_record):
     if nlines*16 < len(raw_record):
         nlines += 1
 
-    print(" AD Record #%d:" % offset)
+    print(f" AD Record #{offset:d}:")
     for line in range(0, nlines):
-        line_str = ' '.join(['%02x' % c for c in raw_record[line*16:(line+1)*16]])
-        print('  ' + line_str)
-
+        line_str = " ".join([f"{c:02x}" % c for c in raw_record[line*16:(line+1)*16]])
+        print("  " + line_str)
 
 
 class BleCentralShell(InteractiveShell):
@@ -118,7 +124,7 @@ class BleCentralShell(InteractiveShell):
             self.set_prompt(HTML("<b>wble-central></b>"), force)
         else:
             self.set_prompt(HTML(
-                "<b>wble-central|<ansicyan>%s</ansicyan>></b>" % self.__target_bd
+                f"<b>wble-central|<ansicyan>{self.__target_bd}</ansicyan>></b>"
             ), force)
 
 
@@ -200,7 +206,9 @@ class BleCentralShell(InteractiveShell):
             self.switch_role(Scanner)
 
             # Start scanning
-            print_formatted_text(HTML("<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>"))
+            print_formatted_text(HTML(
+                "<ansigreen> RSSI Lvl  Type  BD Address        Extra info</ansigreen>"
+            ))
             self.__connector.start()
             try:
                 for device in self.__connector.discover_devices():
@@ -226,7 +234,7 @@ class BleCentralShell(InteractiveShell):
             self.error(f"No permission to access the required interface &lt;{interface}&gt; !")
 
     @category('Devices discovery')
-    def do_devices(self, arg):
+    def do_devices(self, _):
         """list discovered devices
 
         <ansicyan><b>devices</b></ansicyan>
@@ -269,7 +277,7 @@ class BleCentralShell(InteractiveShell):
                     f"<ansigreen><b>Device {dev_info.address}</b></ansigreen>"
                 ))
 
-                print_formatted_text(HTML("<b>RSSI:</b>\t\t\t%4d dBm" % dev_info.rssi))
+                print_formatted_text(HTML(f"<b>RSSI:</b>\t\t\t{dev_info.rssi:4d} dBm"))
                 print_formatted_text(HTML(f"<b>Address type:</b>\t\t{address_type}"))
                 print('')
                 print_formatted_text(HTML("<ansicyan><u>Raw advertising records</u></ansicyan>\n"))
@@ -288,7 +296,8 @@ class BleCentralShell(InteractiveShell):
         """
         # Keep track of BD addresses and names
         targets = [dev['info'].address for dev in self.__cache.iterate()]
-        targets.extend(['"%s"' % dev['info'].name for dev in self.__cache.iterate() if dev['info'].name is not None])
+        targets.extend([f"\"{dev['info'].name}\"" for dev in self.__cache.iterate()
+                        if dev['info'].name is not None])
         return targets
 
     def complete_info(self):
@@ -303,6 +312,11 @@ class BleCentralShell(InteractiveShell):
 
 
     def complete_connect(self):
+        """Auto-complete callback for `connect` shell command.
+        
+        This callback will look into cached devices and populate the suggestions
+        with it.
+        """
         # Keep track of BD addresses and names
         targets = self.get_cache_targets()
         completions = self.autocomplete_env()
@@ -328,12 +342,16 @@ class BleCentralShell(InteractiveShell):
         """
         # Check arguments
         if len(args) < 1:
-            self.error("<u>connect</u> requires at least one parameter (device name or BD address).\ntype \'help connect\' for more details.")
+            self.error((
+                "<u>connect</u> requires at least one parameter (device name or BD address).\n"
+                "type \'help connect\' for more details."))
             return
 
         # Ensure we are not using a unix socket interface (we cannot connect if this is the case)
         if self.is_stdin_piped():
-            self.error("<u>connect</u> cannot be used when wble-central is chained with another tool.")
+            self.error(
+                "<u>connect</u> cannot be used when wble-central is chained with another tool."
+            )
             return
 
         try:
@@ -341,7 +359,7 @@ class BleCentralShell(InteractiveShell):
             try:
                 target = self.__cache[args[0]]
                 target_bd_addr = target['info'].address
-                target_random_address_type = (target['info'].address_type == 1)
+                target_random_address_type = target['info'].address_type == 1
             except IndexError:
                 # If target not in cache, we are expecting a BD address
                 if re.match(BDADDR_REGEXP, args[0]):
@@ -356,14 +374,17 @@ class BleCentralShell(InteractiveShell):
                 elif args[1].lower() in ("pub", "public"):
                     target_random_address_type = False
                 else:
-                    self.error("You must indicate a valid connection type ('public' or 'random').")
+                    self.error(
+                        "You must indicate a valid connection type ('public' or 'random')."
+                    )
                     return
 
             # Switch role to Central
             self.switch_role(Central)
             try:
                 # Try to connect to our target device (central role is started here)
-                self.__target = self.__connector.connect(target_bd_addr, random=target_random_address_type)
+                self.__target = self.__connector.connect(target_bd_addr,
+                                                         random=target_random_address_type)
                 self.__target_bd = target_bd_addr
 
                 # Check connection is OK
@@ -378,7 +399,8 @@ class BleCentralShell(InteractiveShell):
                         self.__wireshark.attach(self.__connector)
 
                     # Detach any previous callback
-                    self.__connector.detach_callback(self.on_disconnect, on_reception=True, on_transmission=False)
+                    self.__connector.detach_callback(self.on_disconnect, on_reception=True,
+                                                     on_transmission=False)
 
                     # Attach our packet monitor callback (to detect disconnection)
                     self.__connector.attach_callback(
@@ -412,7 +434,7 @@ class BleCentralShell(InteractiveShell):
             self.error(f"No permission to access the required interface &lt;{interface}&gt; !")
 
 
-    def on_disconnect(self, packet=None):
+    def on_disconnect(self, _):
         """Disconnection callback
 
         This callback is called when a BLE peripheral disconnects our central.
@@ -435,7 +457,7 @@ class BleCentralShell(InteractiveShell):
 
 
     @category("GATT client")
-    def do_disconnect(self, arg):
+    def do_disconnect(self, _):
         """disconnect from device
 
         <ansicyan><b>disconnect</b></ansicyan>
@@ -465,13 +487,14 @@ class BleCentralShell(InteractiveShell):
         This command performs a GATT services and characteristics discovery,
         collecting all this information and keeping it in a dedicated <b>cache</b>.
 
-        If <ansicyan>PROFILE</ansicyan> is provided, <i>wble-central</i> will load this file JSON content
-        as current device GATT profile instead of discovering GATT services and
-        characteristics. If not, it will discover the device services and
-        characteristics, this operation may take some time to complete.
+        If <ansicyan>PROFILE</ansicyan> is provided, <i>wble-central</i> will load
+        this file JSON content as current device GATT profile instead of discovering
+        GATT services and characteristics. If not, it will discover the device services
+        and characteristics, this operation may take some time to complete.
 
-        This <b>cached information</b> is then used by commands <ansicyan>read</ansicyan>, <ansicyan>services</ansicyan>,
-        and <ansicyan>characteristics</ansicyan> to speed up the process.
+        This <b>cached information</b> is then used by commands <ansicyan>read</ansicyan>,
+        <ansicyan>services</ansicyan>, and <ansicyan>characteristics</ansicyan> to
+        speed up the process.
 
         <aaa fg="orange">Sometimes this discovery process may cause an error and produces
         incomplete information, in this case try again and cross fingers.</aaa>
@@ -481,8 +504,8 @@ class BleCentralShell(InteractiveShell):
             if len(args) > 0:
                 try:
                     # Load file content
-                    profile_json = open(args[0],'rb').read()
-                    profile = json.loads(profile_json)
+                    with open(args[0],'rb') as dev_profile:
+                        profile_json = dev_profile.read()
 
                     # Recreate a PeripheralDevice based on this profile
                     self.__target = PeripheralDevice(
@@ -491,7 +514,7 @@ class BleCentralShell(InteractiveShell):
                         conn_handle=self.__connector.connection.conn_handle,
                         from_json=profile_json
                     )
-                    
+
                 except IOError:
                     self.error(f"Cannot load profile json file `{args[0]}`")
 
@@ -512,7 +535,9 @@ class BleCentralShell(InteractiveShell):
 
             # Show services and characteristics
             for service in self.__target.services():
-                print_formatted_text(HTML(f"<ansigreen><b>Service {service.name}</b></ansigreen>\n"))
+                print_formatted_text(HTML(
+                    f"<ansigreen><b>Service {service.name}</b></ansigreen>\n"
+                ))
                 for charac in service.characteristics():
                     properties = charac.properties
                     charac_rights = []
@@ -526,23 +551,26 @@ class BleCentralShell(InteractiveShell):
                         charac_rights.append('indicate')
                     if properties & CharacteristicProperties.NOTIFY != 0:
                         charac_rights.append('notify')
-                    print_formatted_text(HTML(" <b>%s</b> handle: <b>%d</b>, value handle: <b>%d</b>" % (
-                        charac.name, charac.handle, charac.value_handle
+                    print_formatted_text(HTML((
+                        f" <b>{charac.name}</b> handle: <b>{charac.handle:d}</b>, "
+                        f"value handle: <b>{charac.value_handle:d}</b>"
                     )))
-                    print_formatted_text(HTML("  | <ansicyan>access rights:</ansicyan> <b>%s</b>" % ', '.join(charac_rights)))
+
+                    access_rights = ', '.join(charac_rights)
+                    print_formatted_text(HTML(
+                        f"  | <ansicyan>access rights:</ansicyan> <b>{access_rights}</b>"
+                    ))
 
                     for desc in charac.descriptors():
-                        print_formatted_text(HTML(
-                            "  | <ansiblue><b>Descriptor type %s</b></ansiblue> handle: <b>%d</b>" % (
-                                desc.name,
-                                desc.handle
-                            )
-                        ))
+                        print_formatted_text(HTML((
+                            f"  | <ansiblue><b>Descriptor type {desc.name}</b></ansiblue> "
+                            f"handle: <b>{desc.handle:d}</b>"
+                        )))
                 print('')
 
 
     @category("GATT client")
-    def do_services(self, args):
+    def do_services(self, _):
         """discover/show current device services
 
         <ansicyan><b>services</b></ansicyan>
@@ -561,22 +589,24 @@ class BleCentralShell(InteractiveShell):
                     self.error("GATT timeout occured")
                     return
                 except ConnectionLostException:
-                    self.error("Services/characteristics discovery failed (peripheral disconnected)")
+                    self.error((
+                        "Services/characteristics discovery failed "
+                        "(peripheral disconnected)"))
                     return
 
             # We are connected to a device, list cached services
             for service in self.__target.services():
-                print_formatted_text(HTML(
-                    "<ansicyan><b>%s</b></ansicyan> start handle: <b>%d</b>, end handle: <b>%d</b>" % (
-                        service.uuid, service.handle, service.end_handle
-                    )
-                ))
+                print_formatted_text(HTML((
+                    f"<ansicyan><b>{service.uuid}</b></ansicyan> "
+                    f"start handle: <b>{service.handle:d}</b>, "
+                    f"end handle: <b>{service.end_handle:d}</b>"
+                )))
         else:
             self.error("No device connected.")
 
 
     @category("GATT client")
-    def do_characteristics(self, args):
+    def do_characteristics(self, _):
         """discover/show current device characteristics
 
         <ansicyan><b>characteristics</b></ansicyan>
@@ -595,7 +625,9 @@ class BleCentralShell(InteractiveShell):
                     self.error("GATT timeout occured")
                     return
                 except ConnectionLostException:
-                    self.error("Services/characteristics discovery failed (peripheral disconnected)")
+                    self.error((
+                        "Services/characteristics discovery failed "
+                        "(peripheral disconnected)"))
                     return
 
 
@@ -614,18 +646,21 @@ class BleCentralShell(InteractiveShell):
                         charac_rights.append('indicate')
                     if properties & CharacteristicProperties.NOTIFY != 0:
                         charac_rights.append('notify')
-                    print_formatted_text(HTML(" <b>%s</b> handle: <b>%d</b>, value handle: <b>%d</b>" % (
-                        charac.uuid, charac.handle, charac.value_handle
+                    print_formatted_text(HTML((
+                        f" <b>{charac.uuid}</b> handle: <b>{charac.handle:d}</b>, "
+                        f"value handle: <b>{charac.value_handle:d}</b>"
                     )))
-                    print_formatted_text(HTML("  | <ansicyan>access rights:</ansicyan> <b>%s</b>" % ', '.join(charac_rights)))
-                    
+
+                    access_rights = ', '.join(charac_rights)
+                    print_formatted_text(HTML(
+                        f"  | <ansicyan>access rights:</ansicyan> <b>{access_rights}</b>"
+                    ))
+
                     for desc in charac.descriptors():
-                        print_formatted_text(HTML(
-                            "  | <ansiblue><b>Descriptor type %s</b></ansiblue> handle: <b>%d</b>" % (
-                                desc.name,
-                                desc.handle
-                            ) 
-                        ))
+                        print_formatted_text(HTML((
+                            f"  | <ansiblue><b>Descriptor type {desc.name}</b></ansiblue> "
+                            f"handle: <b>{desc.handle:d}</b>"
+                        )))
         else:
             self.error("No device connected.")
 
@@ -649,12 +684,13 @@ class BleCentralShell(InteractiveShell):
         if self.__target_bd:
             # parse target arguments
             if len(args) == 0:
-                self.error("You must provide at least a characteristic value handle or characteristic UUID.")
+                self.error((
+                    "You must provide at least a characteristic value handle "
+                    "or characteristic UUID."))
                 return
-            else:
-                handle = None
-                offset = None
-                uuid = None
+
+            handle = None
+            offset = None
 
             # figure out what the handle is
             if args[0].lower().startswith('0x'):
@@ -730,12 +766,12 @@ class BleCentralShell(InteractiveShell):
         """
         # parse target arguments
         if len(args) <2:
-            self.error("You must provide at least a characteristic value handle or characteristic UUID, and a value to write.")
+            self.error((
+                "You must provide at least a characteristic value handle or "
+                "characteristic UUID, and a value to write."))
             return
-        else:
-            handle = None
-            offset = None
-            uuid = None
+
+        handle = None
 
         # figure out what the handle is
         if args[0].lower().startswith('0x'):
@@ -973,8 +1009,11 @@ class BleCentralShell(InteractiveShell):
                     'LL_START_ENC_RSP': LL_START_ENC_RSP,
                     'LL_UNKNOWN_RSP': LL_UNKNOWN_RSP,
                 }
+
+                # We know what we are doing, disable pylint warning
+                # pylint: disable-next=eval-used
                 raw_pdu = eval(python_code, scapy_env, {})
-                if isinstance(raw_pdu, BTLE_CTRL) or isinstance(raw_pdu, L2CAP_Hdr):               
+                if isinstance(raw_pdu, (BTLE_CTRL, L2CAP_Hdr)):
                     res = self.__connector.send_pdu(
                         BTLE_DATA()/raw_pdu,
                         conn_handle=self.__target.conn_handle
@@ -1014,7 +1053,7 @@ class BleCentralShell(InteractiveShell):
                     handle = int(args[0].lower(), 16)
                 except ValueError:
                     self.error(f"Wrong handle: {args[0]}")
-                    return 
+                    return
             else:
                 try:
                     handle = int(args[0])
@@ -1039,14 +1078,16 @@ class BleCentralShell(InteractiveShell):
 
             def on_charac_notified(_, value, indication):
                 if indication:
-                    print_formatted_text(HTML(
-                        f"<ansimagenta>Indication</ansimagenta> received from characteristic with handle {handle}"
-                    ))
+                    print_formatted_text(HTML((
+                        f"<ansimagenta>Indication</ansimagenta> received from "
+                        f"characteristic with handle {handle}"
+                    )))
                     hexdump(value)
                 else:
-                    print_formatted_text(HTML(
-                        f"<ansimagenta>Notification</ansimagenta> received from characteristic with handle {handle}"
-                    ))
+                    print_formatted_text(HTML((
+                        f"<ansimagenta>Notification</ansimagenta> received from "
+                        f"characteristic with handle {handle}"
+                    )))
                     hexdump(value)
 
             if target_charac is not None:
@@ -1058,27 +1099,33 @@ class BleCentralShell(InteractiveShell):
                                 callback=on_charac_notified
                             )
                             if result:
-                                print_formatted_text(HTML(
-                                f"Successfully subscribed to notification for characteristic {target_charac.uuid}"
-                                ))
+                                print_formatted_text(HTML((
+                                    f"Successfully subscribed to notification for "
+                                    f"characteristic {target_charac.uuid}"
+                                )))
                             else:
-                                print_formatted_text(HTML(
-                                f"An error occurred when subscribing to notification for characteristic {target_charac.uuid}"
-                                ))
+                                print_formatted_text(HTML((
+                                    f"An error occurred when subscribing to notification"
+                                    f" for characteristic {target_charac.uuid}"
+                                )))
                         else:
-                            self.error("Characteristic does not send notification nor indication.")
+                            self.error((
+                                "Characteristic does not send notification "
+                                "nor indication."))
                     else:
                         result = target_charac.subscribe(
                             callback=on_charac_notified
                         )
                         if result:
-                            print_formatted_text(HTML(
-                                f"Successfully subscribed to notification for characteristic {target_charac.uuid}"
-                            ))
+                            print_formatted_text(HTML((
+                                f"Successfully subscribed to notification for "
+                                f"characteristic {target_charac.uuid}"
+                            )))
                         else:
-                            print_formatted_text(HTML(
-                                f"An error occurred when subscribing to notification for characteristic {target_charac.uuid}"
-                            ))
+                            print_formatted_text(HTML((
+                                f"An error occurred when subscribing to notification "
+                                f"for characteristic {target_charac.uuid}"
+                            )))
                 except AttError as att_err:
                     self.show_att_error(att_err)
                 except GattTimeoutException:
@@ -1139,7 +1186,9 @@ class BleCentralShell(InteractiveShell):
             if target_charac is not None:
                 try:
                     target_charac.unsubscribe()
-                    print_formatted_text(HTML(f"Successfully unsubscribed from characteristic {target_charac.uuid}"))
+                    print_formatted_text(HTML(
+                        f"Successfully unsubscribed from characteristic {target_charac.uuid}"
+                    ))
                 except AttError as att_err:
                     self.show_att_error(att_err)
                 except GattTimeoutException:
@@ -1182,9 +1231,11 @@ class BleCentralShell(InteractiveShell):
                             self.__wireshark.attach(self.__connector)
                             self.__wireshark.start()
                     except ExternalToolNotFound:
-                        self.error("Cannot launch Wireshark, please make sure it is installed.")
+                        self.error(("Cannot launch Wireshark, "
+                                    "please make sure it is installed."))
                 else:
-                    self.error("Wireshark is already launched, see <ansicyan>wireshark off</ansicyan>")
+                    self.error(("Wireshark is already launched, see "
+                                "<ansicyan>wireshark off</ansicyan>"))
             else:
                 # Detach monitor if any
                 if self.__wireshark is not None:
