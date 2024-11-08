@@ -56,7 +56,7 @@ class Sniffer(Phy, EventsManager):
                 self.__configuration.lora_configuration.spreading_factor,
                 self.__configuration.lora_configuration.coding_rate,
                 self.__configuration.lora_configuration.bandwidth,
-                12,
+                self.__configuration.lora_configuration.preamble_length,
                 crc=self.__configuration.lora_configuration.enable_crc,
                 explicit=self.__configuration.lora_configuration.enable_explicit_mode
             )
