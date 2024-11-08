@@ -38,9 +38,9 @@ def read_gatt_characteristic(app, command_args, device, profile_loaded=False):
     if len(command_args) == 0:
         app.error('You must provide at least a characteristic value handle or characteristic UUID.')
         return
-    else:
-        handle = None
-        offset = None
+
+    handle = None
+    offset = None
 
     # figure out what the handle is
     if command_args[0].lower().startswith('0x'):
@@ -89,7 +89,7 @@ def read_gatt_characteristic(app, command_args, device, profile_loaded=False):
             device.discover()
 
         # Search characteristic from its UUID
-        target_charac = device.find_characteristic_by_uuid(handle)                       
+        target_charac = device.find_characteristic_by_uuid(handle)
         if target_charac is not None:
             try:
                 # Read data
