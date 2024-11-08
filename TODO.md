@@ -62,3 +62,170 @@ Python library allowing to interact with offensive security tools implementing t
 - [ ] Implementing Generic GFSK protocol connectors
 - [ ] Improving examples structure, adding support of parameters
   - [ ] Moving client.py into examples, harmonizing the behaviour with other examples
+
+
+### Code cleaning
+
+- [ ] whad.ble
+    - [x] whad.ble.cli
+        - [x] whad.ble.central
+        - [x] whad.ble.clone
+        - [x] whad.ble.peripheral
+        - [x] whad.ble.ble_connect
+        - [x] whad.ble.ble_proxy
+        - [x] whad.ble.ble_spawn
+    - [ ] whad.ble.connector
+    - [ ] whad.ble.profile
+    - [ ] whad.ble.stack
+    - [ ] whad.ble.tools
+    - [ ] whad.ble.utils
+    - [ ] whad.ble.crypto
+    - [ ] whad.ble.exceptions
+    - [ ] whad.ble.injecting
+    - [ ] whad.ble.metadata
+    - [ ] whad.ble.scanning
+    - [ ] whad.ble.sniffing
+- [ ] whad.cli
+    - [ ] whad.cli.app
+    - [ ] whad.cli.shell
+    - [ ] whad.cli.ui
+- [ ] whad.common
+    - [ ] whad.common.converters
+    - [ ] whad.common.converters.hid
+    - [ ] whad.common.monitors
+    - [ ] whad.common.monitors.pcap
+    - [ ] whad.common.monitors.wireshark
+    - [ ] whad.common.stack
+    - [ ] whad.common.analyzer
+    - [ ] whad.common.metadata
+    - [ ] whad.common.pcap
+    - [ ] whad.common.replay
+    - [ ] whad.common.sniffing
+    - [ ] whad.common.triggers
+- [x] whad.device
+    - [x] whad.device.bridge
+    - [x] whad.device.connector
+    - [x] whad.device.device
+    - [x] whad.device.info
+    - [x] whad.device.tcp
+    - [x] whad.device.uart
+    - [x] whad.device.unix
+    - [x] whad.device.virtual
+        - [x] whad.device.virtual.apimote
+        - [x] whad.device.virtual.hci
+        - [x] whad.device.virtual.pcap
+        - [x] whad.device.virtual.rfstorm
+        - [x] whad.device.virtual.rzusbstick
+        - [x] whad.device.virtual.ubertooth
+        - [x] whad.device.virtual.yard
+- [ ] whad.dot15d4
+    - [ ] whad.dot15d4.connector
+    - [ ] whad.dot15d4.stack
+    - [ ] whad.dot15d4.utils
+    - [ ] whad.dot15d4.address
+    - [ ] whad.dot15d4.exceptions
+    - [ ] whad.dot15d4.injecting
+    - [ ] whad.dot15d4.metadata
+    - [ ] whad.dot15d4.sniffing
+- [x] whad.esb
+    - [x] whad.esb.connector
+    - [x] whad.esb.stack
+    - [x] whad.esb.utils
+    - [x] whad.esb.esbaddr
+    - [x] whad.esb.exceptions
+    - [x] whad.esb.injecting
+    - [x] whad.esb.scanning
+    - [x] whad.esb.sniffing
+- [ ] whad.hub
+    - [ ] whad.hub.ble
+    - [ ] whad.hub.discovery
+    - [ ] whad.hub.dot15d4
+    - [ ] whad.hub.esb
+    - [ ] whad.hub.generic
+    - [ ] whad.hub.phy
+    - [ ] whad.hub.unifying
+    - [ ] whad.hub.events
+    - [ ] whad.hub.exceptions
+    - [ ] whad.hub.message
+    - [ ] whad.hub.metadata
+    - [ ] whad.hub.registry
+- [ ] whad.lorawan
+    - [ ] whad.lorawan.connector
+    - [ ] whad.lorawan.stack
+    - [ ] whad.lorawan.app
+    - [ ] whad.lorawan.channel
+    - [ ] whad.lorawan.crypto
+    - [ ] whad.lorawan.exceptions
+    - [ ] whad.lorawan.helpers
+- [ ] whad.phy
+    - [ ] whad.phy.cli
+    - [ ] whad.phy.connector
+    - [ ] whad.phy.utils
+    - [ ] whad.phy.exceptions
+    - [ ] whad.phy.injecting
+    - [ ] whad.phy.metadata
+    - [ ] whad.phy.sniffing
+- [x] whad.protocol (excluded)
+- [ ] whad.rf4ce
+    - [ ] whad.rf4ce.connector
+    - [ ] whad.rf4ce.stack
+    - [ ] whad.rf4ce.utils
+    - [ ] whad.utils
+    - [ ] whad.crypto
+    - [ ] whad.exceptions
+    - [ ] whad.injecting
+    - [ ] whad.sniffing
+- [ ] whad.scapy
+    - [ ] whad.scapy.layers.apimote
+    - [ ] whad.scapy.layers.bluetooth
+    - [ ] whad.scapy.layers.bt_mesh
+    - [ ] whad.scapy.layers.dot15d4tap
+    - [ ] whad.scapy.layers.esb
+    - [ ] whad.scapy.layers.hci
+    - [ ] whad.scapy.layers.lorawan
+    - [ ] whad.scapy.layers.microsoft
+    - [ ] whad.scapy.layers.nordic
+    - [ ] whad.scapy.layers.phy
+    - [ ] whad.scapy.layers.rf4ce
+    - [ ] whad.scapy.layers.ubertooth
+    - [ ] whad.scapy.layers.unifying
+    - [ ] whad.scapy.layers.zdp
+    - [ ] whad.scapy.layers.zll
+- [x] whad.tools
+    - [x] whad.tools.wanalyze
+    - [x] whad.tools.wdump
+    - [x] whad.tools.wextract
+    - [x] whad.tools.wfilter
+    - [x] whad.tools.whadup
+    - [x] whad.tools.winject
+    - [x] whad.tools.winstall
+    - [x] whad.tools.wplay
+    - [x] whad.tools.wreplay
+    - [x] whad.tools.wserver
+    - [x] whad.tools.wshark
+    - [x] whad.tools.wsniff
+- [ ] whad.unifying
+    - [ ] whad.unifying.cli
+    - [ ] whad.unifying.connector
+    - [ ] whad.unifuing.hid
+    - [ ] whad.unifying.stack
+    - [ ] whad.unifying.tools
+    - [ ] whad.unifying.utils
+    - [ ] whad.unifying.crypto
+    - [ ] whad.unifying.exceptions
+    - [ ] whad.unifying.injecting
+    - [ ] whad.unifying.metadata
+    - [ ] whad.unifying.sniffing
+- [ ] whad.zigbee
+    - [ ] whad.zigbee.cli
+    - [ ] whad.zigbee.connector
+    - [ ] whad.zigbee.profile
+    - [ ] whad.zigbee.stack
+    - [ ] whad.zigbee.utils
+    - [ ] whad.zigbee.crypto
+    - [ ] whad.zigbee.exceptions
+    - [ ] whad.zigbee.injecting
+    - [ ] whad.zigbee.sniffing
+- [ ] whad.exceptions
+- [ ] whad.helpers
+- [ ] whad.version
