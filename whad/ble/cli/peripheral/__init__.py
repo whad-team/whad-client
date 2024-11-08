@@ -4,7 +4,7 @@
 from whad.cli.app import CommandLineApp, run_app
 from whad.ble.cli.peripheral.shell import BlePeriphShell
 
-from .commands import *
+from .commands.shell import interactive_handler
 
 class BlePeriphApp(CommandLineApp):
     """Bluetooth Low Energy Peripheral emulation app

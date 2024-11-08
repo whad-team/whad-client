@@ -54,7 +54,8 @@ def interactive_handler(app, _):
         # If a profile has been provided, load it
         if app.args.profile is not None:
             # Read profile
-            profile_json = open(app.args.profile,'rb').read()
+            with open(app.args.profile,'rb') as f:
+                profile_json = f.read()
         else:
             profile_json = None
 
