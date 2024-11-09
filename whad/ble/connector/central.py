@@ -2,12 +2,13 @@
 Bluetooth Low Energy Central connector
 ======================================
 """
+import logging
 
 from time import time, sleep
-from whad.ble.connector import BLE
+from whad.ble.connector.base import BLE
 from whad.hub.ble import Direction
 from whad.hub.ble.bdaddr import BDAddress
-from whad.ble.stack import BleStack, BtVersion
+from whad.ble.stack import BleStack
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
 from whad.ble.stack.gatt import GattClient
 from whad.ble.stack.att import ATTLayer
@@ -15,30 +16,28 @@ from whad.ble.stack.smp import CryptographicDatabase
 from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
 from whad.ble.profile.device import PeripheralDevice
 from whad.common.stack import Layer
-from whad.protocol.ble.ble_pb2 import BleDirection
 from whad.exceptions import UnsupportedCapability
 
-from binascii import hexlify
-
-import logging
 logger = logging.getLogger(__name__)
 
 class Central(BLE):
     """This connector provides a BLE Central role.
 
     To initiate a connection to a device, just call :meth:`Central.connect` with the target
-    BD address and it should return an instance of :class:`whad.ble.profile.device.PeripheralDevice` in return.
+    BD address and it should return an instance of 
+    :class:`whad.ble.profile.device.PeripheralDevice` in return.
 
     """
 
-    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack, client=GattClient, security_database=None):
-        super().__init__(device)
-
+    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack,
+                 client=GattClient, security_database=None):
         """Attach a GATT client if specified in parameter
 
         If `client` is set to None, the default GATT layer is used, which does
         not provide any client feature at all.
         """
+        super().__init__(device)
+
         if client is not None:
             if issubclass(client, Layer) and client.alias == 'gatt':
                 ATTLayer.add(client)
@@ -47,11 +46,11 @@ class Central(BLE):
         self.__stack = stack(self)
         self.__connected = False
         self.__peripheral = None
-        self.__random_addr = False
         self.__profile_json = from_json
         self.__target = None
         self.__local = None
         self.__conn_handle = None
+        self.connection = None
 
         # If no connection, check if
         if not self.can_be_central():
@@ -59,7 +58,9 @@ class Central(BLE):
 
         # Initialize security database
         if security_database is None:
-            logger.info('No security database provided to this Peripheral instance, use a default one.')
+            logger.info((
+                "No security database provided to this Peripheral instance, "
+                "use a default one."))
             self.__security_database = CryptographicDatabase()
         else:
             logger.info('Peripheral will use the provided security database.')
@@ -75,6 +76,8 @@ class Central(BLE):
 
     @property
     def security_database(self):
+        """Central role security database.
+        """
         return self.__security_database
 
     @property
@@ -90,7 +93,9 @@ class Central(BLE):
         return self.__target
 
     @property
-    def conn_handle(self):
+    def conn_handle(self) -> int:
+        """Connection handle.
+        """
         return self.__conn_handle
 
     @property
@@ -99,7 +104,8 @@ class Central(BLE):
         '''
         return self.__stack
 
-    def connect(self, bd_address, random=False, timeout=30, access_address=None, channel_map=None, crc_init=None, hop_interval=None, hop_increment=None) -> PeripheralDevice:
+    def connect(self, bd_address, random=False, timeout=30, access_address=None,channel_map=None,
+                crc_init=None, hop_interval=None, hop_increment=None) -> PeripheralDevice:
         """Connect to a target device
 
         :param  bd_address:     Bluetooth device address (in format 'xx:xx:xx:xx:xx:xx')
@@ -137,11 +143,10 @@ class Central(BLE):
                 if time()-start_time >= timeout:
                     raise PeripheralNotFound
                 sleep(0.1)
-            self.__random_addr = random
             return self.peripheral()
-        else:
-            # TODO: raise cannot connect
-            raise PeripheralNotFound()
+
+        # Raise error
+        raise PeripheralNotFound()
 
     def peripheral(self) -> PeripheralDevice:
         """Connected BLE peripheral.
@@ -149,7 +154,8 @@ class Central(BLE):
         return self.__peripheral
 
 
-    def send_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE, access_address=0x8e89bed6, encrypt=None) -> bool:
+    def send_pdu(self, pdu, conn_handle=0, direction=Direction.MASTER_TO_SLAVE,
+                 access_address=0x8e89bed6, encrypt=None) -> bool:
         """Send a PDU to the connected peripheral device or to the central device.
 
         :param  pdu:            BLE PDU to send.
@@ -167,9 +173,11 @@ class Central(BLE):
         :rtype:                 bool
         """
         if self.__connected:
-            return super().send_pdu(pdu, conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
-        else:
-            raise ConnectionLostException(None)
+            return super().send_pdu(pdu, conn_handle, direction=direction,
+                                    access_address=access_address, encrypt=encrypt)
+
+        # Connection lost
+        raise ConnectionLostException(None)
 
     ##############################
     # Incoming events
@@ -330,8 +338,9 @@ class Central(BLE):
 
                 # Return information
                 return (version, result.subversion, company)
-            else:
-                return None
+
+        # Error
+        return None
 
     def export_profile(self):
         """Export GATT profile of the existing connection.

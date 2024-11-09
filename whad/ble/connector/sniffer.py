@@ -1,17 +1,24 @@
-from whad.ble.connector import BLE, Injector, Hijacker
-from whad.ble.utils.phy import is_access_address_valid
+"""Bluetooth Low Energy sniffing module.
+"""
+import logging
+from typing import List
+from time import sleep
+
+from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE
+
+from whad.ble.connector.base import BLE
+from whad.ble.connector.injector import Injector
+from whad.ble.connector.hijacker import Hijacker
 from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress, \
     SynchronizationEvent, DesynchronizationEvent, KeyExtractedEvent
-from whad.ble.crypto import EncryptedSessionInitialization, LinkLayerDecryptor, LegacyPairingCracking
-from whad.hub.ble import AccessAddressDiscovered, Synchronized, BleRawPduReceived, BlePduReceived, BleAdvPduReceived
+from whad.ble.crypto import EncryptedSessionInitialization, LinkLayerDecryptor, \
+    LegacyPairingCracking
+from whad.hub.ble import AccessAddressDiscovered, Synchronized, BleRawPduReceived, \
+    BlePduReceived, BleAdvPduReceived
 from whad.ble.exceptions import MissingCryptographicMaterial
 from whad.exceptions import WhadDeviceDisconnected
 from whad.ble import UnsupportedCapability, message_filter
-from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE
 from whad.common.sniffing import EventsManager
-from struct import pack
-from time import sleep
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +44,13 @@ class Sniffer(BLE, EventsManager):
 
     @property
     def synchronized(self):
+        """Synchromization state
+        """
         return self.__synchronized
 
     def wait_new_connection(self, address="FF:FF:FF:FF:FF:FF"):
+        """Wait for synchronization on a new connection.
+        """
         self.filter = address
         self.configure(advertisements=False, connection=True)
         self.start()
@@ -49,40 +60,48 @@ class Sniffer(BLE, EventsManager):
 
     @property
     def access_address(self):
+        """Access address
+        """
         if self.__connection is None:
             return 0x8e89bed6
-        else:
-            return self.__connection.access_address
+        return self.__connection.access_address
 
     @property
     def crc_init(self):
+        """CRC seed value
+        """
         if self.__connection is None:
             return 0x555555
-        else:
-            return self.__connection.crc_init
+        return self.__connection.crc_init
 
     @property
     def hop_interval(self):
+        """Hop interval value
+        """
         if self.__connection is None:
             return None
-        else:
-            return self.__connection.hop_interval
+        return self.__connection.hop_interval
 
     @property
     def hop_increment(self):
+        """Hop increment value
+        """
         if self.__connection is None:
             return None
-        else:
-            return self.__connection.hop_interval
+        return self.__connection.hop_interval
 
     @property
     def channel_map(self):
+        """Channel map in use
+        """
         if self.__connection is None:
             return None
-        else:
-            return self.__connection.channel_map
+        return self.__connection.channel_map
 
-    def on_synchronized(self, access_address=None, crc_init=None, hop_increment=None, hop_interval=None, channel_map=None):
+    def on_synchronized(self, access_address=None, crc_init=None, hop_increment=None,
+                        hop_interval=None, channel_map=None):
+        """Synchronization callback
+        """
         self.__synchronized = True
         self.__connection = SynchronizedConnection(
             access_address = access_address,
@@ -92,22 +111,27 @@ class Sniffer(BLE, EventsManager):
             channel_map = channel_map
         )
         self.trigger_event(SynchronizationEvent(self.__connection))
-        logger.info("Connection synchronized -> access_address={}, crc_init={}, hop_interval={} ({} us), hop_increment={}, channel_map={}.".format(
-                    "0x{:08x}".format(self.__connection.access_address),
-                    "0x{:06x}".format(self.__connection.crc_init),
-                    str(self.__connection.hop_interval), str(self.__connection.hop_interval*1250),
-                    str(self.__connection.hop_increment),
-                    "0x"+self.__connection.channel_map.hex()
-        ))
+        logger.info(("Connection synchronized -> access_address=0x%08x,"
+                     " crc_init=0x%06x, hop_interval=%d (%d us)"
+                     "hop_increment=%d, channel_map=0x%s"),
+                    self.__connection.access_address,
+                    self.__connection.crc_init,
+                    self.__connection.hop_interval,
+                    self.__connection.hop_interval*1250,
+                    self.__connection.hop_increment,
+                    self.__connection.channel_map.value.hex())
 
     def on_desynchronized(self, access_address=None):
+        """Desynchronization callback
+        """
         self.__synchronized = False
         self.__connection = None
         self.trigger_event(DesynchronizationEvent())
         logger.info("Connection lost.")
 
     def _enable_sniffing(self):
-
+        """Enable sniffing
+        """
         for key in self.__configuration.keys:
             self.__decryptor.add_key(key)
 
@@ -121,7 +145,8 @@ class Sniffer(BLE, EventsManager):
             channel_map = self.__configuration.active_connection.channel_map
             hop_interval = self.__configuration.active_connection.hop_interval
             hop_increment = self.__configuration.active_connection.hop_increment
-            self.sniff_active_connection(access_address, crc_init, channel_map, hop_interval, hop_increment)
+            self.sniff_active_connection(access_address, crc_init, channel_map,
+                                         hop_interval, hop_increment)
 
         elif self.__configuration.follow_connection:
             for key in self.__configuration.keys:
@@ -129,35 +154,41 @@ class Sniffer(BLE, EventsManager):
 
             if not self.can_sniff_new_connection():
                 raise UnsupportedCapability("Sniff")
-            else:
-                self.sniff_new_connection(
-                    channel=self.__configuration.channel,
-                    show_advertisements=self.__configuration.show_advertisements,
-                    show_empty_packets=self.__configuration.show_empty_packets,
-                    bd_address=self.__configuration.filter
-                )
+
+            self.sniff_new_connection(
+                channel=self.__configuration.channel,
+                show_advertisements=self.__configuration.show_advertisements,
+                show_empty_packets=self.__configuration.show_empty_packets,
+                bd_address=self.__configuration.filter
+            )
         elif self.__configuration.show_advertisements:
             if not self.can_sniff_advertisements():
                 raise UnsupportedCapability("Sniff")
-            else:
-                self.sniff_advertisements(
-                    channel=self.__configuration.channel,
-                    bd_address=self.__configuration.filter
-                )
+
+            self.sniff_advertisements(
+                channel=self.__configuration.channel,
+                bd_address=self.__configuration.filter
+            )
 
 
     def add_key(self, key):
+        """Add known encryption key to configured keys
+        """
         self.stop()
         self.__configuration.keys.append(key)
         self._enable_sniffing()
 
     def clear_keys(self):
+        """Clear known keys
+        """
         self.stop()
         self.__configuration.keys = []
         self._enable_sniffing()
 
     @property
-    def decrypt(self):
+    def decrypt(self) -> bool:
+        """Automatic decryption status
+        """
         return self.__configuration.decrypt
 
     @decrypt.setter
@@ -168,6 +199,8 @@ class Sniffer(BLE, EventsManager):
 
     @property
     def configuration(self):
+        """Sniffing configuration
+        """
         return self.__configuration
 
     @configuration.setter
@@ -176,9 +209,12 @@ class Sniffer(BLE, EventsManager):
         self.__configuration = new_configuration
         self._enable_sniffing()
 
-    def configure(self, active_connection=None, access_addresses_discovery=False, advertisements=True, connection=True, empty_packets=False):
+    def configure(self, active_connection=None, access_addresses_discovery=False,
+                  advertisements=True, connection=True, empty_packets=False):
+        """Configure sniffer
+        """
         self.stop()
-        self.__configuration.active_connection = active_connection if active_connection is not None else None
+        self.__configuration.active_connection = active_connection
         self.__configuration.access_addresses_discovery = access_addresses_discovery
         self.__configuration.show_advertisements = advertisements
         self.__configuration.show_empty_packets = empty_packets
@@ -187,6 +223,8 @@ class Sniffer(BLE, EventsManager):
 
     @property
     def filter(self):
+        """BD address filter
+        """
         return self.__configuration.filter.upper()
 
     @filter.setter
@@ -197,6 +235,8 @@ class Sniffer(BLE, EventsManager):
 
     @property
     def channel(self):
+        """BLE channel number
+        """
         return self.__configuration.channel
 
     @channel.setter
@@ -206,7 +246,9 @@ class Sniffer(BLE, EventsManager):
         self._enable_sniffing()
 
 
-    def available_actions(self, filter=None):
+    def available_actions(self, filter=None) -> List[BLE]:
+        """Determine the actions available once synchronized with a connection.
+        """
         actions = []
         if self.__synchronized:
             if self.can_inject():
@@ -217,11 +259,18 @@ class Sniffer(BLE, EventsManager):
 
             return [action for action in actions if filter is None or isinstance(action, filter)]
 
+        # No action available
+        return []
+
     def process_packet(self, packet):
+        """Process sniffed packet
+        """
         if self.__configuration.decrypt and BTLE_DATA in packet:
             self.__encrypted_session_initialization.process_packet(packet)
             if self.__encrypted_session_initialization.encryption:
-                self.__decryptor.add_crypto_material(*self.__encrypted_session_initialization.crypto_material)
+                self.__decryptor.add_crypto_material(
+                    *self.__encrypted_session_initialization.crypto_material
+                )
                 self.__encrypted_session_initialization.reset()
             try:
                 decrypted, success = self.__decryptor.attempt_to_decrypt(packet[BTLE])
@@ -244,8 +293,8 @@ class Sniffer(BLE, EventsManager):
                 keys = self.__legacy_pairing_cracking.keys
                 if keys is not None:
                     tk, stk = keys
-                    logger.info("[i] New temporary key extracted: ", tk.hex())
-                    logger.info("[i] New short term key extracted: ", stk.hex())
+                    logger.info("[i] New temporary key extracted: %s", tk.hex())
+                    logger.info("[i] New short term key extracted: %s", stk.hex())
                     self.trigger_event(KeyExtractedEvent(stk))
                     self.__decryptor.add_key(stk)
                     self.__legacy_pairing_cracking.reset()
@@ -253,6 +302,8 @@ class Sniffer(BLE, EventsManager):
         return packet
 
     def sniff(self):
+        """Main sniffing function
+        """
         try:
             while True:
                 if self.__configuration.access_addresses_discovery:
@@ -267,13 +318,17 @@ class Sniffer(BLE, EventsManager):
                         aa = message.access_address
 
                         if aa not in self.__access_addresses:
-                            self.__access_addresses[aa] = AccessAddress(aa, timestamp=timestamp, rssi=rssi)
+                            self.__access_addresses[aa] = AccessAddress(
+                                aa, timestamp=timestamp,
+                                rssi=rssi
+                            )
                         else:
                             self.__access_addresses[aa].update(timestamp=timestamp, rssi=rssi)
                         yield self.__access_addresses[aa]
 
                 elif self.__configuration.active_connection is not None:
-                    message = self.wait_for_message(filter=message_filter(Synchronized), timeout=0.1)
+                    message = self.wait_for_message(filter=message_filter(Synchronized),
+                                                    timeout=0.1)
 
                     if message is not None:
                         if message.hop_increment > 0:
@@ -284,7 +339,8 @@ class Sniffer(BLE, EventsManager):
                             else:
                                 message_type = BleAdvPduReceived
 
-                            message = self.wait_for_message(filter=message_filter(message_type), timeout=0.1)
+                            message = self.wait_for_message(filter=message_filter(message_type),
+                                                            timeout=0.1)
                             if message is not None:
                                 packet = message.to_packet()
                                 self.monitor_packet_rx(packet)
@@ -298,7 +354,8 @@ class Sniffer(BLE, EventsManager):
                     else:
                         message_type = BleAdvPduReceived
 
-                    message = self.wait_for_message(filter=message_filter(message_type), timeout=0.1)
+                    message = self.wait_for_message(filter=message_filter(message_type),
+                                                    timeout=0.1)
                     if message is not None:
                         packet = message.to_packet()
                         packet = self.process_packet(packet)

@@ -27,15 +27,14 @@ an :class:`UnsupportedCapability` exception.
 
 """
 from time import time
+from typing import Iterator
+
 from scapy.packet import Packet
 
-from typing import Iterator
 from whad.hub.ble import BleAdvPduReceived, BleRawPduReceived
-from whad.ble.connector import BLE
+from whad.ble.connector.base import BLE
 from whad.ble.scanning import AdvertisingDevicesDB, AdvertisingDevice
-from whad.ble import UnsupportedCapability, message_filter, BleAdvType,\
-    BTLE_ADV_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_NONCONN_IND, BTLE_ADV_SCAN_IND,\
-    BTLE_SCAN_RSP, BTLE_ADV
+from whad.ble import UnsupportedCapability, message_filter, BTLE_ADV
 
 class Scanner(BLE):
     """
@@ -74,7 +73,8 @@ class Scanner(BLE):
         super().start()
 
 
-    def discover_devices(self, minimal_rssi = None, filter_address = None, timeout: float = None) -> Iterator[AdvertisingDevice]:
+    def discover_devices(self, minimal_rssi = None, filter_address = None,
+                         timeout: float = None) -> Iterator[AdvertisingDevice]:
         """
         Parse incoming advertisements and yield discovered devices.
 

@@ -4,16 +4,20 @@ This connector can be used either in standalone to replay packets or combined
 with whadreplay.
 """
 from dataclasses import dataclass
+
 from scapy.packet import Packet
+from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_RF, BTLE_CTRL, LL_CONNECTION_PARAM_REQ, \
+    LL_FEATURE_REQ, LL_VERSION_IND, LL_PING_REQ, LL_PING_RSP, LL_CONNECTION_PARAM_RSP, \
+    LL_FEATURE_RSP
+from scapy.layers.bluetooth import L2CAP_Connection_Parameter_Update_Request, \
+    L2CAP_Connection_Parameter_Update_Response
+
 from whad.device import WhadDevice
 from whad.exceptions import UnsupportedCapability
 from whad.ble.connector import Central
 from whad.ble.exceptions import PeripheralNotFound
 from whad.scapy.layers import NordicBLE
-from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_RF, BTLE_CTRL, LL_CONNECTION_PARAM_REQ, LL_FEATURE_REQ, \
-    LL_VERSION_IND, LL_PING_REQ, LL_PING_RSP, LL_CONNECTION_PARAM_RSP, LL_FEATURE_RSP
-from scapy.layers.bluetooth import L2CAP_Connection_Parameter_Update_Request, L2CAP_Connection_Parameter_Update_Response
-from whad.common.replay import ReplayRole, ReplayInterface
+from whad.common.replay import ReplayInterface
 
 @dataclass
 class ReplayConfiguration:
@@ -61,10 +65,10 @@ class Replay(Central, ReplayInterface):
         try:
             self.start()
             self.__target = self.connect(config.target, config.random)
-            
+
             # Success !
             return True
-        except PeripheralNotFound as err:
+        except PeripheralNotFound:
             # We were not able to initialize our replay instance
             return False
 
@@ -89,7 +93,7 @@ class Replay(Central, ReplayInterface):
         # Or a L2CAP connection parameter update procedure ?
         elif packet.haslayer(L2CAP_Connection_Parameter_Update_Request):
             self.__active_procedures.append('llconnparams')
-        
+
 
     def should_send_pdu(self, packet: BTLE_DATA):
         """Determine if we should send a specific PDU
@@ -100,28 +104,33 @@ class Replay(Central, ReplayInterface):
             self.__active_procedures.remove('version')
             # But we shall not send this PDU
             return False
-        elif packet.haslayer(LL_PING_RSP) and 'ping' in self.__active_procedures:
+
+        if packet.haslayer(LL_PING_RSP) and 'ping' in self.__active_procedures:
             # Procedure is complete
             self.__active_procedures.remove('ping')
             return False
-        elif packet.haslayer(LL_CONNECTION_PARAM_RSP) and 'connparams' in self.__active_procedures:
+
+        if packet.haslayer(LL_CONNECTION_PARAM_RSP) and 'connparams' in self.__active_procedures:
             # Procedure is complete
             self.__active_procedures.remove('connparams')
             return False
-        elif packet.haslayer(LL_FEATURE_RSP):
+
+        if packet.haslayer(LL_FEATURE_RSP):
             # Procedure is complete
             self.__active_procedures.remove('features')
             return False
-        elif packet.haslayer(L2CAP_Connection_Parameter_Update_Response) and 'llconnparams' in self.__active_procedures:
+
+        if packet.haslayer(L2CAP_Connection_Parameter_Update_Response) and 'llconnparams' in self.__active_procedures:
             # Procedure is complete
             self.__active_procedures.remove('llconnparams')
             return False
-        else:
-            # Check if interface supports sending control PDUs (required to send control PDUs)
-            if packet.haslayer(BTLE_CTRL):
-                return self.can_inject()
-            else:
-                return True
+
+        # Check if interface supports sending control PDUs (required to send control PDUs)
+        if packet.haslayer(BTLE_CTRL):
+            return self.can_inject()
+
+        # By default, send other PDUs.
+        return True
 
     def send_packet(self, packet : Packet):
         """Send packet callback.
@@ -141,12 +150,12 @@ class Replay(Central, ReplayInterface):
 
                         # Packet sent, return True
                         return True
-                    else:
-                        # Packet not sent
-                        return False
-                else:
-                    self.analyze_incoming_pdu(pdu)
-        
+
+                    # Packet not sent
+                    return False
+
+                self.analyze_incoming_pdu(pdu)
+
         elif packet.haslayer(BTLE_RF):
             btle_rf = packet[BTLE_RF]
             if btle_rf.haslayer(BTLE_DATA):
@@ -157,11 +166,10 @@ class Replay(Central, ReplayInterface):
                     if self.should_send_pdu(pdu):
                         self.send_data_pdu(pdu, conn_handle=self.__target.conn_handle)
                         return True
-                    else:
-                        return False
-                else:
-                    self.analyze_incoming_pdu(pdu)
-                
+                    return False
+
+                self.analyze_incoming_pdu(pdu)
+
         # Packet cannot be sent, return False
         return False
         

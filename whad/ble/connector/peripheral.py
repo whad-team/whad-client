@@ -9,10 +9,10 @@ BLE devices to connect to it and query its services, characteristics, and descri
 The connector provides some callbacks such as :meth:`Peripheral.on_connected` to
 react on specific events.
 """
-
+import logging
 from time import sleep
 
-from whad.ble.connector import BLE
+from whad.ble.connector.base import BLE
 from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
 from whad.ble.stack.gatt import GattServer, GattClientServer
@@ -23,12 +23,8 @@ from whad.ble.profile.device import PeripheralDevice
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField
 from whad.hub.ble import Direction as BleDirection
 from whad.exceptions import UnsupportedCapability
-from time import sleep
-
-from binascii import hexlify
 
 # Logging
-import logging
 logger = logging.getLogger(__name__)
 
 class Peripheral(BLE):
@@ -39,7 +35,9 @@ class Peripheral(BLE):
     defined by a specific profile.
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, public=True, stack=BleStack, gatt=GattServer, pairing=Pairing(), security_database=None):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None,
+                 scan_data=None, bd_address=None, public=True, stack=BleStack, gatt=GattServer,
+                 pairing=Pairing(), security_database=None):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -52,21 +50,26 @@ class Peripheral(BLE):
         :type   scan_data:  :class:`whad.ble.profile.advdata.AdvDataFieldList`
         :param  bd_address: Bluetooth Device address to use
         :type   bd_address: str
-        :param  public:     Set to True to use a public Bluetooth Device address, False to use a random one
+        :param  public:     Set to True to use a public Bluetooth Device address,
+                            False to use a random one
         :type   public:     bool
-        :param  stack:      Bluetooth Low Energy stack to use, :class:`whad.ble.stack.BleStack` by default
+        :param  stack:      Bluetooth Low Energy stack to use,
+                            :class:`whad.ble.stack.BleStack` by default
         :param  gatt:       Bluetooth Low Energy GATT
         """
         super().__init__(device)
 
         # Attach a GATT server to our stack ATT layer
-        att_layer = stack.find('att')
+        att_layer = stack.find("att")
         if att_layer is not None:
             att_layer.add(gatt)
 
         # Initialize local peer and remote per info
         self.__local_peer = None
         self.__remote_peer = None
+        self.__gatt_server = None
+        self.__peripheral = None
+        self.__central = None
 
         # Initialize stack
         self.__stack = stack(self)
@@ -76,18 +79,20 @@ class Peripheral(BLE):
 
         # Initialize profile
         if profile is None:
-            logger.info('No profile provided to this Peripheral instance, use a default one.')
+            logger.info("No profile provided to this Peripheral instance, use a default one.")
             self.__profile = GenericProfile()
         else:
-            logger.info('Peripheral will use the provided profile.')
+            logger.info("Peripheral will use the provided profile.")
             self.__profile = profile
 
         # Initialize security database
         if security_database is None:
-            logger.info('No security database provided to this Peripheral instance, use a default one.')
+            logger.info((
+                "No security database provided to this Peripheral instance, "
+                "use a default one."))
             self.__security_database = CryptographicDatabase()
         else:
-            logger.info('Peripheral will use the provided security database.')
+            logger.info("Peripheral will use the provided security database.")
             self.__security_database = security_database
 
         # Initiate pairing parameters
@@ -95,37 +100,43 @@ class Peripheral(BLE):
 
         # Check if device accepts peripheral mode
         if not self.can_be_peripheral():
-            logger.info('Capability MasterRole not supported by this WHAD device')
+            logger.info("Capability MasterRole not supported by this WHAD device")
             raise UnsupportedCapability("Peripheral")
-        else:
-            # Set bd address if provided
-            if bd_address is not None:
-                logger.info('Set BD address to %s' % bd_address)
-                self.set_bd_address(bd_address, public=public)
 
-            # If an existing connection is hijacked, simulate a connection
-            if existing_connection is not None:
-                self.on_connected(existing_connection)
-            else:
-                # If no advertising data has been set, initialize this peripheral
-                # with default flags.
-                if adv_data is None:
-                    adv_data = AdvDataFieldList(AdvFlagsField())
-                
-                # Enable peripheral mode
-                logger.info('Enable peripheral mode with advertising data: %s' % adv_data)
-                self.enable_peripheral_mode(adv_data, scan_data)
+        # Set bd address if provided
+        if bd_address is not None:
+            logger.info("Set BD address to %s", bd_address)
+            self.set_bd_address(bd_address, public=public)
+
+        # If an existing connection is hijacked, simulate a connection
+        if existing_connection is not None:
+            self.on_connected(existing_connection)
+        else:
+            # If no advertising data has been set, initialize this peripheral
+            # with default flags.
+            if adv_data is None:
+                adv_data = AdvDataFieldList(AdvFlagsField())
+
+            # Enable peripheral mode
+            logger.info("Enable peripheral mode with advertising data: %s", adv_data)
+            self.enable_peripheral_mode(adv_data, scan_data)
 
     @property
     def local_peer(self):
+        """Local peer object
+        """
         return self.__local_peer
 
     @property
     def remote_peer(self):
+        """Remote peer object
+        """
         return self.__remote_peer
 
     @property
-    def conn_handle(self):
+    def conn_handle(self) -> int:
+        """Connection handle
+        """
         return self.__conn_handle
 
     def get_pairing_parameters(self):
@@ -133,10 +144,12 @@ class Peripheral(BLE):
         """
         return self.__pairing_parameters
 
-    def send_data_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None) -> bool:
+    def send_data_pdu(self, data, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER,
+                      access_address=0x8e89bed6, encrypt=None) -> bool:
         """Send a PDU to the central device this peripheral device is connected to.
 
-        Sending direction is set to ̀ BleDirection.SLAVE_TO_MASTER` as we need to send PDUs to a central device.
+        Sending direction is set to ̀ BleDirection.SLAVE_TO_MASTER` as we need
+        to send PDUs to a central device.
 
         :param  pdu:            PDU to send
         :type   pdu:            :class:`scapy.layers.bluetooth4LE.BTLE`
@@ -149,13 +162,16 @@ class Peripheral(BLE):
         :return:                PDU transmission result.
         :rtype: bool
         """
-        return super().send_data_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
+        return super().send_data_pdu(data, conn_handle=conn_handle, direction=direction,
+                                     access_address=access_address, encrypt=encrypt)
 
 
-    def send_ctrl_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER, access_address=0x8e89bed6, encrypt=None) -> bool:
+    def send_ctrl_pdu(self, pdu, conn_handle=1, direction=BleDirection.SLAVE_TO_MASTER,
+                      access_address=0x8e89bed6, encrypt=None) -> bool:
         """Send a PDU to the central device this peripheral device is connected to.
 
-        Sending direction is set to ̀ BleDirection.SLAVE_TO_MASTER` as we need to send PDUs to a central device.
+        Sending direction is set to ̀ BleDirection.SLAVE_TO_MASTER` as we need 
+        to send PDUs to a central device.
 
         :param  pdu:            PDU to send
         :type   pdu:            :class:`scapy.layers.bluetooth4LE.BTLE`
@@ -168,11 +184,13 @@ class Peripheral(BLE):
         :return:                PDU transmission result.
         :rtype: bool
         """
-        return super().send_ctrl_pdu(pdu, conn_handle=conn_handle, direction=direction, access_address=access_address, encrypt=encrypt)
+        return super().send_ctrl_pdu(pdu, conn_handle=conn_handle, direction=direction,
+                                     access_address=access_address, encrypt=encrypt)
 
 
     def use_stack(self, clazz=BleStack):
-        """Specify a stack class to use for BLE. By default, our own stack (BleStack) is used.
+        """Specify a stack class to use for BLE. By default, our own stack
+        (BleStack) is used.
 
         :param  clazz:  BLE stack to use.
         :type   clazz:  :class:`whad.ble.stack.BleStack`
@@ -181,11 +199,15 @@ class Peripheral(BLE):
 
     @property
     def smp(self):
+        """Security Manager Protocol
+        """
         if self.connection is not None:
             return self.connection.smp
         return None
 
     def pairing(self, pairing=None):
+        """Trigger a pairing request with the provided parameters, if any.
+        """
         if self.smp is None:
             return False
         if pairing is not None:
@@ -204,12 +226,16 @@ class Peripheral(BLE):
 
     @property
     def gatt(self):
+        """Generic Attribute layer
+        """
         if self.connection is not None:
             return self.connection.gatt
         return None
 
     @property
     def security_database(self):
+        """Security Database
+        """
         return self.__security_database
 
     def is_connected(self) -> bool:
@@ -237,7 +263,8 @@ class Peripheral(BLE):
         :type   connection_data:    :class:`whad.protocol.ble_pb2.Connected`
         """
         # Retrieve the GATT server instance and set its profile
-        logger.info('a device is now connected (connection handle: %d)' % connection_data.conn_handle)
+        logger.info("a device is now connected (connection handle: %d)",
+                    connection_data.conn_handle)
         self.__local_peer = BDAddress.from_bytes(
             connection_data.advertiser,
             connection_data.adv_addr_type
@@ -263,7 +290,8 @@ class Peripheral(BLE):
         :type   connection_data:    :class:`whad.protocol.ble_pb2.Disconnected`
         """
 
-        logger.info('a device has just connected (connection handle: %d)' % disconnection_data.conn_handle)
+        logger.info("a device has just connected (connection handle: %d)",
+                    disconnection_data.conn_handle)
         self.__stack.on_disconnection(
             disconnection_data.conn_handle,
             disconnection_data.reason
@@ -288,7 +316,7 @@ class Peripheral(BLE):
         :type   pdu:    :class:`scapy.layers.bluetooth4LE.BTLE`
         """
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
-            logger.info('Control PDU comes from master, forward to peripheral')
+            logger.info("Control PDU comes from master, forward to peripheral")
             self.__stack.on_ctl_pdu(pdu.metadata.connection_handle, pdu)
 
     def on_data_pdu(self, pdu):
@@ -299,7 +327,7 @@ class Peripheral(BLE):
         :type   pdu:    :class:`scapy.layers.bluetooth4LE.BTLE_DATA`
         """
         if pdu.metadata.direction == BleDirection.MASTER_TO_SLAVE:
-            logger.info('Data PDU comes from master, forward to peripheral')
+            logger.info("Data PDU comes from master, forward to peripheral")
             self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
 
     def on_new_connection(self, connection):
@@ -328,13 +356,13 @@ class Peripheral(BLE):
 
         if crypto_material is not None and crypto_material.has_ltk():
             conn_handle = connection.conn_handle
-            self.__stack.get_layer('ll').state.register_encryption_key(
+            self.__stack.get_layer("ll").state.register_encryption_key(
                 conn_handle,
                 crypto_material.ltk.value
             )
             if crypto_material.is_authenticated():
                 #print("Marked as authenticated")
-                self.__stack.get_layer('ll').state.mark_as_authenticated(connection.conn_handle)
+                self.__stack.get_layer("ll").state.mark_as_authenticated(connection.conn_handle)
             else:
                 pass#print("Marked as unauthenticated")
 
@@ -344,26 +372,14 @@ class Peripheral(BLE):
 
         # Notify our profile about this connection
         self.__profile.on_connect(self.connection.conn_handle)
-    '''
-    def start_encryption(self):
-        # Check if we got a matching LTK
-        crypto_material = self.security_database.get(address=self.__target)
 
-        if crypto_material is not None and crypto_material.has_ltk():
-            conn_handle = self.connection.smp.get_layer('l2cap').state.conn_handle
-            if crypto_material is not None and crypto_material.has_ltk():
-                self.connection.smp.get_layer('ll').start_encryption(
-                    conn_handle,
-                    unpack('>Q', crypto_material.ltk.rand)[0],
-                    crypto_material.ltk.ediv
-                )
-    '''
 class PeripheralClient(Peripheral):
     '''This BLE connector provides a way to create a peripheral device with
     both GATT server and client roles.
     '''
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None, scan_data=None, bd_address=None, public=True, stack=BleStack):
+    def __init__(self, device, existing_connection = None, profile=None, adv_data=None,
+                 scan_data=None, bd_address=None, public=True, stack=BleStack):
         super().__init__(
             device,
             existing_connection=existing_connection,
@@ -398,4 +414,6 @@ class PeripheralClient(Peripheral):
 
     @property
     def central_device(self):
+        """Central device
+        """
         return self.__peripheral
