@@ -434,7 +434,7 @@ class BleCentralShell(InteractiveShell):
             self.error(f"No permission to access the required interface &lt;{interface}&gt; !")
 
 
-    def on_disconnect(self, _):
+    def on_disconnect(self, _=None):
         """Disconnection callback
 
         This callback is called when a BLE peripheral disconnects our central.
