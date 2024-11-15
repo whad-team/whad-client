@@ -1,7 +1,8 @@
 from scapy.packet import Packet, bind_layers, split_layers
 from scapy.fields import Field, ByteEnumField, StrLenField, StrFixedLenField, IntField, XShortField, LEShortField, \
     FieldLenField, StrLenField, ConditionalField, PacketField, XByteField, XIntField,  SignedShortField, SignedByteField, \
-    XShortEnumField, BitEnumField, BitField, ByteField, ShortField, XShortField, PacketListField, FieldListField, IEEEFloatField
+    XShortEnumField, BitEnumField, BitField, ByteField, ShortField, XShortField, PacketListField, FieldListField, IEEEFloatField, \
+    ThreeBytesField
 #from whad.scapy.layers.wirelesshart_db import EXPANDED_DEVICE_TYPES, MANUFACTURERS_ID_CODES
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS, Dot15d4Data, MultipleTypeField
 from scapy.config import conf
@@ -12,11 +13,8 @@ from calendar import month_abbr
 import os.path
 import json
 
-import cProfile
-cProfile.run("import whad")
-
 def get_db(dbname):
-    name = os.path.realpath("{}/ressources/databases/{}.json".format(os.path.dirname(__file__) + "/../../", dbname))
+    name = os.path.realpath("{}/ressources/databases/{}.json".format(os.path.dirname(__file__) + "../../../", dbname))
     with open(name, "r") as f:
         return json.loads(f.read())
 
@@ -614,12 +612,194 @@ class WirelessHart_Read_Packet_TTL_Response(WirelessHart_Command_Payload):
         ByteField("ttl", None)
     ]
 
+
+class WirelessHart_Write_Timetable_Request(WirelessHart_Command_Payload):
+    name = "Request Timetable Request"
+    fields_desc = [
+        ByteField("timetable_id", None),
+        BitField("reserved", 0, 5), 
+        BitField("intermittent", 0, 1), 
+        BitField("sink", 0, 1), 
+        BitField("source", 0, 1), 
+
+        ByteEnumField("timetable_application_domain", None, {0:"publish", 1:"event", 2:"maintenance", 3:"block_transfer"}), 
+
+        XShortField("peer_nickname", None), 
+        IntField("period", None),
+
+        ByteField("route_id", None)
+    ]
+
+
+class WirelessHart_Write_Timetable_Response(WirelessHart_Command_Payload):
+    name = "Request Timetable Response"
+    fields_desc = [
+        ByteField("timetable_id", None),
+        BitField("reserved", 0, 5), 
+        BitField("intermittent", 0, 1), 
+        BitField("sink", 0, 1), 
+        BitField("source", 0, 1), 
+
+        ByteEnumField("timetable_application_domain", None, {0:"publish", 1:"event", 2:"maintenance", 3:"block_transfer"}), 
+
+        XShortField("peer_nickname", None), 
+        IntField("period", None),
+
+        ByteField("route_id", None), 
+        
+        ByteField("number_of_timetables_remaining", None), 
+
+    ]
+
+
+
+class WirelessHart_Request_Timetable_Request(WirelessHart_Command_Payload):
+    name = "Request Timetable Request"
+    fields_desc = [
+        ByteField("timetable_id", None),
+
+        BitField("reserved", 0, 5), 
+        BitField("intermittent", 0, 1), 
+        BitField("sink", 0, 1), 
+        BitField("source", 0, 1), 
+        ByteEnumField("timetable_application_domain", None, {0:"publish", 1:"event", 2:"maintenance", 3:"block_transfer"}), 
+        XShortField("peer_nickname", None), 
+        IntField("period", None)
+    ]
+
+class WirelessHart_Request_Timetable_Response(WirelessHart_Command_Payload):
+    name = "Request Timetable Response"
+    fields_desc = [
+        ByteField("status", None), 
+
+        ByteField("timetable_id", None),
+
+        BitField("reserved", 0, 5), 
+        BitField("intermittent", 0, 1), 
+        BitField("sink", 0, 1), 
+        BitField("source", 0, 1), 
+        ByteEnumField("timetable_application_domain", None, {0:"publish", 1:"event", 2:"maintenance", 3:"block_transfer"}), 
+        XShortField("peer_nickname", None), 
+        IntField("period", None),
+        ByteField("route_id", None)
+    ]
+
+class WirelessHart_Read_Unique_Identifier_Request(WirelessHart_Command_Payload):
+    name = "Read Unique Identifier Request"
+    fields_desc = []
+
+
+class WirelessHart_Read_Unique_Identifier_Response(WirelessHart_Command_Payload):
+    name = "Read Unique Identifier Response"
+    fields_desc = [
+        ByteField("status", None), 
+        ByteField("static", 254), 
+        XShortEnumField("expanded_device_type", None, EXPANDED_DEVICE_TYPES), 
+        ByteField("min_preambles", None), 
+        ByteField("protocol_major_revision", None), 
+        ByteField("device_revision_level", None), 
+        ByteField("software_revision_level", None), 
+        BitField("hardware_revision_level", 0, 5), 
+
+        BitEnumField("physical_signaling_code", 0, 3, {
+            0 : "bell_202_current", 
+            1 : "bell_202_voltage", 
+            2 : "rs_485", 
+            3 : "rs_232", 
+            4 : "wireless", 
+            6 : "special" 
+        }), 
+
+        BitField("c8psk_in_multidrop_only", 0, 1),
+        BitField("c8psk_capable_field_device", 0, 1),
+        BitField("reserved1", 0, 1),
+        BitField("safehart_capable_field_device", 0, 1),
+        BitField("dot15d4_oqpsk", 0, 1),
+        BitField("protocol_bridge_device", 0, 1),
+        BitField("eeprom_control", 0, 1),
+        BitField("multisensor_field_device", 0, 1),
+        ThreeBytesField("device_id", None), 
+        ByteField("preambles_number", None), 
+        ByteField("last_device_variable_code", None), 
+        ShortField("configuration_change_counter", None), 
+
+
+        # Extended Device status byte
+        BitField('reserved2', 0, 2), 
+        BitEnumField('function_check', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('out_of_specification', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('failure', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('critical_power_failure', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('device_variable_alert', 0, 1, {0 : "no", 1: "yes"}), 
+        BitEnumField('maintenance_required', 0, 1, {0 : "no", 1: "yes"}), 
+
+    ]
+    
+
+class WirelessHart_Report_Device_Health_Request(WirelessHart_Command_Payload):
+    name = "Report Device Health Request"
+    fields_desc = []
+
+class WirelessHart_Report_Device_Health_Response(WirelessHart_Command_Payload):
+    name = "Report Device Health Response"
+    fields_desc = [
+        ByteField("status", None), 
+        ShortField("generated_packets", None), 
+        ShortField("terminated_packets", None),
+        ShortField("datalink_mic_failures", None),
+        ShortField("network_mic_failures", None), 
+        ByteEnumField("power_status", None, {
+            0 : "nominal", 
+            1 : "low", 
+            2 : "critically_low", 
+            3 : "recharging_low", 
+            4 : "recharging_high"
+        }),
+        ByteField("crc_failures", None), 
+        ByteField("unicast_nonce_counter_values_not_received", None), 
+        ByteField("max_packet_buffer_queue_length", None), 
+        IEEEFloatField("average_packet_buffer_queue_length", None), 
+
+        IntField("average_latency_packets_from_gateway", None), 
+        IntField("variance_latency_packets_from_gateway", None),
+        IntField("timely_packets_received", None), 
+        IntField("late_packets_received", None), 
+        ByteField("unknown_sessions_received", None)
+
+
+    ]
+
+
+class WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request(WirelessHart_Command_Payload):
+    name = "Vendor Specific (Dust Networks) Ping Request"
+    fields_desc = [
+        XShortField("expanded_device_type", None), 
+        ShortField("hops", None), 
+    ]
+
+
+class WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response(WirelessHart_Command_Payload):
+    name = "Vendor Specific (Dust Networks) Ping Response"
+    fields_desc = [
+        ByteField("status", None), 
+        XShortField("expanded_device_type", None), 
+        ShortField("hops", None),
+        ShortField("temperature", None), # / 10 -> val en deg celcius
+        ShortField("voltage", None), # / 100 -> val en V
+
+    ]
+
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_Acknowledgement, pdu_type=0)
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_Advertisement, pdu_type=1)
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_KeepAlive, pdu_type=2)
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_Network_Hdr, pdu_type=7)
 
 bind_layers(WirelessHart_Network_Hdr, WirelessHart_Network_Security_SubLayer_Hdr)
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Report_Device_Health_Request, command_number=0x30b)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Report_Device_Health_Response, command_number=0x30b)
+#bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Read_Unique_Identifier_Request, command_number=0x0)
+#bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Read_Unique_Identifier_Response, command_number=0x0)
 
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Report_Neighbor_Signal_Level_Command_Request, command_number=0x313)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Report_Neighbor_Signal_Level_Command_Response, command_number=0x313)
@@ -651,7 +831,6 @@ bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Read_Wireless_Module
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Write_CCA_Mode_Request, command_number=0x325)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Write_CCA_Mode_Response, command_number=0x325)
 
-
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Write_Modify_Route_Request, command_number=0x3ce)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Write_Modify_Route_Response, command_number=0x3ce)
 
@@ -663,6 +842,16 @@ bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Write_RTC_Time_Mappi
 
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Read_Packet_TTL_Request, command_number=0x328)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Read_Packet_TTL_Response, command_number=0x328)
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Request_Timetable_Request, command_number=0x31f)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Request_Timetable_Response, command_number=0x31f)
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Write_Timetable_Request, command_number=0x3cd)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Write_Timetable_Response, command_number=0x3cd)
+
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request, command_number=0xfc04)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Ping_Response, command_number=0xfc05)
 
 old_guess_payload_class = Dot15d4Data.guess_payload_class
 
@@ -714,38 +903,45 @@ def decrypt_nwk(pkt, key):
                 start_byte = b"\x00"
             nonce = start_byte + pack('>I', pkt.counter) + pack('>Q', addr)
         else:
+
             addr = pkt.nwk_src_addr
             start_byte = b"\x00"
+            #addr = pkt.nwk_src_addr
+            #start_byte = b"\x00"
             nonce = start_byte + pack('>I', pkt.counter) + pack('>Q', addr)
 
-
+        '''
         print("[i] Decryption (NWK)")
         print("    * key  : ", key.hex())
         print("    * data : ", encrypted_payload.hex())
         print("    * auth : ", auth.hex())
         print("    * nonce: ", nonce.hex())
-
+        '''
         cipher = AES.new(key, AES.MODE_CCM, nonce=nonce, mac_len=4)
         cipher.update(auth)
         decrypted = cipher.decrypt_and_verify(encrypted_payload, received_mac_tag=mic)
 
-        print("[i] Decryption success !")
+        print("[i] Decryption success ! ({})".format(key.hex()))
         print("    * decr:  ", decrypted.hex())
         print()
         return decrypted
     
     except ValueError:
-        print("[e] Decryption failure - incorrect MIC (recv:", mic.hex(), ")")
-        print()
+        #print("[e] Decryption failure - incorrect MIC (recv:", mic.hex(), ")")
+        #print(  repr(pkt))
         return None
         
 key_found = False
-unicast_session_key     = bytes.fromhex("e06a7fa7f38a405bd2ff238d23dcdc1c")
-broadcast_session_key   = bytes.fromhex("5ac873bfa618d4ce181d6f5faeabfb3b")
+#unicast_session_key     = bytes.fromhex("e06a7fa7f38a405bd2ff238d23dcdc1c")
+#broadcast_session_key   = bytes.fromhex("5ac873bfa618d4ce181d6f5faeabfb3b")
+
+unicast_session_key = []
+broadcast_session_key = []
+
 assigned_nickname = 0x0002
 if __name__ == "__main__":
     count = 0
-    pkts = rdpcap("whad/ressources/pcaps/wireless_hart_capture_channel_13_41424344414243444142434441424344.pcap")
+    pkts = rdpcap("whad/ressources/pcaps/wireless_hart_capture_channel_11_41424344414243444142434441424344_2nodes.pcap")
     for pkt in pkts:
         dot15d4_bytes = bytes(pkt)[44:]
         dot15d4_pkt = Dot15d4FCS(dot15d4_bytes)
@@ -757,19 +953,56 @@ if __name__ == "__main__":
                 if decrypted is not None:
                     for c in WirelessHart_Transport_Layer_Hdr(decrypted).commands:
                         if hasattr(c, "key_value"):
-                            print("[i] found key:",c.key_value.hex())
-                            key_found = True
+                            if c.key_value not in unicast_session_key:
+                                print(repr(c))
+                                print("KEY", c.key_value.hex())
+                                unicast_session_key.append(c.key_value)
+                        '''
+                        if WirelessHart_Write_Modify_Session_Command_Request in c and hasattr(c, "key_value"):
+                            unicast_session_key.append(c.key_value)
+                            unicast_session_key = list(set(unicast_session_key))
+                            print("[i] found unicast key:",c.key_value.hex())
+                        elif WirelessHart_Write_Network_Key_Request in c and hasattr(c, "key_value"):
+                            broadcast_session_key.append(c.key_value)
+                            broadcast_session_key = list(set(broadcast_session_key))
+                            print("[i] found broadcast key:",c.key_value.hex())
+                        elif WirelessHart_Write_Modify_Session_Command_Response in c and hasattr(c, "key_value"):
+                            unicast_session_key.append(c.key_value)
+                            unicast_session_key = list(set(unicast_session_key))
+                            print("[i] found unicast key:",c.key_value.hex())
+                        elif WirelessHart_Write_Network_Key_Response in c and hasattr(c, "key_value"):
+                            broadcast_session_key.append(c.key_value)
+                            broadcast_session_key = list(set(broadcast_session_key))
+                            print("[i] found broadcast key:",c.key_value.hex())
+                        '''
+                            #key_found = True
                             # e06a7fa7f38a405bd2ff238d23dcdc1c
                             # 5ac873bfa618d4ce181d6f5faeabfb3b
 
-                    # WirelessHart_Transport_Layer_Hdr(decrypted).show()
+                    #WirelessHart_Transport_Layer_Hdr(decrypted).show()
 
             elif WirelessHart_Network_Security_SubLayer_Hdr in dot15d4_pkt and dot15d4_pkt.security_types == 0:
-                
-                if key_found:
-                    decrypted = decrypt_nwk(dot15d4_pkt, key=unicast_session_key)
-                    if decrypted is not None:
-                        WirelessHart_Transport_Layer_Hdr(decrypted).show()
+                print(hex(dot15d4_pkt.nwk_src_addr), "->", hex(dot15d4_pkt.nwk_dest_addr))
+                if len(unicast_session_key) > 0:
+                    dec = None
+                    for k in unicast_session_key:
+                        #print("[i] Trying key ", k.hex())
+                        decrypted = decrypt_nwk(dot15d4_pkt, key=k)
+                        if decrypted is not None:
+                            for c in WirelessHart_Transport_Layer_Hdr(decrypted).commands:
+                                if hasattr(c, "key_value"):
+                                    if c.key_value not in unicast_session_key:
+                                        print(repr(c))
+                                        print("KEY", c.key_value.hex())
+                                        unicast_session_key.append(c.key_value)
+
+                            dec = WirelessHart_Transport_Layer_Hdr(decrypted)
+                            break
+                    if dec is None:
+                        print("FAIL: ", repr(dot15d4_pkt))
+                    else:
+                        print("WIN: ", repr(dot15d4_pkt))
+                        dec.show()
                     #dot15d4_pkt.show()
                     
                     # Not working for now...
@@ -791,7 +1024,7 @@ if __name__ == "__main__":
             #print("received mic:", hex(dot15d4_pkt.mic))
             #print("computed mic:", compute_dlmic(dot15d4_pkt, b'www.hartcomm.org').hex())
             #break
-
+print(unicast_session_key)
 '''
 conf.dot15d4_protocol = "wirelesshart"
 
