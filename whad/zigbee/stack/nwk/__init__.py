@@ -278,7 +278,7 @@ class NWKManagementService(NWKService):
 
 
     @Dot15d4Service.request("NLME-JOIN")
-    def join(self, extended_pan_id, association_type=NWKJoinMode.NEW_JOIN, scan_channels=0x7fff800, scan_duration=4, join_as_router=False, rx_on_when_idle=True, mains_powered_device=False, security_enable=False):
+    def join(self, extended_pan_id, association_type=NWKJoinMode.NEW_JOIN, scan_channels=0x7fff800, scan_duration=4, join_as_router=False, rx_on_when_idle=True, mains_powered_device=False, security_enable=False, force=False):
         """
         Implements the NLME-JOIN request.
 
@@ -290,7 +290,8 @@ class NWKManagementService(NWKService):
             table = self.database.get("nwkNeighborTable")
 
             while True:
-                candidate_parents = table.select_suitable_parent(extended_pan_id, self.database.get("nwkUpdateId"))
+                candidate_parents = table.select_suitable_parent(extended_pan_id, self.database.get("nwkUpdateId"),
+                                                                no_permit_check=force)
                 if len(candidate_parents) == 0:
                     return False
 
@@ -335,6 +336,7 @@ class NWKManagementService(NWKService):
                     security_capability=False,
                     fast_association=False
                 ):
+                    logger.debug("[nwk_management_service] association is successful")
                     # Update database according to successful association
                     macShortAddress = self.manager.get_layer('mac').database.get("macShortAddress")
                     self.database.set("nwkNetworkAddress", macShortAddress)
@@ -347,6 +349,7 @@ class NWKManagementService(NWKService):
                         nwkAddressMap[selected_parent.extended_address] = selected_parent.address
                     return True
                 else:
+                    logger.debug("[nwk_management_service] association is unsuccessful")
                     selected_parent.potential_parent = 0
 
         # In the case of a rejoin
