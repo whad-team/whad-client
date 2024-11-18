@@ -88,13 +88,16 @@ class Network:
         devices = self.stack.get_layer('apl').get_application_by_name("zdo").device_and_service_discovery.discover_nodes()
         return self.nodes
 
-    def join(self):
+    def join(self, force: bool = False):
         """
         Join the network (if permitted).
 
         This method is blocking and wait until we are both associated AND authorized on the network.
+
+        :param force: If set to `True`, join network even if association is not allowed.
+        :type force: bool
         """
-        if self.is_joining_permitted():
+        if self.is_joining_permitted() or force:
             join_success = self.stack.get_layer('apl').get_application_by_name("zdo").network_manager.join(self)
             if join_success:
                 while not self.is_authorized():
