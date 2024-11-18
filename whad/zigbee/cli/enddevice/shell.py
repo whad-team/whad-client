@@ -262,7 +262,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                     )
                 )
             else:
-                print("Failed to join target network (PAN ID = %s / Ext. PAN ID = %s)." % (
+                self.error("Failed to join target network (PAN ID = %s / Ext. PAN ID = %s)." % (
                         hex(target['info'].pan_id),
                         str(Dot15d4Address(target['info'].extended_pan_id))
                     )
