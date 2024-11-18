@@ -390,6 +390,8 @@ class MACManagementService(MACService):
         """
         Implement the MLME-ASSOCIATE request operation.
         """
+
+        logger.debug("[mac] starting association with %s", coordinator_pan_id)
         self.database.set("macPanId", coordinator_pan_id)
         if is_short_address(coordinator_address):
             self.database.set("macCoordShortAddress", coordinator_address)
@@ -405,6 +407,7 @@ class MACManagementService(MACService):
         )
 
         try:
+            logger.debug("[mac] sending association request ...")
             acked = self.manager.send_data(
                     Dot15d4Cmd(
                         cmd_id = "AssocReq",
@@ -427,6 +430,7 @@ class MACManagementService(MACService):
             )
 
             if acked:
+                logger.debug("[mac] association request sent, send data request ...")
                 sleep(duration/1000000)
                 ack = self.manager.send_data(
                     Dot15d4Cmd(
@@ -441,6 +445,7 @@ class MACManagementService(MACService):
                 )
 
                 if acked:
+                    logger.debug("[mac] data request sent, waiting for association response ...")
                     try:
                         association_response = self.wait_for_packet(
                             lambda pkt: Dot15d4CmdAssocResp in pkt, timeout=5.0
@@ -455,12 +460,16 @@ class MACManagementService(MACService):
 
                             return True
                         else:
+                            logger.debug("[mac] associaton unsucessful")
                             raise MACAssociationFailure("association response unsuccessful (status={})".format(hex(association_response.association_status)))
                     except MACTimeoutException:
+                        logger.debug("[mac] association timeout")
                         raise MACAssociationFailure("association response timeout. ")
                 else:
+                    logger.debug("[mac] no ack for data request")
                     raise MACAssociationFailure("no acknowledgement received for DataRequest. ")
             else:
+                logger.debug("[mac] no ack for association request")
                 raise MACAssociationFailure("no acknowledgement received for AssociationRequest. ")
 
         except MACAssociationFailure as err:
