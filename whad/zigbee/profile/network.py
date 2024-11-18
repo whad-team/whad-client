@@ -3,6 +3,9 @@ from whad.zigbee.profile.nodes import CoordinatorNode, EndDeviceNode, RouterNode
 from whad.dot15d4.address import Dot15d4Address
 from random import randint
 from time import sleep
+import logging
+
+logger = logging.getLogger(__name__)
 
 class JoiningForbidden(Exception):
     """
@@ -98,11 +101,15 @@ class Network:
         :type force: bool
         """
         if self.is_joining_permitted() or force:
-            join_success = self.stack.get_layer('apl').get_application_by_name("zdo").network_manager.join(self)
+            logger.debug("Start joining network (force=%s)", force)
+            join_success = self.stack.get_layer('apl').get_application_by_name("zdo").network_manager.join(self, force=force)
             if join_success:
                 while not self.is_authorized():
                     sleep(0.1)
+                logger.debug("Successfully joined network")
                 return True
+            
+            logger.debug("Failed joining network")
             return False
         else:
             raise JoiningForbidden
