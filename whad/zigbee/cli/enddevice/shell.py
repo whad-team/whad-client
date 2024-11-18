@@ -190,14 +190,22 @@ class ZigbeeEndDeviceShell(InteractiveShell):
     def do_join(self, args):
         """join a network
 
-        <ansicyan><b>join</b> <i>[ Extended PAN ID or PAN ID ]</i> ([force])</ansicyan>
+        <ansicyan><b>join</b> <i>[ Extended PAN ID or PAN ID ] (force)</i></ansicyan>
 
         Initiate a ZigBee join to a specific network by its extended PAN ID or
         PAN ID. If multiple networks have the same PAN ID, the first one will be
         picked for join.
 
+        Example:
+
+            <i>    zigbee-enddevice> join 0x1234</i>
+
         Joining a network that des not permit association is possible by using the
         optional <i>force</i> parameter.
+
+        Example:
+
+            <i>    zigbee-enddevice> join 0x1234 force</i>
         """
 
         if len(args) < 1:
