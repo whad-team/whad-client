@@ -89,6 +89,7 @@ Specific LoRa options
 * ``--bandwidth`` (``-bw``): set LoRa bandwidth in Hz
 * ``--enable-crc`` (``-crc``): enable LoRa CRC
 * ``--enable-explicit_mode`` (``-em``): enable explicit mode
+* ``--preamble-length`` (``-pl``): set preamble length in number of symbols
 
 Example of raw demodulation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
