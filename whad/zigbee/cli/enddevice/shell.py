@@ -253,13 +253,21 @@ class ZigbeeEndDeviceShell(InteractiveShell):
             )
 
             # Perform join
-            target['info'].join(force=force)
+            result = target['info'].join(force=force)
 
-            print("Successfully joined to target network (PAN ID = %s / Ext. PAN ID = %s)." % (
-                    hex(target['info'].pan_id),
-                    str(Dot15d4Address(target['info'].extended_pan_id))
+            if result:
+                print("Successfully joined to target network (PAN ID = %s / Ext. PAN ID = %s)." % (
+                        hex(target['info'].pan_id),
+                        str(Dot15d4Address(target['info'].extended_pan_id))
+                    )
                 )
-            )
+            else:
+                print("Failed to join target network (PAN ID = %s / Ext. PAN ID = %s)." % (
+                        hex(target['info'].pan_id),
+                        str(Dot15d4Address(target['info'].extended_pan_id))
+                    )
+                )
+
             if target['info'].network_key is not None:
                 print_formatted_text(HTML('<ansicyan><b>Network key:</b></ansicyan> %s' % target['info'].network_key.hex()))
 
