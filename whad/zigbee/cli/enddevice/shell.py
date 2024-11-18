@@ -190,11 +190,14 @@ class ZigbeeEndDeviceShell(InteractiveShell):
     def do_join(self, args):
         """join a network
 
-        <ansicyan><b>join</b> <i>[ Extended PAN ID or PAN ID ]</i> </ansicyan>
+        <ansicyan><b>join</b> <i>[ Extended PAN ID or PAN ID ]</i> ([force])</ansicyan>
 
         Initiate a ZigBee join to a specific network by its extended PAN ID or
         PAN ID. If multiple networks have the same PAN ID, the first one will be
         picked for join.
+
+        Joining a network that des not permit association is possible by using the
+        optional <i>force</i> parameter.
         """
 
         if len(args) < 1:
@@ -203,12 +206,13 @@ class ZigbeeEndDeviceShell(InteractiveShell):
 
         #try:
         target = None
+        force = len(args) >= 2 and args[1].lower() == "force"
 
         try:
             target = self.__cache[args[0]]
             target_pan_id = Dot15d4Address(target['info'].extended_pan_id)
 
-        except IndexError as notfound:
+        except IndexError:
             # If target not in cache, we are expecting an extended PAN ID or a PAN ID
             try:
                 target_pan_id = Dot15d4Address(args[0])
@@ -247,7 +251,10 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                 target['info'].channel
                 )
             )
-            target['info'].join()
+
+            # Perform join
+            target['info'].join(force=force)
+
             print("Successfully joined to target network (PAN ID = %s / Ext. PAN ID = %s)." % (
                     hex(target['info'].pan_id),
                     str(Dot15d4Address(target['info'].extended_pan_id))
