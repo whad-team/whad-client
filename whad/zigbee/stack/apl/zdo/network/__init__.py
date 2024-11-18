@@ -131,7 +131,7 @@ class ZDONetworkManager(ZDOObject):
                         )
         return networks.values()
 
-    def join(self, network):
+    def join(self, network, force: bool = False):
         """
         Join a specific network.
         """
@@ -152,12 +152,14 @@ class ZDONetworkManager(ZDOObject):
         join_success = nwk_management.join(
             apsUseExtendedPANID,
             association_type=NWKJoinMode.NEW_JOIN,
-            scan_channels=apsChannelMask
+            scan_channels=apsChannelMask,
+            force=force
         )
         if not join_success:
             logger.info("[zdo_network_manager] failure during network join, exiting.")
             return False
 
+        logger.debug("[zdo_network_manager] successfully joined network.")
         self.network = network
         return True
 
