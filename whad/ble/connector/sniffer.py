@@ -246,7 +246,7 @@ class Sniffer(BLE, EventsManager):
         self._enable_sniffing()
 
 
-    def available_actions(self, filter=None) -> List[BLE]:
+    def available_actions(self, action_filter=None) -> List[BLE]:
         """Determine the actions available once synchronized with a connection.
         """
         actions = []
@@ -257,7 +257,8 @@ class Sniffer(BLE, EventsManager):
             if self.can_hijack_both() or self.can_hijack_slave() or self.can_hijack_master():
                 actions.append(Hijacker(self.device, connection=self.__connection))
 
-            return [action for action in actions if filter is None or isinstance(action, filter)]
+            return [action for action in actions
+                    if action_filter is None or isinstance(action, action_filter)]
 
         # No action available
         return []
@@ -364,4 +365,4 @@ class Sniffer(BLE, EventsManager):
 
         # Handle device disconnection
         except WhadDeviceDisconnected:
-            return
+            pass
