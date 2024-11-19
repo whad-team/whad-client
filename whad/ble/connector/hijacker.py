@@ -97,7 +97,7 @@ class Hijacker(BLE):
         # Connection failed
         raise self.__exception
 
-    def on_desynchronized(self, access_address):
+    def on_desynchronized(self, access_address=None):
         """Desynchronization callback
         """
         if access_address == self.__connection.access_address:
