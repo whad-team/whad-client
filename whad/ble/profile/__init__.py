@@ -306,7 +306,7 @@ class Characteristic:
     def end_handle(self) -> int:
         """Characteristic end handle (including characteristic value and descriptors).
         """
-        return self.handle + self.get_required_handles()
+        return self.handle + self.get_required_handles() - 1
 
     @property
     def name(self) -> str:
@@ -378,8 +378,7 @@ class ServiceModel:
     PRIMARY = 1
     SECONDARY = 2
 
-    def __init__(self, uuid=None, start_handle=None, end_handle=None, name=None,
-                 service_type=PRIMARY, **kwargs):
+    def __init__(self, uuid=None, start_handle=None, end_handle=None, name=None, **kwargs):
         self.__handle = 0
         self.__end_handle = 0
         self.__uuid = uuid
@@ -426,7 +425,7 @@ class ServiceModel:
         self.__characteristics.append(characteristic_model)
 
         # Update end handle value (include definition is a single attribute)
-        self.__end_handle = max(self.__end_handle, characteristic_model.handle)
+        self.__end_handle = max(self.__end_handle, characteristic_model.end_handle)
 
     def add_included_service(self, service_model):
         """Add an included service to the model
@@ -487,44 +486,10 @@ class PrimaryService(ServiceModel):
     """Primary service model.
     """
 
-    def __init__(self, uuid=None, start_handle=0, end_handle=0, name=None, **kwargs):
-        """Declares a GATT primary service.
-
-        Other named arguments are used to add service's characteristics.
-
-        :param  uuid:           Primary service UUID
-        :type   uuid:           :class:`whad.ble.profile.attribute.UUID`
-        :param  start_handle:   Service start handle
-        :type   start_handle:   int, optional
-        :param  end_handle:     Service end handle
-        :type   end_handle:     int, optional
-        :param  name:           Service name
-        :type   name:           str
-        """
-        super().__init__(uuid, start_handle, end_handle, service_type=ServiceModel.PRIMARY,
-                         name=name, **kwargs)
-
 
 class SecondaryService(ServiceModel):
     """Secondary service model.
     """
-
-    def __init__(self, uuid=None, start_handle=0, end_handle=0, name=None, **kwargs):
-        """Declares a GATT secondary service.
-
-        Other named arguments are used to add service's characteristics.
-
-        :param  uuid:           Primary service UUID
-        :type   uuid:           :class:`whad.ble.profile.attribute.UUID`
-        :param  start_handle:   Service start handle
-        :type   start_handle:   int, optional
-        :param  end_handle:     Service end handle
-        :type   end_handle:     int, optional
-        :param  name:           Service name
-        :type   name:           str
-        """
-        super().__init__(uuid, start_handle, end_handle, service_type=ServiceModel.SECONDARY,
-                         name=name, **kwargs)
 
 
 class GenericProfile:
