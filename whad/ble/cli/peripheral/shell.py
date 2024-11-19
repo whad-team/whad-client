@@ -220,12 +220,12 @@ class BlePeriphShell(InteractiveShell):
     def has_service(self, uuid: str):
         """Check if a service is already registered
         """
-        return self.__profile.get_service_by_UUID(UUID(uuid)) is not None
+        return self.__profile.get_service_by_uuid(UUID(uuid)) is not None
 
     def get_service(self, uuid: str):
         """Return service characteristics
         """
-        service_obj = self.__profile.get_service_by_UUID(UUID(uuid))
+        service_obj = self.__profile.get_service_by_uuid(UUID(uuid))
         if service_obj is not None:
             return service_obj
 
@@ -238,7 +238,7 @@ class BlePeriphShell(InteractiveShell):
         @param  str     uuid    Service UUID
         @retval bool    True if service has been successfully registered, False otherwise
         """
-        service_obj = self.__profile.get_service_by_UUID(UUID(uuid))
+        service_obj = self.__profile.get_service_by_uuid(UUID(uuid))
         if service_obj is None:
             self.__profile.add_service(PrimaryService(uuid=UUID(uuid)))
             return True
@@ -248,7 +248,7 @@ class BlePeriphShell(InteractiveShell):
     def unregister_service(self, uuid: str):
         """Unregister a service
         """
-        service_obj = self.__profile.get_service_by_UUID(UUID(uuid))
+        service_obj = self.__profile.get_service_by_uuid(UUID(uuid))
         if service_obj is not None:
             self.__profile.remove_service(service_obj)
             return True
@@ -459,7 +459,7 @@ class BlePeriphShell(InteractiveShell):
     def has_service_char(self, service_uuid:str, char_uuid:str):
         """Check if a characteristic is already registered for a specific service
         """
-        service_obj = self.__profile.get_service_by_UUID(UUID(service_uuid))
+        service_obj = self.__profile.get_service_by_uuid(UUID(service_uuid))
         if service_obj is not None:
             charac = service_obj.get_characteristic(UUID(char_uuid))
             return charac is not None
@@ -562,7 +562,7 @@ class BlePeriphShell(InteractiveShell):
         """
         completions = {}
         if self.__selected_service is not None:
-            service = self.__profile.get_service_by_UUID(UUID(self.__selected_service))
+            service = self.__profile.get_service_by_uuid(UUID(self.__selected_service))
             if service is not None:
                 chars = list(service.characteristics())
                 for action in ["add", "remove"]:
@@ -635,7 +635,7 @@ class BlePeriphShell(InteractiveShell):
                 print_formatted_text(HTML(
                     f"<ansicyan>Characteristics for service {self.__selected_service}:</ansicyan>"
                 ))
-                selected_service = self.__profile.get_service_by_UUID(UUID(self.__selected_service))
+                selected_service = self.__profile.get_service_by_uuid(UUID(self.__selected_service))
                 if selected_service is not None:
                     characs = list(selected_service.characteristics())
                     if len(characs) > 0:
@@ -812,7 +812,7 @@ class BlePeriphShell(InteractiveShell):
         if len(args) >= 1:
             try:
                 charac_uuid = UUID(args[0])
-                charac = self.__profile.get_characteristic_by_UUID(charac_uuid)
+                charac = self.__profile.get_characteristic_by_uuid(charac_uuid)
                 if charac is not None:
                     print_formatted_text(HTML(
                         f" <i>{hexdump(charac.value, result='return')}</i>"
