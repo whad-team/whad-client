@@ -2,7 +2,8 @@
 """
 import struct
 import logging
-from whad.helpers import swap_bits
+
+from scapy.packet import Packet
 from scapy.compat import raw
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
@@ -10,6 +11,7 @@ from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
 
 from whad.hub.ble import generate_ble_metadata
 from whad.hub import ProtocolHub
+from whad.hub.message import HubMessage
 from whad.hub.ble import AdvType, BleAdvPduReceived, BlePduReceived, BleRawPduReceived, \
     SendBlePdu, SendBleRawPdu
 
@@ -20,10 +22,10 @@ def packet_to_bytes(packet):
     """
     try:
         return raw(packet)
-    except TypeError as type_err:
-        return bytes(packet.__bytes__())
+    except TypeError:
+        return bytes(packet)
 
-class BleMessageTranslator(object):
+class BleMessageTranslator:
     """BLE Whad message translator.
 
     This translator is used to provide the format of a specific scapy packet
@@ -71,7 +73,7 @@ class BleMessageTranslator(object):
         return formatted_packet, timestamp
 
 
-    def from_message(self, message):
+    def from_message(self, message) -> Packet:
         """Convert a WHAD message into a packet, if it makes sense.
         """
         try:
@@ -110,12 +112,17 @@ class BleMessageTranslator(object):
                 packet.metadata = generate_ble_metadata(message)
                 return packet
 
+            # No matching packet found, return None.
+            return None
+
         except AttributeError as err:
             logger.error(err)
             return None
 
 
-    def from_packet(self, packet, encrypt=False):
+    def from_packet(self, packet: Packet, encrypt: bool = False) -> HubMessage:
+        """Convert a BLE PDU scapy packet into the corresponding hub message.
+        """
         direction = packet.metadata.direction
         connection_handle = packet.metadata.connection_handle
 
