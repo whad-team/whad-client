@@ -12,7 +12,7 @@ from whad.ble.profile.characteristic import Characteristic
 logger = logging.getLogger(__name__)
 
 class Service(Attribute):
-    """GATT service implementation
+    """GATT service attribute
     """
 
     def __init__(self, uuid, type_uuid, handle=0, end_handle=0):
@@ -26,14 +26,14 @@ class Service(Attribute):
         self.__included_services = []
 
     @property
-    def uuid(self):
+    def uuid(self) -> UUID:
         """Service UUID
         """
         return self.__service_uuid
 
 
     @Attribute.handle.setter
-    def handle(self, new_handle):
+    def handle(self, new_handle: int):
         """Overwrite `Attribute` handle setter.
         """
         if isinstance(new_handle, int):
@@ -53,19 +53,19 @@ class Service(Attribute):
 
     @property
     def end_handle(self) -> int:
-        """Service end handle
+        """End handle
         """
         return self.__end_handle
 
     @end_handle.setter
     def end_handle(self, value: int):
-        """Service end handle setter
+        """Set end handle
         """
         self.__end_handle = value
 
     @property
     def name(self) -> str:
-        """Service name (alias or UUID)
+        """Readable service name
         """
         alias = get_uuid_alias(self.__service_uuid)
         if alias is not None:
@@ -172,14 +172,18 @@ class Service(Attribute):
 
 
 class PrimaryService(Service):
-    """GATT Primary service
+    """Primary service attribute.
+
+    This attribute has a type UUID of 0x2800.
     """
 
     def __init__(self, uuid, handle=0, end_handle=0):
         super().__init__(uuid, UUID(0x2800),handle=handle, end_handle=end_handle)
 
 class SecondaryService(Service):
-    """GATT Secondary service
+    """Secondary service attribute.
+
+    This attribute has a type UUID of 0x2801.
     """
 
     def __init__(self, uuid, handle=None):
@@ -219,53 +223,57 @@ class IncludeService(Attribute):
         return self.handle
 
     @end_handle.setter
-    def end_handle(self, value):
+    def end_handle(self, value) -> int:
+        """End handle
+        """
         self.__end_handle = value
 
     @property
-    def uuid(self):
+    def uuid(self) -> UUID:
         """Return the attribute type UUID.
         """
         return self.type_uuid
 
     @property
-    def service_uuid(self):
+    def service_uuid(self) -> UUID:
         """Return the included service UUID
         """
         return self.__service_uuid
 
     @property
-    def service_start_handle(self):
+    def service_start_handle(self) -> int:
         """Return the included service start handle
         """
         return self.__start_handle
 
     @service_start_handle.setter
-    def service_start_handle(self, value):
+    def service_start_handle(self, value: int):
+        """Service start handle setter
+        """
         self.__start_handle = value
 
     @property
-    def service_end_handle(self):
+    def service_end_handle(self) -> int:
         """Return the included service end handle
         """
         return self.__end_handle
 
     @service_end_handle.setter
-    def service_end_handle(self, value):
+    def service_end_handle(self, value: int):
+        """End handle setter
+        """
         self.__end_handle = value
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Generate the description of the included service definition attribute.
         """
         alias = get_uuid_alias(self.__service_uuid)
         if alias is not None:
             return f"Included service {alias} (0x{self.__service_uuid})"
+        return f"Included service {self.__service_uuid}"
 
-        # No alias
-        return 'Included service ' + str(self.__service_uuid)
-
-    def payload(self):
+    def payload(self) -> bytes:
         """Return service UUID as bytes
         """
         if self.__service_uuid.type == UUID.TYPE_16:
