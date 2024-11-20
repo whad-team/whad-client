@@ -17,7 +17,8 @@ from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode, ReadAcce
 from whad.ble.stack.att.exceptions import error_response_to_exc, AttErrorCode
 from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
-from whad.ble.profile import GenericProfile, Pairing
+from whad.ble.profile import GenericProfile
+from whad.ble.stack.smp import Pairing
 from whad.ble.profile.characteristic import Characteristic, CharacteristicDescriptor, ClientCharacteristicConfig, CharacteristicValue
 from whad.ble.profile.service import PrimaryService, SecondaryService, IncludeService
 
