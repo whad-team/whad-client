@@ -41,7 +41,10 @@ from whad.ble.profile.characteristic import CharacteristicProperties, Characteri
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.attribute import UUID
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> a0b860e (Improved code quality: added missing docstrings, fixed typos and optimized code.)
 logger = logging.getLogger(__name__)
 
 class PeripheralCharacteristicDescriptor:
@@ -114,14 +117,14 @@ class PeripheralCharacteristicValue:
         )
 
     @property
-    def handle(self):
-        """Characteristic value handle
+    def handle(self) -> int:
+        """Characteristic handle value
         """
         return self.__char_value.handle
 
     @property
     def characteristic(self):
-        """Parent characteristic object
+        """Underlying GATT characteristic
         """
         return self.__characteristic
 
@@ -190,31 +193,31 @@ class PeripheralCharacteristic:
 
     @property
     def type_uuid(self) -> UUID:
-        """GATT attribute type UUID
+        """Type UUID
         """
         return self.__characteristic.type_uuid
 
     @property
-    def properties(self) -> list:
+    def properties(self):
         """Characteristic properties
         """
         return self.__characteristic.properties
 
     @property
     def handle(self) -> int:
-        """Characteristic handle value
+        """Handle value
         """
         return self.__characteristic.handle
 
     @property
     def end_handle(self) -> int:
-        """Characteristic end handle value
+        """End handle for this characteristic
         """
         return self.__characteristic.end_handle
 
     @property
     def value_handle(self) -> int:
-        """Characteristic value handle
+        """Handle for this characteristic value attribute
         """
         return self.__characteristic.value_handle
 
@@ -259,6 +262,13 @@ class PeripheralCharacteristic:
         rather than a write request. Otherwise, use a write request. If a characteristic
         has both write and write without response properties, `without_response` must be
         set to True to use a write command.
+
+        :param value: Value to write into the characteristic
+        :type value: bytes
+        :param without_response: Send a GATT write command instead of a GATT write
+                                 if set to `True`
+        :return: `True` on successful write, `False` otherwise
+        :rtype: bool
         """
         # If characteristic is only writeable without response, force without_response to True.
         access_mask = CharacteristicProperties.WRITE_WITHOUT_RESPONSE | CharacteristicProperties.WRITE
@@ -305,6 +315,8 @@ class PeripheralCharacteristic:
                     desc,
                     self.__gatt
                 )
+        # Not found
+        return None
 
         # No descriptor
         return None
@@ -332,7 +344,8 @@ class PeripheralCharacteristic:
         :param bool notification: If set, subscribe for notification
         :param bool indication: If set, subscribe for indication (cannot be used
                                 when notification is set)
-        :param callable callback: Callback function to be called on indication/notification event
+        :param callable callback: Callback function to be called on
+                                  indication/notification event
         :return bool: True if subscription has successfully been performed, False otherwise.
         """
         if notification:
@@ -521,7 +534,7 @@ class PeripheralDevice(GenericProfile):
 
 
     def start_encryption(self):
-        """Start encryption procedure for BLE peripheral
+        """Start encryption procedure
         """
         security_database = self.__smp.security_database
 
@@ -603,7 +616,7 @@ class PeripheralDevice(GenericProfile):
                 self.__gatt
             )
 
-        # Not found
+        # Service not found
         return None
 
     def find_characteristic_by_uuid(self, uuid: UUID):
@@ -624,6 +637,9 @@ class PeripheralDevice(GenericProfile):
                     )
         # Not found
         return None
+
+        # Not found
+        return False
 
 
     def find_object_by_handle(self, handle):
@@ -748,8 +764,8 @@ class PeripheralDevice(GenericProfile):
 
         :param  handle: Characteristic or descriptor handle.
         :type   handle: int
-        :param  offset: Offset applied when reading data from characteristic or descriptor
-                        (default: 0).
+        :param  offset: Offset applied when reading data from characteristic or
+                        descriptor (default: 0).
         :type   offset: int, optional
         :param  long:   use GATT long read procedure if set to True (default: False)
         :type   long:   bool, optional
