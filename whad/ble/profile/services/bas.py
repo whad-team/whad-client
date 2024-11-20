@@ -4,7 +4,7 @@ from struct import pack, unpack
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile import PrimaryService, Characteristic
 
-class BatteryService(object):
+class BatteryService:
     """Battery Service Profile
 
     This service implements the BLE Battery Service as described in the spec.
@@ -24,10 +24,18 @@ class BatteryService(object):
     def set_battery_level(self, level: int):
         """Set battery level
         """
-        if level >= 0 and level<=100:
+        if 0 <= level <=100:
+            # level property is dynamically created by the GATT
+            # profile where this class is used.
+            #
+            # pylint: disable-next=E1101
             self.battery.level.value = pack('B', level)
 
     def get_battery_level(self):
         """Return battery level
         """
+        # level property is dynamically created by the GATT
+        # profile where this class is used.
+        #
+        # pylint: disable-next=E1101
         return unpack('B', self.battery.level.value)[0]
