@@ -115,7 +115,7 @@ class WhadWiresharkApp(CommandLineApp):
             self.post_run()
 
     def post_run(self):
-        if not self.is_stdout_piped():
+        if not self.is_stdout_piped() and self.monitor is not None:
             wait("Forwarding {count} packets to wireshark".format(
                     count=str(self.monitor.packets_written)
                 ),
