@@ -1,7 +1,6 @@
+"""Bluetooth Low Energy ATT security mode helpers
+"""
 from whad.ble.stack.att.constants import BleAttSecurityMode
-from whad.ble.utils.validators import InvalidUUIDException
-from struct import pack, unpack
-from binascii import hexlify, unhexlify, Error as BinasciiError
 
 def get_att_security_mode_from_mode_and_level(mode, level):
     """
@@ -15,7 +14,8 @@ def get_att_security_mode_from_mode_and_level(mode, level):
     """
     if mode == 0 and level == 0:
         return BleAttSecurityMode.NO_ACCESS
-    elif mode == 1:
+
+    if mode == 1:
         if level == 1:
             return BleAttSecurityMode.OPEN
         if level == 2:
@@ -24,7 +24,8 @@ def get_att_security_mode_from_mode_and_level(mode, level):
             return BleAttSecurityMode.ENCRYPTION_WITH_AUTHENTICATION
         if level == 4:
             return BleAttSecurityMode.ENCRYPTION_WITH_SECURE_CONNECTIONS
-    elif mode == 2:
+
+    if mode == 2:
         if level == 1:
             return BleAttSecurityMode.DATA_SIGNING_NO_AUTHENTICATION
         if level == 2:
