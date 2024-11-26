@@ -77,8 +77,8 @@ Python library allowing to interact with offensive security tools implementing t
     - [x] whad.ble.connector
     - [x] whad.ble.profile
     - [ ] whad.ble.stack
-    - [ ] whad.ble.tools
-    - [ ] whad.ble.utils
+    - [x] whad.ble.tools
+    - [x] whad.ble.utils
     - [ ] whad.ble.crypto
     - [ ] whad.ble.exceptions
     - [ ] whad.ble.injecting
