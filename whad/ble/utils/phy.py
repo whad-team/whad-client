@@ -1,26 +1,30 @@
-'''
-This module provides some helpers functions and constants related to Bluetooth Low Energy physical layer.
-'''
-from whad.helpers import swap_bits
-from whad.phy import Endianness, GFSKModulationScheme, PhysicalLayer
-from scapy.layers.bluetooth4LE import BTLE
+"""
+This module provides some helpers functions and constants related to Bluetooth Low
+Energy physical layer.
+"""
 from enum import IntEnum
 from dataclasses import dataclass
 from struct import pack
 
+from scapy.layers.bluetooth4LE import BTLE
+
+from whad.helpers import swap_bits
+from whad.phy import Endianness, GFSKModulationScheme, PhysicalLayer
+
+
 class FieldsSize(IntEnum):
-    '''
+    """
     Size of major BLE fields (in bytes).
-    '''
+    """
     ACCESS_ADDRESS_SIZE = 4
     HEADER_SIZE = 2
     CRC_SIZE = 3
 
 
 def frequency_to_channel(frequency):
-    '''
+    """
     Converts a frequency (in Hz) to the corresponding BLE channel.
-    '''
+    """
     if not isinstance(frequency,int) or frequency < 2402000000 or frequency > 2480000000:
         return None
 
@@ -41,9 +45,9 @@ def frequency_to_channel(frequency):
     return channel
 
 def channel_to_frequency(channel):
-    '''
+    """
     Converts a BLE channel to the corresponding frequency (in Hz).
-    '''
+    """
     if not isinstance(channel,int) or channel < 0 or channel > 39:
         return None
     if channel == 37:
@@ -60,38 +64,38 @@ def channel_to_frequency(channel):
     return (2400 + freq_offset) * 1000000
 
 def dewhitening(data, channel):
-  '''
-  Dewhiten data based on BLE channel.
-  '''
-  ret = []
-  lfsr = swap_bits(channel) | 2
+    """
+    Dewhiten data based on BLE channel.
+    """
+    ret = []
+    lfsr = swap_bits(channel) | 2
 
-  for d in data:
-    d = swap_bits(d)
-    for i in 128, 64, 32, 16, 8, 4, 2, 1:
-      if lfsr & 0x80:
-        lfsr ^= 0x11
-        d ^= i
+    for d in data:
+        d = swap_bits(d)
+        for i in 128, 64, 32, 16, 8, 4, 2, 1:
+            if lfsr & 0x80:
+                lfsr ^= 0x11
+                d ^= i
 
-      lfsr <<= 1
-      i >>=1
-    ret.append(swap_bits(d))
+            lfsr <<= 1
+            i >>=1
+        ret.append(swap_bits(d))
 
-  return bytes(ret)
+    return bytes(ret)
 
 def whitening(data, channel):
-    '''
+    """
     Whiten data based on a BLE channel.
-    '''
+    """
     return dewhitening(data, channel)
 
 def crc(data, init=0x555555):
-    '''
+    """
     Computes the 24-bit CRC of provided data.
-    '''
+    """
     ret = [(init >> 16) & 0xff, (init >> 8) & 0xff, init & 0xff]
     for d in data:
-        for v in range(8):
+        for _ in range(8):
             t = (ret[0] >> 7) & 1
 
             ret[0] <<= 1
@@ -117,16 +121,16 @@ def crc(data, init=0x555555):
 
 
 def is_access_address_valid(aa):
-    '''
+    """
     This function checks if the provided access address is valid.
-    '''
+    """
     a = (aa & 0xff000000)>>24
     b = (aa & 0x00ff0000)>>16
     c = (aa & 0x0000ff00)>>8
-    d = (aa & 0x000000ff)
+    d = aa & 0x000000ff
     if a==b and b==c and c==d:
         return False
-    if (aa == 0x8E89BED6):
+    if aa == 0x8E89BED6:
         return True
     bb = aa
     for i in range(0,26):
@@ -149,22 +153,30 @@ def is_access_address_valid(aa):
 
 @dataclass
 class BLEPhysicalLayerConfiguration:
+    """Bluetooth Low Energy PHY configuration
+    """
     address : int = 0x8e89bed6
     channel : int = 37
     crc_init : int = 0x555555
 
 
-def check_crc(pkt, configuration):
-    return crc(pkt[FieldsSize.ACCESS_ADDRESS_SIZE:-FieldsSize.CRC_SIZE], configuration.crc_init) == pkt[-FieldsSize.CRC_SIZE:]
+def check_crc(pkt, configuration) -> bool:
+    """Check BLE packet CRC depending on the configuration
+    """
+    return crc(pkt[FieldsSize.ACCESS_ADDRESS_SIZE:-FieldsSize.CRC_SIZE],
+               configuration.crc_init) == pkt[-FieldsSize.CRC_SIZE:]
 
 def decoding(pkt, configuration):
+    """Decode BLE packet (dewhiten)
+    """
     # Remove preamble
     while pkt.startswith(b"\xAA"):
         pkt = pkt[1:]
 
     dewhitened = dewhitening(pkt[FieldsSize.ACCESS_ADDRESS_SIZE:], configuration.channel)
     size = dewhitened[1]
-    packet = pkt[:FieldsSize.ACCESS_ADDRESS_SIZE] + dewhitened[:size+ FieldsSize.CRC_SIZE + FieldsSize.HEADER_SIZE]
+    packet = pkt[:FieldsSize.ACCESS_ADDRESS_SIZE]
+    packet += dewhitened[:size+ FieldsSize.CRC_SIZE + FieldsSize.HEADER_SIZE]
     return packet
 
 
