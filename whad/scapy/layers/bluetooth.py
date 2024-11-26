@@ -21,10 +21,7 @@ class SM_Security_Request(Packet):
 
 bind_layers(SM_Hdr, SM_Security_Request, sm_command=0x0b)
 
-class BluetoothUserSocketFixed(BluetoothUserSocket):
-    pass
 
-'''
 class sockaddr_hci(ctypes.Structure):
     _fields_ = [
         ("sin_family", ctypes.c_ushort),
@@ -119,4 +116,4 @@ class BluetoothUserSocketFixed(SuperSocket):
             if self.ins and (WINDOWS or self.ins.fileno() != -1):
                 close(self.ins.fileno())
         close(self.hci_fd)
-'''
+
