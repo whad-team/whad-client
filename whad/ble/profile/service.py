@@ -70,8 +70,6 @@ class Service(Attribute):
         alias = get_uuid_alias(self.__service_uuid)
         if alias is not None:
             return f"{alias} (0x{self.__service_uuid})"
-
-        # No alias
         return str(self.__service_uuid)
 
     def payload(self):

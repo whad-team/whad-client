@@ -41,10 +41,6 @@ from whad.ble.profile.characteristic import CharacteristicProperties, Characteri
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.attribute import UUID
 
-<<<<<<< HEAD
-
-=======
->>>>>>> a0b860e (Improved code quality: added missing docstrings, fixed typos and optimized code.)
 logger = logging.getLogger(__name__)
 
 class PeripheralCharacteristicDescriptor:
@@ -288,8 +284,8 @@ class PeripheralCharacteristic:
                 value
             )
 
-        # Cannot write value
-        return False
+        # Error
+        raise ValueError()
 
     def descriptors(self):
         """Return all the descriptors associated with this characteristic.
@@ -534,7 +530,7 @@ class PeripheralDevice(GenericProfile):
 
 
     def start_encryption(self):
-        """Start encryption procedure
+        """Start encryption procedure for BLE peripheral
         """
         security_database = self.__smp.security_database
 
@@ -616,7 +612,7 @@ class PeripheralDevice(GenericProfile):
                 self.__gatt
             )
 
-        # Service not found
+        # Not found
         return None
 
     def find_characteristic_by_uuid(self, uuid: UUID):
