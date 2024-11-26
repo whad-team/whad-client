@@ -3,6 +3,7 @@
 This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
+import sys
 import logging
 import time
 
@@ -93,8 +94,8 @@ class WhadWiresharkApp(CommandLineApp):
                 self.monitor.start()
 
                 if self.is_stdout_piped():
-                    # Wait for the user to CTL-C
-                    while interface.opened:
+                    # Wait for the user to CTL-C or wireshark to be closed
+                    while interface.opened and not self.monitor.is_terminated():
                         time.sleep(.1)
                 else:
                     # Loop until interface or wireshark is closed
@@ -105,12 +106,12 @@ class WhadWiresharkApp(CommandLineApp):
                         )
                         time.sleep(.2)
 
-
         except KeyboardInterrupt:
             # Launch post-run tasks
             if self.monitor is not None:
                 self.monitor.stop()
                 self.monitor.close()
+        finally:
             self.post_run()
 
     def post_run(self):
