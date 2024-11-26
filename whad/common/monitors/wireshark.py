@@ -66,6 +66,14 @@ class WiresharkMonitor(PcapWriterMonitor):
                 dissector_name = conf_line.split("Proto(")[1].split(",")[0].replace("\"", "")
             self._wireshark_process = Popen([self._wireshark_path,"-X","lua_script:"+dissector,"-o","uat:user_dlts:\"User 1 (DLT=148)\",\""+dissector_name+"\",\"\",\"\",\"\",\"\"", "-k", "-i", fifo], stderr=DEVNULL, stdout=DEVNULL)
 
+    def is_terminated(self) -> bool:
+        """Check if wireshark process has terminated.
+
+        :return: `True` if process has terminated, `False` otherwise
+        :rtype: bool
+        """
+        return self._wireshark_process.poll() is not None
+
     def close(self):
         self._writer_lock.acquire()
         if hasattr(self, "_writer") and self._writer is not None:

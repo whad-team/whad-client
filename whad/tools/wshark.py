@@ -97,7 +97,8 @@ class WhadWiresharkApp(CommandLineApp):
                     while interface.opened:
                         time.sleep(.1)
                 else:
-                    while interface.opened:
+                    # Loop until interface or wireshark is closed
+                    while interface.opened and not self.monitor.is_terminated():
                         wait("Forwarding {count} packets to wireshark".format(
                                 count=str(self.monitor.packets_written)
                             )
