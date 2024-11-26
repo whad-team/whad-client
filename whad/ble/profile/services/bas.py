@@ -24,10 +24,18 @@ class BatteryService:
     def set_battery_level(self, level: int):
         """Set battery level
         """
-        if 0 <= level <= 100:
+        if 0 <= level <=100:
+            # level property is dynamically created by the GATT
+            # profile where this class is used.
+            #
+            # pylint: disable-next=E1101
             self.battery.level.value = pack('B', level)
 
     def get_battery_level(self):
         """Return battery level
         """
+        # level property is dynamically created by the GATT
+        # profile where this class is used.
+        #
+        # pylint: disable-next=E1101
         return unpack('B', self.battery.level.value)[0]
