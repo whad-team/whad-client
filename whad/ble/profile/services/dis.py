@@ -1,10 +1,9 @@
 """Bluetooth Low Energy Device Information Service Profile
 """
-from struct import pack, unpack
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile import PrimaryService, Characteristic
 
-class DeviceInformationService(object):
+class DeviceInformationService:
     """Define Device Information Service
     """
 
