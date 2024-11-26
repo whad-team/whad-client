@@ -12,11 +12,7 @@ from whad.ble.profile.characteristic import Characteristic
 logger = logging.getLogger(__name__)
 
 class Service(Attribute):
-<<<<<<< HEAD
-    """GATT service implementation
-=======
     """GATT service attribute
->>>>>>> 91ddc9da831aa60c8d406121886210d50b617eb1
     """
 
     def __init__(self, uuid, type_uuid, handle=0, end_handle=0):
@@ -30,11 +26,7 @@ class Service(Attribute):
         self.__included_services = []
 
     @property
-<<<<<<< HEAD
-    def uuid(self):
-=======
     def uuid(self) -> UUID:
->>>>>>> 91ddc9da831aa60c8d406121886210d50b617eb1
         """Service UUID
         """
         return self.__service_uuid
@@ -61,40 +53,23 @@ class Service(Attribute):
 
     @property
     def end_handle(self) -> int:
-<<<<<<< HEAD
-        """Service end handle
-=======
         """End handle
->>>>>>> 91ddc9da831aa60c8d406121886210d50b617eb1
         """
         return self.__end_handle
 
     @end_handle.setter
     def end_handle(self, value: int):
-<<<<<<< HEAD
-        """Service end handle setter
-=======
         """Set end handle
->>>>>>> 91ddc9da831aa60c8d406121886210d50b617eb1
         """
         self.__end_handle = value
 
     @property
     def name(self) -> str:
-<<<<<<< HEAD
-        """Service name (alias or UUID)
-=======
         """Readable service name
->>>>>>> 91ddc9da831aa60c8d406121886210d50b617eb1
         """
         alias = get_uuid_alias(self.__service_uuid)
         if alias is not None:
             return f"{alias} (0x{self.__service_uuid})"
-<<<<<<< HEAD
-
-        # No alias
-=======
->>>>>>> 91ddc9da831aa60c8d406121886210d50b617eb1
         return str(self.__service_uuid)
 
     def payload(self):
@@ -195,26 +170,18 @@ class Service(Attribute):
 
 
 class PrimaryService(Service):
-<<<<<<< HEAD
-    """GATT Primary service
-=======
     """Primary service attribute.
 
     This attribute has a type UUID of 0x2800.
->>>>>>> 91ddc9da831aa60c8d406121886210d50b617eb1
     """
 
     def __init__(self, uuid, handle=0, end_handle=0):
         super().__init__(uuid, UUID(0x2800),handle=handle, end_handle=end_handle)
 
 class SecondaryService(Service):
-<<<<<<< HEAD
-    """GATT Secondary service
-=======
     """Secondary service attribute.
 
     This attribute has a type UUID of 0x2801.
->>>>>>> 91ddc9da831aa60c8d406121886210d50b617eb1
     """
 
     def __init__(self, uuid, handle=None):
@@ -302,22 +269,12 @@ class IncludeService(Attribute):
         alias = get_uuid_alias(self.__service_uuid)
         if alias is not None:
             return f"Included service {alias} (0x{self.__service_uuid})"
-<<<<<<< HEAD
-
-        # No alias
-        return 'Included service ' + str(self.__service_uuid)
-=======
         return f"Included service {self.__service_uuid}"
->>>>>>> 91ddc9da831aa60c8d406121886210d50b617eb1
 
     def payload(self) -> bytes:
         """Return service UUID as bytes
         """
         if self.__service_uuid.type == UUID.TYPE_16:
             return pack('<HH', self.__start_handle, self.__end_handle) + self.__service_uuid.packed
-<<<<<<< HEAD
-=======
-
->>>>>>> 91ddc9da831aa60c8d406121886210d50b617eb1
         # 128-bit UUID
         return pack('<HH', self.__start_handle, self.__end_handle)
