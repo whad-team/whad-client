@@ -692,10 +692,13 @@ class BlePeriphShell(InteractiveShell):
             
             # Search characteristic by its handle
             if self.__profile is not None:
-                charac = self.__profile.find_object_by_handle(handle_uuid)
-                if isinstance(charac, Characteristic):
-                    # Update value
-                    charac.value = value
+                try:
+                    charac = self.__profile.find_object_by_handle(handle_uuid)
+                    if isinstance(charac, Characteristic):
+                        # Update value
+                        charac.value = value
+                except IndexError:
+                    self.error("Cannot find characteristic with UUID %s" % handle_uuid)
             else:
                 self.error('GATT profile has not been set.')
         elif isinstance(handle_uuid, UUID):
