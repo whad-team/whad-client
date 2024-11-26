@@ -9,10 +9,13 @@ target device, creates another device and relay GATT operations (characteristic
 read, write, notification and indication) between a client and the target
 device.
 """
+import logging
+from binascii import hexlify
 
-from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL
+from scapy.layers.bluetooth4LE import BTLE_DATA
 from scapy.layers.bluetooth import L2CAP_Hdr
-from whad.ble.connector import BLE, Central, Peripheral, Scanner
+
+from whad.ble.connector import Central, Peripheral
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvCompleteLocalName
 from whad.ble.profile import GenericProfile
 from whad.ble.exceptions import HookReturnValue, HookDontForward
@@ -20,10 +23,8 @@ from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.exceptions import WhadDeviceNotFound
 from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
 from whad.hub.ble import Direction as BleDirection
-from binascii import hexlify
-from time import time
-# Logging
-import logging
+
+
 logger = logging.getLogger(__name__)
 
 #############################################
@@ -41,8 +42,9 @@ def is_pdu_valid(pdu):
         btle_data = pdu.getlayer(BTLE_DATA)
         if btle_data.LLID in [0x01, 0x02]:
             return btle_data.haslayer(L2CAP_Hdr)
-        else:
-            return (btle_data.LLID == 0x03)
+
+        # Control PDU
+        return btle_data.LLID == 0x03
     return False
 
 
@@ -74,9 +76,11 @@ class LowLevelPeripheral(Peripheral):
         """Instanciate a LowLevelPeripheral instance
 
         :param LinkLayerProxy proxy: Reference to the link-layer proxy that will receive events
-        :param WhadDevice device: A :class:`whad.device.WhadDevice` object to use as the physical link
+        :param WhadDevice device: A :class:`whad.device.WhadDevice` object to use
+                                  as the physical link
         :param AdvDataFieldList adv_data: Advertising data of the exposed proxy device (mandatory)
-        :param AdvDataFieldList scan_data: Scan response data of the exposed proxy device (optional, can be None)
+        :param AdvDataFieldList scan_data: Scan response data of the exposed proxy
+                                           device (optional, can be None)
         """
         super().__init__(device, adv_data=adv_data, scan_data=scan_data, bd_address=bd_address)
         self.__proxy = proxy
@@ -88,7 +92,8 @@ class LowLevelPeripheral(Peripheral):
 
 
     def set_other_half(self, other_half):
-        """Set the *other half*, i.e. the reference to a :class:`LowLevelCentral` device connected to the target device
+        """Set the *other half*, i.e. the reference to a :class:`LowLevelCentral`
+        device connected to the target device
 
         :param LowLevelCentral other_half: Link-layer Central device to notify events
         """
@@ -102,7 +107,7 @@ class LowLevelPeripheral(Peripheral):
         """
         self.__connected = True
         if connection_data.conn_handle is None:
-           self.__conn_handle = 0
+            self.__conn_handle = 0
         else:
             self.__conn_handle = connection_data.conn_handle
 
@@ -130,7 +135,7 @@ class LowLevelPeripheral(Peripheral):
                     self.send_pdu(reshape_pdu(_pdu), self.__conn_handle)
 
 
-    def on_disconnected(self, connection_data):
+    def on_disconnected(self, disconnection_data):
         """Callback to handle link-layer disconnection event
 
         :param connection_data: Connection data
@@ -177,7 +182,7 @@ class LowLevelPeripheral(Peripheral):
                 else:
                     self.__other_half.forward_data_pdu(pdu)
             else:
-                logger.error('client is not connected to proxy')
+                logger.error("client is not connected to proxy")
 
 
     def forward_ctrl_pdu(self, pdu):
@@ -185,15 +190,17 @@ class LowLevelPeripheral(Peripheral):
 
         :param Packet pdu: Control PDU to forward
         """
-        logger.info('Forwarding control PDU to central (%s)' % str(self.__conn_handle))
+        logger.info("Forwarding control PDU to central (%s)", str(self.__conn_handle))
         if self.__conn_handle is not None:
             return self.send_pdu(
                 reshape_pdu(pdu),
                 self.__conn_handle,
                 direction=BleDirection.SLAVE_TO_MASTER
             )
-        else:
-            self.__pending_control_pdus.append(reshape_pdu(pdu))
+
+        # Not connected, adding control PDU to pending control PDUs
+        self.__pending_control_pdus.append(reshape_pdu(pdu))
+        return True
 
 
     def forward_data_pdu(self, pdu):
@@ -201,15 +208,17 @@ class LowLevelPeripheral(Peripheral):
 
         :param Packet pdu: Data PDU to forward
         """
-        logger.info('Forwarding data PDU to central (%s)' % str(self.__conn_handle))
+        logger.info("Forwarding data PDU to central (%s)", str(self.__conn_handle))
         if self.__conn_handle is not None:
             return self.send_pdu(
                 reshape_pdu(pdu),
                 self.__conn_handle,
                 direction=BleDirection.SLAVE_TO_MASTER
             )
-        else:
-            self.__pending_data_pdus.append(reshape_pdu(pdu))
+
+        # Not connected, adding data PDU to pending data PDUs
+        self.__pending_data_pdus.append(reshape_pdu(pdu))
+        return True
 
 
 class LowLevelCentral(Central):
@@ -246,7 +255,8 @@ class LowLevelCentral(Central):
         """Determine if this Central device is connected to the target device.
 
         :rtype: bool
-        :return: True if an active connection exists between the central device and the target, False otherwise
+        :return: True if an active connection exists between the central device
+                 and the target, False otherwise
         """
         return self.__connected
 
@@ -265,17 +275,17 @@ class LowLevelCentral(Central):
 
         self.__connected = True
         if connection_data.conn_handle is None:
-           self.__conn_handle = 0
+            self.__conn_handle = 0
         else:
             self.__conn_handle = connection_data.conn_handle
 
 
-    def on_disconnected(self, connection_data):
+    def on_disconnected(self, disconnection_data):
         """Callback called when our central device has been disconnected from our target device
         """
-        super().on_disconnected(connection_data)
+        super().on_disconnected(disconnection_data)
 
-        logger.info('target device has disconnected')
+        logger.info("target device has disconnected")
         self.__connected = False
         self.__conn_handle = None
 
@@ -323,8 +333,10 @@ class LowLevelCentral(Central):
         """
         if self.__conn_handle is not None:
             return self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
-        else:
-            logger.error('proxy is not connected to target device')
+
+        # Error, proxy not connected
+        logger.error("proxy is not connected to target device")
+        return False
 
     def forward_data_pdu(self, pdu):
         """Forward a Data PDU to the connected device, if an active connection exists
@@ -333,17 +345,20 @@ class LowLevelCentral(Central):
         """
         if self.__conn_handle is not None:
             return self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
-        else:
-            logger.error('proxy is not connected to target device')
+
+        # Error, proxy not connected
+        logger.error("proxy is not connected to target device")
+        return False
 
 
-class LinkLayerProxy(object):
+class LinkLayerProxy:
     """This class implements a GATT proxy that relies on two BLE-compatible
     WHAD devices to create a real BLE device that will proxify all the link-layer
     traffic to another device.
     """
 
-    def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None, spoof=False):
+    def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None,
+                 spoof=False):
         """
         :param BLE proxy: BLE device to use as a peripheral (GATT Server)
         :param BLE target: BLE device to use as a central (GATT Client)
@@ -357,7 +372,7 @@ class LinkLayerProxy(object):
         if adv_data is None:
             self.__adv_data = AdvDataFieldList(
                 AdvFlagsField(),
-                AdvCompleteLocalName(b'BleProxy')
+                AdvCompleteLocalName(b"BleProxy")
             )
         else:
             self.__adv_data = adv_data
@@ -372,12 +387,10 @@ class LinkLayerProxy(object):
         self.__target_bd_addr = bd_address
         self.__spoof = spoof
 
-        # Callbacks
-        self.__callbacks = []
-
-
     @property
     def target(self):
+        """Proxy target (central)
+        """
         return self.__central
 
 
@@ -402,6 +415,8 @@ class LinkLayerProxy(object):
 
 
     def close(self):
+        """Close proxy
+        """
         if self.__central is not None:
             self.__central.close()
         if self.__peripheral is not None:
@@ -414,12 +429,12 @@ class LinkLayerProxy(object):
         """
 
         # First, connect our central device to our target device
-        logger.info('create low-level central device ...')
+        logger.info("create low-level central device ...")
         print(self.__proxy)
         self.__central = LowLevelCentral(self, self.__target)
-        logger.info('connecting to target device ...')
+        logger.info("connecting to target device ...")
         if self.__central.connect(self.__target_bd_addr) is not None:
-            logger.info('proxy is connected to target device, create our own device ...')
+            logger.info("proxy is connected to target device, create our own device ...")
 
             # Once connected, we start our peripheral
             self.__peripheral = LowLevelPeripheral(
@@ -431,27 +446,27 @@ class LinkLayerProxy(object):
             )
 
             # Interconnect central and peripheral
-            logger.info('proxy peripheral device created, interconnect with central ...')
+            logger.info("proxy peripheral device created, interconnect with central ...")
             self.__peripheral.set_other_half(self.__central)
             self.__central.set_other_half(self.__peripheral)
-            logger.info('central and peripheral devices are now interconnected')
+            logger.info("central and peripheral devices are now interconnected")
 
             # Start advertising
-            logger.info('starting advertising our proxy device')
+            logger.info("starting advertising our proxy device")
             self.__peripheral.start()
-            logger.info('LinkLayerProxy instance is ready')
+            logger.info("LinkLayerProxy instance is ready")
 
 
     def on_connect(self):
         """This method is called when a client connects to the proxy.
         """
-        logger.info('Client has just connected to our proxy')
+        logger.info("Client has just connected to our proxy")
 
 
     def on_disconnect(self):
         """This method is called when a client disconnects from the proxy.
         """
-        logger.info('Client has just disconnected from our proxy')
+        logger.info("Client has just disconnected from our proxy")
 
 
     def on_ctl_pdu(self, pdu, direction):
@@ -464,10 +479,10 @@ class LinkLayerProxy(object):
         :return: A PDU to be sent to the target device or None to avoid forwarding.
         :rtype: Packet, None
         """
-        logger.info('Received a Control PDU: %s (Direction: %d)' % (
+        logger.info("Received a Control PDU: %s (Direction: %d)",
             hexlify(bytes(pdu)),
             direction
-        ))
+        )
         return pdu
 
 
@@ -481,10 +496,10 @@ class LinkLayerProxy(object):
         :return: A PDU to be sent to the target device or None to avoid forwarding.
         :rtype: Packet, None
         """
-        logger.info('Received a Data PDU: %s (Direction: %d)' % (
+        logger.info("Received a Data PDU: %s (Direction: %d)",
             hexlify(bytes(pdu)),
             direction
-        ))
+        )
         return pdu
 
 
@@ -493,6 +508,9 @@ class LinkLayerProxy(object):
 #############################################
 
 class ImportedDevice(GenericProfile):
+    """Device imported from JSON profile.
+    """
+
     def __init__(self, proxy, target, from_json):
         super().__init__(from_json=from_json)
         self.__target = target
@@ -541,11 +559,12 @@ class ImportedDevice(GenericProfile):
             # By default, return characteristic value
             raise HookReturnValue(value)
         except GattTimeoutException as gatt_error:
-            logger.error('GATT timeout during characteristic read, return empty data')
-            raise HookReturnValue(b'')
+            logger.error("GATT timeout during characteristic read, return empty data")
+            raise HookReturnValue(b'') from gatt_error
 
 
-    def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
+    def on_characteristic_write(self, service, characteristic, offset=0, value=b'',
+                                without_response=False):
         """Characteristic write hook
 
         This hook is called whenever a charactertistic is about to be written by a GATT
@@ -570,12 +589,12 @@ class ImportedDevice(GenericProfile):
             c.write(value, without_response=without_response)
         except HookReturnValue as write_override:
             c.write(write_override.value, without_response=without_response)
-        except GattTimeoutException as gatt_error:
-            logger.error('GATT timeout during characteristic write')
-            pass
+        except GattTimeoutException:
+            logger.error("GATT timeout during characteristic write")
 
 
-    def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
+    def on_characteristic_subscribed(self, service, characteristic, notification=False,
+                                     indication=False):
         """Characteristic subscription hook.
         """
         try:
@@ -598,10 +617,10 @@ class ImportedDevice(GenericProfile):
                         # Override value if required
                         characteristic.value = value_override.value
 
-                    except HookDontForward as block:
+                    except HookDontForward:
                         # Don't forward notification
                         pass
-                logger.info('[proxy] subscribe to characteristic %s' % characteristic.uuid)
+                logger.info("[proxy] subscribe to characteristic %s", characteristic.uuid)
                 c.subscribe(callback=notif_cb, notification=True)
             elif indication and c is not None:
                 # Forward callback
@@ -621,15 +640,16 @@ class ImportedDevice(GenericProfile):
                         # Override value if required
                         characteristic.value = value_override.value
 
-                    except HookDontForward as block:
+                    except HookDontForward:
                         # Don't forward notification
                         pass
 
-                logger.info('[proxy] subscribe to characteristic %s (indication)' % characteristic.uuid)
+                logger.info("[proxy] subscribe to characteristic %s (indication)",
+                            characteristic.uuid)
                 c.subscribe(callback=indicate_cb, indication=True)
 
             else:
-                logger.error('[proxy] cannot find characteristic %s' % characteristic.uuid)
+                logger.error("[proxy] cannot find characteristic %s", characteristic.uuid)
 
             # No action possible here (for now)
             self.__proxy.on_characteristic_subscribed(
@@ -638,8 +658,8 @@ class ImportedDevice(GenericProfile):
                 notification=notification,
                 indication=indication
             )
-        except GattTimeoutException as gatt_error:
-            logger.error('GATT timeout during characteristic subscribe')
+        except GattTimeoutException:
+            logger.error("GATT timeout during characteristic subscribe")
 
 
     def on_characteristic_unsubscribed(self, service, characteristic):
@@ -654,15 +674,16 @@ class ImportedDevice(GenericProfile):
                 service,
                 characteristic
             )
-        except GattTimeoutException as gatt_error:
-            logger.error('GATT timeout during characteristic unsubscribe')
+        except GattTimeoutException:
+            logger.error("GATT timeout during characteristic unsubscribe")
 
 
-class GattProxy(object):
+class GattProxy:
     """GATT Proxy
     """
 
-    def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None, spoof=False, profile=None):
+    def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None,
+                 spoof=False, profile=None):
         self.__central = None
         self.__peripheral = None
         self.__proxy_dev = proxy
@@ -672,23 +693,30 @@ class GattProxy(object):
         if adv_data is None:
             self.__adv_data = AdvDataFieldList(
                 AdvFlagsField(),
-                AdvCompleteLocalName(b'BleProxy')
+                AdvCompleteLocalName(b"BleProxy")
             )
         else:
             self.__adv_data = adv_data
         self.__scan_data = scan_data
+        self.__target = None
         self.__target_bd_addr = bd_address
 
     @property
     def target(self):
+        """Proxy target
+        """
         return self.__target
 
     @property
     def central(self):
+        """Central role
+        """
         return self.__central
 
     @property
     def peripheral(self):
+        """Peripheral role
+        """
         return self.__profile
 
     def get_wireshark_monitor(self):
@@ -701,6 +729,9 @@ class GattProxy(object):
             monitor_ws.attach(self.__peripheral)
             return monitor_ws
 
+        # No wireshark monitor attached
+        return None
+
 
     def get_pcap_monitor(self, filename):
         """Attach a PCAP writer monitor to the target device.
@@ -712,13 +743,20 @@ class GattProxy(object):
             monitor_pcap.attach(self.__peripheral)
             return monitor_pcap
 
+        # No PCAP monitor attached
+        return None
 
-    def on_connect(self, conn_handle):
-        logger.info('client connected to proxy')
+
+    def on_connect(self, conn_handle: int):
+        """Connection callback
+        """
+        logger.info("client connected to proxy (handle: %d)", conn_handle)
 
 
     def on_disconnect(self, conn_handle):
-        logger.info('client disconnected from proxy')
+        """Disconnection callback
+        """
+        logger.info("client disconnected from proxy (handle: %d)", conn_handle)
 
 
     def on_characteristic_read(self, service, characteristic, value, offset=0, length=0):
@@ -730,37 +768,44 @@ class GattProxy(object):
         :param int offset: write offset
         :param int length: maximum read length for this characteristic
         """
-        logger.info(' << Read characteristic %s: %s' % (characteristic.uuid, value))
+        logger.info(" << Read characteristic %s: %s", characteristic.uuid, value)
 
 
-    def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
+    def on_characteristic_write(self, service, characteristic, offset=0, value=b'',
+                                without_response=False):
         """This callback is called whenever a characteristic is written.
 
         Raise a :class:`HookReturnValue` exception to override the value that will be written
         in the target characteristic.
 
-        Raise any other hook exception (:class:`HookReturnAccessDenied`, :class:`HookReturnNotFound`,
-        :class:`HookReturnAuthentRequired` or :class:`HookReturnAuthorRequired`) to force the proxy
+        Raise any other hook exception (:class:`HookReturnAccessDenied`,
+        :class:`HookReturnNotFound`, :class:`HookReturnAuthentRequired` or
+        :class:`HookReturnAuthorRequired`) to force the proxy
         to return a specific error to the initiator device.
 
         :param Service service: Service object the target characteristic belongs to.
         :param Characteristic characteristic: Target characteristic object.
         :param int offset: write offset
         :param bytes value: value to write into this characteristic
-        :param bool without_response: True if write operation does not require a response, False otherwise (default: False)
+        :param bool without_response: True if write operation does not require a response,
+                                      False otherwise (default: False)
         """
-        logger.info(' >> Write characteristic %s with value %s at offset %d' % (characteristic.uuid, value, offset))
+        logger.info(" >> Write characteristic %s with value %s at offset %d",
+                    characteristic.uuid, value, offset)
 
 
-    def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
-        """This callback is called whenever a characteristic is subscribed to for notification or indication.
+    def on_characteristic_subscribed(self, service, characteristic, notification=False,
+                                     indication=False):
+        """This callback is called whenever a characteristic is subscribed to for
+        notification or indication.
 
         :param Service service: Service object the target characteristic belongs to.
         :param Characteristic characteristic: Target characteristic object.
         :param bool notification: Set to True to subscribe for notification
         :param bool indication: Set to True to subscribe to indication
         """
-        logger.info(' ** Subscribed to characteristic %s from service %s' % (characteristic.uuid, service.uuid))
+        logger.info(" ** Subscribed to characteristic %s from service %s",
+                    characteristic.uuid, service.uuid)
 
 
     def on_characteristic_unsubscribed(self, service, characteristic):
@@ -769,40 +814,43 @@ class GattProxy(object):
         :param Service service: Service object the target characteristic belongs to.
         :param Characteristic characteristic: Target characteristic object.
         """
-        logger.info(' ** Unsubscribed to characteristic %s from service %s' % (characteristic.uuid, service.uuid))
+        logger.info(" ** Unsubscribed to characteristic %s from service %s",
+                    characteristic.uuid, service.uuid)
 
 
     def on_notification(self, service, characteristic, value):
         """This callback is called whenever a notification is received.
         """
-        logger.info(' == notification for characteristic %s from service %s: %s' %  (characteristic.uuid, service.uuid, value))
+        logger.info(" == notification for characteristic %s from service %s: %s",
+                    characteristic.uuid, service.uuid, value)
 
 
     def on_indication(self, service, characteristic, value):
         """This callback is called whenever a notification is received.
         """
-        logger.info(' == indication for characteristic %s from service %s: %s' %  (characteristic.uuid, service.uuid, value))
+        logger.info(" == indication for characteristic %s from service %s: %s",
+                    characteristic.uuid, service.uuid, value)
 
 
     def start(self):
         """Start our GATT Proxy
         """
-        logger.info('create our central device')
+        logger.info("create our central device")
         self.__central = Central(self.__target_dev, from_json=self.__profile)
-        logger.info('connect to target device')
+        logger.info("connect to target device")
         self.__target = self.__central.connect(self.__target_bd_addr)
         if self.__target is not None:
             if self.__profile is not None:
-                logger.info('use the provided profile (json) ...')
+                logger.info("use the provided profile (json) ...")
                 target_profile = self.__profile
             else:
-                logger.info('connected to target device, discover services and characteristics ...')
+                logger.info("connected to target device, discover services and characteristics ...")
                 self.__target.discover()
-                logger.info('services and characs discovered')
+                logger.info("services and characs discovered")
                 target_profile = self.__target.export_json()
 
             # Once connected, we start our peripheral
-            logger.info('create a peripheral with similar profile ...')
+            logger.info("create a peripheral with similar profile ...")
             self.__profile = ImportedDevice(
                     self,
                     self.__target,
@@ -816,6 +864,6 @@ class GattProxy(object):
             self.__peripheral.enable_peripheral_mode(adv_data=self.__adv_data)
 
             # Start advertising
-            logger.info('starting advertising')
+            logger.info("starting advertising")
             self.__peripheral.start()
-            logger.info('GattProxy instance is ready')
+            logger.info("GattProxy instance is ready")
