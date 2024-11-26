@@ -245,8 +245,8 @@ class WhadAnalyzeApp(CommandLineApp):
                     analyzer._displayed = False
                 analyzer.reset()
 
-            # No packets returned
-            return None
+        # No packets returned
+        return None
 
     def get_provided_analyzers(self) -> Tuple[list, dict]:
         """Retrieve a list of analyzers with their corresponding parameters.
