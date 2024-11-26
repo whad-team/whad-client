@@ -12,6 +12,9 @@ from whad.ble.profile.characteristic import Characteristic
 logger = logging.getLogger(__name__)
 
 class Service(Attribute):
+    """GATT service implementation
+    """
+
     def __init__(self, uuid, type_uuid, handle=0, end_handle=0):
         super().__init__(uuid=type_uuid,handle=handle, value=uuid.to_bytes())
         self.__service_uuid = uuid
@@ -24,6 +27,8 @@ class Service(Attribute):
 
     @property
     def uuid(self):
+        """Service UUID
+        """
         return self.__service_uuid
 
 
@@ -40,30 +45,34 @@ class Service(Attribute):
             for characteristic in self.__characteristics:
                 characteristic.handle = char_handle + 1
                 char_handle = characteristic.end_handle
-            
+
             # Update service end_handle value
             self.__end_handle = char_handle
         else:
             raise InvalidHandleValueException
 
     @property
-    def end_handle(self):
+    def end_handle(self) -> int:
+        """Service end handle
+        """
         return self.__end_handle
 
     @end_handle.setter
-    def end_handle(self, value):
+    def end_handle(self, value: int):
+        """Service end handle setter
+        """
         self.__end_handle = value
 
     @property
-    def name(self):
+    def name(self) -> str:
+        """Service name (alias or UUID)
+        """
         alias = get_uuid_alias(self.__service_uuid)
         if alias is not None:
-            return '%s (0x%s)' % (
-                alias,
-                str(self.__service_uuid)
-            )
-        else:
-            return str(self.__service_uuid)
+            return f"{alias} (0x{self.__service_uuid})"
+
+        # No alias
+        return str(self.__service_uuid)
 
     def payload(self):
         """Return service UUID as bytes
@@ -95,19 +104,20 @@ class Service(Attribute):
             # Look for characteristic object
             if characteristic in self.__characteristics:
                 self.__characteristics.remove(characteristic)
-        
+
         # Update characteristic handles
         char_handle = self.handle
-        for characteristic in self.__characteristics:
-            characteristic.handle = char_handle + 1
-            char_handle = characteristic.end_handle
-        
+        for charac in self.__characteristics:
+            charac.handle = char_handle + 1
+            char_handle = charac.end_handle
+
         # Update service end_handle value
         self.__end_handle = char_handle
 
     def characteristics(self):
-        for charac in self.__characteristics:
-            yield charac
+        """Enumerate characteristics
+        """
+        yield from self.__characteristics
 
     def get_characteristic(self, uuid):
         """Get characteristic by UUID
@@ -116,7 +126,7 @@ class Service(Attribute):
             if charac.uuid == uuid:
                 return charac
         return None
-    
+
     def add_include_service(self, included_service):
         """Add include service definition, update end handle
         """
@@ -142,7 +152,7 @@ class Service(Attribute):
             # Look for characteristic object
             if included_service in self.__included_services:
                 self.__included_services.remove(included_service)
-        
+
         # Update included services and characteristic handles
         char_handle = self.handle
         for inc_service in self.__included_services:
@@ -151,21 +161,26 @@ class Service(Attribute):
         for characteristic in self.__characteristics:
             characteristic.handle = char_handle + 1
             char_handle = characteristic.end_handle
-        
+
         # Update service end_handle value
-        self.__end_handle = char_handle        
+        self.__end_handle = char_handle
 
     def included_services(self):
-        for inc_service in self.__included_services:
-            yield inc_service
+        """Enumerate included services
+        """
+        yield from self.__included_services
 
 
 class PrimaryService(Service):
+    """GATT Primary service
+    """
 
     def __init__(self, uuid, handle=0, end_handle=0):
         super().__init__(uuid, UUID(0x2800),handle=handle, end_handle=end_handle)
 
 class SecondaryService(Service):
+    """GATT Secondary service
+    """
 
     def __init__(self, uuid, handle=None):
         super().__init__(uuid, UUID(0x2801),handle=handle)
@@ -212,29 +227,29 @@ class IncludeService(Attribute):
         """Return the attribute type UUID.
         """
         return self.type_uuid
-    
+
     @property
     def service_uuid(self):
         """Return the included service UUID
         """
         return self.__service_uuid
-    
+
     @property
     def service_start_handle(self):
         """Return the included service start handle
         """
         return self.__start_handle
-    
+
     @service_start_handle.setter
     def service_start_handle(self, value):
         self.__start_handle = value
-    
+
     @property
     def service_end_handle(self):
         """Return the included service end handle
         """
         return self.__end_handle
-    
+
     @service_end_handle.setter
     def service_end_handle(self, value):
         self.__end_handle = value
@@ -245,17 +260,15 @@ class IncludeService(Attribute):
         """
         alias = get_uuid_alias(self.__service_uuid)
         if alias is not None:
-            return 'Included service %s (0x%s)' % (
-                alias,
-                str(self.__service_uuid)
-            )
-        else:
-            return 'Included service ' + str(self.__service_uuid)
+            return f"Included service {alias} (0x{self.__service_uuid})"
+
+        # No alias
+        return 'Included service ' + str(self.__service_uuid)
 
     def payload(self):
         """Return service UUID as bytes
         """
         if self.__service_uuid.type == UUID.TYPE_16:
             return pack('<HH', self.__start_handle, self.__end_handle) + self.__service_uuid.packed
-        else:
-            return pack('<HH', self.__start_handle, self.__end_handle)
+        # 128-bit UUID
+        return pack('<HH', self.__start_handle, self.__end_handle)
