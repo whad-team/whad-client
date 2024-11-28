@@ -1,1 +1,2 @@
-from whad.hub.ble import BLEMetadata, generate_ble_metadata
+"""Old metadata stuff, do we need to remove it ?
+"""
