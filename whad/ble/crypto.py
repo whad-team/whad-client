@@ -1,3 +1,7 @@
+"""Bluetooth Low Energy cryptographic helpers (based on Bluetooth Specification)
+"""
+from struct import pack
+
 from Cryptodome.Cipher import AES
 from Cryptodome.Hash import CMAC
 from Cryptodome.Random import get_random_bytes
@@ -5,16 +9,16 @@ from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, \
     generate_private_key, derive_private_key, EllipticCurvePublicNumbers, \
     ECDH
 from scapy.layers.bluetooth4LE import LL_ENC_REQ, LL_ENC_RSP, LL_START_ENC_REQ, \
-    BTLE_CTRL, BTLE_DATA, BTLE, BTLE_CONNECT_REQ
+    BTLE_CTRL, BTLE_DATA, BTLE_CONNECT_REQ
 from scapy.layers.bluetooth import SM_Hdr, SM_Pairing_Request, SM_Random, \
     SM_Pairing_Response, SM_Confirm, SM_Encryption_Information, SM_Master_Identification, \
     SM_Identity_Information, SM_Identity_Address_Information, SM_Signing_Information
+
 from whad.common.analyzer import TrafficAnalyzer
 from whad.hub.ble.bdaddr import BDAddress
-from whad.protocol.ble.ble_pb2 import BleDirection
+from whad.hub.ble import Direction as BleDirection
 from whad.ble.exceptions import MissingCryptographicMaterial
-from struct import pack
-from binascii import hexlify
+
 
 def generate_random_value(bits):
     """Generate a random value of provided bit size.
@@ -26,28 +30,32 @@ def generate_random_value(bits):
 
 def e(key, plaintext):
     """
-    Implements the security function e, defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.1.
+    Implements the security function e, defined in Bluetooth Core Specification,
+    [Vol 3] Part H, Section 2.2.1.
     """
     aes = AES.new(key,AES.MODE_ECB)
     return aes.encrypt(plaintext)
 
 def em1(key, ciphertext):
     """
-    Implements e{-1}, the inverse of the security function e, defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.1.
+    Implements e{-1}, the inverse of the security function e, defined in Bluetooth
+    Core Specification, [Vol 3] Part H, Section 2.2.1.
     """
     aes = AES.new(key,AES.MODE_ECB)
     return aes.decrypt(ciphertext)
 
 def s1(key, r1, r2):
     """
-    Implements the key generation function s1, defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.4.
+    Implements the key generation function s1, defined in Bluetooth Core Specification,
+    [Vol 3] Part H, Section 2.2.4.
     """
     r = r1[8:16] + r2[8:16]
     return e(key,r)
 
 def aes_cmac(key, message):
     """
-    Implements the AES-CMAC authentication function AES_CMAC, defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.5.
+    Implements the AES-CMAC authentication function AES_CMAC, defined in Bluetooth Core
+    Specification, [Vol 3] Part H, Section 2.2.5.
     """
     cmac = CMAC.new(key, ciphermod=AES)
     cmac.update(message)
@@ -62,7 +70,8 @@ def xor(a,b):
 
 def c1(key, r, pres, preq, iat, ia, rat, ra):
     """
-    Implements the Confirm value generation function c1 defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.3.
+    Implements the Confirm value generation function c1 defined in Bluetooth Core
+    Specification, [Vol 3] Part H, Section 2.2.3.
     """
     if isinstance(ia, str):
         ia = bytes.fromhex(ia.replace(":",""))
@@ -78,7 +87,8 @@ def c1(key, r, pres, preq, iat, ia, rat, ra):
 
 def c1m1(key, confirm, pres, preq, iat, ia, rat, ra):
     """
-    Implements the inverse of the Confirm value generation function c1{-1} defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.3.
+    Implements the inverse of the Confirm value generation function c1{-1}
+    defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.3.
     """
     if isinstance(ia, str):
         ia = bytes.fromhex(ia.replace(":",""))
@@ -94,62 +104,69 @@ def c1m1(key, confirm, pres, preq, iat, ia, rat, ra):
 
 def ah(key, r):
     """
-    Implements the random address hash function ah defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.3.
+    Implements the random address hash function ah defined in Bluetooth Core Specification,
+    [Vol 3] Part H, Section 2.2.3.
     """
     if isinstance(r, str):
-        r = bytes.fromhex(ia.replace(":",""))
+        r = bytes.fromhex(r.replace(":",""))
     rp = 13*b"\x00" + r
     return e(key, rp)[-3:]
 
-def f4(U, V, X, Z):
+def f4(u, v, x, z):
     """
-    Implements the Confirm value generation function f4 defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.6.
+    Implements the Confirm value generation function f4 defined in Bluetooth Core Specification,
+    [Vol 3] Part H, Section 2.2.6.
     """
-    return aes_cmac(X,U + V + Z)
+    return aes_cmac(x,u + v + z)
 
-def f5(W, N1, N2, A1, A2):
+def f5(w, n1, n2, a1, a2):
     """
-    Implements the key generation function f5 defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.7.
+    Implements the key generation function f5 defined in Bluetooth Core Specification,
+    [Vol 3] Part H, Section 2.2.7.
     """
     salt = bytes.fromhex("6C888391AAF5A53860370BDB5A6083BE")
-    T = aes_cmac(salt, W)
+    t = aes_cmac(salt, w)
     return (
-            aes_cmac(T, b"\x01" + b"\x62\x74\x6c\x65" + N1 + N2 + A1 + A2 + b"\x01\x00") +
-            aes_cmac(T, b"\x00" + b"\x62\x74\x6c\x65" + N1 + N2 + A1 + A2 + b"\x01\x00")
+            aes_cmac(t, b"\x01" + b"\x62\x74\x6c\x65" + n1 + n2 + a1 + a2 + b"\x01\x00") +
+            aes_cmac(t, b"\x00" + b"\x62\x74\x6c\x65" + n1 + n2 + a1 + a2 + b"\x01\x00")
     )
 
-def f6(W, N1, N2, R, IOcap, A1, A2):
+def f6(w, n1, n2, r, iocap, a1, a2):
     """
-    Implements the check value generation function f6 defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.8.
-    """
-    return (
-            aes_cmac(W, N1 + N2 + R + IOcap + A1 + A2)
-    )
-
-
-def g2(U, V, X , Y):
-    """
-    Implements the numeric comparison value generation function g2 defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.9.
+    Implements the check value generation function f6 defined in Bluetooth Core Specification,
+    [Vol 3] Part H, Section 2.2.8.
     """
     return (
-            aes_cmac(X,U+V+Y)[-4:]
-    )
-
-def h6(W, keyID):
-    """
-    Implements the link key conversion function h6 defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.10.
-    """
-    return (
-            aes_cmac(W,keyID)
+            aes_cmac(w, n1 + n2 + r + iocap + a1 + a2)
     )
 
 
-def h7(salt, W):
+def g2(u, v, x , y):
     """
-    Implements the link key conversion function h7 defined in Bluetooth Core Specification, [Vol 3] Part H, Section 2.2.11.
+    Implements the numeric comparison value generation function g2 defined in Bluetooth Core
+    Specification, [Vol 3] Part H, Section 2.2.9.
     """
     return (
-            aes_cmac(salt,W)
+            aes_cmac(x,u+v+y)[-4:]
+    )
+
+def h6(w, key_id):
+    """
+    Implements the link key conversion function h6 defined in Bluetooth Core Specification,
+    [Vol 3] Part H, Section 2.2.10.
+    """
+    return (
+            aes_cmac(w,key_id)
+    )
+
+
+def h7(salt, w):
+    """
+    Implements the link key conversion function h7 defined in Bluetooth Core Specification,
+    [Vol 3] Part H, Section 2.2.11.
+    """
+    return (
+            aes_cmac(salt,w)
     )
 
 def generate_p256_keypair(private_number=None):
@@ -203,26 +220,30 @@ class LinkLayerCryptoManager:
 
     def update_slave_counter(self, new_value):
         """
-        Update the slave's counter (counters must be updated to allow decryption and encryption).
+        Update the slave's counter (counters must be updated to allow decryption
+        and encryption).
         """
         self.slave_cnt = new_value
 
     def update_master_counter(self, new_value):
         """
-        Update the master's counter (counters must be updated to allow decryption and encryption).
+        Update the master's counter (counters must be updated to allow decryption
+        and encryption).
         """
         self.master_cnt = new_value
 
 
     def increment_slave_counter(self):
         """
-        Increment the slave's counter (counters must be updated to allow decryption and encryption).
+        Increment the slave's counter (counters must be updated to allow decryption
+        and encryption).
         """
         self.slave_cnt += 1
 
     def increment_master_counter(self):
         """
-        Increment the master's counter (counters must be updated to allow decryption and encryption).
+        Increment the master's counter (counters must be updated to allow decryption
+        and encryption).
         """
         self.master_cnt += 1
 
@@ -241,7 +262,8 @@ class LinkLayerCryptoManager:
         header = bytes([payload[0] & 0xe3])
         nonce = self.generate_nonce(direction)
         plaintext = payload[2:]
-        cipher = AES.new(self.session_key, AES.MODE_CCM, nonce=nonce, mac_len=4, assoc_len=len(header))
+        cipher = AES.new(self.session_key, AES.MODE_CCM, nonce=nonce, mac_len=4,
+                         assoc_len=len(header))
         cipher.update(header)
         ciphertext = cipher.encrypt(plaintext)
         mic = cipher.digest()
@@ -259,9 +281,10 @@ class LinkLayerCryptoManager:
         else:
             old_counter = self.slave_cnt
 
-        for i in range(error_tolerance):
+        for _ in range(error_tolerance):
             nonce = self.generate_nonce(direction)
-            cipher = AES.new(self.session_key, AES.MODE_CCM, nonce=nonce, mac_len=4, assoc_len=len(header))
+            cipher = AES.new(self.session_key, AES.MODE_CCM, nonce=nonce, mac_len=4,
+                             assoc_len=len(header))
             cipher.update(header)
             plaintext = cipher.decrypt(ciphertext)
             try:
@@ -282,12 +305,19 @@ class LinkLayerCryptoManager:
 
 
 class EncryptedSessionInitialization(TrafficAnalyzer):
-    def __init__(self, master_skd = None, master_iv = None, slave_skd = None, slave_iv = None):
-        self.reset()
+    """Custom traffic analyzer to detect encrypted session initialization
+    from BLE PDUs.
+    """
+
+    def __init__(self, master_skd = None, master_iv = None, slave_skd = None,
+                 slave_iv = None):
+        super().__init__()
         self.master_skd = master_skd
         self.master_iv = master_iv
         self.slave_skd = slave_skd
         self.slave_iv = slave_iv
+        self.started = False
+
 
     def reset(self):
         super().reset()
@@ -332,6 +362,8 @@ class EncryptedSessionInitialization(TrafficAnalyzer):
 
     @property
     def crypto_material(self):
+        """Retrieve recovered cryptographic material, if any.
+        """
         if (
                 self.master_skd is not None and
                 self.master_iv is not None and
@@ -339,17 +371,23 @@ class EncryptedSessionInitialization(TrafficAnalyzer):
                 self.slave_iv is not None
         ):
             return (self.master_skd, self.master_iv, self.slave_skd, self.slave_iv)
-        else:
-            return None
+
+        # No crypto material
+        return None
 
     @property
-    def encryption(self):
+    def encryption(self) -> bool:
+        """Determine if encryption is enabled or not.
+        """
         return self.crypto_material is not None and self.started
 
 
 
 
 class LinkLayerDecryptor:
+    """Custom decryptor for BLE link-layer.
+    """
+
     def __init__(self, *keys):
         self.keys = list(keys)
         self.managers = {}
@@ -360,6 +398,8 @@ class LinkLayerDecryptor:
 
 
     def add_crypto_material(self, master_skd, master_iv, slave_skd, slave_iv):
+        """Add cryptographic material to the decryptor.
+        """
         self.master_skd.append(master_skd)
         self.master_iv.append(master_iv)
         self.slave_skd.append(slave_skd)
@@ -367,6 +407,8 @@ class LinkLayerDecryptor:
 
 
     def add_key(self, key):
+        """Add an encryption key to the decryptor.
+        """
         if isinstance(key, str):
             if len(key) == 16:
                 key = key.encode('ascii')
@@ -385,6 +427,8 @@ class LinkLayerDecryptor:
         return False
 
     def attempt_to_decrypt(self, packet):
+        """Try to decrypt a packet based on known cryptograpgic material.
+        """
         if (
                 len(self.master_skd) == 0 or
                 len(self.master_iv) == 0 or
@@ -400,20 +444,24 @@ class LinkLayerDecryptor:
         if packet.len == 0 and packet.LLID == 1:
             return (None, False)
 
-        for i in range(len(self.master_skd)):
+        for i, skd in enumerate(self.master_skd):
             for key in self.keys:
 
                 if key not in self.managers:
-                    manager = LinkLayerCryptoManager(key, self.master_skd[i], self.master_iv[i], self.slave_skd[i], self.slave_iv[i])
+                    manager = LinkLayerCryptoManager(key, skd,
+                                                     self.master_iv[i], self.slave_skd[i],
+                                                     self.slave_iv[i])
                 else:
                     manager = self.managers[key]
 
-                plaintext, success = manager.decrypt(bytes(packet)[4:-3], direction=BleDirection.MASTER_TO_SLAVE)
+                plaintext, success = manager.decrypt(bytes(packet)[4:-3],
+                                                     direction=BleDirection.MASTER_TO_SLAVE)
                 if success:
                     manager.increment_master_counter()
                     self.managers[key] = manager
                 else:
-                    plaintext, success = manager.decrypt(bytes(packet)[4:-3], direction=BleDirection.SLAVE_TO_MASTER)
+                    plaintext, success = manager.decrypt(bytes(packet)[4:-3],
+                                                         direction=BleDirection.SLAVE_TO_MASTER)
                     if success:
                         manager.increment_slave_counter()
                         self.managers[key] = manager
@@ -426,17 +474,26 @@ class LinkLayerDecryptor:
 
 
 class IdentityResolvingKeyDistribution(TrafficAnalyzer):
+    """Traffic analyzer aiming at recovering an IRK
+    """
+
     def __init__(self):
-        self.reset()
+        self.irk = None
+        self.address = None
+        super().__init__()
 
     @property
     def output(self):
+        """Output state
+        """
         return {
             "address" : self.address,
             "irk" : self.irk
         }
 
     def process_packet(self, packet):
+        """Update traffic analyzer state by processing a specific packet.
+        """
         if SM_Identity_Information in packet:
             self.trigger()
             self.irk = packet.irk
@@ -448,16 +505,25 @@ class IdentityResolvingKeyDistribution(TrafficAnalyzer):
             self.complete()
 
     def reset(self):
+        """Reset analyzer state.
+        """
         super().reset()
         self.irk = None
         self.address = None
 
 class LongTermKeyDistribution(TrafficAnalyzer):
+    """Traffic analyzer to recover any long-term encryption key
+    """
     def __init__(self):
-        self.reset()
+        self.ediv = None
+        self.rand = None
+        self.ltk = None
+        super().__init__()
 
     @property
     def output(self):
+        """Analyzer output state.
+        """
         return {
             "ltk" : self.ltk,
             "rand" : self.rand,
@@ -465,6 +531,8 @@ class LongTermKeyDistribution(TrafficAnalyzer):
         }
 
     def process_packet(self, packet):
+        """Update analyzer state by processing a given packet.
+        """
         if SM_Encryption_Information in packet:
             self.trigger()
             self.ltk = packet.ltk
@@ -477,22 +545,31 @@ class LongTermKeyDistribution(TrafficAnalyzer):
             self.complete()
 
     def reset(self):
+        """Reset analyzer state.
+        """
         super().reset()
         self.ediv = None
         self.rand = None
         self.ltk = None
 
 class ConnectionSignatureResolvingKeyDistribution(TrafficAnalyzer):
+    """Traffic analyzer tp recover a CSRK.
+    """
     def __init__(self):
-        self.reset()
+        self.csrk = None
+        super().__init__()
 
     @property
     def output(self):
+        """Output satate.
+        """
         return {
             "csrk" : self.csrk
         }
 
     def process_packet(self, packet):
+        """Update analyzer state by processing a given packet.
+        """
         if SM_Signing_Information in packet:
             self.trigger()
             self.csrk = packet.csrk
@@ -504,158 +581,165 @@ class ConnectionSignatureResolvingKeyDistribution(TrafficAnalyzer):
         self.csrk = None
 
 class LegacyPairingCracking(TrafficAnalyzer):
-        def __init__(
-            self,
-            initiator = None,
-            responder = None,
-            pairing_req = None,
-            pairing_rsp = None,
-            master_confirm = None,
-            master_random = None,
-            slave_confirm = None,
-            slave_random = None
-        ):
-            self.reset()
-            self.initiator = initiator
-            self.responder = responder
+    """Traffic analyzer to break legacy pairing whenever it is possible.
+    """
+    def __init__(
+        self,
+        initiator = None,
+        responder = None,
+        pairing_req = None,
+        pairing_rsp = None,
+        master_confirm = None,
+        master_random = None,
+        slave_confirm = None,
+        slave_random = None
+    ):
+        super().__init__()
+        self.initiator = initiator
+        self.responder = responder
 
-            self.pairing_req = pairing_req
-            self.pairing_rsp = pairing_rsp
-            self.master_confirm = master_confirm
-            self.master_random = master_random
-            self.slave_confirm = slave_confirm
-            self.slave_random = slave_random
+        self.pairing_req = pairing_req
+        self.pairing_rsp = pairing_rsp
+        self.master_confirm = master_confirm
+        self.master_random = master_random
+        self.slave_confirm = slave_confirm
+        self.slave_random = slave_random
 
-        def reset(self):
-            super().reset()
-            self.initiator = None
-            self.responder = None
+        self.tk = None
+        self.stk = None
 
-            self.pairing_req = None
-            self.pairing_rsp = None
-            self.master_confirm = None
-            self.master_random = None
-            self.slave_confirm = None
-            self.slave_random = None
+    def reset(self):
+        super().reset()
+        self.initiator = None
+        self.responder = None
 
-            self.tk = None
-            self.stk = None
+        self.pairing_req = None
+        self.pairing_rsp = None
+        self.master_confirm = None
+        self.master_random = None
+        self.slave_confirm = None
+        self.slave_random = None
 
-        def process_packet(self, pkt):
-            if BTLE_CONNECT_REQ in pkt:
-                self.trigger()
-                self.initiator = BDAddress(pkt.InitA, random=pkt.TxAdd == 1)
-                self.responder = BDAddress(pkt.AdvA, random=pkt.RxAdd == 1)
-                self.mark_packet(pkt)
-            elif SM_Pairing_Request in pkt:
-                self.trigger()
-                self.pairing_req = bytes(pkt[SM_Hdr].build()) # why scapy why
-                self.mark_packet(pkt)
+        self.tk = None
+        self.stk = None
 
-            elif SM_Pairing_Response in pkt:
-                self.trigger()
-                self.pairing_rsp = bytes(pkt[SM_Hdr].build())
-                self.mark_packet(pkt)
+    def process_packet(self, packet):
+        """Update analyzer state by processing a given packet
+        """
+        if BTLE_CONNECT_REQ in packet:
+            self.trigger()
+            self.initiator = BDAddress(packet.InitA, random=packet.TxAdd == 1)
+            self.responder = BDAddress(packet.AdvA, random=packet.RxAdd == 1)
+            self.mark_packet(packet)
+        elif SM_Pairing_Request in packet:
+            self.trigger()
+            self.pairing_req = bytes(packet[SM_Hdr].build()) # why scapy why
+            self.mark_packet(packet)
 
-            elif SM_Confirm in pkt and self.master_confirm is None:
-                self.trigger()
-                self.master_confirm = bytes(pkt.confirm)
-                self.mark_packet(pkt)
-            elif SM_Confirm in pkt and self.master_confirm is not None:
-                self.trigger()
-                self.slave_confirm = bytes(pkt.confirm)
-                self.mark_packet(pkt)
-            elif SM_Random in pkt and self.master_random is None:
-                self.trigger()
-                self.master_random = bytes(pkt.random)
-                self.mark_packet(pkt)
-            elif SM_Random in pkt and self.master_random is not None:
-                self.trigger()
-                self.slave_random = bytes(pkt.random)
-                self.mark_packet(pkt)
-            if (
-                self.initiator is not None and
-                self.responder is not None and
-                self.pairing_req is not None and
-                self.pairing_rsp is not None and
-                self.master_confirm is not None and
-                self.slave_confirm is not None and
-                self.master_random is not None and
-                self.slave_random is not None
-            ):
-                self.complete()
+        elif SM_Pairing_Response in packet:
+            self.trigger()
+            self.pairing_rsp = bytes(packet[SM_Hdr].build())
+            self.mark_packet(packet)
 
-        def process_connected(self, initiator, responder):
-            self.initiator = initiator
-            self.responder = responder
+        elif SM_Confirm in packet and self.master_confirm is None:
+            self.trigger()
+            self.master_confirm = bytes(packet.confirm)
+            self.mark_packet(packet)
+        elif SM_Confirm in packet and self.master_confirm is not None:
+            self.trigger()
+            self.slave_confirm = bytes(packet.confirm)
+            self.mark_packet(packet)
+        elif SM_Random in packet and self.master_random is None:
+            self.trigger()
+            self.master_random = bytes(packet.random)
+            self.mark_packet(packet)
+        elif SM_Random in packet and self.master_random is not None:
+            self.trigger()
+            self.slave_random = bytes(packet.random)
+            self.mark_packet(packet)
 
-        # Harmonize this into Traffic Analyzer class, we CAN'T run a bruteforce every time a packet is processed
-        @property
-        def ready(self):
-            return (
-                self.initiator is not None and
-                self.responder is not None and
-                self.pairing_req is not None and
-                self.pairing_rsp is not None and
-                (
-                    (self.master_confirm is not None or
-                     self.slave_confirm is not None)
-                    and
-                    (self.master_random is not None and
-                    self.slave_random is not None)
-                )
+        if self.ready:
+            self.complete()
+
+    def process_connected(self, initiator, responder):
+        """Process a connection event.
+        """
+        self.initiator = initiator
+        self.responder = responder
+
+    # Harmonize this into Traffic Analyzer class, we CAN'T run a bruteforce
+    # every time a packet is processed
+    @property
+    def ready(self):
+        """Encryption material is available
+        """
+        return (
+            self.initiator is not None and
+            self.responder is not None and
+            self.pairing_req is not None and
+            self.pairing_rsp is not None and
+            (
+                (self.master_confirm is not None or
+                    self.slave_confirm is not None)
+                and
+                (self.master_random is not None and
+                self.slave_random is not None)
+            )
+        )
+
+    @property
+    def output(self):
+        """Output state.
+        """
+        keys = self.keys
+        if keys is None:
+            return {
+                "tk" : None,
+                "stk" : None
+            }
+
+        tk, stk = keys
+        return {
+            "tk" : tk,
+            "stk" : stk
+        }
+
+    @property
+    def keys(self):
+        """Recovered keys
+        """
+        if self.master_confirm is not None and self.master_random is not None:
+            rand = self.master_random
+            confirm = self.master_confirm
+        elif  self.slave_confirm is not None and self.slave_random is not None:
+            rand = self.slave_random
+            confirm = self.slave_confirm
+        else:
+            return None
+
+        if self.tk is not None and self.stk is not None:
+            return (self.tk, self.stk)
+
+        for i in range(0,1000000):
+            tk = pack(">IIII", 0,0,0,i)
+
+            p1 = self.pairing_rsp[::-1] + self.pairing_req[::-1] + (
+                (b"\x01" if self.responder.is_random() else b"\x00") +
+                (b"\x01" if self.initiator.is_random() else b"\x00")
             )
 
-        @property
-        def output(self):
-            keys = self.keys
-            if keys is None:
-                return {
-                    "tk" : None,
-                    "stk" : None
-                }
-            else:
-                tk, stk = keys
-                return {
-                    "tk" : tk,
-                    "stk" : stk
-                }
+            p2 = b"\x00\x00\x00\x00" + self.initiator.value[::-1] + self.responder.value[::-1]
 
-        @property
-        def keys(self):
+            a = xor(p1, rand[::-1])
+            aes = AES.new(tk, AES.MODE_ECB)
+            res1 = aes.encrypt(a)
+            b = xor(res1, p2)
+            res2 = aes.encrypt(b)
 
-            if self.master_confirm is not None and self.master_random is not None:
-                rand = self.master_random
-                confirm = self.master_confirm
-            elif  self.slave_confirm is not None and self.slave_random is not None:
-                rand = self.slave_random
-                confirm = self.slave_confirm
-            else:
-                return None
+            if res2 == confirm[::-1]:
 
-            if self.tk is not None and self.stk is not None:
-                return (self.tk, self.stk)
-
-            for i in range(0,1000000):
-                tk = pack(">IIII", 0,0,0,i)
-
-                p1 = self.pairing_rsp[::-1] + self.pairing_req[::-1] + (
-                    (b"\x01" if self.responder.is_random() else b"\x00") +
-                    (b"\x01" if self.initiator.is_random() else b"\x00")
-                )
-
-                p2 = b"\x00\x00\x00\x00" + self.initiator.value[::-1] + self.responder.value[::-1]
-
-                a = xor(p1, rand[::-1])
-                aes = AES.new(tk, AES.MODE_ECB)
-                res1 = aes.encrypt(a)
-                b = xor(res1, p2)
-                res2 = aes.encrypt(b)
-
-                if res2 == confirm[::-1]:
-
-                    stk = s1(tk, self.slave_random[::-1], self.master_random[::-1])
-                    self.tk = tk
-                    self.stk = stk
-                    return (tk, stk)
-            return None
+                stk = s1(tk, self.slave_random[::-1], self.master_random[::-1])
+                self.tk = tk
+                self.stk = stk
+                return (tk, stk)
+        return None
