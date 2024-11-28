@@ -93,9 +93,10 @@ class Scanner(BLE):
                     advertisement,
                     filter_addr=filter_address
                 )
+
                 for device in devices:
-                    if device is not None and device.scanned:
-                        yield device
+                    yield device
+
             if (timeout is not None) and (time() - start_time > timeout):
                 break
 
