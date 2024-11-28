@@ -1,3 +1,9 @@
+"""WHAD generic injection configuration for BLE.
+
+This module defines the :class:`whad.ble.injecting.InjectionConfiguration`
+used by `winject` to determine the parameters required for packet injection.
+"""
+
 from dataclasses import dataclass
 from whad.ble.sniffing import ConnectionConfiguration
 
