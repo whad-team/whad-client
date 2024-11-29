@@ -1,6 +1,8 @@
 """Att Exceptions
 """
 class AttErrorCode:
+    """ATT error codes
+    """
     INVALID_HANDLE_VALUE = 0x01
     READ_NOT_PERMITTED = 0x02
     WRITE_NOT_PERMITTED = 0x03
@@ -31,75 +33,85 @@ class AttError(Exception):
 class InvalidHandleValueError(AttError):
     """Exception raised when an invalid handle value is provided.
     """
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
 
 class ReadNotPermittedError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Exception raised when a read operation is performed while not permitted
+    """
 
 class WriteNotPermittedError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Exception raised when a write operation is performed while not allowed
+    """
 
 class InvalidPduError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Exception raised when an invalid PDU is processed
+    """
 
 class InsufficientAuthenticationError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Authentication required
+    """
 
 class UnsupportedRequestError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Exception raised when an unsupported request is received
+    """
 
 class InvalidOffsetError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Exception raised when an invalid offset is provided to a read or write
+    operation
+    """
 
 class InsufficientAuthorizationError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Exception raised if an authorization is required
+    """
 
 class PrepareQueueFullError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Raised when a prepare write queue is full.
+    """
 
 class AttributeNotFoundError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Exception raised when an attribute cannot be found.
+    """
 
 class AttributeNotLongError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Raised a read long operation is performed on a not-long attribute.
+    """
 
 class InsufficientEncryptionKeySize(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Raised when wrong key size is used
+    """
 
 class InvalidAttrValueLength(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Raised when an invalid length is used on an attribute
+    """
 
 class UnlikelyError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Raised when an unlikely error is triggered
+    """
 
 class InsufficientEncryptionError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Raised on insufficient encryption.
+    """
 
 class UnsupportedGroupTypesError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Raised when an unsupported group type is requested.
+    """
 
 class InsufficientResourcesError(AttError):
-    def __init__(self, request, handle):
-        super().__init__(request, handle)
+    """Raised to notify an error of resources
+    """
 
-def error_response_to_exc(error_code, request, handle):
-    RESP_TO_EXC = {
+def error_response_to_exc(error_code, request, handle) -> AttError:
+    """Convert error code to corresponding exception.
+
+    :param error_code: ATT error code
+    :type error_code: int
+    :param request: Request that lead to this error code
+    :type request: int
+    :param handle: related handle
+    :type handle: int
+    :return: corresponding exception
+    :rtype: AttError
+    """
+    resp_to_exc = {
         0x01: InvalidHandleValueError,
         0x02: ReadNotPermittedError,
         0x03: WriteNotPermittedError,
@@ -118,7 +130,7 @@ def error_response_to_exc(error_code, request, handle):
         0x10: UnsupportedGroupTypesError,
         0x11: InsufficientResourcesError
     }
-    if error_code in RESP_TO_EXC:
-        return RESP_TO_EXC[error_code](request, handle)
+    if error_code in resp_to_exc:
+        return resp_to_exc[error_code](request, handle)
     else:
         return AttError(request, handle)

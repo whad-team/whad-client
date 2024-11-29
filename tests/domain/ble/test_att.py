@@ -15,7 +15,7 @@ from scapy.layers.bluetooth import *
 from whad.common.stack import alias
 from whad.common.stack.tests import Sandbox, LayerMessage
 
-from whad.ble.stack.att import ATTLayer, ATT_Handle_Value_Confirmation
+from whad.ble.stack.att import ATTLayer, AttHandleValueConfirmation
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
 from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.exceptions import *
@@ -140,7 +140,7 @@ class TestAttToL2CAP(GattTest):
         '''Check if ATT layer `find_info_response()` sends
         the correct message to L2CAP.
         '''
-        att.find_info_response(format=1, handles=b'test')
+        att.find_info_response(form=1, handles=b'test')
         assert l2cap_instance.expect(LayerMessage(
             'att',
             'l2cap',
@@ -428,7 +428,7 @@ class TestAttToL2CAP(GattTest):
         assert l2cap_instance.expect(LayerMessage(
             'att',
             'l2cap',
-            ATT_Hdr() / ATT_Handle_Value_Confirmation()
+            ATT_Hdr() / AttHandleValueConfirmation()
         ))
 
 
