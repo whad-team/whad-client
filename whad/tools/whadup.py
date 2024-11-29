@@ -87,6 +87,8 @@ DOT15D4_COMMANDS = {
     Dot15d4Commands.Start: "Start: can start depending on the current mode",
     Dot15d4Commands.Stop: "Stop: can stop depending on the current mode",
     Dot15d4Commands.ManInTheMiddle: "ManInTheMiddle: can perform a Man-in-the-Middle attack",
+    Dot15d4Commands.Sync: "Sync: can synchronize with a TSCH-based network",
+
 }
 
 ESB_COMMANDS = {

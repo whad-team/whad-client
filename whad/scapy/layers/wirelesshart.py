@@ -941,12 +941,20 @@ broadcast_session_key = []
 assigned_nickname = 0x0002
 if __name__ == "__main__":
     count = 0
+    #pkts = rdpcap("whad/ressources/pcaps/wireless_hart_capture_channel_11_41424344414243444142434441424344_2nodes.pcap")
     pkts = rdpcap("whad/ressources/pcaps/wireless_hart_capture_channel_11_41424344414243444142434441424344_2nodes.pcap")
     for pkt in pkts:
         dot15d4_bytes = bytes(pkt)[44:]
         dot15d4_pkt = Dot15d4FCS(dot15d4_bytes)
+
         if WirelessHart_DataLink_Advertisement not in dot15d4_pkt:
             
+            print("-------------------------------------")
+            print("TIMESTAMP", pkt.time)
+            if hasattr(dot15d4_pkt, "asn_snippet"):
+                print("ASN_SNIPPET", dot15d4_pkt.asn_snippet)
+            #print("RAW", bytes(dot15d4_pkt).hex())
+            #print("REPR", repr(dot15d4_pkt))
             if WirelessHart_Network_Security_SubLayer_Hdr in dot15d4_pkt and dot15d4_pkt.security_types == 1:
                 decrypted = decrypt_nwk(dot15d4_pkt, key=b"ABCDABCDABCDABCD")
                 
@@ -979,7 +987,7 @@ if __name__ == "__main__":
                             # e06a7fa7f38a405bd2ff238d23dcdc1c
                             # 5ac873bfa618d4ce181d6f5faeabfb3b
 
-                    #WirelessHart_Transport_Layer_Hdr(decrypted).show()
+                    WirelessHart_Transport_Layer_Hdr(decrypted).show()
 
             elif WirelessHart_Network_Security_SubLayer_Hdr in dot15d4_pkt and dot15d4_pkt.security_types == 0:
                 print(hex(dot15d4_pkt.nwk_src_addr), "->", hex(dot15d4_pkt.nwk_dest_addr))
@@ -1018,13 +1026,19 @@ if __name__ == "__main__":
                     #else:
                     #    print("[!] failure")
                     #    break
+            else:
+                print("OTHER", repr(dot15d4_pkt))
         else:
-            #print("ASN", hex(dot15d4_pkt.asn))
+            print("ADV", " | time=",pkt.time, " | asn=",  dot15d4_pkt.asn)
+            #print(repr(dot15d4_pkt))#dot15d4_pkt.show()
+            #print()
             pass#dot15d4_pkt.show()
             #print("received mic:", hex(dot15d4_pkt.mic))
             #print("computed mic:", compute_dlmic(dot15d4_pkt, b'www.hartcomm.org').hex())
             #break
-print(unicast_session_key)
+
+
+
 '''
 conf.dot15d4_protocol = "wirelesshart"
 

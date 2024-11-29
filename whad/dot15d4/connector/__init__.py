@@ -82,6 +82,17 @@ class Dot15d4(WhadDeviceConnector):
             (commands & (1 << Commands.Stop))>0
         )
 
+
+    def can_synchronize(self) -> bool:
+        """
+        Determine if the device can synchronize with a TSCH-based network.
+        """
+        commands = self.device.get_domain_commands(Domain.Dot15d4)
+        return (
+            (commands & (1 << Commands.Sync)) > 0
+        )
+
+
     def can_set_node_address(self) -> bool:
         """
         Determine if the device can configure a Node address.
@@ -196,6 +207,18 @@ class Dot15d4(WhadDeviceConnector):
         # Create EndDeviceMode message
         msg = self.hub.dot15d4.create_coord_mode(channel)
 
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+
+    def synchronize(self, timestamp : int, asn : int) -> bool:
+        """
+        Synchronize with a TSCH-based network.
+        """
+        if not self.can_synchronize():
+            raise UnsupportedCapability("Synchronization")
+
+        # Create Sync message
+        msg = self.hub.dot15d4.create_sync(timestamp, asn)
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 

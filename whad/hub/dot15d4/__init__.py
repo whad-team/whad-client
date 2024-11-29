@@ -31,6 +31,7 @@ class Commands:
     Start = 0x09
     Stop = 0x0a
     ManInTheMiddle = 0x0b
+    Sync = 0x0c
 
 class MitmRole:
     """Dot15d4 Mitm role
@@ -142,7 +143,7 @@ def generate_dot15d4_metadata(message):
 
     return metadata
 
-@pb_bind(ProtocolHub, name="dot15d4", version=1)
+@pb_bind(ProtocolHub, name="dot15d4", version=2)
 class Dot15d4Domain(Registry):
     """WHAD Dot15d4 domain messages parser/factory.
     """
@@ -201,6 +202,21 @@ class Dot15d4Domain(Registry):
         message_type = message.dot15d4.WhichOneof('msg')
         message_clazz = Dot15d4Domain.bound(message_type, proto_version)
         return message_clazz.parse(proto_version, message)
+
+
+    def create_sync(self, timestamp: int, asn : int) -> HubMessage:
+        """Create a Sync message.
+
+        :param timestamp: integer representing the synchronization timestamp
+        :param asn: integer representing the synchronization absolute slot number
+        :type timestamp: int
+        :type asn: int
+        :return: instance of `Sync`
+        """
+        return Dot15d4Domain.bound('sync', self.proto_version)(
+            timestamp=timestamp,
+            asn=asn
+        )
 
     def create_set_node_address(self, address: NodeAddress) -> HubMessage:
         """Create a SetNodeAddress message.
@@ -462,10 +478,22 @@ class ZigBeeDomain(Dot15d4Domain):
         conf.dot15d4_protocol = "zigbee"
 
 
+@pb_bind(ProtocolHub, name="wirelesshart", version=2)
+class WirelessHartDomain(Dot15d4Domain):
+    NAME = 'wirelesshart'
+    VERSIONS = {}
+
+    def __init__(self, version: int):
+        """Initializes a Wireless Hart domain instance
+        """
+        super().__init__(version)
+        conf.dot15d4_protocol = "wirelesshart"
+
 from .address import SetNodeAddress
 from .mode import SniffMode, RouterMode, EndDeviceMode, CoordMode, EnergyDetectionMode, \
     JamMode, MitmMode, Start, Stop, Jammed, EnergyDetectionSample
 from .pdu import SendPdu, SendRawPdu, PduReceived, RawPduReceived
+from .tsch import Sync
 
 __all__ = [
     'SetNodeAddress',
@@ -489,5 +517,6 @@ __all__ = [
     'NodeAddressShort',
     'NodeAddressExt',
     'NodeAddressType',
-    'MitmRole'
+    'MitmRole', 
+    'Sync'
 ]
