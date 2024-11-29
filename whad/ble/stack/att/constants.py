@@ -1,15 +1,20 @@
 """ATT constants (error and operation codes)
 """
 import sys
+from typing import List
 
 if sys.version_info[0] == 3 and sys.version_info[1] >= 10:
     # Import UnionType only for Python >= 3.10
     from types import UnionType
     def is_union_type(obj):
+        """Determine if object is of UnionType.
+        """
         return isinstance(obj, UnionType)
 else:
     # UnionType is not available
-    def is_union_type(obj):
+    def is_union_type(_):
+        """UnionType is not available by default
+        """
         return False
 
 class BleAttOpcode:
@@ -66,11 +71,17 @@ class BleAttErrorCode:
     INSUFFICIENT_RESOURCES = 0x11
 
 class SecurityMode:
+    """SMP Security mode
+
+    This class is used to store the security mode and level.
+    """
     def __init__(self, security_mode=0, security_level=0):
         self.security_mode = security_mode
         self.security_level = security_level
 
 class BleAttSecurityMode:
+    """BLE default security modes
+    """
     NO_ACCESS = SecurityMode(0, 0)
     OPEN = SecurityMode(1, 1)
     ENCRYPTION_NO_AUTHENTICATION = SecurityMode(1, 2)
@@ -80,25 +91,36 @@ class BleAttSecurityMode:
     DATA_SIGNING_WITH_AUTHENTICATION = SecurityMode(2, 2)
 
 class BleAttProperties:
+    """BLE Attribute properties
+    """
     READ = 0x01
     WRITE = 0x02
     DEFAULT = READ | WRITE
 
 
 class SecurityProperty:
+    """BLE basic security property
+    """
     def __repr__(self):
         return self.__class__.__name__
 
 class Encryption(SecurityProperty):
-    pass
+    """Encryption security property
+    """
 
 class Authentication(SecurityProperty):
-    pass
+    """Authentication security property
+    """
 
 class Authorization(SecurityProperty):
-    pass
+    """Authorization security property
+    """
 
 class SecurityAccess:
+    """Security access definition
+
+    A security access is determined by one or more security properties.
+    """
     TYPE = ""
 
     def __init__(self, *args):
@@ -110,39 +132,59 @@ class SecurityAccess:
         else:
             self.__access = []
 
-    def requires_encryption(self):
+    def requires_encryption(self) -> bool:
+        """Determine if encryption security property is set
+        """
         return Encryption in self.__access
 
-    def requires_authentication(self):
+    def requires_authentication(self) -> bool:
+        """Determine if authentication security property is set
+        """
         return Authentication in self.__access
 
-    def requires_authorization(self):
+    def requires_authorization(self) -> bool:
+        """Determine if authorization security property is set
+        """
         return Authorization in self.__access
 
     @property
     def access(self):
+        """Security access properties
+        """
         return self.__access
 
     def __repr__(self):
-        return "%s (%s)" % (self.__class__.TYPE, " | ".join([a.__name__ for a in self.access]))
+        """String representation
+        """
+        props = " | ".join([a.__name__ for a in self.access])
+        return f"{self.__class__.TYPE} ({props})"
 
     @classmethod
     def generate(cls, val):
+        """Generate a security access based on a list of security properties.
+        """
         if isinstance(val, list) and all([isinstance(i, SecurityAccess) for i in val]):
             return val
-        elif isinstance(val, SecurityAccess):
+
+        if isinstance(val, SecurityAccess):
             return [val]
-        else:
-            return []
+
+        return []
 
     def __or__(self, other):
+        """overload the | operator to append a security property to the current
+        properties.
+        """
         if isinstance(other, SecurityAccess):
             return [self, other]
-        else:
-            return [self]
+
+        return [self]
 
     @classmethod
-    def accesses_to_int(cls, value):
+    def accesses_to_int(cls, value) -> int:
+        """Convert a security access into the corresponding integer value.
+        """
+        shift = 0
         return_value = 0
         for access in value:
             if isinstance(access, ReadAccess):
@@ -159,7 +201,10 @@ class SecurityAccess:
         return return_value
 
     @classmethod
-    def int_to_accesses(cls, value):
+    def int_to_accesses(cls, value) -> List[SecurityProperty]:
+        """Convert an integer value into the corresponding security properties
+        list
+        """
         accesses = []
         read_properties = []
         if bool(value & 1):
@@ -184,11 +229,11 @@ class SecurityAccess:
         return accesses
 
 class ReadAccess(SecurityAccess):
+    """Default read access
+    """
     TYPE = "Read"
 
 class WriteAccess(SecurityAccess):
+    """Default write access
+    """
     TYPE = "Write"
-
-'''
-ReadAccess(Encryption, Authentication, Authorization) | WriteAccess(Encryption, Authentication)
-'''

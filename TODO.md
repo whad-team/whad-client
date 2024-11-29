@@ -75,16 +75,16 @@ Python library allowing to interact with offensive security tools implementing t
         - [x] whad.ble.ble_proxy
         - [x] whad.ble.ble_spawn
     - [x] whad.ble.connector
-    - [x] whad.ble.profile
+    - [x] whad.ble.profile -> + unit tests for service/characteristic
     - [ ] whad.ble.stack
     - [x] whad.ble.tools
     - [x] whad.ble.utils
-    - [ ] whad.ble.crypto
-    - [ ] whad.ble.exceptions
-    - [ ] whad.ble.injecting
-    - [ ] whad.ble.metadata
-    - [ ] whad.ble.scanning
-    - [ ] whad.ble.sniffing
+    - [x] whad.ble.crypto
+    - [x] whad.ble.exceptions
+    - [x] whad.ble.injecting
+    - [x] whad.ble.metadata
+    - [x] whad.ble.scanning
+    - [x] whad.ble.sniffing
 - [ ] whad.cli
     - [ ] whad.cli.app
     - [ ] whad.cli.shell
