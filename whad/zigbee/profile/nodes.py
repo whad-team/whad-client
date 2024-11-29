@@ -61,6 +61,7 @@ class Node:
         ):
             self.__active_endpoints = []
             endpoints = self.stack.get_layer('apl').get_application_by_name("zdo").device_and_service_discovery.get_active_endpoints(self.__address)
+            
             if endpoints is None:
                 self.__active_endpoints = None
                 raise EndpointsDiscoveryException()

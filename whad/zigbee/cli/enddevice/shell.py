@@ -220,7 +220,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
             target = self.__cache[args[0]]
             target_pan_id = Dot15d4Address(target['info'].extended_pan_id)
 
-        except IndexError:
+        except (IndexError, KeyError):
             # If target not in cache, we are expecting an extended PAN ID or a PAN ID
             try:
                 target_pan_id = Dot15d4Address(args[0])
@@ -304,7 +304,6 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                 print("Discovering surrounding nodes.")
                 nodes = self.__target_network['info'].discover()
                 self.__target_network['discovered'] = True
-                print([(node.address, node.extended_address) for node in nodes])
                 for node in nodes:
                     if isinstance(node, CoordinatorNode):
                         print("New Coordinator discovered (addr. = %s, ext. addr. = %s)" % (
@@ -416,12 +415,12 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                 for endpoint in selected_node.endpoints:
                     try:
                         profile_name = ZIGBEE_PROFILE_IDENTIFIERS[endpoint.profile_id]
-                    except IndexError:
+                    except (IndexError, KeyError):
                         profile_name = "Unknown"
 
                     try:
                         device_name = ZIGBEE_DEVICE_IDENTIFIERS[endpoint.device_id]
-                    except IndexError:
+                    except (IndexError, KeyError):
                         device_name = "Unknown device"
 
                     print_formatted_text(HTML('<ansigreen><b>Endpoint #%d: %s profile (%s) -> %s device (%s) </b></ansigreen>' %
@@ -438,7 +437,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                     for cluster_id in endpoint.input_clusters:
                         try:
                             category, cluster_name = ZIGBEE_CLUSTER_IDENTIFIERS[cluster_id]
-                        except IndexError:
+                        except (IndexError, KeyError):
                             category, cluster_name = ("Unknown category", "Unknown cluster")
                         print_formatted_text(HTML('    | <b>%s - %s (%s)</b>' % (category, cluster_name, hex(cluster_id))))
 
@@ -446,7 +445,7 @@ class ZigbeeEndDeviceShell(InteractiveShell):
                     for cluster_id in endpoint.output_clusters:
                         try:
                             category, cluster_name = ZIGBEE_CLUSTER_IDENTIFIERS[cluster_id]
-                        except IndexError:
+                        except (IndexError, KeyError):
                             category, cluster_name = ("Unknown category", "Unknown cluster")
                         print_formatted_text(HTML('    | <b>%s - %s (%s)</b>' % (category, cluster_name, hex(cluster_id))))
                 print()
@@ -463,20 +462,24 @@ class ZigbeeEndDeviceShell(InteractiveShell):
         for node in self.__target_network['info'].nodes:
             if address == "0x{:04x}".format(node.address) or address == str(Dot15d4Address(node.extended_address)).lower():
                 endpoints = {}
-                for endpoint in node.endpoints:
-                    input_clusters = {}
-                    for input_cluster in endpoint.input_clusters:
-                        commands = {}
-                        for candidate_cluster_class in ZCLClientCluster.child_clusters():
-                            candidate = candidate_cluster_class()
-                            if candidate.cluster_id == input_cluster:
-                                for command_id, command in candidate.CLUSTER_SPECIFIC_COMMANDS.items():
-                                    commands[str(command['name'].replace(' ', '_').lower())] = None
-                                for command_id, command in candidate.PROFILE_WIDE_COMMANDS.items():
-                                    commands[str(command['name'].replace(' ', '_').lower())] = None
-                                break
-                        input_clusters[str(input_cluster)] = commands
-                    endpoints[str(endpoint.number)] = input_clusters
+                try:
+                    for endpoint in node.endpoints:
+                        input_clusters = {}
+                        if endpoint is not None:
+                            for input_cluster in endpoint.input_clusters:
+                                commands = {}
+                                for candidate_cluster_class in ZCLClientCluster.child_clusters():
+                                    candidate = candidate_cluster_class()
+                                    if candidate.cluster_id == input_cluster:
+                                        for command_id, command in candidate.CLUSTER_SPECIFIC_COMMANDS.items():
+                                            commands[str(command['name'].replace(' ', '_').lower())] = None
+                                        for command_id, command in candidate.PROFILE_WIDE_COMMANDS.items():
+                                            commands[str(command['name'].replace(' ', '_').lower())] = None
+                                        break
+                                input_clusters[str(input_cluster)] = commands
+                        endpoints[str(endpoint.number)] = input_clusters
+                except EndpointsDiscoveryException:
+                    pass
         return endpoints
 
     def complete_cluster_cmd(self):
