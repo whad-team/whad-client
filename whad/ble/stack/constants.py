@@ -1,7 +1,9 @@
 """Bluetooth Low Energy stack constants
 """
 
-class BtVersion(object):
+class BtVersion:
+    """Bluetooth version wrapper
+    """
 
     def __init__(self, major, minor, desc=''):
         self.desc = desc
@@ -55,11 +57,9 @@ BT_VERSIONS = {
     0x0C: BtVersion(5, 3, 'Bluetooth Core Specification 5.3')
 }
 
-BT_VERSIONS
-
-
 # manufacturers as defined by the Bluetooth SIG
-# (https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers). Last updated 08/02/22
+# (https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers).
+# Last updated 08/02/22
 BT_MANUFACTURERS = {
     0x0000: 'Ericsson Technology Licensing',
     0x0001: 'Nokia Mobile Phones',
@@ -3055,8 +3055,12 @@ BT_MANUFACTURERS = {
     0x0BB0: 'Ecolab Inc.',
     0x0BB1: 'Beijing ranxin intelligence technology Co.,LTD',
     0x0BB2: 'Fjorden Electra AS',
-    0xffff: 'This value has special meaning depending on the context in which it used.\nLink Manager Protocol (LMP): '
-            'This value may be used in the internal and interoperability tests before a Company ID has been assigned. '
-            'This value shall not be used in shipping end products.\nDevice ID Profile: This value is reserved as the '
-            'default vendor ID when no Device ID service record is present in a remote device.'
+    0xffff: 'This value has special meaning depending on the context in which it used.\n'
+            'Link Manager Protocol (LMP): '
+            'This value may be used in the internal and interoperability tests before a '
+            'Company ID has been assigned. '
+            'This value shall not be used in shipping end products.\n'
+            'Device ID Profile: This value is reserved as the '
+            'default vendor ID when no Device ID service record is present in a'
+            'remote device.'
 }
