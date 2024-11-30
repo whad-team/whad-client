@@ -386,6 +386,10 @@ class LinkLayer(Layer):
     """Bluetooth Low Energy link-layer implementation.
     """
 
+    def __init__(self, parent=None, layer_name=None, options=None):
+        super().__init__(parent=parent, layer_name=layer_name, options=options)
+        self.__llcm = None
+
     def configure(self, options=None):
         # Control PDU dispatch
         self.__handlers = {
@@ -435,18 +439,23 @@ class LinkLayer(Layer):
                 local_peer_addr,
                 remote_peer_addr
             )
-        else:
-            logger.error('[!] Connection already exists')
+        # Connection already exists
+        logger.error('[!] Connection already exists')
 
-            # Return connection object
-            return BleConnection(
-                self,
-                conn_handle,
-                local_peer_addr,
-                remote_peer_addr
-            )
+        # Return connection object
+        return BleConnection(
+            self,
+            conn_handle,
+            local_peer_addr,
+            remote_peer_addr
+        )
 
-    def on_disconnect(self, conn_handle):
+    def on_disconnect(self, conn_handle: int):
+        """Handle disconnection event
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        """
         # Free the previously instantiated L2CAP layer
         conn_layer = self.state.get_connection_l2cap(conn_handle)
         if conn_layer is not None:
@@ -456,8 +465,13 @@ class LinkLayer(Layer):
         self.state.unregister_connection(conn_handle)
 
     @source('phy', 'data')
-    def on_data_pdu_recv(self, pdu, conn_handle=None):
-        """We received a DATA PDU.
+    def on_data_pdu_recv(self, pdu: Packet, conn_handle: int = None):
+        """Handle data PDU sent by our PHY layer
+
+        :param pdu: Incoming PDU to process
+        :type pdu: Packet
+        :param conn_handle: Connection handle
+        :type conn_handle: int
         """
         # Count PDU
         if conn_handle in self.state.connections:
@@ -468,8 +482,15 @@ class LinkLayer(Layer):
         self.on_data_pdu(pdu, conn_handle)
 
     @source('phy', 'control')
-    def on_ctrl_pdu_recv(self, pdu, tag=None, conn_handle=None):
-        """We received a CTRL PDU.
+    def on_ctrl_pdu_recv(self, pdu: Packet, tag: str = None, conn_handle: int = None):
+        """Handle control PDU received by our PHY layer
+
+        :param pdu: Received control PDU
+        :type pdu: Packet
+        :param tag: Optional tag
+        :type tag: str, optional
+        :param conn_handle: Connection handle
+        :type conn_handle: int
         """
         # Count PDU
         if conn_handle in self.state.connections:
@@ -479,7 +500,15 @@ class LinkLayer(Layer):
         # We received a control PDU
         self.on_ctrl_pdu(pdu, conn_handle)
 
-    def on_ctrl_pdu(self, pdu, conn_handle):
+    def on_ctrl_pdu(self, pdu: Packet, conn_handle: int):
+        """Process a specific control PDU by calling the associated
+        control PDU type handler.
+
+        :param pdu: Control PDU
+        :type pdu: Packet
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        """
         if conn_handle in self.state.connections:
             ctrl = pdu.getlayer(BTLE_CTRL)
             if ctrl.opcode in self.__handlers:
@@ -488,8 +517,14 @@ class LinkLayer(Layer):
             logger.error('[!] Unknown connection handle: %d', conn_handle)
 
 
-    def on_data_pdu(self, pdu, conn_handle):
-        """Forward data PDU to upper layer (L2CAP)
+    def on_data_pdu(self, pdu: Packet, conn_handle: int):
+        """Forward data PDU to the upper layer (L2CAP) instance of the
+        connection identified by its connection handle.
+
+        :param pdu: Incoming data PDU
+        :type pdu: Packet
+        :param conn_handle: Connection handle
+        :type conn_handle: int
         """
         # We look for the corresponding L2CAP layer instance
         l2cap_layer = self.state.get_connection_l2cap(conn_handle)
@@ -497,15 +532,21 @@ class LinkLayer(Layer):
             self.send(l2cap_layer, bytes(pdu.payload), fragment=pdu.LLID == 0x1)
 
     @instance('l2cap')
-    def on_l2cap_send_data(self, instance, data, fragment=False, encrypt=None):
-        '''L2CAP data encapsulation
+    def on_l2cap_send_data(self, l2cap_inst: Layer, data: Packet, fragment=False, encrypt=None):
+        '''Handle L2CAP packets coming from our L2CAP layer and encapsulate them into a
+        BTLE_DATA packet (data PDU).
 
-        This method retrieves the connection handle corresponding to the instance
-        that wants to send data and build a BTLE_DATA packet to send to the PHY
-        layer.
+        :param l2cap_inst: Connection L2CAP instance
+        :type l2cap_inst: Layer
+        :param data: L2CAP packet to forward to PHY
+        :type data: Packet
+        :param fragment: If set to `True`, will set the fragment flag in the data PDU.
+        :type fragment: bool
+        :param encrypt: If set to `True`, enable encryption for this data PDU
+        :type encrypt: bool
         '''
         # Retrieve connection handle corresponding to the instance
-        conn_handle = self.state.get_connection_handle(instance)
+        conn_handle = self.state.get_connection_handle(l2cap_inst)
         if conn_handle is not None:
             logger.debug("sending l2cap data PDU for conn_handle %d", conn_handle)
             llid = 0x01 if fragment else 0x02
@@ -522,8 +563,15 @@ class LinkLayer(Layer):
         else:
             logger.error("no connection handle found for L2CAP instance %s", instance)
 
-    def send_ctrl_pdu(self, conn_handle, pdu, encrypt=None):
+    def send_ctrl_pdu(self, conn_handle: int, pdu: Packet, encrypt: bool = None):
         """Send a control PDU to the underlying PHY layer.
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param pdu: control PDU to send
+        :type pdu: Packet
+        :param encrypt: If set to `True`, control PDU will be sent encrypted
+        :type encrypt: bool
         """
         self.send('phy', BTLE_DATA()/BTLE_CTRL()/pdu, tag='control',
                   conn_handle=conn_handle, encrypt=encrypt)
@@ -531,24 +579,46 @@ class LinkLayer(Layer):
 
     ### Link-layer control PDU callbacks
 
-    def on_unsupported_opcode(self, conn_handle, opcode):
+    def on_unsupported_opcode(self, conn_handle: int, opcode: int):
+        """Handle unsupported control PDU opcodes.
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param opcode: control PDU opcode
+        :type opcode: int
+        """
         self.send_ctrl_pdu(
             conn_handle,
             LL_UNKNOWN_RSP(code=opcode)
         )
 
-    def on_connection_update_req(self, conn_handle, conn_update):
+    def on_connection_update_req(self, conn_handle: int, conn_update: LL_CONNECTION_UPDATE_IND):
         """Connection update is not supported yet
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param conn_update: Connection update PDU
+        :type conn_update: LL_CONNECTION_UPDATE_IND
         """
         self.on_unsupported_opcode(conn_handle, CONNECTION_UPDATE_REQ)
 
-    def on_channel_map_req(self, conn_handle, channel_map):
+    def on_channel_map_req(self, conn_handle: int, channel_map: LL_CHANNEL_MAP_IND):
         """Channel map update is not supported yet
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param channel_map: channel map PDU
+        :type channel_map: LL_CHANNEL_MAP_IND
         """
         self.on_unsupported_opcode(conn_handle, CHANNEL_MAP_REQ)
 
-    def on_terminate_ind(self, conn_handle, terminate):
+    def on_terminate_ind(self, conn_handle: int, terminate: LL_TERMINATE_IND):
         """Terminate this connection
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param terminate: Terminate PDU
+        :type terminate: LL_TERMINATE_IND
         """
         # Connection has been terminated
         conn = self.state.get_connection(conn_handle)
@@ -597,8 +667,13 @@ class LinkLayer(Layer):
                 )
             )
 
-    def on_enc_rsp(self, conn_handle, enc_rsp):
+    def on_enc_rsp(self, conn_handle, enc_rsp: LL_ENC_RSP):
         """Encryption response handler
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param enc_rsp: Encryption response PDU
+        :type enc_rsp: LL_ENC_RSP
         """
         # Retrieve connection handle corresponding to the instance
 
@@ -677,8 +752,13 @@ class LinkLayer(Layer):
             )
 
 
-    def on_enc_req(self, conn_handle, enc_req):
+    def on_enc_req(self, conn_handle: int, enc_req: LL_ENC_REQ):
         """Encryption request handler
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param enc_req: Encryption request PDU
+        :type enc_req: LL_ENC_REQ
         """
         # Retrieve connection handle corresponding to the instance
 
@@ -782,8 +862,13 @@ class LinkLayer(Layer):
                 )
             )
 
-    def on_start_enc_req(self, conn_handle, start_enc_req):
+    def on_start_enc_req(self, conn_handle: int, start_enc_req: LL_START_ENC_REQ):
         """Encryption start request handler.
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param start_enc_req: Start encryption request PDU
+        :type start_enc_req: LL_START_ENC_REQ
         """
 
         # Start encryption (STK as LTK)
@@ -792,14 +877,17 @@ class LinkLayer(Layer):
             LL_START_ENC_RSP()
         )
 
-    def on_start_enc_rsp(self, conn_handle, start_enc_rsp):
+    def on_start_enc_rsp(self, conn_handle: int, start_enc_rsp: LL_START_ENC_RSP):
         """Encryption start response handler
 
         Normally, we get this packet when a link has successfully
         been encrypted (with STK or LTK). So we need to notify the
         SMP that encryption has been acknowledged by the remote peer.
 
-
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param start_enc_rsp: Start encryption response PDU
+        :type start_enc_rsp: LL_START_ENC_RSP
         """
         # Check if we are the encryption initiator,
         # if yes then we need to answer to this encrypted LL_START_ENC_RSP
@@ -817,11 +905,22 @@ class LinkLayer(Layer):
         # Notify SMP channel is now encrypted
         self.get_layer(l2cap_instance).get_layer('smp').on_channel_encrypted()
 
-    def on_unknown_rsp(self, conn_handle, unk_rsp):
-        pass
+    def on_unknown_rsp(self, conn_handle: int, unk_rsp: LL_UNKNOWN_RSP):
+        """handle unknown response PDU (not expected).
 
-    def on_feature_req(self, conn_handle, feature_req):
-        """Features not supported yet
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param unk_rsp: Unknown response PDU
+        :type unk_rsp: LL_UNKNOWN_RSP
+        """
+
+    def on_feature_req(self, conn_handle: int, feature_req: LL_FEATURE_REQ):
+        """Handle feature request
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param feature_req: Feature request PDU
+        :type feature_req: LL_FEATURE_REQ
         """
         #self.on_unsupported_opcode(FEATURE_REQ)
         # Reply with our basic feature set
@@ -833,23 +932,43 @@ class LinkLayer(Layer):
             ])
         )
 
-    def on_feature_rsp(self, conn_handle, feature_rsp):
+    def on_feature_rsp(self, conn_handle: int, feature_rsp: LL_FEATURE_RSP):
         """Features not supported yet
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param feature_rsp: Feature response PDU
+        :type feature_rsp: LL_FEATURE_RSP
         """
         self.on_unsupported_opcode(conn_handle, FEATURE_RSP)
 
-    def on_pause_enc_req(self, conn_handle, pause_enc_req):
-        """Encryption not supported yet
+    def on_pause_enc_req(self, conn_handle: int, pause_enc_req: LL_PAUSE_ENC_RSP):
+        """Encryption not supported yet.
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param pause_enc_req: Pause encryption request PDU
+        :type pause_enc_req: LL_PAUSE_ENC_RSP
         """
         self.on_unsupported_opcode(conn_handle, PAUSE_ENC_REQ)
 
-    def on_pause_enc_rsp(self, conn_handle, pause_enc_rsp):
-        """Encryption not supported yet
+    def on_pause_enc_rsp(self, conn_handle: int, pause_enc_rsp: LL_PAUSE_ENC_RSP):
+        """Encryption not supported yet.
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param pause_enc_rsp: Pause encryption response PDU
+        :type pause_enc_rsp: LL_PAUSE_ENC_RSP
         """
         self.on_unsupported_opcode(conn_handle, PAUSE_ENC_RSP)
 
-    def on_version_ind(self, conn_handle, version):
+    def on_version_ind(self, conn_handle: int, version: LL_VERSION_IND):
         """Send back our version info
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param version: Remote peer version PDU
+        :type version: LL_VERSION_IND
         """
         logger.debug('received a VERSION_IND PDU')
         if not self.state.is_version_sent(conn_handle):
@@ -869,33 +988,89 @@ class LinkLayer(Layer):
         self.state.set_version_remote(conn_handle, version)
         self.state.mark_version_sent(conn_handle)
 
-    def on_reject_ind(self, conn_handle, reject):
-        pass
+    def on_reject_ind(self, conn_handle: int, reject: int):
+        """Handle reject PDU
 
-    def on_slave_feature_req(self, conn_handle, feature_req):
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param reject: rejection reason
+        :type reject: int
+        """
+
+    def on_slave_feature_req(self, conn_handle: int, feature_req: LL_SLAVE_FEATURE_REQ):
+        """Handle slave feature request, return unsupported PDU for now.
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param feature_req: Slave feature request packet
+        :type feature_req: Packet
+        """
         self.on_unsupported_opcode(conn_handle, SLAVE_FEATURE_REQ)
 
-    def on_connection_param_req(self, conn_handle, conn_param_req):
+    def on_connection_param_req(self, conn_handle: int, conn_param_req: LL_CONNECTION_PARAM_REQ):
+        """Handle connection parameter request
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param conn_param_req: Connection parameter request packet
+        :type conn_param_req: LL_CONNECTION_PARAM_REQ
+        """
         self.on_unsupported_opcode(conn_handle, CONNECTION_PARAM_REQ)
 
-    def on_connection_param_rsp(self, conn_handle, conn_param_rsp):
-        pass
+    def on_connection_param_rsp(self, conn_handle: int, conn_param_rsp: LL_CONNECTION_PARAM_RSP):
+        """Handle connection parameter response
 
-    def on_reject_ind_ext(self, conn_handle, reject_ext):
-        pass
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param conn_param_rsp: Connection parameter response
+        :type conn_param_rsp: LL_CONNECTION_PARAM_RSP
+        """
 
-    def on_ping_req(self, conn_handle, ping_req):
+    def on_reject_ind_ext(self, conn_handle: int, reject_ext: LL_REJECT_EXT_IND):
+        """Handle extended rejection PDU
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param reject_ext: Extended rejection PDU
+        :type reject_ext: LL_REJECT_EXT_IND
+        """
+
+    def on_ping_req(self, conn_handle: int, ping_req: LL_PING_REQ):
+        """Handle ping request (not supported for now)
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param ping_req: Ping request PDU
+        :type ping_req: LL_PING_REQ
+        """
         self.on_unsupported_opcode(conn_handle, PING_REQ)
 
-    def on_ping_rsp(self, conn_handle, ping_rsp):
-        pass
+    def on_ping_rsp(self, conn_handle: int, ping_rsp: LL_PING_RSP):
+        """Handle ping response (unsupported for now).
 
-    def on_length_req(self, conn_handle, length_req):
-        """Received a length request PDU
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param ping_rsp: Ping response PDU
+        :type ping_rsp: LL_PING_RSP
+        """
+
+    def on_length_req(self, conn_handle: int, length_req: LL_LENGTH_REQ):
+        """Received a length request PDU (unsupported for now)
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param length_req: Length request PDU
+        :type length_req: LL_LENGTH_REQ
         """
         self.on_unsupported_opcode(conn_handle, LENGTH_REQ)
 
-    def on_length_rsp(self, conn_handle, length_rsp):
-        pass
+    def on_length_rsp(self, conn_handle: int, length_rsp: LL_LENGTH_RSP):
+        """Handle length response
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param length_rsp: Length response
+        :type length_rsp: LL_LENGTH_RSP
+        """
 
 LinkLayer.add(L2CAPLayer)
