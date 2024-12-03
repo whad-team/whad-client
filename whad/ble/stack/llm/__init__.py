@@ -158,7 +158,8 @@ class LinkLayerState(LayerState):
             return self.connections[conn_handle]
         raise IndexError
 
-    def register_connection(self, conn_handle, l2cap_instance, local_peer_addr, remote_peer_addr):
+    def register_connection(self, conn_handle, l2cap_instance, local_peer_addr: BDAddress,
+                            remote_peer_addr: BDAddress):
         """Register a connection into this link-layer state.
 
         :param conn_handle: Connection handle
