@@ -75,6 +75,7 @@ wble-proxy = "whad.ble.cli.ble_proxy:ble_proxy_main"
 wuni-scan = "whad.unifying.cli.wuni_scan:wuni_scan_main"
 wuni-mouse = "whad.unifying.cli.wuni_mouse:wuni_mouse_main"
 wuni-keyboard = "whad.unifying.cli.wuni_keyboard:wuni_kb_main"
+wbtmesh-provisionee = "whad.btmesh.cli.provisionee:btmesh_provisionee_main"
 
 # setuptools specific
 [tool.setuptools]
