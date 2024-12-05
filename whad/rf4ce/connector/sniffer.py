@@ -139,10 +139,9 @@ class Sniffer(RF4CE, EventsManager):
                 message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
-                    packet = self.process_packet(packet)
-
-                    self.monitor_packet_rx(packet)
-
-                    yield packet
+                    if packet is not None:
+                        packet = self.process_packet(packet)
+                        self.monitor_packet_rx(packet)
+                        yield packet
         except WhadDeviceDisconnected:
             return

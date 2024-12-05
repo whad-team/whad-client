@@ -1,10 +1,14 @@
 """WHAD Protocol Dot15d4 pdu messages abstraction layer.
 """
-from struct import pack
+import logging
+
+from struct import pack, error as StructError
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool
 from whad.hub.dot15d4 import Dot15d4Domain, Dot15d4Metadata
+
+logger = logging.getLogger(__name__)
 
 @pb_bind(Dot15d4Domain, 'send', 1)
 class SendPdu(PbMessageWrapper):
@@ -16,7 +20,12 @@ class SendPdu(PbMessageWrapper):
     def to_packet(self):
         """Convert message to the corresponding scapy packet
         """
-        return Dot15d4(self.pdu)
+        try:
+            return Dot15d4(self.pdu)
+        except StructError:
+            logger.debug("[hub::dot15d4] error parsing 802.15.4 frame (%s)",
+                         bytes(self.pdu).hex())
+            return None
 
     @staticmethod
     def from_packet(packet, channel: int = 11):
@@ -35,8 +44,6 @@ class SendPdu(PbMessageWrapper):
         )
         return msg
 
-        return msg
-
 @pb_bind(Dot15d4Domain, 'send_raw', 1)
 class SendRawPdu(PbMessageWrapper):
     """Send Dot15d4 raw PDU message class
@@ -48,7 +55,12 @@ class SendRawPdu(PbMessageWrapper):
     def to_packet(self):
         """Convert message to the corresponding scapy packet
         """
-        return Dot15d4FCS(self.pdu + bytes(pack('>H', self.fcs)))
+        try:
+            return Dot15d4FCS(self.pdu + bytes(pack('>H', self.fcs)))
+        except StructError:
+            logger.debug("[hub::dot15d4] error parsing 802.15.4 frame (%s)",
+                         bytes(self.pdu).hex() + bytes(pack(">H", self.fcs)).hex())
+            return None
 
     @staticmethod
     def from_packet(packet, channel: int = 11):
@@ -71,8 +83,6 @@ class SendRawPdu(PbMessageWrapper):
         )
         return msg
 
-        return msg
-
 @pb_bind(Dot15d4Domain, 'pdu', 1)
 class PduReceived(PbMessageWrapper):
     """Dot15d4 PDU received message class
@@ -87,26 +97,32 @@ class PduReceived(PbMessageWrapper):
     def to_packet(self):
         """Convert message to its scapy packet representation
         """
-        # Create packet
-        packet = Dot15d4(bytes(self.pdu))
+        try:
+            # Create packet
+            packet = Dot15d4(bytes(self.pdu))
 
-        # Set packet metadata
-        packet.metadata = Dot15d4Metadata()
-        packet.metadata.channel = self.channel
+            # Set packet metadata
+            packet.metadata = Dot15d4Metadata()
+            packet.metadata.channel = self.channel
 
-        packet.metadata.decrypted = False
+            packet.metadata.decrypted = False
 
-        if self.lqi is not None:
-            packet.metadata.lqi = self.lqi
-        if self.rssi is not None:
-            packet.metadata.rssi = self.rssi
-        if self.timestamp is not None:
-            packet.metadata.timestamp = self.timestamp
-        if self.fcs_validity is not None:
-            packet.metadata.is_fcs_valid = self.fcs_validity
+            if self.lqi is not None:
+                packet.metadata.lqi = self.lqi
+            if self.rssi is not None:
+                packet.metadata.rssi = self.rssi
+            if self.timestamp is not None:
+                packet.metadata.timestamp = self.timestamp
+            if self.fcs_validity is not None:
+                packet.metadata.is_fcs_valid = self.fcs_validity
 
-        # Return packet
-        return packet
+            # Return packet
+            return packet
+
+        except StructError:
+            logger.debug("[hub::dot15d4] error parsing 802.15.4 frame (%s)",
+                         bytes(self.pdu).hex())
+            return None
 
 
     @staticmethod
@@ -151,26 +167,29 @@ class RawPduReceived(PbMessageWrapper):
     def to_packet(self):
         """Convert message to scapy packet
         """
+        try:
+            # Create packet
+            #print('converting %s' % (self.pdu + bytes(pack(">H", self.fcs))).hex())
+            packet = Dot15d4FCS(bytes(self.pdu) + bytes(pack(">H", self.fcs)))
 
-        # Create packet
-        #print('converting %s' % (self.pdu + bytes(pack(">H", self.fcs))).hex())
-        packet = Dot15d4FCS(bytes(self.pdu) + bytes(pack(">H", self.fcs)))
+            # Set packet metadata
+            packet.metadata = Dot15d4Metadata()
+            packet.metadata.channel = self.channel
+            packet.metadata.decrypted = False
+            if self.lqi is not None:
+                packet.metadata.lqi = self.lqi
+            if self.rssi is not None:
+                packet.metadata.rssi = self.rssi
+            if self.timestamp is not None:
+                packet.metadata.timestamp = self.timestamp
+            if self.fcs_validity is not None:
+                packet.metadata.is_fcs_valid = self.fcs_validity
 
-        # Set packet metadata
-        packet.metadata = Dot15d4Metadata()
-        packet.metadata.channel = self.channel
-        packet.metadata.decrypted = False
-        if self.lqi is not None:
-            packet.metadata.lqi = self.lqi
-        if self.rssi is not None:
-            packet.metadata.rssi = self.rssi
-        if self.timestamp is not None:
-            packet.metadata.timestamp = self.timestamp
-        if self.fcs_validity is not None:
-            packet.metadata.is_fcs_valid = self.fcs_validity
-
-        # Return packet
-        return packet
+            return packet
+        except StructError:
+            logger.debug("[hub::dot15d4] error parsing 802.15.4 frame (%s)",
+                         bytes(self.pdu).hex() + bytes(pack(">H", self.fcs)).hex())
+            return None
 
     @staticmethod
     def from_packet(packet):
@@ -184,7 +203,6 @@ class RawPduReceived(PbMessageWrapper):
         )
 
         # Add optional metadata
-
         if packet.metadata.decrypted is not None:
             msg.decrypted = packet.metadata.decrypted
         if packet.metadata.lqi is not None:
