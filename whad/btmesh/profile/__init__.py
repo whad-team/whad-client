@@ -104,6 +104,10 @@ class BaseMeshProfile(object):
     def unlock_seq(self):
         self.__seq_lock.release()
 
+    @property
+    def seqnum(self):
+        return self.__seq_number
+
     def set_primary_element_addr(self, primary_element_addr):
         """
         Sets the primary unicast addr of the node (after provisioning). Used as an offset for the other elements based on their index
