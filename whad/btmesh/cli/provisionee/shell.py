@@ -7,6 +7,7 @@ from prompt_toolkit import HTML, print_formatted_text
 from whad.exceptions import ExternalToolNotFound
 
 from whad.common.monitors import WiresharkMonitor
+from re import match
 
 INTRO = """
 wbtmesh-provisionee, the WHAD Bluetooth Mesh Provisionee utility
@@ -433,6 +434,109 @@ class BTMeshProvisioneeShell(InteractiveShell):
             else:
                 print_formatted_text(HTML(" <i>No models defined</i>"))
 
+    @category(SETUP_CAT)
+    def do_whitelist(self, args):
+        """Manages the whitelist of the node.
+
+        <ansicyan><b>whitelist</b> [<i>ACTION</i>] [<i>BD_ADDR</i>]</ansicyan>
+
+
+        - <b>add</b> : Adds an address to the whitelist and activates it
+        - <b>remove</b> : Removes an address from the whitelist. If empty, deactivates it.
+        - <b>reset</b> : Resets the whitelist and deactivates it.
+
+        By default, shows the whitelist
+
+        - To add an address to the whitelist : whitelist add 66:55:44:33:22:AA
+
+        - To remove an address from the whitelist : whitelist remove 66:55:44:33:22:AA
+
+        - To reset the whitelist : whitelist reset
+        """
+
+        if self.__current_mode != self.MODE_STARTED:
+            self.error(
+                "Need to have a provisioned node/not in element edit to manage whitelist"
+            )
+            return
+
+        if len(args) < 1:
+            whitelist = self.__connector.whitelist
+            if len(whitelist) == 0:
+                print_formatted_text(
+                    HTML("|─ <ansimagenta><b>Empty Whitelist</b></ansimagenta>")
+                )
+            else:
+                for addr in self.__connector.whitelist:
+                    print_formatted_text(
+                        HTML("|─ <ansimagenta><b>%s</b></ansimagenta>" % addr)
+                    )
+
+        else:
+            action = args[0].lower()
+            if action == "reset":
+                self.__connector.reset_whitelist()
+                self.success("Successfully reset the whitelist")
+
+            elif action == "add" or action == "remove":
+                if len(args) < 2:
+                    self.error("You need to specifiy an address to add/remove")
+                    return
+
+                addr = args[1].lower()
+                if not bool(match(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$", addr)):
+                    self.error("BD addr needs to be in MAC addr format.")
+                    return
+
+                if action == "add":
+                    self.__connector.add_whitelist(addr)
+                    self.success("Successfully added addr %s to the whitelist." % addr)
+
+                elif action == "remove":
+                    self.__connector.remove_whitelist(addr)
+                    self.success(
+                        "Successfully removed addr %s from the whitelist." % addr
+                    )
+
+    @category(SETUP_CAT)
+    def do_seqnum(self, arg):
+        """Manages the sequence number of the node
+
+
+        <ansicyan><b>seqnum</b> [<i>seqnum</i>]</ansicyan>
+
+        By default, prints the current sequence number.
+
+        To set the sequence number :
+
+        > seqnum 0xA10010
+        """
+
+        if self.__current_mode != self.MODE_STARTED:
+            self.error("Can only set the sequence number of a provisioned node.")
+            return
+
+        if len(arg) == 0:
+            print_formatted_text(
+                HTML(
+                    "<ansigreen><b>Sequence number : 0x%x</b></ansigreen>"
+                    % (self.__connector.profile.seqnum)
+                )
+            )
+        else:
+            try:
+                seqnum = int(arg[0], 16)
+            except ValueError:
+                self.error("Sequence number should be in hex format.")
+                return
+
+            if seqnum > 0xFFFFFF:
+                self.error("Sequence Number cannot be larger than 0xFFFFFF.")
+                return
+
+            self.__connector.profile.set_seq_number(seqnum)
+            self.success("Successfully set the sequence number to 0x%x." % seqnum)
+
     @category(ATTACK_CAT)
     def do_network_discovery(self, args):
         """Performs discovery of the network (on a network with directed forwarding)
@@ -515,6 +619,28 @@ class BTMeshProvisioneeShell(InteractiveShell):
                 "Successfully sent the DIRECTED_CONTROL_SET message to broadcast address."
             )
 
+    @category(ATTACK_CAT)
+    def do_a5_attack(self, arg):
+        """Perform the A5 attack.
+
+        <ansicyan><b>a5_attack</b> <i>VICTIM_ADDR</i></ansicyan>
+
+        > a5_attack 0x000A
+        """
+
+        if len(arg) < 1:
+            self.error("You need to specify the victim addr (hex format).")
+            return
+
+        try:
+            victim_addr = int(arg[0], 16)
+        except ValueError:
+            self.error("You need to use hex format for the victim addr.")
+            return
+
+        self.__connector.a5_attack(victim_addr)
+        self.success("Successfully launched A5 attack on 0x%d" % victim_addr)
+
     def complete_wireshark(self):
         """Autocomplete wireshark command"""
         completions = {}
@@ -523,6 +649,33 @@ class BTMeshProvisioneeShell(InteractiveShell):
         else:
             completions["on"] = {}
         return completions
+
+    @category(ATTACK_CAT)
+    def do_a3_attack(self, args):
+        """Perform the A3 attack (based on Path Request Solicitations)
+
+        <ansicyan><b>a3_attack</b> <i>ADDR_1</i> [<i>ADDR_N</i>]</ansicyan>
+
+        > a3_attack 0x0001 0x0003 0x000A
+
+        The addresses listed in argument will be used in the Path Request Solicitations (need 1 minimum)
+        For the already in place paths
+        """
+
+        if len(args) == 0:
+            self.error("You need to specify at least one address for the message.")
+            return
+
+        addr_list = []
+        for addr in args:
+            try:
+                addr_list.append(int(addr, 16))
+            except ValueError:
+                self.error("You need to specify the addresses in hex format")
+                return
+
+        self.__connector.a3_attack(addr_list)
+        self.success("Successfully launched A3 attack on surrounding nodes.")
 
     @category("Monitoring")
     def do_wireshark(self, arg):

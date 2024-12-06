@@ -99,6 +99,36 @@ class DFAttacks(Provisionee):
         )
         thread.start()
 
+    def reset_whitelist(self):
+        """
+        Resets the whitelist
+        """
+        self.whitelist = []
+
+    def add_whitelist(self, addr):
+        """
+        Adds an address to the whitelist
+
+        :param addr: BD Addr to add
+        :type addr: str
+        """
+        addr = addr.lower()
+        if addr not in self.whitelist:
+            self.whitelist.append(addr)
+
+    def remove_whitelist(self, addr):
+        """
+        Removes an address from the whitelist
+
+        :param addr: BD Addr to remove
+        :type addr: str
+        """
+        try:
+            index = self.whitelist.index(addr.lower())
+        except ValueError:
+            return
+        self.whitelist.pop(index)
+
     def get_network_topology(self):
         """
         Returns the Topology dictionary
@@ -114,3 +144,21 @@ class DFAttacks(Provisionee):
         :returns: True is success, False otherwise
         """
         return self._main_stack.get_layer("access").df_set(app_key_index)
+
+    def a5_attack(self, victim_addr):
+        """
+        Perform the A5 attack
+
+        :param victim_addr: Addr of the victim
+        :type victim_addr: int
+        """
+        self._main_stack.get_layer("upper_transport").a5_attack(victim_addr)
+
+    def a3_attack(self, addr_list):
+        """
+        Perform the A3 attack
+
+        :param addr_list: List of addr to put in the Path Request Solicitation message
+        :type addr_list: List[int]
+        """
+        self._main_stack.get_layer("upper_transport").a3_attack(addr_list)

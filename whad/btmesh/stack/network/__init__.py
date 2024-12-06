@@ -139,7 +139,7 @@ class NetworkLayer(Layer):
         if (
             int_dst_addr == 0xFFFF
             or int_dst_addr == 0xFFFB
-            or (dst_type == UNICAST_ADDR_TYPE and int_dst_addr > 0x7FE0)
+            or (dst_type == UNICAST_ADDR_TYPE and int_dst_addr > 0x7E00)
         ):
             return True
 
