@@ -9,6 +9,7 @@ from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvDataField, AdvCompleteLocalName, \
     AdvManufacturerSpecificData, AdvShortenedLocalName, AdvTxPowerLevel, AdvDataFieldListOverflow, AdvDataError
+from whad.ble.connector.base import BLE
 from whad.ble.connector import Central, Peripheral, Sniffer, Hijacker, Injector, Scanner, PeripheralClient
 from whad.ble.utils.phy import PHYS
 
@@ -16,6 +17,7 @@ def is_bdaddr_valid(bd_addr):
     return re.match('^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$',bd_addr)
 
 __all__ = [
+    'BLE',
     'GattClient',
     'GattServer',
     'BDAddress',
