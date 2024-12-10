@@ -104,7 +104,7 @@ class WhadWiresharkApp(CommandLineApp):
                 else:
                     # Wait for the user to CTL-C or close Wireshark
                     while interface.opened and not self.monitor.is_terminated():
-                        wait("Forwarding {self.monitor.packets_written} packets to wireshark")
+                        wait(f"Forwarding {self.monitor.packets_written} packets to wireshark")
                         sleep(.2)
 
         except KeyboardInterrupt:
