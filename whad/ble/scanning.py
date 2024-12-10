@@ -11,9 +11,9 @@ from time import time
 from scapy.layers.bluetooth4LE import BTLE_ADV_IND, BTLE_ADV_NONCONN_IND, \
     BTLE_SCAN_RSP, BTLE_ADV
 
-from whad.ble import BDAddress, AdvDataFieldList, \
-    AdvCompleteLocalName, AdvDataError, AdvDataFieldListOverflow, \
-    AdvShortenedLocalName
+from whad.hub.ble import BDAddress
+from whad.ble.profile.advdata import AdvDataFieldList, AdvCompleteLocalName, \
+    AdvDataError, AdvDataFieldListOverflow, AdvShortenedLocalName
 
 class AdvertisingDevice:
     """Store information about a device:
