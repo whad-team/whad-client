@@ -17,7 +17,8 @@ from whad.hub.ble import AccessAddressDiscovered, Synchronized, BleRawPduReceive
     BlePduReceived, BleAdvPduReceived
 from whad.ble.exceptions import MissingCryptographicMaterial
 from whad.exceptions import WhadDeviceDisconnected
-from whad.ble import UnsupportedCapability, message_filter
+from whad.exceptions import UnsupportedCapability
+from whad.helpers import message_filter
 from whad.common.sniffing import EventsManager
 
 logger = logging.getLogger(__name__)
