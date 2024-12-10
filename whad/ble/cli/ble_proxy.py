@@ -5,6 +5,7 @@ as a proxy to the target device.
 """
 import logging
 from time import time
+
 from hexdump import hexdump
 from prompt_toolkit import print_formatted_text, HTML
 
@@ -22,19 +23,16 @@ class VerboseLLProxy(LinkLayerProxy):
     This class intercepts any BLE link-layer operation and displays it in terminal.
     """
 
-    def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None,
-                 bd_address=None, spoof=False):
-        """Initialize our parent class instance.
-        """
-        super().__init__(proxy=proxy, target=target, adv_data=adv_data, scan_data=scan_data, \
-                         bd_address=bd_address, spoof=spoof)
-
     def on_connect(self):
+        """Handle connection
+        """
         print_formatted_text(HTML(
             "<ansimagenta>Remote device connected</ansimagenta>"
         ))
 
     def on_disconnect(self):
+        """Handle disconnection.
+        """
         print_formatted_text(HTML(
             "<ansimagenta>Remote device disconnected</ansimagenta>"
         ))
@@ -59,19 +57,12 @@ class VerboseLLProxy(LinkLayerProxy):
         return super().on_data_pdu(pdu, direction)
 
 class VerboseProxy(GattProxy):
-    """Verbose GATT Proxy class.
-
-    This class intercepts any GATT operation and displays it in terminal.
+    """Main BLE GATT proxy
     """
 
-    def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None,
-                 bd_address=None, spoof=False, profile=None):
-        """Initialize our parent class instance.
-        """
-        super().__init__(proxy=proxy, target=target, adv_data=adv_data, scan_data=scan_data,
-                         bd_address=bd_address, spoof=spoof, profile=profile)
-
     def on_characteristic_read(self, service, characteristic, value, offset=0, length=0):
+        """Triggered when a characteristic read.
+        """
         if offset > 0:
             print_formatted_text(HTML((
                 f"&lt;&lt;&lt; <ansicyan>Characteristic {characteristic.uuid} read "
@@ -80,15 +71,18 @@ class VerboseProxy(GattProxy):
         else:
             print_formatted_text(HTML(
                 f"&gt;&gt;&gt; <ansicyan>Characteristic {characteristic.uuid} read</ansicyan>"
-            ))            
+            ))
         hexdump(value)
 
     def on_characteristic_write(self, service, characteristic, offset=0, value=b'',
                                 without_response=False):
+        """Triggered when a characteristic write.
+        """
         if offset > 0:
-            print_formatted_text(HTML(
-                f"&lt;&lt;&lt; <ansicyan>Characteristic {characteristic.uuid} written (offset: {offset})</ansicyan>"
-            ))
+            print_formatted_text(HTML((
+                f"&lt;&lt;&lt; <ansicyan>Characteristic {characteristic.uuid} written "
+                f"(offset: {offset})</ansicyan>"
+            )))
         else:
             print_formatted_text(HTML(
                 f"&gt;&gt;&gt; <ansicyan>Characteristic {characteristic.uuid} written</ansicyan>"
@@ -97,6 +91,8 @@ class VerboseProxy(GattProxy):
 
     def on_characteristic_subscribed(self, service, characteristic, notification=False,
                                      indication=False):
+        """Triggered when a GATT client subscribes to a characteristic.
+        """
         if notification:
             print_formatted_text(HTML((
                     f"[!] <ansicyan>Subscribed to notification for charac. "
@@ -109,11 +105,15 @@ class VerboseProxy(GattProxy):
             )))
 
     def on_characteristic_unsubscribed(self, service, characteristic):
+        """Triggered when a GATT client unsubscribes from a characteristic.
+        """
         print_formatted_text(HTML(
                 f"[!] <ansicyan>Unubscribed from charac. {characteristic.uuid}</ansicyan>"
         ))
 
     def on_notification(self, service, characteristic, value):
+        """Triggered when a notification is received.
+        """
         print_formatted_text(HTML((
             f"&lt;&lt;&lt; <ansicyan>[!] Notification for charac. "
             f"{characteristic.uuid}:</ansicyan>"
@@ -121,6 +121,8 @@ class VerboseProxy(GattProxy):
         hexdump(value)
 
     def on_indication(self, service, characteristic, value):
+        """Triggered when a indication is received.
+        """
         print_formatted_text(HTML((
             f"&lt;&lt;&lt; <ansicyan>[!] Indication for charac. "
             f"{characteristic.uuid}:</ansicyan>"
@@ -128,11 +130,15 @@ class VerboseProxy(GattProxy):
         hexdump(value)
 
     def on_connect(self, conn_handle):
+        """Triggered when a remote device connects to our spoofed device.
+        """
         print_formatted_text(HTML(
             "<ansimagenta>Remote device connected</ansimagenta>"
         ))
 
     def on_disconnect(self, conn_handle):
+        """Triggered when a remote device disconnects from our spoofed device.
+        """
         print_formatted_text(HTML(
             "<ansimagenta>Remote device disconnected</ansimagenta>"
         ))
@@ -219,7 +225,7 @@ class BleProxyApp(CommandLineDeviceSource):
                 if self.args.bdaddr is None:
                     self.error("Please provide a target BD address.")
                 else:
-                    self.spawn_proxy()                
+                    self.spawn_proxy()
             else:
                 self.error("You need to specify an interface with option --interface.")
 
