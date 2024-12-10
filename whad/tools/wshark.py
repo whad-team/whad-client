@@ -97,12 +97,12 @@ class WhadWiresharkApp(CommandLineApp):
                 self.monitor.attach(self.connector)
                 self.monitor.start()
 
-                if self.is_stdout_piped():
+                if self.is_stdout_piped() and not self.monitor.is_terminated():
                     # Wait for the user to CTL-C
                     while interface.opened:
                         sleep(.1)
                 else:
-                    while interface.opened:
+                    while interface.opened and not self.monitor.is_terminated():
                         wait("Forwarding {self.monitor.packets_written} packets to wireshark")
                         sleep(.2)
 
@@ -115,7 +115,7 @@ class WhadWiresharkApp(CommandLineApp):
             self.post_run()
 
     def post_run(self):
-        if not self.is_stdout_piped():
+        if not self.is_stdout_piped() and self.monitor is not None:
             wait(f"Forwarding {self.monitor.packets_written} packets to wireshark",
                 end=True
             )
