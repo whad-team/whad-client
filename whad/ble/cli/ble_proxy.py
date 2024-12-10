@@ -72,14 +72,14 @@ class VerboseProxy(GattProxy):
             ))
         else:
             print_formatted_text(HTML(
-                f"&gt;&gt;&gt; <ansicyan>Characteristic {characteristic.uuid} written</ansicyan>"
+                f"&gt;&gt;&gt; <ansicyan>Characteristic {characteristic.uuid} read</ansicyan>"
             ))            
         hexdump(value)
 
     def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
         if offset > 0:
             print_formatted_text(HTML(
-                f"&lt;&lt;&lt; <ansicyan>Characteristic {characteristic.uuid} read (offset: {offset})</ansicyan>"
+                f"&lt;&lt;&lt; <ansicyan>Characteristic {characteristic.uuid} written (offset: {offset})</ansicyan>"
             ))
         else:
             print_formatted_text(HTML(
@@ -203,7 +203,10 @@ class BleProxyApp(CommandLineDeviceSource):
 
             # We need to have an interface specified
             if self.interface is not None:
-                self.spawn_proxy()                
+                if self.args.bdaddr is None:
+                    self.error("Please provide a target BD address.")
+                else:
+                    self.spawn_proxy()                
             else:
                 self.error("You need to specify an interface with option --interface.")
 
@@ -226,7 +229,7 @@ class BleProxyApp(CommandLineDeviceSource):
         scanner = Scanner(self.interface)
         scanner.start()
         for device in scanner.discover_devices():
-            if device.address.lower() == self.args.bdaddr:
+            if device.address.lower() == self.args.bdaddr.lower():
                 if device.adv_records is not None and device.scan_rsp_records is not None:
                     adv_data, scan_rsp = device.adv_records.to_bytes(), device.scan_rsp_records.to_bytes()
                     break
