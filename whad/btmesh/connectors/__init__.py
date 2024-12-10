@@ -169,28 +169,28 @@ class BTMesh(Sniffer):
         # AdvA = randbytes(6).hex(":")  # random in spec
         AdvA = b"\x11\x22\x33\x44\x55\x66"
         adv_pkt = BTLE_ADV(TxAdd=0) / BTLE_ADV_NONCONN_IND(AdvA=AdvA, data=packet)
-        for i in range(0, 2):
+        for i in range(0, 1):
             self.send_pdu(
                 adv_pkt,
                 access_address=0x8E89BED6,
                 conn_handle=39,
                 direction=BleDirection.UNKNOWN,
             )
-            sleep(0.005)
+            sleep(0.003)
             self.send_pdu(
                 adv_pkt,
                 access_address=0x8E89BED6,
                 conn_handle=37,
                 direction=BleDirection.UNKNOWN,
             )
-            sleep(0.005)
+            sleep(0.003)
             res = self.send_pdu(
                 adv_pkt,
                 access_address=0x8E89BED6,
                 conn_handle=38,
                 direction=BleDirection.UNKNOWN,
             )
-            sleep(0.005)
+            sleep(0.003)
         return res
 
     def change_sniffing_channel(self):

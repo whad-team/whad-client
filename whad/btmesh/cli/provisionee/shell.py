@@ -677,6 +677,25 @@ class BTMeshProvisioneeShell(InteractiveShell):
         self.__connector.a3_attack(addr_list)
         self.success("Successfully launched A3 attack on surrounding nodes.")
 
+    @category(ATTACK_CAT)
+    def do_a2_attack(self, arg):
+        """Activates or deactivtes the A2 attack
+
+        <ansicyan><b>a2_attack</b> <i>"on" | "off"</i></ansicyan>
+        """
+        if len(arg) < 1:
+            self.error("Specify 'on' or 'off' in the argument of the command.")
+            return
+
+        action = arg[0].lower()
+        if action == "on":
+            self.__connector.a2_attack(True)
+            self.success("Successfully activated A2.")
+
+        elif action == "off":
+            self.__connector.a2_attack(False)
+            self.success("Successfully deactivated A2.")
+
     @category("Monitoring")
     def do_wireshark(self, arg):
         """launch wireshark to monitor packets
@@ -711,3 +730,82 @@ class BTMeshProvisioneeShell(InteractiveShell):
                     self.__wireshark = None
         else:
             self.error("Missing arguments, see <ansicyan>help wireshark</ansicyan>.")
+
+    @category(SETUP_CAT)
+    def do_df_entry(self, args):
+        """Get the Forwarding table entry corresponding to the arguments
+
+        <ansicyan><b>df_entry</b> <i>dest</i> <i>fw_update_id</i></ansicyan>
+        """
+
+        if len(args) < 2:
+            self.error("Specify the destination address and the fw_update_id")
+            return
+
+        try:
+            dest = int(args[0], 16)
+        except ValueError:
+            self.error("You need to specify the addresses in hex format")
+            return
+
+        try:
+            fw_update_id = int(args[1])
+        except ValueError:
+            self.error("Specify the fw_update_id in decimal.")
+            return
+
+
+        self.__connector.df_entry(dest, fw_update_id)
+        self.success("Successfully sent FORWARDING_TABLE_ENTRIES_GET message.")
+
+    @category(SETUP_CAT)
+    def do_df_dependents(self, args):
+        """Get the dependent nodes
+
+        <ansicyan><b>df_dependents</b> <i>dest</i> <i>fw_update_id</i> <i>po</> <i>pt</i></ansicyan>
+        """
+
+        if len(args) < 4:
+            self.error("Specify the destination address and the fw_update_id")
+            return
+
+        try:
+            dest = int(args[0], 16)
+            po = int(args[2], 16)
+            pt = int(args[3], 16)
+        except ValueError:
+            self.error("You need to specify the addresses in hex format")
+            return
+
+        try:
+            fw_update_id = int(args[1])
+        except ValueError:
+            self.error("Specify the fw_update_id in decimal.")
+            return
+
+
+        self.__connector.df_dependents(dest, fw_update_id, po, pt)
+        self.success("Successfully sent FORWARDING_TABLE_DEPENDENTS_GET message.")
+
+
+    @category(SETUP_CAT)
+    def do_df_reset(self, arg):
+        """Deactivates the DF for the specified destination address (can be broadcast). Deletes all entries at the same time
+
+
+        <ansicyan><b>df_reset</b> [<i>dest</i>]</ansicyan>
+
+        By default sends to the broadcast addr.
+        """
+
+        if len(arg) < 1:
+            addr = 0xffff
+        else:
+            try:
+                addr = int(arg[0],16)
+            except ValueError:
+                self.error("Address must be in hex form.")
+                return
+
+        self.__connector.df_reset(addr)
+        self.success("Successfully reset the DF of specified node(s).")
