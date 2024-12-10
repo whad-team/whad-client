@@ -3,7 +3,9 @@
 This utility will connect to a device and spawn a similar device that will act
 as a proxy to the target device.
 """
+import logging
 from time import time
+
 from hexdump import hexdump
 from prompt_toolkit import print_formatted_text, HTML
 
@@ -13,115 +15,130 @@ from whad.ble.tools.proxy import GattProxy, LinkLayerProxy
 from whad.cli.app import CommandLineDeviceSource, run_app
 from whad.hub.ble import Direction
 
-import logging
 logger = logging.getLogger(__name__)
 
 class VerboseLLProxy(LinkLayerProxy):
     """Verbose link-layer proxy
     """
 
-    def __init__(self, app, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None, spoof=False):
-        """Initialize our parent class instance.
-        """
-        super().__init__(proxy=proxy, target=target, adv_data=adv_data, scan_data=scan_data, \
-                         bd_address=bd_address, spoof=spoof)
-        self.__app = app
-
     def on_connect(self):
+        """Handle connection
+        """
         print_formatted_text(HTML(
-            f"<ansimagenta>Remote device connected</ansimagenta>"
+            "<ansimagenta>Remote device connected</ansimagenta>"
         ))
 
     def on_disconnect(self):
+        """Handle disconnection.
+        """
         print_formatted_text(HTML(
-            f"<ansimagenta>Remote device disconnected</ansimagenta>"
+            "<ansimagenta>Remote device disconnected</ansimagenta>"
         ))
 
     def on_ctl_pdu(self, pdu, direction):
         """Display captured Control PDU"""
         if direction == Direction.MASTER_TO_SLAVE:
-            print_formatted_text(HTML("&lt;&lt;&lt; <ansicyan>Control PDU</ansicyan>"))      
+            print_formatted_text(HTML("&lt;&lt;&lt; <ansicyan>Control PDU</ansicyan>"))
         else:
             print_formatted_text(HTML("&gt;&gt;&gt; <ansicyan>Control PDU</ansicyan>"))
         hexdump(bytes(pdu))
         return super().on_ctl_pdu(pdu, direction)
 
-    
+
     def on_data_pdu(self, pdu, direction):
         """Display captured data PDU"""
         if direction == Direction.MASTER_TO_SLAVE:
-            print_formatted_text(HTML("&lt;&lt;&lt; <ansimagenta>Data PDU</ansimagenta>"))      
+            print_formatted_text(HTML("&lt;&lt;&lt; <ansimagenta>Data PDU</ansimagenta>"))
         else:
             print_formatted_text(HTML("&gt;&gt;&gt; <ansimagenta>Data PDU</ansimagenta>"))
         hexdump(bytes(pdu))
         return super().on_data_pdu(pdu, direction)
 
 class VerboseProxy(GattProxy):
+    """Main BLE GATT proxy
+    """
 
-    def __init__(self, app, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None, spoof=False, profile=None):
-        """Initialize our parent class instance.
-        """
-        super().__init__(proxy=proxy, target=target, adv_data=adv_data, scan_data=scan_data, \
-                         bd_address=bd_address, spoof=spoof, profile=profile)
-        self.__app = app
-        
     def on_characteristic_read(self, service, characteristic, value, offset=0, length=0):
+        """Triggered when a characteristic read.
+        """
         if offset > 0:
-            print_formatted_text(HTML(
-                f"&lt;&lt;&lt; <ansicyan>Characteristic {characteristic.uuid} read (offset: {offset})</ansicyan>"
-            ))
+            print_formatted_text(HTML((
+                f"&lt;&lt;&lt; <ansicyan>Characteristic {characteristic.uuid} "
+                f"read (offset: {offset})</ansicyan>"
+            )))
         else:
             print_formatted_text(HTML(
                 f"&gt;&gt;&gt; <ansicyan>Characteristic {characteristic.uuid} read</ansicyan>"
-            ))            
+            ))
         hexdump(value)
 
-    def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
+    def on_characteristic_write(self, service, characteristic, offset=0, value=b'',
+                                without_response=False):
+        """Triggered when a characteristic write.
+        """
         if offset > 0:
-            print_formatted_text(HTML(
-                f"&lt;&lt;&lt; <ansicyan>Characteristic {characteristic.uuid} written (offset: {offset})</ansicyan>"
-            ))
+            print_formatted_text(HTML((
+                f"&lt;&lt;&lt; <ansicyan>Characteristic {characteristic.uuid} written "
+                f"(offset: {offset})</ansicyan>"
+            )))
         else:
             print_formatted_text(HTML(
                 f"&gt;&gt;&gt; <ansicyan>Characteristic {characteristic.uuid} written</ansicyan>"
-            ))  
+            ))
         hexdump(value)
 
-    def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
+    def on_characteristic_subscribed(self, service, characteristic, notification=False,
+                                     indication=False):
+        """Triggered when a GATT client subscribes to a characteristic.
+        """
         if notification:
-            print_formatted_text(HTML(
-                    f"[!] <ansicyan>Subscribed to notification for charac. {characteristic.uuid}</ansicyan>"
-            ))
+            print_formatted_text(HTML((
+                    f"[!] <ansicyan>Subscribed to notification for charac. "
+                    f"{characteristic.uuid}</ansicyan>"
+            )))
         if indication:
-            print_formatted_text(HTML(
-                    f"[!] <ansicyan>Subscribed to notification for charac. {characteristic.uuid}</ansicyan>"
-            ))    
+            print_formatted_text(HTML((
+                    f"[!] <ansicyan>Subscribed to notification for charac. "
+                    f"{characteristic.uuid}</ansicyan>"
+            )))
 
     def on_characteristic_unsubscribed(self, service, characteristic):
+        """Triggered when a GATT client unsubscribes from a characteristic.
+        """
         print_formatted_text(HTML(
                 f"[!] <ansicyan>Unubscribed from charac. {characteristic.uuid}</ansicyan>"
         ))
 
     def on_notification(self, service, characteristic, value):
-        print_formatted_text(HTML(
-            f"&lt;&lt;&lt; <ansicyan>[!] Notification for charac. {characteristic.uuid}:</ansicyan>"
-        ))
+        """Triggered when a notification is received.
+        """
+        print_formatted_text(HTML((
+            f"&lt;&lt;&lt; <ansicyan>[!] Notification for charac. "
+            f"{characteristic.uuid}:</ansicyan>"
+        )))
         hexdump(value)
 
     def on_indication(self, service, characteristic, value):
-        print_formatted_text(HTML(
-            f"&lt;&lt;&lt; <ansicyan>[!] Indication for charac. {characteristic.uuid}:</ansicyan>"
-        ))
+        """Triggered when a indication is received.
+        """
+        print_formatted_text(HTML((
+            f"&lt;&lt;&lt; <ansicyan>[!] Indication for charac. "
+            f"{characteristic.uuid}:</ansicyan>"
+        )))
         hexdump(value)
 
     def on_connect(self, conn_handle):
+        """Triggered when a remote device connects to our spoofed device.
+        """
         print_formatted_text(HTML(
-            f"<ansimagenta>Remote device connected</ansimagenta>"
+            "<ansimagenta>Remote device connected</ansimagenta>"
         ))
 
     def on_disconnect(self, conn_handle):
+        """Triggered when a remote device disconnects from our spoofed device.
+        """
         print_formatted_text(HTML(
-            f"<ansimagenta>Remote device disconnected</ansimagenta>"
+            "<ansimagenta>Remote device disconnected</ansimagenta>"
         ))
 
 class BleProxyApp(CommandLineDeviceSource):
@@ -206,11 +223,11 @@ class BleProxyApp(CommandLineDeviceSource):
                 if self.args.bdaddr is None:
                     self.error("Please provide a target BD address.")
                 else:
-                    self.spawn_proxy()                
+                    self.spawn_proxy()
             else:
                 self.error("You need to specify an interface with option --interface.")
 
-        except KeyboardInterrupt as keybd:
+        except KeyboardInterrupt:
             self.warning("wble-proxy stopped (CTL-C)")
 
         # Launch post-run tasks
@@ -222,7 +239,7 @@ class BleProxyApp(CommandLineDeviceSource):
         proxy_iface = WhadDevice.create(self.args.proxy_iface)
         adv_data = None
         scan_rsp = None
-        
+
         # Start scanning, we are looking for our target device
         print(f"Scanning for target device (timeout: {self.args.timeout} seconds)...")
         scan_start_ts = time()
@@ -231,9 +248,10 @@ class BleProxyApp(CommandLineDeviceSource):
         for device in scanner.discover_devices():
             if device.address.lower() == self.args.bdaddr.lower():
                 if device.adv_records is not None and device.scan_rsp_records is not None:
-                    adv_data, scan_rsp = device.adv_records.to_bytes(), device.scan_rsp_records.to_bytes()
+                    adv_data = device.adv_records.to_bytes()
+                    scan_rsp = device.scan_rsp_records.to_bytes()
                     break
-                
+
             # Device search timeout reached, show warning and stop proxy
             if time() - scan_start_ts > self.args.timeout:
                 self.warning("Target device not found, connection timeout exceeded.")
@@ -242,7 +260,6 @@ class BleProxyApp(CommandLineDeviceSource):
         if adv_data is not None and scan_rsp is not None:
             if not self.args.linklayer:
                 proxy = VerboseProxy(
-                    self,
                     proxy_iface,
                     self.interface,
                     adv_data=adv_data,
@@ -252,7 +269,6 @@ class BleProxyApp(CommandLineDeviceSource):
                 )
             else:
                 proxy = VerboseLLProxy(
-                    self,
                     proxy=proxy_iface,
                     target=self.interface,
                     adv_data=adv_data,
@@ -260,7 +276,7 @@ class BleProxyApp(CommandLineDeviceSource):
                     bd_address=self.args.bdaddr,
                     spoof=self.args.spoof
                 )
-            
+
             # Start our proxy
             proxy.start()
 
@@ -278,7 +294,7 @@ class BleProxyApp(CommandLineDeviceSource):
                 ws_mon.start()
             else:
                 ws_mon = None
-            
+
             print('Proxy is ready, press a key to stop.')
             input()
 
@@ -286,7 +302,7 @@ class BleProxyApp(CommandLineDeviceSource):
             if ws_mon is not None:
                 ws_mon.stop()
                 ws_mon.detach()
-            
+
             # Stop PCAP monitor
             if pcap_mon is not None:
                 pcap_mon.stop()
@@ -294,5 +310,7 @@ class BleProxyApp(CommandLineDeviceSource):
 
 
 def ble_proxy_main():
+    """Main BLE proxy launcher.
+    """
     app = BleProxyApp()
     run_app(app)
