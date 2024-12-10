@@ -35,6 +35,9 @@ class AccessLayer(Layer):
         # Set to True when a handler for an Access Message is executed
         self.state.__is_processing_message = False
 
+        # Custom handlers for specific packets (will skip the elements)
+        self._custom_handlers = {}
+
         self.state.profile = options["profile"]
 
     def check_queue(self):
@@ -64,8 +67,8 @@ class AccessLayer(Layer):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         pkt, ctx = message
-        #print("SENDING")
-        #pkt.show()
+        # print("SENDING")
+        # pkt.show()
         self.send("upper_transport", message)
 
     def process_access_message(self, message):
@@ -76,9 +79,11 @@ class AccessLayer(Layer):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         packet, ctx = message
-        #print("RECEIVED")
-        #packet.show()
         dst_addr = ctx.dest_addr
+
+        if type(packet[1]) in self._custom_handlers:
+            self._custom_handlers[type(packet[1])](message)
+            return
 
         # Elements that will process the message
         target_elements = []

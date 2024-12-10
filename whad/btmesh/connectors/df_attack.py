@@ -162,3 +162,33 @@ class DFAttacks(Provisionee):
         :type addr_list: List[int]
         """
         self._main_stack.get_layer("upper_transport").a3_attack(addr_list)
+
+    def a2_attack(self, action):
+        """
+        Activate or not the A2 attack reaction to Path request messages
+
+        :param action: True to activate, False to deactivate
+        :type action: Bool
+        """
+        self._main_stack.get_layer("upper_transport").a2_attack(action)
+
+    def df_entry(self, dest, fw_update_id):
+        """
+        Sends a FORWARDING_TABLE_ENTRIES_GET message
+        """
+        self._main_stack.get_layer("access").df_entry(dest, fw_update_id)
+
+    def df_dependents(self, dest, fw_update_id, po, pt):
+        """
+        Sends a FORWARDING_TABLE_ENTRIES_GET message
+        """
+        self._main_stack.get_layer("access").df_dependents(dest, fw_update_id, po, pt)
+
+    def df_reset(self, addr):
+        """
+        Resets the DF of the specified addr
+
+        :param addr: Target addr
+        :type addr: int
+        """
+        self._main_stack.get_layer("access").df_reset(addr)
