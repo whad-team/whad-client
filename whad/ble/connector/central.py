@@ -3,8 +3,8 @@ Bluetooth Low Energy Central connector
 ======================================
 """
 import logging
-
 from time import time, sleep
+
 from whad.ble.connector.base import BLE
 from whad.hub.ble import Direction
 from whad.hub.ble.bdaddr import BDAddress
