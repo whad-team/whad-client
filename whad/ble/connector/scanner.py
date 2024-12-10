@@ -30,11 +30,13 @@ from time import time
 from typing import Iterator
 
 from scapy.packet import Packet
+from scapy.layers.bluetooth4LE import BTLE_ADV
 
 from whad.hub.ble import BleAdvPduReceived, BleRawPduReceived
 from whad.ble.connector.base import BLE
 from whad.ble.scanning import AdvertisingDevicesDB, AdvertisingDevice
-from whad.ble import UnsupportedCapability, message_filter, BTLE_ADV
+from whad.exceptions import UnsupportedCapability
+from whad.helpers import message_filter
 
 class Scanner(BLE):
     """

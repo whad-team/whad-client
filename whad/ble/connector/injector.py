@@ -9,7 +9,8 @@ from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA
 
 from whad.ble.connector.base import BLE
 from whad.ble.exceptions import NotSynchronized
-from whad.ble import UnsupportedCapability, message_filter
+from whad.exceptions import UnsupportedCapability
+from whad.helpers import message_filter
 from whad.hub.ble import Injected, Direction as BleDirection
 from whad.ble.sniffing import SynchronizedConnection
 from whad.ble.injecting import InjectionConfiguration

@@ -4,7 +4,8 @@ from whad.ble.connector.base import BLE
 from whad.ble.connector.central import Central
 from whad.ble.connector.peripheral import Peripheral
 from whad.ble.exceptions import ConnectionLostException
-from whad.ble import UnsupportedCapability, message_filter
+from whad.exceptions import UnsupportedCapability
+from whad.helpers import message_filter
 from whad.hub.events import ConnectionEvt
 from whad.hub.ble import Hijacked
 
