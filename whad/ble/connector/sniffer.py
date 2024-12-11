@@ -120,7 +120,7 @@ class Sniffer(BLE, EventsManager):
                     self.__connection.hop_interval,
                     self.__connection.hop_interval*1250,
                     self.__connection.hop_increment,
-                    self.__connection.channel_map.value.hex())
+                    self.__connection.channel_map.hex())
 
     def on_desynchronized(self, access_address=None):
         """Desynchronization callback
