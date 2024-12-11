@@ -53,6 +53,10 @@ def is_device_supported(vid, pid, manufacturer, product):
         if _product is not None and _product != product:
             continue
 
+        # NCC Sniffle also relies on a CP2102, must be excluded
+        if vid == 0x10C4 and pid==0xEA60 and manufacturer == "ITead" and product == "Sonoff Zigbee 3.0 USB Dongle Plus":
+            continue
+
         # Device is supported.
         return True
 

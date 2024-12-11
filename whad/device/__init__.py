@@ -21,7 +21,7 @@ from whad.device.uart import UartDevice
 from whad.device.tcp import TCPSocketDevice
 from whad.device.unix import UnixSocketDevice
 from whad.device.virtual import HCIDevice, APIMoteDevice, RFStormDevice, RZUSBStickDevice, \
-    UbertoothDevice, YardStickOneDevice
+    UbertoothDevice, YardStickOneDevice, SniffleDevice
 
 # Remove scapy deprecation warnings
 warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
@@ -40,5 +40,6 @@ __all__ = [
     "RFStormDevice",
     "RZUSBStickDevice",
     "UbertoothDevice",
-    "YardStickOneDevice"
+    "YardStickOneDevice",
+    "SniffleDevice"
 ]

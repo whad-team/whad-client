@@ -12,6 +12,7 @@ from .hci import HCIDevice
 from .rfstorm import RFStormDevice
 from .yard import YardStickOneDevice
 from .pcap import PCAPDevice
+from .sniffle import SniffleDevice
 
 __all__ = [
     "UbertoothDevice",
@@ -20,5 +21,6 @@ __all__ = [
     "HCIDevice",
     "RFStormDevice",
     "YardStickOneDevice",
-    "PCAPDevice"
+    "PCAPDevice",
+    "SniffleDevice"
 ]
