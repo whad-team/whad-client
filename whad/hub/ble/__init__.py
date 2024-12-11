@@ -191,16 +191,19 @@ class ExtAdvPdu:
 
 def phy_to_btle_rf(phy: int) -> int:
     """Convert BlePhy constant into BTLE_RF PHY value."""
-    if 0 < phy < 4:
-        return [0, 2, 1].index(phy)
-    else:
-        return 0
+    if phy == BlePhy.LE_1M_CODED:
+        return 2
+    elif phy == BlePhy.LE_2M:
+        return 1
+    return 0
 
 def btle_rf_to_phy(phy: int) -> int:
     """Convert BTLE_RF PHY value to BlePhy."""
-    if phy >= 0 and phy <= 3:
-        return [BlePhy.LE_1M, BlePhy.LE_2M, BlePhy.LE_1M_CODED, BlePhy.UNDEFINED].index(phy)
-    return 0
+    if phy == 2:
+        return BlePhy.LE_2M
+    elif phy == 1:
+        return BlePhy.LE_1M_CODED
+    return BlePhy.LE_1M
 
 @dataclass(repr=False)
 class BLEMetadata(Metadata):

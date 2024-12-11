@@ -293,6 +293,7 @@ class Device:
         from .ubertooth import Ubertooth
         from .yard import YardStickOne
         from .antstick import ANTStick
+        from .sniffle import Sniffle
         return [
             Uart,
             Hci,
@@ -304,7 +305,8 @@ class Device:
             RzUsbStick,
             Ubertooth,
             YardStickOne,
-            ANTStick
+            ANTStick,
+            Sniffle
         ]
 
     @classmethod
@@ -470,6 +472,9 @@ class Device:
             elif transport == 'antstick':
                 from .antstick import ANTStick
                 return ANTStick.create_inst(interface)
+            elif transport == 'sniffle':
+                from .sniffle import Sniffle
+                return Sniffle.create_inst(interface)
 
             # No other known transport
             raise WhadDeviceNotFound
