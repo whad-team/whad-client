@@ -8,7 +8,8 @@ from scapy.themes import BrightTheme
 
 from whad.cli.app import CommandLineApp, run_app
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
-from whad.device import Bridge, ProtocolHub
+from whad.device import Bridge
+from whad.hub import ProtocolHub
 
 logger = logging.getLogger(__name__)
 
