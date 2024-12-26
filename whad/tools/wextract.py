@@ -6,7 +6,6 @@ which can be used to access a device remotely.
 import sys
 import time
 import logging
-from typing import List, Tuple
 
 from scapy.packet import Packet
 from scapy.config import conf
