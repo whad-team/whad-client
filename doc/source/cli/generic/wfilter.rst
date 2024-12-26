@@ -25,6 +25,7 @@ Command-line options
 * ``--transform`` (``-t``): apply a transform to packets
 * ``--invert`` (``-e``): invert filter
 * ``--forward`` (``-f``): forward packets that do not match the specified filter (dropped by default)
+* ``--load`` (``-l``): load specified Python module containing extra Scapy layers definitions
 
 Specifying a filter
 ^^^^^^^^^^^^^^^^^^^
