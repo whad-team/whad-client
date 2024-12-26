@@ -59,6 +59,8 @@ class WhadExtractApp(CommandLineApp):
         )
 
     def build_extractors(self):
+        """Build extracors based on provided arguments.
+        """
         extractor_template = "lambda p : %s"
         extractors = []
         for extractor in self.args.extractor:
