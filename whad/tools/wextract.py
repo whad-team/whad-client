@@ -59,7 +59,7 @@ class WhadExtractApp(CommandLineApp):
         )
 
     def build_extractors(self) -> List[Tuple[str, callable]]:
-        """Build extracors based on provided arguments.
+        """Build extractors based on provided arguments.
 
         :rtype: list
         :return: list of extractors
