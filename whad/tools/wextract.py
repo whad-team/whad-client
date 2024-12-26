@@ -49,12 +49,16 @@ class WhadExtractApp(CommandLineApp):
             help='delimiter between extractor'
         )
 
-    def build_extractors(self) -> List[Tuple[str, callable]]:
-        """Build extractors based on provided arguments.
+        self.add_argument(
+            '-l',
+            '--load',
+            dest='loadables',
+            default=None,
+            action="append",
+            help='load Scapy packet definitions from external Python file'
+        )
 
-        :rtype: list
-        :return: list of extractors
-        """
+    def build_extractors(self):
         extractor_template = "lambda p : %s"
         extractors = []
         for extractor in self.args.extractor:
@@ -93,6 +97,17 @@ class WhadExtractApp(CommandLineApp):
     def run(self):
         # Launch pre-run tasks
         self.pre_run()
+
+        # Load any Scapy definition files if provided
+        for loadable in self.args.loadables:
+            l = __import__(loadable)
+            for obj in dir(l):
+                o = getattr(l, obj)
+                try:
+                    if issubclass(o, Packet) and o != Packet:
+                        globals()[obj] = o
+                except TypeError:
+                    pass
         try:
             if self.is_piped_interface():
                 interface = self.input_interface

@@ -141,9 +141,9 @@ class WhadFilterApp(CommandLineApp):
         self.add_argument(
             '-l',
             '--load',
-            dest='load',
+            dest='loadables',
             default=None,
-            nargs="+",
+            action="append",
             help='load Scapy packet definitions from external Python file'
         )
 
@@ -305,9 +305,21 @@ class WhadFilterApp(CommandLineApp):
         """
         # Launch pre-run tasks
         self.pre_run()
+
         if self.args.down is None and self.args.up is None:
             self.args.up   = True
             self.args.down = True
+
+        # Load any Scapy definition files if provided
+        for loadable in self.args.loadables:
+            l = __import__(loadable)
+            for obj in dir(l):
+                o = getattr(l, obj)
+                try:
+                    if issubclass(o, Packet) and o != Packet:
+                        globals()[obj] = o
+                except TypeError:
+                    pass
 
         try:
             # Build our packet filter, exit if invalid.
@@ -331,11 +343,7 @@ class WhadFilterApp(CommandLineApp):
                 connector.format = hub.get(self.args.domain).format
 
                 if self.is_stdout_piped():
-                    unix_server = UnixConnector(UnixSocketServerDevice(parameters={
-                        'domain': self.args.domain,
-                        'format': self.args.format,
-                        'metadata' : self.args.metadata
-                    }))
+                    unix_server = UnixConnector(UnixSocketServerDevice(parameters=parameters))
 
 
                     while not unix_server.device.opened:
