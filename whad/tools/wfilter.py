@@ -9,7 +9,8 @@ from time import sleep
 
 # We need all scapy layers to craft filter expressions
 # pylint: disable-next=wildcard-import
-from scapy.layers import *
+from scapy.layers.all import *
+from scapy.packet import Packet
 
 # Required to configure scapy theme.
 from scapy.themes import BrightTheme
@@ -311,15 +312,16 @@ class WhadFilterApp(CommandLineApp):
             self.args.down = True
 
         # Load any Scapy definition files if provided
-        for loadable in self.args.loadables:
-            l = __import__(loadable)
-            for obj in dir(l):
-                o = getattr(l, obj)
-                try:
-                    if issubclass(o, Packet) and o != Packet:
-                        globals()[obj] = o
-                except TypeError:
-                    pass
+        if self.args.loadables is not None:
+            for loadable in self.args.loadables:
+                l = __import__(loadable)
+                for obj in dir(l):
+                    o = getattr(l, obj)
+                    try:
+                        if issubclass(o, Packet) and o != Packet:
+                            globals()[obj] = o
+                    except TypeError:
+                        pass
 
         try:
             # Build our packet filter, exit if invalid.
@@ -337,6 +339,7 @@ class WhadFilterApp(CommandLineApp):
                 if not self.args.nocolor:
                     conf.color_theme = BrightTheme()
 
+                parameters = self.args.__dict__
                 connector = UnixConnector(interface)
                 connector.domain = self.args.domain
                 hub = ProtocolHub(2)
