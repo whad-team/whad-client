@@ -127,7 +127,7 @@ class UserTransformApp(CommandLineApp):
                 connector.format = hub.get(self.args.domain).format
 
                 if self.is_stdout_piped():
-                    unix_server = UnixConnector(UnixSocketServerDevice(parameters))
+                    unix_server = UnixConnector(UnixSocketServerDevice(parameters=parameters))
 
 
                     while not unix_server.device.opened:
