@@ -20,6 +20,8 @@ Command-line options
 **wextract** supports the following options:
 
 * ``-d``: set delimiter for extraction
+* ``--exceptions`` (``-x``): enable verbose output on exceptions for debugging 
+* ``--load`` (``-l``): load specified Python module containing extra Scapy layers definitions
 
 
 Writing extractors

@@ -44,6 +44,16 @@ Inverting filter
 
 The ``--invert / -e`` option will invert the filter expression.
 
+Specifying additional Scapy layers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``--load / -l`` option can be used to specify a Python module containing
+additional Scapy layers definitions to load. This can come handy when working
+on non-standard protocols for which Scapy does not have any layer defined.
+
+This option can be used more than once to load as many Python module as necessary.
+
+
 Applying a transform to matching packets
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
