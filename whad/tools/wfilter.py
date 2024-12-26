@@ -138,11 +138,20 @@ class WhadFilterApp(CommandLineApp):
             help='forward packets not matched by the filter (dropped by default)'
         )
 
+        self.add_argument(
+            '-l',
+            '--load',
+            dest='load',
+            default=None,
+            nargs="+",
+            help='load Scapy packet definitions from external Python file'
+        )
+
         # Initialize our packet filter
         self.packet_filter = None
 
     def build_filter(self):
-        """Build filter based on provided arguments.
+        """Build filter from provided args.
         """
         if self.args.filter is None:
             self.args.filter = "True"
