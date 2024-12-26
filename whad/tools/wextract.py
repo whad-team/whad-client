@@ -8,6 +8,7 @@ import time
 import logging
 from typing import List, Tuple
 
+from scapy.layers.all import *
 from scapy.packet import Packet
 from scapy.config import conf
 from scapy.themes import BrightTheme
@@ -58,6 +59,15 @@ class WhadExtractApp(CommandLineApp):
             help='load Scapy packet definitions from external Python file'
         )
 
+        self.add_argument(
+            '-x',
+            '--exceptions',
+            dest="show_exc",
+            action="store_true",
+            default=False,
+            help="Show exceptions raised when extracting requested values (debug)"
+        )
+
     def build_extractors(self) -> List[Tuple[str, callable]]:
         """Build extractors based on provided arguments.
 
@@ -89,9 +99,13 @@ class WhadExtractApp(CommandLineApp):
         for extractor,processor in extractors:
             try:
                 output.append(str(processor(pkt)))
-            except Exception:
-                sys.stderr.write(f"Exception raised when evaluating {extractor}\n")
-                sys.stderr.flush()
+            except Exception as err:
+                if self.args.show_exc:
+                    sys.stderr.write("-------------------------------------------------------\n")
+                    sys.stderr.write(f"Exception raised when evaluating {extractor}:\n")
+                    sys.stderr.write(str(err)+"\n")
+                    sys.stderr.write("-------------------------------------------------------\n")
+                    sys.stderr.flush()
                 return pkt
 
         print(self.args.delimiter.join(output))
@@ -104,15 +118,16 @@ class WhadExtractApp(CommandLineApp):
         self.pre_run()
 
         # Load any Scapy definition files if provided
-        for loadable in self.args.loadables:
-            l = __import__(loadable)
-            for obj in dir(l):
-                o = getattr(l, obj)
-                try:
-                    if issubclass(o, Packet) and o != Packet:
-                        globals()[obj] = o
-                except TypeError:
-                    pass
+        if self.args.loadables is not None:
+            for loadable in self.args.loadables:
+                l = __import__(loadable)
+                for obj in dir(l):
+                    o = getattr(l, obj)
+                    try:
+                        if issubclass(o, Packet) and o != Packet:
+                            globals()[obj] = o
+                    except TypeError:
+                        pass
         try:
             if self.is_piped_interface():
                 interface = self.input_interface
