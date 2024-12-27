@@ -76,6 +76,7 @@ wuni-scan = "whad.unifying.cli.wuni_scan:wuni_scan_main"
 wuni-mouse = "whad.unifying.cli.wuni_mouse:wuni_mouse_main"
 wuni-keyboard = "whad.unifying.cli.wuni_keyboard:wuni_kb_main"
 wbtmesh-provisionee = "whad.btmesh.cli.provisionee:btmesh_provisionee_main"
+wbtmesh-dfattacker = "whad.btmesh.cli.dfattacker:btmesh_dfattacker_main"
 
 # setuptools specific
 [tool.setuptools]

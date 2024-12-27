@@ -1,6 +1,6 @@
 from whad.cli.shell import InteractiveShell, category
 from whad.btmesh.profile import BaseMeshProfile
-from whad.btmesh.connectors.df_attack import DFAttacks
+from whad.btmesh.connectors.provisionee import Provisionee
 from whad.btmesh.models import ModelServer, CompositeModelState
 from prompt_toolkit import HTML, print_formatted_text
 
@@ -16,6 +16,7 @@ wbtmesh-provisionee, the WHAD Bluetooth Mesh Provisionee utility
 SETUP_CAT = "Setup node"
 ELEMENT_CAT = "Element edit"
 ATTACK_CAT = "Attacks"
+MISC = "Miscellaneous"
 
 
 class BTMeshProvisioneeShell(InteractiveShell):
@@ -26,26 +27,26 @@ class BTMeshProvisioneeShell(InteractiveShell):
     def __init__(self, interface=None, profile=BaseMeshProfile):
         super().__init__(HTML("<b>wbtmesh-provisionee></b> "))
 
-        self.__current_mode = self.MODE_NORMAL
+        self._current_mode = self.MODE_NORMAL
 
         # Device parameters
-        self.__complete_name = "WhadDev"
-        self.__shortened_name = None
+        self._complete_name = "WhadDev"
+        self._shortened_name = None
 
         # If interface is None, pick the first matching our needs
-        self.__interface = interface
+        self._interface = interface
 
         # Profile
-        self.__profile = profile()
+        self._profile = profile()
 
         # Index of element in MODE_ELEMENT_EDIT and MODE_MODEL_EDIT modes
-        self.__selected_element = None
+        self._selected_element = None
 
         # Model id of the selected model in MODE_MODEL_EDIT
-        self.__selected_model = None
+        self._selected_model = None
 
-        self.__connector = None
-        self.__wireshark = None
+        self._connector = None
+        self._wireshark = None
         self.intro = INTRO
 
         self.update_prompt()
@@ -53,17 +54,17 @@ class BTMeshProvisioneeShell(InteractiveShell):
     def update_prompt(self, force=False):
         """Update prompt to reflect current state"""
         # Are we in element edit mode ?
-        if self.__current_mode == self.MODE_ELEMENT_EDIT:
+        if self._current_mode == self.MODE_ELEMENT_EDIT:
             self.set_prompt(
                 HTML(
                     "<b>wbtmesh-provisionee | <ansicyan>element(%d)</ansicyan>></b> "
-                    % (self.__selected_element)
+                    % (self._selected_element)
                 ),
                 force,
             )
-        elif self.__current_mode == self.MODE_NORMAL:
+        elif self._current_mode == self.MODE_NORMAL:
             self.set_prompt(HTML("<b>wbtmesh-provisionee></b> "), force)
-        elif self.__current_mode == self.MODE_STARTED:
+        elif self._current_mode == self.MODE_STARTED:
             self.set_prompt(
                 HTML(
                     "<b>wbtmesh-provisionee<ansimagenta> [running]</ansimagenta>></b> "
@@ -87,7 +88,7 @@ class BTMeshProvisioneeShell(InteractiveShell):
         """
 
         # Switch to emulation mode
-        self.__current_mode = self.MODE_STARTED
+        self._current_mode = self.MODE_STARTED
         self.update_prompt()
 
         auto_provision = False
@@ -96,10 +97,10 @@ class BTMeshProvisioneeShell(InteractiveShell):
             auto_provision = arg[0].lower() == "auto"
 
         # Instanciate our Peripheral
-        self.__connector = DFAttacks(
-            self.__interface, profile=self.__profile, auto_provision=auto_provision
+        self._connector = Provisionee(
+            self._interface, profile=self._profile, auto_provision=auto_provision
         )
-        self.__connector.start()
+        self._connector.start()
 
     @category(SETUP_CAT)
     def do_resume(self, arg):
@@ -108,8 +109,8 @@ class BTMeshProvisioneeShell(InteractiveShell):
         <ansicyan><b>resume</b></ansicyan>
         """
 
-        self.__connector.start_listening()
-        self.__current_mode = self.MODE_STARTED
+        self._connector.start_listening()
+        self._current_mode = self.MODE_STARTED
 
     @category(SETUP_CAT)
     def do_element(self, args):
@@ -136,16 +137,16 @@ class BTMeshProvisioneeShell(InteractiveShell):
         if len(args) > 0:
             action = args[0].lower()
             if action == "add":
-                if self.__current_mode != self.MODE_NORMAL:
+                if self._current_mode != self.MODE_NORMAL:
                     self.error("Cannot add elements after provisioning")
                     return
 
-                index = self.__profile.register_element(is_primary=False)
+                index = self._profile.register_element(is_primary=False)
 
                 self.success("Element %d successfully added." % index)
 
             elif action == "remove":
-                if self.__current_mode != self.MODE_NORMAL:
+                if self._current_mode != self.MODE_NORMAL:
                     self.error("Cannot remove elements after provisioning")
                     return
 
@@ -159,7 +160,7 @@ class BTMeshProvisioneeShell(InteractiveShell):
                     if index == 0:
                         self.error("Cannot delete primary element")
 
-                    elif self.__profile.remove_elements(index):
+                    elif self._profile.remove_elements(index):
                         self.success(
                             "Successfully removed element at index %d." % index
                         )
@@ -177,24 +178,24 @@ class BTMeshProvisioneeShell(InteractiveShell):
                         self.error("Index needs to be an int")
                         return
 
-                    element = self.__profile.get_element(index)
+                    element = self._profile.get_element(index)
                     if element is None:
                         self.error(
                             "Invalid element index, element %d does not exist." % index
                         )
                         return
 
-                    if self.__connector is not None:
-                        self.__connector.stop_listening()
+                    if self._connector is not None:
+                        self._connector.stop_listening()
 
-                    self.__selected_element = index
-                    self.__current_mode = self.MODE_ELEMENT_EDIT
+                    self._selected_element = index
+                    self._current_mode = self.MODE_ELEMENT_EDIT
 
                 else:
                     self.error("Need to specify an element index to edit")
 
         else:
-            elements = self.__profile.get_all_elements()
+            elements = self._profile.get_all_elements()
 
             for element in elements:
                 print_formatted_text(
@@ -241,11 +242,11 @@ class BTMeshProvisioneeShell(InteractiveShell):
         Writing/reseting to NetKeyList, AppKeyList, ModelToAppKeyList uses other commands.
         """
 
-        if self.__current_mode != self.MODE_ELEMENT_EDIT:
+        if self._current_mode != self.MODE_ELEMENT_EDIT:
             self.error("Can only edit models whilst in Element edit mode.")
             return
 
-        element = self.__profile.get_element(self.__selected_element)
+        element = self._profile.get_element(self._selected_element)
         if len(args) >= 2:
             try:
                 model_id = int(args[0], 16)
@@ -454,20 +455,20 @@ class BTMeshProvisioneeShell(InteractiveShell):
         - To reset the whitelist : whitelist reset
         """
 
-        if self.__current_mode != self.MODE_STARTED:
+        if self._current_mode != self.MODE_STARTED:
             self.error(
                 "Need to have a provisioned node/not in element edit to manage whitelist"
             )
             return
 
         if len(args) < 1:
-            whitelist = self.__connector.whitelist
+            whitelist = self._connector.whitelist
             if len(whitelist) == 0:
                 print_formatted_text(
                     HTML("|─ <ansimagenta><b>Empty Whitelist</b></ansimagenta>")
                 )
             else:
-                for addr in self.__connector.whitelist:
+                for addr in self._connector.whitelist:
                     print_formatted_text(
                         HTML("|─ <ansimagenta><b>%s</b></ansimagenta>" % addr)
                     )
@@ -475,7 +476,7 @@ class BTMeshProvisioneeShell(InteractiveShell):
         else:
             action = args[0].lower()
             if action == "reset":
-                self.__connector.reset_whitelist()
+                self._connector.reset_whitelist()
                 self.success("Successfully reset the whitelist")
 
             elif action == "add" or action == "remove":
@@ -489,11 +490,11 @@ class BTMeshProvisioneeShell(InteractiveShell):
                     return
 
                 if action == "add":
-                    self.__connector.add_whitelist(addr)
+                    self._connector.add_whitelist(addr)
                     self.success("Successfully added addr %s to the whitelist." % addr)
 
                 elif action == "remove":
-                    self.__connector.remove_whitelist(addr)
+                    self._connector.remove_whitelist(addr)
                     self.success(
                         "Successfully removed addr %s from the whitelist." % addr
                     )
@@ -512,7 +513,7 @@ class BTMeshProvisioneeShell(InteractiveShell):
         > seqnum 0xA10010
         """
 
-        if self.__current_mode != self.MODE_STARTED:
+        if self._current_mode != self.MODE_STARTED:
             self.error("Can only set the sequence number of a provisioned node.")
             return
 
@@ -520,7 +521,7 @@ class BTMeshProvisioneeShell(InteractiveShell):
             print_formatted_text(
                 HTML(
                     "<ansigreen><b>Sequence number : 0x%x</b></ansigreen>"
-                    % (self.__connector.profile.seqnum)
+                    % (self._connector.profile.seqnum)
                 )
             )
         else:
@@ -534,167 +535,51 @@ class BTMeshProvisioneeShell(InteractiveShell):
                 self.error("Sequence Number cannot be larger than 0xFFFFFF.")
                 return
 
-            self.__connector.profile.set_seq_number(seqnum)
+            self._connector.profile.set_seq_number(seqnum)
             self.success("Successfully set the sequence number to 0x%x." % seqnum)
 
-    @category(ATTACK_CAT)
-    def do_network_discovery(self, args):
-        """Performs discovery of the network (on a network with directed forwarding)
+    @category(MISC)
+    def do_onoff(self, args):
+        """Sends an onoff message via DF
+        <ansicyan><b>onoff</b> <i>"1"|"0"</i> <i>addr</i> [<i>"acked"|"unacked"</i>]</ansicyan>
 
-        <ansicyan><b>network_discovery</b> <i>addr_low</i> <i>addr_low</i></ansicyan>
+        > onoff 1 0x0004 acked
 
-        > network_discovery 0001 00AA
+        By default, sends the message unacked
         """
-        if self.__current_mode != self.MODE_STARTED:
-            self.error(
-                "Need to have a provisioned node started to launch the discovery."
-            )
-            return
 
         if len(args) < 2:
-            self.error("Please provide the range of addresses to discover")
+            self.error("You need to specify value and a destination address and ")
             return
 
         try:
-            addr_low = int(args[0], 16)
-            addr_high = int(args[1], 16)
+            value = abs(int(args[0]))
+            addr = int(args[1], 16)
         except ValueError:
-            self.error("Please provide the addresses in hex format")
-            return
-
-        self.__connector.do_network_discovery(addr_low, addr_high)
-        self.success("Successfully started the network_discovery attack.")
-        self.success("Wait a little to ask for the topolgy")
-
-    @category(ATTACK_CAT)
-    def do_get_network(self, arg):
-        """Prints the result of the last network discovery (might not be complete if you have not waited enough)
-
-        <ansicyan><b>get_network</b</ansicyan>
-        """
-        topology = self.__connector.get_network_topology()
-
-        for range_start, (range_length, distance) in topology.items():
-            print_formatted_text(
-                HTML(
-                    "|─ <ansimagenta><b>Node 0x%x to 0x%x , %d hops away</b></ansimagenta>"
-                    % (range_start, range_start + range_length, distance)
-                )
-            )
-
-    @category(SETUP_CAT)
-    def do_activate_df(self, arg):
-        """Activates DF to all nodes using via a DIRECTED_CONTROL_SET message (to the broadcast address)
-
-        Activates it for net 0.
-
-        <ansicyan><b>activate_df</b> [<i>APP_KEY_IDX</i>]</ansicyan>
-
-        To send the message using the AppKey with index 1 :
-
-        > activate_df 1
-
-        By default, uses AppKey with index 0.
-        """
-        if self.__current_mode != self.MODE_STARTED:
-            self.error("Need to have a provisioned node started to send this message.")
-            return
-
-        if len(arg) > 0:
-            try:
-                app_key_index = int(arg[0])
-            except ValueError:
-                self.error("AppKey index should be an int in decimal base.")
-                return
-        else:
-            app_key_index = 0
-
-        success = self.__connector.df_set(app_key_index)
-        if not success:
             self.error(
-                "Could not send the message. App key index specified might be invalid."
+                "Value is either '0' or '1', and address is a 2 bytes hexadecimal int."
             )
-        else:
-            self.success(
-                "Successfully sent the DIRECTED_CONTROL_SET message to broadcast address."
-            )
-
-    @category(ATTACK_CAT)
-    def do_a5_attack(self, arg):
-        """Perform the A5 attack.
-
-        <ansicyan><b>a5_attack</b> <i>VICTIM_ADDR</i></ansicyan>
-
-        > a5_attack 0x000A
-        """
-
-        if len(arg) < 1:
-            self.error("You need to specify the victim addr (hex format).")
             return
 
-        try:
-            victim_addr = int(arg[0], 16)
-        except ValueError:
-            self.error("You need to use hex format for the victim addr.")
+        if value > 1:
+            self.error("Value is either '0' or '1'.")
             return
 
-        self.__connector.a5_attack(victim_addr)
-        self.success("Successfully launched A5 attack on 0x%d" % victim_addr)
+        acked = False
+        if len(args) >= 3:
+            acked = args[2] == "acked"
+
+        self._connector.do_onoff(value, addr, acked)
+        self.success("Successfully sent onoff message.")
 
     def complete_wireshark(self):
         """Autocomplete wireshark command"""
         completions = {}
-        if self.__wireshark is not None:
+        if self._wireshark is not None:
             completions["off"] = {}
         else:
             completions["on"] = {}
         return completions
-
-    @category(ATTACK_CAT)
-    def do_a3_attack(self, args):
-        """Perform the A3 attack (based on Path Request Solicitations)
-
-        <ansicyan><b>a3_attack</b> <i>ADDR_1</i> [<i>ADDR_N</i>]</ansicyan>
-
-        > a3_attack 0x0001 0x0003 0x000A
-
-        The addresses listed in argument will be used in the Path Request Solicitations (need 1 minimum)
-        For the already in place paths
-        """
-
-        if len(args) == 0:
-            self.error("You need to specify at least one address for the message.")
-            return
-
-        addr_list = []
-        for addr in args:
-            try:
-                addr_list.append(int(addr, 16))
-            except ValueError:
-                self.error("You need to specify the addresses in hex format")
-                return
-
-        self.__connector.a3_attack(addr_list)
-        self.success("Successfully launched A3 attack on surrounding nodes.")
-
-    @category(ATTACK_CAT)
-    def do_a2_attack(self, arg):
-        """Activates or deactivtes the A2 attack
-
-        <ansicyan><b>a2_attack</b> <i>"on" | "off"</i></ansicyan>
-        """
-        if len(arg) < 1:
-            self.error("Specify 'on' or 'off' in the argument of the command.")
-            return
-
-        action = arg[0].lower()
-        if action == "on":
-            self.__connector.a2_attack(True)
-            self.success("Successfully activated A2.")
-
-        elif action == "off":
-            self.__connector.a2_attack(False)
-            self.success("Successfully deactivated A2.")
 
     @category("Monitoring")
     def do_wireshark(self, arg):
@@ -708,12 +593,12 @@ class BTMeshProvisioneeShell(InteractiveShell):
         if len(arg) >= 1:
             enabled = arg[0].lower() == "on"
             if enabled:
-                if self.__wireshark is None:
+                if self._wireshark is None:
                     try:
-                        self.__wireshark = WiresharkMonitor()
-                        if self.__connector is not None:
-                            self.__wireshark.attach(self.__connector)
-                            self.__wireshark.start()
+                        self._wireshark = WiresharkMonitor()
+                        if self._connector is not None:
+                            self._wireshark.attach(self._connector)
+                            self._wireshark.start()
                     except ExternalToolNotFound as notfound:
                         self.error(
                             "Cannot launch Wireshark, please make sure it is installed."
@@ -724,88 +609,9 @@ class BTMeshProvisioneeShell(InteractiveShell):
                     )
             else:
                 # Detach monitor if any
-                if self.__wireshark is not None:
-                    self.__wireshark.detach()
-                    self.__wireshark.close()
-                    self.__wireshark = None
+                if self._wireshark is not None:
+                    self._wireshark.detach()
+                    self._wireshark.close()
+                    self._wireshark = None
         else:
             self.error("Missing arguments, see <ansicyan>help wireshark</ansicyan>.")
-
-    @category(SETUP_CAT)
-    def do_df_entry(self, args):
-        """Get the Forwarding table entry corresponding to the arguments
-
-        <ansicyan><b>df_entry</b> <i>dest</i> <i>fw_update_id</i></ansicyan>
-        """
-
-        if len(args) < 2:
-            self.error("Specify the destination address and the fw_update_id")
-            return
-
-        try:
-            dest = int(args[0], 16)
-        except ValueError:
-            self.error("You need to specify the addresses in hex format")
-            return
-
-        try:
-            fw_update_id = int(args[1])
-        except ValueError:
-            self.error("Specify the fw_update_id in decimal.")
-            return
-
-
-        self.__connector.df_entry(dest, fw_update_id)
-        self.success("Successfully sent FORWARDING_TABLE_ENTRIES_GET message.")
-
-    @category(SETUP_CAT)
-    def do_df_dependents(self, args):
-        """Get the dependent nodes
-
-        <ansicyan><b>df_dependents</b> <i>dest</i> <i>fw_update_id</i> <i>po</> <i>pt</i></ansicyan>
-        """
-
-        if len(args) < 4:
-            self.error("Specify the destination address and the fw_update_id")
-            return
-
-        try:
-            dest = int(args[0], 16)
-            po = int(args[2], 16)
-            pt = int(args[3], 16)
-        except ValueError:
-            self.error("You need to specify the addresses in hex format")
-            return
-
-        try:
-            fw_update_id = int(args[1])
-        except ValueError:
-            self.error("Specify the fw_update_id in decimal.")
-            return
-
-
-        self.__connector.df_dependents(dest, fw_update_id, po, pt)
-        self.success("Successfully sent FORWARDING_TABLE_DEPENDENTS_GET message.")
-
-
-    @category(SETUP_CAT)
-    def do_df_reset(self, arg):
-        """Deactivates the DF for the specified destination address (can be broadcast). Deletes all entries at the same time
-
-
-        <ansicyan><b>df_reset</b> [<i>dest</i>]</ansicyan>
-
-        By default sends to the broadcast addr.
-        """
-
-        if len(arg) < 1:
-            addr = 0xffff
-        else:
-            try:
-                addr = int(arg[0],16)
-            except ValueError:
-                self.error("Address must be in hex form.")
-                return
-
-        self.__connector.df_reset(addr)
-        self.success("Successfully reset the DF of specified node(s).")
