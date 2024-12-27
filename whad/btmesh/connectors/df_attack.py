@@ -172,17 +172,17 @@ class DFAttacks(Provisionee):
         """
         self._main_stack.get_layer("upper_transport").a2_attack(action)
 
-    def df_entry(self, dest, fw_update_id):
+    def df_table(self, dest):
         """
-        Sends a FORWARDING_TABLE_ENTRIES_GET message
+        Sends a FORWARDING_TABLE_ENTRIES_GET message and waits for the reponse (in Access layer, DFAttacks style)
         """
-        self._main_stack.get_layer("access").df_entry(dest, fw_update_id)
+        return self._main_stack.get_layer("access").df_table(dest)
 
-    def df_dependents(self, dest, fw_update_id, po, pt):
+    def df_dependents(self, dest, po, pt):
         """
-        Sends a FORWARDING_TABLE_ENTRIES_GET message
+        Sends a FORWARDING_TABLE_ENTRIES_GET message and waits for the response (in Access later, DFAttacks style)
         """
-        self._main_stack.get_layer("access").df_dependents(dest, fw_update_id, po, pt)
+        return self._main_stack.get_layer("access").df_dependents(dest, po, pt)
 
     def df_reset(self, addr):
         """
@@ -192,3 +192,25 @@ class DFAttacks(Provisionee):
         :type addr: int
         """
         self._main_stack.get_layer("access").df_reset(addr)
+
+    def do_2way(self, action):
+        """
+        Activates or deactivates 2way paths creation of the network
+
+        :param action: On or off
+        :type action: bool
+        """
+        self._main_stack.get_layer("access").do_2way(action)
+
+    def do_onoff(self, value, addr, acked):
+        """
+        Sends a Generic On/Off set message (acked or unacked)
+
+        :param value: Value to be set (0 or 1)
+        :type value: int
+        :param addr: Destination addr
+        :type addr: int
+        :param acked: Whether the messages is acked or not
+        :type acked: Bool
+        """
+        self._main_stack.get_layer("access").do_onoff(value, addr, acked)

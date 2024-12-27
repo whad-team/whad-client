@@ -16,6 +16,7 @@ from whad.btmesh.stack.utils import (
     VIRTUAL_ADDR_TYPE,
 )
 from queue import Queue
+from threading import Event
 
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,12 @@ class AccessLayer(Layer):
         self._custom_handlers = {}
 
         self.state.profile = options["profile"]
+
+        # When waiting for a specific message, class we are waiting for, and the event object to notify the thread
+        # The received_message containes the context and message received.
+        self.state.expected_class = None
+        self.state.event = Event()
+        self.state.received_message = None
 
     def check_queue(self):
         """
@@ -67,9 +74,25 @@ class AccessLayer(Layer):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         pkt, ctx = message
-        # print("SENDING")
-        # pkt.show()
         self.send("upper_transport", message)
+
+    def wait_for_message(self, clazz):
+        """
+        Sets the a class for the type of message we need to receive. The others are discarded.
+        When message is received, event is set to notify waiting thread.
+
+        THE RECEIVED MESSAGE WILL NOT BE PROCESSED BY THE MODELS.
+
+        :param clazz: Class of message we are waiting for
+        :type clazz: [TODO:type]
+        """
+        self.state.event.clear()
+        self.state.received_message = None
+        self.state.expected_class = clazz
+
+        self.state.event.wait(timeout=2)
+        self.state.expected_class = None
+        return self.state.received_message
 
     def process_access_message(self, message):
         """
@@ -80,6 +103,14 @@ class AccessLayer(Layer):
         """
         packet, ctx = message
         dst_addr = ctx.dest_addr
+
+        # If waiting for a particular message, check and set event if needed
+        if self.state.expected_class is not None:
+            if type(packet[1]) is self.state.expected_class:
+                self.state.expected_class = None
+                self.state.received_message = (packet[1], ctx)
+                self.state.event.set()
+            return
 
         if type(packet[1]) in self._custom_handlers:
             self._custom_handlers[type(packet[1])](message)
