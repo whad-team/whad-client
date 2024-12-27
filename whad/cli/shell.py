@@ -127,12 +127,12 @@ class InteractiveShell:
                 completions['$'+name] = {}
         return completions
 
-    def process(self, input):
+    def process(self, input_line):
         """Process input commands.
         """
         try:
             # Dispatch commands
-            tokens = shlex.split(input)
+            tokens = shlex.split(input_line)
             if len(tokens) >= 1:
                 command = tokens[0]
                 if command in self.__commands:
@@ -176,7 +176,7 @@ class InteractiveShell:
                     if res:
                         break
         except IOError:
-            self.error('Cannot access script file "%s"', script_path)
+            self.error(f"Cannot access script file \"{script_path}\"")
 
     def do_quit(self, args):
         """This method must be overriden to handle tool termination.
@@ -279,7 +279,7 @@ class InteractiveShell:
             if arg[1:] in self.__env:
                 return self.__env[arg[1:]]
             return arg
-        
+
         if arg.startswith('\\$'):
             return arg[1:]
 
