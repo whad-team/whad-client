@@ -99,6 +99,12 @@ class DFAttacks(Provisionee):
         )
         thread.start()
 
+    def do_get_hops(self):
+        """
+        Get the distance between attacker to discovred node via network discovery attack
+        """
+        self._main_stack.get_layer("upper_transport").discovery_get_hops()
+
     def reset_whitelist(self):
         """
         Resets the whitelist

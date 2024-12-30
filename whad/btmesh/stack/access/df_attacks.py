@@ -115,7 +115,7 @@ class DFAttacksAccessLayer(AccessLayer):
         # Wanted lanes
         ctx = copy(ctx)
         pkt = BTMesh_Model_Directed_Forwarding_Wanted_Lanes_Set(
-            net_key_index=0, wanted_lanes=2
+            net_key_index=0, wanted_lanes=1
         )
         pkt = BTMesh_Model_Message() / pkt
         self.process_new_message((pkt, ctx))

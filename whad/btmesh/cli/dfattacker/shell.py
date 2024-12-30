@@ -262,6 +262,18 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
                 )
             )
 
+    @category(ATTACK_CAT)
+    def do_get_hops(self, arg):
+        """Launches the distance discovery attack on discovered nodes
+
+        <ansicyan><b>get_hops</b</ansicyan>
+        """
+
+        self._connector.do_get_hops()
+        self.success(
+            "Successfully launched distance evaluation of discovered nodes. Launch 'get_network' to see results"
+        )
+
     @category(DF_SETUP)
     def do_df_activate(self, arg):
         """Activates DF to all nodes using via a DIRECTED_CONTROL_SET message (to the broadcast address)
