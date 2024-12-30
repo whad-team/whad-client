@@ -55,6 +55,10 @@ class UpperTransportDFAttacks(UpperTransportLayer):
         )
         self._handlers[BTMesh_Upper_Transport_Control_Path_Reply] = self.on_path_reply
 
+        self._handlers[BTMesh_Upper_Transport_Control_Path_Echo_Reply] = (
+            self.on_path_echo_reply
+        )
+
         # Path requests already processed once/sent by us
         # Key is path_origin:FWN
         self.path_requests_processed = {}
@@ -324,7 +328,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
             self.topology[pkt.path_target_unicast_addr_range.range_start] = (
                 range_length,
                 -1,
-            )
+            )  # Send the path echo request
             return
 
         # Send Path Confirmation if Path Reply for our address. For A5 attack, send a dependent_nodes_update afterwards
@@ -399,6 +403,26 @@ class UpperTransportDFAttacks(UpperTransportLayer):
                 base_ctx,
             ))
             sleep(0.2)
+
+    def discovery_get_hops(self):
+        """
+        For the nodes we have discovered with the network discovery attack, we try to get their distance with the
+        Path Echo Request technique
+        """
+
+        ctx = MeshMessageContext()
+        ctx.ttl = 127
+        ctx.creds = DIRECTED_FORWARDING_CREDS
+        ctx.src_addr = b"\x7f\xff"
+        ctx.is_ctl = True
+        ctx.net_key_id = 0
+
+        for addr in self.topology.keys():
+            print(addr)
+            pkt = BTMesh_Upper_Transport_Control_Path_Echo_Request()
+            ctx_send = copy(ctx)
+            ctx_send.dest_addr = addr.to_bytes(2, "big")
+            self.send_control_message((pkt, ctx_send))
 
     def get_network_topology(self):
         return self.topology
@@ -541,3 +565,15 @@ class UpperTransportDFAttacks(UpperTransportLayer):
             resp_pkt,
             resp_ctx,
         ))
+
+    def on_path_echo_reply(self, message):
+        pkt, ctx = message
+
+        print("RECEIVED ECHO REPLY")
+        # Path Echo reply for the network discovery
+        if ctx.dest_addr == b"\x7f\xff":
+            range_length, hops = self.topology[int.from_bytes(ctx.src_addr, "big")]
+            self.topology[int.from_bytes(ctx.src_addr, "big")] = (
+                range_length,
+                0x7F - ctx.ttl,
+            )
