@@ -167,7 +167,9 @@ class BTMesh(Sniffer):
         :type channel: [TODO:type], optional
         """
         # AdvA = randbytes(6).hex(":")  # random in spec
-        AdvA = b"\x11\x22\x33\x44\x55\x66"
+        AdvA = (self.profile.primary_element_addr & 0xFF).to_bytes(
+            1, "big"
+        ) + b"\xaa\xaa\xaa\xaa\xaa"
         adv_pkt = BTLE_ADV(TxAdd=0) / BTLE_ADV_NONCONN_IND(AdvA=AdvA, data=packet)
         for i in range(0, 1):
             self.send_pdu(
@@ -230,6 +232,19 @@ class BTMesh(Sniffer):
         self._main_stack = NetworkLayer(connector=self, options=self.options)
 
         self.is_provisioned = True
+
+    def do_address(self, address=None):
+        """
+        Handler for the do_address command in shell.
+
+        Returns the primary address of the node. If address is not None, sets the value to it.
+        :param address: Address to set for the Node, defaults to None
+        :type address: int, optional
+        """
+        if address is not None:
+            self.profile.set_primary_element_addr(address)
+
+        return self.profile.primary_element_addr
 
 
 class BTMeshHCI(Peripheral):

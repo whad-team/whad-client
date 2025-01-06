@@ -484,3 +484,57 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
 
         self._connector.df_reset(addr)
         self.success("Successfully reset the DF of specified node(s).")
+
+    @category(SETUP_CAT)
+    def do_topology(self, arg):
+        """Configures the whitelist to correspond to a grid or linear topology (based on unicast addresses)
+
+        <ansicyan>topology <i>"linear"|"grid"</ansicyan>
+
+        To set to topology to grid :
+
+        > topology grid
+
+        For a linear topology :
+
+        > topology linear
+        """
+        if self._current_mode != self.MODE_STARTED:
+            self.error(
+                "Need to have a provisioned node/not in element edit to manage whitelist"
+            )
+            return
+
+        if len(arg) < 1:
+            self.error("You need to specify the type of topology (grid or linear)")
+            return
+
+        topology = arg[0].lower()
+        own_addr = self._profile.primary_element_addr
+        base = "aa:aa:aa:aa:aa:"
+        if topology == "linear":
+            self._connector.reset_whitelist()
+            self._connector.add_whitelist(base + ("%02x" % (own_addr - 1 & 0xFF)))
+            self._connector.add_whitelist(base + ("%02x" % (own_addr + 1 & 0xFF)))
+
+            self.success("Successfully set the topology to linear")
+
+        elif topology == "grid":
+            self._connector.reset_whitelist()
+            row = (own_addr >> 4) & 0xF
+            col = own_addr & 0xF
+
+            for dr in [-1, 0, 1]:
+                for dc in [-1, 0, 1]:
+                    if dr == 0 and dc == 0:
+                        continue
+                    new_row = row + dr
+                    new_col = col + dc
+
+                    # Ensure new_row and new_col are within valid range (0 to 15)
+                    if 0 <= new_row <= 15 and 0 <= new_col <= 15:
+                        # Combine the new_row and new_col into a single address
+                        new_address = (new_row << 4) | new_col
+                        self._connector.add_whitelist(base + ("%02x" % new_address))
+
+            self.success("Successfully set the topology to grid")
