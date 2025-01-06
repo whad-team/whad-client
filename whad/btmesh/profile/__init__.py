@@ -58,9 +58,6 @@ class BaseMeshProfile(object):
         # lock to access the seq_number
         self.__seq_lock = Lock()
 
-        # address of primary element, used as an offset for the others
-        self.primary_element_addr = 0
-
         self.iv_index = b"\x00\x00\x00\x00"
 
         # Sequence number of the device for the iv_index

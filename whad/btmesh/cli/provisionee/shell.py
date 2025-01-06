@@ -103,6 +103,39 @@ class BTMeshProvisioneeShell(InteractiveShell):
         self._connector.start()
 
     @category(SETUP_CAT)
+    def do_address(self, arg):
+        """Manages the device's primary unicast address
+
+        <ansicyan><b>address</b> <i>[value]</i></ansicyan>
+
+        This command will set the primary unicast address of the device to 0x05 :
+
+        > address 0x0005
+
+        By default, will print de device's address
+        """
+
+        if self._current_mode != self.MODE_STARTED:
+            self.error("Need to have the devices started")
+            return
+
+        addr = None
+        if len(arg) >= 1:
+            try:
+                addr = int(arg[0], 16)
+            except ValueError:
+                self.error("Address must be in hexadecimal form")
+                return
+
+            if addr > 32767:
+                self.error("Address must be lower than 0x7FFF")
+                return
+
+        addr = self._connector.do_address(address=addr)
+
+        self.success("Address of the device is now : 0x%x" % addr)
+
+    @category(SETUP_CAT)
     def do_resume(self, arg):
         """Resumes the normal behaviour of a provisioned node (after editing an element)
 

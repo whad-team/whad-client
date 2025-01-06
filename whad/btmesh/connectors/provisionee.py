@@ -80,7 +80,7 @@ class Provisionee(BTMesh):
 
         # Stores the nodes discovered in the network
         # key is range start, tuple is (range_length, hops)
-        self.topology = {} 
+        self.topology = {}
 
         if auto_provision:
             self.auto_provision(net_key, app_key, unicast_addr)
@@ -152,6 +152,36 @@ class Provisionee(BTMesh):
         )
         pkt = BTMesh_Model_Message() / pkt
         self._main_stack.get_layer("access").process_new_message((pkt, ctx))
+
+    def reset_whitelist(self):
+        """
+        Resets the whitelist
+        """
+        self.whitelist = []
+
+    def add_whitelist(self, addr):
+        """
+        Adds an address to the whitelist
+
+        :param addr: BD Addr to add
+        :type addr: str
+        """
+        addr = addr.lower()
+        if addr not in self.whitelist:
+            self.whitelist.append(addr)
+
+    def remove_whitelist(self, addr):
+        """
+        Removes an address from the whitelist
+
+        :param addr: BD Addr to remove
+        :type addr: str
+        """
+        try:
+            index = self.whitelist.index(addr.lower())
+        except ValueError:
+            return
+        self.whitelist.pop(index)
 
     """
     def handle_key_press(self):

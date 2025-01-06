@@ -105,36 +105,6 @@ class DFAttacks(Provisionee):
         """
         self._main_stack.get_layer("upper_transport").discovery_get_hops()
 
-    def reset_whitelist(self):
-        """
-        Resets the whitelist
-        """
-        self.whitelist = []
-
-    def add_whitelist(self, addr):
-        """
-        Adds an address to the whitelist
-
-        :param addr: BD Addr to add
-        :type addr: str
-        """
-        addr = addr.lower()
-        if addr not in self.whitelist:
-            self.whitelist.append(addr)
-
-    def remove_whitelist(self, addr):
-        """
-        Removes an address from the whitelist
-
-        :param addr: BD Addr to remove
-        :type addr: str
-        """
-        try:
-            index = self.whitelist.index(addr.lower())
-        except ValueError:
-            return
-        self.whitelist.pop(index)
-
     def get_network_topology(self):
         """
         Returns the Topology dictionary
