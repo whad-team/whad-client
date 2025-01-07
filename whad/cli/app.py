@@ -595,6 +595,10 @@ class CommandLineApp(ArgumentParser):
                     return True
                 else:
                     logger.debug(f"[cli] stdout redirected to /dev/null, no unix socket needed")
+                    return False
+            else:
+                logger.debug("[cli] stdout is redirected and cannot determine if it leads to /dev/null or not (OS not Linux)")
+                return True
 
         return False
 
