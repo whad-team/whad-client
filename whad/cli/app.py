@@ -583,7 +583,20 @@ class CommandLineApp(ArgumentParser):
 
         :return bool: True if stdout is piped, False otherwise
         """
-        return (not sys.stdout.isatty())
+        if not sys.stdout.isatty():
+            # If we are on a Linux system, check if we are redirected to
+            # /dev/null, in this case we consider we are not *really* piped
+            # with a program.
+            if sys.platform in ("linux", "linux2"):
+                pid = os.getpid()
+                stdout_target = os.readlink(f"/proc/{pid}/fd/1")
+                if stdout_target != "/dev/null":
+                    logger.debug(f"[cli] stdout is redirected to {stdout_target}")
+                    return True
+                else:
+                    logger.debug(f"[cli] stdout redirected to /dev/null, no unix socket needed")
+
+        return False
 
 
     def is_stdin_piped(self):
