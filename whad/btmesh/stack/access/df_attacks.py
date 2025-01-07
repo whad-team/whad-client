@@ -61,7 +61,7 @@ class DFAttacksAccessLayer(AccessLayer):
         pkt, ctx = message
         pkt.show()
 
-    def df_set(self, app_key_index):
+    def df_set(self, dest):
         """
         Used to set the Directed Forwarding in all nodes by sending a DIRECTED_CONTROL_SET message
 
@@ -75,14 +75,13 @@ class DFAttacksAccessLayer(AccessLayer):
 
         (worst case scenario for the attacks basically)
 
-        :param app_key_index: App key index chosen
-        :type app_key_index: int
-        :returns: True if success, False if fail (no app key with specified app key index)
+        :param dest: Destination address
+        :type dest: int
         """
         app_key = (
             self.state.profile.get_configuration_server_model()
             .get_state("app_key_list")
-            .get_value(app_key_index)
+            .get_value(0)
         )
 
         if app_key is None:
@@ -101,7 +100,7 @@ class DFAttacksAccessLayer(AccessLayer):
 
         ctx.creds = MANAGED_FLOODING_CREDS
         ctx.src_addr = self.state.profile.primary_element_addr.to_bytes(2, "big")
-        ctx.dest_addr = b"\xff\xff"
+        ctx.dest_addr = dest.to_bytes(2, "big")
         ctx.ttl = 127
         ctx.is_ctl = False
         ctx.net_key_id = 0
@@ -118,7 +117,7 @@ class DFAttacksAccessLayer(AccessLayer):
             net_key_index=0, wanted_lanes=1
         )
         pkt = BTMesh_Model_Message() / pkt
-        self.process_new_message((pkt, ctx))
+        # self.process_new_message((pkt, ctx))
         sleep(0.3)
 
         # Echo interval
@@ -127,13 +126,13 @@ class DFAttacksAccessLayer(AccessLayer):
             net_key_index=0, unicast_echo_interval=5, multicast_echo_interval=5
         )
         pkt = BTMesh_Model_Message() / pkt
-        self.process_new_message((pkt, ctx))
+        # self.process_new_message((pkt, ctx))
         sleep(0.3)
 
         # Lane lifetime
         ctx = copy(ctx)
         pkt = BTMesh_Model_Directed_Forwarding_Path_Metric_Set(
-            net_key_index=0, path_lifetime=0, path_metric_type=0
+            net_key_index=0, path_lifetime=2, path_metric_type=0
         )
         pkt = BTMesh_Model_Message() / pkt
         self.process_new_message((pkt, ctx))

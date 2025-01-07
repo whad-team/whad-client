@@ -111,15 +111,14 @@ class DFAttacks(Provisionee):
         """
         return self._main_stack.get_layer("upper_transport").get_network_topology()
 
-    def df_set(self, app_key_index):
+    def df_set(self, dest):
         """
-        Activates DF via a DIRECTED_CONTROL_SET (Access message) to all nodes
+        Activates DF via a DIRECTED_CONTROL_SET (Access message) to the destination specified
 
-        :param app_key_index: App key index to use
-        :type app_key_index: int
-        :returns: True is success, False otherwise
+        :param dest: Target addr
+        :type dest: int
         """
-        return self._main_stack.get_layer("access").df_set(app_key_index)
+        return self._main_stack.get_layer("access").df_set(dest)
 
     def a5_attack(self, victim_addr):
         """

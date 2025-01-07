@@ -104,7 +104,7 @@ def show_fw_table(fw_table):
         if header.backward_path_validated_flag:
             print_formatted_text(HTML("<ansicyan><i> └─ Path is 2-way</i></ansicyan>"))
         else:
-            print_formatted_text(HTML("<ansicyan><i> └─ Path is 1-way<i></ansicyan>"))
+            print_formatted_text(HTML("<ansicyan><i> └─ Path is 1-way</i></ansicyan>"))
 
 
 def show_dependents(dependent_status):
@@ -276,17 +276,17 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
 
     @category(DF_SETUP)
     def do_df_activate(self, arg):
-        """Activates DF to all nodes using via a DIRECTED_CONTROL_SET message (to the broadcast address)
+        """Activates DF to all nodes using via a DIRECTED_CONTROL_SET message.
 
         Activates it for net 0.
 
-        <ansicyan><b>df_activate</b> [<i>APP_KEY_IDX</i>]</ansicyan>
+        <ansicyan><b>df_activate</b> [<i>DEST</i>]</ansicyan>
 
-        To send the message using the AppKey with index 1 :
+        To send the message to 0x05 :
 
-        > df_activate 1
+        > df_activate 0x05
 
-        By default, uses AppKey with index 0.
+        By default, sends it to the broadcast address
         """
         if self._current_mode != self.MODE_STARTED:
             self.error("Need to have a provisioned node started to send this message.")
@@ -294,22 +294,17 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
 
         if len(arg) > 0:
             try:
-                app_key_index = int(arg[0])
+                addr = int(arg[0], 16)
             except ValueError:
-                self.error("AppKey index should be an int in decimal base.")
+                self.error("Addr should be in hex format.")
                 return
         else:
-            app_key_index = 0
+            addr = 0xFFFF
 
-        success = self._connector.df_set(app_key_index)
-        if not success:
-            self.error(
-                "Could not send the message. App key index specified might be invalid."
-            )
-        else:
-            self.success(
-                "Successfully sent the DIRECTED_CONTROL_SET message to broadcast address."
-            )
+        self._connector.df_set(addr)
+        self.success(
+            "Successfully sent the DIRECTED_CONTROL_SET message to 0x%x." % addr
+        )
 
     @category(DF_SETUP)
     def do_2way(self, arg):
