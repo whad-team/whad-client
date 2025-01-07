@@ -266,7 +266,7 @@ class BleProxyApp(CommandLineDeviceSource):
                     self.interface,
                     adv_data=adv_data,
                     scan_data=scan_rsp,
-                    bd_address=self.args.bdaddr,
+                    bd_address=self.args.bdaddr.lower(),
                     spoof=self.args.spoof
                 )
             else:
@@ -275,7 +275,7 @@ class BleProxyApp(CommandLineDeviceSource):
                     target=self.interface,
                     adv_data=adv_data,
                     scan_data=scan_rsp,
-                    bd_address=self.args.bdaddr,
+                    bd_address=self.args.bdaddr.lower(),
                     spoof=self.args.spoof
                 )
 
