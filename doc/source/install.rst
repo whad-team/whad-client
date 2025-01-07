@@ -2,17 +2,23 @@ Installation
 =============
 
 Installing WHAD from pip
--------------------------
+------------------------
 
 Installing WHAD is straightforward with ``pip``:
 
 .. code-block:: text
 
-    pip install whad
+    $ pip install whad
 
+.. important::
+
+    It is highly recommended to use a virtual environment for WHAD in order to
+    avoid any dependency collision, see `this tutorial <https://docs.python.org/3/tutorial/venv.html>`_.
+
+    You can also use `pipx <https://pipx.pypa.io/stable/>`_ instead of *pip*, as it manages its own virtual environments.
 
 Installing WHAD from Github repository
-----------------------------------------
+--------------------------------------
 
 Another solution is to get the source from github directly:
 
@@ -20,10 +26,11 @@ Another solution is to get the source from github directly:
 
     $ git clone https://github.com/whad-team/whad-client.git
     $ cd whad-client
+    $ pip install --upgrade pip setuptools
     $ pip install .
 
 Installing rules for WHAD-compatible devices
----------------------------------------------
+--------------------------------------------
 
 By default, interacting with most WHAD-compatible devices require root permissions.
 
