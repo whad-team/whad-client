@@ -477,7 +477,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
             on_behalf_of_dependent_origin=0,
             path_origin_path_metric_type=0,
             path_discovery_interval=0,
-            path_origin_path_lifetime=0,
+            path_origin_path_lifetime=2,
             path_origin_path_metric=0,
             destination=victim_addr,
             path_origin_unicast_addr_range=UnicastAddr(
