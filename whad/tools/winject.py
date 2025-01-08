@@ -13,11 +13,10 @@ from argparse import ArgumentParser
 
 # Import every possible scapy layer for packet crafting
 # pylint: disable-next=wildcard-import
-from scapy.layers import *
-from scapy.layers.bluetooth4LE import BTLE_RF, BTLE
+from scapy.layers.all import *
 
 # Import scapy helpers
-from scapy.packet import Packet
+from scapy.packet import Packet, Raw
 from scapy.config import conf
 from scapy.themes import BrightTheme
 
@@ -84,6 +83,8 @@ class WhadInjectApp(CommandLineApp):
         self.add_argument(
             '-d',
             '--delay',
+            type=float,
+            default='1.0',
             dest='delay',
             help="Delay between the transmission of two consecutive packets"
         )
@@ -203,23 +204,26 @@ class WhadInjectApp(CommandLineApp):
         self.provided_count = 0
         if hasattr(self.args, "packet"):
             for p in self.args.packet:
-                try:
-                    # pylint: disable-next=eval-used
-                    pkt = eval(p)
-                    self._input_queue.put(pkt)
-                    self.provided_count += 1
-                except SyntaxError:
-                    error(f"Invalid syntax: `{p}`")
-                except Exception:
-                    # If hexadecimal only, try to interpret as bytes
-                    if all(c in string.hexdigits for c in p):
+                # Is it some hex
+                if all(c in string.hexdigits for c in p):
+                    if len(p) % 2 == 0:
                         try:
                             pkt = bytes.fromhex(p)
                             self._input_queue.put(pkt)
                             self.provided_count += 1
                         except Exception as err:
-                            error(f"Failure during packet interpretation: {p} -> {err}")
+                            error(f"Failure during raw packet decoding: {p} -> {err}")
                     else:
+                        error("Raw packets must be provided in valid hexadecimal form")
+                else:
+                    try:
+                        # pylint: disable-next=eval-used
+                        pkt = eval(p)
+                        self._input_queue.put(pkt)
+                        self.provided_count += 1
+                    except SyntaxError:
+                        error(f"Invalid syntax: `{p}`")
+                    except Exception as err:
                         error(f"Failure during packet interpretation: {p} -> {err}")
 
     def pre_run(self):
