@@ -9,10 +9,12 @@ from scapy.compat import raw
 from scapy.config import conf
 from scapy.layers.dot15d4 import Dot15d4 as Dot15d4NoFCS
 from scapy.layers.dot15d4 import Dot15d4FCS
+
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr
 from whad.hub.dot15d4 import Dot15d4Metadata
 # Main whad imports
 from whad.hub.discovery import Domain, Capability
+from whad.cli.app import CommandLineApp
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
@@ -57,14 +59,21 @@ class Dot15d4(WhadDeviceConnector):
         # will be wrong if using a version prior to 1.1.0.
         if device.info.fw_url == "https://github.com/whad-team/butterfly":
             if Version(device.info.version_str) < Version("1.1.0"):
-                logger.warning((
-                    "[warning]------------------------------------------------------\n"
-                    "You are using a ButteRFly version prior to 1.1.0 that does not correctly compute FCS values,\n"
-                    "this will result in invalid FCS values in packets and PCAP files that may cause errors when\n"
-                    "used with other WHAD tools. Please consider upgrading firmware to the latest version \n"
-                    "(see https://github.com/whad-team/butterfly).\n"
-                    "---------------------------------------------------------------"
+                message = ((
+                    "You are using a ButteRFly version prior to 1.1.0 that does not correctly compute FCS values, "
+                    "this will result in invalid FCS values in packets and PCAP files that may cause errors when "
+                    "used with other WHAD tools. Please consider upgrading firmware to the latest version "
+                    "(see https://github.com/whad-team/butterfly). "
+                    "You can also use `winstall --flash butterfly` to reprogram your USB dongle."
                 ))
+
+                # Use application warning method if available
+                app = CommandLineApp.get_instance()
+                if app is not None:
+                    app.warning(message)
+                else:
+                    # If not available, use basic logging capabilities
+                    logger.warning(message)
 
         # Check if device supports 802.15.4
         if not self.device.has_domain(Domain.Dot15d4):
