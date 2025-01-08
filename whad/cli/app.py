@@ -290,6 +290,9 @@ class CommandLineApp(ArgumentParser):
     OUTPUT_STANDARD = 1
     OUTPUT_WHAD = 2
 
+    # Unique application instance
+    instance = None
+
     def __init__(self, description: str = None, commands: bool=True, interface: bool=True, input: int = INPUT_WHAD,
                  output: int = OUTPUT_WHAD, **kwargs):
         """Instanciate a CommandLineApp
@@ -302,6 +305,10 @@ class CommandLineApp(ArgumentParser):
         :param int input: specify the input type when application has its stdin piped
         :param int output: specify the output type when application has its stdout piped
         """
+        # Save application instance as a class property
+        if CommandLineApp.instance is None:
+            CommandLineApp.instance = self
+
         super().__init__(description=description, **kwargs)
 
         self.__interface = None
@@ -369,6 +376,13 @@ class CommandLineApp(ArgumentParser):
                 nargs='*',
                 help="command arguments"
             )
+
+    @staticmethod
+    def get_instance():
+        """Return unique application instance
+        """
+        return CommandLineApp.instance
+
 
     @property
     def interface(self):
