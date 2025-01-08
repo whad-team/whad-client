@@ -1,4 +1,8 @@
+import logging
 from typing import Union, Tuple
+
+# packaging
+from packaging.version import Version
 
 # Scapy imports
 from scapy.compat import raw
@@ -20,6 +24,7 @@ from whad.hub.dot15d4 import NodeAddress, Commands, NodeAddressType, PduReceived
     RawPduReceived, EnergyDetectionSample
 from whad.hub.events import JammedEvt
 
+logger = logging.getLogger(__name__)
 
 class Dot15d4(WhadDeviceConnector):
     """
@@ -46,6 +51,20 @@ class Dot15d4(WhadDeviceConnector):
         # Open device and make sure it is compatible
         self.device.open()
         self.device.discover()
+
+        # Display a warning message if ButteRFly version is less than 1.1.0 as
+        # a critical bug has been found and fixed in version 1.1.0. FCS values
+        # will be wrong if using a version prior to 1.1.0.
+        if device.info.fw_url == "https://github.com/whad-team/butterfly":
+            if Version(device.info.version_str) < Version("1.1.0"):
+                logger.warning((
+                    "[warning]------------------------------------------------------\n"
+                    "You are using a ButteRFly version prior to 1.1.0 that does not correctly compute FCS values,\n"
+                    "this will result in invalid FCS values in packets and PCAP files that may cause errors when\n"
+                    "used with other WHAD tools. Please consider upgrading firmware to the latest version \n"
+                    "(see https://github.com/whad-team/butterfly).\n"
+                    "---------------------------------------------------------------"
+                ))
 
         # Check if device supports 802.15.4
         if not self.device.has_domain(Domain.Dot15d4):
