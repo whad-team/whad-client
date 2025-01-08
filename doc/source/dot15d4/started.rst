@@ -28,6 +28,9 @@ channel and sniff packets:
     # Set channel
     sniffer.channel = 11
 
+    # Start sniffing
+    sniffer.start()
+
     # Listen for packets
     for packet in sniffer.sniff():
         packet.show()
