@@ -344,8 +344,15 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             self.error("You need to use hex format for the victim addr.")
             return
 
-        self._connector.a5_attack(victim_addr)
-        self.success("Successfully launched A5 attack on 0x%d" % victim_addr)
+        self.warning("Waiting for the Path Reply from 0x%x ..." % (victim_addr))
+        result = self._connector.a5_attack(victim_addr)
+        if result:
+            self.success(
+                "Successfully launched A5 attack on 0x%d. Check table to see if successfull"
+                % victim_addr
+            )
+        else:
+            self.error("Attack failed, did not received Reply. Retry.")
 
     @category(ATTACK_CAT)
     def do_a3_attack(self, args):

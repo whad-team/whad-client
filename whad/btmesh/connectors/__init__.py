@@ -171,21 +171,19 @@ class BTMesh(Sniffer):
             1, "big"
         ) + b"\xaa\xaa\xaa\xaa\xaa"
         adv_pkt = BTLE_ADV(TxAdd=0) / BTLE_ADV_NONCONN_IND(AdvA=AdvA, data=packet)
-        for i in range(0, 1):
+        for i in range(0, 2):
             self.send_pdu(
                 adv_pkt,
                 access_address=0x8E89BED6,
                 conn_handle=39,
                 direction=BleDirection.UNKNOWN,
             )
-            sleep(0.003)
             self.send_pdu(
                 adv_pkt,
                 access_address=0x8E89BED6,
                 conn_handle=37,
                 direction=BleDirection.UNKNOWN,
             )
-            sleep(0.003)
             res = self.send_pdu(
                 adv_pkt,
                 access_address=0x8E89BED6,

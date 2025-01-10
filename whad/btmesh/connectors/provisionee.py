@@ -183,6 +183,19 @@ class Provisionee(BTMesh):
             return
         self.whitelist.pop(index)
 
+    def do_onoff(self, value, addr, acked):
+        """
+        Sends a Generic On/Off set message (acked or unacked)
+
+        :param value: Value to be set (0 or 1)
+        :type value: int
+        :param addr: Destination addr
+        :type addr: int
+        :param acked: Whether the messages is acked or not
+        :type acked: Bool
+        """
+        self._main_stack.get_layer("access").do_onoff(value, addr, acked)
+
     """
     def handle_key_press(self):
         while True:

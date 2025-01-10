@@ -127,7 +127,7 @@ class DFAttacks(Provisionee):
         :param victim_addr: Addr of the victim
         :type victim_addr: int
         """
-        self._main_stack.get_layer("upper_transport").a5_attack(victim_addr)
+        return self._main_stack.get_layer("upper_transport").a5_attack(victim_addr)
 
     def a3_attack(self, addr_list):
         """
@@ -176,16 +176,3 @@ class DFAttacks(Provisionee):
         :type action: bool
         """
         self._main_stack.get_layer("access").do_2way(action)
-
-    def do_onoff(self, value, addr, acked):
-        """
-        Sends a Generic On/Off set message (acked or unacked)
-
-        :param value: Value to be set (0 or 1)
-        :type value: int
-        :param addr: Destination addr
-        :type addr: int
-        :param acked: Whether the messages is acked or not
-        :type acked: Bool
-        """
-        self._main_stack.get_layer("access").do_onoff(value, addr, acked)

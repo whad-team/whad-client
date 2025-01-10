@@ -501,6 +501,12 @@ class UpperTransportDFAttacks(UpperTransportLayer):
             pkt,
             ctx,
         ))
+        self.wait_for_message(BTMesh_Upper_Transport_Control_Path_Reply)
+        message = self.state.received_message
+        if message is None:
+            return False
+
+        return True
 
     def path_echo_reply_send(self, path_origin, path_target):
         """

@@ -6,6 +6,7 @@ Sends and respondes to UpperLayer Control messages (no application encryption)
 """
 
 import logging
+from threading import Event
 from whad.common.stack import Layer, alias, source
 from whad.btmesh.stack.utils import (
     get_address_type,
@@ -33,6 +34,7 @@ from whad.scapy.layers.btmesh import (
     BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm,
 )
 from whad.btmesh.stack.access import AccessLayer
+from queue import Queue
 from scapy.all import raw
 from whad.btmesh.crypto import UpperTransportLayerAppKeyCryptoManager
 
@@ -50,6 +52,18 @@ class UpperTransportLayer(Layer):
 
         # Access elements and models
         self.state.profile = options["profile"]
+
+        # Rx message queue from LowerTransportLayer
+        self.__queue = Queue()
+
+        # Set to True when a handler for an Access Message is executed
+        self.state.__is_processing_message = False
+
+        # When waiting for a specific CTL message, class we are waiting for, and the event object to notify the thread
+        # The received_message containes the context and message received.
+        self.state.expected_class = None
+        self.state.event = Event()
+        self.state.received_message = None
 
         # handlers for the Upper Transport Control messages
         self._handlers = {
@@ -72,6 +86,13 @@ class UpperTransportLayer(Layer):
             BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm: self.default_ctl_handler,
         }
 
+    def check_queue(self):
+        """
+        If the queue is not empty, process the next UpperTransportLayer Message
+        """
+        if not self.__queue.empty():
+            self.process_lower_transport_message(self.__queue.get_nowait())
+
     def send_to_lower_transport(self, message):
         """
         Sends an encrypted Upper Layer Access PDU and its context to the Lower Transport Layer
@@ -89,6 +110,24 @@ class UpperTransportLayer(Layer):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         self.send("access", message)
+
+    def wait_for_message(self, clazz):
+        """
+        Sets the a class for the type of message we need to receive. The others are discarded.
+        When message is received, event is set to notify waiting thread.
+
+        THE RECEIVED MESSAGE WILL NOT BE PROCESSED BY THE MODELS.
+
+        :param clazz: Class of message we are waiting for
+        :type clazz: [TODO:type]
+        """
+        self.state.event.clear()
+        self.state.received_message = None
+        self.state.expected_class = clazz
+
+        self.state.event.wait(timeout=3)
+        self.state.expected_class = None
+        return self.state.received_message
 
     def __get_app_key_index_from_aid(self, aid):
         """
@@ -170,6 +209,17 @@ class UpperTransportLayer(Layer):
     @source("lower_transport")
     def on_lower_transport_message(self, message):
         """
+        Handler when an UpperTransportLayer message is received from Network
+
+        :param message: Message received with its context
+        :type message: (Packet, MeshMessageContext)
+        """
+        self.__queue.put_nowait(message)
+        if not self.state.__is_processing_message:
+            self.check_queue()
+
+    def process_lower_transport_message(self, message):
+        """
         Process a message sent by the Lower Transport Layer with its context
         Can be a control message OR an encrypted Access message
         For now control messages are discarded
@@ -181,6 +231,15 @@ class UpperTransportLayer(Layer):
 
         # if control message, get handler for message and run it
         if not isinstance(pkt, BTMesh_Upper_Transport_Access_PDU):
+            # Check if we are waiting for a message in particular
+            if (
+                self.state.expected_class is not None
+                and type(pkt) is self.state.expected_class
+            ):
+                self.state.expected_class = None
+                self.state.received_message = message
+                self.state.event.set()
+
             self._handlers[type(pkt)](message)
             return
 
@@ -237,7 +296,7 @@ class UpperTransportLayer(Layer):
         """
         logger.debug("DEFAULT CTL PACKET HANDLER, NOTHING TO DO")
         pkt, ctx = message
-        #pkt.show()
+        # pkt.show()
         return
 
     def send_control_message(self, message):
@@ -249,8 +308,7 @@ class UpperTransportLayer(Layer):
         """
         pkt, ctx = message
         if (
-            ctx.src_addr
-            == self.state.profile.primary_element_addr.to_bytes(2, "big")
+            ctx.src_addr == self.state.profile.primary_element_addr.to_bytes(2, "big")
             or ctx.seq_number is None
         ):
             ctx.seq_number = self.state.profile.get_next_seq_number(inc=5)
