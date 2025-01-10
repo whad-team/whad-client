@@ -15,8 +15,17 @@ from whad.btmesh.stack.utils import (
     GROUP_ADDR_TYPE,
     VIRTUAL_ADDR_TYPE,
 )
+from whad.btmesh.stack.constants import (
+    DIRECTED_FORWARDING_CREDS,
+    MANAGED_FLOODING_CREDS,
+)
 from queue import Queue
 from threading import Event
+from whad.scapy.layers.btmesh import (
+    BTMesh_Model_Generic_OnOff_Set,
+    BTMesh_Model_Generic_OnOff_Set_Unacknowledged,
+    BTMesh_Model_Message,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -200,3 +209,47 @@ class AccessLayer(Layer):
         pkt, ctx = message
         ctx.is_ctl = False
         self.send_to_upper_transport(message)
+
+    def do_onoff(self, value, addr, acked):
+        """
+        Sends a Generic On/Off set message (acked or unacked)
+
+        :param value: Value to be set (0 or 1)
+        :type value: int
+        :param addr: Destination addr
+        :type addr: int
+        :param acked: Whether the messages is acked or not
+        :type acked: Bool
+        """
+
+        app_key = (
+            self.state.profile.get_configuration_server_model()
+            .get_state("app_key_list")
+            .get_value(0)
+        )
+
+        if app_key is None:
+            return
+
+        if acked:
+            pkt = BTMesh_Model_Generic_OnOff_Set(
+                onoff=value,
+                transaction_id=self.transaction_id,
+            )
+        else:
+            pkt = BTMesh_Model_Generic_OnOff_Set_Unacknowledged(
+                onoff=value, transaction_id=self.transaction_id
+            )
+
+        ctx = MeshMessageContext()
+        ctx.creds = DIRECTED_FORWARDING_CREDS
+        ctx.src_addr = self.state.profile.primary_element_addr.to_bytes(2, "big")
+        ctx.dest_addr = addr.to_bytes(2, "big")
+        ctx.ttl = 127
+        ctx.is_ctl = False
+        ctx.net_key_id = 0
+        ctx.application_key_index = 0
+        ctx.aid = app_key.aid
+
+        pkt = BTMesh_Model_Message() / pkt
+        self.process_new_message((pkt, ctx))
