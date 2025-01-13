@@ -5,6 +5,7 @@ from typing import Union, Tuple
 from packaging.version import Version
 
 # Scapy imports
+from scapy.packet import Packet, Raw
 from scapy.compat import raw
 from scapy.config import conf
 from scapy.layers.dot15d4 import Dot15d4 as Dot15d4NoFCS
@@ -227,7 +228,7 @@ class Dot15d4(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def send(self, pdu, channel:int = 11) -> bool:
+    def send(self, pdu: Union[Packet, bytes, Dot15d4NoFCS, Dot15d4FCS], channel:int = 11) -> bool:
         """
         Send 802.15.4 packets (on a single channel).
 
@@ -242,19 +243,26 @@ class Dot15d4(WhadDeviceConnector):
             metadata = Dot15d4Metadata()
             metadata.raw = False
             metadata.channel = channel
+
+            # If PDU is provided as bytes, wrap it into a Raw packet
+            if isinstance(pdu, bytes):
+                pdu = Raw(pdu)
+
             if self.support_raw_pdu():
                 metadata.raw = True
 
                 if Dot15d4FCS not in pdu:
+                    # Compute FCS if required by the hardware
                     packet = Dot15d4FCS(raw(pdu) + Dot15d4FCS().compute_fcs(raw(pdu)))
                 else:
                     packet = pdu
 
             elif Dot15d4FCS in pdu:
+                # Remove FCS if hardware cannot set it
                 packet = Dot15d4NoFCS(raw(pdu)[:-2])
             else:
                 packet = pdu
-            
+
             if hasattr(packet, "reserved"):
                 packet.reserved = packet.reserved
 
@@ -266,11 +274,11 @@ class Dot15d4(WhadDeviceConnector):
             return False
 
 
-    def send_mac(self, pdu, channel=11, add_fcs=False):
+    def send_mac(self, pdu: bytes, channel: int = 11, add_fcs: bool = False):
         if self.can_send():
             if add_fcs:
                 fcs = Dot15d4FCS().compute_fcs(bytes(pdu))
-                pdu += fcs
+                packet = pdu + fcs
                 raw_mode = True
             else:
                 packet = pdu / raw(b'\x00\x00')
@@ -279,6 +287,7 @@ class Dot15d4(WhadDeviceConnector):
             # Add Dot15d4 metadata
             packet.metadata = Dot15d4Metadata()
             packet.metadata.raw = raw_mode
+            packet.metadata.channel = channel
 
             # Send packet
             return super().send_packet(packet)
@@ -322,13 +331,11 @@ class Dot15d4(WhadDeviceConnector):
         """
         Generic message handler.
         """
-        pass
 
     def on_discovery_msg(self, message):
         """
         Discovery message handler.
         """
-        pass
 
     def on_domain_msg(self, domain:str, message):
         """
