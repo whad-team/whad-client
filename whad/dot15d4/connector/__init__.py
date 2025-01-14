@@ -14,6 +14,7 @@ from scapy.layers.dot15d4 import Dot15d4FCS
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr
 from whad.hub.dot15d4 import Dot15d4Metadata
 # Main whad imports
+from whad.scapy.layers.dot15d4tap import Dot15d4Raw
 from whad.hub.discovery import Domain, Capability
 from whad.cli.app import CommandLineApp
 from whad.device import WhadDeviceConnector
@@ -275,14 +276,41 @@ class Dot15d4(WhadDeviceConnector):
 
 
     def send_mac(self, pdu: bytes, channel: int = 11, add_fcs: bool = False):
+        """
+        Send raw 802.15.4 packets (on a single channel).
+
+        :param pdu: 802.15.4 packet to send
+        :type pdu: bytes
+        :param channel: Channel on which the packet has to be sent
+        :type channel: int
+        :param add_fcs: Add FCS field if set to `True`
+        :type add_fcs: bool
+        :return: `True` if packet has been correctly sent, `False` otherwise.
+        :rtype: bool
+        """
         if self.can_send():
-            if add_fcs:
-                fcs = Dot15d4FCS().compute_fcs(bytes(pdu))
-                packet = pdu + fcs
+            # If raw mode is supported by the hardware, handle FCS value
+            if self.support_raw_pdu():
+                # Enable raw mode
                 raw_mode = True
+
+                # Add FCS if required
+                if add_fcs:
+                    fcs = Dot15d4FCS().compute_fcs(bytes(pdu))
+                    packet = Dot15d4Raw(pdu + fcs)
+                else:
+                    packet = Dot15d4Raw(pdu)
             else:
-                packet = pdu / raw(b'\x00\x00')
+                # Disable raw mode
                 raw_mode = False
+
+                # Cannot add/remove FCS, let hardware generate it
+                logger.debug((
+                    "[dot15d4::send_mac()] cannot add or remove FCS because HW"
+                    "does not support raw packets, rollback to classic 802.15.4"
+                    "frames with valid FCS."
+                ))
+                packet = Dot15d4Raw(pdu)
 
             # Add Dot15d4 metadata
             packet.metadata = Dot15d4Metadata()
@@ -291,8 +319,9 @@ class Dot15d4(WhadDeviceConnector):
 
             # Send packet
             return super().send_packet(packet)
-        else:
-            return False
+
+        # Failed at sending packet.
+        return False
 
     def perform_ed_scan(self, channel:int = 11) -> bool:
         """
