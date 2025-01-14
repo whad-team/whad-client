@@ -1,4 +1,4 @@
-from scapy.packet import Packet, bind_layers
+from scapy.packet import Packet, bind_layers, Raw
 from scapy.config import conf
 from scapy.fields import ByteField, ByteEnumField, LEShortEnumField, \
     FieldLenField, PacketListField, LenField, LEThreeBytesField, \
@@ -10,6 +10,10 @@ class LEIEEEFloatField(Field[int, int]):
     def __init__(self, name, default):
         Field.__init__(self, name, default, "<f")
 
+
+class Dot15d4Raw(Raw):
+    """IEEE 802.15.4 raw packet
+    """
 
 # Implement https://github.com/jkcko/ieee802.15.4-tap
 DLT_IEEE802_15_4_TAP = 283
