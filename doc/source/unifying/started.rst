@@ -33,8 +33,8 @@ The following snippet allows basic Logitech Unifying sniffing:
     # Configure scanning (loop on all channels)
     sniffer.scanning = True
 
-    # Sniff packets
-    for packet in sniffer.sniff():
+    # Sniff packets for 30 seconds
+    for packet in sniffer.sniff(timeout=30.0):
         packet.show()
 
 Any Logitech Unifying frame will be shown whatever the Logitech Unifying device is.

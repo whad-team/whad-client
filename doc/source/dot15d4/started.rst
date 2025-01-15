@@ -31,8 +31,8 @@ channel and sniff packets:
     # Start sniffing
     sniffer.start()
 
-    # Listen for packets
-    for packet in sniffer.sniff():
+    # Listen for packets for 30 seconds
+    for packet in sniffer.sniff(timeout=30.0):
         packet.show()
 
 Sending packets
