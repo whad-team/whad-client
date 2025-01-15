@@ -1,9 +1,10 @@
 """Bluetooth Low Energy sniffing module.
 """
 import logging
-from typing import List
-from time import sleep
+from typing import List, Generator
+from time import sleep, time
 
+from scapy.packet import Packet
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE
 
 from whad.ble.connector.base import BLE
@@ -303,9 +304,14 @@ class Sniffer(BLE, EventsManager):
 
         return packet
 
-    def sniff(self):
+    def sniff(self, timeout: float = None) -> Generator[Packet, None, None]:
         """Main sniffing function
+
+        :param timeout: Number of seconds after which sniffing is stopped.
+                        Wait forever if set to `None`.
+        :type timeout: float
         """
+        start = time()
         try:
             while True:
                 if self.__configuration.access_addresses_discovery:
@@ -364,6 +370,11 @@ class Sniffer(BLE, EventsManager):
                         self.monitor_packet_rx(packet)
                         yield packet
 
+                # Check if timeout has been reached
+                if timeout is not None:
+                    if time() - start >= timeout:
+                        break
+
         # Handle device disconnection
         except WhadDeviceDisconnected:
-            pass
+            return
