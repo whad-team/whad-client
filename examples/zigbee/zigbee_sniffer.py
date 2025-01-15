@@ -26,10 +26,13 @@ if __name__ == '__main__':
 
             # Iterate over the received packets
             sniffer.start()
-            for i in sniffer.sniff():
+            for i in sniffer.sniff(timeout=30.0):
                 print(repr(i))
 
-
+            # Close monitor and device
+            monitor.detach()
+            monitor.close()
+            dev.close()
 
         except (KeyboardInterrupt, SystemExit):
             monitor.detach()

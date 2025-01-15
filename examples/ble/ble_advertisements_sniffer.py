@@ -1,7 +1,8 @@
+import sys
+
 from whad.ble import Sniffer
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
-import sys
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -20,7 +21,7 @@ if __name__ == '__main__':
 
             # Start the sniffer and iterate on received packets to display them
             sniffer.start()
-            for pkt in sniffer.sniff():
+            for pkt in sniffer.sniff(timeout=30.0):
                 print(repr(pkt))
 
         except (KeyboardInterrupt, SystemExit):
