@@ -610,14 +610,17 @@ class CommandLineApp(ArgumentParser):
                 pid = os.getpid()
                 stdout_target = os.readlink(f"/proc/{pid}/fd/1")
                 if stdout_target != "/dev/null":
-                    logger.debug(f"[cli] stdout is redirected to {stdout_target}")
+                    logger.debug("[cli] stdout is redirected to %s", stdout_target)
                     return True
-                else:
-                    logger.debug(f"[cli] stdout redirected to /dev/null, no unix socket needed")
-                    return False
-            else:
-                logger.debug("[cli] stdout is redirected and cannot determine if it leads to /dev/null or not (OS not Linux)")
-                return True
+
+                logger.debug("[cli] stdout redirected to /dev/null, no unix socket needed")
+                return False
+
+            logger.debug((
+                "[cli] stdout is redirected and cannot determine if it leads"
+                "to /dev/null or not (OS not Linux)"
+            ))
+            return True
 
         return False
 
