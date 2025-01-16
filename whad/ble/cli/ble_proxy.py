@@ -258,7 +258,11 @@ class BleProxyApp(CommandLineDeviceSource):
             # Device search timeout reached, show warning and stop proxy
             if time() - scan_start_ts > self.args.timeout:
                 self.warning("Target device not found, connection timeout exceeded.")
+                scanner.stop()
                 return
+
+        # Stop scanning
+        scanner.stop()
 
         if adv_data is not None and scan_rsp is not None:
             if not self.args.linklayer:
