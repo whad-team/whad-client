@@ -300,6 +300,10 @@ class CommandLineApp(ArgumentParser):
         :param int input: specify the input type when application has its stdin piped
         :param int output: specify the output type when application has its stdout piped
         """
+        # Save application instance as a class property
+        if CommandLineApp.instance is None:
+            CommandLineApp.instance = self
+
         super().__init__(description=description, **kwargs)
 
         self.__interface = None
@@ -367,6 +371,13 @@ class CommandLineApp(ArgumentParser):
                 nargs='*',
                 help="command arguments"
             )
+
+    @staticmethod
+    def get_instance():
+        """Return unique application instance
+        """
+        return CommandLineApp.instance
+
 
     @property
     def interface(self):
@@ -588,7 +599,27 @@ class CommandLineApp(ArgumentParser):
 
         :return bool: True if stdout is piped, False otherwise
         """
-        return not sys.stdout.isatty()
+        if not sys.stdout.isatty():
+            # If we are on a Linux system, check if we are redirected to
+            # /dev/null, in this case we consider we are not *really* piped
+            # with a program.
+            if sys.platform in ("linux", "linux2"):
+                pid = os.getpid()
+                stdout_target = os.readlink(f"/proc/{pid}/fd/1")
+                if stdout_target != "/dev/null":
+                    logger.debug("[cli] stdout is redirected to %s", stdout_target)
+                    return True
+
+                logger.debug("[cli] stdout redirected to /dev/null, no unix socket needed")
+                return False
+
+            logger.debug((
+                "[cli] stdout is redirected and cannot determine if it leads"
+                "to /dev/null or not (OS not Linux)"
+            ))
+            return True
+
+        return False
 
 
     def is_stdin_piped(self):

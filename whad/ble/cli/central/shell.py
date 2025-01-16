@@ -56,7 +56,7 @@ def show_adv_record(offset, raw_record):
 
     print(f" AD Record #{offset:d}:")
     for line in range(0, nlines):
-        line_str = " ".join([f"{c:02x}" % c for c in raw_record[line*16:(line+1)*16]])
+        line_str = " ".join([f"{c:02x}" for c in raw_record[line*16:(line+1)*16]])
         print("  " + line_str)
 
 
