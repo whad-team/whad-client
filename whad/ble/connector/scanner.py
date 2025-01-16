@@ -74,6 +74,14 @@ class Scanner(BLE):
         self.__db.reset()
         super().start()
 
+    def stop(self):
+        """Stop scanning.
+
+        Stop scanning for devices, disable scan mode if used.
+        """
+        if self.can_scan():
+            self.enable_scan_mode(False)
+        super().stop()
 
     def discover_devices(self, minimal_rssi = None, filter_address = None,
                          timeout: float = None) -> Iterator[AdvertisingDevice]:
@@ -101,7 +109,6 @@ class Scanner(BLE):
 
             if (timeout is not None) and (time() - start_time > timeout):
                 break
-
 
     def sniff(self) -> Iterator[Packet]:
         """
