@@ -43,6 +43,7 @@ class BleSpawnInputPipe(Bridge):
     def __init__(self, input_connector, output_connector):
         """Initialize our ble-spawn input pipe.
         """
+        self.__output_pending_packets = []
         logger.debug('[ble-spawn][input-pipe] Initialization')
         super().__init__(input_connector, output_connector)
 
