@@ -207,6 +207,7 @@ class BleProxyApp(CommandLineDeviceSource):
         )
 
         self.add_argument(
+            "-o",
             "--output",
             dest="output",
             default=None,
