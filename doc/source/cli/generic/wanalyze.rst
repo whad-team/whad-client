@@ -48,6 +48,8 @@ Command-line options
 * ``--raw`` (``-r``): dump output directly to stdout buffer (e.g., to process raw bytes)
 * ``--list`` (``-l``): display a list of available analyzers
 
+.. include:: debug-options.rst
+
 Displaying the available analyzers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

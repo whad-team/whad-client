@@ -28,6 +28,8 @@ Command-line options
 * ``--network-panid`` (``-t``): specifies a target extended ZigBee network PAN ID (64 bits)
 * ``--file`` (``-f``): provides a script to execute
 
+.. include:: ../generic/debug-options.rst
+
 Discover ZigBee networks
 ------------------------
 

@@ -16,6 +16,8 @@ Usage
 
     ... | wshark | ...
 
+.. include:: ../generic/debug-options.rst
+
 Simple example
 --------------
 

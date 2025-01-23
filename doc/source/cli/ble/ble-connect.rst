@@ -16,14 +16,15 @@ Usage
 Command-line options
 --------------------
 
-**ble-proxy** supports the following options:
+**wble-connect** supports the following options:
 
 * ``--interface`` (``-i``): specifies the WHAD interface to use to connect to the target device
 * ``--no-color``: disables colors in output
 * ``--spoof-public``: if supported, sets WHAD adapter's BD address to the specified public address
 * ``--spoof-random``: if supported, sets WHAD adapter's BD address to the specified random address
-* ``--random`` (``-r``): target device BD address is random (default: public)
+* ``--random`` (``-r``): if set, consider the target device BD address is random (default: public)
 
+.. include:: ../generic/debug-options.rst
 
 Example usage
 -------------

@@ -40,6 +40,8 @@ with all their consecutive layers and fields as produced by *Scapy* packet's ``s
 ``repr`` format will show a packet's Python object representation by calling its ``__repr__()``
 method.
 
+.. include:: debug-options.rst
+
 Capture raw demodulated data
 ----------------------------
 

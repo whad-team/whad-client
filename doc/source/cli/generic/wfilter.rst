@@ -27,6 +27,8 @@ Command-line options
 * ``--forward`` (``-f``): forward packets that do not match the specified filter (dropped by default)
 * ``--load`` (``-l``): load specified Python module containing extra Scapy layers definitions
 
+.. include:: debug-options.rst
+
 Specifying a filter
 ^^^^^^^^^^^^^^^^^^^
 

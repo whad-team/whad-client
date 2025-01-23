@@ -20,6 +20,8 @@ Command-line options
 * ``--force`` (``-f``): force PCAP file overwrite, if destination file already exists
 * ``--append`` (``-a``): append packets to an existing file, create new file if it does not exist
 
+.. include:: debug-options.rst
+
 Saving filtered packets into a PCAP file
 ----------------------------------------
 
