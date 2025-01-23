@@ -20,14 +20,41 @@ Installing WHAD is straightforward with ``pip``:
 Installing WHAD from Github repository
 --------------------------------------
 
-Another solution is to get the source from github directly:
+Another solution is to get the source from github directly and install the framework
+with the classic Python tools.
+
+First, you may need some specific system dependencies:
+
+- Python3 development libraries (`apt install python3-dev` on Debian or Ubuntu)
+- a working compiler as it is required to build some dependencies
+
+On a Debian/Ubuntu x86/x64 system:
+
+```
+$ sudo apt install gcc python3-dev binutils -y
+```
+
+On a Debian/Ubuntu aarch64 system:
+
+```
+$ sudo apt install aarch64-linux-gnu-gcc binutils python3-dev -y`
+```
+
+Then clone the repository, create a virtual environment and install it:
 
 .. code-block:: text
 
     $ git clone https://github.com/whad-team/whad-client.git
     $ cd whad-client
-    $ pip install --upgrade pip setuptools
-    $ pip install .
+    $ python3 -m venv venv
+    $ . ./venv/bin/activate
+    (venv)$ pip install --upgrade pip setuptools
+    (venv)$ pip install .
+
+.. important::
+
+    It is highly recommended to use a virtual environment for WHAD in order to
+    avoid any dependency collision, see `this tutorial <https://docs.python.org/3/tutorial/venv.html>`_.
 
 Installing rules for WHAD-compatible devices
 --------------------------------------------
