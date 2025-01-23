@@ -31,6 +31,8 @@ Command-line options
 * ``--repeat`` (``-r``): repeat the transmission of packets
 * ``--delay DELAY`` (``-d DELAY``): delay between the transmission of two consecutive packets
 
+.. include:: debug-options.rst
+
 Specific PHY options
 ^^^^^^^^^^^^^^^^^^^^
 

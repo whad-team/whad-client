@@ -27,6 +27,8 @@ Command-line options
 * ``--wireshark`` (``-w``): spawns a wireshark instance that will monitor packets in real-time
 * ``--flush``: enable wireshark monitoring
 
+.. include:: debug-options.rst
+
 How to replay a PCAP file with ``wplay``
 ----------------------------------------
 

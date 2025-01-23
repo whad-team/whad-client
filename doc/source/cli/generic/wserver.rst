@@ -26,6 +26,8 @@ Command-line options
 * ``--address`` (``-a``): specify an IP address to listen on (default: `127.0.0.1` or `::1`)
 * ``--port`` (``-p``): specify the port to use (default: `12345`)
 
+.. include:: debug-options.rst
+
 Exposing a WHAD device over TCP
 -------------------------------
 

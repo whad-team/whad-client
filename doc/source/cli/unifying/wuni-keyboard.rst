@@ -29,6 +29,7 @@ Command-line options
 * ``--locale`` (``-l``): specify a keyboard disposition (default: *us*)
 * ``--key`` (``-k``): encryption key (in hex) to use for payload injection, enables encryption if set
 
+.. include:: ../generic/debug-options.rst
 
 Logging keyboard keypresses
 ---------------------------

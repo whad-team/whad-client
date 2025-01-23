@@ -32,6 +32,8 @@ Command-line options
 * ``--file`` (``-f``): provides a script to execute
 * ``--no-color``: disables colors in output
 
+.. include:: ../generic/debug-options.rst
+
 Supported commands
 ------------------
 

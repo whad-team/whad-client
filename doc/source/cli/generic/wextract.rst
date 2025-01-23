@@ -23,6 +23,7 @@ Command-line options
 * ``--exceptions`` (``-x``): enable verbose output on exceptions for debugging 
 * ``--load`` (``-l``): load specified Python module containing extra Scapy layers definitions
 
+.. include:: debug-options.rst
 
 Writing extractors
 ^^^^^^^^^^^^^^^^^^
