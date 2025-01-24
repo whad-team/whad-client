@@ -1,6 +1,7 @@
 """wble-peripheral interactive shell.
 """
-
+import json
+from typing import Union
 from binascii import unhexlify, Error as BinasciiError
 
 # pylint: disable-next=wildcard-import,unused-wildcard-import
@@ -14,7 +15,8 @@ from whad.ble.utils.validators import InvalidUUIDException
 from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Peripheral, GenericProfile, AdvDataFieldList, \
-    AdvCompleteLocalName, AdvShortenedLocalName, AdvFlagsField
+    AdvCompleteLocalName, AdvShortenedLocalName, AdvFlagsField, AdvDataField, \
+    AdvDataFieldListOverflow
 from whad.ble.profile.service import PrimaryService
 from whad.ble.profile.characteristic import Characteristic, CharacteristicProperties, \
     ClientCharacteristicConfig, CharacteristicValue
@@ -55,6 +57,184 @@ def validate_uuid(uuid: str) -> str:
     # Return the normalized UUID
     return uuid
 
+class AdvRecordsManager:
+    """Advertising records manager
+
+    This class manages the advertising data and scan response data of a
+    device in order to optimize them.
+
+    It is a bit limited for now as you may only have one field of each type
+    in the advertising data, however it tries to store as much records as
+    possible in the advertisement data and the scan response data.
+    """
+
+    def __init__(self, adv_data: AdvDataFieldList = None, scan_rsp_data: AdvDataFieldList = None):
+        """Initialize manager
+        """
+        # Advertising data is mandatory
+        if adv_data is not None:
+            self.__adv_data = adv_data
+        else:
+            self.__adv_data = AdvDataFieldList()
+        
+        # Scan response data is optional
+        if scan_rsp_data is not None:
+            self.__scan_rsp_data = scan_rsp_data
+        else:
+            self.__scan_rsp_data = None
+
+    @property
+    def adv_data(self):
+        return self.__adv_data
+    
+    @property
+    def scan_rsp_data(self):
+        return self.__scan_rsp_data
+
+    @property
+    def complete_name(self) -> str:
+        """Parses current records and return the complete name value, if found.
+
+        :return: Complete local name
+        :rtype: str
+        """
+        cln = self.get_record(AdvCompleteLocalName)
+        if cln is not None:
+            return cln.name.decode("utf-8")
+
+    @complete_name.setter
+    def complete_name(self, value: str):
+        """Update complete name
+        """
+        cln = self.get_record(AdvCompleteLocalName)
+        if cln is not None:
+            cln.name = bytes(value, "utf-8")
+            self.update_record(cln)
+        else:
+            self.add_record(AdvCompleteLocalName(bytes(value, "utf-8")))
+
+    @property
+    def short_name(self) -> str:
+        """Parses current records and return short name value, if found.
+
+        :return: Short name
+        :rtype: str
+        """
+        cln = self.get_record(AdvShortenedLocalName)
+        if cln is not None:
+            return cln.name.decode("utf-8")
+
+    @short_name.setter
+    def short_name(self, value: str):
+        """Update shortened name
+        """
+        cln = self.get_record(AdvShortenedLocalName)
+        if cln is not None:
+            cln.name = bytes(value, "utf-8")
+            self.update_record(cln)
+        else:
+            self.add_record(AdvShortenedLocalName(bytes(value, "utf-8")))
+
+    def get_record(self, record_type) -> AdvDataField:
+        """Find a specific record.
+        """
+        # Look into adv_data
+        for r in self.__adv_data:
+            if isinstance(r, record_type):
+                return r
+            
+        # Look into scan response data
+        for r in self.__scan_rsp_data:
+            if isinstance(r, record_type):
+                return r
+            
+        # No record found
+        return None
+    
+    def remove_record(self, record_type):
+        """Remove a record of a specific type.
+        """
+        for r in self.__adv_data:
+            if isinstance(r, record_type):
+                self.__adv_data.remove(r)
+                return
+
+        for r in self.__scan_rsp_data:
+            if isinstance(r, record_type):
+                self.__scan_rsp_data.remove(r)
+                return
+
+
+    def update_record(self, record: AdvDataField):
+        """Update a specific record.
+        """
+        # Remove record and add it again
+        self.remove_record(record.__class__)
+        self.add_record(record)
+
+    def add_record(self, record: AdvDataField) -> bool:
+        """Add a record into the device advertising data, optimize storage.
+        """
+        # Get the record size
+        record_size = len(record.to_bytes())
+        
+        # First, we check if we can add it into the advertising data
+        if len(self.__adv_data.to_bytes()) + record_size <= 31:
+            self.__adv_data.add(record)
+            return True
+
+        # If it does not fit, check if we can insert it into our
+        # scan response data. If no scan response data is set, add
+        # one with our record.
+        if self.__scan_rsp_data is None:
+            self.__scan_rsp_data = AdvDataFieldList()
+            self.__scan_rsp_data.add(record)
+            return True
+
+        if len(self.__scan_rsp_data.to_bytes()) + record_size <= 31:
+            self.__scan_rsp_data.add(record)
+            return True
+
+        # In other cases, we need to optimize our records to fit our
+        # new one, if possible.
+        return self.__insert_record(record)
+
+    def __insert_record(self, record: AdvDataField) -> bool:
+        """Check if we have enough room for our record and reorganize records
+        to make it fit. This method must be called when there is no space in
+        advertising data or scan response data to insert this record.
+        """
+        # First, we need to collect all our records and their respective size
+        records = []
+        records_size = []
+        for r in self.__adv_data:
+            records_size.append(len(r.to_bytes()))
+            records.append(r)
+        for r in self.__scan_rsp_data:
+            records_size.append(len(r.to_bytes()))
+            records.append(r)
+
+        # Now that we have a list of records, we check if we can find an arrangement
+        # that may make fit all these records into adv_data and scan_rsp_data.
+        record_len = len(record.to_bytes())
+        for i in range(len(records)):
+            tmp_arr = records_size[:i] + [record_len] + records_size[i:]
+            tmp_records = records[:i] + [record] + records[i:]
+            for j in range(len(tmp_arr)):
+                if sum(tmp_arr[:j]) <= 31 and sum(tmp_arr[j:]) <= 31:
+                    # we found a working combination, rebuild adv_data and
+                    # scan_rsp_data from this.
+                    tmp_adv_data = AdvDataFieldList()
+                    for r in tmp_records[:j]:
+                        tmp_adv_data.add(r)
+                    self.__adv_data = tmp_adv_data
+                    tmp_scan_rsp_data = AdvDataFieldList()
+                    for r in tmp_records[j:]:
+                        tmp_scan_rsp_data.add(r)
+                    self.__scan_rsp_data = tmp_scan_rsp_data
+                    return True
+        
+        return False
 
 class MonitoringProfile(GenericProfile):
     """Peripheral monitoring profile.
@@ -151,9 +331,46 @@ class BlePeriphShell(InteractiveShell):
         if dev_profile is not None:
             # Set profile
             self.__profile = MonitoringProfile(from_json=dev_profile)
+
+            # Set advertising data
+            profile = json.loads(dev_profile)
+            if "devinfo" in profile and "adv_data" in profile["devinfo"]:
+                self.adv_data = AdvDataFieldList.from_bytes(
+                    bytes.fromhex(profile["devinfo"]["adv_data"])
+                )
+                if "scan_rsp" in profile["devinfo"]:
+                    self.scan_rsp_data = AdvDataFieldList.from_bytes(
+                        bytes.fromhex(profile["devinfo"]["scan_rsp"])
+                    )
+                else:
+                    self.scan_rsp_data = None
+            else:
+                # No advertising data (should not be the case)
+                self.warning("No advertising data in JSON profile !")
+                self.adv_data = AdvDataFieldList(AdvFlagsField())
+                self.scan_rsp_data = None
         else:
+            # Create a default profile
             self.__profile = MonitoringProfile()
 
+            # Generate AD data
+            self.adv_data = AdvDataFieldList()
+            if self.__complete_name is not None:
+                self.adv_data.add(AdvCompleteLocalName(
+                    bytes(self.__complete_name, "utf-8")
+                ))
+            if self.__shortened_name is not None:
+                self.adv_data.add(AdvShortenedLocalName(
+                    bytes(self.__shortened_name, "utf-8")
+                ))
+            self.adv_data.add(AdvFlagsField(
+                bredr_support=False,
+            ))
+
+            # Set advertising data
+            self.scan_rsp_data = None
+
+        self.__adv_manager = AdvRecordsManager(self.adv_data, self.scan_rsp_data)
         self.__selected_service = None
         self.__connector: WhadDeviceConnector = None
         self.__wireshark = None
@@ -856,20 +1073,6 @@ class BlePeriphShell(InteractiveShell):
         Starts the peripheral with its configured services and characteristics.
         """
 
-        # Generate AD data
-        adv_data = AdvDataFieldList()
-        if self.__complete_name is not None:
-            adv_data.add(AdvCompleteLocalName(
-                bytes(self.__complete_name, "utf-8")
-            ))
-        if self.__shortened_name is not None:
-            adv_data.add(AdvShortenedLocalName(
-                bytes(self.__shortened_name, "utf-8")
-            ))
-        adv_data.add(AdvFlagsField(
-            bredr_support=False,
-        ))
-
         # Switch to emulation mode
         self.__current_mode = self.MODE_STARTED
         self.update_prompt()
@@ -878,8 +1081,11 @@ class BlePeriphShell(InteractiveShell):
         self.__connector = Peripheral(
             self.__interface,
             profile=self.__profile,
-            adv_data=adv_data
+            adv_data=self.__adv_manager.adv_data,
+            scan_data=self.__adv_manager.scan_rsp_data
         )
+
+        # Start advertising
         self.__connector.start()
 
     @category("Peripheral control")
@@ -945,13 +1151,24 @@ class BlePeriphShell(InteractiveShell):
         This command sets the complete local name for the emulated peripheral.
         """
         if len(args) > 0:
-            self.__complete_name = args[0]
-            self.success(f"Device name set to \"{self.__complete_name}\"")
-        else:
-            print_formatted_text(HTML(
-                f"<ansicyan>Device complete name:</ansicyan> {self.__complete_name}"
-            ))
+            # Save name
+            name = args[0]
 
+            try:
+                self.__adv_manager.complete_name = name
+                self.success(f"Device name set to \"{name}\"")
+            except AdvDataFieldListOverflow:
+                self.error("Advertising data is full !")
+
+        else:
+            # Complete name
+            complete_name = self.__adv_manager.complete_name
+            if complete_name is not None:
+                print_formatted_text(HTML(
+                    f"<ansicyan>Device complete name:</ansicyan> {complete_name}"
+                ))
+            else:
+                self.warning("Complete local name not set.")
 
     @category("Advertising data")
     def do_shortname(self, args):
@@ -962,18 +1179,29 @@ class BlePeriphShell(InteractiveShell):
         This command sets the shortened local name for the emulated peripheral.
         """
         if len(args) > 0:
-            self.__shortened_name = args[0]
-            self.success(f"Device short name set to \"{self.__shortened_name}\"")
+            # Save name
+            name = args[0]
+
+            try:
+                self.__adv_manager.short_name = name
+                self.success(f"Device shortened name set to \"{name}\"")
+            except AdvDataFieldListOverflow:
+                self.error("Advertising data is full !")
         else:
-            print_formatted_text(HTML(
-                f"<ansicyan>Device short name:</ansicyan> {self.__shortened_name}"
-            ))
+            # Short name
+            short_name = self.__adv_manager.short_name
+            if short_name is not None:
+                print_formatted_text(HTML(
+                    f"<ansicyan>Device shortened name:</ansicyan> {short_name}"
+                ))
+            else:
+                self.warning("Shortened local name not set.")
 
     @category("Advertising data")
     def do_manuf(self, args):
         """Set device manufacturer company ID and data.
 
-        <ansicyan><b>shortname</b> [<i>COMPANY_ID</i> <i>HEX DATA</i>]</ansicyan>
+        <ansicyan><b>manuf</b> [<i>COMPANY_ID</i> <i>HEX DATA</i>]</ansicyan>
 
         This commands defines the company ID to use in BLE advertising record
         along with manufacturer data if a COMPANY_ID and HEX DATA are provided,
