@@ -29,6 +29,7 @@ Command-line options
 * ``--bdaddr`` (``-b``): specifies a Bluetooth Device address to use for the GATT server in the form *XX:XX:XX:XX:XX:XX*
 * ``--file`` (``-f``): provides a script to execute
 * ``--no-color``: disables colors in output
+* ``--profile`` (``-p``): specifies a device profile file (JSON) that will be used to populate GATT services, characteristics and advertisement info
 
 .. include:: ../generic/debug-options.rst
 
@@ -38,12 +39,13 @@ Quick tutorial
 Configuring a peripheral
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-We can create a custom BLE peripheral profile with the interactive shell. So let's get
-an interactive session from `wble-periph`:
+`wble-periph` exposes an interactive shell that provides all the required features
+to create a GATT peripheral with services and characteristics. It must be started
+with the specific interface you want to use (in this case *hci0*):
 
 .. code-block:: text
 
-    $ wble-periph -i hci0 interactive
+    $ wble-periph -i hci0
     wble-periph>
 
 First, we add a generic service (*Generic Access*):
@@ -104,9 +106,10 @@ json profile that will populate all the services and characteristics by using th
 
 .. code-block:: text
 
-    $ wble-periph -i hci0 -p mydevice.json interactive
+    $ wble-periph -i hci0 -p mydevice.json
 
-We can check the services and characteristics have been automatically populated:
+This will launch an interactive shell with the peripheral GATT profile populated with
+the specified JSON file. We can check the provided profile has been successfully loaded:
 
 .. code-block:: text
 
