@@ -1,7 +1,33 @@
 Installation
 =============
 
-Installing WHAD from pip
+System dependencies
+-------------------
+
+First, you may need some specific system dependencies:
+
+- Python3 development libraries (`apt install python3-dev` on Debian or Ubuntu)
+- a working compiler as it is required to build some dependencies
+
+On a Debian/Ubuntu *x86/x64* system:
+
+```
+$ sudo apt install gcc python3-dev binutils -y
+```
+
+On a Debian/Ubuntu *aarch64* system:
+
+```
+$ sudo apt install aarch64-linux-gnu-gcc binutils python3-dev -y`
+```
+
+.. note::
+
+    If your system needs extra dependencies or requires special steps to be
+    followed in order to flawlessly install WHAD, let us know by `creating an
+    issue on our Github repository <https://github.com/whad-team/whad-client/issues/new/choose>`_ !
+
+Installing WHAD with pip
 ------------------------
 
 Installing WHAD is straightforward with ``pip``:
@@ -22,23 +48,6 @@ Installing WHAD from Github repository
 
 Another solution is to get the source from github directly and install the framework
 with the classic Python tools.
-
-First, you may need some specific system dependencies:
-
-- Python3 development libraries (`apt install python3-dev` on Debian or Ubuntu)
-- a working compiler as it is required to build some dependencies
-
-On a Debian/Ubuntu x86/x64 system:
-
-```
-$ sudo apt install gcc python3-dev binutils -y
-```
-
-On a Debian/Ubuntu aarch64 system:
-
-```
-$ sudo apt install aarch64-linux-gnu-gcc binutils python3-dev -y`
-```
 
 Then clone the repository, create a virtual environment and install it:
 
