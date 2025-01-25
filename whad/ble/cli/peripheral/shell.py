@@ -125,8 +125,14 @@ class AdvRecordsManager:
         """
         cln = self.get_record(AdvCompleteLocalName)
         if cln is not None:
+            old_value = cln.name
             cln.name = bytes(value, "utf-8")
-            self.update_record(cln)
+            try:
+                self.update_record(cln)
+            except AdvDataFieldListOverflow as overflow:
+                cln.name = old_value
+                self.update_record(cln)
+                raise AdvDataFieldListOverflow() from overflow
         else:
             self.add_record(AdvCompleteLocalName(bytes(value, "utf-8")))
 
@@ -147,8 +153,14 @@ class AdvRecordsManager:
         """
         cln = self.get_record(AdvShortenedLocalName)
         if cln is not None:
-            cln.name = bytes(value, "utf-8")
-            self.update_record(cln)
+            old_value = cln.name
+            try:
+                cln.name = bytes(value, "utf-8")
+                self.update_record(cln)
+            except AdvDataFieldListOverflow as overflow:
+                cln.name = old_value
+                self.update_record(cln)
+                raise AdvDataFieldListOverflow() from overflow
         else:
             self.add_record(AdvShortenedLocalName(bytes(value, "utf-8")))
 
@@ -167,12 +179,18 @@ class AdvRecordsManager:
             if isinstance(comp_id, int) and isinstance(data, bytes):
                 cln = self.get_record(AdvManufacturerSpecificData)
                 if cln is not None:
+                    old_id, old_data = cln.company, cln.data
                     cln.company = comp_id
                     cln.data = data
-                    self.update_record(cln)
+                    try:
+                        self.update_record(cln)
+                    except AdvDataFieldListOverflow as overflow:
+                        cln.company = old_id
+                        cln.data = old_data
+                        self.update_record(cln)
+                        raise AdvDataFieldListOverflow() from overflow
                 else:
                     self.add_record(AdvManufacturerSpecificData(comp_id, data))
-
 
     def __fit_records(self, records: List[AdvDataField], length: int = 31):
         """Find the records that may best fit in the given space
@@ -280,8 +298,12 @@ class AdvRecordsManager:
         """Update a specific record.
         """
         # Remove record and add it again
+        old_record = self.get_record(record.__class__)
         self.remove_record(record.__class__)
         self.add_record(record)
+        
+        # Make sure it fits
+        self.pack()
 
     def add_record(self, record: AdvDataField) -> bool:
         """Add a record into the device advertising data, optimize storage.
@@ -1134,16 +1156,19 @@ class BlePeriphShell(InteractiveShell):
         self.__current_mode = self.MODE_STARTED
         self.update_prompt()
 
-        # Instanciate our Peripheral
-        self.__connector = Peripheral(
-            self.__interface,
-            profile=self.__profile,
-            adv_data=self.__adv_manager.adv_data,
-            scan_data=self.__adv_manager.scan_rsp_data
-        )
+        try:
+            # Instanciate our Peripheral
+            self.__connector = Peripheral(
+                self.__interface,
+                profile=self.__profile,
+                adv_data=self.__adv_manager.adv_data,
+                scan_data=self.__adv_manager.scan_rsp_data
+            )
 
-        # Start advertising
-        self.__connector.start()
+            # Start advertising
+            self.__connector.start()
+        except AdvDataFieldListOverflow:
+            self.error("Advertising data is too big to fit in advertisement !")
 
     @category("Peripheral control")
     def do_stop(self, _):
@@ -1215,7 +1240,7 @@ class BlePeriphShell(InteractiveShell):
                 self.__adv_manager.complete_name = name
                 self.success(f"Device name set to \"{name}\"")
             except AdvDataFieldListOverflow:
-                self.error("Advertising data is full !")
+                self.error("Advertising data is full, cannot set complete local name.")
 
         else:
             # Complete name
@@ -1241,9 +1266,9 @@ class BlePeriphShell(InteractiveShell):
 
             try:
                 self.__adv_manager.short_name = name
-                self.success(f"Device shortened name set to \"{name}\"")
+                self.success(f"Device shortened local name set to \"{name}\"")
             except AdvDataFieldListOverflow:
-                self.error("Advertising data is full !")
+                self.error("Advertising data is full, cannot set shortened local name")
         else:
             # Short name
             short_name = self.__adv_manager.short_name
@@ -1252,7 +1277,7 @@ class BlePeriphShell(InteractiveShell):
                     f"<ansicyan>Device shortened name:</ansicyan> {short_name}"
                 ))
             else:
-                self.warning("Shortened local name not set.")
+                self.error("No shortened local name has been set yet.")
 
     @category("Advertising data")
     def do_manuf(self, args):
@@ -1287,9 +1312,11 @@ class BlePeriphShell(InteractiveShell):
             try:
                 self.__adv_manager.manufacturer_data = (manuf_comp, unhexlify(manuf_data))
                 self.success("Manufacturer data set.")
-            except Exception:
+            except BinasciiError:
                 self.__manuf_data = []
                 self.error("Error while parsing manufacturer data (not valid hex)")
+            except AdvDataFieldListOverflow:
+                self.error("Advertising data is full, cannot set manufacturer specific data")
         else:
             if self.__adv_manager.manufacturer_data is not None:
                 manuf_comp, manuf_data = self.__adv_manager.manufacturer_data
@@ -1311,7 +1338,6 @@ class BlePeriphShell(InteractiveShell):
                             [f"{v:02x}" for v in manuf_data[i*16:(i+1)*16]]
                         )
                         print_formatted_text(HTML(f"   <i>{data}</i>"))
-
             else:
                 self.error("No manufacturer data has been set yet.")
 
