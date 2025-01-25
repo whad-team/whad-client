@@ -1,7 +1,7 @@
 """wble-peripheral interactive shell.
 """
 import json
-from typing import Union
+from typing import Union, List, Tuple
 from binascii import unhexlify, Error as BinasciiError
 
 # pylint: disable-next=wildcard-import,unused-wildcard-import
@@ -16,7 +16,7 @@ from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Peripheral, GenericProfile, AdvDataFieldList, \
     AdvCompleteLocalName, AdvShortenedLocalName, AdvFlagsField, AdvDataField, \
-    AdvDataFieldListOverflow
+    AdvDataFieldListOverflow, AdvManufacturerSpecificData
 from whad.ble.profile.service import PrimaryService
 from whad.ble.profile.characteristic import Characteristic, CharacteristicProperties, \
     ClientCharacteristicConfig, CharacteristicValue
@@ -71,24 +71,41 @@ class AdvRecordsManager:
     def __init__(self, adv_data: AdvDataFieldList = None, scan_rsp_data: AdvDataFieldList = None):
         """Initialize manager
         """
-        # Advertising data is mandatory
+        # Load advertising records
+        self.__records = []
         if adv_data is not None:
-            self.__adv_data = adv_data
-        else:
-            self.__adv_data = AdvDataFieldList()
-        
-        # Scan response data is optional
+            for r in adv_data:
+                self.__records.append(r)
         if scan_rsp_data is not None:
-            self.__scan_rsp_data = scan_rsp_data
-        else:
-            self.__scan_rsp_data = None
+            for r in scan_rsp_data:
+                self.__records.append(r)
+
+        # Save adv_data and scan_rsp_data in case no modification is
+        # requested.
+        self.__tainted = False
+        self.__adv_data = adv_data
+        self.__scan_rsp_data = scan_rsp_data
 
     @property
     def adv_data(self):
+        """Return the advertising data (max 31 bytes)
+        """
+        # Pack records if they have been tainted
+        if self.__tainted:
+            self.pack()
+        
+        # Return the advertising data
         return self.__adv_data
     
     @property
     def scan_rsp_data(self):
+        """Return the scan response data (max 31 bytes)
+        """
+        # Pack records if they have been tainted
+        if self.__tainted:
+            self.pack()
+
+        # Return the scan response data
         return self.__scan_rsp_data
 
     @property
@@ -135,35 +152,129 @@ class AdvRecordsManager:
         else:
             self.add_record(AdvShortenedLocalName(bytes(value, "utf-8")))
 
+    @property
+    def manufacturer_data(self):
+        """Manufacturer data
+        """
+        cln = self.get_record(AdvManufacturerSpecificData)
+        if cln is not None:
+            return (cln.company, cln.data)
+        
+    @manufacturer_data.setter
+    def manufacturer_data(self, data: Tuple[int, bytes]):
+        if isinstance(data, tuple) and len(data) == 2:
+            comp_id, data = data
+            if isinstance(comp_id, int) and isinstance(data, bytes):
+                cln = self.get_record(AdvManufacturerSpecificData)
+                if cln is not None:
+                    cln.company = comp_id
+                    cln.data = data
+                    self.update_record(cln)
+                else:
+                    self.add_record(AdvManufacturerSpecificData(comp_id, data))
+
+
+    def __fit_records(self, records: List[AdvDataField], length: int = 31):
+        """Find the records that may best fit in the given space
+        """
+        fitting_records = []
+
+        # Sort records
+        records.sort(key=lambda r: len(r.to_bytes()), reverse=True)
+        
+        # Find the biggest record that may fit in the given space
+        used_space = 0
+        found = True
+        while found:
+            found = False
+            for r in records:
+                if len(r.to_bytes()) <= length:
+                    # Add record
+                    fitting_records.append(r)
+                    used_space += len(r.to_bytes())
+                    length -= len(r.to_bytes())
+                    records.remove(r)
+                    found = True
+                    break
+        
+        # Return the fitting records and the remaining list
+        return (fitting_records, records)
+
+    def pack(self):
+        """Pack records into advertising and scan response data.
+        """
+        # Copy our records array
+        records = [r for r in self.__records]
+
+        # Pack records to fit advertising data
+        adv_records, remaining = self.__fit_records(records, 31)
+
+        # If some records remain, try to pack them into a scan response data
+        if len(remaining) > 0:
+            scan_rsp_records, remaining = self.__fit_records(records, 31)
+        else:
+            scan_rsp_records = None
+
+        # If no remaining records, we're good.
+        if len(remaining) > 0:
+            raise AdvDataFieldListOverflow()
+        else:
+            # Update advertising data and scan
+            self.__adv_data = AdvDataFieldList()
+            for r in adv_records:
+                self.__adv_data.add(r)
+            if scan_rsp_records is not None:
+                self.__scan_rsp_data = AdvDataFieldList()
+                for r in scan_rsp_records:
+                    self.__scan_rsp_data.add(r)
+            
+            # Advertising data and scan response data is up-to-date.
+            self.__tainted = False
+
+    def taint(self):
+        """Mark advertising data as modified
+        """
+        if not self.__tainted:
+            self.__tainted = True
+
     def get_record(self, record_type) -> AdvDataField:
         """Find a specific record.
         """
-        # Look into adv_data
-        for r in self.__adv_data:
-            if isinstance(r, record_type):
-                return r
-            
-        # Look into scan response data
-        for r in self.__scan_rsp_data:
-            if isinstance(r, record_type):
-                return r
-            
+        if not self.__tainted:
+            # Look into adv_data
+            for r in self.__adv_data:
+                if isinstance(r, record_type):
+                    return r
+                
+            # Look into scan response data (if any)
+            if self.__scan_rsp_data is not None:
+                for r in self.__scan_rsp_data:
+                    if isinstance(r, record_type):
+                        return r
+        else:
+            # Look in our records
+            for r in self.__records:
+                if isinstance(r, record_type):
+                    return r
+
         # No record found
         return None
     
-    def remove_record(self, record_type):
+    def remove_record(self, record_type) -> bool:
         """Remove a record of a specific type.
         """
-        for r in self.__adv_data:
-            if isinstance(r, record_type):
-                self.__adv_data.remove(r)
-                return
+        # Find and remove record
+        record = self.get_record(record_type)
+        if record is not None:
+            # Remove record
+            self.__records.remove(record)
+            self.taint()
 
-        for r in self.__scan_rsp_data:
-            if isinstance(r, record_type):
-                self.__scan_rsp_data.remove(r)
-                return
-
+            # Success
+            return True
+        
+        # Not found
+        return False
 
     def update_record(self, record: AdvDataField):
         """Update a specific record.
@@ -175,66 +286,12 @@ class AdvRecordsManager:
     def add_record(self, record: AdvDataField) -> bool:
         """Add a record into the device advertising data, optimize storage.
         """
-        # Get the record size
-        record_size = len(record.to_bytes())
-        
-        # First, we check if we can add it into the advertising data
-        if len(self.__adv_data.to_bytes()) + record_size <= 31:
-            self.__adv_data.add(record)
-            return True
+        # Mark as modified
+        self.taint()
 
-        # If it does not fit, check if we can insert it into our
-        # scan response data. If no scan response data is set, add
-        # one with our record.
-        if self.__scan_rsp_data is None:
-            self.__scan_rsp_data = AdvDataFieldList()
-            self.__scan_rsp_data.add(record)
-            return True
+        # Add record to our records list
+        self.__records.append(record)
 
-        if len(self.__scan_rsp_data.to_bytes()) + record_size <= 31:
-            self.__scan_rsp_data.add(record)
-            return True
-
-        # In other cases, we need to optimize our records to fit our
-        # new one, if possible.
-        return self.__insert_record(record)
-
-    def __insert_record(self, record: AdvDataField) -> bool:
-        """Check if we have enough room for our record and reorganize records
-        to make it fit. This method must be called when there is no space in
-        advertising data or scan response data to insert this record.
-        """
-        # First, we need to collect all our records and their respective size
-        records = []
-        records_size = []
-        for r in self.__adv_data:
-            records_size.append(len(r.to_bytes()))
-            records.append(r)
-        for r in self.__scan_rsp_data:
-            records_size.append(len(r.to_bytes()))
-            records.append(r)
-
-        # Now that we have a list of records, we check if we can find an arrangement
-        # that may make fit all these records into adv_data and scan_rsp_data.
-        record_len = len(record.to_bytes())
-        for i in range(len(records)):
-            tmp_arr = records_size[:i] + [record_len] + records_size[i:]
-            tmp_records = records[:i] + [record] + records[i:]
-            for j in range(len(tmp_arr)):
-                if sum(tmp_arr[:j]) <= 31 and sum(tmp_arr[j:]) <= 31:
-                    # we found a working combination, rebuild adv_data and
-                    # scan_rsp_data from this.
-                    tmp_adv_data = AdvDataFieldList()
-                    for r in tmp_records[:j]:
-                        tmp_adv_data.add(r)
-                    self.__adv_data = tmp_adv_data
-                    tmp_scan_rsp_data = AdvDataFieldList()
-                    for r in tmp_records[j:]:
-                        tmp_scan_rsp_data.add(r)
-                    self.__scan_rsp_data = tmp_scan_rsp_data
-                    return True
-        
-        return False
 
 class MonitoringProfile(GenericProfile):
     """Peripheral monitoring profile.
@@ -1201,56 +1258,59 @@ class BlePeriphShell(InteractiveShell):
     def do_manuf(self, args):
         """Set device manufacturer company ID and data.
 
-        <ansicyan><b>manuf</b> [<i>COMPANY_ID</i> <i>HEX DATA</i>]</ansicyan>
+        <ansicyan><b>manuf</b> [<i>COMPANY_ID</i> <i>HEX_DATA</i>]</ansicyan>
 
         This commands defines the company ID to use in BLE advertising record
-        along with manufacturer data if a COMPANY_ID and HEX DATA are provided,
+        along with manufacturer data if a COMPANY_ID and HEX_DATA are provided,
         or simply manufacturer data otherwise.
         """
         if len(args) >= 2:
             comp_id = args[0]
             manuf_data = args[1]
+            manuf_comp = None
             if comp_id.lower().startswith("0x"):
-                self.__manuf_comp = int(comp_id, 16)
+                manuf_comp = int(comp_id, 16)
             else:
                 # First, search for company in our list of known companies (no case compare)
                 for cid, comp_name in BT_MANUFACTURERS.items():
                     if comp_name.lower() == comp_id:
-                        self.__manuf_comp = cid
+                        manuf_comp = cid
                         break
 
-                if self.__manuf_comp is None:
+                if manuf_comp is None:
                     try:
-                        self.__manuf_comp = int(comp_id)
+                        manuf_comp = int(comp_id)
                     except ValueError:
                         self.error("Bad company ID ({comp_id})")
                         return
 
             try:
-                self.__manuf_data = unhexlify(manuf_data)
+                self.__adv_manager.manufacturer_data = (manuf_comp, unhexlify(manuf_data))
                 self.success("Manufacturer data set.")
             except Exception:
                 self.__manuf_data = []
                 self.error("Error while parsing manufacturer data (not valid hex)")
         else:
-            if self.__manuf_comp is not None:
-                if self.__manuf_comp in BT_MANUFACTURERS:
-                    manuf_name = BT_MANUFACTURERS[self.__manuf_comp]
+            if self.__adv_manager.manufacturer_data is not None:
+                manuf_comp, manuf_data = self.__adv_manager.manufacturer_data
+                if manuf_comp in BT_MANUFACTURERS:
+                    manuf_name = BT_MANUFACTURERS[manuf_comp]
                 else:
                     manuf_name = "Unknown"
                 print_formatted_text(HTML("<ansicyan>Device Manufacturer data record:</ansicyan>"))
                 print_formatted_text(HTML(
-                    f" <b>Company ID:</b> 0x{self.__manuf_comp:04x} ({manuf_name})"
+                    f" <b>Company ID:</b> 0x{manuf_comp:04x} ({manuf_name})"
                 ))
-                if self.__manuf_data != []:
+                if manuf_data != []:
                     print_formatted_text(HTML(" <b>Manuf. Data:</b>"))
-                    nb_lines = int(len(self.__manuf_data)/16)
-                    if nb_lines*16 < len(self.__manuf_data):
+                    nb_lines = int(len(manuf_data)/16)
+                    if nb_lines*16 < len(manuf_data):
                         nb_lines += 1
                     for i in range(nb_lines):
-                        manuf_data = " ".join([f"{v:02x}" % v
-                                               for v in self.__manuf_data[i*16:(i+1)*16]])
-                        print_formatted_text(HTML(f"   <i>{manuf_data}</i>"))
+                        data = " ".join(
+                            [f"{v:02x}" for v in manuf_data[i*16:(i+1)*16]]
+                        )
+                        print_formatted_text(HTML(f"   <i>{data}</i>"))
 
             else:
                 self.error("No manufacturer data has been set yet.")
