@@ -303,6 +303,34 @@ class AdvManufacturerSpecificData(AdvDataField):
 
     def __init__(self, company_id, data):
         super().__init__(0xFF, pack('<H', company_id&0xffff) + bytes(data))
+        self.__company = company_id
+        self.__data = data
+
+    @property
+    def company(self) -> int:
+        """Company ID
+        """
+        return self.__company
+    
+    @company.setter
+    def company(self, value):
+        """Update company ID
+        """
+        self.__company = value
+        self.set_value(pack('<H', value&0xffff) + bytes(self.__data))
+
+    @property
+    def data(self) -> bytes:
+        """Manufacturer data
+        """
+        return self.__data
+    
+    @data.setter
+    def data(self, value: bytes):
+        """Update manufacturer data
+        """
+        self.__data = value
+        self.set_value(pack('<H', self.__company&0xffff) + bytes(self.__data))
 
     @staticmethod
     def from_bytes(ad_record):
