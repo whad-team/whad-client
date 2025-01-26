@@ -586,14 +586,14 @@ class PeripheralDevice(GenericProfile):
         self.__central.disconnect(self.__conn_handle)
 
 
-    def discover(self):
+    def discover(self, include_values: bool = False):
         """Discovers services, characteristics and descriptors.
 
         This method must be called before accessing any service or characteristic,
         as it is required to retrieve the corresponding GATT handles.
         """
         # Discover
-        self.__gatt.discover()
+        self.__gatt.discover(save_values=include_values)
 
 
     def find_service_by_uuid(self, uuid: UUID) -> PeripheralService:
