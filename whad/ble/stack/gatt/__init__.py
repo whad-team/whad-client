@@ -658,7 +658,7 @@ class GattClient(GattLayer):
                     error_response_to_exc(msg.reason, msg.request, msg.handle)
 
     @proclock
-    def discover_characteristics(self, service):
+    def discover_characteristics(self, service, save_values: bool = False):
         """
         Discover service characteristics
         """
@@ -695,6 +695,11 @@ class GattClient(GattLayer):
                     )
                     charac.handle = charac_handle
                     charac.value_handle = charac_value_handle
+
+                    # Read value if requested and characteristic is readable
+                    if save_values and (charac_properties & 0x02) > 0:
+                        charac.value = self.read(charac_value_handle)
+                        
                     handle = charac.handle+2
                     logger.debug('found characteristic %s with handle %d' % (charac_uuid, charac_value_handle))
                     yield charac
@@ -738,14 +743,14 @@ class GattClient(GattLayer):
 
                 handle += 1
 
-    def discover(self):
+    def discover(self, save_values: bool = False):
         # Discover services
         services = []
         for service in self.discover_primary_services():
             services.append(service)
 
         for service in services:
-            for characteristic in self.discover_characteristics(service):
+            for characteristic in self.discover_characteristics(service, save_values=save_values):
                 service.add_characteristic(characteristic)
             self.__model.add_service(service)
 
