@@ -25,7 +25,7 @@ EXPECTED_BLE_PARAMS = [
     "conn_handle",
 ]
 
-def profile_discover(app: CommandLineApp, device) -> bool:
+def profile_discover(app: CommandLineApp, device, include_values: False) -> bool:
     """Discover the GATT profile of a given device
 
     :param app: WHAD application instance
@@ -36,7 +36,7 @@ def profile_discover(app: CommandLineApp, device) -> bool:
     :rtype: bool
     """
     try:
-        device.discover()
+        device.discover(include_values=include_values)
     except AttError as atterr:
         show_att_error(app, atterr)
         return False
@@ -88,6 +88,13 @@ def profile_discover(app: CommandLineApp, device) -> bool:
                         .format(name=desc.name, handle=desc.handle)
                 )
 
+
+            # Show values if requested
+            if include_values:
+                print_formatted_text(
+                    HTML("    <ansiblue>Value</ansiblue>: {value}")
+                        .format(value=charac.value.hex())
+                )
         print('')
 
     # Success
@@ -175,7 +182,7 @@ def profile_handler(app, command_args):
                 try:
                     print("Enumerating services and characteristics ...")
                     # Perform profile discovery
-                    result = profile_discover(app, device)
+                    result = profile_discover(app, device, include_values=(len(command_args) >= 1))
 
                     # Export profile to JSON file if required
                     if result and len(command_args) >= 1:
