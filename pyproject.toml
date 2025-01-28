@@ -95,7 +95,7 @@ whad = [
   "ressources/pcaps/*.pcap",
   "ressources/rules/*.rules",
   "ressources/wireshark/*.lua",
-
+  "data/clues/CLUES_data.json",
 ]
 
 [project.urls]

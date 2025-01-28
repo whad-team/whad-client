@@ -7,6 +7,7 @@ from struct import pack, unpack
 from whad.ble.stack.att.constants import BleAttProperties, SecurityAccess
 from whad.ble.profile.attribute import Attribute, UUID, get_uuid_alias
 from whad.ble.exceptions import InvalidHandleValueException
+from whad.ble.utils.clues import CluesDb
 
 
 class CharacteristicProperties:
@@ -44,9 +45,11 @@ class CharacteristicDescriptor(Attribute):
     def name(self):
         """Descriptor name
         """
+        # Search Bluetooth known UUIDs
         alias = get_uuid_alias(self.type_uuid)
         if alias is not None:
             return f"{alias} (0x{self.type_uuid})"
+
         # No alias
         return str(self.type_uuid)
 
@@ -290,9 +293,20 @@ class Characteristic(Attribute):
     def name(self):
         """Characteristic standard name (if any)
         """
+        # Search Bluetooth known UUIDs
         alias = get_uuid_alias(self.__charac_uuid)
         if alias is not None:
             return f"{alias} (0x{self.__charac_uuid})"
+
+        
+        # Search in collaborative CLUES database
+        alias = CluesDb.get_uuid_alias(self.__charac_uuid)
+        if alias is not None:
+            if self.__charac_uuid.type == UUID.TYPE_16:
+                return f"{alias} (0x{self.__charac_uuid})"
+            else:
+                return f"{alias} ({self.__charac_uuid})"
+
 
         return str(self.__charac_uuid)
 
