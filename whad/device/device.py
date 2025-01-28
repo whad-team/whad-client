@@ -245,18 +245,29 @@ class WhadDevice:
                 except ValueError:
                     index = None
 
+            # Retrieve the list of available devices
+            # (could be a list or a dict)
             available_devices = cls.list()
+
             # If the list of device is built statically, check before instantiation
             if available_devices is not None:
                 if index is not None:
                     try:
+                        # Try to retrieve a device based on the provided index
                         return available_devices[index]
+                    except KeyError as exc:
+                        raise WhadDeviceNotFound from exc
                     except IndexError as exc:
                         raise WhadDeviceNotFound from exc
                 elif identifier is not None:
-                    for dev in available_devices:
-                        if dev.identifier == identifier:
-                            return dev
+                    if isinstance(available_devices, list):
+                        for dev in available_devices:
+                            if dev.identifier == identifier:
+                                return dev
+                    elif isinstance(available_devices, dict):
+                        for dev_id, dev in available_devices.items():
+                            if dev.identifier == identifier:
+                                return dev
                     raise WhadDeviceNotFound
                 else:
                     raise WhadDeviceNotFound
