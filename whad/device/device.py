@@ -332,8 +332,12 @@ class WhadDevice:
         for device_class in device_classes:
             device_class_list = device_class.list()
             if device_class_list is not None:
-                for device in device_class_list:
-                    available_devices.append(device)
+                if isinstance(device_class_list, list):
+                    for device in device_class_list:
+                        available_devices.append(device)
+                elif isinstance(device_class_list, dict):
+                    for dev_id, device in device_class_list.items():
+                        available_devices.append(device)
         return available_devices
 
     @classmethod
@@ -373,16 +377,30 @@ class WhadDevice:
         """
         return self.__opened
 
-    def __init__(self):
+    def __init__(self, index: int = None):
+        """Initialize a device
+
+        Device index can be specified through the `index` argument, but keep
+        in mind that this `index` argument, if used, must be passed for all
+        devices of the same class in order not to mess up with numbering.
+        Calling code will be in charge of keeping device indexes unique.
+
+        :param index: Specifies the index of this device
+        :type index: int
+        """
         # Device information
         self.__info = None
         self.__discovered = False
         self.__opened = False
         self.__closing = False
 
-        # Generate device index
-        self.inc_dev_index()
-        self.__index = self.__class__.CURRENT_DEVICE_INDEX
+        # Generate device index if not provided
+        if index is None:
+            self.inc_dev_index()
+            self.__index = self.__class__.CURRENT_DEVICE_INDEX
+        else:
+            # Used by HCI devices to force index to match system names
+            self.__index = index
 
         # Device connectors
         self.__connector = None
@@ -1073,7 +1091,7 @@ class VirtualDevice(WhadDevice):
     """
     AdapterDevice device class.
     """
-    def __init__(self):
+    def __init__(self, index: int = None):
         self._dev_type = None
         self._dev_id = None
         self._fw_author = None
@@ -1081,7 +1099,7 @@ class VirtualDevice(WhadDevice):
         self._fw_version = (0, 0, 0)
         self._dev_capabilities = {}
         self.__lock = Lock()
-        super().__init__()
+        super().__init__(index)
 
     def send_message(self, message, keep=None):
         """Send message to host.

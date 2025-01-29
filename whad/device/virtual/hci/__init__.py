@@ -95,7 +95,7 @@ class HCIDevice(VirtualDevice):
         return available_devices
 
     def __init__(self, index):
-        super().__init__()
+        super().__init__(index=index)
         self.__converter = HCIConverter(self)
         self.__index = index
         self.__socket = None
