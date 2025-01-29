@@ -89,7 +89,6 @@ class HCIDevice(VirtualDevice):
         available_devices = {}
         devices_ids = HCIConfig.list()
         for device_id in devices_ids:
-            #available_devices.append(HCIDevice(index=device_id))
             available_devices[device_id] = HCIDevice(index=device_id)
 
         return available_devices
