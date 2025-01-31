@@ -3,8 +3,10 @@ import logging
 from scapy.packet import Packet
 from whad.wirelesshart.connector import WirelessHart
 from whad.wirelesshart.sniffing import SnifferConfiguration
+from whad.scapy.layers.wirelesshart import WirelessHart_Network_Security_SubLayer_Hdr
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter
+from whad.wirelesshart.crypto import WirelessHartDecryptor
 from whad.common.sniffing import EventsManager
 from whad.hub.dot15d4 import RawPduReceived, PduReceived
 from whad.hub.message import AbstractPacket
@@ -27,7 +29,7 @@ class Sniffer(WirelessHart, EventsManager):
         WirelessHart.__init__(self, device)
         EventsManager.__init__(self)
 
-
+        self.__decryptor = WirelessHartDecryptor()
         self.__configuration = SnifferConfiguration()
         
         # Check if device can perform sniffing
@@ -103,6 +105,12 @@ class Sniffer(WirelessHart, EventsManager):
         :return: received packet
         :rtype: :class:`scapy.packet.Packet`
         """
+        if WirelessHart_Network_Security_SubLayer_Hdr in packet and self.__configuration.decrypt:
+            decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
+            if success:
+                packet = decrypted 
+                packet.metadata.decrypted = True
+                
         return packet
 
     def sniff(self):

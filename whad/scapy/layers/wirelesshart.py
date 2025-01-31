@@ -308,7 +308,7 @@ class WirelessHart_Report_Neighbor_Signal_Level_Command_Response(WirelessHart_Co
 class WirelessHart_Write_Modify_Session_Command_Request(WirelessHart_Command_Payload):
     name = "Write / modify session Command Request"
     fields_desc = [
-        ByteEnumField("session_type", None, {}), 
+        ByteEnumField("session_type", None, {0 : "unicast", 1 : "broadcast", 2 : "join"}), 
         XShortField("nickname", None), 
         StrFixedLenField("peer_unique_id", None, length=5),
         IntField("peer_nonce_counter_value", None),
@@ -323,7 +323,7 @@ class WirelessHart_Write_Modify_Session_Command_Response(WirelessHart_Command_Pa
     fields_desc = [
         ByteField("status", None), # not in spec but seems to be here ? 
 
-        ByteEnumField("session_type", None, {}), 
+        ByteEnumField("session_type", None, {0 : "unicast", 1 : "broadcast", 2 : "join"}), 
         XShortField("nickname", None), 
         StrFixedLenField("peer_unique_id", None, length=5),
         IntField("peer_nonce_counter_value", None),
@@ -795,6 +795,7 @@ bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_DataLink_KeepAlive, pdu_type
 bind_layers(WirelessHart_DataLink_Hdr, WirelessHart_Network_Hdr, pdu_type=7)
 
 bind_layers(WirelessHart_Network_Hdr, WirelessHart_Network_Security_SubLayer_Hdr)
+bind_layers(WirelessHart_Network_Security_SubLayer_Hdr, WirelessHart_Transport_Layer_Hdr, security_types=15)
 
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Report_Device_Health_Request, command_number=0x30b)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Report_Device_Health_Response, command_number=0x30b)
@@ -941,7 +942,7 @@ broadcast_session_key = []
 assigned_nickname = 0x0002
 if __name__ == "__main__":
     count = 0
-    #pkts = rdpcap("whad/ressources/pcaps/wireless_hart_capture_channel_11_41424344414243444142434441424344_2nodes.pcap")
+    #pkts = rdpcap("whad/ressources/pcaps/wireless_hart_capture_channel_13_41424344414243444142434441424344.pcap")
     pkts = rdpcap("whad/ressources/pcaps/wireless_hart_capture_channel_11_41424344414243444142434441424344_2nodes.pcap")
     for pkt in pkts:
         dot15d4_bytes = bytes(pkt)[44:]
@@ -953,8 +954,8 @@ if __name__ == "__main__":
             print("TIMESTAMP", pkt.time)
             if hasattr(dot15d4_pkt, "asn_snippet"):
                 print("ASN_SNIPPET", dot15d4_pkt.asn_snippet)
-            #print("RAW", bytes(dot15d4_pkt).hex())
-            #print("REPR", repr(dot15d4_pkt))
+            print("RAW", bytes(dot15d4_pkt).hex())
+            print("REPR", repr(dot15d4_pkt))
             if WirelessHart_Network_Security_SubLayer_Hdr in dot15d4_pkt and dot15d4_pkt.security_types == 1:
                 decrypted = decrypt_nwk(dot15d4_pkt, key=b"ABCDABCDABCDABCD")
                 
@@ -965,6 +966,7 @@ if __name__ == "__main__":
                                 print(repr(c))
                                 print("KEY", c.key_value.hex())
                                 unicast_session_key.append(c.key_value)
+                                broadcast_session_key.append((dot15d4_pkt.src_addr, dot15d4_pkt.dest_addr, c))
                         '''
                         if WirelessHart_Write_Modify_Session_Command_Request in c and hasattr(c, "key_value"):
                             unicast_session_key.append(c.key_value)
@@ -1003,6 +1005,7 @@ if __name__ == "__main__":
                                         print(repr(c))
                                         print("KEY", c.key_value.hex())
                                         unicast_session_key.append(c.key_value)
+                                        broadcast_session_key.append((dot15d4_pkt.src_addr, dot15d4_pkt.dest_addr, c))
 
                             dec = WirelessHart_Transport_Layer_Hdr(decrypted)
                             break
@@ -1029,7 +1032,7 @@ if __name__ == "__main__":
             else:
                 print("OTHER", repr(dot15d4_pkt))
         else:
-            print("ADV", " | time=",pkt.time, " | asn=",  dot15d4_pkt.asn)
+            #print("ADV", " | time=",pkt.time, " | asn=",  dot15d4_pkt.asn)
             #print(repr(dot15d4_pkt))#dot15d4_pkt.show()
             #print()
             pass#dot15d4_pkt.show()
@@ -1037,8 +1040,9 @@ if __name__ == "__main__":
             #print("computed mic:", compute_dlmic(dot15d4_pkt, b'www.hartcomm.org').hex())
             #break
 
-
-
+#from pprint import pprint
+#pprint(unicast_session_key)
+#pprint(broadcast_session_key)
 '''
 conf.dot15d4_protocol = "wirelesshart"
 

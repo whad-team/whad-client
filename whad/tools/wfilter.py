@@ -8,6 +8,8 @@ from prompt_toolkit import print_formatted_text, HTML
 from whad.common.monitors.pcap import PcapWriterMonitor
 from whad.cli.app import CommandLineApp, ApplicationError, run_app
 from scapy.all import *
+from whad.scapy.layers.rf4ce import *
+from whad.scapy.layers.wirelesshart import *
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
 from whad.device import Bridge, ProtocolHub
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady

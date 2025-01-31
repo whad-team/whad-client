@@ -25,6 +25,8 @@ if __name__ == '__main__':
             controller = Controller(dev, profiles=[mso])
             controller.set_channel(15)
             controller.start()
+            controller.stack.get_layer('nwk').get_service('management').discovery()
+
             # Bind with a specific target
             mso.bind(Dot15d4Address("c5:92:a7:d2:59:d1:19:c4").value, 0x269a)
 

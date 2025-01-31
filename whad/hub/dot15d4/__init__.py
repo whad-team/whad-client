@@ -5,6 +5,8 @@ from dataclasses import dataclass, field, fields
 
 from scapy.layers.dot15d4 import Dot15d4FCS
 from whad.scapy.layers.rf4ce import RF4CE_Hdr
+from whad.scapy.layers.wirelesshart import WirelessHart_DataLink_Hdr
+
 from scapy.config import conf
 from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4MitmRole, AddressType
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr,\
