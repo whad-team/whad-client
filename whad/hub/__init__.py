@@ -10,6 +10,7 @@ to protobuf messages fields.
 import logging
 from typing import Union
 from whad.protocol.whad_pb2 import Message
+from google.protobuf.message import DecodeError
 from .registry import Registry
 
 logger = logging.getLogger(__name__)
@@ -69,9 +70,14 @@ class ProtocolHub(Registry):
         """Parse a serialized WHAD message into an associated object.
         """
         if isinstance(data, bytes):
-            # Use protocol buffers to parse our message
-            msg = Message()
-            msg.ParseFromString(bytes(data))
+            try:
+                # Use protocol buffers to parse our message
+                msg = Message()
+                msg.ParseFromString(bytes(data))
+            except DecodeError:
+                # Error occured when parsing message
+                logger.debug("Decoding error occured when parsing %s", data)
+                return None
         elif isinstance(data, Message):
             msg = data
         else:

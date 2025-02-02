@@ -725,18 +725,15 @@ class WhadDevice:
                     if len(self.__inpipe) >= (msg_size+4):
                         raw_message = self.__inpipe[4:4+msg_size]
 
-                        # Parse our message with our Protocol Hub
-                        #_msg = Message()
-                        #_msg.ParseFromString(bytes(raw_message))
-
                         # Parse received message with our Protocol Hub
                         msg = self.__hub.parse(bytes(raw_message))
 
-                        #logger.debug("[WhadDevice] WHAD message successfully parsed")
-                        self.on_message_received(msg)
+                        # Forward message if successfully parsed
+                        if msg is not None:
+                            self.on_message_received(msg)
+
                         # Chomp
                         self.__inpipe = self.__inpipe[msg_size + 4:]
-                        #logger.debug("[WhadDevice] Remaining bytes: %s", hexlify(self.__inpipe))
                     else:
                         break
                 else:
