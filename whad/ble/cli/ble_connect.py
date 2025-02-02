@@ -317,20 +317,22 @@ class BleConnectApp(CommandLineDevicePipe):
             # Launch pre-run tasks
             self.pre_run()
 
-            # We need to have an interface specified
-            if self.interface is not None:
-                # Make sure we are piped to another tool
-                if self.is_stdout_piped() and not self.is_stdin_piped():
-                    # Connect to the target device
-                    self.connect_target(self.args.bdaddr, self.args.random)
-                elif self.is_stdin_piped() and not self.is_stdout_piped():
-                    # Connect to the target device once the previous tool
-                    # gives us a unix socket.
-                    self.connect_target_and_proxify(self.args.bdaddr, self.args.random)
+            # We need a BD address to be set
+            if self.args.bdaddr is not None:
+                # We need to have an interface specified
+                if self.interface is not None:
+                    # Make sure we are piped to another tool
+                    if self.is_stdout_piped() and not self.is_stdin_piped():
+                        # Connect to the target device
+                        self.connect_target(self.args.bdaddr, self.args.random)
+                    elif self.is_stdin_piped() and not self.is_stdout_piped():
+                        # Connect to the target device once the previous tool
+                        # gives us a unix socket.
+                        self.connect_target_and_proxify(self.args.bdaddr, self.args.random)
+                    else:
+                        self.error('Tool must be piped to another WHAD tool.')
                 else:
-                    self.error('Tool must be piped to another WHAD tool.')
-            else:
-                self.error('You need to specify an interface with option --interface.')
+                    self.error('You need to specify an interface with option --interface.')
 
         except KeyboardInterrupt:
             self.warning("wble-connect stopped (CTL-C)")
@@ -399,7 +401,18 @@ class BleConnectApp(CommandLineDevicePipe):
 
             # Connect to our target device
             try:
+                # Output current status on stderr
+                logger.info(f"[wble-connect::connect_target] Connecting to {bdaddr} ...")
+                sys.stderr.write(f"Connecting to {bdaddr} ...\n")
+                sys.stderr.flush()
+
+                # Connect to target device
                 periph = central.connect(bdaddr, random_connection_type)
+
+                # We are connected
+                logger.info(f"[wble-connect::connect_target] Connected to {bdaddr}")
+                sys.stderr.write(f"Connected to {bdaddr}\n")
+                sys.stderr.flush()
 
                 # Get peers
                 logger.info("local_peer: %s", central.local_peer)
@@ -422,6 +435,7 @@ class BleConnectApp(CommandLineDevicePipe):
 
             except PeripheralNotFound:
                 # Could not connect
+                logger.info(f"[wble-connect::connect_target] Cannot connect to {bdaddr}")
                 self.error(f"Cannot connect to {bdaddr}")
             finally:
                 central.stop()
