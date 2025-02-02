@@ -286,12 +286,13 @@ class TCPSocketConnector(WhadDeviceConnector):
                         _msg = self.hub.parse(bytes(raw_message))
 
                         # Send to device
-                        logger.debug(("WHAD message successfully parsed, "
-                                      "forward to underlying device"))
-                        self.device.send_message(_msg)
+                        if _msg is not None:
+                            logger.debug(("WHAD message successfully parsed, "
+                                        "forward to underlying device"))
+                            self.device.send_message(_msg)
 
-                        # Notify message
-                        self.on_msg_sent(_msg)
+                            # Notify message
+                            self.on_msg_sent(_msg)
 
                         # Chomp
                         self.__inpipe = self.__inpipe[msg_size + 4:]
