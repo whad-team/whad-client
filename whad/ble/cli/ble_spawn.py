@@ -243,37 +243,41 @@ class BleSpawnApp(CommandLineDevicePipe):
             if self.interface is not None:
 
                 if self.args.profile is not None:
+                    try:
+                        # Load file content
+                        with open(self.args.profile,'rb') as profile:
+                            profile_json = profile.read()
+                            profile = json.loads(profile_json)
 
-                    # Load file content
-                    with open(self.args.profile,'rb') as profile:
-                        profile_json = profile.read()
-                        profile = json.loads(profile_json)
+                        adv_data = bytes.fromhex(profile["devinfo"]["adv_data"])
+                        scan_rsp = bytes.fromhex(profile["devinfo"]["scan_rsp"])
 
-                    adv_data = bytes.fromhex(profile["devinfo"]["adv_data"])
-                    scan_rsp = bytes.fromhex(profile["devinfo"]["scan_rsp"])
+                        # If stdin is piped, we are supposed to advertise a device and
+                        # proxify once connected
+                        if self.is_stdin_piped() and not self.is_stdout_piped():
+                            # We create a peripheral that will send all packets to our input interface
+                            self.__mode = self.MODE_END_CHAIN
+                            self.create_input_proxy(adv_data, scan_rsp, int(self.args.conn_handle))
 
-                    # If stdin is piped, we are supposed to advertise a device and
-                    # proxify once connected
-                    if self.is_stdin_piped() and not self.is_stdout_piped():
-                        # We create a peripheral that will send all packets to our input interface
-                        self.__mode = self.MODE_END_CHAIN
-                        self.create_input_proxy(adv_data, scan_rsp, int(self.args.conn_handle))
-
-                    # Else if stdout is piped, we are supposed to advertise a device
-                    # and proxify when connected
-                    elif self.is_stdout_piped() and not self.is_stdin_piped():
-                        # We create a peripheral that will proxy all messages
-                        self.__mode = self.MODE_START_CHAIN
-                        self.create_output_proxy(adv_data, scan_rsp, profile_json)
-                    else:
-                        self.error('Tool must be piped to another WHAD tool.')
+                        # Else if stdout is piped, we are supposed to advertise a device
+                        # and proxify when connected
+                        elif self.is_stdout_piped() and not self.is_stdin_piped():
+                            # We create a peripheral that will proxy all messages
+                            self.__mode = self.MODE_START_CHAIN
+                            self.create_output_proxy(adv_data, scan_rsp, profile_json)
+                        else:
+                            self.error('Tool must be piped to another WHAD tool.')
+                    except FileNotFoundError:
+                        self.error(f"Profile file not found ({self.args.profile}).")
+                    except IOError:
+                        self.error(f"Cannot read file ({self.args.profile}).")
                 else:
-                    self.error('You need to specify a profile file with option --profile.')
+                    self.error("You need to specify a profile file with option --profile.")
             else:
-                self.error('You need to specify an interface with option --interface.')
+                self.error("You need to specify an interface with option --interface.")
 
         except KeyboardInterrupt:
-            self.warning('ble-spawn stopped (CTL-C)')
+            self.warning("ble-spawn stopped (CTL-C)")
 
         # Launch post-run tasks
         self.post_run()
