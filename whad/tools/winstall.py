@@ -118,7 +118,7 @@ class WhadInstallApp(CommandLineApp):
         :rtype: str
         """
         return os.path.realpath(
-            f"{os.path.dirname(whad.__file__)}/ressources/rules/{device_name}.rules"
+            f"{os.path.dirname(whad.__file__)}/resources/rules/{device_name}.rules"
         )
 
 

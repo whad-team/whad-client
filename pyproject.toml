@@ -92,9 +92,9 @@ exclude = [
 
 [tool.setuptools.package-data]
 whad = [
-  "ressources/pcaps/*.pcap",
-  "ressources/rules/*.rules",
-  "ressources/wireshark/*.lua",
+  "resources/pcaps/*.pcap",
+  "resources/rules/*.rules",
+  "resources/wireshark/*.lua",
   "data/clues/CLUES_data.json",
 ]
 
