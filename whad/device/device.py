@@ -808,6 +808,11 @@ class WhadDevice:
         #if self.__closing:
         #    return
 
+        # If no connector set, we cannot process messages, we keep them in
+        # memory instead.
+        if self.__connector is None:
+            return False
+
         try:
             message = self.__messages.get(block=True, timeout=timeout)
             if message is not None:
