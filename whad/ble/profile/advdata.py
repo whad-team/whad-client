@@ -724,7 +724,8 @@ class AdvURI(AdvDataField):
         :rtype: AdvURI
         """
         if len(ad_record) >= 2:
-            scheme = unpack('<H', ad_record[:2])[0]
+            # Fetch the first UTF-8 character codepoint
+            scheme = ord(ad_record.decode("utf-8")[0])
             uri = ad_record[2:]
             scheme_alias = AdvURI.get_scheme(scheme)
             decoded_uri = uri.decode('utf-8')
@@ -1134,7 +1135,6 @@ class EddystoneUrl(AdvServiceData16):
         :param str url: Url to embed into this Eddystone-URL record.
         """
         eddystone_url = self.encode_url(url)
-        print(eddystone_url)
         super().__init__(UUID(0xFEAA), bytes([0x10, 0xF8] + eddystone_url))
 
 
