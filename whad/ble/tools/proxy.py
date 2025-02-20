@@ -72,7 +72,7 @@ class LowLevelPeripheral(Peripheral):
     to provide a Link-Layer peripheral with the requested advertising data.
     """
 
-    def __init__(self, proxy, device, adv_data, scan_data, bd_address=None):
+    def __init__(self, proxy, device, adv_data, scan_data, bd_address=None, public=True):
         """Instanciate a LowLevelPeripheral instance
 
         :param LinkLayerProxy proxy: Reference to the link-layer proxy that will receive events
@@ -82,7 +82,7 @@ class LowLevelPeripheral(Peripheral):
         :param AdvDataFieldList scan_data: Scan response data of the exposed proxy
                                            device (optional, can be None)
         """
-        super().__init__(device, adv_data=adv_data, scan_data=scan_data, bd_address=bd_address)
+        super().__init__(device, adv_data=adv_data, scan_data=scan_data, bd_address=bd_address, public=public)
         self.__proxy = proxy
         self.__connected = False
         self.__conn_handle = None
@@ -358,7 +358,7 @@ class LinkLayerProxy:
     """
 
     def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None,
-                 spoof=False):
+                 spoof=False, random=False):
         """
         :param BLE proxy: BLE device to use as a peripheral (GATT Server)
         :param BLE target: BLE device to use as a central (GATT Client)
@@ -385,6 +385,7 @@ class LinkLayerProxy:
         self.__target = target
         self.__peripheral = None
         self.__target_bd_addr = bd_address
+        self.__target_random=random
         self.__spoof = spoof
 
     @property
@@ -433,7 +434,7 @@ class LinkLayerProxy:
         print(self.__proxy)
         self.__central = LowLevelCentral(self, self.__target)
         logger.info("connecting to target device ...")
-        if self.__central.connect(self.__target_bd_addr) is not None:
+        if self.__central.connect(self.__target_bd_addr, random=self.__target_random) is not None:
             logger.info("proxy is connected to target device, create our own device ...")
 
             # Once connected, we start our peripheral
@@ -442,7 +443,8 @@ class LinkLayerProxy:
                 self.__proxy,
                 self.__adv_data,
                 self.__scan_data,
-                bd_address=self.__target_bd_addr if self.__spoof else None
+                bd_address=self.__target_bd_addr if self.__spoof else None,
+                public=not self.__target_random
             )
 
             # Interconnect central and peripheral
@@ -683,7 +685,7 @@ class GattProxy:
     """
 
     def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None,
-                 spoof=False, profile=None):
+                 spoof=False, profile=None, random=False):
         self.__central = None
         self.__peripheral = None
         self.__proxy_dev = proxy
@@ -700,6 +702,7 @@ class GattProxy:
         self.__scan_data = scan_data
         self.__target = None
         self.__target_bd_addr = bd_address
+        self.__target_random = random
 
     @property
     def target(self):
@@ -837,8 +840,8 @@ class GattProxy:
         """
         logger.info("create our central device")
         self.__central = Central(self.__target_dev, from_json=self.__profile)
-        logger.info("connect to target device")
-        self.__target = self.__central.connect(self.__target_bd_addr)
+        logger.info("connect to target device (random:%s)", self.__target_random)
+        self.__target = self.__central.connect(self.__target_bd_addr, random=self.__target_random)
         if self.__target is not None:
             if self.__profile is not None:
                 logger.info("use the provided profile (json) ...")
@@ -859,7 +862,8 @@ class GattProxy:
             self.__peripheral = Peripheral(self.__proxy_dev, profile=self.__profile,
                 adv_data=self.__adv_data,
                 scan_data=self.__scan_data,
-                bd_address=self.__target_bd_addr if self.__spoof else None
+                bd_address=self.__target_bd_addr if self.__spoof else None,
+                public=not self.__target_random
             )
             self.__peripheral.enable_peripheral_mode(adv_data=self.__adv_data)
 

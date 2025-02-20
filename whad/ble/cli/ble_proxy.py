@@ -198,6 +198,16 @@ class BleProxyApp(CommandLineDeviceSource):
             help="Enable BD address spoofing (if available)"
         )
 
+        # Add an optional random type argument
+        self.add_argument(
+            '-r',
+            '--random',
+            dest='random',
+            action='store_true',
+            default=False,
+            help='Use a random connection type'
+        )
+
         self.add_argument(
             "--link-layer",
             dest="linklayer",
@@ -249,7 +259,9 @@ class BleProxyApp(CommandLineDeviceSource):
         scanner = Scanner(self.interface)
         scanner.start()
         for device in scanner.discover_devices():
+            print(device)
             if device.address.lower() == self.args.bdaddr.lower():
+                print('scanning')
                 if device.adv_records is not None and device.scan_rsp_records is not None:
                     adv_data = device.adv_records.to_bytes()
                     scan_rsp = device.scan_rsp_records.to_bytes()
@@ -272,7 +284,8 @@ class BleProxyApp(CommandLineDeviceSource):
                     adv_data=adv_data,
                     scan_data=scan_rsp,
                     bd_address=self.args.bdaddr.lower(),
-                    spoof=self.args.spoof
+                    spoof=self.args.spoof,
+                    random=self.args.random
                 )
             else:
                 proxy = VerboseLLProxy(
@@ -281,10 +294,12 @@ class BleProxyApp(CommandLineDeviceSource):
                     adv_data=adv_data,
                     scan_data=scan_rsp,
                     bd_address=self.args.bdaddr.lower(),
-                    spoof=self.args.spoof
+                    spoof=self.args.spoof,
+                    random=self.args.random
                 )
 
             # Start our proxy
+            print("start proxy")
             proxy.start()
 
             # Set output PCAP file if provided\
