@@ -173,3 +173,38 @@ Once correctly flashed, you should be able to see the available devices using ``
       Type: UartDevice
       Index: 0
       Identifier: /dev/ttyUSB0
+
+Installing WHAD in a virtual machine
+------------------------------------
+
+WHAD can be installed in a virtual machine rather than on a host using the
+procedure described above. However, some virtualization softwares required
+specific settings to allow all the features of WHAD.
+
+The following table summarizes the supported virtualization softwares and the
+OSes used to run them, as well as the recommended guest OSes for each of them.
+
+================ ================ ================ ================= ================
+ Software        ARM macOS Host   x86 macOS Host   x86 Windows Host  x86 Linux Host
+================ ================ ================ ================= ================
+ VMWare          Ubuntu 24.04 (1) Ubuntu 24.04 (1) Ubuntu 24.04 (01) Ubuntu 24.04 (1)
+ VirtualBox      *Untested*       *Untested*       Ubuntu 24.04      Ubuntu 24.04
+================ ================ ================ ================= ================
+
+Using VMWare virtualization software (1)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Our tests with the recommended guest OS Ubuntu 22.04 showed that the *Bluetooth*
+service must be stopped or disabled in the Ubuntu guest to avoid conflicts with
+Bluetooth USB dongles:
+
+.. code-block:: shell
+
+    $ sudo service bluetooth stop
+
+.. note::
+    
+    On Linux hosts, the *Bluetooth* service does not need to be stopped or1
+    disabled in guest OS.
+
+
