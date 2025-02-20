@@ -106,6 +106,7 @@ class Peripheral(BLE):
         # Set bd address if provided
         if bd_address is not None:
             logger.info("Set BD address to %s", bd_address)
+            print("set bd address")
             self.set_bd_address(bd_address, public=public)
 
         # If an existing connection is hijacked, simulate a connection
