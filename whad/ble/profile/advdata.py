@@ -685,7 +685,7 @@ class AdvURI(AdvDataField):
             self.__scheme = url_info.scheme
             scheme = AdvURI.SUPPORTED_SCHEMES[url_info.scheme]
             self.__uri = url_info._replace(scheme='').geturl()
-            encoded_uri = pack('<H', scheme) + self.__uri.encode('utf-8')
+            encoded_uri = chr(scheme).encode("utf-8") + self.__uri.encode('utf-8')
             super().__init__(0x24, encoded_uri)
         else:
             raise AdvDataError
