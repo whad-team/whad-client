@@ -1,0 +1,2 @@
+# RzUsbStick:
+ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="210a", MODE:="0666"

@@ -1,0 +1,2 @@
+# RfStorm:
+ATTRS{idVendor}=="1915", ATTRS{idProduct}=="0102", MODE="0666"
