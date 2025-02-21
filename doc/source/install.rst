@@ -188,7 +188,7 @@ OSes used to run them, as well as the recommended guest OSes for each of them.
  Software        ARM macOS Host   x86 macOS Host   x86 Windows Host  x86 Linux Host
 ================ ================ ================ ================= ================
  VMWare          Ubuntu 24.04 (1) Ubuntu 24.04 (1) Ubuntu 24.04 (01) Ubuntu 24.04 (1)
- VirtualBox      *Untested*       *Untested*       Ubuntu 24.04      Ubuntu 24.04
+ VirtualBox      *Untested*       Ubuntu 24.04     Ubuntu 24.04      Ubuntu 24.04
 ================ ================ ================ ================= ================
 
 Using VMWare virtualization software (1)
