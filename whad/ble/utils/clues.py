@@ -32,7 +32,7 @@ def uuid_match(uuid: UUID, pattern: str) -> bool:
 class CluesDb:
     """DarkMentorLLC Clues collaborative database.
     """
-    CLUES_CACHE = None
+    CLUES_CACHE = []
 
     @staticmethod
     def load_data():
@@ -68,5 +68,3 @@ class CluesDb:
 
         # Not found
         return None
-
-        
