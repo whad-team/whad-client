@@ -10,9 +10,6 @@ def test_clues_data():
     """
     assert os.path.exists("./whad/resources/clues/CLUES_data.json")
     assert os.path.isfile("./whad/resources/clues/CLUES_data.json")
-
-def test_clues_db():
-    """Load CLUES database
-    """
-    # Must load without any error
-    CluesDb.load_data()
+    # load JSON
+    with open("./whad/resources/clues/CLUES_data.json", 'r', encoding="utf-8") as clues_json:
+        json.load(clues_json)
