@@ -94,7 +94,7 @@ from a specific advertising device (*cc:5f:f0:e5:81:75*):
 
 .. code-block:: text
 
-    $ wplay --flush ressources/pcaps/ble_discovery.pcap ble | wfilter "BTLE_ADV_IND in p and p.AdvA == 'cc:5f:f0:e5:81:75'"
+    $ wplay --flush resources/pcaps/ble_discovery.pcap ble | wfilter "BTLE_ADV_IND in p and p.AdvA == 'cc:5f:f0:e5:81:75'"
     [ raw=True, decrypted=False, timestamp=0, channel=0, rssi=-50, direction=0, connection_handle=0, is_crc_valid=True, relative_timestamp=0, processed=False, encrypt=False ]
     <BTLE  access_addr=0x8e89bed6 crc=0x0 |<BTLE_ADV  RxAdd=public TxAdd=public ChSel=#2 RFU=0 PDU_type=ADV_IND Length=0x25 |<BTLE_ADV_IND  AdvA=cc:5f:f0:e5:81:75 data=[<EIR_Hdr  len=2 type=flags |<EIR_Flags  flags=general_disc_mode+br_edr_not_supported |>>, <EIR_Hdr  len=17 type=complete_list_128_bit_svc_uuids |<EIR_CompleteList128BitServiceUUIDs  svc_uuids=[UUID('bdce0001-e90d-4685-b89d-5578cd199a9f')] |>>, <EIR_Hdr  len=9 type=mfg_specific_data |<EIR_Manufacturer_Specific_Data  company_id=0xffff |<Raw  load='u\\x81\\xe5\\xf0_\\xcc' |>>>] |>>>
 
@@ -108,7 +108,7 @@ Next, we are going to modify the received signal strength of all packets to -20:
 
 .. code-block:: text
 
-    $ wplay --flush ressources/pcaps/ble_discovery.pcap ble | wfilter -t "p.metadata.rssi=-20" --down
+    $ wplay --flush resources/pcaps/ble_discovery.pcap ble | wfilter -t "p.metadata.rssi=-20" --down
     [ raw=True, decrypted=False, timestamp=0, channel=0, rssi=-20, direction=0, connection_handle=0, is_crc_valid=True, relative_timestamp=0, processed=False, encrypt=False ]
     <BTLE  access_addr=0x8e89bed6 crc=0x0 |<BTLE_ADV  RxAdd=public TxAdd=public ChSel=#2 RFU=0 PDU_type=ADV_IND Length=0x25 |<BTLE_ADV_IND  AdvA=cc:5f:f0:e5:81:75 data=[<EIR_Hdr  len=2 type=flags |<EIR_Flags  flags=general_disc_mode+br_edr_not_supported |>>, <EIR_Hdr  len=17 type=complete_list_128_bit_svc_uuids |<EIR_CompleteList128BitServiceUUIDs  svc_uuids=[UUID('bdce0001-e90d-4685-b89d-5578cd199a9f')] |>>, <EIR_Hdr  len=9 type=mfg_specific_data |<EIR_Manufacturer_Specific_Data  company_id=0xffff |<Raw  load='u\\x81\\xe5\\xf0_\\xcc' |>>>] |>>>
 
@@ -119,7 +119,7 @@ Or we also can change the advertiser address to *11:22:33:44:55:66* for every ``
 
 .. code-block:: text
 
-    $ wplay --flush ressources/pcaps/ble_discovery.pcap ble | wfilter -t "p[BTLE_ADV_IND].AdvA='11:22:33:44:55:66'" --down "BTLE_ADV_IND in p"
+    $ wplay --flush resources/pcaps/ble_discovery.pcap ble | wfilter -t "p[BTLE_ADV_IND].AdvA='11:22:33:44:55:66'" --down "BTLE_ADV_IND in p"
     [ raw=True, decrypted=False, timestamp=0, channel=0, rssi=-50, direction=0, connection_handle=0, is_crc_valid=True, relative_timestamp=0, processed=False, encrypt=False ]
     <BTLE  access_addr=0x8e89bed6 crc=0x0 |<BTLE_ADV  RxAdd=public TxAdd=public ChSel=#2 RFU=0 PDU_type=ADV_IND Length=0x25 |<BTLE_ADV_IND  AdvA=11:22:33:44:55:66 data=[<EIR_Hdr  len=2 type=flags |<EIR_Flags  flags=general_disc_mode+br_edr_not_supported |>>, <EIR_Hdr  len=17 type=complete_list_128_bit_svc_uuids |<EIR_CompleteList128BitServiceUUIDs  svc_uuids=[UUID('bdce0001-e90d-4685-b89d-5578cd199a9f')] |>>, <EIR_Hdr  len=9 type=mfg_specific_data |<EIR_Manufacturer_Specific_Data  company_id=0xffff |<Raw  load='u\\x81\\xe5\\xf0_\\xcc' |>>>] |>>>
 

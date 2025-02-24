@@ -42,6 +42,11 @@ class AdvDataField:
         """Return the record type
         """
         return self.__type
+    
+    def set_value(self, value):
+        """Set advertising record value
+        """
+        self.__value = value
 
     def to_bytes(self):
         """Serialize record into a byte array
@@ -220,6 +225,13 @@ class AdvShortenedLocalName(AdvDataField):
         """
         return self.__name
 
+    @name.setter
+    def name(self, value: bytes):
+        """Update shortened name
+        """
+        self.__name = value
+        self.set_value(value)
+
     @staticmethod
     def from_bytes(ad_record):
         """Deserialize an AdvShortenedLocalName
@@ -247,10 +259,15 @@ class AdvCompleteLocalName(AdvDataField):
         """Return the complete device name
         """
         return self.__name
+    
+    @name.setter
+    def name(self, value: bytes):
+        self.__name = value
+        self.set_value(value)
 
     @staticmethod
     def from_bytes(ad_record):
-        """Deserialize an AdvShortenedLocalName
+        """Deserialize an AdvCompleteLocalName
 
         :param bytes ad_record: Serialized AdvCompleteLocalName AD record
         :return: An AdvCompleteLocalName object
@@ -286,6 +303,34 @@ class AdvManufacturerSpecificData(AdvDataField):
 
     def __init__(self, company_id, data):
         super().__init__(0xFF, pack('<H', company_id&0xffff) + bytes(data))
+        self.__company = company_id
+        self.__data = data
+
+    @property
+    def company(self) -> int:
+        """Company ID
+        """
+        return self.__company
+    
+    @company.setter
+    def company(self, value):
+        """Update company ID
+        """
+        self.__company = value
+        self.set_value(pack('<H', value&0xffff) + bytes(self.__data))
+
+    @property
+    def data(self) -> bytes:
+        """Manufacturer data
+        """
+        return self.__data
+    
+    @data.setter
+    def data(self, value: bytes):
+        """Update manufacturer data
+        """
+        self.__data = value
+        self.set_value(pack('<H', self.__company&0xffff) + bytes(self.__data))
 
     @staticmethod
     def from_bytes(ad_record):
@@ -1209,6 +1254,23 @@ class AdvDataFieldList:
             self.__fields.append(item)
         else:
             raise AttributeError
+
+    def get(self, adv_type) -> AdvDataField:
+        """Find the first advertising record of the specified type
+        """
+        for field in self.__fields:
+            if isinstance(field, adv_type):
+                return field
+        return None
+    
+    def remove(self, field: AdvDataField) -> bool:
+        """Remove a record from this list
+        """
+        for f in self.__fields:
+            if f == field:
+                self.__fields.remove(f)
+                return True
+        return False
 
     def to_bytes(self):
         """Convert field list to bytes

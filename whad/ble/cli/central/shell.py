@@ -282,7 +282,7 @@ class BleCentralShell(InteractiveShell):
                 print('')
                 print_formatted_text(HTML("<ansicyan><u>Raw advertising records</u></ansicyan>\n"))
                 offset = 0
-                for adv_record in dev_info.adv_records:
+                for adv_record in dev_info.ad_records:
                     show_adv_record(offset, adv_record.to_bytes())
                     offset += 1
                     print('')

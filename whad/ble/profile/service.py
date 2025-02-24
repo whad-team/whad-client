@@ -8,6 +8,7 @@ from struct import pack
 from whad.ble.exceptions import InvalidHandleValueException
 from whad.ble.profile.attribute import Attribute, UUID, get_uuid_alias
 from whad.ble.profile.characteristic import Characteristic
+from whad.ble.utils.clues import CluesDb
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +68,20 @@ class Service(Attribute):
     def name(self) -> str:
         """Readable service name
         """
+        # Search in Bluetooth known UUIDs
         alias = get_uuid_alias(self.__service_uuid)
         if alias is not None:
             return f"{alias} (0x{self.__service_uuid})"
+        
+        # Search in collaborative CLUES database
+        alias = CluesDb.get_uuid_alias(self.__service_uuid)
+        if alias is not None:
+            if self.__service_uuid.type == UUID.TYPE_16:
+                return f"{alias} (0x{self.__service_uuid})"
+            else:
+                return f"{alias} ({self.__service_uuid})"
+
+        # Default name
         return str(self.__service_uuid)
 
     def payload(self):
@@ -266,10 +278,23 @@ class IncludeService(Attribute):
     def name(self) -> str:
         """Generate the description of the included service definition attribute.
         """
+        # Search in Bluetooth known database
         alias = get_uuid_alias(self.__service_uuid)
         if alias is not None:
             return f"Included service {alias} (0x{self.__service_uuid})"
+        
+        # Search in collaborative CLUES database
+        alias = Clues.get_uuid_alias(self.__service_uuid)
+        if alias is not None:
+            if self.__service_uuid.type == UUID.TYPE_16:
+                return f"Included service {alias} (0x{self.__service_uuid})"
+            else:
+                return f"Included service {alias} ({self.__service_uuid})"
+
+        # Not found, default name is UUID
         return f"Included service {self.__service_uuid}"
+    
+
 
     def payload(self) -> bytes:
         """Return service UUID as bytes

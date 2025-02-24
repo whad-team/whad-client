@@ -142,7 +142,8 @@ class InteractiveShell:
                         return self.__commands[command](resolved_args)
                     except KeyboardInterrupt:
                         print("\rInterrupted by user.")
-        except ValueError:
+        except ValueError as e:
+            print(e)
             self.warning('An error occurred while processing your command.')
 
     def run(self):
