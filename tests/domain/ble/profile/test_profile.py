@@ -177,6 +177,7 @@ def test_profile_json_export(basic_profile: GenericProfile):
                         "properties": 10,
                         "security": 0,
                         "value": {
+                            "data": "44756d6d7956616c7565",
                             "handle": 3,
                             "uuid": "5678"
                         },
