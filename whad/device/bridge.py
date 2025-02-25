@@ -29,8 +29,24 @@ class BridgeIfaceWrapper(WhadDeviceConnector):
         logger.debug("[PacketProcIfaceWrapper] on_disconnection")
         self.__processor.on_disconnect(self)
 
+    def unlock(self, dispatch_callback=None):
+        """Unlock connector and dispatch pending PDUs.
+
+        :param  dispatch_callback: PDU dispatch callback that overrides the
+                                   internal dispatch routine
+        :type   dispatch_callback: callable
+        """
+        super().unlock(self.dispatch_locked_pdus)
+
+    def dispatch_locked_pdus(self, pdu):
+        """Process locked pdus.
+        """
+        # convert packet to message
+        msg = self.hub.convert_packet(pdu)
+        #logger.debug("[PacketProcIfaceWrapper] process locked pdu %s", msg)
+        self.on_any_msg(msg)
+
     def on_any_msg(self, message):
-        logger.debug("[PacketProcIfaceWrapper] on_any_msg: %s", message)
         self.__processor.on_any_msg(self, message)
 
     def on_generic_msg(self, message):
@@ -103,6 +119,18 @@ class Bridge:
         """
         return self.__out
 
+    @property
+    def input_wrapper(self) -> WhadDeviceConnector:
+        """Get the internal connector for input
+        """
+        return self.__in_wrapper
+    
+    @property
+    def output_wrapper(self) -> WhadDeviceConnector:
+        """Get the internal connector for output
+        """
+        return self.__out_wrapper
+
     def on_disconnect(self, wrapper):
         """When a wrapper disconnects, stop bridge.
         """
@@ -115,6 +143,7 @@ class Bridge:
         :param message: Incoming message
         :type message: HubMessage
         """
+        logger.debug("bridge::on_any_msg - %s", message)
         if wrapper == self.__in_wrapper:
             self.on_outbound(message)
         elif wrapper == self.__out_wrapper:
