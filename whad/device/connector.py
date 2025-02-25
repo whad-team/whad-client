@@ -263,9 +263,6 @@ class WhadDeviceConnector:
                                    internal dispatch routine
         :type   dispatch_callback: callable
         """
-        # Mark connector as unlocked
-        self.__locked = False
-
         # Dispatch PDUs
         try:
             while True:
@@ -285,6 +282,9 @@ class WhadDeviceConnector:
         except Empty:
             # Processing done, continue.
             pass
+
+        # Mark connector as unlocked
+        self.__locked = False
 
     def is_locked(self) -> bool:
         """Determine if the connector is locked.
