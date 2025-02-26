@@ -258,20 +258,18 @@ class BleProxyApp(CommandLineDeviceSource):
         scan_start_ts = time()
         scanner = Scanner(self.interface)
         scanner.start()
-        for device in scanner.discover_devices():
-            print(device)
+        for device in scanner.discover_devices(timeout=self.args.timeout):
             if device.address.lower() == self.args.bdaddr.lower():
-                print('scanning')
                 if device.adv_records is not None and device.scan_rsp_records is not None:
                     adv_data = device.adv_records.to_bytes()
                     scan_rsp = device.scan_rsp_records.to_bytes()
                     break
 
-            # Device search timeout reached, show warning and stop proxy
-            if time() - scan_start_ts > self.args.timeout:
-                self.warning("Target device not found, connection timeout exceeded.")
-                scanner.stop()
-                return
+        # Device search timeout reached, show warning and stop proxy
+        if adv_data is None:
+            self.warning("Target device not found, connection timeout exceeded.")
+            scanner.stop()
+            return
 
         # Stop scanning
         scanner.stop()
