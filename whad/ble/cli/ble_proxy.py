@@ -4,12 +4,11 @@ This utility will connect to a device and spawn a similar device that will act
 as a proxy to the target device.
 """
 import logging
-from time import time
 
 from hexdump import hexdump
 from prompt_toolkit import print_formatted_text, HTML
 
-from whad.ble import Scanner
+from whad.ble import Scanner, BDAddress
 from whad.device import WhadDevice
 from whad.ble.tools.proxy import GattProxy, LinkLayerProxy
 from whad.cli.app import CommandLineDeviceSource, run_app
@@ -168,6 +167,7 @@ class BleProxyApp(CommandLineDeviceSource):
             "--proxy-interface",
             dest="proxy_iface",
             type=str,
+            required=True,
             help="Specify the WHAD interface to use for our spoofed device"
         )
 
@@ -199,14 +199,14 @@ class BleProxyApp(CommandLineDeviceSource):
         )
 
         # Add an optional random type argument
-        self.add_argument(
-            '-r',
-            '--random',
-            dest='random',
-            action='store_true',
-            default=False,
-            help='Use a random connection type'
-        )
+        #self.add_argument(
+        #    '-r',
+        #    '--random',
+        #    dest='random',
+        #    action='store_true',
+        #    default=False,
+        #    help='Use a random connection type'
+        #)
 
         self.add_argument(
             "--link-layer",
@@ -249,24 +249,29 @@ class BleProxyApp(CommandLineDeviceSource):
     def spawn_proxy(self):
         """Create a GATT proxy
         """
+        # Exit if proxy interface not specified
+        if self.args.proxy_iface is None:
+            return
+
         proxy_iface = WhadDevice.create(self.args.proxy_iface)
         adv_data = None
         scan_rsp = None
+        target = None
 
         # Start scanning, we are looking for our target device
         print(f"Scanning for target device (timeout: {self.args.timeout} seconds)...")
-        scan_start_ts = time()
         scanner = Scanner(self.interface)
         scanner.start()
         for device in scanner.discover_devices(timeout=self.args.timeout):
             if device.address.lower() == self.args.bdaddr.lower():
                 if device.adv_records is not None and device.scan_rsp_records is not None:
-                    adv_data = device.adv_records.to_bytes()
-                    scan_rsp = device.scan_rsp_records.to_bytes()
+                    target = device
+                    #adv_data = device.adv_records.to_bytes()
+                    #scan_rsp = device.scan_rsp_records.to_bytes()
                     break
 
         # Device search timeout reached, show warning and stop proxy
-        if adv_data is None:
+        if target is None:
             self.warning("Target device not found, connection timeout exceeded.")
             scanner.stop()
             return
@@ -274,35 +279,37 @@ class BleProxyApp(CommandLineDeviceSource):
         # Stop scanning
         scanner.stop()
 
-        if adv_data is not None and scan_rsp is not None:
+        # Display target device info
+        addr_type = "random" if target.address_type == BDAddress.RANDOM else "public"
+        print(f"Found target device {target.address} ({addr_type})")
+
+        if target is not None:
             if not self.args.linklayer:
                 proxy = VerboseProxy(
                     proxy_iface,
                     self.interface,
-                    adv_data=adv_data,
-                    scan_data=scan_rsp,
+                    adv_data=target.adv_records.to_bytes(),
+                    scan_data=target.scan_rsp_records.to_bytes(),
                     bd_address=self.args.bdaddr.lower(),
                     spoof=self.args.spoof,
-                    random=self.args.random
+                    random=(target.address_type == BDAddress.RANDOM)
                 )
             else:
                 proxy = VerboseLLProxy(
                     proxy=proxy_iface,
                     target=self.interface,
-                    adv_data=adv_data,
-                    scan_data=scan_rsp,
+                    adv_data=target.adv_records.to_bytes(),
+                    scan_data=target.scan_rsp_records.to_bytes(),
                     bd_address=self.args.bdaddr.lower(),
                     spoof=self.args.spoof,
-                    random=self.args.random
+                    random=(target.address_type == BDAddress.RANDOM)
                 )
 
             # Start our proxy
-            print("start proxy")
             proxy.start()
 
-            # Set output PCAP file if provided\
+            # Set output PCAP file if provided
             if self.args.output is not None:
-                print("Setting a pcap monitor")
                 pcap_mon = proxy.get_pcap_monitor(self.args.output)
                 pcap_mon.start()
             else:
