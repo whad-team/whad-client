@@ -206,14 +206,14 @@ class BleProxyApp(CommandLineDeviceSource):
         )
 
         # Add an optional random type argument
-        self.add_argument(
-            '-r',
-            '--random',
-            dest='random',
-            action='store_true',
-            default=False,
-            help='Use a random connection type'
-        )
+        #self.add_argument(
+        #    '-r',
+        #    '--random',
+        #    dest='random',
+        #    action='store_true',
+        #    default=False,
+        #    help='Use a random connection type'
+        #)
 
         self.add_argument(
             "--link-layer",
