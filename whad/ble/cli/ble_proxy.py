@@ -275,7 +275,6 @@ class BleProxyApp(CommandLineDeviceSource):
         scanner.start()
         for device in scanner.discover_devices(timeout=self.args.timeout):
             if device.address.lower() == self.args.bdaddr.lower():
-                print('scanning')
                 if device.adv_records is not None and device.scan_rsp_records is not None:
                     target = device
                     #adv_data = device.adv_records.to_bytes()
