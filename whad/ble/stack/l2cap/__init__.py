@@ -51,6 +51,12 @@ class L2CAPLayer(ContextualLayer):
         logger.debug("remote MTU changed to %d for conn_handle %d", mtu, self.state.conn_handle)
         self.state.remote_mtu = mtu
 
+        # Update local MTU if lower than remote MTU
+        if self.state.local_mtu < self.state.remote_mtu:
+            logger.debug("local MTU changed to %d for conn_handle %d",
+                         self.state.remote_mtu, self.state.conn_handle)
+            self.state.local_mtu = self.state.remote_mtu
+
     def get_local_mtu(self) -> int:
         """Retrieve local MTU
         """
