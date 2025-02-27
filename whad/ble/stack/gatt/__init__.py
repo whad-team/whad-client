@@ -2092,7 +2092,7 @@ class GattServer(GattLayer):
             attrs[attribute.handle] = attribute
             attrs_handles.append(attribute.handle)
         attrs_handles.sort()
-
+        print(attrs_handles)
         # If we have at least one item to return
         if len(attrs_handles) > 0:
 
