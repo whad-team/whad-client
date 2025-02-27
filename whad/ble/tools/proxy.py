@@ -653,16 +653,16 @@ class ImportedDevice(GenericProfile):
                         # Forward to proxy
                         self.__proxy.on_notification(
                             service,
-                            charac,
+                            characteristic,
                             value
                         )
 
                         # Update characteristic value
-                        charac.value = value
+                        characteristic.value = value
 
                     except HookReturnValue as value_override:
                         # Override value if required
-                        charac.value = value_override.value
+                        characteristic.value = value_override.value
 
                     except HookDontForward:
                         # Don't forward notification
@@ -676,16 +676,16 @@ class ImportedDevice(GenericProfile):
                         # Forward to proxy hook.
                         self.__proxy.on_indication(
                             service,
-                            charac,
+                            characteristic,
                             value
                         )
 
                         # Update characteristic value
-                        charac.value = value
+                        characteristic.value = value
 
                     except HookReturnValue as value_override:
                         # Override value if required
-                        charac.value = value_override.value
+                        characteristic.value = value_override.value
 
                     except HookDontForward:
                         # Don't forward notification
