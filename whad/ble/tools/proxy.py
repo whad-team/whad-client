@@ -432,6 +432,7 @@ class LinkLayerProxy:
         # First, connect our central device to our target device
         logger.info("create low-level central device ...")
         self.__central = LowLevelCentral(self, self.__target)
+        self.__central.lock()
         logger.info("connecting to target device ...")
         if self.__central.connect(self.__target_bd_addr, random=self.__target_random) is not None:
             logger.info("proxy is connected to target device, create our own device ...")
@@ -455,6 +456,7 @@ class LinkLayerProxy:
             # Start advertising
             logger.info("starting advertising our proxy device")
             self.__peripheral.start()
+            self.__central.unlock()
             logger.info("LinkLayerProxy instance is ready")
 
 
@@ -602,21 +604,21 @@ class ImportedDevice(GenericProfile):
             c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
             if notification and c is not None:
                 # Forward callback
-                def notif_cb(charac, value, indication=False):
+                def notif_cb(handle, value, indication=False):
                     try:
                         # Forward to proxy
                         self.__proxy.on_notification(
                             service,
-                            charac,
+                            characteristic,
                             value
                         )
 
                         # Update characteristic value
-                        charac.value = value
+                        characteristic.value = value
 
                     except HookReturnValue as value_override:
                         # Override value if required
-                        charac.value = value_override.value
+                        characteristic.value = value_override.value
 
                     except HookDontForward:
                         # Don't forward notification
@@ -625,21 +627,21 @@ class ImportedDevice(GenericProfile):
                 c.subscribe(callback=notif_cb, notification=True)
             elif indication and c is not None:
                 # Forward callback
-                def indicate_cb(charac, value, indication=True):
+                def indicate_cb(handle, value, indication=True):
                     try:
                         # Forward to proxy hook.
                         self.__proxy.on_indication(
                             service,
-                            charac,
+                            characteristic,
                             value
                         )
 
                         # Update characteristic value
-                        charac.value = value
+                        characteristic.value = value
 
                     except HookReturnValue as value_override:
                         # Override value if required
-                        charac.value = value_override.value
+                        characteristic.value = value_override.value
 
                     except HookDontForward:
                         # Don't forward notification

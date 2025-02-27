@@ -93,6 +93,8 @@ class GattLayer(Layer):
             GattExecuteWriteRequest: self.on_execute_write_request,
             GattExecuteWriteResponse: self.on_execute_write_response,
 
+            GattExchangeMtuResponse: self.on_exch_mtu_response,
+
         }
 
     @property
@@ -403,6 +405,10 @@ class GattLayer(Layer):
         """
         pass
 
+    def on_exch_mtu_response(self, reponse: GattExchangeMtuResponse):
+        """ATT MTU Exchange response callback
+        """
+        pass
 
 
 class GattClient(GattLayer):
@@ -1160,8 +1166,6 @@ class GattServer(GattLayer):
             attrs[attribute.handle] = attribute
             attrs_handles.append(attribute.handle)
         attrs_handles.sort()
-        print(attrs_handles)
-        print(request.value)
 
         # Loop on attributes and return the attributes with a value that matches the request value
         matching_attrs = []
@@ -2052,7 +2056,7 @@ class GattServer(GattLayer):
             attrs[attribute.handle] = attribute
             attrs_handles.append(attribute.handle)
         attrs_handles.sort()
-        print(attrs_handles)
+
         # If we have at least one item to return
         if len(attrs_handles) > 0:
 
