@@ -30,7 +30,8 @@ from whad.ble.stack.gatt.message import GattExecuteWriteRequest, GattExecuteWrit
     GattFindInfoRequest, GattReadByTypeResponse, GattReadRequest, GattReadResponse, \
     GattReadBlobRequest, GattReadBlobResponse, GattReadMultipleRequest, \
     GattReadMultipleResponse, GattWriteCommand, GattWriteRequest, GattWriteResponse, \
-    GattReadByGroupTypeRequest, GattReadByTypeRequest, GattReadByTypeRequest128
+    GattReadByGroupTypeRequest, GattReadByTypeRequest, GattReadByTypeRequest128, \
+    GattExchangeMtuResponse
 
 # Add missing ATT_Handle_Value_Confirmation class
 class AttHandleValueConfirmation(Packet):
@@ -167,11 +168,11 @@ class ATTLayer(Layer):
         :param mtu_resp: MTU response
         :type mtu_resp: ATT_Exchange_MTU_Request
         """
-        self.get_layer('l2cap').set_remote_mtu(mtu_resp.mtu)
+        self.get_layer('l2cap').set_local_mtu(mtu_resp.mtu)
 
         # Forward to GATT
-        #self.send('gatt', GattExchangeMtuResponse(mtu=mtu_resp.mtu),
-        #          tag='XCHG_MTU_RESP')
+        self.send('gatt', GattExchangeMtuResponse(mtu=mtu_resp.mtu),
+                  tag='XCHG_MTU_RESP')
 
 
     def on_find_info_request(self, request: ATT_Find_Information_Request):
