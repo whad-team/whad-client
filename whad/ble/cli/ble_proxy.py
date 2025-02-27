@@ -198,16 +198,6 @@ class BleProxyApp(CommandLineDeviceSource):
             help="Enable BD address spoofing (if available)"
         )
 
-        # Add an optional random type argument
-        #self.add_argument(
-        #    '-r',
-        #    '--random',
-        #    dest='random',
-        #    action='store_true',
-        #    default=False,
-        #    help='Use a random connection type'
-        #)
-
         self.add_argument(
             "--link-layer",
             dest="linklayer",
@@ -254,8 +244,6 @@ class BleProxyApp(CommandLineDeviceSource):
             return
 
         proxy_iface = WhadDevice.create(self.args.proxy_iface)
-        adv_data = None
-        scan_rsp = None
         target = None
 
         # Start scanning, we are looking for our target device

@@ -1100,12 +1100,12 @@ class BleCentralShell(InteractiveShell):
                             )
                             if result:
                                 print_formatted_text(HTML((
-                                    f"Successfully subscribed to notification for "
+                                    f"Successfully subscribed to indication for "
                                     f"characteristic {target_charac.uuid}"
                                 )))
                             else:
                                 print_formatted_text(HTML((
-                                    f"An error occurred when subscribing to notification"
+                                    f"An error occurred when subscribing to indication"
                                     f" for characteristic {target_charac.uuid}"
                                 )))
                         else:
@@ -1114,6 +1114,7 @@ class BleCentralShell(InteractiveShell):
                                 "nor indication."))
                     else:
                         result = target_charac.subscribe(
+                            notification=True,
                             callback=on_charac_notified
                         )
                         if result:

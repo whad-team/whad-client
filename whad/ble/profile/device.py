@@ -334,7 +334,7 @@ class PeripheralCharacteristic:
             ((self.__characteristic.properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE) != 0)
         )
 
-    def subscribe(self, notification=True, indication=False, callback=None):
+    def subscribe(self, notification=False, indication=False, callback=None):
         """Subscribe for notification/indication.
 
         :param bool notification: If set, subscribe for notification

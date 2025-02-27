@@ -431,7 +431,6 @@ class LinkLayerProxy:
 
         # First, connect our central device to our target device
         logger.info("create low-level central device ...")
-        print(self.__proxy)
         self.__central = LowLevelCentral(self, self.__target)
         logger.info("connecting to target device ...")
         if self.__central.connect(self.__target_bd_addr, random=self.__target_random) is not None:
@@ -576,7 +575,7 @@ class ImportedDevice(GenericProfile):
 
         try:
 
-             # Get target characteristic and write its value
+            # Get target characteristic and write its value
             c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
 
             self.__proxy.on_characteristic_write(
@@ -608,16 +607,16 @@ class ImportedDevice(GenericProfile):
                         # Forward to proxy
                         self.__proxy.on_notification(
                             service,
-                            characteristic,
+                            charac,
                             value
                         )
 
                         # Update characteristic value
-                        characteristic.value = value
+                        charac.value = value
 
                     except HookReturnValue as value_override:
                         # Override value if required
-                        characteristic.value = value_override.value
+                        charac.value = value_override.value
 
                     except HookDontForward:
                         # Don't forward notification
@@ -629,18 +628,18 @@ class ImportedDevice(GenericProfile):
                 def indicate_cb(charac, value, indication=True):
                     try:
                         # Forward to proxy hook.
-                        self.__proxy.on_notification(
+                        self.__proxy.on_indication(
                             service,
-                            characteristic,
+                            charac,
                             value
                         )
 
                         # Update characteristic value
-                        characteristic.value = value
+                        charac.value = value
 
                     except HookReturnValue as value_override:
                         # Override value if required
-                        characteristic.value = value_override.value
+                        charac.value = value_override.value
 
                     except HookDontForward:
                         # Don't forward notification
