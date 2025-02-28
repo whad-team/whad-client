@@ -221,6 +221,8 @@ class BleProxyApp(CommandLineDeviceSource):
             help="Output PCAP file path"
         )
 
+        self.proxy = None
+
     def run(self):
         """Override App's run() method to handle scripting feature.
         """
@@ -239,6 +241,10 @@ class BleProxyApp(CommandLineDeviceSource):
 
         except KeyboardInterrupt:
             self.warning("wble-proxy stopped (CTL-C)")
+            
+            # Stop gracefully
+            if self.proxy is not None:
+                self.proxy.stop()
 
         # Launch post-run tasks
         self.post_run()
@@ -280,7 +286,7 @@ class BleProxyApp(CommandLineDeviceSource):
 
         if target is not None:
             if not self.args.linklayer:
-                proxy = VerboseProxy(
+                self.proxy = VerboseProxy(
                     proxy_iface,
                     self.interface,
                     adv_data=target.adv_records.to_bytes(),
@@ -290,7 +296,7 @@ class BleProxyApp(CommandLineDeviceSource):
                     random=(target.address_type == BDAddress.RANDOM)
                 )
             else:
-                proxy = VerboseLLProxy(
+                self.proxy = VerboseLLProxy(
                     proxy=proxy_iface,
                     target=self.interface,
                     adv_data=target.adv_records.to_bytes(),
@@ -301,18 +307,18 @@ class BleProxyApp(CommandLineDeviceSource):
                 )
 
             # Start our proxy
-            proxy.start()
+            self.proxy.start()
 
             # Set output PCAP file if provided
             if self.args.output is not None:
-                pcap_mon = proxy.get_pcap_monitor(self.args.output)
+                pcap_mon = self.proxy.get_pcap_monitor(self.args.output)
                 pcap_mon.start()
             else:
                 pcap_mon = None
 
             # Create a Wireshark monitor
             if self.args.wireshark:
-                ws_mon = proxy.get_wireshark_monitor()
+                ws_mon = self.proxy.get_wireshark_monitor()
                 ws_mon.start()
             else:
                 ws_mon = None
@@ -321,7 +327,8 @@ class BleProxyApp(CommandLineDeviceSource):
             input()
 
             # Stop proxy
-            proxy.stop()
+            self.proxy.stop()
+            self.proxy = None
 
             # Stop Wireshark monitor
             if ws_mon is not None:

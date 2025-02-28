@@ -15,7 +15,7 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, \
     HCI_Event_Disconnection_Complete, HCI_Cmd_LE_Set_Scan_Response_Data, \
     HCI_Cmd_LE_Set_Random_Address, HCI_Cmd_LE_Long_Term_Key_Request_Reply, \
-    HCI_Cmd_LE_Start_Encryption_Request
+    HCI_Cmd_LE_Start_Encryption_Request, HCI_Cmd_LE_Set_Advertising_Parameters
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -475,6 +475,9 @@ class HCIDevice(VirtualDevice):
 
             # Not supported !
             logger.debug("Address modification not supported.")
+
+            # But at least we keep our address type
+            self._bd_address_type = bd_address_type
             return False
 
         self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
@@ -583,7 +586,34 @@ class HCIDevice(VirtualDevice):
         if self._advertising and enable:
             return True
         else:
-            logger.debug(f"Enable advertising: {enable}")
+            logger.debug("Set advertising parameters")
+            if wait_response:
+                # Wait for a response and update result accordingly.
+                response = self._write_command(HCI_Cmd_LE_Set_Advertising_Parameters(
+                    interval_min = 0x0020,
+                    interval_max = 0x0020,
+                    adv_type="ADV_IND",
+                    oatype=0 if self._bd_address_type == AddressType.PUBLIC else 1,
+                    datype=0,
+                    daddr="00:00:00:00:00:00",
+                    channel_map=0x7,
+                    filter_policy="all:all"
+                ))
+                result = response.status == 0x00
+            else:
+                # Don't wait, simply send command and consider it OK.
+                self._write_command(HCI_Cmd_LE_Set_Advertising_Parameters(
+                    interval_min = 0x0020,
+                    interval_max = 0x0020,
+                    adv_type="ADV_IND",
+                    oatype=0 if self._bd_address_type == AddressType.PUBLIC else 1,
+                    datype="public",
+                    daddr="00:00:00:00:00:00",
+                    channel_map=0x07,
+                    filter_policy="all:all"
+                ), wait_response=False)
+
+            logger.debug("Enable advertising: %s", enable)
             if wait_response:
                 # Wait for a response and update result accordingly.
                 response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))

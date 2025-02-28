@@ -916,10 +916,13 @@ class GattProxy:
                     self.__target,
                     target_profile
             )
+
+            # Create a peripheral with the target device address if possible
+            # If not, the device will take its own default address.
             self.__peripheral = Peripheral(self.__proxy_dev, profile=self.__profile,
                 adv_data=self.__adv_data,
                 scan_data=self.__scan_data,
-                bd_address=self.__target_bd_addr if self.__spoof else None,
+                bd_address=self.__target_bd_addr,
                 public=not self.__target_random
             )
             
