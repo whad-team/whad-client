@@ -205,6 +205,20 @@ While a peripheral is running, we can write and read the values of characteristi
 If we write to a characteristic a device has subscribed to for notification/indication,
 it will send a notification/indication to the connected device.
 
+Changing the connection MTU
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The `mtu` command can be used when a connection is established to change the
+*maximum transmission unit* or *MTU*:
+
+.. code-block:: text
+
+    wble-periph[running]> mtu 200
+    Connection MTU set to 200.
+
+.. important::
+
+    MTU value must be equal to or greater than 23.
 
 Stopping our peripheral
 ~~~~~~~~~~~~~~~~~~~~~~~
