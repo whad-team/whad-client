@@ -11,7 +11,9 @@ from time import sleep
 from whad.cli.app import CommandLineDevicePipe, run_app
 from whad.device import Bridge
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
-from whad.hub.ble import Connected, Disconnected, BlePduReceived, BleRawPduReceived
+from whad.hub.ble import Connected, Disconnected, BlePduReceived, BleRawPduReceived, \
+    BDAddress
+from whad.ble.connector.peripheral import PeripheralEventListener, PeripheralEventConnected
 from whad.ble.connector import Peripheral, Central
 from whad.hub.discovery import Capability, Domain
 
@@ -257,7 +259,8 @@ class BleSpawnApp(CommandLineDevicePipe):
                         if self.is_stdin_piped() and not self.is_stdout_piped():
                             # We create a peripheral that will send all packets to our input interface
                             self.__mode = self.MODE_END_CHAIN
-                            self.create_input_proxy(adv_data, scan_rsp, int(self.args.conn_handle))
+                            self.create_input_proxy(adv_data, scan_rsp, int(self.args.conn_handle),
+                                                    profile)
 
                         # Else if stdout is piped, we are supposed to advertise a device
                         # and proxify when connected
@@ -282,15 +285,20 @@ class BleSpawnApp(CommandLineDevicePipe):
         # Launch post-run tasks
         self.post_run()
 
-    def create_input_proxy(self, adv_data: bytes, scan_data: bytes, conn_handle):
+    def create_input_proxy(self, adv_data: bytes, scan_data: bytes, conn_handle, profile):
         """Configure our hardware to advertise a BLE peripheral, and once
         a central device is connected relay all packets to our input_interface.
         """
         self.input_conn_handle = int(self.args.conn_handle)
 
+        # Extract address info from profile
+        address = profile["devinfo"]["bd_addr"]
+        address_type = profile["devinfo"]["addr_type"]
+
         # Create our peripheral
         logger.info("[ble-spawn] Creating peripheral ...")
-        peripheral = Peripheral(self.interface, adv_data=adv_data, scan_data=scan_data)
+        peripheral = Peripheral(self.interface, adv_data=adv_data, scan_data=scan_data,
+                                bd_address=address, public=address_type==BDAddress.PUBLIC)
 
         # Query the input device to check if it supports raw BLE packets
         self.input_interface.discover()
