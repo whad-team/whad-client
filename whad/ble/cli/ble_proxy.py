@@ -320,6 +320,9 @@ class BleProxyApp(CommandLineDeviceSource):
             print('Proxy is ready, press a key to stop.')
             input()
 
+            # Stop proxy
+            proxy.stop()
+
             # Stop Wireshark monitor
             if ws_mon is not None:
                 ws_mon.stop()
