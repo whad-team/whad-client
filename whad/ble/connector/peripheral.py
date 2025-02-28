@@ -11,6 +11,8 @@ react on specific events.
 """
 import logging
 from time import sleep
+from queue import Queue
+from threading import Thread
 
 from whad.ble.connector.base import BLE
 from whad.hub.ble.bdaddr import BDAddress
@@ -26,6 +28,53 @@ from whad.exceptions import UnsupportedCapability
 
 # Logging
 logger = logging.getLogger(__name__)
+
+class PeripheralEventConnected:
+    """Connected event
+    """
+    def __init__(self, conn_handle, local: BDAddress, remote: BDAddress):
+        self.__conn_handle = conn_handle
+        self.__local = local
+        self.__remote = remote
+
+    @property
+    def conn_handle(self):
+        return self.__conn_handle
+
+    @property
+    def local(self):
+        return self.__local
+
+    @property
+    def remote(self):
+        return self.__remote
+
+class PeripheralEventListener(Thread):
+    """Peripheral event listener.
+    """
+
+    def __init__(self, callback=None):
+        """Initialize event listener
+        """
+        super().__init__()
+        self.__queue = Queue()
+        self.__running = True
+        self.__callback = callback
+
+    @property
+    def queue(self):
+        return self.__queue
+    
+    def notify(self, event):
+        """Add event to notify
+        """
+        self.__queue.put(event)
+    
+    def run(self):
+        while self.__running:
+            event = self.__queue.get()
+            if self.__callback is not None:
+                self.__callback(event)
 
 class Peripheral(BLE):
     """This BLE connector provides a way to create a peripheral device.
@@ -77,6 +126,9 @@ class Peripheral(BLE):
         self.__connected = False
         self.__conn_handle = None
 
+        # Initialize event listener
+        self.__evt_listener = None
+
         # Initialize profile
         if profile is None:
             logger.info("No profile provided to this Peripheral instance, use a default one.")
@@ -123,6 +175,12 @@ class Peripheral(BLE):
             self.enable_peripheral_mode(adv_data, scan_data)
 
     @property
+    def listener(self):
+        """Attached event listener
+        """
+        return self.__evt_listener
+
+    @property
     def local_peer(self):
         """Local peer object
         """
@@ -139,6 +197,15 @@ class Peripheral(BLE):
         """Connection handle
         """
         return self.__conn_handle
+
+    def attach_event_listener(self, listener: PeripheralEventListener):
+        """Attach an event queue to receive asynchronous notifications.
+
+        :param  listener: Event listener
+        :type   listener: PeripheralEventListener
+        """
+        # Save event queue
+        self.__evt_listener = listener
 
     def get_pairing_parameters(self):
         """Returns the provided pairing parameters, if any.
@@ -284,6 +351,14 @@ class Peripheral(BLE):
         self.__connected = True
         self.__conn_handle = connection_data.conn_handle
 
+        # Notify event listener, if any
+        if self.__evt_listener is not None:
+            self.__evt_listener.notify(PeripheralEventConnected(
+                connection_data.conn_handle,
+                self.__local_peer,
+                self.__remote_peer
+            ))
+
     def on_disconnected(self, disconnection_data):
         """A device has just disconnected from this peripheral.
 
@@ -373,6 +448,19 @@ class Peripheral(BLE):
 
         # Notify our profile about this connection
         self.__profile.on_connect(self.connection.conn_handle)
+
+    def set_mtu(self, mtu: int):
+        """Set connection MTU.
+        """
+        if self.connection is not None:
+            # Start a MTU exchange procedure
+            self.connection.gatt.set_mtu(mtu)
+
+    def get_mtu(self) -> int:
+        """Retrieve the connection MTU.
+        """
+        if self.connection is not None:
+            return self.connection.l2cap.get_local_mtu()
 
 class PeripheralClient(Peripheral):
     '''This BLE connector provides a way to create a peripheral device with
