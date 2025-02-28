@@ -788,3 +788,11 @@ class PeripheralDevice(GenericProfile):
         logger.debug('PeripheralDevice has disconnected')
         if self.__disconnect_cb is not None:
             self.__disconnect_cb()
+
+    def on_mtu_changed(self, mtu: int):
+        """MTU change callback
+
+        :param  mtu: New MTU value
+        :type   mtu: int
+        """
+        logger.debug("PeripheralDevice: MTU has been changed to %d", mtu)

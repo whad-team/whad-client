@@ -874,3 +874,7 @@ class BLE(WhadDeviceConnector):
 
         # Send BLE packet
         return super().send_packet(packet)
+
+    def on_mtu_changed(self, conn_handle, mtu: int):
+        """Connection MTU has been updated.
+        """
