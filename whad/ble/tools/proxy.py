@@ -15,7 +15,9 @@ from binascii import hexlify
 from scapy.layers.bluetooth4LE import BTLE_DATA
 from scapy.layers.bluetooth import L2CAP_Hdr
 
+from whad.hub.ble import BDAddress
 from whad.ble.connector import Central, Peripheral
+from whad.ble.connector.peripheral import PeripheralEventListener, PeripheralEventConnected
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvCompleteLocalName
 from whad.ble.profile import GenericProfile
 from whad.ble.exceptions import HookReturnValue, HookDontForward
@@ -111,6 +113,22 @@ class LowLevelPeripheral(Peripheral):
         else:
             self.__conn_handle = connection_data.conn_handle
 
+        local_peer = BDAddress.from_bytes(
+            connection_data.advertiser,
+            connection_data.adv_addr_type
+        )
+        remote_peer = BDAddress.from_bytes(
+            connection_data.initiator,
+            connection_data.init_addr_type
+        )
+
+        # Notify event listener
+        self.listener.notify(PeripheralEventConnected(
+            connection_data.conn_handle,
+            local_peer,
+            remote_peer
+        ))
+
         # Notify proxy that a connection has been established
         if self.__proxy is not None:
             self.__proxy.on_connect()
@@ -126,12 +144,15 @@ class LowLevelPeripheral(Peripheral):
                     self.send_pdu(reshape_pdu(_pdu), self.__conn_handle)
 
         if len(self.__pending_data_pdus) > 0:
+            logger.debug("Sending pending PDUs to other half...")
             for _pdu in self.__pending_data_pdus:
                 if self.__proxy is not None:
-                    pdu = self.__proxy.on_data_pdu(_pdu, BleDirection.MASTER_TO_SLAVE)
+                    logger.debug("Calling proxy on_data_pdu with PDU %s..." % _pdu)
+                    pdu = self.__proxy.on_data_pdu(_pdu, BleDirection.SLAVE_TO_MASTER)
                     if pdu is not None:
-                        self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
+                        self.send_pdu(reshape_pdu(pdu), self.__conn_handle, direction=BleDirection.SLAVE_TO_MASTER)
                 else:
+                    logger.debug("Directly sending PDU %s..." % _pdu)
                     self.send_pdu(reshape_pdu(_pdu), self.__conn_handle)
 
 
@@ -208,8 +229,8 @@ class LowLevelPeripheral(Peripheral):
 
         :param Packet pdu: Data PDU to forward
         """
-        logger.info("Forwarding data PDU to central (%s)", str(self.__conn_handle))
         if self.__conn_handle is not None:
+            logger.info("Forwarding data PDU to central (%s)", str(self.__conn_handle))
             return self.send_pdu(
                 reshape_pdu(pdu),
                 self.__conn_handle,
@@ -217,6 +238,7 @@ class LowLevelPeripheral(Peripheral):
             )
 
         # Not connected, adding data PDU to pending data PDUs
+        logger.info("Adding data PDU to pending PDUs")
         self.__pending_data_pdus.append(reshape_pdu(pdu))
         return True
 
@@ -453,12 +475,26 @@ class LinkLayerProxy:
             self.__central.set_other_half(self.__peripheral)
             logger.info("central and peripheral devices are now interconnected")
 
+            # Install peripheral event listener
+            self.__listener = PeripheralEventListener(callback=self.on_periph_event)
+            self.__peripheral.attach_event_listener(self.__listener)
+            self.__listener.start()
+
             # Start advertising
             logger.info("starting advertising our proxy device")
             self.__peripheral.start()
             self.__central.unlock()
             logger.info("LinkLayerProxy instance is ready")
 
+    def on_periph_event(self, event):
+        """Handle peripheral events.
+        """
+        if isinstance(event, PeripheralEventConnected):
+            """When a central is connected, update its mtu if not 23.
+            """
+            mtu = self.__central.get_mtu()
+            if mtu != 23:
+                self.__peripheral.set_mtu(mtu)
 
     def on_connect(self):
         """This method is called when a client connects to the proxy.
@@ -680,6 +716,11 @@ class ImportedDevice(GenericProfile):
         except GattTimeoutException:
             logger.error("GATT timeout during characteristic unsubscribe")
 
+    def on_mtu_changed(self, mtu: int):
+        """MTU update callback.
+        """
+        self.__proxy.on_mtu_changed(mtu)
+
 
 class GattProxy:
     """GATT Proxy
@@ -704,6 +745,7 @@ class GattProxy:
         self.__target = None
         self.__target_bd_addr = bd_address
         self.__target_random = random
+        self.__central_mtu = 23
 
     @property
     def target(self):
@@ -835,6 +877,10 @@ class GattProxy:
         logger.info(" == indication for characteristic %s from service %s: %s",
                     characteristic.uuid, service.uuid, value)
 
+    def on_mtu_changed(self, mtu: int):
+        """MTU has been updated
+        """
+        logger.info("== MTU changed to %d", mtu)
 
     def start(self):
         """Start our GATT Proxy
@@ -854,6 +900,7 @@ class GattProxy:
                 target_profile = self.__target.export_json()
 
             # Once connected, we start our peripheral
+            self.__central_mtu = self.__central.get_mtu()
             logger.info("create a peripheral with similar profile ...")
             self.__profile = ImportedDevice(
                     self,
@@ -866,9 +913,24 @@ class GattProxy:
                 bd_address=self.__target_bd_addr if self.__spoof else None,
                 public=not self.__target_random
             )
+            
+            # Attach peripheral listener
+            self.__listener = PeripheralEventListener(callback=self.on_periph_event)
+            self.__peripheral.attach_event_listener(self.__listener)
+            self.__listener.start()
+
             self.__peripheral.enable_peripheral_mode(adv_data=self.__adv_data)
 
             # Start advertising
             logger.info("starting advertising")
             self.__peripheral.start()
             logger.info("GattProxy instance is ready")
+
+    def on_periph_event(self, event):
+        """Handle peripheral events.
+        """
+        if isinstance(event, PeripheralEventConnected):
+            """When a central is connected, update its mtu if not 23.
+            """
+            if self.__central_mtu != 23:
+                self.__peripheral.set_mtu(self.__central_mtu)
