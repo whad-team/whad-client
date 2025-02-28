@@ -351,6 +351,7 @@ class WhadDeviceConnector:
         msg = self.hub.convert_packet(packet)
 
         if msg is not None:
+            logger.info("[connector] send packet command")
             resp = self.send_command(msg, message_filter(CommandResult))
             logger.info("[connector] Command sent, result: %s", resp)
 

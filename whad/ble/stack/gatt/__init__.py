@@ -160,7 +160,7 @@ class GattLayer(Layer):
         """
         self.__queue.put(message, block=True, timeout=None)
 
-    def wait_for_message(self, message_clazz, timeout=5.0):
+    def wait_for_message(self, message_clazz, timeout=10.0):
         """Wait for a specific message type or error, other messages are dropped
 
         :param type message_clazz: Expected message class
@@ -192,6 +192,11 @@ class GattLayer(Layer):
 
     def on_error_response(self, error: GattErrorResponse):
         self.on_gatt_message(error)
+
+    def on_mtu_changed(self, mtu: int):
+        """MTU has been updated
+        """
+        pass
 
     @txlock
     def on_find_info_request(self, packet: GattFindInfoRequest):
@@ -405,10 +410,12 @@ class GattLayer(Layer):
         """
         pass
 
-    def on_exch_mtu_response(self, reponse: GattExchangeMtuResponse):
-        """ATT MTU Exchange response callback
+    def on_exch_mtu_response(self, response):
+        """ATT MTU exchange response
+
+        :param GattExchangeMtuResponse response: response from remote device
         """
-        pass
+        self.on_gatt_message(response)
 
 
 class GattClient(GattLayer):
@@ -981,6 +988,11 @@ class GattClient(GattLayer):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
         else:
             return None
+        
+    def on_mtu_changed(self, mtu):
+        """MTU has changed, notify client.
+        """
+        pass
 
     def services(self):
         return self.__model.services()
@@ -1041,6 +1053,30 @@ class GattServer(GattLayer):
     # GATT procedures
     ###################################
 
+    def set_mtu(self, mtu):
+        '''Set (G)ATT server MTU (must be >= ATT_MTU, i.e. 23).
+
+        This method is exposed in GattServer but really interact with the underlying
+        ATT layer, and checks if we receive an answer from the remote device.
+
+        :param int mtu: ATT MTU to use
+        :return int: remote device MTU
+        '''
+        if mtu >= 23:
+            self.lock_tx()
+            self.att.exch_mtu_request(mtu)
+            self.unlock_tx()
+
+            msg = self.wait_for_message(GattExchangeMtuResponse)
+            if isinstance(msg, GattExchangeMtuResponse):
+                self.get_layer("l2cap").set_remote_mtu(msg.mtu)
+                return msg.mtu
+            elif isinstance(msg, GattErrorResponse):
+                raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+        else:
+            return None
+
+    @proclock
     def notify(self, characteristic):
         """Sends a notification to a GATT client for a given characteristic.
 
@@ -2113,6 +2149,13 @@ class GattServer(GattLayer):
             pairing_parameters = pairing
 
         self.smp.request_pairing(pairing=pairing_parameters)
+
+    def on_exch_mtu_response(self, response):
+        """ATT MTU exchange response
+
+        :param GattExchangeMtuResponse response: response from remote device
+        """
+        self.on_gatt_message(response)
 
 class GattClientServer(GattServer, GattClient):
 

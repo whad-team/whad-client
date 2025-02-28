@@ -349,3 +349,23 @@ class Central(BLE):
         :rtype: str
         """
         return self.connection.gatt.model.export_json()
+
+    def on_mtu_changed(self, conn_handle, mtu: int):
+        """Notify MTU change to peripheral.
+        """
+        if self.__peripheral is not None:
+            logger.debug("[Central::on_mtu_changed] MTU changed to %d, notify peripheral", mtu)
+            self.__peripheral.on_mtu_changed(mtu)
+
+    def set_mtu(self, mtu: int):
+        """Set connection MTU.
+        """
+        if self.__gatt_client is not None:
+            # Start a MTU exchange procedure
+            self.__gatt_client.set_mtu(mtu)
+
+    def get_mtu(self) -> int:
+        """Retrieve the connection MTU.
+        """
+        if self.connection is not None:
+            return self.connection.l2cap.get_local_mtu()
