@@ -15,6 +15,7 @@ from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Peripheral, GenericProfile, AdvDataFieldList, \
     AdvCompleteLocalName, AdvShortenedLocalName, AdvFlagsField
+from whad.ble.connector.peripheral import PeripheralEventListener, PeripheralEventConnected
 from whad.ble.profile.service import PrimaryService
 from whad.ble.profile.characteristic import Characteristic, CharacteristicProperties, \
     ClientCharacteristicConfig, CharacteristicValue
@@ -880,7 +881,18 @@ class BlePeriphShell(InteractiveShell):
             profile=self.__profile,
             adv_data=adv_data
         )
+        # create our event listener
+        self.__listener = PeripheralEventListener(callback=self.on_periph_event)
+        self.__listener.start()
+        self.__connector.attach_event_listener(self.__listener)
+
+        # Start peripheral
         self.__connector.start()
+
+    def on_periph_event(self, event):
+        if isinstance(event, PeripheralEventConnected):
+            print("Got a connection from a central, updating MTU")
+            self.__connector.set_mtu(200)
 
     @category("Peripheral control")
     def do_stop(self, _):
@@ -1026,6 +1038,21 @@ class BlePeriphShell(InteractiveShell):
 
             else:
                 self.error("No manufacturer data has been set yet.")
+
+    def do_mtu(self, args):
+        """Set peripheral MTU.
+
+        <ansicyan><b>mtu</b> [<i>MTU</i>]</ansicyan>   
+        """
+        if len(args) == 1:
+            try:
+                mtu = int(args[0])
+                if mtu >= 23:
+                    self.__connector.set_mtu(mtu)
+                else:
+                    self.error("MTU must be greater or equal to 23.")
+            except ValueError:
+                self.error("MTU is not a valid integer")
 
     def do_back(self, _):
         """Return to normal mode.
