@@ -1039,10 +1039,14 @@ class BlePeriphShell(InteractiveShell):
             else:
                 self.error("No manufacturer data has been set yet.")
 
+    @category("Peripheral control")
     def do_mtu(self, args):
         """Set peripheral MTU.
 
-        <ansicyan><b>mtu</b> [<i>MTU</i>]</ansicyan>   
+        <ansicyan><b>mtu</b> [<i>MTU</i>]</ansicyan>
+
+        Send a MTU exchange request to the connected Central device.
+        MTU value must be equal to or greater than 23.
         """
         if len(args) == 1:
             try:
