@@ -8,10 +8,10 @@ from scapy.data import MTU
 from scapy.consts import WINDOWS
 from scapy.supersocket import SuperSocket
 from scapy.packet import bind_layers, Packet
-from scapy.fields import BitField
+from scapy.fields import BitField, LEShortField
 from scapy.error import warning
 from scapy.layers.bluetooth import BluetoothUserSocket, BluetoothSocketError, BluetoothCommandError, \
-    HCI_Hdr, SM_Hdr
+    HCI_Hdr, SM_Hdr, HCI_Event_LE_Meta, HCI_Command_Hdr
 
 class SM_Security_Request(Packet):
     name = "Security Request"
@@ -116,4 +116,26 @@ class BluetoothUserSocketFixed(SuperSocket):
             if self.ins and (WINDOWS or self.ins.fileno() != -1):
                 close(self.ins.fileno())
         close(self.hci_fd)
+
+class HCI_LE_Meta_Data_Length_Change(Packet):
+    name = "Data Length Change"
+    fields_desc = [LEShortField("handle", 0),
+                   LEShortField("max_tx_octets", 0x001B),
+                   LEShortField("max_tx_time", 0x0148),
+                   LEShortField("max_rx_octets", 0x001B),
+                   LEShortField("max_rx_time", 0x0148)
+                   ]
+    
+class HCI_LE_Set_Data_Length(Packet):
+    name = "Set Data Length"
+    fields_desc = [LEShortField("handle", 0),
+                   LEShortField("tx_octets", 0x001B),
+                   LEShortField("tx_time", 0x0148),
+                   ]
+    
+# HCI LE events
+bind_layers(HCI_Command_Hdr, HCI_LE_Set_Data_Length, opcode=0x2022)
+
+# HCI LE commands
+bind_layers(HCI_Event_LE_Meta, HCI_LE_Meta_Data_Length_Change, event=7)
 
