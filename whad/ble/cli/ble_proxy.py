@@ -131,6 +131,8 @@ class VerboseProxy(GattProxy):
     def on_connect(self, conn_handle):
         """Triggered when a remote device connects to our spoofed device.
         """
+        super().on_connect(conn_handle)
+
         print_formatted_text(HTML(
             "<ansimagenta>Remote device connected</ansimagenta>"
         ))
@@ -140,6 +142,11 @@ class VerboseProxy(GattProxy):
         """
         print_formatted_text(HTML(
             "<ansimagenta>Remote device disconnected</ansimagenta>"
+        ))
+
+    def on_mtu_changed(self, mtu):
+        print_formatted_text(HTML(
+            f"<ansicyan>MTU changed to {mtu}"
         ))
 
 class BleProxyApp(CommandLineDeviceSource):
