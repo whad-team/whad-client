@@ -12,7 +12,7 @@ from typing import List
 from scapy.layers.bluetooth import HCI_Event_LE_Meta, HCI_LE_Meta_Advertising_Reports, \
     HCI_LE_Meta_Connection_Complete, L2CAP_Hdr, HCI_Hdr, HCI_ACL_Hdr, \
     HCI_Event_Disconnection_Complete, HCI_LE_Meta_Long_Term_Key_Request, \
-    HCI_Event_Encryption_Change
+    HCI_Event_Encryption_Change, ATT_Exchange_MTU_Response
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL, LL_ENC_REQ, \
     LL_ENC_RSP, LL_START_ENC_RSP, LL_START_ENC_REQ
 from scapy.compat import raw
@@ -49,6 +49,18 @@ class HCIConverter:
         self.cached_l2cap_payload = b""
         self.cached_l2cap_length = 0
         self.waiting_l2cap_fragments = False
+        self.__locked = False
+
+    def lock(self):
+        """Lock the message converter. Messages are then added in a list
+        of pending messages and will be processed when converter is unlocked.
+        """
+        self.__locked = True
+
+    def unlock(self):
+        """Unlock converter and trigger pending messages processing.
+        """
+        self.__locked = False
 
     def process_message(self, message: HubMessage):
         """This function turns a BLE hub message into the corresponding HCI
@@ -63,7 +75,6 @@ class HCIConverter:
         if L2CAP_Hdr in ll_packet or self.waiting_l2cap_fragments:
             if not self.waiting_l2cap_fragments and (
                     len(raw(ll_packet[L2CAP_Hdr:])) < ll_packet[L2CAP_Hdr:].len):
-
                 self.waiting_l2cap_fragments = True
                 self.cached_l2cap_payload = raw(ll_packet[BTLE_DATA:][1:])
                 self.cached_l2cap_length = ll_packet[L2CAP_Hdr:].len
@@ -74,7 +85,6 @@ class HCIConverter:
             if self.waiting_l2cap_fragments:
                 self.cached_l2cap_payload += raw(ll_packet[BTLE_DATA:][1:])
                 if self.cached_l2cap_length == (len(self.cached_l2cap_payload) - 4):
-                    L2CAP_Hdr(self.cached_l2cap_payload).show()
                     hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle)
                     hci_packet = hci_packet / L2CAP_Hdr(self.cached_l2cap_payload)
                     self.waiting_l2cap_fragments = False
@@ -269,7 +279,11 @@ class HCIConverter:
                 processed
             )
 
-            return [msg]
+            if self.__locked:
+                self.add_pending_message(msg)
+                return []
+            else:
+                return [msg]
 
         if event.PB == 1:
             pdu = BTLE_DATA()/event[HCI_ACL_Hdr:].payload
@@ -292,8 +306,11 @@ class HCIConverter:
                 conn_handle,
                 processed
             )
-
-            return [msg]
+            if self.__locked:
+                self.add_pending_message(msg)
+                return []
+            else:
+                return [msg]
 
         # Unsupported event, no messages.
         return []

@@ -725,24 +725,28 @@ class HCIDevice(VirtualDevice):
             self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_send_pdu(self, message):
-        logger.debug("Received WHAD BLE send_pdu message")
+        logger.debug("[%s] Received WHAD BLE send_pdu message", self.interface)
         if ((self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE) or
            (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
             try:
                 hci_packets = self.__converter.process_message(message)
 
                 if hci_packets is not None:
-                    logger.debug("sending HCI packets ...")
+                    logger.debug("[%s] sending HCI packets ...", self.interface)
+
+                    self.__converter.lock()
                     success = True
                     for hci_packet in hci_packets:
                         success = success and self._write_packet(hci_packet)
-                    logger.debug("HCI packet sending result: %s", success)
+                    logger.debug("[%s] HCI packet sending result: %s", self.interface, success)
                     if success:
-                        logger.debug("send_pdu command succeeded.")
+                        logger.debug("[%s] send_pdu command succeeded.", self.interface)
                         self._send_whad_command_result(CommandResult.SUCCESS)
                     else:
-                        logger.debug("send_pdu command failed.")
+                        logger.debug("[%s] send_pdu command failed.", self.interface)
                         self._send_whad_command_result(CommandResult.ERROR)
+                    self.__converter.unlock()
+
                 pending_messages = self.__converter.get_pending_messages()
                 for pending_message in pending_messages:
                     self._send_whad_message(pending_message)
