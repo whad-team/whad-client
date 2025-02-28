@@ -157,6 +157,7 @@ class BlePeriphShell(InteractiveShell):
 
         self.__selected_service = None
         self.__connector: WhadDeviceConnector = None
+        self.__listener: PeripheralEventListener = None
         self.__wireshark = None
         self.__central_bd = None
         self.intro = INTRO
@@ -901,6 +902,10 @@ class BlePeriphShell(InteractiveShell):
         if self.__connector is not None:
             self.__connector.stop()
             self.__connector.close()
+        
+        if self.__listener is not None:
+            self.__listener.stop()
+            self.__listener.join()
 
         self.__current_mode = self.MODE_NORMAL
         self.update_prompt()
@@ -1051,12 +1056,24 @@ class BlePeriphShell(InteractiveShell):
         if len(args) == 1:
             try:
                 mtu = int(args[0])
+
+                # Make sure we have a connector
+                if self.__connector is None:
+                    self.error("No active connection, cannot set MTU.")
+                    return
+
+                # Update MTU value
                 if mtu >= 23:
                     self.__connector.set_mtu(mtu)
+                    print(f"Connection MTU set to {mtu}.")
                 else:
                     self.error("MTU must be greater or equal to 23.")
             except ValueError:
                 self.error("MTU is not a valid integer")
+        elif len(args) < 1:
+            self.error("MTU value is missing")
+        elif len(args) > 1:
+            self.error("Too many arguments !")
 
     def do_back(self, _):
         """Return to normal mode.
