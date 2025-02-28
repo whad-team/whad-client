@@ -11,7 +11,7 @@ react on specific events.
 """
 import logging
 from time import sleep
-from queue import Queue
+from queue import Queue, Empty
 from threading import Thread
 
 from whad.ble.connector.base import BLE
@@ -70,11 +70,20 @@ class PeripheralEventListener(Thread):
         """
         self.__queue.put(event)
     
+    def stop(self):
+        """Stop listener
+        """
+        self.__running = False
+
     def run(self):
         while self.__running:
-            event = self.__queue.get()
-            if self.__callback is not None:
-                self.__callback(event)
+            try:
+                event = self.__queue.get(timeout=1.0)
+                if event is not None:
+                    if self.__callback is not None:
+                        self.__callback(event)
+            except Empty:
+                pass
 
 class Peripheral(BLE):
     """This BLE connector provides a way to create a peripheral device.

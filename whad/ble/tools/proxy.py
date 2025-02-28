@@ -404,11 +404,13 @@ class LinkLayerProxy:
         # Save both devices
         self.__proxy = proxy
         self.__central = None
+        self.__listener = None
         self.__target = target
         self.__peripheral = None
         self.__target_bd_addr = bd_address
         self.__target_random=random
         self.__spoof = spoof
+
 
     @property
     def target(self):
@@ -485,6 +487,12 @@ class LinkLayerProxy:
             self.__peripheral.start()
             self.__central.unlock()
             logger.info("LinkLayerProxy instance is ready")
+
+    def stop(self):
+        """Stop proxy
+        """
+        if self.__listener is not None:
+            self.__listener.stop()
 
     def on_periph_event(self, event):
         """Handle peripheral events.
@@ -746,6 +754,7 @@ class GattProxy:
         self.__target_bd_addr = bd_address
         self.__target_random = random
         self.__central_mtu = 23
+        self.__listener = None
 
     @property
     def target(self):
@@ -925,6 +934,12 @@ class GattProxy:
             logger.info("starting advertising")
             self.__peripheral.start()
             logger.info("GattProxy instance is ready")
+
+    def stop(self):
+        """Stop proxy
+        """
+        if self.__listener is not None:
+            self.__listener.stop()
 
     def on_periph_event(self, event):
         """Handle peripheral events.
