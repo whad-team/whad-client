@@ -467,7 +467,7 @@ class LinkLayerProxy:
                 self.__proxy,
                 self.__adv_data,
                 self.__scan_data,
-                bd_address=self.__target_bd_addr if self.__spoof else None,
+                bd_address=self.__target_bd_addr,
                 public=not self.__target_random
             )
 
