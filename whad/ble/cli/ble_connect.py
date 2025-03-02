@@ -78,6 +78,7 @@ class BleConnectOutputPipe(Bridge):
 
         # Unlock connector, causing packets to be sent to the output connector
         input_connector.unlock(dispatch_callback=self.dispatch_pending_pdu)
+        output_connector.unlock(dispatch_callback=self.dispatch_pending_input_pdu)
 
 
     def dispatch_pending_pdu(self, pdu):
@@ -92,6 +93,14 @@ class BleConnectOutputPipe(Bridge):
         # Send message to our chained tool
         self.output.send_message(message)
 
+    def dispatch_pending_input_pdu(self, pdu):
+        """Dispatch pending input PDU.
+        """
+        # Convert packet back to message and forward to output
+        message = BlePduReceived.from_packet(pdu)
+
+        # Send message to our chained tool
+        self.input.send_message(message)
 
 class BleConnectInputPipe(Bridge):
     """wble-connect input pipe

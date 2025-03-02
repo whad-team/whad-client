@@ -13,6 +13,7 @@ from scapy.themes import BrightTheme
 from whad.cli.ui import wait, success
 from whad.hub import ProtocolHub
 from whad.device import Bridge
+from whad.device.connector import WhadDeviceConnector
 from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.common.monitors import WiresharkMonitor
 from whad.cli.app import CommandLineApp, run_app
@@ -20,6 +21,22 @@ from whad.cli.app import CommandLineApp, run_app
 # wshark logger
 logger = logging.getLogger(__name__)
 
+class LockedConnector(WhadDeviceConnector):
+    """Provides a lockable connector.
+    """
+
+    def __init__(self, device):
+        # We set the connector with no interface for now
+        super().__init__(None)
+
+        # Then we lock it
+        self.lock()
+
+        # And we eventually configure the interface
+        # Once the device connector is set, packets will go in a locked queue
+        # and could be later retrieved when connector is unlocked.
+        self.set_device(device)
+        device.set_connector(self)
 
 class WhadWiresharkApp(CommandLineApp):
     """Main WiresharkApp class
@@ -96,6 +113,8 @@ class WhadWiresharkApp(CommandLineApp):
                 self.monitor = WiresharkMonitor()
                 self.monitor.attach(self.connector)
                 self.monitor.start()
+
+                connector.unlock()
 
                 if self.is_stdout_piped():
                     # Wait for the user to CTL-C or close Wireshark
