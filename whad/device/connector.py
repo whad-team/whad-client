@@ -274,6 +274,9 @@ class WhadDeviceConnector:
                     if self.__synchronous:
                         self.add_pending_packet(pdu)
                     else:
+                        # Report packet to monitors
+                        self.monitor_packet_rx(pdu)
+
                         # Else forward PDU to our standard PDU processing method
                         self.on_packet(pdu)
                 else:
