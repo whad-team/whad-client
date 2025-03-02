@@ -262,7 +262,6 @@ class Central(BLE):
         :param  pdu: BLE Data PDU
         :type   pdu: :class:`scapy.layers.bluetooth4LE.BTLE_DATA`
         """
-        logger.info('received data PDU')
         if pdu.metadata.direction == Direction.SLAVE_TO_MASTER:
             self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
 
@@ -353,6 +352,7 @@ class Central(BLE):
     def on_mtu_changed(self, conn_handle, mtu: int):
         """Notify MTU change to peripheral.
         """
+        logger.info("on_mtu_changed")
         if self.__peripheral is not None:
             logger.debug("[Central::on_mtu_changed] MTU changed to %d, notify peripheral", mtu)
             self.__peripheral.on_mtu_changed(mtu)
