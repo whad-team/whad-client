@@ -456,7 +456,10 @@ class UnixSocketConnector(WhadDeviceConnector):
         self.__shutdown_required = False
 
         # Initialize parent class (device connector)
-        super().__init__(device)
+        super().__init__(None)
+        self.lock()
+        self.set_device(device)
+        device.set_connector(self)
 
         # Create our Unix socket path
         if path is not None:
@@ -568,6 +571,7 @@ class UnixSocketConnector(WhadDeviceConnector):
         try:
             while not self.__shutdown_required:
                 self.__client,_ = self.__socket.accept()
+                self.unlock()
                 try:
                     while not self.__shutdown_required:
                         rlist = [self.__client.fileno()]
