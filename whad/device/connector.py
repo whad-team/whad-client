@@ -268,7 +268,7 @@ class WhadDeviceConnector:
             while True:
                 # Retrieve PDU
                 pdu = self.__locked_pdus.get(block=False, timeout=0.2)
-
+                logger.info("Unlocked pdu for processing: %s" % pdu)
                 if dispatch_callback is None:
                     # If connector is in synchronous mode, move PDUs to our pending queue
                     if self.__synchronous:
@@ -280,6 +280,7 @@ class WhadDeviceConnector:
                     # Call the provided dispatch callback
                     dispatch_callback(pdu)
         except Empty:
+            logger.info("Error while unlocking")
             # Processing done, continue.
             pass
 
@@ -299,6 +300,7 @@ class WhadDeviceConnector:
         :param  Packet pdu:  Packet to add to locked packets queue
         :type   pdu: scapy.packet.Packet
         """
+        logger.info("Add locked pdu: %s" % pdu)
         self.__locked_pdus.put(pdu)
 
     # Device interaction

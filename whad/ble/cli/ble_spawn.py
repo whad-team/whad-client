@@ -11,6 +11,7 @@ from time import sleep
 from whad.cli.app import CommandLineDevicePipe, run_app
 from whad.device import Bridge
 from whad.ble import BLE
+from whad.device.connector import WhadDeviceConnector
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
 from whad.hub.ble import Connected, Disconnected, BlePduReceived, BleRawPduReceived, \
     BDAddress
@@ -19,6 +20,26 @@ from whad.ble.connector import Peripheral, Central
 from whad.hub.discovery import Capability, Domain
 
 logger = logging.getLogger(__name__)
+
+class LockedConnector(WhadDeviceConnector):
+    """Provides a lockable connector.
+    """
+
+    def __init__(self, device):
+        # We set the connector with no interface for now
+        super().__init__(None)
+
+        # Then we lock it
+        self.lock()
+
+        # And we eventually configure the interface
+        # Once the device connector is set, packets will go in a locked queue
+        # and could be later retrieved when connector is unlocked.
+        self.set_device(device)
+        device.set_connector(self)
+
+    def on_any_msg(self, message):
+        logger.info("spawn received: %s" % message)
 
 class BleSpawnOutputPipe(Bridge):
     """wble-spawn output pipe
@@ -190,6 +211,13 @@ class BleSpawnInputPipe(Bridge):
         """Initialize our ble-spawn input pipe.
         """
         self.__output_pending_packets = []
+
+        # Do we get raw PDUs ?
+        if output_connector.support_raw_pdu():
+            self.support_raw_pdu = True
+        else:
+            self.support_raw_pdu = False
+
         logger.debug('[ble-spawn][input-pipe] Initialization')
         super().__init__(input_connector, output_connector)
 
@@ -197,6 +225,22 @@ class BleSpawnInputPipe(Bridge):
         self.__connected = False
         self.__in_conn_handle = None
         self.__out_conn_handle = None
+
+        input_connector.unlock(dispatch_callback=self.dispatch_pending_pdu)
+
+
+    def dispatch_pending_pdu(self, pdu):
+        """Dispatch pending PDU.
+        """
+        logger.info("=== Dispatching pdu %s" % pdu)
+        # Convert packet back to message and forward to output
+        if self.output.support_raw_pdu:
+            message = BleRawPduReceived.from_packet(pdu)
+        else:
+            message = BlePduReceived.from_packet(pdu)
+
+        # Send message to our chained tool
+        self.output.send_message(message)
 
     def set_in_conn_handle(self, conn_handle: int):
         """Saves the input connector connection handle.
@@ -223,52 +267,26 @@ class BleSpawnInputPipe(Bridge):
         logger.debug("[ble-spawn][input-pipe] convert message %s into a command", message)
         if isinstance(message, BleRawPduReceived):
             # Does our input connector support raw packets ?
-            if connector.support_raw_pdu():
-                logger.debug("[ble-spawn][input-pipe] connector supports raw pdu")
-                # Create a SendBleRawPdu command
-                command = connector.hub.ble.create_send_raw_pdu(
-                    message.direction,
-                    message.pdu,
-                    message.crc,
-                    encrypt=False,
-                    access_address=message.access_address,
-                    conn_handle=conn_handle, # overwrite the connection handle
-                )
-                logger.debug("[ble-spawn][input-pipe] created command %s", command)
-            else:
-                logger.debug("[ble-spawn][input-pipe] connector does not support raw pdu")
-                # Create a SendBlePdu command
-                command = connector.hub.ble.create_send_pdu(
-                    message.direction,
-                    message.pdu,
-                    conn_handle, # overwrite the connection handle
-                    encrypt=False
-                )
-                logger.debug("[ble-spawn][input-pipe] created command %s", command)
+            logger.debug("[ble-spawn][input-pipe] connector does not support raw pdu")
+            # Create a SendBlePdu command
+            command = connector.hub.ble.create_send_pdu(
+                message.direction,
+                message.pdu,
+                conn_handle, # overwrite the connection handle
+                encrypt=False
+            )
+            logger.debug("[ble-spawn][input-pipe] created command %s", command)
         elif isinstance(message, BlePduReceived):
             # Does our input connector support raw packets ?
-            if connector.support_raw_pdu():
-                logger.debug("[ble-spawn][input-pipe] connector supports raw pdu")
-                # Create a SendBleRawPdu command
-                command = connector.hub.ble.create_send_raw_pdu(
-                    message.direction,
-                    message.pdu,
-                    None,
-                    encrypt=False,
-                    access_address=0x11223344, # We use the default access address
-                    conn_handle=conn_handle, # overwrite the connection handle
-                )
-                logger.debug("[ble-spawn][input-pipe] created command %s", command)
-            else:
-                logger.debug("[ble-spawn][input-pipe] connector does not support raw pdu")
-                # Create a SendBlePdu command
-                command = self.input.hub.ble.create_send_pdu(
-                    message.direction,
-                    message.pdu,
-                    conn_handle, # overwrite the connection handle
-                    encrypt=False
-                )
-                logger.debug("[ble-spawn][input-pipe] created command %s", command)
+            logger.debug("[ble-spawn][input-pipe] connector does not support raw pdu")
+            # Create a SendBlePdu command
+            command = self.input.hub.ble.create_send_pdu(
+                message.direction,
+                message.pdu,
+                conn_handle, # overwrite the connection handle
+                encrypt=False
+            )
+            logger.debug("[ble-spawn][input-pipe] created command %s", command)
         else:
             # Not a BLE packet notification
             command = None
@@ -468,7 +486,7 @@ class BleSpawnApp(CommandLineDevicePipe):
 
         # Create our packet bridge
         logger.info("[ble-spawn] Starting our input pipe")
-        input_pipe = BleSpawnInputPipe(Central(self.input_interface), peripheral)
+        input_pipe = BleSpawnInputPipe(LockedConnector(self.input_interface), peripheral)
         input_pipe.set_in_conn_handle(conn_handle)
 
         # Loop until the user hits CTL-C

@@ -134,6 +134,7 @@ class BleConnectInputPipe(Bridge):
     def dispatch_pending_input_pdu(self, pdu):
         """Dispatch pending PDU.
         """
+        logger.info("Dispatching input pdu %s" % pdu)
         # Convert packet back to message and forward to output
         if self.support_raw_pdu:
             message = BleRawPduReceived.from_packet(pdu)
@@ -147,6 +148,7 @@ class BleConnectInputPipe(Bridge):
     def dispatch_pending_output_pdu(self, pdu):
         """Dispatch pending out PDUs (received)
         """
+        logger.info("Dispatching output pdu %s" % pdu)
         if self.support_raw_pdu:
             message = BleRawPduReceived.from_packet(pdu)
         else:
