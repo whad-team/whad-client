@@ -410,7 +410,10 @@ class UnixConnector(WhadDeviceConnector):
     """
 
     def __init__(self, device):
-        super().__init__(device)
+        super().__init__(None)
+        self.lock()
+        self.set_device(device)
+        device.set_connector(self)
         device.open()
 
     def on_discovery_msg(self, message):
@@ -423,7 +426,7 @@ class UnixConnector(WhadDeviceConnector):
         pass
 
     def on_packet(self, packet):
-        pass
+        logger.info("unixconnector: received packet: %s" % packet)
 
     def on_event(self, event):
         pass
