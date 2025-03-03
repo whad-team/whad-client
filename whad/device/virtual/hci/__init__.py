@@ -332,7 +332,7 @@ class HCIDevice(VirtualDevice):
         """Read HCI device default buffer size and update max ACL length.
         """
         response = self._write_command(HCI_Cmd_Read_Buffer_Size())
-        response.show()
+
         if response is not None and response.status == 0x0:
             if HCI_Cmd_Complete_Read_Buffer_Size in response:
                 if response.acl_pkt_len > 0:
