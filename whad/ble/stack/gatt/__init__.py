@@ -1069,10 +1069,13 @@ class GattServer(GattLayer):
 
             msg = self.wait_for_message(GattExchangeMtuResponse)
             if isinstance(msg, GattExchangeMtuResponse):
+                self.get_layer("l2cap").set_local_mtu(mtu)
                 self.get_layer("l2cap").set_remote_mtu(msg.mtu)
                 return msg.mtu
             elif isinstance(msg, GattErrorResponse):
-                raise error_response_to_exc(msg.reason, msg.request, msg.handle)
+                # If an error has been received, that means the MTU exchange
+                # procedure failed. We keep the same MTU.
+                return None
         else:
             return None
 
