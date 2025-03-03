@@ -407,13 +407,28 @@ class UnixSocketServerDevice(WhadDevice):
 
 class UnixConnector(WhadDeviceConnector):
     """Dummy connector for Unix socket.
+
+    Connector is locked by default.
     """
 
-    def __init__(self, device):
-        super().__init__(None)
-        self.lock()
-        self.set_device(device)
-        device.set_connector(self)
+    def __init__(self, device, locked: bool = True):
+        """Create a locked connector.
+        """
+        if locked:
+            # Create an empty connector, attach to no device
+            super().__init__(None)
+
+            # Lock connector
+            self.lock()
+
+            # Attach to device
+            self.set_device(device)
+            device.set_connector(self)
+        else:
+            #Create a dummy connector.
+            super().__init__(device)
+
+        # Open device
         device.open()
 
     def on_discovery_msg(self, message):
@@ -426,7 +441,7 @@ class UnixConnector(WhadDeviceConnector):
         pass
 
     def on_packet(self, packet):
-        logger.info("unixconnector: received packet: %s" % packet)
+        pass
 
     def on_event(self, event):
         pass

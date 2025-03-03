@@ -360,6 +360,10 @@ class WhadFilterApp(CommandLineApp):
                                                  self.on_tx_packet)
 
                 else:
+                    # Unlock Unix connector
+                    connector.unlock()
+
+                    # Overwrite its packet rx method
                     connector.on_packet = self.on_rx_packet
 
                 # Keep running while interface is active
