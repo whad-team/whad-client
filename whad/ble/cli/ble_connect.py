@@ -81,24 +81,15 @@ class BleConnectOutputPipe(Bridge):
         output_connector.unlock(dispatch_callback=self.dispatch_pending_input_pdu)
 
 
-    def dispatch_pending_pdu(self, pdu):
+    def dispatch_pending_pdu(self, message):
         """Dispatch pending PDU.
         """
-        # Convert packet back to message and forward to output
-        if self.support_raw_pdu:
-            message = BleRawPduReceived.from_packet(pdu)
-        else:
-            message = BlePduReceived.from_packet(pdu)
-
         # Send message to our chained tool
         self.output.send_message(message)
 
-    def dispatch_pending_input_pdu(self, pdu):
+    def dispatch_pending_input_pdu(self, message):
         """Dispatch pending input PDU.
         """
-        # Convert packet back to message and forward to output
-        message = BlePduReceived.from_packet(pdu)
-
         # Send message to our chained tool
         self.input.send_message(message)
 
@@ -140,15 +131,10 @@ class BleConnectInputPipe(Bridge):
         output_connector.unlock(dispatch_callback=self.dispatch_pending_output_pdu)
         input_connector.unlock(dispatch_callback=self.dispatch_pending_input_pdu)
 
-    def dispatch_pending_input_pdu(self, pdu):
+    def dispatch_pending_input_pdu(self, message):
         """Dispatch pending PDU.
         """
-        logger.info("Dispatching input pdu %s" % pdu)
-        # Convert packet back to message and forward to output
-        if self.support_raw_pdu:
-            message = BleRawPduReceived.from_packet(pdu)
-        else:
-            message = BlePduReceived.from_packet(pdu)
+        logger.info("Dispatching input pdu %s" % message)
 
         # Send message to our chained tool
         command = self.convert_packet_message(message, self.__out_handle)
@@ -157,11 +143,7 @@ class BleConnectInputPipe(Bridge):
     def dispatch_pending_output_pdu(self, pdu):
         """Dispatch pending out PDUs (received)
         """
-        logger.info("Dispatching output pdu %s" % pdu)
-        if self.support_raw_pdu:
-            message = BleRawPduReceived.from_packet(pdu)
-        else:
-            message = BlePduReceived.from_packet(pdu)
+        logger.info("Dispatching output pdu %s" % message)
         self.input.send_message(message)
 
     def convert_packet_message(self, message, conn_handle: int):
