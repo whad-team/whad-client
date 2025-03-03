@@ -98,6 +98,12 @@ class BleConnection:
         """Link layer
         """
         return self.__l2cap.get_layer("ll")
+    
+    @property
+    def att(self):
+        """ATT layer
+        """
+        return self.__l2cap.get_layer("att")
 
     @property
     def remote_version(self):
@@ -564,7 +570,7 @@ class LinkLayer(Layer):
         else:
             logger.error("no connection handle found for L2CAP instance %s", instance)
 
-    @instance('l2cap', tag='mtu')
+    @instance('l2cap', tag='ATT_MTU')
     def on_l2cap_mtu_changed(self, l2cap_inst: Layer, mtu: int):
         """Handle MTU value change notification from L2CAP layer.
 
@@ -576,11 +582,11 @@ class LinkLayer(Layer):
         # Retrieve connection handle corresponding to the instance
         conn_handle = self.state.get_connection_handle(l2cap_inst)
         if conn_handle is not None:
-            logger.debug("sending updated MTU (%d) for conn_handle %d", mtu, conn_handle)
+            logger.debug("sending updated ATT MTU (%d) for conn_handle %d", mtu, conn_handle)
             self.send(
                 'phy',
                 mtu,
-                tag='mtu',
+                tag='ATT_MTU',
                 conn_handle=conn_handle
             )
 

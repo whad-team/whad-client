@@ -90,7 +90,7 @@ class BleStack(Layer):
         logger.debug('sending a control PDU (%d bytes) to conn_handle %d' % (len(pdu), conn_handle))
         self.__connector.send_ctrl_pdu(pdu, conn_handle, encrypt=encrypt)
 
-    @source('ll', 'mtu')
+    @source('ll', tag='ATT_MTU')
     def on_mtu_changed(self, mtu, conn_handle=None):
         """Notify connector that the MTU has changed.
         """

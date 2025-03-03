@@ -5,6 +5,8 @@ This layer manager mostly translates Scapy ATT packets into GATT messages requir
 layer, and exposes an interface to the GATT layer in order to allow ATT packets to be forged
 and sent to the underlying layer (L2CAP).
 """
+import logging
+
 from typing import List
 from scapy.layers.bluetooth import ATT_Error_Response, ATT_Exchange_MTU_Request, \
     ATT_Exchange_MTU_Response, ATT_Execute_Write_Request, ATT_Execute_Write_Response, \
@@ -31,7 +33,9 @@ from whad.ble.stack.gatt.message import GattExecuteWriteRequest, GattExecuteWrit
     GattReadBlobRequest, GattReadBlobResponse, GattReadMultipleRequest, \
     GattReadMultipleResponse, GattWriteCommand, GattWriteRequest, GattWriteResponse, \
     GattReadByGroupTypeRequest, GattReadByTypeRequest, GattReadByTypeRequest128, \
-    GattExchangeMtuResponse
+    GattExchangeMtuResponse, GattExchangeMtuRequest
+
+logger = logging.getLogger(__name__)
 
 # Add missing ATT_Handle_Value_Confirmation class
 class AttHandleValueConfirmation(Packet):
@@ -47,6 +51,45 @@ bind_layers(ATT_Hdr, AttHandleValueConfirmation, opcode=BleAttOpcode.HANDLE_VALU
 class ATTLayer(Layer):
     """ATT layer implementation.
     """
+
+    def configure(self, options=None):
+        """Layer configuration
+        """
+        # Initialize state
+        self.state.client_att_mtu = 23
+        self.state.server_att_mtu = 23
+
+    def set_client_mtu(self, mtu: int):
+        """Set ATT client MTU
+        """
+        if mtu >= 23:
+            self.state.client_att_mtu = mtu
+    
+    def get_client_mtu(self) -> int:
+        """Retrieve ATT client MTU
+        """
+        return self.state.client_att_mtu
+
+    def set_server_mtu(self, mtu: int):
+        """Set ATT server MTU
+        """
+        if mtu >= 23:
+            self.state.server_att_mtu = mtu
+
+    def get_server_mtu(self) -> int:
+        """Retrieve ATT server MTU
+        """
+        return self.state.server_att_mtu
+    
+    def notify_client_mtu(self):
+        """Notify l2cap that ATT MTU has changed for client
+        """
+        self.send("l2cap", self.state.client_att_mtu, tag="ATT_MTU")
+
+    def notify_server_mtu(self):
+        """Notify l2cap that ATT MTU has changed for server
+        """
+        self.send("l2cap", self.state.server_att_mtu, tag="ATT_MTU")
 
     ##########################################
     # Incoming requests and responses
@@ -154,13 +197,14 @@ class ATTLayer(Layer):
         :param mtu_req: MTU request
         :type mtu_req: ATT_Exchange_MTU_Request
         """
-        # Update L2CAP Client MTU
-        self.get_layer('l2cap').set_remote_mtu(mtu_req.mtu)
+        logger.debug("[att] got an MTU exchange request (mtu: %d)", mtu_req.mtu)
 
         # Send back our MTU.
-        self.send_data(ATT_Exchange_MTU_Response(
-            mtu=self.get_layer('l2cap').get_local_mtu()
-        ))
+        #self.send_data(ATT_Exchange_MTU_Response(
+        #    mtu=mtu_req.mtu
+        #))
+
+        self.send("gatt", GattExchangeMtuRequest(mtu=mtu_req.mtu), tag="XCHG_MTU_REQ")
 
     def on_exch_mtu_response(self, mtu_resp: ATT_Exchange_MTU_Response):
         """Update L2CAP remote MTU based on ATT_Exchange_MTU_Response.
@@ -168,7 +212,6 @@ class ATTLayer(Layer):
         :param mtu_resp: MTU response
         :type mtu_resp: ATT_Exchange_MTU_Request
         """
-        self.get_layer('l2cap').set_local_mtu(mtu_resp.mtu)
 
         # Forward to GATT
         self.send('gatt', GattExchangeMtuResponse(mtu=mtu_resp.mtu),
@@ -493,6 +536,7 @@ class ATTLayer(Layer):
         :param int mtu: Maximum Transmission Unit
         """
         # Update local MTU first
+        logger.debug("[att] sending an MTU exchange request (mtu: %d)", mtu)
         self.send_data(ATT_Exchange_MTU_Request(
             mtu=mtu
         ))
@@ -502,6 +546,7 @@ class ATTLayer(Layer):
 
         :param int mtu: Maximum Transmission Unit
         """
+        logger.debug("[att] sending an MTU exchange response (mtu: %d)", mtu)
         self.send_data(ATT_Exchange_MTU_Response(
             mtu=mtu
         ))

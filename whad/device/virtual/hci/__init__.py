@@ -15,7 +15,9 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, \
     HCI_Event_Disconnection_Complete, HCI_Cmd_LE_Set_Scan_Response_Data, \
     HCI_Cmd_LE_Set_Random_Address, HCI_Cmd_LE_Long_Term_Key_Request_Reply, \
-    HCI_Cmd_LE_Start_Encryption_Request, HCI_Cmd_LE_Set_Advertising_Parameters
+    HCI_Cmd_LE_Start_Encryption_Request, HCI_Cmd_LE_Set_Advertising_Parameters, \
+    HCI_Cmd_LE_Read_Buffer_Size
+from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -115,6 +117,7 @@ class HCIDevice(VirtualDevice):
         self._cached_scan_response_data = None
         self.__timeout = 1.0
         self._connected = False
+        self.__max_acl_len = 27
         self._active_handles = []
 
     @property
@@ -325,6 +328,20 @@ class HCIDevice(VirtualDevice):
         return response is not None and response.status == 0x0
 
 
+    def _read_buffer_size(self):
+        """Read HCI device buffer size and update HCI MTU.
+        """
+        response = self._write_command(HCI_Cmd_LE_Read_Buffer_Size())
+        if response is not None and response.status == 0x0:
+            if HCI_Cmd_LE_Complete_Read_Buffer_Size in response:
+                # Update HCI MTU
+                logger.debug("[hci][%s] ACL buffer length: %d", self.interface, response.acl_pkt_len)
+                self.__max_acl_len = response.acl_pkt_len
+                return True
+            
+        return False
+        
+
     def _set_event_filter(self, filter_type=0):
         """
         Configure HCI device event filter.
@@ -359,6 +376,7 @@ class HCIDevice(VirtualDevice):
         """
         success = (
                 self._reset() and
+                self._read_buffer_size() and
                 self._set_event_filter(0) and
                 self._set_connection_accept_timeout(32000) and
                 self._set_event_mask(b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d") and
@@ -651,6 +669,20 @@ class HCIDevice(VirtualDevice):
                 )
             )
         return response.status == 0x00
+
+    def _update_max_acl_len(self, length: int):
+        """Update device HCI MTU
+        """
+        self.__max_acl_len = length
+        print("hci max acl size: %d" % length)
+
+    def get_max_acl_len(self) -> int:
+        """Retrieve maximum ACL length
+
+        :return: Current HCI maximum TX size
+        :rtype: int
+        """
+        return self.__max_acl_len
 
 
     def _on_whad_ble_encryption(self, message):

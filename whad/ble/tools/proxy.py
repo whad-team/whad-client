@@ -910,6 +910,7 @@ class GattProxy:
 
             # Once connected, we start our peripheral
             self.__central_mtu = self.__central.get_mtu()
+            logger.debug("[GattProxy] central mtu: %d", self.__central_mtu)
             logger.info("create a peripheral with similar profile ...")
             self.__profile = ImportedDevice(
                     self,
@@ -950,5 +951,8 @@ class GattProxy:
         if isinstance(event, PeripheralEventConnected):
             """When a central is connected, update its mtu if not 23.
             """
+            self.__central_mtu = self.__central.get_mtu()
+            logger.debug("[GattProxy] central mtu: %d", self.__central_mtu)
             if self.__central_mtu != 23:
+                logger.debug("[GattProxy] Setting peripheral MTU to %d", self.__central_mtu)
                 self.__peripheral.set_mtu(self.__central_mtu)
