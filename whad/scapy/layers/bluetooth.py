@@ -136,14 +136,25 @@ class HCI_LE_Set_Data_Length(Packet):
 
 
 class HCI_Cmd_LE_Complete_Read_Buffer_Size(Packet):
-    name = "Read BD Addr"
+    name = "LE Read Buffer Size response"
+    fields_desc = [ByteField("status", 0), 
+                   ShortField("acl_pkt_len", 0),
+                   ByteField("total_num_acl_pkts", 0)]
+    
+class HCI_Cmd_Read_Buffer_Size(Packet):
+    name = "Read Buffer Size"
+
+class HCI_Cmd_Complete_Read_Buffer_Size(Packet):
+    name = "Read Buffer Size response"
     fields_desc = [ByteField("status", 0), 
                    ShortField("acl_pkt_len", 0),
                    ByteField("total_num_acl_pkts", 0)]
 
 # HCI LE events
 bind_layers(HCI_Command_Hdr, HCI_LE_Set_Data_Length, opcode=0x2022)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Buffer_Size, opcode=0x1005)
 
 # HCI LE commands
 bind_layers(HCI_Event_LE_Meta, HCI_LE_Meta_Data_Length_Change, event=7)
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_LE_Complete_Read_Buffer_Size, opcode=0x2002)  # noqa: E501
+bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Buffer_Size, opcode=0x1005)  # noqa: E501

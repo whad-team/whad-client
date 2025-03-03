@@ -17,7 +17,8 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Cmd_LE_Set_Random_Address, HCI_Cmd_LE_Long_Term_Key_Request_Reply, \
     HCI_Cmd_LE_Start_Encryption_Request, HCI_Cmd_LE_Set_Advertising_Parameters, \
     HCI_Cmd_LE_Read_Buffer_Size
-from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size
+from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, HCI_Cmd_Read_Buffer_Size, \
+    HCI_Cmd_Complete_Read_Buffer_Size
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -327,17 +328,35 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_Reset())
         return response is not None and response.status == 0x0
 
-
     def _read_buffer_size(self):
-        """Read HCI device buffer size and update HCI MTU.
+        """Read HCI device default buffer size and update max ACL length.
+        """
+        response = self._write_command(HCI_Cmd_Read_Buffer_Size())
+        response.show()
+        if response is not None and response.status == 0x0:
+            if HCI_Cmd_Complete_Read_Buffer_Size in response:
+                if response.acl_pkt_len > 0:
+                    # Update HCI MTU
+                    logger.debug("[hci][%s] ACL buffer length: %d", self.interface, response.acl_pkt_len)
+                    self.__max_acl_len = response.acl_pkt_len
+                    return True
+
+        return False
+
+    def _le_read_buffer_size(self):
+        """Read HCI device LE buffer size and update max ACL length.
         """
         response = self._write_command(HCI_Cmd_LE_Read_Buffer_Size())
         if response is not None and response.status == 0x0:
             if HCI_Cmd_LE_Complete_Read_Buffer_Size in response:
-                # Update HCI MTU
-                logger.debug("[hci][%s] ACL buffer length: %d", self.interface, response.acl_pkt_len)
-                self.__max_acl_len = response.acl_pkt_len
-                return True
+                if response.acl_pkt_len > 0:
+                    # Update HCI MTU
+                    logger.debug("[hci][%s] LE ACL buffer length: %d", self.interface, response.acl_pkt_len)
+                    self.__max_acl_len = response.acl_pkt_len
+                    return True
+                else:
+                    logger.debug("[hci][%s] LE ACL buffer read failed, read ACL buffer size")
+                    return self._read_buffer_size()
             
         return False
         
@@ -376,7 +395,7 @@ class HCIDevice(VirtualDevice):
         """
         success = (
                 self._reset() and
-                self._read_buffer_size() and
+                self._le_read_buffer_size() and
                 self._set_event_filter(0) and
                 self._set_connection_accept_timeout(32000) and
                 self._set_event_mask(b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d") and
