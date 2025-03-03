@@ -814,9 +814,12 @@ class HCIDevice(VirtualDevice):
                 if hci_packets is not None:
                     logger.debug("[%s] sending HCI packets ...", self.interface)
 
+                    self.__converter.lock()
                     success = True
                     for hci_packet in hci_packets:
                         success = success and self._write_packet(hci_packet)
+                    self.__converter.unlock()
+                    
                     logger.debug("[%s] HCI packet sending result: %s", self.interface, success)
                     if success:
                         logger.debug("[%s] send_pdu command succeeded.", self.interface)
