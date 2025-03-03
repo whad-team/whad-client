@@ -50,18 +50,7 @@ class HCIConverter:
         self.cached_l2cap_payload = b""
         self.cached_l2cap_length = 0
         self.waiting_l2cap_fragments = False
-        self.__locked = False
 
-    def lock(self):
-        """Lock the message converter. Messages are then added in a list
-        of pending messages and will be processed when converter is unlocked.
-        """
-        self.__locked = True
-
-    def unlock(self):
-        """Unlock converter and trigger pending messages processing.
-        """
-        self.__locked = False
 
     def process_message(self, message: HubMessage):
         """This function turns a BLE hub message into the corresponding HCI
@@ -303,11 +292,7 @@ class HCIConverter:
                 processed
             )
 
-            if self.__locked:
-                self.add_pending_message(msg)
-                return []
-            else:
-                return [msg]
+            return [msg]
 
         if event.PB == 1:
             pdu = BTLE_DATA()/event[HCI_ACL_Hdr:].payload
@@ -330,11 +315,8 @@ class HCIConverter:
                 conn_handle,
                 processed
             )
-            if self.__locked:
-                self.add_pending_message(msg)
-                return []
-            else:
-                return [msg]
+
+            return [msg]
 
         # Unsupported event, no messages.
         return []

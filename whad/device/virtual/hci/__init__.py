@@ -814,7 +814,6 @@ class HCIDevice(VirtualDevice):
                 if hci_packets is not None:
                     logger.debug("[%s] sending HCI packets ...", self.interface)
 
-                    #self.__converter.lock()
                     success = True
                     for hci_packet in hci_packets:
                         success = success and self._write_packet(hci_packet)
@@ -825,7 +824,6 @@ class HCIDevice(VirtualDevice):
                     else:
                         logger.debug("[%s] send_pdu command failed.", self.interface)
                         self._send_whad_command_result(CommandResult.ERROR)
-                    #self.__converter.unlock()
 
                 pending_messages = self.__converter.get_pending_messages()
                 for pending_message in pending_messages:
