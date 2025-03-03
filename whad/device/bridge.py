@@ -94,6 +94,9 @@ class Bridge:
         self.__in_wrapper = BridgeIfaceWrapper(self.__in_device, self)
         self.__out_wrapper = BridgeIfaceWrapper(self.__out_device, self)
 
+        # Unlock connectors, if locked.
+        self.unlock()
+
     def detach(self):
         """Detach BridgeIfaceWrappers from bridge's devices.
         """
@@ -189,6 +192,8 @@ class Bridge:
             self.__out.send_message(message)
 
     def unlock(self):
+        """Unlock bridge interfaces.
+        """
         # Unlock connector, causing packets to be sent to the output connector
         if self.__in.is_locked():
             self.__in.unlock(dispatch_callback=self.dispatch_pending_input)

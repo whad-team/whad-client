@@ -21,24 +21,6 @@ from whad.cli.app import CommandLineApp, run_app
 # wshark logger
 logger = logging.getLogger(__name__)
 
-
-class LockedConnector(WhadDeviceConnector):
-    """Provides a lockable connector.
-    """
-
-    def __init__(self, device):
-        # We set the connector with no interface for now
-        super().__init__(None)
-
-        # Then we lock it
-        self.lock()
-
-        # And we eventually configure the interface
-        # Once the device connector is set, packets will go in a locked queue
-        # and could be later retrieved when connector is unlocked.
-        self.set_device(device)
-        device.set_connector(self)
-
 class WhadWiresharkApp(CommandLineApp):
     """Main WiresharkApp class
     """
@@ -77,16 +59,18 @@ class WhadWiresharkApp(CommandLineApp):
                 if not self.args.nocolor:
                     conf.color_theme = BrightTheme()
 
-                parameters = self.args.__dict__
-
-                parameters.update({
-                    #"on_tx_packet_cb" : self.on_tx_packet,
-                    #"on_rx_packet_cb" : self.on_rx_packet,
-                })
-
                 # Using a UnixConnector is just a small hack, as it acts like
                 # a dummy connector.
                 connector = UnixConnector(interface)
+                connector.domain = self.args.domain
+                hub = ProtocolHub(2)
+                connector.format = hub.get(self.args.domain).format
+
+                # Attack a wireshark monitor
+                self.monitor = WiresharkMonitor()
+                self.monitor.attach(connector)
+                self.monitor.start()
+
                 if self.is_stdout_piped():
                     proxy = UnixConnector(UnixSocketServerDevice(parameters=self.args.__dict__))
 
@@ -96,37 +80,17 @@ class WhadWiresharkApp(CommandLineApp):
                         sleep(0.1)
 
                     # Bridge both connectors and their respective interfaces
-                    bridge = Bridge(connector, proxy)
-
-                # Save our connector and force its domain
-                self.connector = connector
-                self.connector.domain = self.args.domain
-                #self.connector.translator = get_translator(self.args.domain)(connector.hub)
-                #self.connector.format = connector.translator.format
-
-
-                # Query our protocol hub to gather the correct format function
-                # based on the provided domain
-                hub = ProtocolHub(2)
-                self.connector.format = hub.get(self.args.domain).format
-
-                if self.is_stdout_piped():
-                    # Attack a wireshark monitor
-                    logger.info("wshark: register monitors")
-                    self.monitor = WiresharkMonitor()
-                    self.monitor.attach(self.connector)
-                    self.monitor.start()
-
-                    bridge.unlock()
+                    _ = Bridge(connector, proxy)
 
                     # Wait for the user to CTL-C or close Wireshark
                     while interface.opened and not self.monitor.is_terminated():
                         sleep(.1)
+
                 else:
                     # Attack a wireshark monitor
                     logger.info("wshark: register monitors")
                     self.monitor = WiresharkMonitor()
-                    self.monitor.attach(self.connector)
+                    self.monitor.attach(connector)
                     self.monitor.start()
 
                     connector.unlock()

@@ -10,36 +10,14 @@ from time import sleep
 
 from whad.cli.app import CommandLineDevicePipe, run_app
 from whad.device import Bridge
-from whad.ble import BLE
-from whad.device.connector import WhadDeviceConnector
+from whad.device.connector import LockedConnector
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
 from whad.hub.ble import Connected, Disconnected, BlePduReceived, BleRawPduReceived, \
     BDAddress
-from whad.ble.connector.peripheral import PeripheralEventListener, PeripheralEventConnected
-from whad.ble.connector import Peripheral, Central
+from whad.ble.connector import Peripheral
 from whad.hub.discovery import Capability, Domain
 
 logger = logging.getLogger(__name__)
-
-class LockedConnector(WhadDeviceConnector):
-    """Provides a lockable connector.
-    """
-
-    def __init__(self, device):
-        # We set the connector with no interface for now
-        super().__init__(None)
-
-        # Then we lock it
-        self.lock()
-
-        # And we eventually configure the interface
-        # Once the device connector is set, packets will go in a locked queue
-        # and could be later retrieved when connector is unlocked.
-        self.set_device(device)
-        device.set_connector(self)
-
-    def on_any_msg(self, message):
-        logger.info("spawn received: %s" % message)
 
 class BleSpawnOutputPipe(Bridge):
     """wble-spawn output pipe
@@ -67,23 +45,6 @@ class BleSpawnOutputPipe(Bridge):
         # with the ones we already captured.
         super().__init__(input_connector, output_connector)
 
-        # Unlock connector, causing packets to be sent to the output connector
-        input_connector.unlock(dispatch_callback=self.dispatch_pending_pdu)
-
-
-    def dispatch_pending_pdu(self, pdu):
-        """Dispatch pending PDU.
-        """
-        # Convert packet back to message and forward to output
-        if self.support_raw_pdu:
-            message = BleRawPduReceived.from_packet(pdu)
-        else:
-            message = BlePduReceived.from_packet(pdu)
-
-        # Send message to our chained tool
-        logger.info("spawn: Send pending message %s", message)
-        #command = self.convert_packet_message(message, False)
-        self.output.send_message(message)
 
     def convert_packet_message(self, message, ingress=True):
         """Convert a BleRawPduReceived/BlePduReceived notification into the
@@ -226,22 +187,6 @@ class BleSpawnInputPipe(Bridge):
         self.__in_conn_handle = None
         self.__out_conn_handle = None
 
-        input_connector.unlock(dispatch_callback=self.dispatch_pending_pdu)
-
-
-    def dispatch_pending_pdu(self, pdu):
-        """Dispatch pending PDU.
-        """
-        logger.info("=== Dispatching pdu %s" % pdu)
-        # Convert packet back to message and forward to output
-        if self.output.support_raw_pdu:
-            message = BleRawPduReceived.from_packet(pdu)
-        else:
-            message = BlePduReceived.from_packet(pdu)
-
-        # Send message to our chained tool
-        self.output.send_message(message)
-
     def set_in_conn_handle(self, conn_handle: int):
         """Saves the input connector connection handle.
         """
@@ -335,7 +280,7 @@ class BleSpawnInputPipe(Bridge):
 
             # Send pending packets, if any
             for message in self.__output_pending_packets:
-                logger.debug('[ble-spawn][input-pipe] process pending PDU message %s' % message)
+                logger.debug('[ble-spawn][input-pipe] process pending PDU message %s', message)
                 command = self.convert_packet_message(message, self.__out_conn_handle, False)
                 self.output.send_command(command)
         else:

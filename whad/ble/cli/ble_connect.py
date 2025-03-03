@@ -12,10 +12,8 @@ from whad.device.unix import UnixConnector, UnixSocketServerDevice
 from whad.device import Bridge
 
 # WHAD BLE interfaces
-from whad.ble import BLE, Central
-from whad.device.connector import WhadDeviceConnector
-from whad.hub import ProtocolHub
-from whad.hub.events import DisconnectionEvt
+from whad.ble import Central
+from whad.device.connector import LockedConnector
 from whad.ble.exceptions import PeripheralNotFound
 
 # WHAD BLE messages
@@ -27,71 +25,6 @@ from whad.hub.ble.bdaddr import BDAddress
 from whad.cli.app import CommandLineDevicePipe, run_app
 
 logger = logging.getLogger(__name__)
-
-class LockedConnector(WhadDeviceConnector):
-    """Provides a lockable connector.
-    """
-
-    def __init__(self, device):
-        # We set the connector with no interface for now
-        super().__init__(None)
-
-        # Then we lock it
-        self.lock()
-
-        # And we eventually configure the interface
-        # Once the device connector is set, packets will go in a locked queue
-        # and could be later retrieved when connector is unlocked.
-        self.set_device(device)
-        device.set_connector(self)
-
-
-class BleConnectOutputPipe(Bridge):
-    """wble-connect output pipe
-
-    When wble-connect is used with its output piped to another WHAD tool,
-    it creates a connection to a BLE device and then gives access to the
-    WHAD adapter in its entirety. The piped tool can send commands and will
-    receive notifications from the adapter.
-
-    There is not specific process to be applied, we are just bridging a
-    unix socket server device to the central connector and that's it.
-    """
-
-    def __init__(self, input_connector, output_connector):
-        """Custom output pipe, will make sure to forward queued PDUs from
-        input_connector to output_connector.
-        """
-        # Retrieve an instance of our protocol hub
-        self.hub = input_connector.hub
-
-        # Do we get raw PDUs ?
-        if input_connector.support_raw_pdu():
-            self.support_raw_pdu = True
-        else:
-            self.support_raw_pdu = False
-
-        # This will dissociate the underlying devices from our connectors.
-        # Our central proxy will no more store queued packets, so we are left
-        # with the ones we already captured.
-        super().__init__(input_connector, output_connector)
-
-        # Unlock connector, causing packets to be sent to the output connector
-        input_connector.unlock(dispatch_callback=self.dispatch_pending_pdu)
-        output_connector.unlock(dispatch_callback=self.dispatch_pending_input_pdu)
-
-
-    def dispatch_pending_pdu(self, message):
-        """Dispatch pending PDU.
-        """
-        # Send message to our chained tool
-        self.output.send_message(message)
-
-    def dispatch_pending_input_pdu(self, message):
-        """Dispatch pending input PDU.
-        """
-        # Send message to our chained tool
-        self.input.send_message(message)
 
 class BleConnectInputPipe(Bridge):
     """wble-connect input pipe
@@ -464,7 +397,7 @@ class BleConnectApp(CommandLineDevicePipe):
                 }))
 
                 # Create our custom pipe
-                BleConnectOutputPipe(central, proxy)
+                Bridge(central, proxy)
 
                 # Wait for device to disconnect (or user CTL-C)
                 proxy.device.wait()

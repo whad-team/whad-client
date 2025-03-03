@@ -143,8 +143,6 @@ class WhadDeviceConnector:
             self.__transmission_callbacks = {}
 
 
-        return removed
-
     def reset_callbacks(self, reception = True, transmission = True):
         """
         Detach any packet callback attached to the current connector.
@@ -459,3 +457,21 @@ class WhadDeviceConnector:
         logger.error("Class: %s", self.__class__)
         logger.error("method `on_event` must be implemented in inherited classes")
         raise RequiredImplementation()
+
+
+class LockedConnector(WhadDeviceConnector):
+    """Provides a lockable connector.
+    """
+
+    def __init__(self, device):
+        # We set the connector with no interface for now
+        super().__init__(None)
+
+        # Then we lock it
+        self.lock()
+
+        # And we eventually configure the interface
+        # Once the device connector is set, packets will go in a locked queue
+        # and could be later retrieved when connector is unlocked.
+        self.set_device(device)
+        device.set_connector(self)
