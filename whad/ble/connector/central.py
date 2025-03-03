@@ -368,4 +368,4 @@ class Central(BLE):
         """Retrieve the connection MTU.
         """
         if self.connection is not None:
-            return self.connection.l2cap.get_local_mtu()
+            return self.connection.att.get_server_mtu()

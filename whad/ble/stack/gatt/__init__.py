@@ -93,6 +93,7 @@ class GattLayer(Layer):
             GattExecuteWriteRequest: self.on_execute_write_request,
             GattExecuteWriteResponse: self.on_execute_write_response,
 
+            GattExchangeMtuRequest: self.on_exch_mtu_request,
             GattExchangeMtuResponse: self.on_exch_mtu_response,
 
         }
@@ -410,6 +411,13 @@ class GattLayer(Layer):
         """
         pass
 
+    def on_exch_mtu_request(self, request):
+        """ATT MTU exchange request
+
+        :param request: request from remote device
+        """
+        pass
+
     def on_exch_mtu_response(self, response):
         """ATT MTU exchange response
 
@@ -540,6 +548,19 @@ class GattClient(GattLayer):
                 indication=True
             )
         self.att.handle_value_confirmation()
+
+    @txlock
+    def on_exch_mtu_request(self, request):
+        """Received an MTU exchange request
+        """
+        # We do accept MTU exchange request, save server MTU and answer
+        self.att.set_server_mtu(request.mtu)
+        self.att.set_client_mtu(request.mtu)
+        self.att.exch_mtu_response(self.att.get_client_mtu())
+
+        # Notify our connector about this MTU update
+        logging.debug("[gatt] notifying connector new server mtu: %d", request.mtu)
+        self.att.notify_server_mtu()
 
     def on_exch_mtu_response(self, response):
         """ATT MTU exchange response
@@ -813,7 +834,7 @@ class GattClient(GattLayer):
 
         :param int handle: Handle of the attribute to read (descriptor or characteristic)
         """
-        local_mtu = self.get_layer('l2cap').get_local_mtu()
+        local_mtu = self.att.get_server_mtu()
 
         value=b''
         offset=0
@@ -842,7 +863,7 @@ class GattClient(GattLayer):
         :param int handle: Target characteristic or descriptor handle
         :param bytes value: Data to write
         """
-        local_mtu = self.get_layer('l2cap').get_local_mtu()
+        local_mtu = self.att.get_server_mtu()
 
         # Check if data to write is longer than MTU
         if len(value) > (local_mtu - 3):
@@ -901,7 +922,7 @@ class GattClient(GattLayer):
         # We need to determine how many prepared write requests we should issue
         # to the target device
         data_len = len(value)
-        local_mtu = self.get_layer('l2cap').get_local_mtu()
+        local_mtu = self.att.get_server_mtu()
 
         nb_chunks = int(data_len / (local_mtu - 5))
         if nb_chunks % (local_mtu - 5) > 0:
@@ -983,6 +1004,14 @@ class GattClient(GattLayer):
 
             msg = self.wait_for_message(GattExchangeMtuResponse)
             if isinstance(msg, GattExchangeMtuResponse):
+                # Update client and server MTU
+                self.att.set_client_mtu(mtu)
+                self.att.set_server_mtu(msg.mtu)
+
+                # Notify our connector that the remote server has
+                # changed its MTU
+                logging.debug("[gatt client] notifying received server mtu: %d", msg.mtu)
+                self.att.notify_server_mtu()
                 return msg.mtu
             elif isinstance(msg, GattErrorResponse):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
@@ -1069,8 +1098,14 @@ class GattServer(GattLayer):
 
             msg = self.wait_for_message(GattExchangeMtuResponse)
             if isinstance(msg, GattExchangeMtuResponse):
-                self.get_layer("l2cap").set_local_mtu(mtu)
-                self.get_layer("l2cap").set_remote_mtu(msg.mtu)
+                # Save client and server MTU
+                self.att.set_server_mtu(mtu)
+                self.att.set_client_mtu(msg.mtu)
+
+                # Notify our connector that the remote client has changed
+                # its ATT MTU
+                #logging.debug("[gatt server] notifying received client mtu: %d", msg.mtu)
+                #self.att.notify_client_mtu()
                 return msg.mtu
             elif isinstance(msg, GattErrorResponse):
                 # If an error has been received, that means the MTU exchange
@@ -1086,7 +1121,7 @@ class GattServer(GattLayer):
         :param Characteristic characteristic: Characteristic to notify the GATT client about.
         """
         try:
-            local_mtu = self.get_layer('l2cap').get_local_mtu()
+            local_mtu = self.att.get_client_mtu()
 
             # Call model callback
             service = self.server_model.find_service_by_characteristic_handle(characteristic.handle)
@@ -1115,7 +1150,7 @@ class GattServer(GattLayer):
         :param Characteristic characteristic: Characteristic to notify the GATT client about.
         """
         try:
-            local_mtu = self.get_layer('l2cap').get_local_mtu()
+            local_mtu = self.att.get_client_mtu()
 
             # Call model callback
             service = self.server_model.find_service_by_characteristic_handle(characteristic.handle)
@@ -1153,7 +1188,7 @@ class GattServer(GattLayer):
         if len(attrs_handles) > 0:
 
             # Get MTU
-            mtu = self.get_layer('l2cap').get_local_mtu()
+            mtu = self.att.get_client_mtu()
 
             # Get item size (UUID size + 2)
             uuid_size = len(attrs[attrs_handles[0]].type_uuid.packed)
@@ -1232,7 +1267,7 @@ class GattServer(GattLayer):
         # FindByTypeValueResponse PDU
         if len(matching_attrs) > 0:
             # Build the response
-            mtu = self.get_layer('l2cap').get_local_mtu()
+            mtu = self.att.get_client_mtu()
             max_nb_items = int((mtu - 1) / 4)
 
             # Create our datalist
@@ -1270,7 +1305,7 @@ class GattServer(GattLayer):
         :param int handle: Characteristic or descriptor handle
         """
         try:
-            local_mtu = self.get_layer('l2cap').get_local_mtu()
+            local_mtu = self.att.get_client_mtu()
 
             # Search attribute by handle and send respons
             attr = self.server_model.find_object_by_handle(request.handle)
@@ -1397,7 +1432,7 @@ class GattServer(GattLayer):
         """Read blob request
         """
         try:
-            local_mtu = self.get_layer('l2cap').get_local_mtu()
+            local_mtu = self.att.get_client_mtu()
 
             # Search attribute by handle and send response
             attr = self.server_model.find_object_by_handle(request.handle)
@@ -1980,7 +2015,7 @@ class GattServer(GattLayer):
         if len(attrs_handles) > 0:
 
             # Get MTU
-            mtu = self.get_layer('l2cap').get_local_mtu()
+            mtu = self.att.get_client_mtu()
 
             # If client is looking for characteristic declaration,
             # we compute the correct item size and maximum number
@@ -2100,7 +2135,7 @@ class GattServer(GattLayer):
         if len(attrs_handles) > 0:
 
             # Get MTU
-            mtu = self.get_layer('l2cap').get_local_mtu()
+            mtu = self.att.get_client_mtu()
 
             # Get item size (UUID size + 4)
             uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
@@ -2152,6 +2187,19 @@ class GattServer(GattLayer):
             pairing_parameters = pairing
 
         self.smp.request_pairing(pairing=pairing_parameters)
+
+    @txlock
+    def on_exch_mtu_request(self, request):
+        """Received an MTU exchange request
+        """
+        # We do accept MTU exchange request, save server MTU and answer
+        self.att.set_client_mtu(request.mtu)
+        self.att.set_server_mtu(request.mtu)
+        self.att.exch_mtu_response(self.att.get_server_mtu())
+
+        # Notify our connector about this MTU update
+        logging.debug("[gatt] notifying connector new client mtu: %d", request.mtu)
+        self.att.notify_client_mtu()
 
     def on_exch_mtu_response(self, response):
         """ATT MTU exchange response

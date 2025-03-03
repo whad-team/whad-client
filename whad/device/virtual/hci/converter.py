@@ -12,7 +12,8 @@ from typing import List
 from scapy.layers.bluetooth import HCI_Event_LE_Meta, HCI_LE_Meta_Advertising_Reports, \
     HCI_LE_Meta_Connection_Complete, L2CAP_Hdr, HCI_Hdr, HCI_ACL_Hdr, \
     HCI_Event_Disconnection_Complete, HCI_LE_Meta_Long_Term_Key_Request, \
-    HCI_Event_Encryption_Change, ATT_Exchange_MTU_Response
+    HCI_Event_Encryption_Change
+from whad.scapy.layers.bluetooth import HCI_LE_Meta_Data_Length_Change
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE_CTRL, LL_ENC_REQ, \
     LL_ENC_RSP, LL_START_ENC_RSP, LL_START_ENC_REQ
 from scapy.compat import raw
@@ -74,28 +75,44 @@ class HCIConverter:
         # L2CAP packet reassembly
         if L2CAP_Hdr in ll_packet or self.waiting_l2cap_fragments:
             if not self.waiting_l2cap_fragments and (
-                    len(raw(ll_packet[L2CAP_Hdr:])) < ll_packet[L2CAP_Hdr:].len):
+                    (len(raw(ll_packet[L2CAP_Hdr:])) - 4) < ll_packet[L2CAP_Hdr:].len):
                 self.waiting_l2cap_fragments = True
                 self.cached_l2cap_payload = raw(ll_packet[BTLE_DATA:][1:])
                 self.cached_l2cap_length = ll_packet[L2CAP_Hdr:].len
 
                 # No HCI packet to send for now (data queued)
+                logger.debug("l2cap is incomplete")
                 return []
 
             if self.waiting_l2cap_fragments:
                 self.cached_l2cap_payload += raw(ll_packet[BTLE_DATA:][1:])
                 if self.cached_l2cap_length == (len(self.cached_l2cap_payload) - 4):
-                    hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle)
-                    hci_packet = hci_packet / L2CAP_Hdr(self.cached_l2cap_payload)
                     self.waiting_l2cap_fragments = False
-                    return [hci_packet]
+                    logger.debug("[hci device] reassembled l2cap data !")
+
+                    # L2CAP data has been reassembled, then split in respect of
+                    # the underlying device max ACL length
+                    l2cap_data = bytes(L2CAP_Hdr(self.cached_l2cap_payload))
+                    max_acl_len = self.__device.get_max_acl_len()
+                    nb_hci_packets = len(l2cap_data)//max_acl_len
+                    if len(l2cap_data)%max_acl_len > 0:
+                        nb_hci_packets += 1
+                    hci_packets = []
+                    for i in range(nb_hci_packets):
+                        pkt = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle)
+                        pkt = pkt / l2cap_data[i*max_acl_len:(i+1)*max_acl_len]
+                        hci_packets.append(pkt)
+                    logger.debug("[hci converter] split ACL data into %d chunks (total: %d, acl_len: %d)", nb_hci_packets, len(l2cap_data), max_acl_len)
+                    return hci_packets
 
                 # No HCI packet for now.
+                logger.debug("l2cap is incomplete, more fragments")
                 return []
 
             # No fragmentation, send data as-is.
             hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle)
             hci_packet = hci_packet / ll_packet[L2CAP_Hdr:]
+            logger.debug("l2cap does not need frag")
             return [hci_packet]
 
         if ll_packet.LLID == 3:
@@ -183,6 +200,13 @@ class HCIConverter:
 
             if HCI_LE_Meta_Long_Term_Key_Request in event:
                 return self.process_long_term_key_request(event[HCI_LE_Meta_Long_Term_Key_Request:])
+            
+            if HCI_LE_Meta_Data_Length_Change in event:
+                # Process a data length change
+                length = event[HCI_LE_Meta_Data_Length_Change].max_tx_octets
+                logger.debug("[hci][%s] update HCI data length to %d", self.__device.interface, length)
+                self.__device._update_max_acl_len(length)
+
 
         if HCI_Event_Encryption_Change in event:
             return self.process_encryption_change_event(event[HCI_Event_Encryption_Change:])

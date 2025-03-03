@@ -331,6 +331,7 @@ class WhadAnalyzeApp(CommandLineApp):
                     _ = WhadAnalyzePipe(connector, unix_server, self.on_packet)
                 else:
                     connector.on_packet = self.on_packet
+                    connector.unlock()
 
                 while interface.opened:
                     sleep(.1)
