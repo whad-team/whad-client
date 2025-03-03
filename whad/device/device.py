@@ -1060,24 +1060,11 @@ class WhadDevice:
 
             # Check if message is a received packet
             if issubclass(message, AbstractPacket):
-                # Convert message into packet
-                packet = message.to_packet()
-                if packet is not None:
-
-                    # Report packet to monitors
-                    self.__connector.monitor_packet_rx(packet)
-
-                    # Forward to our connector
-                    if self.__connector.is_locked():
-                        # If we are locked, then add packet to our locked packets
-                        self.__connector.add_locked_pdu(packet)
-                    elif self.__connector.is_synchronous():
-                        # If we are in synchronous mode, add packet as pending
-                        self.__connector.add_pending_packet(packet)
-                    else:
-                        #logger.debug("[WhadDevice] on_domain_msg() for device %s: %s",
-                        #             self.interface, message)
-                        self.__connector.on_packet(packet)
+                # If connector is locked, save message into locked pdus
+                if self.__connector.is_locked():
+                    self.__connector.add_locked_pdu(message)
+                else:
+                    self.on_packet_message(message)
             elif issubclass(message, AbstractEvent):
                 # Convert message into event
                 event = message.to_event()
@@ -1088,6 +1075,25 @@ class WhadDevice:
                 # Forward other messages to on_domain_msg() callback
                 self.__connector.on_domain_msg(domain, message)
         return False
+
+    def on_packet_message(self, message):
+        """Process packet message
+        """
+        # Convert message into packet
+        packet = message.to_packet()
+        if packet is not None:
+
+            # Report packet to monitors
+            self.__connector.monitor_packet_rx(packet)
+
+            # Forward to our connector
+            if self.__connector.is_synchronous():
+                # If we are in synchronous mode, add packet as pending
+                self.__connector.add_pending_packet(packet)
+            else:
+                #logger.debug("[WhadDevice] on_domain_msg() for device %s: %s",
+                #             self.interface, message)
+                self.__connector.on_packet(packet)
 
 class VirtualDevice(WhadDevice):
     """

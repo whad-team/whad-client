@@ -187,3 +187,24 @@ class Bridge:
                 self.__in.monitor_packet_rx(packet)
 
             self.__out.send_message(message)
+
+    def unlock(self):
+        # Unlock connector, causing packets to be sent to the output connector
+        if self.__in.is_locked():
+            self.__in.unlock(dispatch_callback=self.dispatch_pending_input)
+        if self.__out.is_locked():
+            self.__out.unlock(dispatch_callback=self.dispatch_pending_output)
+
+    def dispatch_pending_output(self, message):
+        """Forward pending output messages to input.
+        """
+        self.output.monitor_packet_rx(message.to_packet())
+        self.input.monitor_packet_tx(message.to_packet())
+        self.input.send_message(message)
+
+    def dispatch_pending_input(self, message):
+        """Forward pending input messages to output.
+        """
+        self.output.monitor_packet_tx(message.to_packet())
+        self.input.monitor_packet_rx(message.to_packet())
+        self.output.send_message(message)

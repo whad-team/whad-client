@@ -21,33 +21,6 @@ from whad.cli.app import CommandLineApp, run_app
 # wshark logger
 logger = logging.getLogger(__name__)
 
-class SharkBridge(Bridge):
-
-    def __init__(self, input_connector, output_connector):
-        """Custom output pipe, will make sure to forward queued PDUs from
-        input_connector to output_connector.
-        """
-        # Retrieve an instance of our protocol hub
-        self.hub = input_connector.hub
-
-        # This will dissociate the underlying devices from our connectors.
-        # Our central proxy will no more store queued packets, so we are left
-        # with the ones we already captured.
-        super().__init__(input_connector, output_connector)
-
-        # Unlock connector, causing packets to be sent to the output connector
-        input_connector.unlock(dispatch_callback=self.dispatch_pending_input)
-        output_connector.unlock(dispatch_callback=self.dispatch_pending_output)
-
-    def dispatch_pending_output(self, pdu):
-        """Convert pdu into message and send to output
-        """
-        msg = self.hub.convert_packet(pdu)
-        self.input.send_message(msg)
-
-    def dispatch_pending_input(self, pdu):
-        msg = self.hub.convert_packet(pdu)
-        self.output.send_message(msg)
 
 class LockedConnector(WhadDeviceConnector):
     """Provides a lockable connector.
@@ -123,7 +96,7 @@ class WhadWiresharkApp(CommandLineApp):
                         sleep(0.1)
 
                     # Bridge both connectors and their respective interfaces
-                    _ = SharkBridge(connector, proxy)
+                    bridge = Bridge(connector, proxy)
 
                 # Save our connector and force its domain
                 self.connector = connector
@@ -137,18 +110,27 @@ class WhadWiresharkApp(CommandLineApp):
                 hub = ProtocolHub(2)
                 self.connector.format = hub.get(self.args.domain).format
 
-                # Attack a wireshark monitor
-                self.monitor = WiresharkMonitor()
-                self.monitor.attach(self.connector)
-                self.monitor.start()
-
-                connector.unlock()
-
                 if self.is_stdout_piped():
+                    # Attack a wireshark monitor
+                    logger.info("wshark: register monitors")
+                    self.monitor = WiresharkMonitor()
+                    self.monitor.attach(self.connector)
+                    self.monitor.start()
+
+                    bridge.unlock()
+
                     # Wait for the user to CTL-C or close Wireshark
                     while interface.opened and not self.monitor.is_terminated():
                         sleep(.1)
                 else:
+                    # Attack a wireshark monitor
+                    logger.info("wshark: register monitors")
+                    self.monitor = WiresharkMonitor()
+                    self.monitor.attach(self.connector)
+                    self.monitor.start()
+
+                    connector.unlock()
+
                     # Wait for the user to CTL-C or close Wireshark
                     while interface.opened and not self.monitor.is_terminated():
                         wait(f"Forwarding {self.monitor.packets_written} packets to wireshark")
