@@ -493,7 +493,6 @@ class ATTLayer(Layer):
         :param int mtu: Maximum Transmission Unit
         """
         # Update local MTU first
-        self.get_layer('l2cap').set_local_mtu(mtu)
         self.send_data(ATT_Exchange_MTU_Request(
             mtu=mtu
         ))
