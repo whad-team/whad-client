@@ -137,8 +137,7 @@ class HCI_LE_Set_Data_Length(Packet):
 
 class HCI_Cmd_LE_Complete_Read_Buffer_Size(Packet):
     name = "LE Read Buffer Size response"
-    fields_desc = [ByteField("status", 0), 
-                   ShortField("acl_pkt_len", 0),
+    fields_desc = [LEShortField("acl_pkt_len", 0),
                    ByteField("total_num_acl_pkts", 0)]
     
 class HCI_Cmd_Read_Buffer_Size(Packet):
@@ -146,8 +145,7 @@ class HCI_Cmd_Read_Buffer_Size(Packet):
 
 class HCI_Cmd_Complete_Read_Buffer_Size(Packet):
     name = "Read Buffer Size response"
-    fields_desc = [ByteField("status", 0), 
-                   ShortField("acl_pkt_len", 0),
+    fields_desc = [LEShortField("acl_pkt_len", 0),
                    ByteField("total_num_acl_pkts", 0)]
 
 # HCI LE events
