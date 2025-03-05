@@ -571,7 +571,7 @@ class UUID:
             self.type = UUID.TYPE_128
 
         if self.uuid is None:
-            raise InvalidUUIDException()
+            raise InvalidUUIDException(uuid)
 
     def __eq__(self, other):
         # TODO expand 16 bit UUIDs
