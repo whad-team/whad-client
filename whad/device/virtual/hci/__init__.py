@@ -183,7 +183,6 @@ class HCIDevice(VirtualDevice):
         Fetches data from the device, if there is any data to read. We call select()
         to make sure data is waiting to be read before reading it.
         """
-
         if not self.__opened:
             raise WhadDeviceNotReady()
         try:
@@ -543,6 +542,8 @@ class HCIDevice(VirtualDevice):
         """
         Establish a connection using HCI device.
         """
+        logger.debug("bd_address: %s (%d)", bd_address, bd_address_type)
+        logger.debug("[hci] _connect() called")
         patype = 0 if bd_address_type == AddressType.PUBLIC else 1
         if channel_map is not None:
             formatted_channel_map = unpack("<Q",channel_map+ b"\x00\x00\x00")[0]
@@ -550,7 +551,11 @@ class HCIDevice(VirtualDevice):
                 chM=formatted_channel_map
             ))
             if response.status != 0x00:
+                logger.debug("[hci] HCI SetHostChannelClassification command failed with response %d", response.status)
                 return False
+
+        # Connect
+        logger.debug("[hci] sending HCI_LE_Create_Connection command")
         response = self._write_command(
             HCI_Cmd_LE_Create_Connection(
                 paddr=bd_address,
@@ -559,6 +564,8 @@ class HCIDevice(VirtualDevice):
                 max_interval=hop_interval
             )
         )
+        if response.status != 0x00:
+            logger.debug("[hci] HCI_LE_Create_Connection command failed with response %d", response.status)
         return response is not None and response.status == 0x00
 
     def _disconnect(self, handle):
@@ -742,6 +749,7 @@ class HCIDevice(VirtualDevice):
         self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_connect(self, message):
+        logger.debug("[hci] received WHAD connect message")
         if Commands.ConnectTo in self._dev_capabilities[Domain.BtLE][1]:
             bd_address = message.bd_address
             bd_address_type = message.addr_type
@@ -819,7 +827,6 @@ class HCIDevice(VirtualDevice):
                     for hci_packet in hci_packets:
                         success = success and self._write_packet(hci_packet)
                     self.__converter.unlock()
-                    
                     logger.debug("[%s] HCI packet sending result: %s", self.interface, success)
                     if success:
                         logger.debug("[%s] send_pdu command succeeded.", self.interface)
