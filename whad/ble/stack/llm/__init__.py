@@ -466,6 +466,8 @@ class LinkLayer(Layer):
         # Free the previously instantiated L2CAP layer
         conn_layer = self.state.get_connection_l2cap(conn_handle)
         if conn_layer is not None:
+            # Mark GATT layer as disconnected
+            self.get_layer(conn_layer).get_layer("gatt").state.terminated = True
             self.destroy(self.get_layer(conn_layer))
 
         # Remove connection from our registered connections
