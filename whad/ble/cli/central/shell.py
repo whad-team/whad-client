@@ -361,6 +361,7 @@ class BleCentralShell(InteractiveShell):
                 target_bd_addr = target['info'].address
                 target_random_address_type = target['info'].address_type == 1
             except IndexError:
+                print("Device not in cache")
                 # If target not in cache, we are expecting a BD address
                 if re.match(BDADDR_REGEXP, args[0]):
                     target_bd_addr = args[0]
@@ -411,10 +412,10 @@ class BleCentralShell(InteractiveShell):
                     )
 
                     # Create our cached device if non-existing
-                    if self.__target_bd not in self.__cache:
+                    if self.__target_bd.lower() not in self.__cache:
                         self.__cache.add(AdvertisingDevice(
                             -50,
-                            0,
+                            target_random_address_type,
                             self.__target_bd,
                             AdvDataFieldList()
                         ))
