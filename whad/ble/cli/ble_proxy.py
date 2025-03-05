@@ -99,7 +99,7 @@ class VerboseProxy(GattProxy):
             )))
         if indication:
             print_formatted_text(HTML((
-                    f"[!] <ansicyan>Subscribed to notification for charac. "
+                    f"[!] <ansicyan>Subscribed to indication for charac. "
                     f"{characteristic.uuid}</ansicyan>"
             )))
 
