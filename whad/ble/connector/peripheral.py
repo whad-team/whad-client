@@ -16,7 +16,7 @@ from threading import Thread
 
 from whad.ble.connector.base import BLE
 from whad.hub.ble.bdaddr import BDAddress
-from whad.ble.stack import BleStack
+from whad.ble.stack import BleStack, Layer
 from whad.ble.stack.gatt import GattServer, GattClientServer
 from whad.ble.stack.att import ATTLayer
 from whad.ble.stack.smp import CryptographicDatabase, Pairing
@@ -28,6 +28,17 @@ from whad.exceptions import UnsupportedCapability
 
 # Logging
 logger = logging.getLogger(__name__)
+
+class PeripheralEventDisconnected:
+    """Connected event
+    """
+    def __init__(self, conn_handle):
+        self.__conn_handle = conn_handle
+
+    @property
+    def conn_handle(self):
+        return self.__conn_handle
+
 
 class PeripheralEventConnected:
     """Connected event
@@ -117,11 +128,6 @@ class Peripheral(BLE):
         """
         super().__init__(device)
 
-        # Attach a GATT server to our stack ATT layer
-        att_layer = stack.find("att")
-        if att_layer is not None:
-            att_layer.add(gatt)
-
         # Initialize local peer and remote per info
         self.__local_peer = None
         self.__remote_peer = None
@@ -130,7 +136,8 @@ class Peripheral(BLE):
         self.__central = None
 
         # Initialize stack
-        self.__stack = stack(self)
+        self.__configure_stack(stack, gatt)
+
         self.connection = None
         self.__connected = False
         self.__conn_handle = None
@@ -206,6 +213,23 @@ class Peripheral(BLE):
         """
         return self.__conn_handle
 
+    def __configure_stack(self, phy_layer=None, gatt_layer=None):
+        """
+        """
+        # Save GATT and PHY layers
+        if gatt_layer is not None:
+            self.__gatt_layer = gatt_layer
+        if phy_layer is not None:
+            self.__phy_layer = phy_layer
+            
+            # Configure BLE stack to use our PHY class
+            self.__stack = phy_layer(self)
+
+        # Configure ATT layer to use our GATT class
+        if self.__gatt_layer is not None:
+            if issubclass(self.__gatt_layer, Layer) and self.__gatt_layer.alias == 'gatt':
+                ATTLayer.add(self.__gatt_layer)
+
     def attach_event_listener(self, listener: PeripheralEventListener):
         """Attach an event queue to receive asynchronous notifications.
 
@@ -214,6 +238,12 @@ class Peripheral(BLE):
         """
         # Save event queue
         self.__evt_listener = listener
+
+    def notify_event(self, event):
+        """Notify event
+        """
+        if self.__evt_listener is not None:
+            self.__evt_listener.notify(event)
 
     def get_pairing_parameters(self):
         """Returns the provided pairing parameters, if any.
@@ -263,6 +293,10 @@ class Peripheral(BLE):
         return super().send_ctrl_pdu(pdu, conn_handle=conn_handle, direction=direction,
                                      access_address=access_address, encrypt=encrypt)
 
+    def set_profile(self, profile: GenericProfile):
+        """Set peripheral profile.
+        """
+        self.__profile = profile
 
     def use_stack(self, clazz=BleStack):
         """Specify a stack class to use for BLE. By default, our own stack
@@ -327,6 +361,12 @@ class Peripheral(BLE):
         while not self.is_connected():
             sleep(.5)
 
+    def wait_disconnection(self):
+        """Wait for a GATT client to connect to the peripheral. If a connection
+        is already active, returns immediately.
+        """
+        while self.is_connected():
+            sleep(.5)
 
     ##############################
     # Incoming events
@@ -338,6 +378,9 @@ class Peripheral(BLE):
         :param  connection_data:    Connection data
         :type   connection_data:    :class:`whad.protocol.ble_pb2.Connected`
         """
+        # Make sure stack is correctly configured
+        self.__configure_stack()
+
         # Retrieve the GATT server instance and set its profile
         logger.info("a device is now connected (connection handle: %d)",
                     connection_data.conn_handle)
@@ -360,12 +403,12 @@ class Peripheral(BLE):
         self.__conn_handle = connection_data.conn_handle
 
         # Notify event listener, if any
-        if self.__evt_listener is not None:
-            self.__evt_listener.notify(PeripheralEventConnected(
+        self.notify_event(PeripheralEventConnected(
                 connection_data.conn_handle,
                 self.__local_peer,
                 self.__remote_peer
             ))
+
 
     def on_disconnected(self, disconnection_data):
         """A device has just disconnected from this peripheral.
@@ -376,6 +419,7 @@ class Peripheral(BLE):
 
         logger.info("a device has just connected (connection handle: %d)",
                     disconnection_data.conn_handle)
+        print("stack notified of disconnection")
         self.__stack.on_disconnection(
             disconnection_data.conn_handle,
             disconnection_data.reason
@@ -388,6 +432,10 @@ class Peripheral(BLE):
         # We are now disconnected
         self.__connected = False
 
+        # Notify event listener, if any
+        self.notify_event(PeripheralEventDisconnected(
+            disconnection_data.conn_handle
+        ))
 
     def on_ctl_pdu(self, pdu):
         """This method is called whenever a control PDU is received.
@@ -420,13 +468,13 @@ class Peripheral(BLE):
         :param  connection:    Connection data
         :type   connection:    :class:`whad.protocol.ble_pb2.Connected`
         """
+
         # Use GATT server
         self.connection = connection
         self.__connected = True
 
         # Retrieve GATT server
         self.__gatt_server = connection.gatt
-
         self.__gatt_server.set_server_model(self.__profile)
         self.__connected = True
 
