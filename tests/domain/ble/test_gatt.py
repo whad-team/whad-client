@@ -696,10 +696,5 @@ class TestGattServerProcedures(object):
     def test_set_mtu_fail(self, att, gatt):
         '''GATT client MTU exchange failure
         '''
-        gatt.on_gatt_message(GattErrorResponse(
-            BleAttOpcode.EXCHANGE_MTU_REQUEST,
-            0,
-            BleAttErrorCode.REQUEST_NOT_SUPP
-        ))
-        with pytest.raises(UnsupportedRequestError):
-            gatt.set_mtu(100)
+        gatt.on_gatt_message(GattExchangeMtuResponse(23))
+        assert gatt.set_mtu(100) == 23
