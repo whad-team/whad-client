@@ -9,8 +9,9 @@ from scapy.layers.bluetooth4LE import *
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
 
-from whad.ble.exceptions import InvalidHandleValueException
-from whad.ble.utils.validators import InvalidUUIDException
+from whad.ble.exceptions import InvalidHandleValueException, \
+    InvalidUUIDException as AttrInvalidUUIDException
+from whad.ble.utils.validators import validate_attribute_uuid, InvalidUUIDException
 from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Peripheral, GenericProfile, AdvDataFieldList, \
@@ -47,11 +48,16 @@ def validate_uuid(uuid: str) -> str:
     :rtype: str
     :return: Validated UUID
     """
-    # Parse provided UUID
-    if uuid.lower().startswith("0x"):
-        uuid = str(UUID(int(uuid, 16)))
-    else:
-        uuid = str(UUID(uuid))
+    try:
+        # Parse provided UUID
+        if isinstance(uuid, str) and uuid.lower().startswith("0x"):
+            uuid = str(UUID(int(uuid, 16)))
+        else:
+            uuid = str(UUID(uuid))
+    except TypeError as type_err:
+        raise InvalidUUIDException(uuid) from type_err
+    except InvalidUUIDException as uuid_err:
+        raise InvalidUUIDException(uuid) from uuid_err
 
     # Return the normalized UUID
     return uuid
@@ -315,7 +321,7 @@ class BlePeriphShell(InteractiveShell):
                 if len(args) >= 2:
                     try:
                         # Validate UUID
-                        service_uuid = validate_uuid(args[1])
+                        service_uuid = validate_attribute_uuid(args[1])
 
                         # If service already exists, error.
                         if self.has_service(service_uuid):
@@ -330,8 +336,8 @@ class BlePeriphShell(InteractiveShell):
 
                         # Success
                         self.success(f"Service {service_uuid} successfully added.")
-                    except InvalidUUIDException:
-                        self.error(f"Invalid UUID: {args[1]}")
+                    except InvalidUUIDException as bad_uuid:
+                        self.error(bad_uuid.description)
                 else:
                     self.error("You need to provide a valid UUID.")
             elif action == "remove":
@@ -344,15 +350,15 @@ class BlePeriphShell(InteractiveShell):
                     if len(args) >= 2:
                         try:
                             # Validate UUID
-                            service_uuid = validate_uuid(args[1])
+                            service_uuid = validate_attribute_uuid(args[1])
 
                             if self.has_service(service_uuid):
                                 self.unregister_service(service_uuid)
                                 self.success(f"Successfully removed service {service_uuid}.")
                             else:
                                 self.error(f"Service {service_uuid} is not a registered service.")
-                        except InvalidUUIDException:
-                            self.error("Invalid UUID: {args[1]}")
+                        except InvalidUUIDException as bad_uuid:
+                            self.error(bad_uuid.description)
                     else:
                         self.error("You need to provide a valid UUID.")
             elif action == "edit":
@@ -363,7 +369,7 @@ class BlePeriphShell(InteractiveShell):
                 if len(args) >= 2:
                     try:
                         # Validate UUID
-                        service_uuid = validate_uuid(args[1])
+                        service_uuid = validate_attribute_uuid(args[1])
 
                         if self.has_service(service_uuid):
                             self.select_service(service_uuid)
@@ -372,8 +378,8 @@ class BlePeriphShell(InteractiveShell):
 
                         # Error, not registered
                         self.error(f"Service {service_uuid} is not a registered service.")
-                    except InvalidUUIDException:
-                        self.error(f"Invalid UUID: {args[1]}")
+                    except InvalidUUIDException as bad_uuid:
+                        self.error(bad_uuid.description)
                 else:
                     self.error("You need to provide a valid UUID.")
             else:
@@ -595,7 +601,7 @@ class BlePeriphShell(InteractiveShell):
                     if len(args)>=2:
                         try:
                             # Retrieve characteristic UUID
-                            char_uuid = validate_uuid(args[1])
+                            char_uuid = validate_attribute_uuid(args[1])
 
                             # Parse permissions
                             if len(args) >= 3:
@@ -608,8 +614,8 @@ class BlePeriphShell(InteractiveShell):
                             else:
                                 self.error((f"Characteristic {char_uuid} already exist in "
                                            f"service {self.__selected_service}"))
-                        except InvalidUUIDException:
-                            self.error("Invalid UUID for characteristic.")
+                        except InvalidUUIDException as bad_uuid:
+                            self.error(bad_uuid.description)
                     else:
                         print_formatted_text(HTML(
                             "<b>Usage:</b> <ansicyan>add</ansicyan> <i>UUID</i> [<i>PERM,</i> ...]"
@@ -618,7 +624,7 @@ class BlePeriphShell(InteractiveShell):
                     if len(args)>=2:
                         try:
                             # Retrieve characteristic UUID
-                            char_uuid = validate_uuid(args[1])
+                            char_uuid = validate_attribute_uuid(args[1])
 
                             # Remove characteristic
                             if self.has_service_char(self.__selected_service, char_uuid):
@@ -626,8 +632,8 @@ class BlePeriphShell(InteractiveShell):
                                 self.success(f"Successfully removed characteristic {char_uuid}")
                             else:
                                 self.error(f"Characteristic {char_uuid} does not exist.")
-                        except InvalidUUIDException:
-                            self.error("Invalid UUID for characteristic.")
+                        except InvalidUUIDException as bad_uuid:
+                            self.error(bad_uuid.description)
                     else:
                         print_formatted_text(HTML(
                             "<b>Usage:</b> <ansicyan>remove</ansicyan> <i>UUID</i>"
@@ -821,7 +827,7 @@ class BlePeriphShell(InteractiveShell):
                     ))
                 else:
                     self.error("Unknown characteristic {charac_uuid}")
-            except InvalidUUIDException:
+            except AttrInvalidUUIDException:
                 try:
                     # Decode handle
                     if args[0].lower().startswith("0x"):
