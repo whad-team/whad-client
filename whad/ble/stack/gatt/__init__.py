@@ -1712,6 +1712,9 @@ class GattServer(GattLayer):
                         charac.set_notification_callback(None)
                         charac.set_indication_callback(None)
 
+                        if charac in self.__subscribed_characs:
+                            self.__subscribed_characs.remove(charac)
+
                         # Notify model
                         self.server_model.on_characteristic_unsubscribed(
                             service,
@@ -1848,7 +1851,7 @@ class GattServer(GattLayer):
 
             elif isinstance(attr, ClientCharacteristicConfig):
                 # Fixed length, make sure size <= 2.
-                if len(request.value) <= 2:
+                if len(request.value) <= 2 and request.value != attr.value:
                     attr.value = request.value + attr.value[len(request.value):]
 
                     # Notify our model
