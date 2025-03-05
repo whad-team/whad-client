@@ -187,6 +187,7 @@ class HCIConverter:
         """
         Converts an HCI event to the corresponding Link Layer packet (if possible).
         """
+
         if HCI_Event_LE_Meta in event:
             if HCI_LE_Meta_Advertising_Reports in event:
                 return self.process_advertising_reports(event[HCI_LE_Meta_Advertising_Reports:])
@@ -389,7 +390,7 @@ class HCIConverter:
             self.__device._active_handles.remove(event.handle)
 
             # Send disconnection message to consumer.
-            logger.debug("[hci] sending Disconnect message to host")
+            logger.debug("[hci] sending Disconnected message to host")
             msg = self.__device.hub.ble.create_disconnected(
                 event.reason,
                 event.handle
