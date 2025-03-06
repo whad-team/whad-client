@@ -5,9 +5,6 @@ Bluetooth Low Energy Peripheral connector
 WHAD provides a specific connector to create a BLE device, :class:`Peripheral`.
 This connector implements a GATT server and hosts a GATT profile, allowing remote
 BLE devices to connect to it and query its services, characteristics, and descriptors.
-
-The connector provides some callbacks such as :meth:`Peripheral.on_connected` to
-react on specific events.
 """
 import logging
 from time import sleep
@@ -30,34 +27,64 @@ from whad.exceptions import UnsupportedCapability
 logger = logging.getLogger(__name__)
 
 class PeripheralEventDisconnected:
-    """Connected event
+    """Peripheral disconnected event.
     """
-    def __init__(self, conn_handle):
+    def __init__(self, conn_handle: int):
+        """Initialize this event
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        """
         self.__conn_handle = conn_handle
 
     @property
-    def conn_handle(self):
+    def conn_handle(self) -> int:
+        """Connection handle
+
+        :rtype: int
+        """
         return self.__conn_handle
 
 
 class PeripheralEventConnected:
     """Connected event
     """
-    def __init__(self, conn_handle, local: BDAddress, remote: BDAddress):
+    def __init__(self, conn_handle: int, local: BDAddress, remote: BDAddress):
+        """Initialize event
+
+        :param conn_handle: Connection handle
+        :type conn_handle: int
+        :param local: Peripheral BD address
+        :type local: :py:class:`whad.ble.BDAddress`
+        :param remote: Central BD address
+        :type remote: :py:class:`whad.ble.BDAddress`
+        """
         self.__conn_handle = conn_handle
         self.__local = local
         self.__remote = remote
 
     @property
-    def conn_handle(self):
+    def conn_handle(self) -> int:
+        """Connection handle
+
+        :rtype: int
+        """
         return self.__conn_handle
 
     @property
-    def local(self):
+    def local(self) -> BDAddress:
+        """Peripheral BD address
+
+        :rtype: :py:class:`whad.ble.BDAddress`
+        """
         return self.__local
 
     @property
-    def remote(self):
+    def remote(self) -> BDAddress:
+        """Central BD address
+
+        :rtype: :py:class:`whad.ble.BDAddress`
+        """
         return self.__remote
 
 class PeripheralEventListener(Thread):
