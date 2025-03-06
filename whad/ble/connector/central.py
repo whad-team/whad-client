@@ -1,6 +1,12 @@
 """
 Bluetooth Low Energy Central connector
 ======================================
+
+The :py:class:`whad.ble.connector.central.Central` class provides its own
+asynchronous event notification mechanism (different from the one used in
+the :py:class:`whad.ble.connector.peripheral.Peripheral` class for some
+weird reasons).
+
 """
 import logging
 from time import time, sleep
@@ -29,7 +35,8 @@ class CentralEvent:
     """
 
 class CentralConnected(CentralEvent):
-    """Central has been disconnected
+    """Event sent when central has successfully connected to a remote
+    peripheral.
     """
     def __init__(self, handle: int, local_peer: BDAddress, remote_peer: BDAddress):
         """Initialization
@@ -39,15 +46,21 @@ class CentralConnected(CentralEvent):
         self.__remote = remote_peer
 
     @property
-    def handle(self):
+    def handle(self) -> int:
+        """Connection handle
+        """
         return self.__handle
     
     @property
     def local_peer(self) -> BDAddress:
+        """Central BD address
+        """
         return self.__local
     
     @property
     def remote_peer(self) -> BDAddress:
+        """Remote device BD address
+        """
         return self.__remote
 
     def __repr__(self) -> str:
@@ -55,12 +68,22 @@ class CentralConnected(CentralEvent):
 
 
 class CentralDisconnected(CentralEvent):
-    """Central has been disconnected
+    """Event sent when central has been disconnected from a remote
+    peripheral.
     """
     def __init__(self, handle: int):
         """Initialization
+
+        :param handle: Connection handle
+        :type handle: int
         """
         self.__handle = handle
+
+    @property
+    def handle(self) -> int:
+        """Connection handle
+        """
+        return self.__handle
 
     def __repr__(self) -> str:
         return f"<CentralDisconnected handle={self.__handle}/>"
@@ -255,10 +278,16 @@ class Central(BLE):
 
     def on_central_event(self, event: CentralEvent):
         """Central event handler
+
+        :param  event: Central event to handle
+        :type   event: CentralEvent
         """
 
     def __notify_event(self, event: CentralEvent):
         """Send event to handlers.
+
+        :param  event: Central event to notify
+        :type   event: CentralEvent
         """
         self.__event_handler.send_event(event)
 
