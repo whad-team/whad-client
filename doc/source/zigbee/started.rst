@@ -25,6 +25,9 @@ ZigBee frames sent on channel 11:
     # Set channel
     sniffer.channel = 11
 
+    # Start sniffer
+    sniffer.start()
+
     # Sniff packets for 30 seconds
     for packet in sniffer.sniff(timeout=30.0):
         packet.show()
