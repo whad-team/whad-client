@@ -993,9 +993,10 @@ class GattProxy:
         if self.__target.conn_handle is not None:
             self.__central.disconnect(self.__target.conn_handle)
         self.__central.stop()
-        if self.__peripheral.conn_handle is not None:
-            self.__peripheral.disconnect(self.__peripheral.conn_handle)
-        self.__peripheral.stop()
+        if self.__peripheral is not None:
+            if self.__peripheral.conn_handle is not None:
+                self.__peripheral.disconnect(self.__peripheral.conn_handle)
+            self.__peripheral.stop()
 
     def on_periph_event(self, event):
         """Handle peripheral events.
