@@ -29,8 +29,24 @@ class BridgeIfaceWrapper(WhadDeviceConnector):
         logger.debug("[PacketProcIfaceWrapper] on_disconnection")
         self.__processor.on_disconnect(self)
 
+    def unlock(self, dispatch_callback=None):
+        """Unlock connector and dispatch pending PDUs.
+
+        :param  dispatch_callback: PDU dispatch callback that overrides the
+                                   internal dispatch routine
+        :type   dispatch_callback: callable
+        """
+        super().unlock(self.dispatch_locked_pdus)
+
+    def dispatch_locked_pdus(self, pdu):
+        """Process locked pdus.
+        """
+        # convert packet to message
+        msg = self.hub.convert_packet(pdu)
+        #logger.debug("[PacketProcIfaceWrapper] process locked pdu %s", msg)
+        self.on_any_msg(msg)
+
     def on_any_msg(self, message):
-        logger.debug("[PacketProcIfaceWrapper] on_any_msg: %s", message)
         self.__processor.on_any_msg(self, message)
 
     def on_generic_msg(self, message):
@@ -78,6 +94,9 @@ class Bridge:
         self.__in_wrapper = BridgeIfaceWrapper(self.__in_device, self)
         self.__out_wrapper = BridgeIfaceWrapper(self.__out_device, self)
 
+        # Unlock connectors, if locked.
+        self.unlock()
+
     def detach(self):
         """Detach BridgeIfaceWrappers from bridge's devices.
         """
@@ -103,6 +122,18 @@ class Bridge:
         """
         return self.__out
 
+    @property
+    def input_wrapper(self) -> WhadDeviceConnector:
+        """Get the internal connector for input
+        """
+        return self.__in_wrapper
+    
+    @property
+    def output_wrapper(self) -> WhadDeviceConnector:
+        """Get the internal connector for output
+        """
+        return self.__out_wrapper
+
     def on_disconnect(self, wrapper):
         """When a wrapper disconnects, stop bridge.
         """
@@ -115,6 +146,7 @@ class Bridge:
         :param message: Incoming message
         :type message: HubMessage
         """
+        logger.debug("bridge::on_any_msg - %s", message)
         if wrapper == self.__in_wrapper:
             self.on_outbound(message)
         elif wrapper == self.__out_wrapper:
@@ -158,3 +190,26 @@ class Bridge:
                 self.__in.monitor_packet_rx(packet)
 
             self.__out.send_message(message)
+
+    def unlock(self):
+        """Unlock bridge interfaces.
+        """
+        # Unlock connector, causing packets to be sent to the output connector
+        if self.__in.is_locked():
+            self.__in.unlock(dispatch_callback=self.dispatch_pending_input)
+        if self.__out.is_locked():
+            self.__out.unlock(dispatch_callback=self.dispatch_pending_output)
+
+    def dispatch_pending_output(self, message):
+        """Forward pending output messages to input.
+        """
+        self.output.monitor_packet_rx(message.to_packet())
+        self.input.monitor_packet_tx(message.to_packet())
+        self.input.send_message(message)
+
+    def dispatch_pending_input(self, message):
+        """Forward pending input messages to output.
+        """
+        self.output.monitor_packet_tx(message.to_packet())
+        self.input.monitor_packet_rx(message.to_packet())
+        self.output.send_message(message)

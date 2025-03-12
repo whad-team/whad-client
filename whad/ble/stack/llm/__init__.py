@@ -98,6 +98,12 @@ class BleConnection:
         """Link layer
         """
         return self.__l2cap.get_layer("ll")
+    
+    @property
+    def att(self):
+        """ATT layer
+        """
+        return self.__l2cap.get_layer("att")
 
     @property
     def remote_version(self):
@@ -460,6 +466,8 @@ class LinkLayer(Layer):
         # Free the previously instantiated L2CAP layer
         conn_layer = self.state.get_connection_l2cap(conn_handle)
         if conn_layer is not None:
+            # Mark GATT layer as disconnected
+            self.get_layer(conn_layer).get_layer("gatt").state.terminated = True
             self.destroy(self.get_layer(conn_layer))
 
         # Remove connection from our registered connections
@@ -549,7 +557,7 @@ class LinkLayer(Layer):
         # Retrieve connection handle corresponding to the instance
         conn_handle = self.state.get_connection_handle(l2cap_inst)
         if conn_handle is not None:
-            logger.debug("sending l2cap data PDU for conn_handle %d", conn_handle)
+            logger.debug("sending l2cap data PDU for conn_handle %d (%d bytes)", conn_handle,len(data))
             llid = 0x01 if fragment else 0x02
             self.send(
                 'phy',
@@ -563,6 +571,26 @@ class LinkLayer(Layer):
             )
         else:
             logger.error("no connection handle found for L2CAP instance %s", instance)
+
+    @instance('l2cap', tag='ATT_MTU')
+    def on_l2cap_mtu_changed(self, l2cap_inst: Layer, mtu: int):
+        """Handle MTU value change notification from L2CAP layer.
+
+        :param l2cap_inst: Connection L2CAP instance
+        :type l2cap_inst: Layer
+        :param mtu: Updated MTU value
+        :param mtu: int
+        """
+        # Retrieve connection handle corresponding to the instance
+        conn_handle = self.state.get_connection_handle(l2cap_inst)
+        if conn_handle is not None:
+            logger.debug("sending updated ATT MTU (%d) for conn_handle %d", mtu, conn_handle)
+            self.send(
+                'phy',
+                mtu,
+                tag='ATT_MTU',
+                conn_handle=conn_handle
+            )
 
     def send_ctrl_pdu(self, conn_handle: int, pdu: Packet, encrypt: bool = None):
         """Send a control PDU to the underlying PHY layer.

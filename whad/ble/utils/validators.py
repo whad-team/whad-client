@@ -6,7 +6,7 @@ from typing import Tuple
 
 from binascii import unhexlify
 
-from whad.ble.profile.attribute import UUID
+from whad.ble.profile.attribute import UUID, InvalidUUIDException as AttrInvalidUUIDException
 
 
 class InvalidUUIDException(Exception):
@@ -20,6 +20,7 @@ class InvalidUUIDException(Exception):
             f"The supplied UUID ({uuid}) is not a valid 16-bit or 128-bit UUID. "
             "(ex: 2a1b or 000AA000-0BB0-10C0-80A0-00805F9B34FB"
         )
+        
 
 # Validators for various BLESuite input parameters supplied by the user. The use
 # of these validators is mostly limited to import/export and CLI features.
@@ -210,8 +211,10 @@ def validate_attribute_uuid(uuid):
     # which will break the UUID class
     try:
         UUID(uuid)
-    except InvalidUUIDException as uuid_err:
+    except AttrInvalidUUIDException as uuid_err:
         raise InvalidUUIDException(uuid) from uuid_err
+    except TypeError as type_err:
+        raise InvalidUUIDException(uuid) from type_err
     return uuid
 
 

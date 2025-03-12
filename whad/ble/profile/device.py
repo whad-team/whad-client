@@ -334,7 +334,7 @@ class PeripheralCharacteristic:
             ((self.__characteristic.properties & CharacteristicProperties.WRITE_WITHOUT_RESPONSE) != 0)
         )
 
-    def subscribe(self, notification=True, indication=False, callback=None):
+    def subscribe(self, notification=False, indication=False, callback=None):
         """Subscribe for notification/indication.
 
         :param bool notification: If set, subscribe for notification
@@ -788,3 +788,11 @@ class PeripheralDevice(GenericProfile):
         logger.debug('PeripheralDevice has disconnected')
         if self.__disconnect_cb is not None:
             self.__disconnect_cb()
+
+    def on_mtu_changed(self, mtu: int):
+        """MTU change callback
+
+        :param  mtu: New MTU value
+        :type   mtu: int
+        """
+        logger.debug("PeripheralDevice: MTU has been changed to %d", mtu)

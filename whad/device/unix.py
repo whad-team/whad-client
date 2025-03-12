@@ -407,10 +407,28 @@ class UnixSocketServerDevice(WhadDevice):
 
 class UnixConnector(WhadDeviceConnector):
     """Dummy connector for Unix socket.
+
+    Connector is locked by default.
     """
 
-    def __init__(self, device):
-        super().__init__(device)
+    def __init__(self, device, locked: bool = True):
+        """Create a locked connector.
+        """
+        if locked:
+            # Create an empty connector, attach to no device
+            super().__init__(None)
+
+            # Lock connector
+            self.lock()
+
+            # Attach to device
+            self.set_device(device)
+            device.set_connector(self)
+        else:
+            #Create a dummy connector.
+            super().__init__(device)
+
+        # Open device
         device.open()
 
     def on_discovery_msg(self, message):
@@ -456,7 +474,10 @@ class UnixSocketConnector(WhadDeviceConnector):
         self.__shutdown_required = False
 
         # Initialize parent class (device connector)
-        super().__init__(device)
+        super().__init__(None)
+        self.lock()
+        self.set_device(device)
+        device.set_connector(self)
 
         # Create our Unix socket path
         if path is not None:
@@ -568,6 +589,7 @@ class UnixSocketConnector(WhadDeviceConnector):
         try:
             while not self.__shutdown_required:
                 self.__client,_ = self.__socket.accept()
+                self.unlock()
                 try:
                     while not self.__shutdown_required:
                         rlist = [self.__client.fileno()]

@@ -126,6 +126,10 @@ class WhadDumpApp(CommandLineApp):
                         while interface.opened:
                             sleep(.1)
                     else:
+                        # Unlock Unix connector first
+                        connector.unlock()
+
+                        # Process packets
                         while interface.opened:
                             wait(f"Dumping {self.monitor.packets_written} packets into pcap file: ",
                                 suffix = self.args.pcap
