@@ -56,6 +56,9 @@ class AccessLayer(Layer):
         self.state.event = Event()
         self.state.received_message = None
 
+        # For onoff messages (testing), transaction_id
+        self.transaction_id = 0
+
     def check_queue(self):
         """
         If the queue is not empty, process the next Access Message
@@ -210,7 +213,7 @@ class AccessLayer(Layer):
         ctx.is_ctl = False
         self.send_to_upper_transport(message)
 
-    def do_onoff(self, value, addr, acked):
+    def do_onoff(self, value, addr, acked, df):
         """
         Sends a Generic On/Off set message (acked or unacked)
 
@@ -220,6 +223,8 @@ class AccessLayer(Layer):
         :type addr: int
         :param acked: Whether the messages is acked or not
         :type acked: Bool
+        :param df: Whether message is sent via DF or not (MF if not)
+        :type df: Bool
         """
 
         app_key = (
@@ -241,8 +246,12 @@ class AccessLayer(Layer):
                 onoff=value, transaction_id=self.transaction_id
             )
 
+        self.transaction_id = (self.transaction_id + 1) % 256
         ctx = MeshMessageContext()
-        ctx.creds = DIRECTED_FORWARDING_CREDS
+        if df:
+            ctx.creds = DIRECTED_FORWARDING_CREDS
+        else:
+            ctx.creds = MANAGED_FLOODING_CREDS
         ctx.src_addr = self.state.profile.primary_element_addr.to_bytes(2, "big")
         ctx.dest_addr = addr.to_bytes(2, "big")
         ctx.ttl = 127

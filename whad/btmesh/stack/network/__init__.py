@@ -18,6 +18,7 @@ from whad.btmesh.stack.constants import (
     VIRTUAL_ADDR_TYPE,
     UNICAST_ADDR_TYPE,
     UNASSIGNED_ADDR_TYPE,
+    GROUP_ADDR_TYPE,
     MANAGED_FLOODING_CREDS,
     DIRECTED_FORWARDING_CREDS,
 )
@@ -112,7 +113,7 @@ class NetworkLayer(Layer):
         """
         Verifies the src_addr and dst_addr under the critierias defined in
         Mesh Spec Section 3.4.3. Does not check against Access layer key type criterias here.
-        Checks also is a unicast addr is within the range of this device
+        Returns the type of the Address if compliant, or None if not.
 
         :param src_addr: The source address in the network PDU
         :type src_addr: Bytes
@@ -120,38 +121,28 @@ class NetworkLayer(Layer):
         :type dst_addr: Bytes
         :param network_ctl: value of the network_ctl flag in the Network PDU
         :type network_ctl: int
-        :returns: True if address ok, False otherwise
-        :rtype: boolean
+        :returns: Address type if address ok, None otherwise
+        :rtype:  int | None
         """
         src_type = get_address_type(src_addr)
         if src_type != UNICAST_ADDR_TYPE or self.state.profile.is_unicast_addr_ours(
             int.from_bytes(src_addr, "big"),
         ):
-            return False
+            return None
 
         dst_type = get_address_type(dst_addr)
         if dst_type == UNASSIGNED_ADDR_TYPE:
-            return False
-        if network_ctl == 1 and dst_type == VIRTUAL_ADDR_TYPE:
-            return True  # Modified because inconcistency in Specification (Direct Forwarding may need dst_field VIRTUAL in ctl msg)
+            return None
+        if dst_type == VIRTUAL_ADDR_TYPE:
+            return VIRTUAL_ADDR_TYPE  # Modified because inconcistency in Specification (Direct Forwarding may need dst_field VIRTUAL in ctl msg, hence dont check network_ctl)
+        if dst_type == GROUP_ADDR_TYPE:
+            if network_ctl == 0:
+                return GROUP_ADDR_TYPE
+            else:
+                return None
 
-        int_dst_addr = int.from_bytes(dst_addr, "big")
-        if (
-            int_dst_addr == 0xFFFF
-            or int_dst_addr == 0xFFFB
-            or (dst_type == UNICAST_ADDR_TYPE and int_dst_addr > 0x7E00)
-        ):
-            return True
-
-        if dst_type != UNICAST_ADDR_TYPE or (
-            not self.state.profile.is_unicast_addr_ours(
-                int_dst_addr,
-            )
-        ):
-            logger.debug(b"RECEIVED MESSAGE FROM " + src_addr + b" TO " + dst_addr)
-            return False
-
-        return True
+        # Address is UNICAST_ADDR_TYPE
+        return UNICAST_ADDR_TYPE
 
     def __cache_verif(self, deobf_net_pdu):
         """
@@ -181,6 +172,45 @@ class NetworkLayer(Layer):
         :type lower_transport_pdu: [TODO:type]
         """
         self.send("lower_transport", (lower_transport_pdu, msg_ctx))
+
+    def relay_packet(self, deobf_net_pdu, dst_addr, net_key):
+        """
+        Relays a received PDU if relay is enabled
+
+        :param deobf_net_pdu: Deobfucated packet
+        :type deobf_net_pdu: BTMesh_Network_PDU
+        :param dst_addr: Destination addr of the packet
+        :type dst_addr: bytes
+        :param net_key: Network Key used to (de)obfuscate the packet
+        :type net_key: NetworkLayerCryptoManager
+        """
+        # Check if unicast addr is not ours
+        if self.state.profile.is_unicast_addr_ours(int.from_bytes(dst_addr, "big")):
+            return
+
+        # Check TTL > 1
+        if deobf_net_pdu.ttl < 2:
+            return
+
+        # Only relay if MF for now
+        if deobf_net_pdu.nid != net_key.nid_mf:
+            return
+
+        deobf_net_pdu.ttl -= 1
+
+        # obfuscate the payload
+        obfu_data = net_key.obfuscate_net_pdu(
+            deobf_net_pdu, self.state.profile.iv_index
+        )
+
+        pkt = BTMesh_Obfuscated_Network_PDU(
+            ivi=deobf_net_pdu.ivi,
+            nid=deobf_net_pdu.nid,
+            obfuscated_data=obfu_data,
+            enc_dst_enc_transport_pdu_mic=deobf_net_pdu.enc_dst_enc_transport_pdu_mic,
+        )
+        thread = Thread(target=self.sending_thread, args=EIR_Hdr(type=0x2A) / pkt)
+        thread.start()
 
     def on_net_pdu_received(self, net_pdu, rssi):
         """
@@ -238,13 +268,22 @@ class NetworkLayer(Layer):
 
         # check address validity. Mesh Spec Section 3.4.3
         dst_addr = plaintext[:2]
-        are_addr_valid = self.__check_address_validity(src_addr, dst_addr, network_ctl)
-        if not are_addr_valid:
+        addr_type = self.__check_address_validity(src_addr, dst_addr, network_ctl)
+        if addr_type is None:
             # logger.warning(
-            #    "Received Network PDU with non compliant addr types or UNICAST addr not ours, dropping"
+            #    "Received Network PDU with non compliant addr types, dropping"
             # )
             return
 
+        # If relay enabled, try to relay packet (if applicable)
+        if self.state.is_relay_enabled:
+            self.relay_packet(deobf_net_pdu, dst_addr, addr_type, net_key)
+
+        # Check if addr should be processed by our device
+        if not self.state.profile.is_addr_ours(dst_addr, addr_type):
+            return False
+
+        # Process the packet if we are a target of the message
         # Create Lower Transport PDU and send it to the layer
         raw_lower_transport = plaintext[2:]
         if network_ctl == 1:

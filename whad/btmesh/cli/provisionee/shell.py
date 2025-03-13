@@ -136,6 +136,39 @@ class BTMeshProvisioneeShell(InteractiveShell):
         self.success("Address of the device is now : 0x%x" % addr)
 
     @category(SETUP_CAT)
+    def do_relay(self, arg):
+        """Activate or deactivate the relaying of messages by the device (should be provisioned)
+
+        <ansicyan><b>relay</b>  [<i>on/off</i>]</ansicyan>
+
+        Activate : <b>relay</b> <i>on</i>
+
+        By default, this command shows the relay status of the node
+        """
+
+        if self._current_mode != self.MODE_STARTED:
+            self.error("Can only managed relaying on a provisioned node.")
+            return
+
+        if len(arg) < 1:
+            relay = self._connector.get_relaying_status()
+            if relay:
+                self.success("Relay is activated on the node.")
+            else:
+                self.success("Relay is deactivated on the node")
+
+        else:
+            relay = arg[0].lower()
+            if relay == "on":
+                self._connector.set_relay(True)
+                self.success("Relay is now activated on the node.")
+            elif relay == "off":
+                self._connector.set_relay(False)
+                self.success("Relays is now deactivated on the node")
+            else:
+                self.error("Wrong argument, should be on/off")
+
+    @category(SETUP_CAT)
     def do_resume(self, arg):
         """Resumes the normal behaviour of a provisioned node (after editing an element)
 

@@ -242,9 +242,16 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             self.error("Please provide the addresses in hex format")
             return
 
+        if addr_low > addr_high:
+            self.error("High address should be larger than low address")
+            return
+
         self._connector.do_network_discovery(addr_low, addr_high)
         self.success("Successfully started the network_discovery attack.")
-        self.success("Wait a little to ask for the topolgy")
+        self.success(
+            "Wait a little to ask for the topolgy, in about %.1f seconds"
+            % ((addr_high - addr_low + 1) * 2.5)
+        )
 
     @category(ATTACK_CAT)
     def do_get_network(self, arg):
