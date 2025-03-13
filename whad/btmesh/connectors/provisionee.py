@@ -183,7 +183,7 @@ class Provisionee(BTMesh):
             return
         self.whitelist.pop(index)
 
-    def do_onoff(self, value, addr, acked):
+    def do_onoff(self, value, addr, acked, df):
         """
         Sends a Generic On/Off set message (acked or unacked)
 
@@ -193,8 +193,25 @@ class Provisionee(BTMesh):
         :type addr: int
         :param acked: Whether the messages is acked or not
         :type acked: Bool
+        :param df: Whether message is sent via DF or not (MF if not)
+        :type df: Bool
         """
-        self._main_stack.get_layer("access").do_onoff(value, addr, acked)
+        self._main_stack.get_layer("access").do_onoff(value, addr, acked, df)
+
+    def set_relay(self, onoff):
+        """
+        Enables of disabled relaying on the NetworkLayer
+
+        :param onoff: Set the relay on or off
+        :type onoff: boolean
+        """
+        self._main_stack.get_layer("network").state.is_relay_enabled = onoff
+
+    def get_relaying_status(self):
+        """
+        Returns whether the relaying is enabled or not
+        """
+        return self._main_stack.get_layer("network").state.is_relay_enabled
 
     """
     def handle_key_press(self):

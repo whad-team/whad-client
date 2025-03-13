@@ -238,6 +238,7 @@ class Model(object):
         # List of handlers for incoming messages. Opcode -> handler
         self.handlers = {}
 
+        # If set to true, need to add corresponding state subscription_list
         self.supports_subscribe = False
 
     def handle_message(self, message):
@@ -450,7 +451,7 @@ class Element(object):
 
     def check_group_subscription(self, addr):
         """
-        Checks if any model in the element is subscribed to the addr in parameter
+        Checks if any model server in the element is subscribed to the addr in parameter
         THE ADDR IS A GROUP ADDR IN THIS FUNCTION
 
         :param addr: Group Addr to check
@@ -459,15 +460,16 @@ class Element(object):
         """
         res = False
         for model in self.models:
-            sub_list = model.get_state("subscription_list").get_value("group_addrs")
-            if addr in sub_list:
-                res = True
-                break
+            if isinstance(model, ModelServer) and model.supports_subscribe:
+                sub_list = model.get_state("subscription_list").get_value("group_addrs")
+                if addr in sub_list:
+                    res = True
+                    break
         return res
 
     def check_virt_subscription(self, addr):
         """
-        Checks if any model in the element is subscribed to the addr in parameter
+        Checks if any model server in the element is subscribed to the addr in parameter
         THE ADDR IS A VIRTUAL ADDR IN THIS FUNCTION
 
         :param addr: Virtual Addr to check
@@ -476,11 +478,12 @@ class Element(object):
         """
         res = False
         for model in self.models:
-            sub_list = model.get_state("subscription_list").get_value("label_uuids")
-            for label in sub_list:
-                if compute_virtual_addr_from_label_uuid(label) == addr:
-                    res = True
-                    break
+            if isinstance(model, ModelServer) and model.supports_subscribe:
+                sub_list = model.get_state("subscription_list").get_value("label_uuids")
+                for label in sub_list:
+                    if compute_virtual_addr_from_label_uuid(label) == addr:
+                        res = True
+                        break
         return res
 
     def handle_user_input(self, key_pressed=""):

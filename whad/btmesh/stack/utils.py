@@ -155,9 +155,9 @@ def get_address_type(address):
 
     if address == 0:
         return UNASSIGNED_ADDR_TYPE
-    if (address[0] >> 6) & 0x10 == 0x00:
+    if (address[0] >> 6) & 0b10 == 0x00:
         return UNICAST_ADDR_TYPE
-    if (address[0] >> 6 & 0x11) == 0b10:
+    if (address[0] >> 6) == 0b10:
         return VIRTUAL_ADDR_TYPE
 
     return GROUP_ADDR_TYPE

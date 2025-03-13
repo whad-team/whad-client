@@ -8,6 +8,12 @@ from whad.btmesh.models import Element
 from whad.btmesh.models.configuration import ConfigurationModelServer
 from whad.btmesh.models.health import HealthModelServer
 from whad.btmesh.models.generic_on_off import GenericOnOffServer
+from whad.btmesh.stack.constants import (
+    GROUP_ADDR_TYPE,
+    UNICAST_ADDR_TYPE,
+    VIRTUAL_ADDR_TYPE,
+    UNASSIGNED_ADDR_TYPE,
+)
 
 from threading import Lock
 
@@ -118,6 +124,7 @@ class BaseMeshProfile(object):
         """
         Verifies if a unicast addr is ours (in the range of our addresses)
         Use after provisioning only ...
+        If addr is 0x7E00 or 0x7FFF, considered ours (for attacks)
 
         :param addr: Unicast addr to check
         :type addr: int
@@ -127,6 +134,35 @@ class BaseMeshProfile(object):
         if addr >= self.primary_element_addr and addr <= max_addr:
             return True
         return False
+
+    def is_addr_ours(self, addr, addr_type):
+        """
+        Checks if an address (unicast, group or virtual) is a target of us (should we process it after the network layer ?)
+
+        :param addr: Address to check
+        :type addr: byte
+        :param addr_type: Addr type
+        :type addr_type: int
+        :returns: True if we are a target, False otherwise
+        :rtype: boolean
+        """
+        if addr_type == UNASSIGNED_ADDR_TYPE:
+            return False
+
+        if addr_type == UNICAST_ADDR_TYPE:
+            return self.is_unicast_addr_ours(int.from_bytes(addr, "big")) or (
+                addr == b"\x7e\x00" or addr == b"\x7f\xff"
+            )
+
+        if (
+            addr_type == GROUP_ADDR_TYPE
+        ):  # for now, only broadcast addr (all nodes and all directed forwarding) are considered
+            if addr == b"\xff\xff" or addr == b"\xff\xfb":
+                return True
+            return False
+
+        if addr_type == VIRTUAL_ADDR_TYPE:
+            return False
 
     @lock
     def get_next_seq_number(self, inc=1):

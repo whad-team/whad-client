@@ -80,7 +80,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
     def on_path_request_react(self, message):
         """
         On path request react, attacks A2 and A3
-        We admit that the unused address in the Path Soliciation is 0x7FE1
+        We admit that the unused address in the Path Soliciation is 0x7E00
 
         :param message: The Path request message and its context
         :type message: (BTMesh_Upper_Transport_Control_Path_Request, MeshMessageContext)
@@ -106,7 +106,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
 
     def a3_path_request_react(self, message):
         """
-        Actions for the A2 attack on a path request
+        Actions for the A3 attack on a path request
 
         :param message: Packet and its context
         :type message: (BTMesh_Upper_Transport_Control_Path_Request, MeshMessageContext)
@@ -402,7 +402,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
                 base_pkt,
                 base_ctx,
             ))
-            sleep(0.2)
+            sleep(2.5)
 
     def discovery_get_hops(self):
         """
