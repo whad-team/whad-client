@@ -44,7 +44,7 @@ Sending IEEE 802.15.4 packets is as easy as it sounds, simply use the
 .. code-block:: python
 
     from whad.device import WhadDevice
-    from whad.dot15d4 import Sniffer
+    from whad.dot15d4 import Dot15d4
 
     # Create a compatible device instance
     device = WhadDevice.create("uart0")
