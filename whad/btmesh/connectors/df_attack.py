@@ -82,7 +82,7 @@ class DFAttacks(Provisionee):
         if auto_provision:
             self.auto_provision(net_key, app_key, unicast_addr)
 
-    def do_network_discovery(self, addr_low, addr_high):
+    def do_network_discovery(self, addr_low, addr_high, delay=3.5):
         """
         launch the discovery attack
 
@@ -90,12 +90,14 @@ class DFAttacks(Provisionee):
         :type addr_low: int
         :param addr_high: Highest address to test
         :type addr_high: int
+        :param delay: Delay between 2 Path Requests, defaults to 3.5
+        :type delay: float, optional
         """
         thread = Thread(
             target=self._main_stack.get_layer(
                 "upper_transport"
             ).discover_topology_thread,
-            args=[addr_low, addr_high],
+            args=[addr_low, addr_high, delay],
         )
         thread.start()
 
@@ -103,7 +105,10 @@ class DFAttacks(Provisionee):
         """
         Get the distance between attacker to discovred node via network discovery attack
         """
-        self._main_stack.get_layer("upper_transport").discovery_get_hops()
+        thread = Thread(
+            target=self._main_stack.get_layer("upper_transport").discovery_get_hops
+        )
+        thread.start()
 
     def get_network_topology(self):
         """
