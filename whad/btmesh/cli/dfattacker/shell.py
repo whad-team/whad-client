@@ -221,9 +221,11 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
     def do_network_discovery(self, args):
         """Performs discovery of the network (on a network with directed forwarding)
 
-        <ansicyan><b>network_discovery</b> <i>addr_low</i> <i>addr_low</i></ansicyan>
+        <ansicyan><b>network_discovery</b> <i>addr_low</i> <i>addr_low</i> [<i>delay</i>]</ansicyan>
 
-        > network_discovery 0001 00AA
+        > network_discovery 0001 00AA 4
+
+        The delay value defaults to 3.5 seconds (delay between 2 Path Requests sent)
         """
         if self._current_mode != self.MODE_STARTED:
             self.error(
@@ -246,11 +248,19 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             self.error("High address should be larger than low address")
             return
 
-        self._connector.do_network_discovery(addr_low, addr_high)
+        if len(args) >= 3:
+            try:
+                delay = float(args[2])
+            except ValueError:
+                self.error("Delay is a float.")
+        else:
+            delay = 3.5
+
+        self._connector.do_network_discovery(addr_low, addr_high, delay)
         self.success("Successfully started the network_discovery attack.")
         self.success(
             "Wait a little to ask for the topolgy, in about %.1f seconds"
-            % ((addr_high - addr_low + 1) * 2.5)
+            % ((addr_high - addr_low + 1) * delay)
         )
 
     @category(ATTACK_CAT)
@@ -273,12 +283,14 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
     def do_get_hops(self, arg):
         """Launches the distance discovery attack on discovered nodes
 
-        <ansicyan><b>get_hops</b</ansicyan>
+        <ansicyan><b>get_hops</b></ansicyan>
         """
 
+        nb_nodes = len(self._connector.get_network_topology().keys())
         self._connector.do_get_hops()
         self.success(
-            "Successfully launched distance evaluation of discovered nodes. Launch 'get_network' to see results"
+            "Successfully launched distance evaluation of discovered nodes. Launch 'get_network' to see results in about %.1f seconds."
+            % (nb_nodes * 0.5)
         )
 
     @category(DF_SETUP)
@@ -495,10 +507,10 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
         self.success("Successfully reset the DF of specified node(s).")
 
     @category(SETUP_CAT)
-    def do_topology(self, arg):
+    def do_topology(self, args):
         """Configures the whitelist to correspond to a grid or linear topology (based on unicast addresses)
 
-        <ansicyan>topology <i>"linear"|"grid"</ansicyan>
+        <ansicyan>topology <i>"linear"|"grid" [<i>grid_size</i>]</ansicyan>
 
         To set to topology to grid :
 
@@ -514,11 +526,11 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             )
             return
 
-        if len(arg) < 1:
+        if len(args) < 1:
             self.error("You need to specify the type of topology (grid or linear)")
             return
 
-        topology = arg[0].lower()
+        topology = args[0].lower()
         own_addr = self._profile.primary_element_addr
         base = "aa:aa:aa:aa:aa:"
         if topology == "linear":
@@ -529,21 +541,31 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             self.success("Successfully set the topology to linear")
 
         elif topology == "grid":
+            if len(args) < 2:
+                self.error("Specify Size of grid")
+                return
+
+            try:
+                grid_size = int(args[1])
+            except ValueError:
+                self.error("Grid size is an integer decimal form")
+                return
+
             self._connector.reset_whitelist()
-            row = (own_addr >> 4) & 0xF
-            col = own_addr & 0xF
+            movements = [
+                -grid_size - 1,
+                -grid_size,
+                -grid_size + 1,
+                -1,
+                +1,
+                grid_size - 1,
+                grid_size,
+                grid_size + 1,
+            ]
 
-            for dr in [-1, 0, 1]:
-                for dc in [-1, 0, 1]:
-                    if dr == 0 and dc == 0:
-                        continue
-                    new_row = row + dr
-                    new_col = col + dc
-
-                    # Ensure new_row and new_col are within valid range (0 to 15)
-                    if 0 <= new_row <= 15 and 0 <= new_col <= 15:
-                        # Combine the new_row and new_col into a single address
-                        new_address = (new_row << 4) | new_col
-                        self._connector.add_whitelist(base + ("%02x" % new_address))
+            for movement in movements:
+                addr = own_addr + movement
+                if addr > 0 and addr <= grid_size * grid_size:
+                    self._connector.add_whitelist(base + ("%02x" % addr))
 
             self.success("Successfully set the topology to grid")

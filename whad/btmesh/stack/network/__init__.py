@@ -133,13 +133,11 @@ class NetworkLayer(Layer):
         dst_type = get_address_type(dst_addr)
         if dst_type == UNASSIGNED_ADDR_TYPE:
             return None
+        # I know dumb condition, but better for clarity, but some weird stuff in specification, keep myself accountable
         if dst_type == VIRTUAL_ADDR_TYPE:
             return VIRTUAL_ADDR_TYPE  # Modified because inconcistency in Specification (Direct Forwarding may need dst_field VIRTUAL in ctl msg, hence dont check network_ctl)
         if dst_type == GROUP_ADDR_TYPE:
-            if network_ctl == 0:
-                return GROUP_ADDR_TYPE
-            else:
-                return None
+            return GROUP_ADDR_TYPE
 
         # Address is UNICAST_ADDR_TYPE
         return UNICAST_ADDR_TYPE
@@ -261,9 +259,9 @@ class NetworkLayer(Layer):
             deobf_net_pdu, self.state.profile.iv_index
         )
         if not is_auth_valid:
-            logger.warning(
-                "Received Network PDU with wrong authentication value, dropping"
-            )
+            # logger.warning(
+            #    "Received Network PDU with wrong authentication value, dropping"
+            # )
             return
 
         # check address validity. Mesh Spec Section 3.4.3
@@ -321,6 +319,7 @@ class NetworkLayer(Layer):
         :type message: (BTMesh_Lower_Transport_Access_Message|BTMesh_Lower_Transport_Control_Message, MeshMessageContext)
         """
         pkt, ctx = message
+
         net_key = (
             self.state.profile.get_configuration_server_model()
             .get_state("net_key_list")

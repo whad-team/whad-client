@@ -150,9 +150,10 @@ class BaseMeshProfile(object):
             return False
 
         if addr_type == UNICAST_ADDR_TYPE:
-            return self.is_unicast_addr_ours(int.from_bytes(addr, "big")) or (
-                addr == b"\x7e\x00" or addr == b"\x7f\xff"
+            res = self.is_unicast_addr_ours(int.from_bytes(addr, "big")) or (
+                addr == b"\x7e\x00" or addr == b"\x7e\x01" or addr == b"\x7f\xff"
             )
+            return res
 
         if (
             addr_type == GROUP_ADDR_TYPE
