@@ -171,6 +171,7 @@ class BTMesh(Sniffer):
             1, "big"
         ) + b"\xaa\xaa\xaa\xaa\xaa"
         adv_pkt = BTLE_ADV(TxAdd=0) / BTLE_ADV_NONCONN_IND(AdvA=AdvA, data=packet)
+        packet.show()
         for i in range(0, 2):
             self.send_pdu(
                 adv_pkt,
@@ -243,6 +244,20 @@ class BTMesh(Sniffer):
             self.profile.set_primary_element_addr(address)
 
         return self.profile.primary_element_addr
+
+    def do_secure_network_beacon(self, key_refresh, iv_update):
+        """
+        Sends a secure network beacon to the network with the given arguments
+
+        :param key_refresh: Key refresh flag
+        :type key_refresh: int
+        :param iv_update: IV update flag
+        :type iv_update: int
+        """
+
+        self._main_stack.get_layer("network").send_secure_network_beacon(
+            key_refresh, iv_update
+        )
 
 
 class BTMeshHCI(Peripheral):

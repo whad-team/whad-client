@@ -12,6 +12,8 @@ from whad.scapy.layers.btmesh import (
     BTMesh_Lower_Transport_Access_Message,
     BTMesh_Lower_Transport_Control_Message,
     EIR_Hdr,
+    EIR_BTMesh_Beacon,
+    BTMesh_Secure_Network_Beacon,
 )
 from whad.btmesh.crypto import NetworkLayerCryptoManager
 from whad.btmesh.stack.constants import (
@@ -309,6 +311,40 @@ class NetworkLayer(Layer):
             msg_ctx.creds == DIRECTED_FORWARDING_CREDS
 
         self.send_to_lower_transport(msg_ctx, lower_transport_pdu)
+
+    # WIP
+    def send_secure_network_beacon(self, key_refresh, iv_update):
+        """
+        Sends a secure network beacon to the network with the given arguments
+
+        :param key_refresh: Key refresh flag
+        :type key_refresh: int
+        :param iv_update: IV update flag
+        :type iv_update: int
+        """
+
+        net_key = (
+            self.state.profile.get_configuration_server_model()
+            .get_state("net_key_list")
+            .get_value(0)
+        )
+
+        message = BTMesh_Secure_Network_Beacon(
+            iv_update_flag=iv_update,
+            key_refresh_flag=key_refresh,
+            nid=net_key.network_id,
+            ivi=self.state.profile.iv_index[0] & 0b1,
+        )
+
+        message.authentication_value = net_key.compute_secure_beacon_auth_value(message)
+        thread = Thread(
+            target=self.sending_thread,
+            args=EIR_Hdr(type=0x2B)
+            / EIR_BTMesh_Beacon(
+                mesh_beacon_type=0x01, secure_beacon_data=message
+            ),
+        )
+        thread.start()
 
     @source("lower_transport")
     def on_lower_transport_packet(self, message):

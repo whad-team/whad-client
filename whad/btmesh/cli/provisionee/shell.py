@@ -606,13 +606,16 @@ class BTMeshProvisioneeShell(InteractiveShell):
 
     @category(MISC)
     def do_onoff(self, args):
-        """Sends an onoff message via DF
-        <ansicyan><b>onoff</b> <i>"1"|"0"</i> <i>addr</i> [<i>"acked"|"unacked"</i>]</ansicyan>
+        """Sends an onoff message
+        <ansicyan><b>onoff</b> <i>"1"|"0"</i> <i>addr</i> [<i>"acked"|"unacked"</i>] [<i>"MF","DF"]</ansicyan>
 
-        > onoff 1 0x0004 acked
+        > onoff 1 0x0004 acked DF
 
-        By default, sends the message unacked
+        By default, sends the message unacked via MF
         """
+        if self._current_mode != self.MODE_STARTED:
+            self.error("Can only send a message from a provisioned node.")
+            return
 
         if len(args) < 2:
             self.error("You need to specify value and a destination address and ")
@@ -635,8 +638,106 @@ class BTMeshProvisioneeShell(InteractiveShell):
         if len(args) >= 3:
             acked = args[2] == "acked"
 
-        self._connector.do_onoff(value, addr, acked)
+        df = False
+        if len(args) >= 4:
+            df = args[3].lower() == "df"
+
+        self._connector.do_onoff(value, addr, acked, df)
         self.success("Successfully sent onoff message.")
+
+    @category(SETUP_CAT)
+    def do_net_keys(self, args):
+        """Manages the net keys of the node (update, add, remove)
+
+        <ansicyan><b>net_keys</b> [<i>ACTION</i>] [<i>NET_KEY_IDX</i>] [<i>NET_KEY_VALUE</i>]</ansicyan>
+
+        For the <i>ACTION</i> field :
+
+        - <b>list</b> : Lists the netkeys and theis values
+        - <b>update</b> : If net_key_idx not already there, add the net_key with net_key_value. If already present, update the value of the key
+        - <b>remove</b> : If net_key_idx present, removes the key (cannot have less than 1 net_key though)
+
+        > To list  :  net_keys list
+
+
+        > To update/add key :  net_keys update 0 efb2255e6422d330088e09bb015ed707
+
+        > To remove : net_keys remove 1
+        """
+
+        if self._current_mode != self.MODE_STARTED:
+            self.error("Cannot manage keys on an unprovisionned device")
+
+        if len(args) >= 1:
+            action = args[0].lower()
+            if action == "list":
+                subnets = self._profile.get_all_subnets()
+                print(subnets)
+                for subnet in subnets:
+                    net_key = self._profile.get_net_key(subnet.net_key_index)
+                    if net_key is None:
+                        continue
+                    print_formatted_text(
+                        HTML(
+                            "|─ <ansimagenta><b>Index : %d Key : %s</b></ansimagenta>"
+                            % (subnet.net_key_index, net_key.net_key.hex())
+                        )
+                    )
+                return
+            elif action == "update":
+                if len(args) < 3:
+                    self.error("Specify net_key_index and value of the key")
+                    return
+
+                try:
+                    net_key_index = int(args[1])
+                    key = bytes.fromhex(args[2])
+                except ValueError:
+                    self.error(
+                        "The net_key_index is an integer and the key is a hex string."
+                    )
+                    return
+
+                success = self._profile.update_net_key(net_key_index, key)
+                if not success:
+                    self.error("Update of net_key failed")
+                    return
+                else:
+                    self.success("Update of net_key successfull")
+
+        else:
+            self.error("Specify an action (list, update, remove)")
+            return
+
+    @category(MISC)
+    def do_secure_network_beacon(self, args):
+        """Sends a secure network beacon with the given parameters.
+
+        <ansicyan><b>secure_network_beacon</b> <i>0|1</i> <i>0|1</i></ansicyan>
+
+        First arugment is key refresh flag, second is IV update flag
+        """
+        if self._current_mode != self.MODE_STARTED:
+            self.error("Can only send a message from a provisioned node.")
+            return
+
+        if len(args) < 2:
+            self.error("Specify key refresh and IV update flags")
+            return
+
+        try:
+            key_refresh = int(args[0])
+            iv_update = int(args[0])
+        except ValueError:
+            self.error("Values for the arguments is 0 or 1")
+            return
+
+        if key_refresh not in [0, 1] or iv_update not in [0, 1]:
+            self.error("Values for the arguments is 0 or 1")
+            return
+
+        self._connector.do_secure_network_beacon(key_refresh, iv_update)
+        self.success("Successfully sent the Secure network beacon.")
 
     def complete_wireshark(self):
         """Autocomplete wireshark command"""
