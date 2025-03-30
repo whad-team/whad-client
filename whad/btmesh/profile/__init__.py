@@ -14,6 +14,9 @@ from whad.btmesh.stack.constants import (
     VIRTUAL_ADDR_TYPE,
     UNASSIGNED_ADDR_TYPE,
 )
+from whad.btmesh.stack.utils import Subnet, MeshMessageContext
+from whad.btmesh.crypto import NetworkLayerCryptoManager
+from whad.scapy.layers.btmesh import BTMesh_Model_Config_Net_Key_Add
 
 from threading import Lock
 
@@ -79,8 +82,8 @@ class BaseMeshProfile(object):
         # Create and register primary element
         self.register_element(is_primary=True)
 
-        # dict of the subnets of the node. Key is net_key_index, value is a Subnet
-        self.__subnets = {}
+        # dict of the subnets of the node. (Subnet objects)
+        self.__subnets = []
 
         self.__populate_base_models()
 
@@ -232,6 +235,10 @@ class BaseMeshProfile(object):
                 field_name=app_key.key_index, value=app_key
             )
 
+        # Create subnet from the provisioning data
+        subnet = Subnet(primary_net_key.key_index)
+        self.add_subnet(subnet)
+
     def bind_all(self, app_key_index):
         """
         Used when auto provisioning. Bind all the models of the node to app_key with index in argument
@@ -298,6 +305,53 @@ class BaseMeshProfile(object):
         """
         return self.get_element(0).get_model_by_id(0)
 
+    def get_net_key(self, index):
+        """
+        Returns the NetworkLayerCryptoManager object associated with net_key_index.
+        None if not exist
+
+        :param index: net_key_index
+        :type index: int
+        """
+        return (
+            self.get_configuration_server_model()
+            .get_state("net_key_list")
+            .get_value(index)
+        )
+
+    def update_net_key(self, net_key_index, key):
+        """
+        Updates the net_key at index if it exists, or creates it alongisde the corresponding Subnet object
+        For update, does not follow the proper Key refresh procedure (simply replaces the value)
+
+        Returns False if problem, True if successfull
+
+        :param net_key_index: The net_key_index
+        :type net_key_index: int
+        :param key: The key value to add/update
+        :type key: Bytes
+        """
+
+        if self.get_subnet(net_key_index) is not None:
+            self.get_configuration_server_model().get_state("net_key_list").set_value(
+                field_name=net_key_index,
+                value=NetworkLayerCryptoManager(net_key_index, key),
+            )
+            return True
+        else:
+            message = BTMesh_Model_Config_Net_Key_Add(
+                net_key_index=net_key_index, net_key=key
+            )
+            response = self.get_configuration_server_model().on_net_key_add((
+                message,
+                MeshMessageContext(),
+            ))
+            if response.status != 0:
+                return False
+
+            self.add_subnet(Subnet(net_key_index))
+            return True
+
     def get_subnet(self, index):
         """
         Returns the subnet with given net_key_index
@@ -307,14 +361,15 @@ class BaseMeshProfile(object):
         :returns: The Subnet associated with the index if it exists, None otherwise
         :rtype: Subnet | None
         """
-        try:
-            return self.__subnets[index]
-        except IndexError:
-            return None
+        for subnet in self.__subnets:
+            if subnet.net_key_index == index:
+                return subnet
+
+        return None
 
     def get_all_subnets(self):
         """
-        Returns all the subnets objects of the node
+        Returns all the subnets objects of the node (List)
         """
         return self.__subnets
 
@@ -325,9 +380,8 @@ class BaseMeshProfile(object):
         :param subnet: The subnet to add (with netkey intialized)
         :type subnet: Subnet
         """
-        if subnet.net_key.key_index in self.__subnets.keys():
-            return
-        self.__subnets[subnet.net_key.key_index] = subnet
+        if self.get_subnet(subnet.net_key_index) is None:
+            self.__subnets.append(subnet)
 
     def remove_subnet(self, index):
         """
@@ -339,4 +393,8 @@ class BaseMeshProfile(object):
         :returns: The removed subnet
         :rtype: Subnet | None
         """
-        return self.__subnets.pop(index, default=None)
+        for i in range(len(self.__subnets)):
+            if self.__subnets[i].net_key_index == index:
+                return self.__subnets.pop(i)
+
+        return None

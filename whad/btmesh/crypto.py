@@ -441,6 +441,9 @@ class NetworkLayerCryptoManager:
         # List of bound app key indexes to this network key
         self.app_key_indexes = []
 
+        # Used when key is updated, old key is stored here only for decipher
+        self.old_net_key = None
+
         self.__compute_sub_keys()
 
     def __compute_sub_keys(self):
@@ -522,7 +525,7 @@ class NetworkLayerCryptoManager:
         """
         Computes the Network ID. Mesh Spec Section 3.9.6.3.2 p. 202
         """
-        return k3(self.net_key)
+        return int.from_bytes(k3(self.net_key), "big")
 
     def add_app_key_index(self, app_key_index):
         """

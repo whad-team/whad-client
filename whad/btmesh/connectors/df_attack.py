@@ -36,6 +36,7 @@ class DFAttacks(Provisionee):
         profile=BaseMeshProfile(),
         auto_provision=False,
         net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
+        #net_key=bytes.fromhex("efb2255e6422d330088e09bb015ed707"),
         app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
         unicast_addr=b"\x00\x02",
     ):

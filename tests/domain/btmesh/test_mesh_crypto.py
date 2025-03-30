@@ -396,19 +396,19 @@ def network_crypto_manager_setup(request):
 class TestNetworkLayerCryptoManager(object):
     def test_nid(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
-        assert crypto_manager.nid.to_bytes(1, "big") == expected["nid"]
+        assert crypto_manager.nid_mf.to_bytes(1, "big") == expected["nid"]
 
     def test_enc_key(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
-        assert crypto_manager.enc_key == expected["enc_key"]
+        assert crypto_manager.enc_key_mf == expected["enc_key"]
 
     def test_privacy_key(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
-        assert crypto_manager.privacy_key == expected["privacy_key"]
+        assert crypto_manager.privacy_key_mf == expected["privacy_key"]
 
     def test_network_id(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
-        assert crypto_manager.network_id == expected["network_id"]
+        assert crypto_manager.network_id == int.from_bytes(expected["network_id"], "big")
 
     def test_identity_key(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
@@ -429,7 +429,7 @@ class TestNetworkLayerCryptoManager(object):
         assert raw(
             BTMesh_Network_PDU(
                 ivi=expected["iv_index"][0] & 0b01,
-                nid=crypto_manager.nid,
+                nid=crypto_manager.nid_mf,
                 network_ctl=network_ctl,
                 ttl=ttl,
                 seq_number=int.from_bytes(seq_number, "big"),

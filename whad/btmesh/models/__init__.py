@@ -125,7 +125,6 @@ class CompositeModelState:
         :type sub_states_cls: Any
         :param net_key_index: If state bound to a subnet, net_key_index of the subnet, defaults to None
         :type net_key_index: int, optional
-
         """
         self.__name = name
 
