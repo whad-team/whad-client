@@ -925,7 +925,6 @@ class GattProxy:
                 self.__peripheral.disconnect(self.__peripheral.conn_handle)
 
             # Reconnect to Central using the already discovered GATT profile
-            self.__peripheral.disconnect(self.__peripheral.conn_handle)
             self.__peripheral.stop()
             self.__central.stop()
             self.__profile = self.__target_profile
