@@ -22,7 +22,7 @@ from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, HC
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
-    WhadDeviceUnsupportedOperation
+    WhadDeviceUnsupportedOperation, WhadDeviceError
 from whad.device import VirtualDevice
 
 # Whad hub
@@ -120,6 +120,7 @@ class HCIDevice(VirtualDevice):
         self._connected = False
         self.__max_acl_len = 27
         self._active_handles = []
+        self.__closing = False
 
     @property
     def identifier(self):
@@ -149,6 +150,13 @@ class HCIDevice(VirtualDevice):
         """
         Close current device.
         """
+        # Avoid recursion that may occur due to super().close()
+        if self.__closing:
+            return
+
+        # Marking device as in closing process
+        self.__closing = True
+
         # Disconnect if necessary
         for handle in self._active_handles:
             self._disconnect(handle)
@@ -163,6 +171,9 @@ class HCIDevice(VirtualDevice):
             del self.__socket
             self.__socket = None
         self.__opened = False
+
+        # Closing process done.
+        self.__closing = False
 
 
     def write(self, data):
@@ -410,7 +421,10 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_Read_BD_Addr())
         if response.status == 0x00 and HCI_Cmd_Complete_Read_BD_Addr in response:
             return response.addr
-        return None
+
+        # Cannot read BD address, device is non-responsive.
+        # logger.error("[%s] cannot read BD address", self.interface)
+        raise WhadDeviceNotReady(f"cannot read BD address of interface {self.interface}")
 
     def _read_local_name(self):
         """
