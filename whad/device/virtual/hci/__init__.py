@@ -424,6 +424,8 @@ class HCIDevice(VirtualDevice):
 
         # Cannot read BD address, device is non-responsive.
         # logger.error("[%s] cannot read BD address", self.interface)
+        logger.debug("cannot read BD address of interface %s", self.interface)
+        logger.debug("raising WhadDeviceNotReady exception")
         raise WhadDeviceNotReady(f"cannot read BD address of interface {self.interface}")
 
     def _read_local_name(self):
@@ -433,7 +435,11 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_Read_Local_Name())
         if response.status == 0x00 and HCI_Cmd_Complete_Read_Local_Name in response:
             return response.local_name
-        return None
+        
+        # Cannot read local name.
+        logger.debug("cannot read local name of interface %s", self.interface)
+        logger.debug("raising WhadDeviceNotReady exception")
+        raise WhadDeviceNotReady()
 
     def _read_local_version_information(self):
         """
@@ -445,7 +451,11 @@ class HCIDevice(VirtualDevice):
             version += [response.hci_subversion]
             manufacturer = BT_MANUFACTURERS[response.company_identifier].encode("utf-8")
             return version, manufacturer
-        return None
+        
+        # Cannot read local version information.
+        logger.debug("cannot read local version of interface %s", self.interface)
+        logger.debug("raising WhadDeviceNotReady exception")
+        raise WhadDeviceNotReady()
 
     def _read_le_supported_states(self):
         """
@@ -459,9 +469,10 @@ class HCIDevice(VirtualDevice):
                     states.append(state)
             return states
 
-        # Error while reading states
-        logger.debug("[hci] interface returned an error while reading supported states")
-        return None
+        # Cannot read supported LE states.
+        logger.debug("cannot read supported LE states for interface %s", self.interface)
+        logger.debug("raising WhadDeviceNotReady exception")
+        raise WhadDeviceNotReady()
 
     def _set_bd_address(self, bd_address="11:22:33:44:55:66", bd_address_type=AddressType.PUBLIC):
         """
