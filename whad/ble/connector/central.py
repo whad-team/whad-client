@@ -11,8 +11,8 @@ weird reasons).
 import logging
 from time import time, sleep
 from threading import Thread
-from queue import Empty
-from multiprocessing import Queue
+from queue import Empty, Queue
+#from multiprocessing import Queue
 
 from whad.ble.connector.base import BLE
 from whad.hub.ble import Direction
@@ -99,6 +99,9 @@ class CentralEventHandler(Thread):
         # Initialize our message queue
         self.__queue = Queue()
 
+        # This thread is a daemon (must be terminated when main thread ends).
+        self.daemon = True
+
     def cancel(self):
         """Stop event handler.
         """
@@ -138,7 +141,7 @@ class CentralEventHandler(Thread):
         """
         while not self.__canceled:
             try:
-                event = self.__queue.get(timeout=1.0)
+                event = self.__queue.get(block=True, timeout=1.0)
                 if event is not None:
                     logger.debug("[central event handler] dispatch queued event: %s", event)
                     for callback, event_type in self.__listeners.items():
@@ -153,7 +156,7 @@ class Central(BLE):
     To initiate a connection to a device, just call :meth:`Central.connect` with the target
     BD address and it should return an instance of 
     :class:`whad.ble.profile.device.PeripheralDevice` in return.
-
+f
     """
 
     def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack,
