@@ -99,6 +99,9 @@ class PeripheralEventListener(Thread):
         self.__running = True
         self.__callback = callback
 
+        # This thread is a daemon (must be terminated when main thread ends).
+        self.daemon = True
+
     @property
     def queue(self):
         return self.__queue
@@ -116,7 +119,7 @@ class PeripheralEventListener(Thread):
     def run(self):
         while self.__running:
             try:
-                event = self.__queue.get(timeout=1.0)
+                event = self.__queue.get(block=True, timeout=1.0)
                 if event is not None:
                     if self.__callback is not None:
                         self.__callback(event)
@@ -446,7 +449,6 @@ class Peripheral(BLE):
 
         logger.info("a device has just connected (connection handle: %d)",
                     disconnection_data.conn_handle)
-        print("stack notified of disconnection")
         self.__stack.on_disconnection(
             disconnection_data.conn_handle,
             disconnection_data.reason
