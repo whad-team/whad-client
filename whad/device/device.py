@@ -41,6 +41,7 @@ class WhadDeviceInputThread(Thread):
         self.__device = device
         self.__io_thread = io_thread
         self.__canceled = False
+        self.daemon = True
 
     def cancel(self):
         """
@@ -68,6 +69,7 @@ class WhadDeviceInputThread(Thread):
         logger.info("Device IO thread canceled and stopped.")
         self.__io_thread.on_disconnection()
         logger.info("on_disconnection done.")
+        logger.info("Input thread for interface %s has stopped.", self.__device.interface)
 
 class WhadDeviceMessageThread(Thread):
     """Main device incoming message processing thread.
@@ -81,6 +83,7 @@ class WhadDeviceMessageThread(Thread):
         super().__init__()
         self.__device = device
         self.__canceled = False
+        self.daemon = True
 
     def cancel(self):
         """
@@ -104,6 +107,8 @@ class WhadDeviceMessageThread(Thread):
         logger.info("Device message thread canceled and stopped, closing device %s.",
                     self.__device)
         self.__device.close()
+        logger.info("Message processing thread for interface %s has stopped.", self.__device.interface)
+
 
 class WhadDeviceIOThread:
     """Main device IO thread.
