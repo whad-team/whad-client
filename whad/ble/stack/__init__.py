@@ -90,6 +90,12 @@ class BleStack(Layer):
         logger.debug('sending a control PDU (%d bytes) to conn_handle %d' % (len(pdu), conn_handle))
         self.__connector.send_ctrl_pdu(pdu, conn_handle, encrypt=encrypt)
 
+    @source('ll', tag='ATT_MTU')
+    def on_mtu_changed(self, mtu, conn_handle=None):
+        """Notify connector that the MTU has changed.
+        """
+        self.__connector.on_mtu_changed(conn_handle, mtu)
+
     def set_encryption(self, conn_handle=None, enabled=True,ll_key=None, ll_iv=None, key=None, rand=None, ediv=None):
         '''Enable or disable encryption using underlying WHAD connector.
         '''

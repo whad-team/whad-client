@@ -1,9 +1,18 @@
 """
 Bluetooth Low Energy Central connector
 ======================================
+
+The :py:class:`whad.ble.connector.central.Central` class provides its own
+asynchronous event notification mechanism (different from the one used in
+the :py:class:`whad.ble.connector.peripheral.Peripheral` class for some
+weird reasons).
+
 """
 import logging
 from time import time, sleep
+from threading import Thread
+from queue import Empty, Queue
+#from multiprocessing import Queue
 
 from whad.ble.connector.base import BLE
 from whad.hub.ble import Direction
@@ -20,13 +29,134 @@ from whad.exceptions import UnsupportedCapability
 
 logger = logging.getLogger(__name__)
 
+
+class CentralEvent:
+    """Central event base class
+    """
+
+class CentralConnected(CentralEvent):
+    """Event sent when central has successfully connected to a remote
+    peripheral.
+    """
+    def __init__(self, handle: int, local_peer: BDAddress, remote_peer: BDAddress):
+        """Initialization
+        """
+        self.__handle = handle
+        self.__local = local_peer
+        self.__remote = remote_peer
+
+    @property
+    def handle(self) -> int:
+        """Connection handle
+        """
+        return self.__handle
+    
+    @property
+    def local_peer(self) -> BDAddress:
+        """Central BD address
+        """
+        return self.__local
+    
+    @property
+    def remote_peer(self) -> BDAddress:
+        """Remote device BD address
+        """
+        return self.__remote
+
+    def __repr__(self) -> str:
+        return f"<CentralConnected handle={self.__handle} local={self.__local} remote={self.__remote}/>"
+
+
+class CentralDisconnected(CentralEvent):
+    """Event sent when central has been disconnected from a remote
+    peripheral.
+    """
+    def __init__(self, handle: int):
+        """Initialization
+
+        :param handle: Connection handle
+        :type handle: int
+        """
+        self.__handle = handle
+
+    @property
+    def handle(self) -> int:
+        """Connection handle
+        """
+        return self.__handle
+
+    def __repr__(self) -> str:
+        return f"<CentralDisconnected handle={self.__handle}/>"
+
+class CentralEventHandler(Thread):
+    """Central event handler.
+    """
+    def __init__(self):
+        super().__init__()
+        self.__canceled = False
+        self.__listeners = {}
+
+        # Initialize our message queue
+        self.__queue = Queue()
+
+        # This thread is a daemon (must be terminated when main thread ends).
+        self.daemon = True
+
+    def cancel(self):
+        """Stop event handler.
+        """
+        self.__canceled = True
+
+    def register_listener(self, callback, event_type=None) -> bool:
+        """Register a listener.
+        """
+        if callback not in self.__listeners:
+            if event_type is None:
+                event_type = CentralEvent
+            self.__listeners[callback] = event_type
+            return True
+        return False
+    
+    def remove_listener(self, callback) -> bool:
+        """Remove a listener.
+        """
+        if callback in self.__listeners:
+            del self.__listeners[callback]
+            return True
+        return False
+
+    def clear_listeners(self):
+        """Clear all listeners.
+        """
+        self.__listeners = {}
+
+    def send_event(self, event: CentralEvent):
+        """Send event to queue.
+        """
+        logger.debug("[central event handler] enqueue event: %s", event)
+        self.__queue.put(event)
+    
+    def run(self):
+        """Event handler main thread.
+        """
+        while not self.__canceled:
+            try:
+                event = self.__queue.get(block=True, timeout=1.0)
+                if event is not None:
+                    logger.debug("[central event handler] dispatch queued event: %s", event)
+                    for callback, event_type in self.__listeners.items():
+                        if isinstance(event, event_type):
+                            callback(event)
+            except Empty:
+                pass
+
 class Central(BLE):
     """This connector provides a BLE Central role.
 
     To initiate a connection to a device, just call :meth:`Central.connect` with the target
     BD address and it should return an instance of 
     :class:`whad.ble.profile.device.PeripheralDevice` in return.
-
+f
     """
 
     def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack,
@@ -38,12 +168,10 @@ class Central(BLE):
         """
         super().__init__(device)
 
-        if client is not None:
-            if issubclass(client, Layer) and client.alias == 'gatt':
-                ATTLayer.add(client)
+        # Reconfigure stack layers
+        self.__configure_stack(stack, client)
 
         self.__gatt_client = None
-        self.__stack = stack(self)
         self.__connected = False
         self.__peripheral = None
         self.__profile_json = from_json
@@ -73,6 +201,27 @@ class Central(BLE):
             # self.stop() # ButteRFly doesn't support calling stop when spawning central
             self.enable_central_mode()
 
+        # Create our event handler and start it
+        self.__event_handler = CentralEventHandler()
+        self.add_event_handler(self.on_central_event)
+        self.__event_handler.start()
+
+    def __configure_stack(self, phy_layer=None, gatt_layer=None):
+        """
+        """
+        # Save GATT and PHY layers
+        if gatt_layer is not None:
+            self.__gatt_layer = gatt_layer
+        if phy_layer is not None:
+            self.__phy_layer = phy_layer
+            
+            # Configure BLE stack to use our PHY class
+            self.__stack = phy_layer(self)
+
+        # Configure ATT layer to use our GATT class
+        if self.__gatt_layer is not None:
+            if issubclass(self.__gatt_layer, Layer) and self.__gatt_layer.alias == 'gatt':
+                ATTLayer.add(self.__gatt_layer)
 
     @property
     def security_database(self):
@@ -104,6 +253,47 @@ class Central(BLE):
         '''
         return self.__stack
 
+    def set_profile_json(self, profile):
+        """Set Central profile as json
+        """
+        self.__profile_json = profile
+
+    def stop(self):
+        """Stopping Central connector.
+        """
+        self.__event_handler.cancel()
+        super().stop()
+
+    def add_event_handler(self, handler, event_type = None):
+        """Add an event handler for a specific event.
+        """
+        self.__event_handler.register_listener(handler, event_type)
+
+    def remove_event_handler(self, handler):
+        """Remove an event handler.
+        """
+        self.__event_handler.remove_listener(handler)
+
+    def clear_event_handlers(self):
+        """Remove all event handlers
+        """
+        self.__event_handler.clear_listeners()
+
+    def on_central_event(self, event: CentralEvent):
+        """Central event handler
+
+        :param  event: Central event to handle
+        :type   event: CentralEvent
+        """
+
+    def __notify_event(self, event: CentralEvent):
+        """Send event to handlers.
+
+        :param  event: Central event to notify
+        :type   event: CentralEvent
+        """
+        self.__event_handler.send_event(event)
+
     def connect(self, bd_address, random=False, timeout=30, access_address=None,channel_map=None,
                 crc_init=None, hop_interval=None, hop_increment=None) -> PeripheralDevice:
         """Connect to a target device
@@ -126,6 +316,9 @@ class Central(BLE):
         :return: An instance of `PeripheralDevice` on success, `None` on failure.
         :rtype: :class:`whad.ble.profile.device.PeripheralDevice`
         """
+        # Make sure our BLE stack is correctly configured
+        self.__configure_stack()
+
         if self.can_connect():
             self.connect_to(
                 bd_address,
@@ -143,6 +336,7 @@ class Central(BLE):
                 if time()-start_time >= timeout:
                     raise PeripheralNotFound
                 sleep(0.1)
+            
             return self.peripheral()
 
         # Raise error
@@ -214,6 +408,10 @@ class Central(BLE):
             self.__target
         )
         self.__conn_handle = connection_data.conn_handle
+        
+        # Notify event handlers
+        self.__notify_event(CentralConnected(connection_data.conn_handle, self.__local,
+                                         self.__target))
 
 
     def on_disconnected(self, disconnection_data):
@@ -236,6 +434,9 @@ class Central(BLE):
         logger.debug("[central] Notify peripheral object that a disconnection occurred")
         if self.__peripheral is not None:
             self.__peripheral.on_disconnect(disconnection_data.conn_handle)
+
+        # Notify event handlers
+        self.__notify_event(CentralDisconnected(self.conn_handle))
 
 
     def on_ctl_pdu(self, pdu):
@@ -262,7 +463,6 @@ class Central(BLE):
         :param  pdu: BLE Data PDU
         :type   pdu: :class:`scapy.layers.bluetooth4LE.BTLE_DATA`
         """
-        logger.info('received data PDU')
         if pdu.metadata.direction == Direction.SLAVE_TO_MASTER:
             self.__stack.on_data_pdu(pdu.metadata.connection_handle, pdu)
 
@@ -349,3 +549,24 @@ class Central(BLE):
         :rtype: str
         """
         return self.connection.gatt.model.export_json()
+
+    def on_mtu_changed(self, conn_handle, mtu: int):
+        """Notify MTU change to peripheral.
+        """
+        logger.info("on_mtu_changed")
+        if self.__peripheral is not None:
+            logger.debug("[Central::on_mtu_changed] MTU changed to %d, notify peripheral", mtu)
+            self.__peripheral.on_mtu_changed(mtu)
+
+    def set_mtu(self, mtu: int):
+        """Set connection MTU.
+        """
+        if self.__gatt_client is not None:
+            # Start a MTU exchange procedure
+            self.__gatt_client.set_mtu(mtu)
+
+    def get_mtu(self) -> int:
+        """Retrieve the connection MTU.
+        """
+        if self.connection is not None:
+            return self.connection.att.get_server_mtu()

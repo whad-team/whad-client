@@ -1312,3 +1312,10 @@ class GenericProfile:
         :param  value:              Characteristic value
         :type   value:              bytes
         """
+
+    def on_mtu_changed(self, mtu: int):
+        """MTU change callback
+
+        :param  mtu: New MTU value
+        :type   mtu: int
+        """

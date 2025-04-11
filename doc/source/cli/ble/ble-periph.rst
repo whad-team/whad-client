@@ -205,6 +205,20 @@ While a peripheral is running, we can write and read the values of characteristi
 If we write to a characteristic a device has subscribed to for notification/indication,
 it will send a notification/indication to the connected device.
 
+Changing the connection MTU
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The `mtu` command can be used when a connection is established to change the
+*maximum transmission unit* or *MTU*:
+
+.. code-block:: text
+
+    wble-periph[running]> mtu 200
+    Connection MTU set to 200.
+
+.. important::
+
+    MTU value must be equal to or greater than 23.
 
 Stopping our peripheral
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -447,3 +461,19 @@ stop
     stop
 
 This command stops the currently running peripheral. It will disconnect any connected device.
+
+mtu
+~~~
+
+.. code-block:: text
+
+    mtu [MTU]
+
+This command starts an ATT MTU exchange procedure: the GATT server will send an1 MTU exchange request
+with the specified MTU value to the connected Central device and await an MTU exchange response.
+The connection MTU is automatically updated when a response is received, or discarded if the Central
+device declined the MTU update.
+
+.. important::
+
+    The MTU value must be >= 23, as stated in the Bluetooth specification.

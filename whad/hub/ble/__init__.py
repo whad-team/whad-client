@@ -74,6 +74,7 @@ class BLEMetadata(Metadata):
     is_crc_valid : bool = None
     relative_timestamp : int = None
     decrypted : bool = None
+    encrypt: bool = False
 
     @classmethod
     def convert_from_header(cls, pkt):

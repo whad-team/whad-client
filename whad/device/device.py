@@ -41,6 +41,7 @@ class WhadDeviceInputThread(Thread):
         self.__device = device
         self.__io_thread = io_thread
         self.__canceled = False
+        self.daemon = True
 
     def cancel(self):
         """
@@ -68,6 +69,7 @@ class WhadDeviceInputThread(Thread):
         logger.info("Device IO thread canceled and stopped.")
         self.__io_thread.on_disconnection()
         logger.info("on_disconnection done.")
+        logger.info("Input thread for interface %s has stopped.", self.__device.interface)
 
 class WhadDeviceMessageThread(Thread):
     """Main device incoming message processing thread.
@@ -81,6 +83,7 @@ class WhadDeviceMessageThread(Thread):
         super().__init__()
         self.__device = device
         self.__canceled = False
+        self.daemon = True
 
     def cancel(self):
         """
@@ -104,6 +107,8 @@ class WhadDeviceMessageThread(Thread):
         logger.info("Device message thread canceled and stopped, closing device %s.",
                     self.__device)
         self.__device.close()
+        logger.info("Message processing thread for interface %s has stopped.", self.__device.interface)
+
 
 class WhadDeviceIOThread:
     """Main device IO thread.
@@ -1060,24 +1065,11 @@ class WhadDevice:
 
             # Check if message is a received packet
             if issubclass(message, AbstractPacket):
-                # Convert message into packet
-                packet = message.to_packet()
-                if packet is not None:
-
-                    # Report packet to monitors
-                    self.__connector.monitor_packet_rx(packet)
-
-                    # Forward to our connector
-                    if self.__connector.is_locked():
-                        # If we are locked, then add packet to our locked packets
-                        self.__connector.add_locked_pdu(packet)
-                    elif self.__connector.is_synchronous():
-                        # If we are in synchronous mode, add packet as pending
-                        self.__connector.add_pending_packet(packet)
-                    else:
-                        #logger.debug("[WhadDevice] on_domain_msg() for device %s: %s",
-                        #             self.interface, message)
-                        self.__connector.on_packet(packet)
+                # If connector is locked, save message into locked pdus
+                if self.__connector.is_locked():
+                    self.__connector.add_locked_pdu(message)
+                else:
+                    self.on_packet_message(message)
             elif issubclass(message, AbstractEvent):
                 # Convert message into event
                 event = message.to_event()
@@ -1088,6 +1080,25 @@ class WhadDevice:
                 # Forward other messages to on_domain_msg() callback
                 self.__connector.on_domain_msg(domain, message)
         return False
+
+    def on_packet_message(self, message):
+        """Process packet message
+        """
+        # Convert message into packet
+        packet = message.to_packet()
+        if packet is not None:
+
+            # Report packet to monitors
+            self.__connector.monitor_packet_rx(packet)
+
+            # Forward to our connector
+            if self.__connector.is_synchronous():
+                # If we are in synchronous mode, add packet as pending
+                self.__connector.add_pending_packet(packet)
+            else:
+                #logger.debug("[WhadDevice] on_domain_msg() for device %s: %s",
+                #             self.interface, message)
+                self.__connector.on_packet(packet)
 
 class VirtualDevice(WhadDevice):
     """

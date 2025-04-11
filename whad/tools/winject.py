@@ -331,6 +331,7 @@ class WhadInjectApp(CommandLineApp):
                         hub = ProtocolHub(2)
                         connector.format = hub.get(self.args.domain).format
                         connector.on_packet = self.on_incoming_packet
+                        connector.unlock()
 
                     try:
                         injector.configuration = configuration

@@ -123,6 +123,26 @@ class WhadDeviceConnector:
 
         return removed
 
+    def migrate_callbacks(self, connector):
+        """Migrate callbacks to another connector
+        """
+        # Enter critical section
+        with self.__callbacks_lock:
+            for cb, cb_filter in self.__reception_callbacks.items():
+                connector.attach_callback(
+                    cb,
+                    filter=cb_filter,
+                    on_reception=True
+                )
+            self.__reception_callbacks = {}
+
+            for cb, cb_filter in self.__transmission_callbacks.items():
+                connector.attach_callback(
+                    cb, filter=cb_filter, on_transmission=True
+                )
+            self.__transmission_callbacks = {}
+
+
     def reset_callbacks(self, reception = True, transmission = True):
         """
         Detach any packet callback attached to the current connector.
@@ -263,28 +283,24 @@ class WhadDeviceConnector:
                                    internal dispatch routine
         :type   dispatch_callback: callable
         """
-        # Mark connector as unlocked
-        self.__locked = False
-
         # Dispatch PDUs
         try:
             while True:
                 # Retrieve PDU
-                pdu = self.__locked_pdus.get(block=False, timeout=0.2)
-
+                message = self.__locked_pdus.get(block=False, timeout=0.2)
+                logger.info("Unlocked message for processing: %s", message)
                 if dispatch_callback is None:
-                    # If connector is in synchronous mode, move PDUs to our pending queue
-                    if self.__synchronous:
-                        self.add_pending_packet(pdu)
-                    else:
-                        # Else forward PDU to our standard PDU processing method
-                        self.on_packet(pdu)
+                    self.device.on_packet_message(message)
                 else:
                     # Call the provided dispatch callback
-                    dispatch_callback(pdu)
+                    dispatch_callback(message)
         except Empty:
+            logger.info("Error while unlocking")
             # Processing done, continue.
             pass
+
+        # Mark connector as unlocked
+        self.__locked = False
 
     def is_locked(self) -> bool:
         """Determine if the connector is locked.
@@ -299,6 +315,7 @@ class WhadDeviceConnector:
         :param  Packet pdu:  Packet to add to locked packets queue
         :type   pdu: scapy.packet.Packet
         """
+        logger.info("Add locked pdu: %s" % pdu)
         self.__locked_pdus.put(pdu)
 
     # Device interaction
@@ -351,6 +368,7 @@ class WhadDeviceConnector:
         msg = self.hub.convert_packet(packet)
 
         if msg is not None:
+            logger.info("[connector] send packet command")
             resp = self.send_command(msg, message_filter(CommandResult))
             logger.info("[connector] Command sent, result: %s", resp)
 
@@ -439,3 +457,21 @@ class WhadDeviceConnector:
         logger.error("Class: %s", self.__class__)
         logger.error("method `on_event` must be implemented in inherited classes")
         raise RequiredImplementation()
+
+
+class LockedConnector(WhadDeviceConnector):
+    """Provides a lockable connector.
+    """
+
+    def __init__(self, device):
+        # We set the connector with no interface for now
+        super().__init__(None)
+
+        # Then we lock it
+        self.lock()
+
+        # And we eventually configure the interface
+        # Once the device connector is set, packets will go in a locked queue
+        # and could be later retrieved when connector is unlocked.
+        self.set_device(device)
+        device.set_connector(self)
