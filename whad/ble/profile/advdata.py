@@ -726,11 +726,12 @@ class AdvURI(AdvDataField):
         :param str url: URL to include in the AdvURI AD record
         """
         url_info = urlparse(url)
+        print(url_info)
         if url_info.scheme and url_info.scheme in AdvURI.SUPPORTED_SCHEMES:
             self.__scheme = url_info.scheme
             scheme = AdvURI.SUPPORTED_SCHEMES[url_info.scheme]
             self.__uri = url_info._replace(scheme='').geturl()
-            encoded_uri = chr(scheme).encode("utf-8") + self.__uri.encode('utf-8')
+            encoded_uri = chr(scheme).encode("utf-8") + ("//" + self.__uri).encode('utf-8')
             super().__init__(0x24, encoded_uri)
         else:
             raise AdvDataError
