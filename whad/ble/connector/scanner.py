@@ -96,7 +96,7 @@ class Scanner(BLE):
         :type   timeout:            float, optional
         """
         start_time = time()
-        for advertisement in self.sniff():
+        for advertisement in self.sniff(timeout=timeout):
             if minimal_rssi is None or advertisement.metadata.rssi > minimal_rssi:
                 devices = self.__db.on_device_found(
                     advertisement.metadata.rssi,
@@ -110,26 +110,30 @@ class Scanner(BLE):
             if (timeout is not None) and (time() - start_time > timeout):
                 break
 
-    def sniff(self) -> Iterator[Packet]:
+    def sniff(self, timeout: float = None) -> Iterator[Packet]:
         """
         Listen and yield incoming advertising PDUs.
         """
-
+        start_time = time()
         while True:
             if self.support_raw_pdu():
                 message_type = BleRawPduReceived
             else:
                 message_type = BleAdvPduReceived
 
-            message = self.wait_for_message(filter=message_filter(message_type))
-            # Convert message from rebuilt PDU
-            packet = message.to_packet()
-            self.monitor_packet_rx(packet)
-            # Force TxAdd value to propagate the address type
-            if isinstance(message, BleAdvPduReceived):
-                if message.addr_type > 0:
-                    packet.getlayer(BTLE_ADV).TxAdd = 1
-            yield packet
+            message = self.wait_for_message(filter=message_filter(message_type), timeout=timeout)
+            if message is not None:
+                # Convert message from rebuilt PDU
+                packet = message.to_packet()
+                self.monitor_packet_rx(packet)
+                # Force TxAdd value to propagate the address type
+                if isinstance(message, BleAdvPduReceived):
+                    if message.addr_type > 0:
+                        packet.getlayer(BTLE_ADV).TxAdd = 1
+                yield packet
+
+            if timeout is not None and time() - start_time > timeout:
+                break
 
     def clear(self):
         """

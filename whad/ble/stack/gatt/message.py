@@ -239,3 +239,9 @@ class GattExchangeMtuResponse(GattDataHolder):
         super().__init__(
             mtu=mtu
         )
+
+class GattExchangeMtuRequest(GattDataHolder):
+    def __init__(self, mtu: int):
+        super().__init__(
+            mtu=mtu
+        )

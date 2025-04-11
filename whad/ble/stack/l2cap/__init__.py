@@ -51,6 +51,12 @@ class L2CAPLayer(ContextualLayer):
         logger.debug("remote MTU changed to %d for conn_handle %d", mtu, self.state.conn_handle)
         self.state.remote_mtu = mtu
 
+        # Update local MTU if lower than remote MTU
+        if self.state.local_mtu < self.state.remote_mtu:
+            logger.debug("local MTU changed to %d for conn_handle %d",
+                         self.state.remote_mtu, self.state.conn_handle)
+            self.state.local_mtu = self.state.remote_mtu
+
     def get_local_mtu(self) -> int:
         """Retrieve local MTU
         """
@@ -127,6 +133,7 @@ class L2CAPLayer(ContextualLayer):
             packets = [
                 data
             ]
+
         return packets
 
     @source('att')
@@ -164,6 +171,12 @@ class L2CAPLayer(ContextualLayer):
             else:
                 # Send packet to link layer
                 self.send('ll', pkt, fragment=True)
+
+    @source("att", tag="ATT_MTU")
+    def on_att_mtu_updated(self, mtu: int):
+        """Notify link-layer that MTU has changed for this connection
+        """
+        self.send('ll', mtu, tag="ATT_MTU")
 
 L2CAPLayer.add(ATTLayer)
 L2CAPLayer.add(SMPLayer)

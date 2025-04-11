@@ -15,11 +15,14 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, \
     HCI_Event_Disconnection_Complete, HCI_Cmd_LE_Set_Scan_Response_Data, \
     HCI_Cmd_LE_Set_Random_Address, HCI_Cmd_LE_Long_Term_Key_Request_Reply, \
-    HCI_Cmd_LE_Start_Encryption_Request
+    HCI_Cmd_LE_Start_Encryption_Request, HCI_Cmd_LE_Set_Advertising_Parameters, \
+    HCI_Cmd_LE_Read_Buffer_Size
+from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, HCI_Cmd_Read_Buffer_Size, \
+    HCI_Cmd_Complete_Read_Buffer_Size
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
-    WhadDeviceUnsupportedOperation
+    WhadDeviceUnsupportedOperation, WhadDeviceError
 from whad.device import VirtualDevice
 
 # Whad hub
@@ -115,7 +118,9 @@ class HCIDevice(VirtualDevice):
         self._cached_scan_response_data = None
         self.__timeout = 1.0
         self._connected = False
+        self.__max_acl_len = 27
         self._active_handles = []
+        self.__closing = False
 
     @property
     def identifier(self):
@@ -145,6 +150,13 @@ class HCIDevice(VirtualDevice):
         """
         Close current device.
         """
+        # Avoid recursion that may occur due to super().close()
+        if self.__closing:
+            return
+
+        # Marking device as in closing process
+        self.__closing = True
+
         # Disconnect if necessary
         for handle in self._active_handles:
             self._disconnect(handle)
@@ -159,6 +171,9 @@ class HCIDevice(VirtualDevice):
             del self.__socket
             self.__socket = None
         self.__opened = False
+
+        # Closing process done.
+        self.__closing = False
 
 
     def write(self, data):
@@ -179,7 +194,6 @@ class HCIDevice(VirtualDevice):
         Fetches data from the device, if there is any data to read. We call select()
         to make sure data is waiting to be read before reading it.
         """
-
         if not self.__opened:
             raise WhadDeviceNotReady()
         try:
@@ -324,6 +338,38 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_Reset())
         return response is not None and response.status == 0x0
 
+    def _read_buffer_size(self):
+        """Read HCI device default buffer size and update max ACL length.
+        """
+        response = self._write_command(HCI_Cmd_Read_Buffer_Size())
+
+        if response is not None and response.status == 0x0:
+            if HCI_Cmd_Complete_Read_Buffer_Size in response:
+                if response.acl_pkt_len > 0:
+                    # Update HCI MTU
+                    logger.debug("[hci][%s] ACL buffer length: %d", self.interface, response.acl_pkt_len)
+                    self.__max_acl_len = response.acl_pkt_len
+                    return True
+
+        return False
+
+    def _le_read_buffer_size(self):
+        """Read HCI device LE buffer size and update max ACL length.
+        """
+        response = self._write_command(HCI_Cmd_LE_Read_Buffer_Size())
+        if response is not None and response.status == 0x0:
+            if HCI_Cmd_LE_Complete_Read_Buffer_Size in response:
+                if response.acl_pkt_len > 0:
+                    # Update HCI MTU
+                    logger.debug("[hci][%s] LE ACL buffer length: %d", self.interface, response.acl_pkt_len)
+                    self.__max_acl_len = response.acl_pkt_len
+                    return True
+                else:
+                    logger.debug("[hci][%s] LE ACL buffer read failed, read ACL buffer size")
+                    return self._read_buffer_size()
+            
+        return False
+        
 
     def _set_event_filter(self, filter_type=0):
         """
@@ -359,6 +405,7 @@ class HCIDevice(VirtualDevice):
         """
         success = (
                 self._reset() and
+                self._le_read_buffer_size() and
                 self._set_event_filter(0) and
                 self._set_connection_accept_timeout(32000) and
                 self._set_event_mask(b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d") and
@@ -374,7 +421,12 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_Read_BD_Addr())
         if response.status == 0x00 and HCI_Cmd_Complete_Read_BD_Addr in response:
             return response.addr
-        return None
+
+        # Cannot read BD address, device is non-responsive.
+        # logger.error("[%s] cannot read BD address", self.interface)
+        logger.debug("cannot read BD address of interface %s", self.interface)
+        logger.debug("raising WhadDeviceNotReady exception")
+        raise WhadDeviceNotReady(f"cannot read BD address of interface {self.interface}")
 
     def _read_local_name(self):
         """
@@ -383,7 +435,11 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_Read_Local_Name())
         if response.status == 0x00 and HCI_Cmd_Complete_Read_Local_Name in response:
             return response.local_name
-        return None
+        
+        # Cannot read local name.
+        logger.debug("cannot read local name of interface %s", self.interface)
+        logger.debug("raising WhadDeviceNotReady exception")
+        raise WhadDeviceNotReady()
 
     def _read_local_version_information(self):
         """
@@ -395,7 +451,11 @@ class HCIDevice(VirtualDevice):
             version += [response.hci_subversion]
             manufacturer = BT_MANUFACTURERS[response.company_identifier].encode("utf-8")
             return version, manufacturer
-        return None
+        
+        # Cannot read local version information.
+        logger.debug("cannot read local version of interface %s", self.interface)
+        logger.debug("raising WhadDeviceNotReady exception")
+        raise WhadDeviceNotReady()
 
     def _read_le_supported_states(self):
         """
@@ -409,9 +469,10 @@ class HCIDevice(VirtualDevice):
                     states.append(state)
             return states
 
-        # Error while reading states
-        logger.debug("[hci] interface returned an error while reading supported states")
-        return None
+        # Cannot read supported LE states.
+        logger.debug("cannot read supported LE states for interface %s", self.interface)
+        logger.debug("raising WhadDeviceNotReady exception")
+        raise WhadDeviceNotReady()
 
     def _set_bd_address(self, bd_address="11:22:33:44:55:66", bd_address_type=AddressType.PUBLIC):
         """
@@ -475,6 +536,9 @@ class HCIDevice(VirtualDevice):
 
             # Not supported !
             logger.debug("Address modification not supported.")
+
+            # But at least we keep our address type
+            self._bd_address_type = bd_address_type
             return False
 
         self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
@@ -503,6 +567,8 @@ class HCIDevice(VirtualDevice):
         """
         Establish a connection using HCI device.
         """
+        logger.debug("bd_address: %s (%d)", bd_address, bd_address_type)
+        logger.debug("[hci] _connect() called")
         patype = 0 if bd_address_type == AddressType.PUBLIC else 1
         if channel_map is not None:
             formatted_channel_map = unpack("<Q",channel_map+ b"\x00\x00\x00")[0]
@@ -510,7 +576,11 @@ class HCIDevice(VirtualDevice):
                 chM=formatted_channel_map
             ))
             if response.status != 0x00:
+                logger.debug("[hci] HCI SetHostChannelClassification command failed with response %d", response.status)
                 return False
+
+        # Connect
+        logger.debug("[hci] sending HCI_LE_Create_Connection command")
         response = self._write_command(
             HCI_Cmd_LE_Create_Connection(
                 paddr=bd_address,
@@ -519,6 +589,8 @@ class HCIDevice(VirtualDevice):
                 max_interval=hop_interval
             )
         )
+        if response.status != 0x00:
+            logger.debug("[hci] HCI_LE_Create_Connection command failed with response %d", response.status)
         return response is not None and response.status == 0x00
 
     def _disconnect(self, handle):
@@ -583,7 +655,34 @@ class HCIDevice(VirtualDevice):
         if self._advertising and enable:
             return True
         else:
-            logger.debug(f"Enable advertising: {enable}")
+            logger.debug("Set advertising parameters")
+            if wait_response:
+                # Wait for a response and update result accordingly.
+                response = self._write_command(HCI_Cmd_LE_Set_Advertising_Parameters(
+                    interval_min = 0x0020,
+                    interval_max = 0x0020,
+                    adv_type="ADV_IND",
+                    oatype=0 if self._bd_address_type == AddressType.PUBLIC else 1,
+                    datype=0,
+                    daddr="00:00:00:00:00:00",
+                    channel_map=0x7,
+                    filter_policy="all:all"
+                ))
+                result = response.status == 0x00
+            else:
+                # Don't wait, simply send command and consider it OK.
+                self._write_command(HCI_Cmd_LE_Set_Advertising_Parameters(
+                    interval_min = 0x0020,
+                    interval_max = 0x0020,
+                    adv_type="ADV_IND",
+                    oatype=0 if self._bd_address_type == AddressType.PUBLIC else 1,
+                    datype="public",
+                    daddr="00:00:00:00:00:00",
+                    channel_map=0x07,
+                    filter_policy="all:all"
+                ), wait_response=False)
+
+            logger.debug("Enable advertising: %s", enable)
             if wait_response:
                 # Wait for a response and update result accordingly.
                 response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))
@@ -621,6 +720,19 @@ class HCIDevice(VirtualDevice):
                 )
             )
         return response.status == 0x00
+
+    def _update_max_acl_len(self, length: int):
+        """Update device HCI MTU
+        """
+        self.__max_acl_len = length
+
+    def get_max_acl_len(self) -> int:
+        """Retrieve maximum ACL length
+
+        :return: Current HCI maximum TX size
+        :rtype: int
+        """
+        return self.__max_acl_len
 
 
     def _on_whad_ble_encryption(self, message):
@@ -662,6 +774,7 @@ class HCIDevice(VirtualDevice):
         self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_connect(self, message):
+        logger.debug("[hci] received WHAD connect message")
         if Commands.ConnectTo in self._dev_capabilities[Domain.BtLE][1]:
             bd_address = message.bd_address
             bd_address_type = message.addr_type
@@ -725,24 +838,28 @@ class HCIDevice(VirtualDevice):
             self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_send_pdu(self, message):
-        logger.debug("Received WHAD BLE send_pdu message")
+        logger.debug("[%s] Received WHAD BLE send_pdu message", self.interface)
         if ((self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE) or
            (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
             try:
                 hci_packets = self.__converter.process_message(message)
 
                 if hci_packets is not None:
-                    logger.debug("sending HCI packets ...")
+                    logger.debug("[%s] sending HCI packets ...", self.interface)
+
+                    self.__converter.lock()
                     success = True
                     for hci_packet in hci_packets:
                         success = success and self._write_packet(hci_packet)
-                    logger.debug("HCI packet sending result: %s", success)
+                    self.__converter.unlock()
+                    logger.debug("[%s] HCI packet sending result: %s", self.interface, success)
                     if success:
-                        logger.debug("send_pdu command succeeded.")
+                        logger.debug("[%s] send_pdu command succeeded.", self.interface)
                         self._send_whad_command_result(CommandResult.SUCCESS)
                     else:
-                        logger.debug("send_pdu command failed.")
+                        logger.debug("[%s] send_pdu command failed.", self.interface)
                         self._send_whad_command_result(CommandResult.ERROR)
+
                 pending_messages = self.__converter.get_pending_messages()
                 for pending_message in pending_messages:
                     self._send_whad_message(pending_message)

@@ -372,6 +372,10 @@ class TestGattClientProcedures(object):
 
 
 class GattServerSandbox(Sandbox):
+    def set_local_mtu(self, mtu):
+        pass
+    def set_remote_mtu(self, mtu):
+        pass
     def get_local_mtu(self):
         return 23
     def get_conn_handle(self):
@@ -676,3 +680,21 @@ class TestGattServerProcedures(object):
                 data=b'\x02\x00\x04\x00\x00\x2A'
             )
         ))      
+
+    def test_set_mtu(self, att, gatt):
+        '''GATT server MTU exchange
+        '''
+        gatt.on_gatt_message(GattExchangeMtuResponse(100))
+        assert gatt.set_mtu(100) == 100
+
+    def test_set_mtu_rejected(self, att, gatt):
+        '''GATT server MTU exchange (request rejected)
+        '''
+        gatt.on_gatt_message(GattExchangeMtuResponse(23))
+        assert gatt.set_mtu(100) == 23
+
+    def test_set_mtu_fail(self, att, gatt):
+        '''GATT client MTU exchange failure
+        '''
+        gatt.on_gatt_message(GattExchangeMtuResponse(23))
+        assert gatt.set_mtu(100) == 23

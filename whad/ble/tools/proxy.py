@@ -15,10 +15,14 @@ from binascii import hexlify
 from scapy.layers.bluetooth4LE import BTLE_DATA
 from scapy.layers.bluetooth import L2CAP_Hdr
 
+from whad.hub.ble import BDAddress
 from whad.ble.connector import Central, Peripheral
+from whad.ble.connector.central import CentralDisconnected
+from whad.ble.connector.peripheral import PeripheralEventListener, PeripheralEventConnected, \
+    PeripheralEventDisconnected
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvCompleteLocalName
 from whad.ble.profile import GenericProfile
-from whad.ble.exceptions import HookReturnValue, HookDontForward
+from whad.ble.exceptions import HookReturnValue, HookDontForward, ConnectionLostException
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.exceptions import WhadDeviceNotFound
 from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
@@ -72,7 +76,7 @@ class LowLevelPeripheral(Peripheral):
     to provide a Link-Layer peripheral with the requested advertising data.
     """
 
-    def __init__(self, proxy, device, adv_data, scan_data, bd_address=None):
+    def __init__(self, proxy, device, adv_data, scan_data, bd_address=None, public=True):
         """Instanciate a LowLevelPeripheral instance
 
         :param LinkLayerProxy proxy: Reference to the link-layer proxy that will receive events
@@ -82,7 +86,7 @@ class LowLevelPeripheral(Peripheral):
         :param AdvDataFieldList scan_data: Scan response data of the exposed proxy
                                            device (optional, can be None)
         """
-        super().__init__(device, adv_data=adv_data, scan_data=scan_data, bd_address=bd_address)
+        super().__init__(device, adv_data=adv_data, scan_data=scan_data, bd_address=bd_address, public=public)
         self.__proxy = proxy
         self.__connected = False
         self.__conn_handle = None
@@ -90,6 +94,9 @@ class LowLevelPeripheral(Peripheral):
         self.__pending_data_pdus = []
         self.__pending_control_pdus = []
 
+    @property
+    def conn_handle(self):
+        return self.__conn_handle
 
     def set_other_half(self, other_half):
         """Set the *other half*, i.e. the reference to a :class:`LowLevelCentral`
@@ -98,7 +105,6 @@ class LowLevelPeripheral(Peripheral):
         :param LowLevelCentral other_half: Link-layer Central device to notify events
         """
         self.__other_half = other_half
-
 
     def on_connected(self, connection_data):
         """Callback to handle link-layer connection from the underlying peripheral connector
@@ -110,6 +116,22 @@ class LowLevelPeripheral(Peripheral):
             self.__conn_handle = 0
         else:
             self.__conn_handle = connection_data.conn_handle
+
+        local_peer = BDAddress.from_bytes(
+            connection_data.advertiser,
+            connection_data.adv_addr_type
+        )
+        remote_peer = BDAddress.from_bytes(
+            connection_data.initiator,
+            connection_data.init_addr_type
+        )
+
+        # Notify event listener
+        self.notify_event(PeripheralEventConnected(
+            connection_data.conn_handle,
+            local_peer,
+            remote_peer
+        ))
 
         # Notify proxy that a connection has been established
         if self.__proxy is not None:
@@ -126,26 +148,16 @@ class LowLevelPeripheral(Peripheral):
                     self.send_pdu(reshape_pdu(_pdu), self.__conn_handle)
 
         if len(self.__pending_data_pdus) > 0:
+            logger.debug("Sending pending PDUs to other half...")
             for _pdu in self.__pending_data_pdus:
                 if self.__proxy is not None:
-                    pdu = self.__proxy.on_data_pdu(_pdu, BleDirection.MASTER_TO_SLAVE)
+                    logger.debug("Calling proxy on_data_pdu with PDU %s..." % _pdu)
+                    pdu = self.__proxy.on_data_pdu(_pdu, BleDirection.SLAVE_TO_MASTER)
                     if pdu is not None:
-                        self.send_pdu(reshape_pdu(pdu), self.__conn_handle)
+                        self.send_pdu(reshape_pdu(pdu), self.__conn_handle, direction=BleDirection.SLAVE_TO_MASTER)
                 else:
+                    logger.debug("Directly sending PDU %s..." % _pdu)
                     self.send_pdu(reshape_pdu(_pdu), self.__conn_handle)
-
-
-    def on_disconnected(self, disconnection_data):
-        """Callback to handle link-layer disconnection event
-
-        :param connection_data: Connection data
-        """
-        self.__connected = False
-        self.__conn_handle = None
-
-        # Notify proxy the current connection has been terminated
-        if self.__proxy is not None:
-            self.__proxy.on_disconnect()
 
 
     def on_ctl_pdu(self, pdu):
@@ -208,8 +220,8 @@ class LowLevelPeripheral(Peripheral):
 
         :param Packet pdu: Data PDU to forward
         """
-        logger.info("Forwarding data PDU to central (%s)", str(self.__conn_handle))
         if self.__conn_handle is not None:
+            logger.info("Forwarding data PDU to central (%s)", str(self.__conn_handle))
             return self.send_pdu(
                 reshape_pdu(pdu),
                 self.__conn_handle,
@@ -217,6 +229,7 @@ class LowLevelPeripheral(Peripheral):
             )
 
         # Not connected, adding data PDU to pending data PDUs
+        logger.info("Adding data PDU to pending PDUs")
         self.__pending_data_pdus.append(reshape_pdu(pdu))
         return True
 
@@ -358,7 +371,7 @@ class LinkLayerProxy:
     """
 
     def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None,
-                 spoof=False):
+                 spoof=False, random=False):
         """
         :param BLE proxy: BLE device to use as a peripheral (GATT Server)
         :param BLE target: BLE device to use as a central (GATT Client)
@@ -382,10 +395,13 @@ class LinkLayerProxy:
         # Save both devices
         self.__proxy = proxy
         self.__central = None
+        self.__listener = None
         self.__target = target
         self.__peripheral = None
         self.__target_bd_addr = bd_address
+        self.__target_random=random
         self.__spoof = spoof
+
 
     @property
     def target(self):
@@ -430,10 +446,11 @@ class LinkLayerProxy:
 
         # First, connect our central device to our target device
         logger.info("create low-level central device ...")
-        print(self.__proxy)
         self.__central = LowLevelCentral(self, self.__target)
+        self.__central.add_event_handler(self.on_central_event, CentralDisconnected)
+        self.__central.lock()
         logger.info("connecting to target device ...")
-        if self.__central.connect(self.__target_bd_addr) is not None:
+        if self.__central.connect(self.__target_bd_addr, random=self.__target_random) is not None:
             logger.info("proxy is connected to target device, create our own device ...")
 
             # Once connected, we start our peripheral
@@ -442,7 +459,8 @@ class LinkLayerProxy:
                 self.__proxy,
                 self.__adv_data,
                 self.__scan_data,
-                bd_address=self.__target_bd_addr if self.__spoof else None
+                bd_address=self.__target_bd_addr,
+                public=not self.__target_random
             )
 
             # Interconnect central and peripheral
@@ -451,11 +469,57 @@ class LinkLayerProxy:
             self.__central.set_other_half(self.__peripheral)
             logger.info("central and peripheral devices are now interconnected")
 
+            # Install peripheral event listener
+            self.__listener = PeripheralEventListener(callback=self.on_periph_event)
+            self.__peripheral.attach_event_listener(self.__listener)
+            self.__listener.start()
+
             # Start advertising
             logger.info("starting advertising our proxy device")
             self.__peripheral.start()
+            self.__central.unlock()
             logger.info("LinkLayerProxy instance is ready")
 
+    def stop(self):
+        """Stop proxy
+        """
+        if self.__listener is not None:
+            self.__listener.stop()
+
+        # Stop central
+        self.__central.clear_event_handlers()
+        self.__central.stop()
+
+    def on_periph_event(self, event):
+        """Handle peripheral events.
+        """
+        if isinstance(event, PeripheralEventConnected):
+            """When a central is connected, update its mtu if not 23.
+            """
+            mtu = self.__central.get_mtu()
+            if mtu != 23:
+                self.__peripheral.set_mtu(mtu)
+        elif isinstance(event, PeripheralEventDisconnected):
+            """Notify proxy that peripheral has disconnected
+            """
+            self.on_disconnect()
+
+    def on_central_event(self, event):
+        """Central event handler
+        """
+        if isinstance(event, CentralDisconnected):
+            # Central has disconnected, 
+            if self.__peripheral.conn_handle is not None:
+                self.__peripheral.disconnect(self.__peripheral.conn_handle)
+                self.__peripheral.wait_disconnection()
+                self.__peripheral.stop()
+                self.__listener.stop()
+            else:
+                logger.debug("[LinkLayerProxy] peripheral not connected")
+
+            # Reconnect to Central
+            self.__central.stop()
+            self.start()
 
     def on_connect(self):
         """This method is called when a client connects to the proxy.
@@ -561,6 +625,8 @@ class ImportedDevice(GenericProfile):
         except GattTimeoutException as gatt_error:
             logger.error("GATT timeout during characteristic read, return empty data")
             raise HookReturnValue(b'') from gatt_error
+        except ConnectionLostException:
+            logger.error("GATT connection lost while reading from characteristic")
 
 
     def on_characteristic_write(self, service, characteristic, offset=0, value=b'',
@@ -574,7 +640,7 @@ class ImportedDevice(GenericProfile):
 
         try:
 
-             # Get target characteristic and write its value
+            # Get target characteristic and write its value
             c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
 
             self.__proxy.on_characteristic_write(
@@ -591,6 +657,8 @@ class ImportedDevice(GenericProfile):
             c.write(write_override.value, without_response=without_response)
         except GattTimeoutException:
             logger.error("GATT timeout during characteristic write")
+        except ConnectionLostException:
+            logger.error("GATT connection lost while writing to characteristic")
 
 
     def on_characteristic_subscribed(self, service, characteristic, notification=False,
@@ -601,7 +669,7 @@ class ImportedDevice(GenericProfile):
             c = self.__target.get_characteristic(service.uuid, characteristic.uuid)
             if notification and c is not None:
                 # Forward callback
-                def notif_cb(charac, value, indication=False):
+                def notif_cb(handle, value, indication=False):
                     try:
                         # Forward to proxy
                         self.__proxy.on_notification(
@@ -624,10 +692,10 @@ class ImportedDevice(GenericProfile):
                 c.subscribe(callback=notif_cb, notification=True)
             elif indication and c is not None:
                 # Forward callback
-                def indicate_cb(charac, value, indication=True):
+                def indicate_cb(handle, value, indication=True):
                     try:
                         # Forward to proxy hook.
-                        self.__proxy.on_notification(
+                        self.__proxy.on_indication(
                             service,
                             characteristic,
                             value
@@ -660,6 +728,8 @@ class ImportedDevice(GenericProfile):
             )
         except GattTimeoutException:
             logger.error("GATT timeout during characteristic subscribe")
+        except ConnectionLostException:
+            logger.error("GATT connection lost while unsubscribing from characteristic")
 
 
     def on_characteristic_unsubscribed(self, service, characteristic):
@@ -676,6 +746,13 @@ class ImportedDevice(GenericProfile):
             )
         except GattTimeoutException:
             logger.error("GATT timeout during characteristic unsubscribe")
+        except ConnectionLostException:
+            logger.error("GATT connection lost while unsubscribing from characteristic")
+
+    def on_mtu_changed(self, mtu: int):
+        """MTU update callback.
+        """
+        self.__proxy.on_mtu_changed(mtu)
 
 
 class GattProxy:
@@ -683,7 +760,7 @@ class GattProxy:
     """
 
     def __init__(self, proxy=None, target=None, adv_data=None, scan_data=None, bd_address=None,
-                 spoof=False, profile=None):
+                 spoof=False, profile=None, random=False):
         self.__central = None
         self.__peripheral = None
         self.__proxy_dev = proxy
@@ -700,6 +777,9 @@ class GattProxy:
         self.__scan_data = scan_data
         self.__target = None
         self.__target_bd_addr = bd_address
+        self.__target_random = random
+        self.__central_mtu = 23
+        self.__listener = None
 
     @property
     def target(self):
@@ -831,39 +911,100 @@ class GattProxy:
         logger.info(" == indication for characteristic %s from service %s: %s",
                     characteristic.uuid, service.uuid, value)
 
+    def on_mtu_changed(self, mtu: int):
+        """MTU has been updated
+        """
+        logger.info("== MTU changed to %d", mtu)
+
+    def on_central_event(self, event):
+        """Handle Central events.
+        """
+        if isinstance(event, CentralDisconnected):
+            # Central has disconnected, kill peripheral
+            if self.__peripheral.conn_handle is not None:
+                self.__peripheral.disconnect(self.__peripheral.conn_handle)
+
+            # Reconnect to Central using the already discovered GATT profile
+            self.__peripheral.stop()
+            self.__central.stop()
+            self.__profile = self.__target_profile
+            self.start()
 
     def start(self):
         """Start our GATT Proxy
         """
         logger.info("create our central device")
         self.__central = Central(self.__target_dev, from_json=self.__profile)
-        logger.info("connect to target device")
-        self.__target = self.__central.connect(self.__target_bd_addr)
+        self.__central.add_event_handler(self.on_central_event)
+        logger.info("connect to target device (random:%s)", self.__target_random)
+        self.__target = self.__central.connect(self.__target_bd_addr, random=self.__target_random)
         if self.__target is not None:
             if self.__profile is not None:
                 logger.info("use the provided profile (json) ...")
-                target_profile = self.__profile
+                self.__target_profile = self.__profile
             else:
                 logger.info("connected to target device, discover services and characteristics ...")
                 self.__target.discover()
                 logger.info("services and characs discovered")
-                target_profile = self.__target.export_json()
+                self.__target_profile = self.__target.export_json()
 
             # Once connected, we start our peripheral
+            self.__central_mtu = self.__central.get_mtu()
+            logger.debug("[GattProxy] central mtu: %d", self.__central_mtu)
             logger.info("create a peripheral with similar profile ...")
             self.__profile = ImportedDevice(
                     self,
                     self.__target,
-                    target_profile
+                    self.__target_profile
             )
+
+            # Create a peripheral with the target device address if possible
+            # If not, the device will take its own default address.
             self.__peripheral = Peripheral(self.__proxy_dev, profile=self.__profile,
                 adv_data=self.__adv_data,
                 scan_data=self.__scan_data,
-                bd_address=self.__target_bd_addr if self.__spoof else None
+                bd_address=self.__target_bd_addr,
+                public=not self.__target_random
             )
+            
+            # Attach peripheral listener
+            self.__listener = PeripheralEventListener(callback=self.on_periph_event)
+            self.__peripheral.attach_event_listener(self.__listener)
+            self.__listener.start()
+
             self.__peripheral.enable_peripheral_mode(adv_data=self.__adv_data)
 
             # Start advertising
             logger.info("starting advertising")
             self.__peripheral.start()
             logger.info("GattProxy instance is ready")
+
+    def stop(self):
+        """Stop proxy
+        """
+        if self.__listener is not None:
+            self.__listener.stop()
+
+        # Remove event handlers
+        self.central.clear_event_handlers()
+        
+        # Disconnect central and peripheral
+        if self.__target.conn_handle is not None:
+            self.__central.disconnect(self.__target.conn_handle)
+        self.__central.stop()
+        if self.__peripheral is not None:
+            if self.__peripheral.conn_handle is not None:
+                self.__peripheral.disconnect(self.__peripheral.conn_handle)
+            self.__peripheral.stop()
+
+    def on_periph_event(self, event):
+        """Handle peripheral events.
+        """
+        if isinstance(event, PeripheralEventConnected):
+            """When a central is connected, update its mtu if not 23.
+            """
+            self.__central_mtu = self.__central.get_mtu()
+            logger.debug("[GattProxy] central mtu: %d", self.__central_mtu)
+            if self.__central_mtu != 23:
+                logger.debug("[GattProxy] Setting peripheral MTU to %d", self.__central_mtu)
+                self.__peripheral.set_mtu(self.__central_mtu)
