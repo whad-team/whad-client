@@ -15,7 +15,7 @@ def uuid_match(uuid: UUID, pattern: str) -> bool:
     # Make sure both have same length
     if len(pattern) != len(uuid_s):
         return False
-    
+
     for pos, c in enumerate(pattern):
         # 'x' in pattern is a wildcard
         if c == 'x':
@@ -24,10 +24,10 @@ def uuid_match(uuid: UUID, pattern: str) -> bool:
         # If characters do not match, UUID is different
         if uuid_s[pos] != c:
             return False
-        
+
     # Success
     return True
-    
+
 
 class CluesDb:
     """DarkMentorLLC Clues collaborative database.
@@ -61,7 +61,7 @@ class CluesDb:
                     name = clue["UUID_name"]
                     company = clue["company"]
                     return f"{company} | {name}"
-                elif "GATT Characteristic" in clue["UUID_usage_array"] and "UUID_name" in clue:
+                if "GATT Characteristic" in clue["UUID_usage_array"] and "UUID_name" in clue:
                     name = clue["UUID_name"]
                     return f"{clue['UUID_name']}"
 
