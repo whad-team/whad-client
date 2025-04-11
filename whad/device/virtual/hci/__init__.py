@@ -605,9 +605,10 @@ class HCIDevice(VirtualDevice):
         """
         Configure advertising data to use by HCI device.
         """
-        # pad data if less than 31 bytes
-        if len(data) < 31:
-            data += b'\x00'*(31 - len(data))
+        # Issue #164: scapy's HCI_Cmd_LE_Set_Advertising_Data class automatically
+        # adds padding to 31 bytes for its data field and computes the data
+        # field based on provided data field.
+        # Therefore, no need to pad to 31 bytes.
 
         # Send command and wait for response if required.
         result = True
@@ -628,6 +629,11 @@ class HCIDevice(VirtualDevice):
         """
         Configure scan response data to use by HCI device.
         """
+        # Issue #164: Scapy's HCI_Cmd_LE_Set_Scan_Response_Data, unlike its
+        # HCI_Cmd_LE_Set_Advertising_Data class, does not automatically pad
+        # data while the HCI LE command requires its data field to be 31-byte
+        # long. In this case, we need to pad our data to 31 bytes.
+
         result = True
         if wait_response:
             # Wait response and update result accordingly.
