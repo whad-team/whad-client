@@ -541,10 +541,16 @@ class GenericProfile:
 
                     if 'characteristics' in service:
                         for charac in service['characteristics']:
+                            # Load characteristic data (if provided)
+                            charac_data = b''
+                            if 'data' in charac['value']:
+                                charac_data = bytes.fromhex(charac['value']['data'])
+                            
+                            # Create characteristic model
                             charac_obj = BleCharacteristic(
                                 uuid=UUID(charac['value']['uuid']),
                                 handle=charac['handle'],
-                                value=b'',
+                                value=charac_data,
                                 properties=charac['properties'],
                                 security=SecurityAccess.int_to_accesses(charac['security'])
                             )
@@ -580,7 +586,6 @@ class GenericProfile:
                         service = getattr(self, prop)
                         service.name = prop
                         services.append(service)
-
 
             # Instanciate each service, and for each of them the corresponding
             # characteristics
@@ -1085,6 +1090,7 @@ class GenericProfile:
                     'value': {
                         'handle': charac.value_handle,
                         'uuid': str(charac.uuid),
+                        'data': charac.value.hex()
                     }
                 }
                 charac_dict['descriptors'] = []

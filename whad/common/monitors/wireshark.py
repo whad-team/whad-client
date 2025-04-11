@@ -22,7 +22,7 @@ class WiresharkMonitor(PcapWriterMonitor):
 
     @classmethod
     def get_dissector(cls, dissector_name):
-        return realpath("{}/ressources/wireshark/{}.lua".format(dirname(whad.__file__), dissector_name))
+        return realpath("{}/resources/wireshark/{}.lua".format(dirname(whad.__file__), dissector_name))
 
     @classmethod
     def get_dlt(cls, domain):

@@ -1,6 +1,7 @@
 """wble-peripheral interactive shell.
 """
-
+import json
+from typing import Union, List, Tuple
 from binascii import unhexlify, Error as BinasciiError
 
 # pylint: disable-next=wildcard-import,unused-wildcard-import
@@ -15,8 +16,10 @@ from whad.ble.utils.validators import validate_attribute_uuid, InvalidUUIDExcept
 from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Peripheral, GenericProfile, AdvDataFieldList, \
-    AdvCompleteLocalName, AdvShortenedLocalName, AdvFlagsField
+    AdvCompleteLocalName, AdvShortenedLocalName, AdvFlagsField, AdvDataField, \
+    AdvDataFieldListOverflow, AdvManufacturerSpecificData
 from whad.ble.connector.peripheral import PeripheralEventListener, PeripheralEventConnected
+
 from whad.ble.profile.service import PrimaryService
 from whad.ble.profile.characteristic import Characteristic, CharacteristicProperties, \
     ClientCharacteristicConfig, CharacteristicValue
@@ -61,6 +64,263 @@ def validate_uuid(uuid: str) -> str:
 
     # Return the normalized UUID
     return uuid
+
+class AdvRecordsManager:
+    """Advertising records manager
+
+    This class manages the advertising data and scan response data of a
+    device in order to optimize them.
+
+    It is a bit limited for now as you may only have one field of each type
+    in the advertising data, however it tries to store as much records as
+    possible in the advertisement data and the scan response data.
+    """
+
+    def __init__(self, adv_data: AdvDataFieldList = None, scan_rsp_data: AdvDataFieldList = None):
+        """Initialize manager
+        """
+        # Load advertising records
+        self.__records = []
+        if adv_data is not None:
+            for r in adv_data:
+                self.__records.append(r)
+        if scan_rsp_data is not None:
+            for r in scan_rsp_data:
+                self.__records.append(r)
+
+        # Save adv_data and scan_rsp_data in case no modification is
+        # requested.
+        self.__tainted = False
+        self.__adv_data = adv_data
+        self.__scan_rsp_data = scan_rsp_data
+
+    @property
+    def adv_data(self):
+        """Return the advertising data (max 31 bytes)
+        """
+        # Pack records if they have been tainted
+        if self.__tainted:
+            self.pack()
+        
+        # Return the advertising data
+        return self.__adv_data
+    
+    @property
+    def scan_rsp_data(self):
+        """Return the scan response data (max 31 bytes)
+        """
+        # Pack records if they have been tainted
+        if self.__tainted:
+            self.pack()
+
+        # Return the scan response data
+        return self.__scan_rsp_data
+
+    @property
+    def complete_name(self) -> str:
+        """Parses current records and return the complete name value, if found.
+
+        :return: Complete local name
+        :rtype: str
+        """
+        cln = self.get_record(AdvCompleteLocalName)
+        if cln is not None:
+            return cln.name.decode("utf-8")
+
+    @complete_name.setter
+    def complete_name(self, value: str):
+        """Update complete name
+        """
+        cln = self.get_record(AdvCompleteLocalName)
+        if cln is not None:
+            old_value = cln.name
+            cln.name = bytes(value, "utf-8")
+            try:
+                self.update_record(cln)
+            except AdvDataFieldListOverflow as overflow:
+                cln.name = old_value
+                self.update_record(cln)
+                raise AdvDataFieldListOverflow() from overflow
+        else:
+            self.add_record(AdvCompleteLocalName(bytes(value, "utf-8")))
+
+    @property
+    def short_name(self) -> str:
+        """Parses current records and return short name value, if found.
+
+        :return: Short name
+        :rtype: str
+        """
+        cln = self.get_record(AdvShortenedLocalName)
+        if cln is not None:
+            return cln.name.decode("utf-8")
+
+    @short_name.setter
+    def short_name(self, value: str):
+        """Update shortened name
+        """
+        cln = self.get_record(AdvShortenedLocalName)
+        if cln is not None:
+            old_value = cln.name
+            try:
+                cln.name = bytes(value, "utf-8")
+                self.update_record(cln)
+            except AdvDataFieldListOverflow as overflow:
+                cln.name = old_value
+                self.update_record(cln)
+                raise AdvDataFieldListOverflow() from overflow
+        else:
+            self.add_record(AdvShortenedLocalName(bytes(value, "utf-8")))
+
+    @property
+    def manufacturer_data(self):
+        """Manufacturer data
+        """
+        cln = self.get_record(AdvManufacturerSpecificData)
+        if cln is not None:
+            return (cln.company, cln.data)
+        
+    @manufacturer_data.setter
+    def manufacturer_data(self, data: Tuple[int, bytes]):
+        if isinstance(data, tuple) and len(data) == 2:
+            comp_id, data = data
+            if isinstance(comp_id, int) and isinstance(data, bytes):
+                cln = self.get_record(AdvManufacturerSpecificData)
+                if cln is not None:
+                    old_id, old_data = cln.company, cln.data
+                    cln.company = comp_id
+                    cln.data = data
+                    try:
+                        self.update_record(cln)
+                    except AdvDataFieldListOverflow as overflow:
+                        cln.company = old_id
+                        cln.data = old_data
+                        self.update_record(cln)
+                        raise AdvDataFieldListOverflow() from overflow
+                else:
+                    self.add_record(AdvManufacturerSpecificData(comp_id, data))
+
+    def __fit_records(self, records: List[AdvDataField], length: int = 31):
+        """Find the records that may best fit in the given space
+        """
+        fitting_records = []
+
+        # Sort records
+        records.sort(key=lambda r: len(r.to_bytes()), reverse=True)
+        
+        # Find the biggest record that may fit in the given space
+        used_space = 0
+        found = True
+        while found:
+            found = False
+            for r in records:
+                if len(r.to_bytes()) <= length:
+                    # Add record
+                    fitting_records.append(r)
+                    used_space += len(r.to_bytes())
+                    length -= len(r.to_bytes())
+                    records.remove(r)
+                    found = True
+                    break
+        
+        # Return the fitting records and the remaining list
+        return (fitting_records, records)
+
+    def pack(self):
+        """Pack records into advertising and scan response data.
+        """
+        # Copy our records array
+        records = [r for r in self.__records]
+
+        # Pack records to fit advertising data
+        adv_records, remaining = self.__fit_records(records, 31)
+
+        # If some records remain, try to pack them into a scan response data
+        if len(remaining) > 0:
+            scan_rsp_records, remaining = self.__fit_records(records, 31)
+        else:
+            scan_rsp_records = None
+
+        # If no remaining records, we're good.
+        if len(remaining) > 0:
+            raise AdvDataFieldListOverflow()
+        else:
+            # Update advertising data and scan
+            self.__adv_data = AdvDataFieldList()
+            for r in adv_records:
+                self.__adv_data.add(r)
+            if scan_rsp_records is not None:
+                self.__scan_rsp_data = AdvDataFieldList()
+                for r in scan_rsp_records:
+                    self.__scan_rsp_data.add(r)
+            
+            # Advertising data and scan response data is up-to-date.
+            self.__tainted = False
+
+    def taint(self):
+        """Mark advertising data as modified
+        """
+        if not self.__tainted:
+            self.__tainted = True
+
+    def get_record(self, record_type) -> AdvDataField:
+        """Find a specific record.
+        """
+        if not self.__tainted:
+            # Look into adv_data
+            for r in self.__adv_data:
+                if isinstance(r, record_type):
+                    return r
+                
+            # Look into scan response data (if any)
+            if self.__scan_rsp_data is not None:
+                for r in self.__scan_rsp_data:
+                    if isinstance(r, record_type):
+                        return r
+        else:
+            # Look in our records
+            for r in self.__records:
+                if isinstance(r, record_type):
+                    return r
+
+        # No record found
+        return None
+    
+    def remove_record(self, record_type) -> bool:
+        """Remove a record of a specific type.
+        """
+        # Find and remove record
+        record = self.get_record(record_type)
+        if record is not None:
+            # Remove record
+            self.__records.remove(record)
+            self.taint()
+
+            # Success
+            return True
+        
+        # Not found
+        return False
+
+    def update_record(self, record: AdvDataField):
+        """Update a specific record.
+        """
+        # Remove record and add it again
+        old_record = self.get_record(record.__class__)
+        self.remove_record(record.__class__)
+        self.add_record(record)
+        
+        # Make sure it fits
+        self.pack()
+
+    def add_record(self, record: AdvDataField) -> bool:
+        """Add a record into the device advertising data, optimize storage.
+        """
+        # Mark as modified
+        self.taint()
+
+        # Add record to our records list
+        self.__records.append(record)
 
 
 class MonitoringProfile(GenericProfile):
@@ -158,9 +418,46 @@ class BlePeriphShell(InteractiveShell):
         if dev_profile is not None:
             # Set profile
             self.__profile = MonitoringProfile(from_json=dev_profile)
+
+            # Set advertising data
+            profile = json.loads(dev_profile)
+            if "devinfo" in profile and "adv_data" in profile["devinfo"]:
+                self.adv_data = AdvDataFieldList.from_bytes(
+                    bytes.fromhex(profile["devinfo"]["adv_data"])
+                )
+                if "scan_rsp" in profile["devinfo"]:
+                    self.scan_rsp_data = AdvDataFieldList.from_bytes(
+                        bytes.fromhex(profile["devinfo"]["scan_rsp"])
+                    )
+                else:
+                    self.scan_rsp_data = None
+            else:
+                # No advertising data (should not be the case)
+                self.warning("No advertising data in JSON profile !")
+                self.adv_data = AdvDataFieldList(AdvFlagsField())
+                self.scan_rsp_data = None
         else:
+            # Create a default profile
             self.__profile = MonitoringProfile()
 
+            # Generate AD data
+            self.adv_data = AdvDataFieldList()
+            if self.__complete_name is not None:
+                self.adv_data.add(AdvCompleteLocalName(
+                    bytes(self.__complete_name, "utf-8")
+                ))
+            if self.__shortened_name is not None:
+                self.adv_data.add(AdvShortenedLocalName(
+                    bytes(self.__shortened_name, "utf-8")
+                ))
+            self.adv_data.add(AdvFlagsField(
+                bredr_support=False,
+            ))
+
+            # Set advertising data
+            self.scan_rsp_data = None
+
+        self.__adv_manager = AdvRecordsManager(self.adv_data, self.scan_rsp_data)
         self.__selected_service = None
         self.__connector: WhadDeviceConnector = None
         self.__listener: PeripheralEventListener = None
@@ -864,37 +1161,38 @@ class BlePeriphShell(InteractiveShell):
         Starts the peripheral with its configured services and characteristics.
         """
 
-        # Generate AD data
-        adv_data = AdvDataFieldList()
-        if self.__complete_name is not None:
-            adv_data.add(AdvCompleteLocalName(
-                bytes(self.__complete_name, "utf-8")
-            ))
-        if self.__shortened_name is not None:
-            adv_data.add(AdvShortenedLocalName(
-                bytes(self.__shortened_name, "utf-8")
-            ))
-        adv_data.add(AdvFlagsField(
-            bredr_support=False,
-        ))
-
         # Switch to emulation mode
         self.__current_mode = self.MODE_STARTED
         self.update_prompt()
 
+        try:
+            # Instanciate our Peripheral
+            self.__connector = Peripheral(
+                self.__interface,
+                profile=self.__profile,
+                adv_data=self.__adv_manager.adv_data,
+                scan_data=self.__adv_manager.scan_rsp_data
+            )
+
+            # Start advertising
+            self.__connector.start()
+        except AdvDataFieldListOverflow:
+            self.error("Advertising data is too big to fit in advertisement !")
+        
         # Instanciate our Peripheral
-        self.__connector = Peripheral(
-            self.__interface,
-            profile=self.__profile,
-            adv_data=adv_data
-        )
+        # self.__connector = Peripheral(
+        #    self.__interface,
+        #    profile=self.__profile,
+        #    adv_data=adv_data
+        #)
         # create our event listener
-        self.__listener = PeripheralEventListener(callback=self.on_periph_event)
-        self.__listener.start()
-        self.__connector.attach_event_listener(self.__listener)
+        # self.__listener = PeripheralEventListener(callback=self.on_periph_event)
+        # self.__listener.start()
+        # self.__connector.attach_event_listener(self.__listener)
 
         # Start peripheral
-        self.__connector.start()
+        # self.__connector.start()
+
 
     def on_periph_event(self, event):
         if isinstance(event, PeripheralEventConnected):
@@ -968,13 +1266,24 @@ class BlePeriphShell(InteractiveShell):
         This command sets the complete local name for the emulated peripheral.
         """
         if len(args) > 0:
-            self.__complete_name = args[0]
-            self.success(f"Device name set to \"{self.__complete_name}\"")
-        else:
-            print_formatted_text(HTML(
-                f"<ansicyan>Device complete name:</ansicyan> {self.__complete_name}"
-            ))
+            # Save name
+            name = args[0]
 
+            try:
+                self.__adv_manager.complete_name = name
+                self.success(f"Device name set to \"{name}\"")
+            except AdvDataFieldListOverflow:
+                self.error("Advertising data is full, cannot set complete local name.")
+
+        else:
+            # Complete name
+            complete_name = self.__adv_manager.complete_name
+            if complete_name is not None:
+                print_formatted_text(HTML(
+                    f"<ansicyan>Device complete name:</ansicyan> {complete_name}"
+                ))
+            else:
+                self.warning("Complete local name not set.")
 
     @category("Advertising data")
     def do_shortname(self, args):
@@ -985,68 +1294,83 @@ class BlePeriphShell(InteractiveShell):
         This command sets the shortened local name for the emulated peripheral.
         """
         if len(args) > 0:
-            self.__shortened_name = args[0]
-            self.success(f"Device short name set to \"{self.__shortened_name}\"")
+            # Save name
+            name = args[0]
+
+            try:
+                self.__adv_manager.short_name = name
+                self.success(f"Device shortened local name set to \"{name}\"")
+            except AdvDataFieldListOverflow:
+                self.error("Advertising data is full, cannot set shortened local name")
         else:
-            print_formatted_text(HTML(
-                f"<ansicyan>Device short name:</ansicyan> {self.__shortened_name}"
-            ))
+            # Short name
+            short_name = self.__adv_manager.short_name
+            if short_name is not None:
+                print_formatted_text(HTML(
+                    f"<ansicyan>Device shortened name:</ansicyan> {short_name}"
+                ))
+            else:
+                self.error("No shortened local name has been set yet.")
 
     @category("Advertising data")
     def do_manuf(self, args):
         """Set device manufacturer company ID and data.
 
-        <ansicyan><b>shortname</b> [<i>COMPANY_ID</i> <i>HEX DATA</i>]</ansicyan>
+        <ansicyan><b>manuf</b> [<i>COMPANY_ID</i> <i>HEX_DATA</i>]</ansicyan>
 
         This commands defines the company ID to use in BLE advertising record
-        along with manufacturer data if a COMPANY_ID and HEX DATA are provided,
+        along with manufacturer data if a COMPANY_ID and HEX_DATA are provided,
         or simply manufacturer data otherwise.
         """
         if len(args) >= 2:
             comp_id = args[0]
             manuf_data = args[1]
+            manuf_comp = None
             if comp_id.lower().startswith("0x"):
-                self.__manuf_comp = int(comp_id, 16)
+                manuf_comp = int(comp_id, 16)
             else:
                 # First, search for company in our list of known companies (no case compare)
                 for cid, comp_name in BT_MANUFACTURERS.items():
                     if comp_name.lower() == comp_id:
-                        self.__manuf_comp = cid
+                        manuf_comp = cid
                         break
 
-                if self.__manuf_comp is None:
+                if manuf_comp is None:
                     try:
-                        self.__manuf_comp = int(comp_id)
+                        manuf_comp = int(comp_id)
                     except ValueError:
                         self.error("Bad company ID ({comp_id})")
                         return
 
             try:
-                self.__manuf_data = unhexlify(manuf_data)
+                self.__adv_manager.manufacturer_data = (manuf_comp, unhexlify(manuf_data))
                 self.success("Manufacturer data set.")
-            except Exception:
+            except BinasciiError:
                 self.__manuf_data = []
                 self.error("Error while parsing manufacturer data (not valid hex)")
+            except AdvDataFieldListOverflow:
+                self.error("Advertising data is full, cannot set manufacturer specific data")
         else:
-            if self.__manuf_comp is not None:
-                if self.__manuf_comp in BT_MANUFACTURERS:
-                    manuf_name = BT_MANUFACTURERS[self.__manuf_comp]
+            if self.__adv_manager.manufacturer_data is not None:
+                manuf_comp, manuf_data = self.__adv_manager.manufacturer_data
+                if manuf_comp in BT_MANUFACTURERS:
+                    manuf_name = BT_MANUFACTURERS[manuf_comp]
                 else:
                     manuf_name = "Unknown"
                 print_formatted_text(HTML("<ansicyan>Device Manufacturer data record:</ansicyan>"))
                 print_formatted_text(HTML(
-                    f" <b>Company ID:</b> 0x{self.__manuf_comp:04x} ({manuf_name})"
+                    f" <b>Company ID:</b> 0x{manuf_comp:04x} ({manuf_name})"
                 ))
-                if self.__manuf_data != []:
+                if manuf_data != []:
                     print_formatted_text(HTML(" <b>Manuf. Data:</b>"))
-                    nb_lines = int(len(self.__manuf_data)/16)
-                    if nb_lines*16 < len(self.__manuf_data):
+                    nb_lines = int(len(manuf_data)/16)
+                    if nb_lines*16 < len(manuf_data):
                         nb_lines += 1
                     for i in range(nb_lines):
-                        manuf_data = " ".join([f"{v:02x}" % v
-                                               for v in self.__manuf_data[i*16:(i+1)*16]])
-                        print_formatted_text(HTML(f"   <i>{manuf_data}</i>"))
-
+                        data = " ".join(
+                            [f"{v:02x}" for v in manuf_data[i*16:(i+1)*16]]
+                        )
+                        print_formatted_text(HTML(f"   <i>{data}</i>"))
             else:
                 self.error("No manufacturer data has been set yet.")
 
