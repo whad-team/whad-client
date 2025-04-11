@@ -38,10 +38,10 @@ class CluesDb:
     def load_data():
         """Load data from CLUES_data.json file
         """
-        # Resolve data path
-        clues_data_path = os.path.join(resources.files("whad"), "resources/clues/CLUES_data.json")
-        if CluesDb.CLUES_CACHE is None:
-            # load JSON
+        if len(CluesDb.CLUES_CACHE) == 0:
+            # Load data from CLUES_data.json into cache
+            clues_data_path = os.path.join(resources.files("whad"),
+                                           "resources/clues/CLUES_data.json")
             with open(clues_data_path, 'r', encoding="utf-8") as clues_json:
                 CluesDb.CLUES_CACHE = json.load(clues_json)
 
@@ -50,8 +50,7 @@ class CluesDb:
         """Generate alias based on UUID.
         """
         # Load data into cache
-        if CluesDb.CLUES_CACHE is None:
-            CluesDb.load_data()
+        CluesDb.load_data()
 
         # Loop on services and known UUIDS
         for clue in CluesDb.CLUES_CACHE:
