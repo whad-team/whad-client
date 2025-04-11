@@ -14,7 +14,7 @@ from whad.ble.exceptions import HookReturnValue, HookReturnAuthentRequired,\
     HookReturnNotFound, ConnectionLostException
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode, ReadAccess, \
     WriteAccess, Authentication, Authorization, Encryption
-from whad.ble.stack.att.exceptions import error_response_to_exc, AttErrorCode
+from whad.ble.stack.att.exceptions import error_response_to_exc, AttErrorCode, AttError
 from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.profile import GenericProfile
@@ -36,8 +36,18 @@ def txlock(f):
 
 def proclock(f):
     def _wrapper(self, *args, **kwargs):
+        # Acquire GATT procedure lock
         self.procedure_start()
-        result = f(self, *args, **kwargs)
+
+        # Call method and unlock GATT procedure lock
+        # if an exception is raised.
+        try:
+            result = f(self, *args, **kwargs)
+        except AttError as err:
+            self.procedure_stop()
+            raise err
+        
+        # Release GATT procedure lock
         self.procedure_stop()
         return result
     return _wrapper
@@ -696,17 +706,17 @@ class GattClient(GattLayer):
         """
         Discover service characteristics
         """
-        logger.debug('discover characteristics for service %s' % service.uuid)
-        logger.debug('discover characteristics from handle %d to %d' % (
+        logger.debug("discover characteristics for service %s", service.uuid)
+        logger.debug("discover characteristics from handle %d to %d", 
             service.handle, service.end_handle
-        ))
+        )
         if isinstance(service, PrimaryService):
             handle = service.handle
         else:
             return
 
         while handle <= service.end_handle:
-            logger.debug('service end handle is: %d' % service.end_handle)
+            logger.debug("service end handle is: %d", service.end_handle)
             self.lock_tx()
             self.att.read_by_type_request(
                 handle,
@@ -732,7 +742,10 @@ class GattClient(GattLayer):
 
                     # Read value if requested and characteristic is readable
                     if save_values and (charac_properties & 0x02) > 0:
-                        charac.value = self.read(charac_value_handle)
+                        try:
+                            charac.value = self.read(charac_value_handle)
+                        except AttError:
+                            charac.value = b""
                         
                     handle = charac.handle+2
                     logger.debug('found characteristic %s with handle %d' % (charac_uuid, charac_value_handle))
