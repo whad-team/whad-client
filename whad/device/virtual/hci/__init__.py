@@ -474,7 +474,8 @@ class HCIDevice(VirtualDevice):
         logger.debug("raising WhadDeviceNotReady exception")
         raise WhadDeviceNotReady()
 
-    def _set_bd_address(self, bd_address="11:22:33:44:55:66", bd_address_type=AddressType.PUBLIC):
+    def _set_bd_address(self, bd_address: bytes = b"\x00\x11\x22\x33\x44\x55",
+                        bd_address_type: int = AddressType.PUBLIC) -> bool:
         """
         Modify the BD address (if supported by the HCI device).
         """
@@ -524,7 +525,7 @@ class HCIDevice(VirtualDevice):
                         b'Integrated System Solution Corp.' : HCI_Cmd_Ericsson_Write_BD_Address,
                         b'ST Microelectronics' : HCI_Cmd_ST_Write_BD_Address
                     }
-                    command = bd_address_mod_map[self._manufacturer]
+                    command = bd_address_mod_map[self._manufacturer](addr=bd_address)
                     self._write_command(command, wait_response=False)
                     self._reset()
 
