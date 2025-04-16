@@ -20,7 +20,7 @@ authors = [
 ]
 readme="README.md"
 
-license = "MIT"
+license = {text = "MIT License"}
 requires-python = ">=3.7, <4"
 description = "Wireless protocols hacking framework"
 classifiers = [
