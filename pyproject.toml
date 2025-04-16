@@ -20,7 +20,7 @@ authors = [
 ]
 readme="README.md"
 
-license = { text="Apache" }
+license = "MIT"
 requires-python = ">=3.7, <4"
 description = "Wireless protocols hacking framework"
 classifiers = [
@@ -31,8 +31,6 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Operating System :: POSIX :: Linux",
-  "License :: OSI Approved :: MIT License"
-
 ]
 dependencies = [
     "protobuf==3.20.*",
@@ -95,7 +93,7 @@ whad = [
   "resources/pcaps/*.pcap",
   "resources/rules/*.rules",
   "resources/wireshark/*.lua",
-  "data/clues/CLUES_data.json",
+  "resources/clues/CLUES_data.json",
 ]
 
 [project.urls]
