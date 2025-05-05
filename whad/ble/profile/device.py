@@ -344,19 +344,19 @@ class PeripheralCharacteristic:
                                   indication/notification event
         :return bool: True if subscription has successfully been performed, False otherwise.
         """
+        # wrap our callback to provide more details about the concerned
+        # characteristic
+        def wrapped_cb(_, value, indication=False):
+            callback(
+                self,
+                value,
+                indication=indication
+            )
+
         if notification:
             # Look for CCCD
             desc = self.get_descriptor(UUID(0x2902))
             if desc is not None:
-                # wrap our callback to provide more details about the concerned
-                # characteristic
-                def wrapped_cb(handle, value, indication=False):
-                    callback(
-                        self,
-                        value,
-                        indication=indication
-                    )
-
                 # Register our callback
                 if callback is not None:
                     self.__gatt.register_notification_callback(
@@ -381,7 +381,7 @@ class PeripheralCharacteristic:
                 if callback is not None:
                     self.__gatt.register_notification_callback(
                         self.__characteristic.value_handle,
-                        callback
+                        wrapped_cb
                     )
 
                 # Enable indication
