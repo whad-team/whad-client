@@ -58,7 +58,7 @@ class ClientCharacteristicConfig(CharacteristicDescriptor):
     """
 
     def __init__(self, characteristic, handle=0, notify=False, indicate=False):
-        """Instanciate a Client Characteristic Configuration Descriptor
+        """Instantiate a Client Characteristic Configuration Descriptor
 
         :param bool notify: Set to True to get the corresponding characteristic notified on change
         :param bool indicate: Set to True to get the corresponding characteristic
@@ -89,7 +89,7 @@ class ReportReferenceDescriptor(CharacteristicDescriptor):
     """
 
     def __init__(self, characteristic, handle=None):
-        """Instanciate a Report Reference Descriptor
+        """Instantiate a Report Reference Descriptor
 
         :param bool notify: Set to True to get the corresponding characteristic notified on change
         :param bool indicate: Set to True to get the corresponding characteristic
@@ -107,7 +107,7 @@ class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
     a textual description of the related characteristic.
     """
     def __init__(self, characteristic, handle=None, description=''):
-        """Instanciate a Characteristic User Description descriptor
+        """Instantiate a Characteristic User Description descriptor
 
         :param description: Set characteristic text description
         """
@@ -146,7 +146,7 @@ class Characteristic(Attribute):
 
     def __init__(self, uuid, handle=0, end_handle=0, value=b'', properties=BleAttProperties.DEFAULT,
                  security=None):
-        """Instanciate a BLE characteristic object
+        """Instantiate a BLE characteristic object
 
         :param uuid: 16-bit or 128-bit UUID
         :param int handle: Handle value

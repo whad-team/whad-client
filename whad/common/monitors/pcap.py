@@ -68,7 +68,7 @@ class PcapWriterMonitor(WhadMonitor):
                     remove(self._pcap_file)
                     existing_pcap_file = False
 
-        # Instanciate the PCAP Writer with the appropriate parameters
+        # Instantiate the PCAP Writer with the appropriate parameters
         self._writer_lock.acquire()
         self._writer = PcapWriter(
                                     self._pcap_file,

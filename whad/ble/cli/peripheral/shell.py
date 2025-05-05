@@ -1166,7 +1166,7 @@ class BlePeriphShell(InteractiveShell):
         self.update_prompt()
 
         try:
-            # Instanciate our Peripheral
+            # Instantiate our Peripheral
             self.__connector = Peripheral(
                 self.__interface,
                 profile=self.__profile,
@@ -1179,7 +1179,7 @@ class BlePeriphShell(InteractiveShell):
         except AdvDataFieldListOverflow:
             self.error("Advertising data is too big to fit in advertisement !")
         
-        # Instanciate our Peripheral
+        # Instantiate our Peripheral
         # self.__connector = Peripheral(
         #    self.__interface,
         #    profile=self.__profile,

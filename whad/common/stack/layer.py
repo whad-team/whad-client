@@ -381,7 +381,7 @@ class Layer(object):
     def populate(self, options={}):
         """Sub-layers instanciation.
 
-        We instanciate each layer and register these instances into our object.
+        We instantiate each layer and register these instances into our object.
         """
         self.__options = options
 
@@ -636,7 +636,7 @@ class Layer(object):
     def configure(self, options):
         """Configure callback.
 
-        Override this method to configure the layer when the stack is instanciated.
+        Override this method to configure the layer when the stack is instantiated.
         """
         pass
 
@@ -730,7 +730,7 @@ class Layer(object):
 
 class ContextualLayer(Layer):
     """This layer is not automatically loaded when the stack model is created
-    and must be instanciated specifically by another layer.
+    and must be instantiated specifically by another layer.
     """
 
     @classmethod

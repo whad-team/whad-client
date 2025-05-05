@@ -603,7 +603,7 @@ class Attribute:
     """GATT Attribute model
     """
     def __init__(self, uuid, handle=None, value=0):
-        """Instanciate a GATT Attribute
+        """Instantiate a GATT Attribute
         """
         self.__uuid = uuid
         self.__handle = handle

@@ -77,7 +77,7 @@ class LowLevelPeripheral(Peripheral):
     """
 
     def __init__(self, proxy, device, adv_data, scan_data, bd_address=None, public=True):
-        """Instanciate a LowLevelPeripheral instance
+        """Instantiate a LowLevelPeripheral instance
 
         :param LinkLayerProxy proxy: Reference to the link-layer proxy that will receive events
         :param WhadDevice device: A :class:`whad.device.WhadDevice` object to use
@@ -246,7 +246,7 @@ class LowLevelCentral(Central):
     """
 
     def __init__(self, proxy, device, connection_data=None):
-        """Instanciate a LowLevelCentral object
+        """Instantiate a LowLevelCentral object
 
         :param WhadDevice device: Underlying WHAD device to use.
         """

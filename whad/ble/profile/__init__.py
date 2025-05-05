@@ -167,7 +167,7 @@ class CharacteristicDescriptor:
     """
 
     def __init__(self, bleclass=None):
-        """Instanciate a characteristic descriptor model
+        """Instantiate a characteristic descriptor model
 
         :param str name: attribute name to access this descriptor
         :param class bleclass: BLE descriptor class to use when instanciating the model
@@ -497,7 +497,7 @@ class GenericProfile:
     """
 
     def __init__(self, start_handle=0, from_json=None):
-        """Parse the device model, instanciate all the services, characteristics
+        """Parse the device model, instantiate all the services, characteristics
         and descriptors, compute all handle values and registers everything
         inside this instance for further use.
 
@@ -587,7 +587,7 @@ class GenericProfile:
                         service.name = prop
                         services.append(service)
 
-            # Instanciate each service, and for each of them the corresponding
+            # Instantiate each service, and for each of them the corresponding
             # characteristics
             for service in services:
                 if isinstance(service, PrimaryService):

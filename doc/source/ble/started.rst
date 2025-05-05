@@ -4,7 +4,7 @@ Getting started
 Scan available devices
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Use the :class:`whad.ble.connector.scanner.Scanner` class to instanciate
+Use the :class:`whad.ble.connector.scanner.Scanner` class to instantiate
 a BLE device scanner and detect all the available devices.
 
 .. code-block:: python
@@ -149,12 +149,12 @@ the device services and characteristics:
             ),
         )
 
-Once this profile defined, instanciate a :class:`whad.ble.connector.Peripheral` object
+Once this profile defined, instantiate a :class:`whad.ble.connector.Peripheral` object
 using this profile:
 
 .. code-block:: python
 
-    # Instanciate our peripheral
+    # Instantiate our peripheral
     my_profile = MyPeripheral()
 
     # Create a periphal device based on this profile
