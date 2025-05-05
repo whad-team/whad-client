@@ -8,7 +8,8 @@ import logging
 
 # Scapy
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
-    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
+    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
+    BTLE_CTRL
 from scapy.packet import Packet
 
 # Device interface
@@ -819,6 +820,17 @@ class BLE(WhadDeviceConnector):
                 packet = BTLE(access_addr=access_address)/pdu
                 send_raw = True
             else:
+                # Sanity check (issue #183): if there is a BTLE_CTRL layer in this
+                # PDU and we don't support raw PDU, issue an error and raise
+                # an UnsupportedCapability exception.
+                if BTLE_CTRL in pdu:
+                    logger.error((
+                        "WHAD interface %s cannot send BLE control PDUs, please "
+                        "use another interface that supports sending raw PDUs."
+                    ), self.device.interface)
+                    raise UnsupportedCapability("RawInject")
+                
+                # PDU is not raw
                 packet = pdu
                 send_raw = False
 
