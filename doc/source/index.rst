@@ -83,3 +83,11 @@ Welcome to WHAD's documentation!
     :caption: Contributing
 
     device/firmware
+
+
+.. toctree::
+    :maxdepth: 1
+    :caption: Python API Reference
+
+    api/device
+    api/monitors
