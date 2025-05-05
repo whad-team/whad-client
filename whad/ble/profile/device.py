@@ -166,6 +166,12 @@ class PeripheralCharacteristic:
         self.__gatt = gatt
 
     @property
+    def name(self) -> str:
+        """Characteristic name.
+        """
+        return self.__characteristic.name
+
+    @property
     def value(self) -> bytes:
         """Transparent characteristic read.
 
@@ -424,6 +430,12 @@ class PeripheralService:
     def __init__(self, service, gatt):
         self.__service = service
         self.__gatt = gatt
+
+    @property
+    def name(self) -> str:
+        """Service name.
+        """
+        return self.__service.name
 
     @property
     def handle(self):
