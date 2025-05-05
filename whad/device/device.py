@@ -292,27 +292,17 @@ class WhadDevice:
     @classmethod
     def create(cls, interface_string):
         '''
-        Allows to get a specific device according to the provided interface string.
-        The interface string is formed as follow:
+        Create a specific device according to the provided interface string,
+        formed as follows:
 
-        "<device_type>[device_index][:device_identifier]"
+        <device_type>[device_index][:device_identifier]
 
         Examples:
-            * Instantiating the first available UartDevice:
-                "uart" or "uart0"
-
-            * Instantiating the second available UartDevice:
-                "uart1"
-
-            * Instantiating an UartDevice linked to /dev/ttyACM0:
-                "uart:/dev/ttyACM0"
-
-            * Instantiating the first available UbertoothDevice:
-                "ubertooth" or "ubertooth0"
-
-            * Instantiating an UbertoothDevice with serial number
-              "11223344556677881122334455667788":
-                ubertooth:11223344556677881122334455667788
+            - `uart` or `uart0`: defines the first compatible UART device available
+            - `uart1`: defines the second compatible UART device available
+            - `uart:/dev/ttyACMO`: defines a compatible UART device identified by `/dev/tty/ACMO`
+            - `ubertooth` or `ubertooth0`: defines the first available Ubertooth device
+            - `ubertooth:11223344556677881122334455667788`: defines a Ubertooth device with serial number *11223344556677881122334455667788*
         '''
         device_classes = cls._get_sub_classes()
 
