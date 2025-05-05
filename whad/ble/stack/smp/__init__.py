@@ -301,7 +301,7 @@ class SM_Peer(object):
 
 
     def __init__(self, address):
-        """Instanciate a SM_Peer.
+        """Instantiate a SM_Peer.
 
         By default, peers are configured to only accept Legacy JustWorks pairing.
         """

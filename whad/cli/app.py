@@ -292,7 +292,7 @@ class CommandLineApp(ArgumentParser):
     def __init__(self, description: str = None, commands: bool=True, interface: bool=True,
                  input: int = INPUT_WHAD,
                  output: int = OUTPUT_WHAD, **kwargs):
-        """Instanciate a CommandLineApp
+        """Instantiate a CommandLineApp
 
         :param str program_name: program (app) name
         :param str usage: usage string

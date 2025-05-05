@@ -97,7 +97,7 @@ class AdvUuid16List(AdvDataField):
     def from_bytes(clazz, ad_record):
         """Deserialize a record containing a list of 16-bit UUIDs.
 
-        :param class clazz: Class that will be instanciated (must inherit from AdvUuid16List)
+        :param class clazz: Class that will be instantiated (must inherit from AdvUuid16List)
         :param bytes ad_record: AD record to deserialize.
         """
         nb_uuids = int(len(ad_record)/2)
@@ -145,7 +145,7 @@ class AdvUuid128List(AdvDataField):
     def from_bytes(clazz, ad_record):
         """Deserialize a record containing a list of 128-bit UUIDs.
 
-        :param class clazz: Class that will be instanciated (must inherit from AdvUuid128List)
+        :param class clazz: Class that will be instantiated (must inherit from AdvUuid128List)
         :param bytes ad_record: AD record to deserialize.
         """
         nb_uuids = int(len(ad_record)/16)
