@@ -140,14 +140,19 @@ class WhadExtractApp(CommandLineApp):
 
                 parameters = self.args.__dict__
 
+                # Create a Unix socket connector
                 connector = UnixSocketConnector(interface)
                 for parameter_name, parameter_value in parameters.items():
                     connector.add_parameter(parameter_name, parameter_value)
 
+                # Set the connector domain
                 connector.domain = self.args.domain
                 hub = ProtocolHub(2)
                 connector.format = hub.get(self.args.domain).format
                 connector.on_packet = self.on_packet
+
+                # Unlock to start processing incoming messages
+                connector.unlock()
 
                 while interface.opened:
                     time.sleep(.1)
