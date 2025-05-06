@@ -19,7 +19,7 @@ from whad.hub.ble import Direction
 from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
-from whad.ble.stack.gatt import GattClient
+from whad.ble.stack.gatt import GattClient, GattClientServer
 from whad.ble.stack.att import ATTLayer
 from whad.ble.stack.smp import CryptographicDatabase
 from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
@@ -472,7 +472,7 @@ f
         """On new connection, discover primary services.
 
         :param  connection: New connection Protobuf message
-        :type   connection: :class:`whad.protocol.ble_pb2.Connected`
+        :type   connection: :class:`whad.protocol.ble_pself.__central = connection.gattb2.Connected`
         """
         logger.info('new connection established')
 
@@ -571,3 +571,31 @@ f
         """
         if self.connection is not None:
             return self.connection.att.get_server_mtu()
+
+class CentralServer(Central):
+    '''This BLE connector provides a way to create a central device with
+    both GATT server and client roles.
+    '''
+
+    def __init__(self, device, existing_connection = None, profile=None, from_json=None, stack=BleStack):
+        # Configure our central connector
+        super().__init__(
+            device,
+            existing_connection=existing_connection,
+            from_json=from_json,
+            stack=stack,
+            client=GattClientServer
+        )
+
+        # Save GATT profile
+        self.__profile = profile
+
+
+    def on_new_connection(self, connection):
+        """Handle new connection
+        """
+        # Configure our GattClientServer instance's server model
+        connection.gatt.set_server_model(self.__profile)
+
+        # Propagate to parent class
+        super().on_new_connection(connection)
