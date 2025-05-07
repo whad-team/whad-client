@@ -7,18 +7,20 @@ from queue import Queue, Empty
 from struct import unpack
 
 # Scapy layers for HCI
-from scapy.layers.bluetooth import BluetoothSocketError, \
+from scapy.layers.bluetooth import BluetoothSocketError, BluetoothUserSocket, \
     HCI_Hdr, HCI_Command_Hdr, HCI_Cmd_Reset, HCI_Cmd_Set_Event_Filter, \
-    HCI_Cmd_Connect_Accept_Timeout, HCI_Cmd_Set_Event_Mask, HCI_Cmd_LE_Host_Supported, \
+    HCI_Cmd_Set_Event_Mask, HCI_Cmd_Write_LE_Host_Support, \
     HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
     HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect, \
     HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, \
     HCI_Event_Disconnection_Complete, HCI_Cmd_LE_Set_Scan_Response_Data, \
     HCI_Cmd_LE_Set_Random_Address, HCI_Cmd_LE_Long_Term_Key_Request_Reply, \
-    HCI_Cmd_LE_Start_Encryption_Request, HCI_Cmd_LE_Set_Advertising_Parameters, \
-    HCI_Cmd_LE_Read_Buffer_Size
-from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, HCI_Cmd_Read_Buffer_Size, \
-    HCI_Cmd_Complete_Read_Buffer_Size
+    HCI_Cmd_LE_Enable_Encryption, HCI_Cmd_LE_Set_Advertising_Parameters, \
+    HCI_Cmd_LE_Read_Buffer_Size_V1, HCI_Cmd_Read_Local_Name, HCI_Cmd_Complete_Read_Local_Name, \
+    HCI_Cmd_Complete_Read_Local_Version_Information, HCI_Cmd_Read_Local_Version_Information, \
+    HCI_Cmd_Write_Connect_Accept_Timeout
+from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
+    HCI_Cmd_Read_Buffer_Size, HCI_Cmd_Complete_Read_Buffer_Size
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -32,10 +34,8 @@ from whad.hub.discovery import Capability
 from whad.hub.ble import Direction as BleDirection, Commands, AddressType
 
 # Whad custom layers
-from whad.scapy.layers.bluetooth import BluetoothUserSocketFixed
-from whad.scapy.layers.hci import HCI_Cmd_Read_Local_Version_Information, \
-    HCI_Cmd_Complete_Read_Local_Version_Information, HCI_VERSIONS, BT_MANUFACTURERS, \
-    HCI_Cmd_Read_Local_Name, HCI_Cmd_Complete_Read_Local_Name, HCI_Cmd_LE_Read_Supported_States, \
+from whad.scapy.layers.hci import HCI_VERSIONS, BT_MANUFACTURERS, \
+    HCI_Cmd_LE_Read_Supported_States, \
     HCI_Cmd_Complete_LE_Read_Supported_States, HCI_Cmd_CSR_Write_BD_Address, HCI_Cmd_CSR_Reset, \
     HCI_Cmd_TI_Write_BD_Address, HCI_Cmd_BCM_Write_BD_Address, HCI_Cmd_Zeevo_Write_BD_Address, \
     HCI_Cmd_Ericsson_Write_BD_Address, HCI_Cmd_ST_Write_BD_Address, \
@@ -54,7 +54,7 @@ def get_hci(index):
     '''
     try:
         logger.debug("Creating bluetooth socket ...")
-        socket = BluetoothUserSocketFixed(index)
+        socket = BluetoothUserSocket(index)
         logger.debug("Bluetooth socket successfully created.")
         return socket
     except BluetoothSocketError:
@@ -63,7 +63,7 @@ def get_hci(index):
             logger.debug("Shutting down HCI interface #%d", index)
             HCIConfig.down(index)
             logger.debug("HCI interface %d shut down, creating Bluetooth socket ...", index)
-            socket = BluetoothUserSocketFixed(index)
+            socket = BluetoothUserSocket(index)
             logger.debug("Bluetooth socket successfully created.")
             return socket
         except BluetoothSocketError as err:
@@ -278,8 +278,7 @@ class HCIDevice(VirtualDevice):
             if response is None:
                 return False
             logger.debug("[hci] response code: 0x%04x", response.code)
-
-        return response.number == 1
+        return response.num_handles == 1
 
     def _write_command(self, command, wait_response=True):
         """
@@ -289,7 +288,7 @@ class HCIDevice(VirtualDevice):
         self.__socket.send(hci_command)
         if wait_response:
             response = self._wait_response()
-            while response.opcode != hci_command.opcode:
+            while response.opcode != hci_command[HCI_Command_Hdr].opcode:
                 response = self._wait_response()
         else:
             response = None
@@ -356,7 +355,7 @@ class HCIDevice(VirtualDevice):
     def _le_read_buffer_size(self):
         """Read HCI device LE buffer size and update max ACL length.
         """
-        response = self._write_command(HCI_Cmd_LE_Read_Buffer_Size())
+        response = self._write_command(HCI_Cmd_LE_Read_Buffer_Size_V1())
         if response is not None and response.status == 0x0:
             if HCI_Cmd_LE_Complete_Read_Buffer_Size in response:
                 if response.acl_pkt_len > 0:
@@ -389,14 +388,14 @@ class HCIDevice(VirtualDevice):
         """
         Configure HCI device connection accept timeout.
         """
-        response = self._write_command(HCI_Cmd_Connect_Accept_Timeout(timeout=timeout))
+        response = self._write_command(HCI_Cmd_Write_Connect_Accept_Timeout(timeout=timeout))
         return response is not None and response.status == 0x00
 
     def indicates_le_support(self):
         """
         Indicates to HCI Device that the Host supports Low Energy mode.
         """
-        response = self._write_command(HCI_Cmd_LE_Host_Supported())
+        response = self._write_command(HCI_Cmd_Write_LE_Host_Support(supported=1))
         return response is not None and response.status == 0x00
 
     def _initialize(self):
@@ -713,7 +712,7 @@ class HCIDevice(VirtualDevice):
             self.__converter.pending_key_request = False
         else:
             response = self._write_command(
-                HCI_Cmd_LE_Start_Encryption_Request(
+                HCI_Cmd_LE_Enable_Encryption(
                     handle=handle,
                     ltk=key[::-1],
                     rand=rand,
