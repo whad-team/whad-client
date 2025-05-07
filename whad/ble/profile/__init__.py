@@ -558,12 +558,16 @@ class GenericProfile:
 
                             # Loop on descriptors for the current characteristic
                             for desc in charac['descriptors']:
+                                # Try to convert this descriptor to an instance
+                                # of one of our supported descriptors
                                 desc_obj = BleCharacteristicDescriptor.from_uuid(
                                     charac_obj,
                                     handle=desc['handle'],
                                     uuid=UUID(desc['uuid']),
                                     value=bytes.fromhex(desc['value']) if 'value' in desc else b''
                                 )
+
+                                # Add descriptor
                                 if desc_obj is not None:
                                     charac_obj.add_descriptor(desc_obj)
                                     self.register_attribute(desc_obj)
