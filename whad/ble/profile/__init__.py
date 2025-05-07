@@ -16,6 +16,7 @@ from typing import List, Iterator
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,\
     CharacteristicProperties, ClientCharacteristicConfig, \
+    CharacteristicDescriptor as BleCharacteristicDescriptor, \
     ReportReferenceDescriptor as BleReportReferenceDescriptor, \
     CharacteristicUserDescriptionDescriptor as BleCharacteristicUserDescriptionDescriptor
 
@@ -555,15 +556,15 @@ class GenericProfile:
                                 security=SecurityAccess.int_to_accesses(charac['security'])
                             )
 
-                            # Loop on descriptors, only support CCC at the moment
+                            # Loop on descriptors for the current characteristic
                             for desc in charac['descriptors']:
-                                if UUID(desc['uuid']) == UUID(0x2902):
-                                    desc_obj = ClientCharacteristicConfig(
-                                        charac_obj,
-                                        handle=desc['handle'],
-                                        notify=charac_obj.must_notify(),
-                                        indicate=charac_obj.must_indicate()
-                                    )
+                                desc_obj = BleCharacteristicDescriptor.from_uuid(
+                                    charac_obj,
+                                    handle=desc['handle'],
+                                    uuid=UUID(desc['uuid']),
+                                    value=bytes.fromhex(desc['value']) if 'value' in desc else b''
+                                )
+                                if desc_obj is not None:
                                     charac_obj.add_descriptor(desc_obj)
                                     self.register_attribute(desc_obj)
 
@@ -682,8 +683,14 @@ class GenericProfile:
                         self.register_attribute(cudd_desc)
 
 
-                    # Loop on other characteristic descriptors and add them
+                    # Loop on other characteristic descriptors and add them,
+                    # if different from CUDD and CCCD.
                     for descriptor in charac.descriptors():
+                        # Exclude CCCD
+                        if descriptor.uuid == UUID(0x2902):
+                            continue
+
+                        # Add descriptor
                         desc = descriptor.bleclass(
                             charac_obj,
                             handle=self.__alloc_handle()
@@ -1097,7 +1104,8 @@ class GenericProfile:
                 for desc in charac.descriptors():
                     desc_dict = {
                         'handle': desc.handle,
-                        'uuid': str(desc.type_uuid)
+                        'uuid': str(desc.type_uuid),
+                        'value': desc.value.hex()
                     }
                     charac_dict['descriptors'].append(desc_dict)
                 service_dict['characteristics'].append(charac_dict)

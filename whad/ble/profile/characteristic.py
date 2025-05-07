@@ -6,9 +6,17 @@ from struct import pack, unpack
 
 from whad.ble.stack.att.constants import BleAttProperties, SecurityAccess
 from whad.ble.profile.attribute import Attribute, UUID, get_uuid_alias
-from whad.ble.exceptions import InvalidHandleValueException
+from whad.ble.exceptions import InvalidHandleValueException, InvalidUUIDException
 from whad.ble.utils.clues import CluesDb
 
+class desc_type:
+
+    def __init__(self, uuid: UUID):
+        self.__uuid = uuid
+
+    def __call__(self, cls):
+        CharacteristicDescriptor.register_type(self.__uuid, cls)
+        return cls
 
 class CharacteristicProperties:
     """Generic characteristic properties.
@@ -25,6 +33,8 @@ class CharacteristicProperties:
 class CharacteristicDescriptor(Attribute):
     """BLE Characteristic descriptor
     """
+    desc_types = {}
+
     def __init__(self, characteristic, uuid, handle=0, value=b''):
         super().__init__(uuid=uuid,handle=handle,value=value)
         self.__characteristic = characteristic
@@ -53,6 +63,37 @@ class CharacteristicDescriptor(Attribute):
         # No alias
         return str(self.type_uuid)
 
+    @staticmethod
+    def register_type(uuid: UUID, cls):
+        """Register descriptor type (associate a descriptor UUID with the
+        corresponding Python class (must inherit from CharacteristicDescriptor)
+        """
+        uuid_value = uuid.value()
+        if uuid_value not in CharacteristicDescriptor.desc_types:
+            if issubclass(cls, CharacteristicDescriptor):
+                CharacteristicDescriptor.desc_types[uuid_value] = cls
+
+    @staticmethod
+    def from_uuid(characteristic, handle: int, uuid: UUID, value: bytes):
+        """Create an instance of a descriptor based on the provided UUID and
+        descriptor value.
+
+        @param uuid: Descriptor UUID
+        @type uuid: UUID
+        @param value: Descriptor value
+        @type value: bytes
+        @return Instance of the corresponding descriptor
+        @rtype CharacteristicDescriptor
+        """
+        uuid_value = uuid.value()
+        if uuid_value in CharacteristicDescriptor.desc_types:
+            cls = CharacteristicDescriptor.desc_types[uuid_value]
+            return cls.from_value(characteristic, handle, value)
+
+        # Cannot find any class matching the provided UUID.
+        return None
+
+@desc_type(UUID(0x2902))
 class ClientCharacteristicConfig(CharacteristicDescriptor):
     """Client Characteristic Configuration Descriptor
     """
@@ -83,6 +124,17 @@ class ClientCharacteristicConfig(CharacteristicDescriptor):
         """
         super().value = pack('<H', val)
 
+    @staticmethod
+    def from_value(characteristic, handle, value):
+        """Create a ClientCharacteristicConfig instance from the provided
+        handle and value, and tie it to a specific characteristic.
+        """
+        # Create our CCCD object
+        cccd = ClientCharacteristicConfig(characteristic, handle)
+        # Set its value
+        cccd.value = value
+
+        return cccd
 
 class ReportReferenceDescriptor(CharacteristicDescriptor):
     """Report Reference Descriptor, used in HID profile
@@ -102,6 +154,7 @@ class ReportReferenceDescriptor(CharacteristicDescriptor):
             value=b'\x01\x01'
         )
 
+@desc_type(UUID(0x2901))
 class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
     """Characteristic description defined by user, contains
     a textual description of the related characteristic.
@@ -111,6 +164,7 @@ class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
 
         :param description: Set characteristic text description
         """
+        self.__description = description
         super().__init__(
             characteristic,
             uuid=UUID(0x2901),
@@ -118,6 +172,21 @@ class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
             value=description.encode('utf-8')
         )
 
+    @property
+    def text(self) -> str:
+        """User description
+        """
+        return self.__description
+
+    @property
+    def name(self):
+        """Descriptor name
+        """
+        return f"{super().name}, '{self.text}'"
+
+    @staticmethod
+    def from_value(characteristic, handle, value):
+        return CharacteristicUserDescriptionDescriptor(characteristic, handle, description=value.decode('utf-8'))
 
 class CharacteristicValue(Attribute):
     """Characteristic value attribute.
