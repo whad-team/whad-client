@@ -342,13 +342,13 @@ class Layer(object):
             if clazz.alias in class_layers:
                 del class_layers[clazz.alias]
 
-    def __init__(self, parent=None, layer_name=None, options={}):
+    def __init__(self, parent=None, layer_name=None, options=None):
         self.__parent = parent
         self.__layer_name = layer_name
         self.__state = self.state_class()
         self.__layers = {}
         self.__layer_cache = {}
-        self.__options = options
+        self.__options = options or {}
         self.__monitor_callbacks = []
 
         # Cache our message handlers
