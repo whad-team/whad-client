@@ -790,6 +790,21 @@ class GattClient(GattLayer):
 
                 handle += 1
 
+    def get_descriptor(self, characteristic: Characteristic, uuid: UUID, handle: int) -> CharacteristicDescriptor:
+        """Read a characteristic descriptor identified by its handle.
+
+        @param handle: Descriptor handle
+        @type handle: int
+        @return Characteristic descriptor
+        @rtype CharacteristicDescriptor
+        """
+        # Read descriptor value
+        desc_value = self.read(handle)
+
+        # Return descriptor object based on value and UUID
+        return CharacteristicDescriptor.from_uuid(characteristic, handle,
+                                                      uuid, desc_value)
+
     def discover(self, save_values: bool = False):
         # Discover services
         services = []
@@ -805,13 +820,9 @@ class GattClient(GattLayer):
         for service in self.__model.services():
             for characteristic in service.characteristics():
                 for descriptor in self.discover_characteristic_descriptors(characteristic):
-                    if descriptor.uuid == UUID(0x2902):
-                        characteristic.add_descriptor(
-                            ClientCharacteristicConfig(
-                                characteristic,
-                                handle=descriptor.handle
-                            )
-                        )
+                    desc = self.get_descriptor(characteristic, descriptor.uuid, descriptor.handle)
+                    if desc is not None:
+                        characteristic.add_descriptor(desc)
 
     @proclock
     def read(self, handle):
