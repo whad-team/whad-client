@@ -90,8 +90,9 @@ class CharacteristicDescriptor(Attribute):
             cls = CharacteristicDescriptor.desc_types[uuid_value]
             return cls.from_value(characteristic, handle, value)
 
-        # Cannot find any class matching the provided UUID.
-        return None
+        # Cannot find any class matching the provided UUID, return a generic
+        # descriptor.
+        return CharacteristicDescriptor(characteristic, uuid, handle, value)
 
 @desc_type(UUID(0x2902))
 class ClientCharacteristicConfig(CharacteristicDescriptor):
