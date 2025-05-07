@@ -14,7 +14,7 @@ from threading import Thread
 from whad.ble.connector.base import BLE
 from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack, Layer
-from whad.ble.stack.gatt import GattServer, GattClientServer, GattServerClient
+from whad.ble.stack.gatt import GattServer, GattServerClient
 from whad.ble.stack.att import ATTLayer
 from whad.ble.stack.smp import CryptographicDatabase, Pairing
 from whad.ble.profile import GenericProfile
