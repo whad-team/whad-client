@@ -14,7 +14,7 @@ from threading import Thread
 from whad.ble.connector.base import BLE
 from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack, Layer
-from whad.ble.stack.gatt import GattServer, GattClientServer
+from whad.ble.stack.gatt import GattServer, GattClientServer, GattServerClient
 from whad.ble.stack.att import ATTLayer
 from whad.ble.stack.smp import CryptographicDatabase, Pairing
 from whad.ble.profile import GenericProfile
@@ -562,32 +562,32 @@ class PeripheralClient(Peripheral):
             scan_data=scan_data,
             bd_address=bd_address,
             public=public,
-            stack=stack
+            stack=stack,
+            gatt=GattServerClient
         )
 
-        # Change ATTLayer to use GattClientServer and reinstantiate our stack
-        ATTLayer.add(GattClientServer)
-        self.use_stack(BleStack)
-
-
     def on_new_connection(self, connection):
+        """Handles incoming connection, wrap Central device in an instance of
+        `PeripheralDevice` to allow interaction.
+        """
         super().on_new_connection(connection)
 
         # Create a new peripheral device to represent the central device
         # that has just connected
 
-        self.__peripheral = PeripheralDevice(
+        self.__central = PeripheralDevice(
             self,
             connection.gatt,
             connection.conn_handle
         )
 
         # Retrieve GATT client
-        self.__central = connection.gatt
-        self.__central.set_client_model(self.__peripheral)
+        central = connection.gatt
+        print(connection.gatt)
+        central.set_client_model(self.__central)
 
     @property
-    def central_device(self):
+    def central(self) -> PeripheralDevice:
         """Central device
         """
-        return self.__peripheral
+        return self.__central
