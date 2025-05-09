@@ -131,7 +131,8 @@ def profile_handler(app, command_args):
     # We need to have an interface specified
     if app.interface is not None and app.args.bdaddr is not None:
 
-        print(f"Searching for target device {app.args.bdaddr} ...")
+        # Print with anonymization (if required)
+        app.print_safe("Searching for target device %s ...", BDAddress(app.args.bdaddr))
 
         # Switch to Scanner mode, search our device
         scanner = Scanner(app.interface)
@@ -150,13 +151,13 @@ def profile_handler(app, command_args):
             scanner.stop()
 
             # Display error message
-            app.error(f"BLE peripheral {app.args.bdaddr} cannot be found.")
+            app.error("BLE peripheral %s cannot be found.", BDAddress(app.args.bdaddr))
             return
 
         # Generate device advertising information
         device_metadata = {
             'adv_data': hexlify(device.adv_records.to_bytes()).decode('utf-8'),
-            'bd_addr': str(device.address),
+            'bd_addr': str(app.anonymize(BDAddress(device.address))),
             'addr_type': device.address_type,
             'scan_rsp': None
         }
@@ -177,12 +178,15 @@ def profile_handler(app, command_args):
             # Connect to target device
             device = central.connect(app.args.bdaddr, random=app.args.random)
             if device is None:
-                app.error("Cannot connect to %s, device does not respond.", app.args.bdaddr)
+                app.error("Cannot connect to %s, device does not respond.",
+                          BDAddress(app.args.bdaddr))
             else:
                 try:
                     print("Enumerating services and characteristics ...")
                     # Perform profile discovery
-                    result = profile_discover(app, device, include_values=(len(command_args) >= 1))
+                    result = profile_discover(
+                        app, device,include_values=(len(command_args) >= 1)
+                    )
 
                     # Export profile to JSON file if required
                     if result and len(command_args) >= 1:
@@ -206,7 +210,7 @@ def profile_handler(app, command_args):
                     app.error("BLE device disconnected during discovery.")
 
         except PeripheralNotFound:
-            app.error(f"BLE peripheral {app.args.bdaddr} cannot be found.")
+            app.error(f"BLE peripheral {app.anonymize(BDAddress(app.args.bdaddr))} cannot be found.")
 
         # Terminate central
         central.stop()
