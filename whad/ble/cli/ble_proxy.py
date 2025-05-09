@@ -14,7 +14,9 @@ from whad.ble.tools.proxy import GattProxy, LinkLayerProxy
 from whad.cli.app import CommandLineDeviceSource, run_app
 from whad.hub.ble import Direction
 
-logger = logging.getLogger(__name__)
+from whad.privacy import PrivacyLogger, print_safe
+
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 class VerboseLLProxy(LinkLayerProxy):
     """Verbose link-layer proxy class.
@@ -282,7 +284,7 @@ class BleProxyApp(CommandLineDeviceSource):
 
         # Display target device info
         addr_type = "random" if target.address_type == BDAddress.RANDOM else "public"
-        print(f"Found target device {target.address} ({addr_type})")
+        print_safe("Found target device %s (%s)", BDAddress(target.address), addr_type)
 
         if target is not None:
             if not self.args.linklayer:
