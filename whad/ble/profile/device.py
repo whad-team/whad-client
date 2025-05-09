@@ -41,7 +41,10 @@ from whad.ble.profile.characteristic import CharacteristicProperties, Characteri
 from whad.ble.profile import GenericProfile
 from whad.ble.profile.attribute import UUID
 
-logger = logging.getLogger(__name__)
+# Privacy
+from whad.privacy import PrivacyLogger
+
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 class PeripheralCharacteristicDescriptor:
     """Wrapper for a peripheral characteristic descriptor.
@@ -645,9 +648,6 @@ class PeripheralDevice(GenericProfile):
                     )
         # Not found
         return None
-
-        # Not found
-        return False
 
 
     def find_object_by_handle(self, handle):

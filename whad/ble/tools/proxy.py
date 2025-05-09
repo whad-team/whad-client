@@ -28,8 +28,10 @@ from whad.exceptions import WhadDeviceNotFound
 from whad.common.monitors import PcapWriterMonitor, WiresharkMonitor
 from whad.hub.ble import Direction as BleDirection
 
+from whad.privacy import PrivacyLogger
 
-logger = logging.getLogger(__name__)
+
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 #############################################
 # Link-layer Proxy related classes
@@ -151,12 +153,12 @@ class LowLevelPeripheral(Peripheral):
             logger.debug("Sending pending PDUs to other half...")
             for _pdu in self.__pending_data_pdus:
                 if self.__proxy is not None:
-                    logger.debug("Calling proxy on_data_pdu with PDU %s..." % _pdu)
+                    logger.debug("Calling proxy on_data_pdu with PDU %s...", _pdu)
                     pdu = self.__proxy.on_data_pdu(_pdu, BleDirection.SLAVE_TO_MASTER)
                     if pdu is not None:
                         self.send_pdu(reshape_pdu(pdu), self.__conn_handle, direction=BleDirection.SLAVE_TO_MASTER)
                 else:
-                    logger.debug("Directly sending PDU %s..." % _pdu)
+                    logger.debug("Directly sending PDU %s...", _pdu)
                     self.send_pdu(reshape_pdu(_pdu), self.__conn_handle)
 
 

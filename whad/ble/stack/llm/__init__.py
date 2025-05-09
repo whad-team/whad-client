@@ -10,12 +10,13 @@ from typing import Tuple
 
 from scapy.layers.bluetooth4LE import *
 
+from whad.privacy import PrivacyLogger
 from whad.common.stack import Layer, alias, source, state, LayerState, instance
 from whad.ble.stack.l2cap import L2CAPLayer
 from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, e
 from whad.hub.ble import BDAddress
 
-logger = logging.getLogger(__name__)
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 CONNECTION_UPDATE_REQ = 0x00
 CHANNEL_MAP_REQ = 0x01

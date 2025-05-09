@@ -26,7 +26,8 @@ from whad.ble.profile.service import PrimaryService as BlePrimaryService, \
 from whad.ble.exceptions import InvalidHandleValueException
 from whad.ble.stack.att.constants import SecurityAccess
 
-logger = logging.getLogger(__name__)
+from whad.privacy import PrivacyLogger
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 ###################################
 # Decorators for GenericProfile
