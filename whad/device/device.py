@@ -16,6 +16,8 @@ from whad.exceptions import UnsupportedDomain, WhadDeviceNotReady, \
     WhadDeviceError
 from whad.helpers import message_filter
 
+from whad.privacy import PrivacyLogger
+
 # WHAD protocol hub
 from whad.hub import ProtocolHub
 from whad.hub.message import AbstractPacket, AbstractEvent
@@ -26,7 +28,7 @@ from whad.hub.generic.cmdresult import ResultCode
 
 from whad.device.info import WhadDeviceInfo
 
-logger = logging.getLogger(__name__)
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 class WhadDeviceInputThread(Thread):
 

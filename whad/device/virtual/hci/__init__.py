@@ -24,12 +24,13 @@ from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, HC
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceUnsupportedOperation, WhadDeviceError
 from whad.device import VirtualDevice
+from whad.privacy import PrivacyLogger
 
 # Whad hub
 from whad.hub.discovery import Domain
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.discovery import Capability
-from whad.hub.ble import Direction as BleDirection, Commands, AddressType
+from whad.hub.ble import Direction as BleDirection, Commands, AddressType, BDAddress
 
 # Whad custom layers
 from whad.scapy.layers.bluetooth import BluetoothUserSocketFixed
@@ -46,7 +47,7 @@ from whad.device.virtual.hci.hciconfig import HCIConfig
 from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, \
     HCIInternalState
 
-logger = logging.getLogger(__name__)
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 def get_hci(index):
     '''
@@ -568,8 +569,7 @@ class HCIDevice(VirtualDevice):
         """
         Establish a connection using HCI device.
         """
-        logger.debug("bd_address: %s (%d)", bd_address, bd_address_type)
-        logger.debug("[hci] _connect() called")
+        logger.debug("[hci] Initiating connection to %s (%d)", BDAddress(bd_address), bd_address_type)
         patype = 0 if bd_address_type == AddressType.PUBLIC else 1
         if channel_map is not None:
             formatted_channel_map = unpack("<Q",channel_map+ b"\x00\x00\x00")[0]
@@ -876,7 +876,7 @@ class HCIDevice(VirtualDevice):
     def _on_whad_ble_set_bd_addr(self, message):
         logger.debug("Received WHAD BLE set_bd_addr message")
         if self._set_bd_address(message.bd_address, message.addr_type):
-            logger.debug("HCI adapter BD address set to %s", str(message.bd_address))
+            logger.debug("HCI adapter BD address set to %s", BDAddress(message.bd_address))
             self._send_whad_command_result(CommandResult.SUCCESS)
         else:
             logger.debug("HCI adapter does not support BD address spoofing")

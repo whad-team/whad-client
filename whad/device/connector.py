@@ -14,7 +14,9 @@ from whad.hub.generic.cmdresult import CommandResult, Success
 from whad.exceptions import WhadDeviceError, WhadDeviceDisconnected, \
     RequiredImplementation
 
-logger = logging.getLogger(__name__)
+from whad.privacy import PrivacyLogger
+
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 class WhadDeviceConnector:
     """
@@ -315,7 +317,7 @@ class WhadDeviceConnector:
         :param  Packet pdu:  Packet to add to locked packets queue
         :type   pdu: scapy.packet.Packet
         """
-        logger.info("Add locked pdu: %s" % pdu)
+        logger.info("Add locked pdu: %s", pdu)
         self.__locked_pdus.put(pdu)
 
     # Device interaction
