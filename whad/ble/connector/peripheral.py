@@ -23,8 +23,10 @@ from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField
 from whad.hub.ble import Direction as BleDirection
 from whad.exceptions import UnsupportedCapability
 
+from whad.privacy import PrivacyLogger, PrivateInfo, anonymize
+
 # Logging
-logger = logging.getLogger(__name__)
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 class PeripheralEventDisconnected:
     """Peripheral disconnected event.
@@ -45,7 +47,7 @@ class PeripheralEventDisconnected:
         """
         return self.__conn_handle
 
-
+@PrivateInfo.register
 class PeripheralEventConnected:
     """Connected event
     """
@@ -86,6 +88,15 @@ class PeripheralEventConnected:
         :rtype: :py:class:`whad.ble.BDAddress`
         """
         return self.__remote
+    
+    def anonymize(self, seed):
+        """Anonymize BD addresses.
+        """
+        return PeripheralEventConnected(
+            self.__conn_handle,
+            anonymize(self.local, seed),
+            anonymize(self.remote, seed)
+        )
 
 class PeripheralEventListener(Thread):
     """Peripheral event listener.
@@ -203,7 +214,7 @@ class Peripheral(BLE):
 
         # Set bd address if provided
         if bd_address is not None:
-            logger.info("Set BD address to %s", bd_address)
+            logger.info("Set BD address to %s", BDAddress(bd_address))
             self.set_bd_address(bd_address, public=public)
 
         # If an existing connection is hijacked, simulate a connection

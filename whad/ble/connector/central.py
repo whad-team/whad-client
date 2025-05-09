@@ -26,14 +26,16 @@ from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
 from whad.ble.profile.device import PeripheralDevice
 from whad.common.stack import Layer
 from whad.exceptions import UnsupportedCapability
+from whad.privacy import PrivacyLogger, PrivateInfo, anonymize
 
-logger = logging.getLogger(__name__)
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 
 class CentralEvent:
     """Central event base class
     """
 
+@PrivateInfo.register
 class CentralConnected(CentralEvent):
     """Event sent when central has successfully connected to a remote
     peripheral.
@@ -66,6 +68,14 @@ class CentralConnected(CentralEvent):
     def __repr__(self) -> str:
         return f"<CentralConnected handle={self.__handle} local={self.__local} remote={self.__remote}/>"
 
+    def anonymize(self, seed):
+        """Anonymization callback, required by PrivateInfo.
+        """
+        return CentralConnected(
+            self.handle,
+            anonymize(self.local_peer, seed),
+            anonymize(self.remote_peer, seed)
+        )
 
 class CentralDisconnected(CentralEvent):
     """Event sent when central has been disconnected from a remote
@@ -116,7 +126,7 @@ class CentralEventHandler(Thread):
             self.__listeners[callback] = event_type
             return True
         return False
-    
+
     def remove_listener(self, callback) -> bool:
         """Remove a listener.
         """
@@ -156,7 +166,6 @@ class Central(BLE):
     To initiate a connection to a device, just call :meth:`Central.connect` with the target
     BD address and it should return an instance of 
     :class:`whad.ble.profile.device.PeripheralDevice` in return.
-f
     """
 
     def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack,
@@ -206,7 +215,6 @@ f
             # self.stop() # ButteRFly doesn't support calling stop when spawning central
             self.enable_central_mode()
 
-
     def __configure_stack(self, phy_layer=None, gatt_layer=None):
         """
         """
@@ -215,7 +223,7 @@ f
             self.__gatt_layer = gatt_layer
         if phy_layer is not None:
             self.__phy_layer = phy_layer
-            
+
             # Configure BLE stack to use our PHY class
             self.__stack = phy_layer(self)
 

@@ -30,8 +30,11 @@ from whad.hub.events import ConnectionEvt, DisconnectionEvt, SyncEvt, DesyncEvt,
 from whad.common.triggers import ManualTrigger, ConnectionEventTrigger, ReceptionTrigger
 from whad.ble.profile.advdata import AdvDataFieldList
 
+# Privacy
+from whad.privacy import PrivacyLogger
+
 # Logging
-logger = logging.getLogger(__name__)
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 class BLE(WhadDeviceConnector):
     """
