@@ -4,7 +4,9 @@ from whad.protocol.whad_pb2 import Message
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper
 from whad.hub.ble import BleDomain
 from whad.hub.events import ConnectionEvt, DisconnectionEvt, DesyncEvt, SyncEvt
+from whad.privacy import PrivateInfo, anonymize
 
+@PrivateInfo.register
 @pb_bind(BleDomain, 'connect', 1)
 class ConnectTo(PbMessageWrapper):
     """BLE connect message class
@@ -16,6 +18,18 @@ class ConnectTo(PbMessageWrapper):
     hop_interval = PbFieldInt('ble.connect.hop_interval', optional=True)
     hop_increment = PbFieldInt('ble.connect.hop_increment', optional=True)
     crc_init = PbFieldInt('ble.connect.crc_init', optional=True)
+
+    def anonymize(self, seed: bytes):
+        """Anonymize BD address.
+        """
+        return ConnectTo(
+            bd_address=anonymize(self.bd_address, seed),
+            addr_type=self.addr_type,
+            access_address=self.access_address,
+            channel_map=self.channel_map,
+            hop_interval=self.hop_interval,
+            crc_init=self.crc_init
+        )
 
 @pb_bind(BleDomain, 'disconnect', 1)
 class Disconnect(PbMessageWrapper):
@@ -49,6 +63,8 @@ class Synchronized(PbMessageWrapper):
     
     @staticmethod
     def from_event(event):
+        """Convert an event into this message.
+        """
         return Synchronized(
             access_address=event.access_address,
             crc_init=event.crc_init,
@@ -57,6 +73,7 @@ class Synchronized(PbMessageWrapper):
             channel_map=event.channel_map
         )
 
+@PrivateInfo.register
 @pb_bind(BleDomain, 'connected', 1)
 class Connected(PbMessageWrapper):
     """BLE connected message class.
@@ -85,6 +102,8 @@ class Connected(PbMessageWrapper):
     
     @staticmethod
     def from_event(event):
+        """Convert an event into this message.
+        """
         return Connected(
             initiator=event.initiator,
             advertiser=event.advertiser,
@@ -92,6 +111,19 @@ class Connected(PbMessageWrapper):
             conn_handle=event.conn_handle,
             adv_addr_type=event.adv_addr_type,
             init_addr_type=event.init_addr_type
+        )
+
+
+    def anonymize(self, seed: bytes):
+        """Anonymize BD addresses.
+        """
+        return Connected(
+            initiator=anonymize(self.initiator, seed),
+            advertiser=anonymize(self.advertiser, seed),
+            access_address=self.access_address,
+            conn_handle=self.conn_handle,
+            adv_addr_type=self.adv_addr_type,
+            init_addr_type=self.init_addr_type
         )
 
 @pb_bind(BleDomain, 'disconnected', 1)
@@ -137,6 +169,8 @@ class Desynchronized(PbMessageWrapper):
     
     @staticmethod
     def from_event(event):
+        """Convert an event into this message.
+        """
         return Desynchronized(
             access_address=event.access_address,
         )

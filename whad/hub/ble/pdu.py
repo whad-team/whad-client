@@ -4,6 +4,9 @@ import struct
 from scapy.compat import raw
 from scapy.layers.bluetooth4LE import BTLE, BTLE_DATA, BTLE_CTRL, BTLE_ADV, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
+
+from whad.privacy import PrivateInfo, anonymize, replace_bytes
+
 from whad.hub.message import AbstractPacket
 from whad.hub.ble import Direction, AdvType, AddressType, BDAddress, BLEMetadata
 
@@ -159,7 +162,7 @@ class SendBlePdu(PbMessageWrapper):
         )
 
 
-
+@PrivateInfo.register
 @pb_bind(BleDomain, "adv_pdu", 1)
 class BleAdvPduReceived(PbMessageWrapper):
     """BLE advertising PDU received message class
@@ -216,6 +219,20 @@ class BleAdvPduReceived(PbMessageWrapper):
         else:
             # Error
             return None
+
+    def anonymize(self, seed: bytes):
+        """Anonymize advertisement.
+
+        BD address is replaced by its obfuscated version, and also replaced in
+        advertisement data if it happens to appear in it (we saw this with some
+        devices in the wild).
+        """
+        return BleAdvPduReceived(
+            adv_type=self.adv_type,
+            bd_address=anonymize(self.bd_address, seed),
+            adv_data=replace_bytes(self.adv_data, self.bd_address, seed),
+            addr_type=self.addr_type
+        )
 
 
 @pb_bind(BleDomain, "pdu", 1)

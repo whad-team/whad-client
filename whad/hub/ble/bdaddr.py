@@ -1,5 +1,8 @@
-import re, json
+import re
+import json
 from binascii import hexlify, unhexlify
+
+from whad.privacy import PrivateInfo, anonymize
 
 class InvalidBDAddressException(Exception):
     """Invalid BD address used
@@ -7,6 +10,7 @@ class InvalidBDAddressException(Exception):
     def __init__(self):
         super().__init__()
 
+@PrivateInfo.register
 class BDAddress(object):
     """This class represents a Bluetooth Device address.
     """
@@ -78,6 +82,13 @@ class BDAddress(object):
         """
         return (self.__type == BDAddress.RANDOM)
 
+    def anonymize(self, seed: bytes):
+        """Anonymize BD address.
+        """
+        # We generate a new BD address from the seed
+        new_addr = anonymize(self.value, seed)
+        return BDAddress(new_addr)
+
     @staticmethod
     def from_bytes(bd_addr_bytes, addr_type=None):
         """Convert a 6-byte array into a valid BD address.
@@ -96,7 +107,6 @@ class BDAddress(object):
             raise InvalidBDAddressException
 
     @staticmethod
-
     def check(bd_addr: str) -> bool:
         """Check if a BD address is valid
 
