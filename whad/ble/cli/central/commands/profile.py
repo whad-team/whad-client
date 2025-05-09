@@ -25,7 +25,7 @@ EXPECTED_BLE_PARAMS = [
     "conn_handle",
 ]
 
-def profile_discover(app: CommandLineApp, device, include_values: False) -> bool:
+def profile_discover(app: CommandLineApp, device, include_values: bool = False) -> bool:
     """Discover the GATT profile of a given device
 
     :param app: WHAD application instance
@@ -236,7 +236,7 @@ def profile_handler(app, command_args):
 
         try:
             # Read GATT characteristic
-            profile_discover(app, device)
+            profile_discover(app, device, include_values=False)
 
             # Export profile to JSON file if required
             if len(command_args) >= 1:
