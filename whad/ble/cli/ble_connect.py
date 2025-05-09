@@ -24,7 +24,10 @@ from whad.hub.ble.bdaddr import BDAddress
 # WHAD CLI helper
 from whad.cli.app import CommandLineDevicePipe, run_app
 
-logger = logging.getLogger(__name__)
+# Privacy
+from whad.privacy import PrivacyLogger, print_safe
+
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 class BleConnectInputPipe(Bridge):
     """wble-connect input pipe
@@ -67,7 +70,7 @@ class BleConnectInputPipe(Bridge):
     def dispatch_pending_input_pdu(self, message):
         """Dispatch pending PDU.
         """
-        logger.info("Dispatching input pdu %s" % message)
+        logger.info("Dispatching input pdu %s", message)
 
         # Send message to our chained tool
         command = self.convert_packet_message(message, self.__out_handle)
@@ -76,8 +79,8 @@ class BleConnectInputPipe(Bridge):
     def dispatch_pending_output_pdu(self, pdu):
         """Dispatch pending out PDUs (received)
         """
-        logger.info("Dispatching output pdu %s" % message)
-        self.input.send_message(message)
+        logger.info("Dispatching output pdu %s", pdu)
+        self.input.send_message(pdu)
 
     def convert_packet_message(self, message, conn_handle: int):
         """Convert a BleRawPduReceived/BlePduReceived notification into the
@@ -165,7 +168,6 @@ class BleConnectInputPipe(Bridge):
         elif isinstance(message, Connected):
             # We are now again connected to the target device, unlock input to
             # process any incoming message and save output connection handle
-            print("Connected to %s" % self.__target_bdaddr)
             logger.debug("[wble-connect][output-pipe] Peripheral connected, updating connection handle")
             self.__out_handle = message.conn_handle
             logger.debug("[wble-connect][output-pide] Unlocking input ...")
@@ -193,7 +195,7 @@ class BleConnectInputPipe(Bridge):
         elif isinstance(message, Connected):
             # A client has reconnected
             logger.error("A client has reconnected, reconnect to our target ...")
-            print("Connecting to %s" % self.__target_bdaddr)
+            print_safe("Connecting to %s", self.__target_bdaddr)
             connect = self.output.hub.ble.create_connect_to(
                 self.__target_bdaddr
             )
@@ -333,9 +335,9 @@ class BleConnectApp(CommandLineDevicePipe):
                 central.lock()
 
                 # Connect to a device
-                print("Connecting to %s" % bdaddr)
+                print_safe("Connecting to %s", BDAddress(bdaddr))
                 periph = central.connect(bdaddr, random_connection_type)
-                print("Connected: %d" % periph.conn_handle)
+                print(f"Connected: {periph.conn_handle}")
 
                 # Create our bridge: it will drive the connection process
                 output_pipe = BleConnectInputPipe(
@@ -350,7 +352,7 @@ class BleConnectApp(CommandLineDevicePipe):
 
             except PeripheralNotFound:
                 # Could not connect
-                self.error(f"Cannot connect to {bdaddr}")
+                self.error("Cannot connect to %s", BDAddress(bdaddr))
 
     def connect_target(self, bdaddr, random_connection_type=False):
         """Connect to our target device
@@ -371,16 +373,16 @@ class BleConnectApp(CommandLineDevicePipe):
             # Connect to our target device
             try:
                 # Output current status on stderr
-                logger.info("[wble-connect::connect_target] Connecting to %s ...", bdaddr)
-                sys.stderr.write(f"Connecting to {bdaddr} ...\n")
+                logger.info("[wble-connect::connect_target] Connecting to %s ...", BDAddress(bdaddr))
+                sys.stderr.write(f"Connecting to {self.anonymize(BDAddress(bdaddr))} ...\n")
                 sys.stderr.flush()
 
                 # Connect to target device
                 periph = central.connect(bdaddr, random_connection_type)
 
                 # We are connected
-                logger.info("[wble-connect::connect_target] Connected to %s", bdaddr)
-                sys.stderr.write(f"Connected to {bdaddr}\n")
+                logger.info("[wble-connect::connect_target] Connected to %s", BDAddress(bdaddr))
+                sys.stderr.write(f"Connected to {self.anonymize(BDAddress(bdaddr))}\n")
                 sys.stderr.flush()
 
                 # Get peers
