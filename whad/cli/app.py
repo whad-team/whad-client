@@ -72,7 +72,11 @@ from whad.device import WhadDevice, UnixSocketDevice
 from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound, \
     WhadDeviceNotReady, WhadDeviceTimeout, UnsupportedDomain
 
-logger = logging.getLogger(__name__)
+from whad.settings import UserSettings
+from whad.privacy import PrivacyLogger, anonymize
+
+# Use a privacy-oriented logger by default.
+logger = PrivacyLogger(logging.getLogger(__name__))
 
 signal(SIGPIPE,SIG_DFL)
 
@@ -317,6 +321,7 @@ class CommandLineApp(ArgumentParser):
         self.__has_interface = interface
         self.__is_interface_piped = False
         self.__has_commands = commands
+        self.__anonymized = False
 
         # Add our default option --interface/-i
         if self.__has_interface:
@@ -353,6 +358,15 @@ class CommandLineApp(ArgumentParser):
             default=None,
             help='write the log output into LOGFILE_PATH'
         )
+        
+        # Anonymization
+        self.add_argument(
+            '--anon',
+            dest='anonymize',
+            action='store_true',
+            default=False,
+            help="enable logs and output anonymization for sharing"
+        )
 
         self.add_argument(
             '--version',
@@ -374,6 +388,9 @@ class CommandLineApp(ArgumentParser):
                 nargs='*',
                 help="command arguments"
             )
+
+        # Load user settings
+        self.__settings = UserSettings()
 
     @staticmethod
     def get_instance():
@@ -408,6 +425,17 @@ class CommandLineApp(ArgumentParser):
         """Return the parsed arguments Namespace.
         """
         return self.__args
+
+    @property
+    def anonymized(self) -> bool:
+        """Anonymization required.
+        """
+        return self.__anonymized
+
+    def anonymize(self, value):
+        if self.anonymized:
+            return anonymize(value, self.__settings.privacy_seed)
+        return value
 
     def is_piped_interface(self):
         """Determine if the input interface is piped from a previous app in
@@ -445,6 +473,11 @@ class CommandLineApp(ArgumentParser):
             else:
                 # Else we log into stderr
                 logging.basicConfig(level=desired_level)
+
+        # Shall we anonymize logs and output ?
+        if self.__args.anonymize:
+            os.environ["anonymized"] = "1"
+            self.__anonymized = True
 
         # If no color is enabled, change color depth to 1 (black/white)
         if self.__args.nocolor:
@@ -641,22 +674,53 @@ class CommandLineApp(ArgumentParser):
                 break
         return pending_input
 
-    def warning(self, message):
+    def print_safe(self, fmt: str, *args):
+        """Anonymize parameters, format message and print it.
+
+        :param fmt: format string
+        :type fmt: str
+        :param args: List of arguments used for formatting the message
+        :type args: list
+        """
+        # Anonymize parameters and forward to print()
+        if len(args) > 0:
+            _args = [self.anonymize(arg) for arg in args]
+            print(fmt % tuple(_args))
+        else:
+            print(fmt)
+
+    def warning(self, fmt: str, *args):
         """Display a warning message in orange (if color is enabled)
         """
         try:
-            print_formatted_text(HTML(f"<aaa fg=\"#e97f11\">/!\\ <b>{message}</b></aaa>"))
+            # Format and anonymize if required
+            if len(args) > 0:
+                _args = [self.anonymize(arg) for arg in args]
+                msg = fmt % tuple(_args)
+            else:
+                msg = fmt
+
+            # Print warning
+            print_formatted_text(HTML(f"<aaa fg=\"#e97f11\">/!\\ <b>{msg}</b></aaa>"))
         except:
             print_formatted_text(HTML(
                 "<aaa fg=\"#e97f11\">/!\\ <b>an unknown warning occured</b></aaa>"
             ))
 
-    def error(self, message):
+    def error(self, fmt: str, *args):
         """Display an error message in red (if color is enabled)
         """
         try:
+            # Format and anonymize if required
+            if len(args) > 0:
+                _args = [self.anonymize(arg) for arg in args]
+                msg = fmt % tuple(_args)
+            else:
+                msg = fmt
+
+            # Print error
             print_formatted_text(
-                HTML('<ansired>[!] <b>{message}</b></ansired>').format(message=message)
+                HTML('<ansired>[!] <b>{message}</b></ansired>').format(message=msg)
             )
         except Exception as err:
             logger.error('[!] an unknown error occured: %s',err)
