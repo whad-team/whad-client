@@ -194,6 +194,11 @@ f
             logger.info('Peripheral will use the provided security database.')
             self.__security_database = security_database
 
+        # Create our event handler and start it
+        self.__event_handler = CentralEventHandler()
+        self.add_event_handler(self.on_central_event)
+        self.__event_handler.start()
+
         # If a connection already exists, just feed the stack with the parameters
         if existing_connection is not None:
             self.on_connected(existing_connection)
@@ -201,10 +206,6 @@ f
             # self.stop() # ButteRFly doesn't support calling stop when spawning central
             self.enable_central_mode()
 
-        # Create our event handler and start it
-        self.__event_handler = CentralEventHandler()
-        self.add_event_handler(self.on_central_event)
-        self.__event_handler.start()
 
     def __configure_stack(self, phy_layer=None, gatt_layer=None):
         """
