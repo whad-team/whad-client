@@ -361,11 +361,13 @@ class CommandLineApp(ArgumentParser):
         
         # Anonymization
         self.add_argument(
-            '--anon',
+            '--anonymous',
             dest='anonymize',
             action='store_true',
             default=False,
-            help="enable logs and output anonymization for sharing"
+            help=(
+                "enable logs and output anonymization"
+            )
         )
 
         self.add_argument(
