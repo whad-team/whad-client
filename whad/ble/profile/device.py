@@ -1,35 +1,12 @@
 """
-Bluetooth Low Energy Peripheral abstraction
-===========================================
+This module provides the :py:class:`.PeripheralDevice` class used to wrap all GATT operations
+for a given connected device:
 
-This module provides the PeripheralDevice class used to wrap all GATT operations
-for a given connected device. This class wraps all the following operations:
-
-* service and characteristics discovery
-* ATT MTU exchange
-* characteristic and descriptor read
-* characteristic and descriptor write
-
-For instance, a `Central` object can be used to initiate a BLE connection to a
-target, and will return a `PeripheralDevice` object, as shown below::
-
-    central = Central(...)
-    target = central.connect('00:11:22:33:44:55')
-
-One can then use this object to discover all the services and characteristics::
-
-    target.discover()
-
-And look for a specific characteristic and read it::
-
-    device_name = target.get_characteristic(UUID('1800'), UUID('2A00'))
-    if device_name is not None:
-        print('Device name is {}'.format(device_name.read()))
-
-It is also possible to write to a characteristic (if writeable)::
-
-    device_name.value = b'MyNewDeviceName'
-
+* discovering services, characteristics and descriptors
+* reading a characteristic's value
+* writing to a characteristic's value
+* subscribing for notifications and indications
+* exchanging MTU value with the remote peripheral
 """
 import logging
 from struct import unpack

@@ -156,7 +156,6 @@ class Central(BLE):
     To initiate a connection to a device, just call :meth:`Central.connect` with the target
     BD address and it should return an instance of 
     :class:`whad.ble.profile.device.PeripheralDevice` in return.
-f
     """
 
     def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack,
