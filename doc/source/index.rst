@@ -35,6 +35,7 @@ Welcome to WHAD's documentation!
     ble/central
     ble/peripheral
     ble/profile
+    ble/exceptions
 
 .. toctree::
     :maxdepth: 1

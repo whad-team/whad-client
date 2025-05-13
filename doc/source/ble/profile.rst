@@ -1,5 +1,5 @@
-Bluetooth Low Energy Device Model
-=================================
+Device Model
+============
 
 WHAD uses a specific device model to create BLE peripherals. This device model
 is implemented in :class:`whad.ble.profile.GenericProfile` and allows dynamic
@@ -64,13 +64,13 @@ to attach a method to a specific event and a specific characteristic:
 A characteristic event handler may raise one of the following exception to cause
 the GATT stack to react accordingly:
 
-* :class:`whad.ble.exceptions.HookReturnValue`: force a characteristic value to be returned
+* :class:`~whad.ble.exceptions.HookReturnValue`: force a characteristic value to be returned
   to a GATT client on a read event
-* :class:`whad.ble.exceptions.HookReturnGattError`: generates a GATT error that will
+* :class:`~whad.ble.exceptions.HookReturnGattError`: generates a GATT error that will
   be sent back to the connected GATT client
-* :class:`whad.ble.exceptions.HookReturnNotFound`: tells a GATT client the characteristic
+* :class:`~whad.ble.exceptions.HookReturnNotFound`: tells a GATT client the characteristic
   does not exist
-* :class:`whad.ble.exceptions.HookReturnAccesDenied`: tells a GATT client that
+* :class:`~whad.ble.exceptions.HookReturnAccesDenied`: tells a GATT client that
   authentication is required to access this characteristic
 
 If no exception is raised in the event handler, the GATT operation continues as
