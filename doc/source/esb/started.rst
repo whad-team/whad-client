@@ -9,7 +9,7 @@ more details.
 Scan available devices
 ----------------------
 
-Use the :class:`whad.esb.connector.scanner.Scanner` class to instanciate
+Use the :class:`whad.esb.connector.scanner.Scanner` class to instantiate
 a BLE device scanner and detect all the available devices.
 
 .. code-block:: python

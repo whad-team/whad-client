@@ -3,28 +3,37 @@
 This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
-import os
+import sys
 import logging
 import time
 import traceback
 import string
-from argparse import ArgumentParser, Namespace
-
-from whad.exceptions import RequiredImplementation, UnsupportedDomain, UnsupportedCapability
-from whad.cli.ui import wait, warning, error, success, info, display_packet
-from whad.cli.app import CommandLineApp, run_app
-from whad.device import Bridge, ProtocolHub
-from scapy.all import *
-from whad.scapy.layers.rf4ce import *
-from whad.scapy.layers.phy import *
-from whad.scapy.layers.esb import *
-from whad.scapy.layers.unifying import *
-from whad.device.unix import UnixConnector, UnixSocketServerDevice
-from whad.tools.utils import list_implemented_injectors, get_injector_parameters, gen_option_name, build_configuration_from_args
-#from whad.unifying import Injector
-from whad.phy.connector.injector import Injector
-
 from queue import Queue
+from argparse import ArgumentParser
+
+# Import every possible scapy layer for packet crafting
+# pylint: disable-next=wildcard-import
+from scapy.layers.all import *
+
+# Import scapy helpers
+from scapy.packet import Packet, Raw
+from scapy.config import conf
+from scapy.themes import BrightTheme
+
+from whad.exceptions import UnsupportedDomain, UnsupportedCapability
+from whad.cli.ui import warning, error, info, display_packet
+from whad.cli.app import CommandLineApp, run_app
+from whad.hub import ProtocolHub
+
+# Import custom scapy layers required for packet crafting.
+from whad.scapy.layers.rf4ce import *       # pylint: disable=wildcard-import,unused-wildcard-import
+from whad.scapy.layers.phy import *         # pylint: disable=wildcard-import,unused-wildcard-import
+from whad.scapy.layers.esb import *         # pylint: disable=wildcard-import,unused-wildcard-import
+from whad.scapy.layers.unifying import *    # pylint: disable=wildcard-import,unused-wildcard-import
+from whad.device.unix import UnixConnector
+from whad.tools.utils import list_implemented_injectors, get_injector_parameters, \
+    gen_option_name, build_configuration_from_args
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,7 +54,11 @@ class WhadDomainSubParser(ArgumentParser):
         #exit(1)
 
 class WhadInjectApp(CommandLineApp):
+    """winject main application class.
+    """
+
     connector = None
+
     def __init__(self):
         """Application uses an interface and has commands.
         """
@@ -70,11 +83,13 @@ class WhadInjectApp(CommandLineApp):
         self.add_argument(
             '-d',
             '--delay',
+            type=float,
+            default='1.0',
             dest='delay',
-            default=0,
             help="Delay between the transmission of two consecutive packets"
         )
 
+        self.provided_count = 0
         self._input_queue = Queue()
         self._repeat_queue = Queue()
 
@@ -99,48 +114,47 @@ class WhadInjectApp(CommandLineApp):
         self.environment = list_implemented_injectors()
 
         # Iterate over domain, and get the associated sniffer parameters
-        for domain_name in self.environment:
-            self.environment[domain_name]["parameters"] = get_injector_parameters(
-                self.environment[domain_name]["configuration_class"]
+        for domain_name, domain in self.environment.items():
+            domain["parameters"] = get_injector_parameters(
+                domain["configuration_class"]
             )
 
 
-            self.environment[domain_name]["subparser"] = subparsers.add_parser(
+            domain["subparser"] = subparsers.add_parser(
                 domain_name,
-                description="WHAD {} Injection tool".format(domain_name.capitalize())
+                description=f"WHAD {domain_name.capitalize()} Injection tool"
             )
 
             # Iterate over every parameters, and add arguments to subparsers
             for (
                     parameter_name,
                     (parameter_type, parameter_default, parameter_base_class, parameter_help)
-                ) in self.environment[domain_name]["parameters"].items():
+                ) in domain["parameters"].items():
 
                 dest = parameter_name
 
                 # If parameter is based on a dataclass, process a subparameter
                 if parameter_base_class is not None:
-                    parameter_base, parameter_name = parameter_name.split(".")
+                    _, parameter_name = parameter_name.split(".")
 
                 parameter_name = gen_option_name(parameter_name)
 
                 # Process parameter help and shortname
                 if parameter_help is not None and "(" in parameter_help:
                     parameter_shortnames = [
-                        "-{}".format(i) for i in
+                        f"-{i}" for i in
                         parameter_help.split("(")[1].replace(")","").split(",")
                     ]
                     parameter_help = parameter_help.split("(")[0]
                 else:
                     parameter_shortnames = []
 
-
                 # Process parameter type
                 if parameter_type != bool:
-                    choices = []
                     # If we got an int
                     if parameter_type == int:
                         # allow to provide hex arguments
+                        # pylint: disable-next=unnecessary-lambda-assignment
                         parameter_type = lambda x: int(x,0)
                     # If we got a list, it is a list of string
                     if parameter_type == list:
@@ -153,7 +167,7 @@ class WhadInjectApp(CommandLineApp):
                     else:
                         action = "store"
                     # Add non-boolean argument to corresponding subparser
-                    self.environment[domain_name]["subparser"].add_argument(
+                    domain["subparser"].add_argument(
                         "--"+parameter_name,
                         *parameter_shortnames,
                         default=parameter_default,
@@ -164,7 +178,7 @@ class WhadInjectApp(CommandLineApp):
                     )
                 else:
                     # Add boolean argument to corresponding subparser
-                    self.environment[domain_name]["subparser"].add_argument(
+                    domain["subparser"].add_argument(
                         "--"+parameter_name,
                         *parameter_shortnames,
                         action='store_true',
@@ -172,37 +186,49 @@ class WhadInjectApp(CommandLineApp):
                         help=parameter_help
                     )
 
-            self.environment[domain_name]["subparser"].add_argument(
+            domain["subparser"].add_argument(
                 dest='packet',
                 nargs="*",
                 help='packet to inject'
             )
 
-    def on_incoming_packet(self, packet):
+    def on_incoming_packet(self, packet: Packet):
+        """Incoming packet callback method, adds packet to input queue.
+        """
         self._input_queue.put(packet)
 
     def generate_packets(self):
+        """Convert packets provided by the user through command-line into scapy
+        packets to inject.
+        """
         self.provided_count = 0
         if hasattr(self.args, "packet"):
             for p in self.args.packet:
-                try:
-                    pkt = eval(p)
-                    self._input_queue.put(pkt)
-                    self.provided_count += 1
-                except Exception as e:
-                    # If hexadecimal only, try to interpret as bytes
-                    if all(c in string.hexdigits for c in p):
+                # Is it some hex
+                if all(c in string.hexdigits for c in p):
+                    if len(p) % 2 == 0:
                         try:
                             pkt = bytes.fromhex(p)
                             self._input_queue.put(pkt)
                             self.provided_count += 1
-                        except Exception as e:
-                            error("Failure during packet interpretation: " + str(p) + " -> " + str(e))
+                        except Exception as err:
+                            error(f"Failure during raw packet decoding: {p} -> {err}")
                     else:
-                        error("Failure during packet interpretation: " + str(p) + " -> " + str(e))
+                        error("Raw packets must be provided in valid hexadecimal form")
+                else:
+                    try:
+                        # pylint: disable-next=eval-used
+                        pkt = eval(p)
+                        self._input_queue.put(pkt)
+                        self.provided_count += 1
+                    except SyntaxError:
+                        error(f"Invalid syntax: `{p}`")
+                    except Exception as err:
+                        error(f"Failure during packet interpretation: {p} -> {err}")
 
     def pre_run(self):
-        """Pre-run operations: rewrite arguments to allow skipping domain name when a pipe is configured.
+        """Pre-run operations: rewrite arguments to allow skipping domain name
+        when a pipe is configured.
         """
 
         try:
@@ -213,16 +239,16 @@ class WhadInjectApp(CommandLineApp):
         except ValueError:
             if "-h" in sys.argv or "--help" in sys.argv:
                 self.print_help()
-                exit(1)
+                sys.exit(1)
             error("You need to provide an interface.")
-            exit(1)
+            sys.exit(1)
 
         start_argv = sys.argv[:index + 2]
         end_argv =  sys.argv[index + 2:]
 
         if len(sys.argv) == 1 or "-h" in start_argv or "--help" in start_argv:
             self.print_help()
-            exit(1)
+            sys.exit(1)
 
 
         error_func = self.error
@@ -233,7 +259,7 @@ class WhadInjectApp(CommandLineApp):
             domain = self.args.domain
         except AttributeError:
             self.error("You have to provide a domain.")
-            exit(1)
+            sys.exit(1)
 
         if self.subparsers is None:
             self.error  = error_func
@@ -264,8 +290,23 @@ class WhadInjectApp(CommandLineApp):
 
         self.generate_packets()
 
+    def is_input_alive(self) -> bool:
+        """Determine if the input interface is providing packets to inject.
+
+        :return: `True` if input interface is alive, `False` otherwise.
+        :rtype: bool
+        """
+        return self.input_interface is not None and self.input_interface.opened
+
+    def has_pending_packets(self) -> bool:
+        """Determine if we still have some packets to inject.
+
+        :return: `True` if we have pending packets to inject, `False` otherwise.
+        :rtype: bool
+        """
+        return self.provided_count > 0 or not self._input_queue.empty()
+
     def run(self):
-        monitors = []
         injector = None
         # Launch pre-run tasks
         self.pre_run()
@@ -290,14 +331,18 @@ class WhadInjectApp(CommandLineApp):
                         hub = ProtocolHub(2)
                         connector.format = hub.get(self.args.domain).format
                         connector.on_packet = self.on_incoming_packet
+                        connector.unlock()
 
                     try:
                         injector.configuration = configuration
                     except Exception as e:
                         self.error("Error during configuration: " +repr(e))
 
+                    # Main loop
                     while True:
-                        while (self.input_interface is not None and self.input_interface.opened) or self.provided_count > 0 or not self._input_queue.empty():
+
+                        # Inject while input interface is alive or we have pending packets
+                        while self.is_input_alive() or self.has_pending_packets():
                             if not self._input_queue.empty():
                                 packet = self._input_queue.get()
                                 try:
@@ -318,30 +363,35 @@ class WhadInjectApp(CommandLineApp):
                                     traceback.print_exc()
                                 self.provided_count-=1
 
+                        # Break if no packets to repeat
                         if not self.args.repeat:
                             break
 
+                        # Move packets to repeat into input queue (pending packets).
                         while not self._repeat_queue.empty():
                             self._input_queue.put(self._repeat_queue.get())
                             self.provided_count += 1
                 else:
                     self.error("You need to specify a domain.")
             else:
-                self.error('You need to specify an interface with option --interface.')
+                self.error("You need to specify an interface with option --interface.")
 
-        except UnsupportedDomain as unsupported_domain:
-            self.error('WHAD device doesn\'t support selected domain ({})'.format(self.args.domain))
+        except UnsupportedDomain:
+            self.error(f"WHAD device doesn\'t support selected domain ({self.args.domain})")
 
         except UnsupportedCapability as unsupported_capability:
-            self.error('WHAD device doesn\'t support selected capability ({})'.format(unsupported_capability.capability))
+            self.error((f"WHAD device doesn't support selected capability "
+                        f"({unsupported_capability.capability})"))
 
-        except KeyboardInterrupt as keybd:
-            self.warning('injector stopped (CTRL-C)')
+        except KeyboardInterrupt:
+            self.warning("injector stopped (CTRL-C)")
             injector.stop()
             injector.close()
-            exit()
+            sys.exit(1)
 
 
 def winject_main():
+    """Launcher for winject CLI application.
+    """
     app = WhadInjectApp()
     run_app(app)

@@ -12,7 +12,7 @@ testpaths = [
 name = "whad"
 
 # Attention: the following version number must match the one in whad/version.py !
-version = "1.2.3"
+version = "1.2.6"
 
 authors = [
     { name="Damien CAUQUIL" },
@@ -20,7 +20,7 @@ authors = [
 ]
 readme="README.md"
 
-license = { text="Apache" }
+license = {text = "MIT License"}
 requires-python = ">=3.7, <4"
 description = "Wireless protocols hacking framework"
 classifiers = [
@@ -31,8 +31,6 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Operating System :: POSIX :: Linux",
-  "License :: OSI Approved :: MIT License"
-
 ]
 dependencies = [
     "protobuf==3.20.*",
@@ -95,10 +93,10 @@ exclude = [
 
 [tool.setuptools.package-data]
 whad = [
-  "ressources/pcaps/*.pcap",
-  "ressources/rules/*.rules",
-  "ressources/wireshark/*.lua",
-
+  "resources/pcaps/*.pcap",
+  "resources/rules/*.rules",
+  "resources/wireshark/*.lua",
+  "resources/clues/CLUES_data.json",
 ]
 
 [project.urls]

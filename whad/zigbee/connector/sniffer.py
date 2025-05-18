@@ -1,4 +1,6 @@
 import logging
+from time import time
+from typing import Generator
 
 from scapy.packet import Packet
 from scapy.layers.zigbee import ZigbeeSecurityHeader
@@ -138,7 +140,14 @@ class Sniffer(Zigbee, EventsManager):
 
         return packet
 
-    def sniff(self):
+    def sniff(self, timeout: float = None) -> Generator[Packet, None, None]:
+        """Sniff ZigBee packets from thin air.
+
+        :param timeout: Specify the number of seconds after which sniffing will stop.
+        :type timeout: float
+        """
+        # Save start time
+        start = time()
         try:
             while True:
                 if self.support_raw_pdu():
@@ -149,8 +158,14 @@ class Sniffer(Zigbee, EventsManager):
                 message = self.wait_for_message(filter=message_filter(message_type), timeout=0.1)
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
-                    self.monitor_packet_rx(packet)
-                    packet = self.process_packet(packet)
-                    yield packet
+                    if packet is not None:
+                        self.monitor_packet_rx(packet)
+                        packet = self.process_packet(packet)
+                        yield packet
+
+                # Check if timeout has been reached (if provided)
+                if timeout is not None:
+                    if time() - start >= timeout:
+                        break
         except WhadDeviceDisconnected:
             return

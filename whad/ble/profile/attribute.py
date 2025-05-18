@@ -1,9 +1,9 @@
 """BLE Attribute
 """
-
-from whad.ble.exceptions import InvalidHandleValueException, InvalidUUIDException
 from struct import pack, unpack
 from binascii import unhexlify, hexlify
+
+from whad.ble.exceptions import InvalidHandleValueException, InvalidUUIDException
 
 # Default services UUID and associated names
 SERVICES_UUID = {
@@ -529,13 +529,15 @@ class UUID:
         # integer
         elif isinstance(uuid, int):
             if 0 <= uuid <= 65536:
-                self.uuid = '%04X' % uuid
+                self.uuid = f"{uuid:04X}"
                 self.packed = pack('<H', uuid)
                 self.type = UUID.TYPE_16
             elif 0 <= uuid <= 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:
-                self.uuid = '%032X' % uuid
-                # modified solution from http://www.codegur.site/6877096/how-to-pack-a-uuid-into-a-struct-in-python
-                self.packed = pack('<QQ', uuid & 0xFFFFFFFFFFFFFFFF, (uuid >> 64) & 0xFFFFFFFFFFFFFFFF)
+                self.uuid = f"{uuid:032X}"
+                # modified solution from http://www.codegur.site/6877096/how-to-
+                # pack-a-uuid-into-a-struct-in-python
+                self.packed = pack('<QQ', uuid & 0xFFFFFFFFFFFFFFFF,
+                                   (uuid >> 64) & 0xFFFFFFFFFFFFFFFF)
                 self.type = UUID.TYPE_128
 
         elif len(uuid) == 4:
@@ -550,22 +552,26 @@ class UUID:
                 self.packed = unhexlify(temp)[::-1]
                 self.type = UUID.TYPE_128
         elif len(uuid) == 32 and "-" not in uuid:
-            self.uuid = b'-'.join((uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:])).decode('latin-1')
+            self.uuid = b'-'.join((uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20],
+                                   uuid[20:])).decode('latin-1')
             self.packed = uuid.decode("hex")[::-1]
             self.type = UUID.TYPE_128
         # binary
         elif len(uuid) == 2:
-            self.uuid = '%04X' % unpack('<H', uuid)[0]
+            v = unpack('<H', uuid)[0]
+            self.uuid = f"{v:04X}"
             self.packed = uuid
             self.type = UUID.TYPE_16
         elif len(uuid) == 16:
             r = uuid[::-1]
-            self.uuid = b'-'.join(map(lambda x: hexlify(x), (r[0:4], r[4:6], r[6:8], r[8:10], r[10:]))).decode('latin-1')
+            self.uuid = b'-'.join(map(lambda x: hexlify(x),
+                                      (r[0:4], r[4:6], r[6:8],r[8:10],
+                                       r[10:]))).decode('latin-1')
             self.packed = uuid
             self.type = UUID.TYPE_128
 
         if self.uuid is None:
-            raise InvalidUUIDException()
+            raise InvalidUUIDException(uuid)
 
     def __eq__(self, other):
         # TODO expand 16 bit UUIDs
@@ -575,23 +581,29 @@ class UUID:
         return self.uuid
 
     def to_bytes(self):
+        """Convert UUID to bytes
+        """
         return self.packed
 
     def value(self):
+        """Retrieve UUID value (16-bit)
+        """
         if self.type == UUID.TYPE_16:
             return unpack('<H', self.packed)[0]
-        else:
-            raise ValueError
+        # Not a 16-bit UUID
+        raise ValueError
 
     @classmethod
     def from_name(cls, name):
+        """Get UUID from standard name.
+        """
         return get_alias_uuid(name)
 
-class Attribute(object):
+class Attribute:
     """GATT Attribute model
     """
     def __init__(self, uuid, handle=None, value=0):
-        """Instanciate a GATT Attribute
+        """Instantiate a GATT Attribute
         """
         self.__uuid = uuid
         self.__handle = handle
@@ -602,24 +614,33 @@ class Attribute(object):
         """
         return pack('<H', self.__handle) + self.__uuid.to_bytes() + self.payload()
 
-    @property
     def payload(self):
+        """Convert attribute to bytes
+        """
         return self.__value
 
     @property
     def value(self):
+        """Attribute value
+        """
         return self.__value
 
     @value.setter
     def value(self, value):
+        """Set attribute value
+        """
         self.__value = value
 
     @property
     def handle(self):
+        """Attribute handle
+        """
         return self.__handle
 
     @handle.setter
     def handle(self, new_handle):
+        """Set attribute handle
+        """
         if isinstance(new_handle, int):
             self.__handle = new_handle
         else:
@@ -627,6 +648,8 @@ class Attribute(object):
 
     @property
     def type_uuid(self):
+        """Attribute type UUID
+        """
         return self.__uuid
 
 
@@ -640,7 +663,7 @@ def get_alias_uuid(alias: str):
     for uuid, name in CHARACS_UUID.items():
         if alias == name:
             return UUID(uuid)
-        
+
     for uuid, name in DESCRIPTORS_UUID.items():
         if alias == name:
             return UUID(uuid)
@@ -655,7 +678,10 @@ def get_uuid_alias(uuid: UUID):
         if uuid.type == UUID.TYPE_16:
             if uuid_val in SERVICES_UUID:
                 return SERVICES_UUID[uuid_val]
-            elif uuid_val in CHARACS_UUID:
+            if uuid_val in CHARACS_UUID:
                 return CHARACS_UUID[uuid_val]
-            elif uuid_val in DESCRIPTORS_UUID:
+            if uuid_val in DESCRIPTORS_UUID:
                 return DESCRIPTORS_UUID[uuid_val]
+
+    # Alias not found
+    return None

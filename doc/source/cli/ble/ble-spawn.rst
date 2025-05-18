@@ -10,12 +10,22 @@ Usage
 
 .. code-block:: text
 
-    wble-spawn -i <INTERFACE> -p [PROFILE]
+    wble-spawn [OPTIONS]
 
 A compatible WHAD *interface* and the path to a JSON *profile* are required to
 populate the BLE device with the corresponding services and characteristics. It
 will also allow `wble-spawn` to use the same advertising data, in order to make
 the emulated device appear the same way the original does.
+
+Command-line options
+--------------------
+
+**wble-spawn** supports the following options:
+
+* ``--interface`` (``-i``): specifies the WHAD interface to use to connect to the target device
+* ``--profile`` (``-p``): specifies the GATT profile file (JSON) to use
+
+.. include:: ../generic/debug-options.rst
 
 Example
 -------

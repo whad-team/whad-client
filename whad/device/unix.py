@@ -13,18 +13,17 @@ import os
 import socket
 import select
 import re
+import logging
 from threading import Thread
-from time import sleep
 from random import randint
 from binascii import hexlify
 
-from whad.device import WhadDevice, WhadDeviceConnector
-from whad.exceptions import WhadDeviceNotReady, WhadDeviceDisconnected
-from whad.protocol.whad_pb2 import Message
-from whad.hub.message import AbstractPacket
 from scapy.config import conf
 
-import logging
+from whad.device import WhadDevice, WhadDeviceConnector
+from whad.exceptions import WhadDeviceNotReady, WhadDeviceDisconnected
+from whad.hub.message import AbstractPacket
+
 logger = logging.getLogger(__name__)
 
 class UnixSocketDevice(WhadDevice):
@@ -45,19 +44,21 @@ class UnixSocketDevice(WhadDevice):
         devices = []
 
         try:
-            # Read /proc/net/unix (Linux only)
-            proc_net_unix = open('/proc/net/unix','r').read()
+            with open("/proc/net/unix",'r', encoding="utf-8") as s:
+                # Read /proc/net/unix (Linux only)
+                proc_net_unix = s.read()
 
-            # Extract all Unix sockets names, only keep those following the WHAD pattern:
-            # whad_<random>.sock
-            p = re.compile('^[0-9a-f]+: [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ (.*)$', re.I | re.M)
-            for socket in p.findall(proc_net_unix):
-                _, filename = os.path.split(socket)
-                if re.match('whad_[0-9a-f]+\\.sock', filename):
-                    dev = UnixSocketDevice(socket)
-                    devices.append(dev)
+                # Extract all Unix sockets names, only keep those following the WHAD pattern:
+                # whad_<random>.sock
+                p = re.compile("^[0-9a-f]+: [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ (.*)$",
+                            re.I | re.M)
+                for socket_ in p.findall(proc_net_unix):
+                    _, filename = os.path.split(socket_)
+                    if re.match('whad_[0-9a-f]+\\.sock', filename):
+                        dev = UnixSocketDevice(socket_)
+                        devices.append(dev)
             return devices
-        except IOError as err:
+        except IOError:
             # Not supported, cannot enumerate devices
             return devices
 
@@ -69,8 +70,8 @@ class UnixSocketDevice(WhadDevice):
 
         # Connect to target Unix Socket device in non-blocking mode
         self.__path = path
+        self.__fileno = None
         self.__socket = None
-        self.__client = None
         self.__opened = False
 
     @property
@@ -101,7 +102,6 @@ class UnixSocketDevice(WhadDevice):
 
         This method is not supported by this type of device.
         """
-        pass
 
 
     def close(self):
@@ -130,14 +130,14 @@ class UnixSocketDevice(WhadDevice):
         :param bytes data: Data to write
         :returns: number of bytes written to the device
         """
-        logger.debug('sending data to unix socket: %s' % hexlify(data))
+        logger.debug("sending data to unix socket: %s", hexlify(data))
         if not self.__opened:
             raise WhadDeviceNotReady()
 
         nb_bytes_written = 0
         wlist = [self.__fileno]
         elist = [self.__fileno]
-        readers,writers,errors = select.select(
+        _, writers, __ = select.select(
             [],
             wlist,
             elist
@@ -161,7 +161,7 @@ class UnixSocketDevice(WhadDevice):
             wlist = []
             elist = [self.__fileno]
 
-            readers,writers,errors = select.select(
+            readers, _, errors = select.select(
                 rlist,
                 wlist,
                 elist,
@@ -178,15 +178,14 @@ class UnixSocketDevice(WhadDevice):
                     raise WhadDeviceDisconnected()
             elif len(errors) > 0:
                 raise WhadDeviceDisconnected()
-        except ConnectionResetError as err:
+        except ConnectionResetError:
             logger.error('Connection reset by peer')
         except Exception as err:
-            raise WhadDeviceDisconnected()
+            raise WhadDeviceDisconnected() from err
 
     def change_transport_speed(self, speed):
         """Not supported by Unix socket devices.
         """
-        pass
 
 class UnixSocketServerDevice(WhadDevice):
     """Unix socket server device
@@ -209,24 +208,25 @@ class UnixSocketServerDevice(WhadDevice):
         else:
             # Generate socket path if not provided
             inst = randint(0x100000, 0x1000000)
-            self.__path = '/tmp/whad_%x.sock' % inst
+            self.__path = f"/tmp/whad_{inst:x}.sock"
 
-        logger.debug('Unix socket path: %s' % self.__path)
+        logger.debug("Unix socket path: %s", self.__path)
 
         # Make sure this path is available
         try:
             if os.path.exists(self.__path) and os.path.isfile(self.__path):
-                logger.debug('Unix socket path exists, deleting file...')
+                logger.debug("Unix socket path exists, deleting file...")
                 os.unlink(self.__path)
             elif os.path.exists(self.__path):
-                logger.debug('Unix socket path exist but is not a file')
+                logger.debug("Unix socket path exist but is not a file")
                 raise WhadDeviceNotReady
         except IOError as err:
-            logger.debug('Error while cleaning Unix socket path %s' % self.__path)
+            logger.debug("Error while cleaning Unix socket path %s", self.__path)
             raise WhadDeviceNotReady from err
 
         self.__socket = None
         self.__client = None
+        self.__fileno = None
         self.__opened = False
 
         # Set unix socket server parameters
@@ -281,15 +281,10 @@ class UnixSocketServerDevice(WhadDevice):
         """Return socket URL
         """
         if len(self.__parameters.keys()) == 0:
-            return 'unix://%s\n' % (
-                self.__path
-            )
-        else:
-            params = '&'.join(['%s=%s' % item for item in self.__parameters.items()])
-            return 'unix://%s?%s\n' % (
-                self.__path,
-                params
-            )
+            return "unix://{self.__path}\n"
+
+        params = '&'.join(['%s=%s' % item for item in self.__parameters.items()])
+        return f"unix://{self.__path}?{params}\n"
 
     def open(self):
         """Open socket server and wait for a connection.
@@ -306,23 +301,22 @@ class UnixSocketServerDevice(WhadDevice):
                 sys.stdout.flush()
 
                 self.__client, infos = self.__socket.accept()
-                logger.debug('unix socket server got a connection from %s' % infos)
+                logger.debug("unix socket server got a connection from %s", infos)
                 self.__fileno = self.__client.fileno()
-                logger.debug('fileno=%s' % self.__fileno)
+                logger.debug("fileno=%s", self.__fileno)
                 self.__opened = True
 
                 # Ask parent class to run a background I/O thread
                 super().open()
-            except BrokenPipeError as err:
-                logger.error('Broken pipe.')
+            except BrokenPipeError:
+                logger.error("Broken pipe.")
                 self.__client = None
-            except TimeoutError as err:
-                logger.info('Timed out.')
+            except TimeoutError:
+                logger.info("Timed out.")
                 self.__timedout = True
                 self.__client = None
             except Exception as other_err:
                 logger.error("Another exception occured: %s", other_err)
-                pass
 
     def read(self):
         """Fetches data from the device, if there is any data to read. We call select()
@@ -338,7 +332,7 @@ class UnixSocketServerDevice(WhadDevice):
             wlist = []
             elist = [self.__fileno]
 
-            readers,writers,errors = select.select(
+            readers, _, errors = select.select(
                 rlist,
                 wlist,
                 elist,
@@ -356,11 +350,11 @@ class UnixSocketServerDevice(WhadDevice):
             elif len(errors) > 0:
                 raise WhadDeviceDisconnected()
 
-        except ConnectionResetError as err:
+        except ConnectionResetError:
             logger.debug('Connection reset by peer')
         except Exception as err:
             #logger.error('Unknown exception occured (%s)' % err)
-            raise WhadDeviceDisconnected()
+            raise WhadDeviceDisconnected() from err
 
     def write(self, data):
         """Writes data to the device. It relies on select() in order to make sure
@@ -370,7 +364,7 @@ class UnixSocketServerDevice(WhadDevice):
         :param bytes data: Data to write
         :returns: number of bytes written to the device
         """
-        logger.debug('sending data to unix server client socket: %s' % hexlify(data))
+        logger.debug("sending data to unix server client socket: %s", hexlify(data))
         if not self.__opened:
             raise WhadDeviceNotReady()
 
@@ -378,7 +372,7 @@ class UnixSocketServerDevice(WhadDevice):
         wlist = [self.__fileno]
         elist = [self.__fileno]
         try:
-            readers,writers,errors = select.select(
+            _, writers, errors = select.select(
                 [],
                 wlist,
                 elist
@@ -406,16 +400,35 @@ class UnixSocketServerDevice(WhadDevice):
 
         This method is not supported by this type of device.
         """
-        pass
 
     def change_transport_speed(self, speed):
         """Not supported by Unix socket devices.
         """
-        pass
 
 class UnixConnector(WhadDeviceConnector):
-    def __init__(self, device):
-        super().__init__(device)
+    """Dummy connector for Unix socket.
+
+    Connector is locked by default.
+    """
+
+    def __init__(self, device, locked: bool = True):
+        """Create a locked connector.
+        """
+        if locked:
+            # Create an empty connector, attach to no device
+            super().__init__(None)
+
+            # Lock connector
+            self.lock()
+
+            # Attach to device
+            self.set_device(device)
+            device.set_connector(self)
+        else:
+            #Create a dummy connector.
+            super().__init__(device)
+
+        # Open device
         device.open()
 
     def on_discovery_msg(self, message):
@@ -449,6 +462,7 @@ class UnixSocketConnector(WhadDeviceConnector):
         """
         # No client connected
         self.__client = None
+        self.__socket = None
 
         # Input pipes
         self.__inpipe = bytearray()
@@ -460,7 +474,10 @@ class UnixSocketConnector(WhadDeviceConnector):
         self.__shutdown_required = False
 
         # Initialize parent class (device connector)
-        super().__init__(device)
+        super().__init__(None)
+        self.lock()
+        self.set_device(device)
+        device.set_connector(self)
 
         # Create our Unix socket path
         if path is not None:
@@ -469,9 +486,9 @@ class UnixSocketConnector(WhadDeviceConnector):
         else:
             # Generate socket path if not provided
             inst = randint(0x100000, 0x1000000)
-            self.__path = '/tmp/whad_%x.sock' % inst
+            self.__path = f"/tmp/whad_{inst:x}.sock"
 
-        logger.debug('Unix socket path: %s' % self.__path)
+        logger.debug("Unix socket path: %s", self.__path)
 
         # Make sure this path is available
         try:
@@ -482,8 +499,8 @@ class UnixSocketConnector(WhadDeviceConnector):
                 logger.debug('Unix socket path exist but is not a file')
                 raise WhadDeviceNotReady
         except IOError as err:
-            logger.debug('Error while cleaning Unix socket path %s' % self.__path)
-            raise WhadDeviceNotReady
+            logger.debug("Error while cleaning Unix socket path %s", self.__path)
+            raise WhadDeviceNotReady from err
 
     def add_parameter(self, key: str, value):
         """Add a parameter to this Unix Socket connector.
@@ -503,12 +520,15 @@ class UnixSocketConnector(WhadDeviceConnector):
         except KeyError:
             return None
 
-    def send_message(self, msg):
-        self.device.send_message(msg)
+    def send_message(self, message, filter=None):
+        """Send message into the unix socket.
+        """
+        self.device.send_message(message, filter=filter)
 
     def on_data_received(self, data):
-        logger.debug('received raw data from socket: %s' % hexlify(data))
-        messages = []
+        """Handle received data from the unix socket.
+        """
+        logger.debug("received raw data from socket: %s", hexlify(data))
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
             # Is the magic correct ?
@@ -523,7 +543,8 @@ class UnixSocketConnector(WhadDeviceConnector):
                         _msg = self.hub.parse(bytes(raw_message))
 
                         # Send to device
-                        logger.debug('WHAD message successfully parsed, forward to underlying device')
+                        logger.debug(("WHAD message successfully parsed, "
+                                     "forward to underlying device"))
                         self.send_message(_msg)
 
                         # Notify message
@@ -537,13 +558,15 @@ class UnixSocketConnector(WhadDeviceConnector):
                     break
             else:
                 # Nope, that's not a header
-                while (len(self.__inpipe) >= 2):
+                while len(self.__inpipe) >= 2:
                     if (self.__inpipe[0] != 0xAC) or (self.__inpipe[1] != 0xBE):
                         self.__inpipe = self.__inpipe[1:]
                     else:
                         break
 
     def shutdown(self):
+        """Shutdown unix socket.
+        """
         self.__shutdown_required = True
 
     def serve(self, timeout=None):
@@ -566,10 +589,11 @@ class UnixSocketConnector(WhadDeviceConnector):
         try:
             while not self.__shutdown_required:
                 self.__client,_ = self.__socket.accept()
+                self.unlock()
                 try:
                     while not self.__shutdown_required:
                         rlist = [self.__client.fileno()]
-                        readers,writers,errors = select.select(rlist, [], rlist, timeout)
+                        readers, _, errors = select.select(rlist, [], rlist, timeout)
 
                         # Do we have pending data ?
                         if len(readers) > 0:
@@ -578,8 +602,9 @@ class UnixSocketConnector(WhadDeviceConnector):
                             if len(data) == 0:
                                 # Exit serve loop
                                 break
-                            else:
-                                self.on_data_received(data)
+
+                            # Process received data
+                            self.on_data_received(data)
                         elif len(errors) > 0:
                             logger.debug('Error detected on server socket, exiting.')
                             break
@@ -630,7 +655,7 @@ class UnixSocketConnector(WhadDeviceConnector):
         classes that inherit from WhadDeviceConnector.
         """
 
-    def on_generic_msg(self, generic_message):
+    def on_generic_msg(self, message):
         """Callback function to process incoming generic messages.
 
         This method MUST be overriden by inherited classes.
@@ -638,36 +663,33 @@ class UnixSocketConnector(WhadDeviceConnector):
         :param message: Generic message
         """
 
-    def on_discovery_msg(self, discovery_message):
+    def on_discovery_msg(self, message):
         pass
 
-    def on_domain_msg(self, domain, domain_message):
+    def on_domain_msg(self, domain, message):
         """Callback function to process incoming domain-related messages.
 
         This method MUST be overriden by inherited classes.
 
         :param message: Domain message
         """
-        pass
 
     def on_packet(self, packet):
         """Callback function to process incoming packets.
         """
-        pass
 
     def on_event(self, event):
-        pass
+        """Handle generic WHAD events.
+        """
 
     def get_url(self):
         """Return socket URL
         """
         if len(self.__parameters.keys()) == 0:
-            return 'unix://%s\n' % (
-                self.__path
-            )
-        else:
-            params = '&'.join(['%s=%s' % item for item in self.__parameters.items()])
-            return f"unix://{self.__path}?{params}\n"
+            return f"unix://{self.__path}\n"
+
+        params = '&'.join(["%s=%s" % item for item in self.__parameters.items()])
+        return f"unix://{self.__path}?{params}\n"
 
 class UnixSocketCallbacksConnector(UnixSocketConnector):
     """
@@ -679,7 +701,9 @@ class UnixSocketCallbacksConnector(UnixSocketConnector):
         super().__init__(device, path)
         conf.dot15d4_protocol = self.get_parameter('domain')
 
-    def send_message(self, msg):
+    def send_message(self, msg, filter=None):
+        """Send message to unix socket.
+        """
         on_tx_packet = self.get_parameter('on_tx_packet_cb')
         if on_tx_packet is not None:
             if isinstance(msg, AbstractPacket):
@@ -691,15 +715,19 @@ class UnixSocketCallbacksConnector(UnixSocketConnector):
                     msg = msg.from_packet(pkt)
 
         if msg is not None:
-            return super().send_message(msg)
+            return super().send_message(msg, filter=filter)
+
+        return None
 
 
-    def on_any_msg(self, msg):
+    def on_any_msg(self, message):
+        """Handle any incoming message.
+        """
         on_rx_packet = self.get_parameter('on_rx_packet_cb')
         if on_rx_packet is not None:
 
-            if isinstance(msg, AbstractPacket):
-                pkt = msg.to_packet()
+            if isinstance(message, AbstractPacket):
+                pkt = message.to_packet()
                 pkt = on_rx_packet(pkt)
                 if pkt is None:
                     msg = None
@@ -708,6 +736,8 @@ class UnixSocketCallbacksConnector(UnixSocketConnector):
 
         if msg is not None:
             return super().on_any_msg(msg)
+
+        return None
 
 
 class UnixSocketProxy(Thread):
@@ -727,7 +757,6 @@ class UnixSocketProxy(Thread):
         super().__init__()
         self.__interface = interface
         self.__params = params
-        self.__canceled = False
 
         # Remove any previously set interface message filter
         self.__interface.set_queue_filter(None)
@@ -739,13 +768,19 @@ class UnixSocketProxy(Thread):
 
     @property
     def interface(self):
+        """Get the underlying interface.
+        """
         return self.__interface
 
     @property
     def connector(self):
+        """Get the underlying connector.
+        """
         return self.__connector
 
     def stop(self):
+        """Stop Unix socket proxy.
+        """
         self.__connector.shutdown()
 
     def run(self):

@@ -98,7 +98,8 @@ class ApplicationError(Exception):
         """
         print_formatted_text(HTML(f"<ansired>[!] <b>{self.__reason}</b></ansired>"))
 
-class command(object):
+#pylint: disable-next=invalid-name
+class command:
     """CommandLineApp command decorator.
 
     This decorator must be used to register a specific command in the main
@@ -165,8 +166,7 @@ class CommandsRegistry:
         """
         if command_name in CommandsRegistry.COMMANDS:
             return CommandsRegistry.COMMANDS[command_name]
-        else:
-            return None
+        return None
 
     @staticmethod
     def get_short_desc(command_name: str) -> str:
@@ -178,8 +178,7 @@ class CommandsRegistry:
         """
         if command_name in CommandsRegistry.CMDS_SHORT_DESC:
             return CommandsRegistry.CMDS_SHORT_DESC[command_name]
-        else:
-            return None
+        return None
 
     @staticmethod
     def get_desc(command_name: str):
@@ -191,15 +190,13 @@ class CommandsRegistry:
         """
         if command_name in CommandsRegistry.CMDS_DESC:
             return CommandsRegistry.CMDS_DESC[command_name]
-        else:
-            return None
+        return None
 
     @staticmethod
     def enumerate_categories() -> Generator[str, None, None]:
         """Enumerate over command categories
         """
-        for category in CommandsRegistry.CATEGORIES:
-            yield category
+        yield from CommandsRegistry.CATEGORIES
 
     @staticmethod
     def enumerate(category=None) -> Generator[tuple, None, None]:
@@ -236,10 +233,10 @@ def show_default_help(_, args):
     if len(args) == 0:
         # Enumerate commands by group
         for category in CommandsRegistry.enumerate_categories():
-            print_formatted_text(HTML('<ansimagenta><b>%s:</b></ansimagenta>' % category))
+            print_formatted_text(HTML(f"<ansimagenta><b>{category}:</b></ansimagenta>"))
             commands = []
-            for command, short_desc, _ in CommandsRegistry.enumerate(category):
-                commands.append((command, short_desc))
+            for cmd, short_desc, _ in CommandsRegistry.enumerate(category):
+                commands.append((cmd, short_desc))
             commands.sort()
 
         # Compute the longest command
@@ -251,7 +248,6 @@ def show_default_help(_, args):
         print('')
     else:
         cmd = args[0]
-        cmd_sd = CommandsRegistry.get_short_desc(cmd)
         cmd_desc = CommandsRegistry.get_desc(cmd)
         print_formatted_text(HTML(cmd_desc.strip()))
 
@@ -290,18 +286,27 @@ class CommandLineApp(ArgumentParser):
     OUTPUT_STANDARD = 1
     OUTPUT_WHAD = 2
 
-    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, input: int = INPUT_WHAD,
+    # Unique application instance
+    instance = None
+
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True,
+                 input: int = INPUT_WHAD,
                  output: int = OUTPUT_WHAD, **kwargs):
-        """Instanciate a CommandLineApp
+        """Instantiate a CommandLineApp
 
         :param str program_name: program (app) name
         :param str usage: usage string
         :param str description: program description
-        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool commands: if enabled, the application will consider first
+                              positional argument as a command
         :param bool interface: if enabled, the application will resolve a WHAD interface
         :param int input: specify the input type when application has its stdin piped
         :param int output: specify the output type when application has its stdout piped
         """
+        # Save application instance as a class property
+        if CommandLineApp.instance is None:
+            CommandLineApp.instance = self
+
         super().__init__(description=description, **kwargs)
 
         self.__interface = None
@@ -352,7 +357,7 @@ class CommandLineApp(ArgumentParser):
         self.add_argument(
             '--version',
             action='version',
-            version='%(prog)s {version}'.format(version=get_version())
+            version=f"%(prog)s {get_version()}"
         )
 
         # Save application type
@@ -369,6 +374,13 @@ class CommandLineApp(ArgumentParser):
                 nargs='*',
                 help="command arguments"
             )
+
+    @staticmethod
+    def get_instance():
+        """Return unique application instance
+        """
+        return CommandLineApp.instance
+
 
     @property
     def interface(self):
@@ -425,9 +437,10 @@ class CommandLineApp(ArgumentParser):
                     logging.basicConfig(filename=self.__args.logfile,
                                         level=desired_level)
                 except IOError:
-                    self.error(
-                        f'Specified log output file ({self.__args.logfile}) cannot be accessed, falling back to stderr.'
-                    )
+                    self.error((
+                        f"Specified log output file ({self.__args.logfile}) "
+                        "cannot be accessed, falling back to stderr."
+                    ))
                     logging.basicConfig(level=desired_level)
             else:
                 # Else we log into stderr
@@ -444,9 +457,13 @@ class CommandLineApp(ArgumentParser):
                     # Create WHAD interface
                     self.__interface = WhadDevice.create(self.__args.interface)
                 except WhadDeviceNotFound as dev_404:
-                    raise ApplicationError(f"Whad adapter '{self.__args.interface}' not found.") from dev_404
+                    raise ApplicationError(
+                        f"Whad adapter '{self.__args.interface}' not found."
+                    ) from dev_404
                 except WhadDeviceAccessDenied as dev_403:
-                    raise ApplicationError("Cannot access WHAD device, please check permissions.") from dev_403
+                    raise ApplicationError(
+                        "Cannot access WHAD device, please check permissions."
+                    ) from dev_403
                 except WhadDeviceNotReady as dev_500:
                     raise ApplicationError("WHAD device is not ready.") from dev_500
 
@@ -517,10 +534,10 @@ class CommandLineApp(ArgumentParser):
 
                                 # We're done
                                 break
-                            else:
-                                # If stdout is not piped, print line
-                                if not self.is_stdout_piped():
-                                    print(line)
+
+                            # If stdout is not piped, print line
+                            if not self.is_stdout_piped():
+                                print(line)
             else:
                 # Check if this application is supposed to be chained with
                 # another app and to process its standard input
@@ -542,7 +559,7 @@ class CommandLineApp(ArgumentParser):
         if self.__output_type == CommandLineApp.OUTPUT_WHAD:
             # If stdout is piped, forward socket info to next tool
             if isinstance(self.__input_iface, UnixSocketDevice) and self.is_stdout_piped():
-                sys.stdout.write('%s\n' % self.__interface_path)
+                sys.stdout.write(f"{self.__interface_path}\n")
                 sys.stdout.flush()
         elif self.__input_type == CommandLineApp.INPUT_WHAD and self.__input_iface is not None:
             # if stdin is piped, close unix socket
@@ -559,16 +576,18 @@ class CommandLineApp(ArgumentParser):
         # If we support first positional arg as command, parse the command
         if self.__has_commands:
             if self.__args.command is not None:
-                command = self.__args.command
-                handler = CommandsRegistry.get_handler(command)
+                cmd = self.__args.command
+                handler = CommandsRegistry.get_handler(cmd)
                 if handler is not None:
-                    return handler(self, self.__args.command_args)
+                    handler(self, self.__args.command_args)
+                    return
             elif CommandsRegistry.get_handler('interactive'):
                 # If no command is passed to the CLI tool and an interactive
                 # command handler has been defined, call it.
                 handler = CommandsRegistry.get_handler('interactive')
                 if handler is not None:
-                    return handler(self, self.__args.command_args)
+                    handler(self, self.__args.command_args)
+                    return
 
             # By default, print help if no script is specified
             self.print_help()
@@ -583,7 +602,24 @@ class CommandLineApp(ArgumentParser):
 
         :return bool: True if stdout is piped, False otherwise
         """
-        return (not sys.stdout.isatty())
+        if not sys.stdout.isatty():
+            # If we are on a Linux system, check if we are redirected to
+            # /dev/null, in this case we consider we are not *really* piped
+            # with a program.
+            if sys.platform in ("linux", "linux2"):
+                pid = os.getpid()
+                stdout_target = os.readlink(f"/proc/{pid}/fd/1")
+                if stdout_target != "/dev/null":
+                    logger.debug(f"[cli] stdout is redirected to {stdout_target}")
+                    return True
+                else:
+                    logger.debug(f"[cli] stdout redirected to /dev/null, no unix socket needed")
+                    return False
+            else:
+                logger.debug("[cli] stdout is redirected and cannot determine if it leads to /dev/null or not (OS not Linux)")
+                return True
+
+        return False
 
 
     def is_stdin_piped(self):
@@ -591,7 +627,7 @@ class CommandLineApp(ArgumentParser):
 
         :return bool: True if stdin is piped, False otherwise
         """
-        return (not sys.stdin.isatty())
+        return not sys.stdin.isatty()
 
     def readline_from_stdin(self):
         """Reads a line from stdin when application has its stdin piped
@@ -609,15 +645,19 @@ class CommandLineApp(ArgumentParser):
         """Display a warning message in orange (if color is enabled)
         """
         try:
-            print_formatted_text(HTML('<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % message))
+            print_formatted_text(HTML(f"<aaa fg=\"#e97f11\">/!\\ <b>{message}</b></aaa>"))
         except:
-            print_formatted_text(HTML('<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % 'an unknown warning occured'))
+            print_formatted_text(HTML(
+                "<aaa fg=\"#e97f11\">/!\\ <b>an unknown warning occured</b></aaa>"
+            ))
 
     def error(self, message):
         """Display an error message in red (if color is enabled)
         """
         try:
-            print_formatted_text(HTML('<ansired>[!] <b>{message}</b></ansired>').format(message=message))
+            print_formatted_text(
+                HTML('<ansired>[!] <b>{message}</b></ansired>').format(message=message)
+            )
         except Exception as err:
             logger.error('[!] an unknown error occured: %s',err)
 
@@ -626,30 +666,38 @@ class CommandLineSource(CommandLineApp):
     """
     Command-line application that can send data to standard output.
     """
-    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
-        """Create a command-line application object that supports no standard input processing
-        and is able to send data to standard output for tool chaining.
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True,
+                 **kwargs):
+        """Create a command-line application object that supports no standard
+        input processing and is able to send data to standard output for tool
+        chaining.
 
         :param str description: program description
-        :param bool commands: if enabled, the application will consider first positional argument as a command
-        :param bool interface: if enabled, the application will resolve a WHAD interface
+        :param bool commands: if enabled, the application will consider first
+                              positional argument as a command
+        :param bool interface: if enabled, the application will resolve a WHAD
+                               interface
         """
-        super().__init__(description, commands, interface, CommandLineApp.INPUT_NONE, CommandLineApp.OUTPUT_STANDARD, **kwargs)
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_NONE,
+                         CommandLineApp.OUTPUT_STANDARD, **kwargs)
 
 
 class CommandLineSink(CommandLineApp):
     """
     Command-line application that can read data from standard input.
     """
-    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
-        """Create a command-line application object that only supports standard input processing
-        and cannot be chained with another tool.
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True,
+                 **kwargs):
+        """Create a command-line application object that only supports standard
+        input processing and cannot be chained with another tool.
 
         :param str description: program description
-        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool commands: if enabled, the application will consider first
+                              positional argument as a command
         :param bool interface: if enabled, the application will resolve a WHAD interface
         """
-        super().__init__(description, commands, interface, CommandLineApp.INPUT_STANDARD, CommandLineApp.OUTPUT_NONE, **kwargs)
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_STANDARD,
+                         CommandLineApp.OUTPUT_NONE, **kwargs)
 
 class CommandLinePipe(CommandLineApp):
     """
@@ -657,31 +705,38 @@ class CommandLinePipe(CommandLineApp):
     to standard output.
     """
 
-    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
-        """Create a command-line application object that supports standard input processing
-        and is able to send data to standard output for tool chaining.
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True,
+                 **kwargs):
+        """Create a command-line application object that supports standard input
+        processing and is able to send data to standard output for tool chaining.
 
         :param str description: program description
-        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool commands: if enabled, the application will consider first
+                              positional argument as a command
         :param bool interface: if enabled, the application will resolve a WHAD interface
         """
-        super().__init__(description, commands, interface, CommandLineApp.INPUT_STANDARD, CommandLineApp.OUTPUT_STANDARD, **kwargs)
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_STANDARD,
+                         CommandLineApp.OUTPUT_STANDARD, **kwargs)
 
 class CommandLineDeviceSource(CommandLineApp):
     """
-    Command-line application that can be chained with a `CommandLineDeviceSink` or `CommandLineDevicePipe` application,
-    in a timely manner.
+    Command-line application that can be chained with a `CommandLineDeviceSink`
+    or `CommandLineDevicePipe` application, in a timely manner.
     """
 
-    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
-        """Create a command-line application object that supports no standard input processing
-        and is able to send data to standard output for tool chaining.
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True,
+                 **kwargs):
+        """Create a command-line application object that supports no standard
+        input processing and is able to send data to standard output for tool
+        chaining.
 
         :param str description: program description
-        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool commands: if enabled, the application will consider first
+                              positional argument as a command
         :param bool interface: if enabled, the application will resolve a WHAD interface
         """
-        super().__init__(description, commands, interface, CommandLineApp.INPUT_NONE, CommandLineApp.OUTPUT_WHAD, **kwargs)
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_NONE,
+                         CommandLineApp.OUTPUT_WHAD, **kwargs)
 
 
 class CommandLineDeviceSink(CommandLineApp):
@@ -690,30 +745,37 @@ class CommandLineDeviceSink(CommandLineApp):
     chained with another application.
     """
 
-    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
-        """Create a command-line application object that only supports standard input processing
-        and cannot be chained with another tool.
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True,
+                 **kwargs):
+        """Create a command-line application object that only supports standard
+        input processing and cannot be chained with another tool.
 
         :param str description: program description
-        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool commands: if enabled, the application will consider first
+                              positional argument as a command
         :param bool interface: if enabled, the application will resolve a WHAD interface
         """
-        super().__init__(description, commands, interface, CommandLineApp.INPUT_WHAD, CommandLineApp.OUTPUT_NONE, **kwargs)
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_WHAD,
+                         CommandLineApp.OUTPUT_NONE, **kwargs)
 
 class CommandLineDevicePipe(CommandLineApp):
     """
-    Command-line application that handles/processes WHAD messages between two WHAD command-line applications.
+    Command-line application that handles/processes WHAD messages between two
+    WHAD command-line applications.
     """
 
-    def __init__(self, description: str = None, commands: bool=True, interface: bool=True, **kwargs):
-        """Create a command-line application object that supports standard input processing
-        and is able to send data to standard output for tool chaining.
+    def __init__(self, description: str = None, commands: bool=True, interface: bool=True,
+                 **kwargs):
+        """Create a command-line application object that supports standard input
+        processing and is able to send data to standard output for tool chaining.
 
         :param str description: program description
-        :param bool commands: if enabled, the application will consider first positional argument as a command
+        :param bool commands: if enabled, the application will consider first
+                              positional argument as a command
         :param bool interface: if enabled, the application will resolve a WHAD interface
         """
-        super().__init__(description, commands, interface, CommandLineApp.INPUT_WHAD, CommandLineApp.OUTPUT_WHAD, **kwargs)
+        super().__init__(description, commands, interface, CommandLineApp.INPUT_WHAD,
+                         CommandLineApp.OUTPUT_WHAD, **kwargs)
 
 def run_app(application: CommandLineApp):
     """Run an application and handle generic exceptions.
@@ -732,7 +794,7 @@ def run_app(application: CommandLineApp):
     except WhadDeviceAccessDenied:
         application.error("Cannot access WHAD interface, check permissions.")
     except UnsupportedDomain as domain_err:
-        application.error("WHAD interface does not support %s." % domain_err.domain)
+        application.error(f"WHAD interface does not support {domain_err.domain}.")
     except Exception as exc:
         application.error("An unexpected exception occured:")
         traceback.print_exception(exc)

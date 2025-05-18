@@ -15,20 +15,15 @@ from whad.ble.profile.attribute import UUID
 
 
 class AdvDataError(Exception):
-    """Advertisement Data error"""
-
-    def __init__(self):
-        super().__init__()
+    """Advertisement Data error
+    """
 
 
 class AdvDataFieldListOverflow(Exception):
-    """Advertisement data field list overflow"""
+    """Advertisement data field list overflow
+    """
 
-    def __init__(self):
-        super().__init__()
-
-
-class AdvDataField(object):
+class AdvDataField:
     """Advertisement basic data field.
 
     This class handles a basic advertisement data record (field) and its
@@ -48,11 +43,16 @@ class AdvDataField(object):
     def type(self):
         """Return the record type"""
         return self.__type
+    
+    def set_value(self, value):
+        """Set advertising record value
+        """
+        self.__value = value
 
     def to_bytes(self):
         """Serialize record into a byte array
 
-        :returns: Serialized record
+        :return: Serialized record
         :rtype: bytes
         """
         return pack("<BB", len(self.__value) + 1, self.__type) + self.__value
@@ -76,10 +76,10 @@ class AdvUuid16List(AdvDataField):
         for arg in args:
             if not isinstance(arg, UUID):
                 raise ValueError
-            elif arg.type != UUID.TYPE_16:
+            if arg.type != UUID.TYPE_16:
                 raise ValueError
-            else:
-                self.__uuids.append(arg)
+            # Append UUID
+            self.__uuids.append(arg)
 
         # Pack data
         super().__init__(eir_tag, b"".join([uuid.packed for uuid in self.__uuids]))
@@ -88,16 +88,17 @@ class AdvUuid16List(AdvDataField):
         return len(self.__uuids)
 
     def __getitem__(self, index):
-        if index >= 0 and index < len(self.__uuids):
+        if 0 <= index < len(self.__uuids):
             return self.__uuids[index]
-        else:
-            raise IndexError
+
+        # Not found
+        raise IndexError
 
     @staticmethod
     def from_bytes(clazz, ad_record):
         """Deserialize a record containing a list of 16-bit UUIDs.
 
-        :param class clazz: Class that will be instanciated (must inherit from AdvUuid16List)
+        :param class clazz: Class that will be instantiated (must inherit from AdvUuid16List)
         :param bytes ad_record: AD record to deserialize.
         """
         nb_uuids = int(len(ad_record) / 2)
@@ -125,10 +126,10 @@ class AdvUuid128List(AdvDataField):
         for arg in args:
             if not isinstance(arg, UUID):
                 raise ValueError
-            elif arg.type != UUID.TYPE_128:
+            if arg.type != UUID.TYPE_128:
                 raise ValueError
-            else:
-                self.__uuids.append(arg)
+            # Append UUID
+            self.__uuids.append(arg)
 
         # Pack data
         super().__init__(eir_tag, b"".join([uuid.packed for uuid in self.__uuids]))
@@ -137,16 +138,16 @@ class AdvUuid128List(AdvDataField):
         return len(self.__uuids)
 
     def __getitem__(self, index):
-        if index >= 0 and index < len(self.__uuids):
+        if 0 <= index < len(self.__uuids):
             return self.__uuids[index]
-        else:
-            raise IndexError
+        # Cannot find item.
+        raise IndexError
 
     @staticmethod
     def from_bytes(clazz, ad_record):
         """Deserialize a record containing a list of 128-bit UUIDs.
 
-        :param class clazz: Class that will be instanciated (must inherit from AdvUuid128List)
+        :param class clazz: Class that will be instantiated (must inherit from AdvUuid128List)
         :param bytes ad_record: AD record to deserialize.
         """
         nb_uuids = int(len(ad_record) / 16)
@@ -162,13 +163,8 @@ class AdvFlagsField(AdvDataField):
     This advertisement field specifies the device capabilities.
     """
 
-    def __init__(
-        self,
-        limited_disc=False,
-        general_disc=True,
-        bredr_support=True,
-        le_bredr_support=False,
-    ):
+    def __init__(self, limited_disc=False, general_disc=True, bredr_support=True,
+                 le_bredr_support=False):
         """
         :param bool limited_disc: If set, enable the limited discoverable mode
         :param bool general_disc: If set, enable the generic discoverable mode
@@ -191,23 +187,23 @@ class AdvFlagsField(AdvDataField):
         """Deserialize an AdvFlagsField AD record.
 
         :param bytes ad_record: AD record to deserialize
-        :returns: an AdvFlagsField object
-        :rtype: AdvFlagsField
+        :return: an AdvFlagsField object
+        :rtype: AdvFlagsField 
         """
 
         if len(ad_record) != 1:
             raise AdvDataError
-        else:
-            limited_disc = (ad_record[0] & 0x01) != 0
-            general_disc = (ad_record[0] & 0x02) != 0
-            bredr_support = (ad_record[0] & 0x04) != 0
-            lebredr_support = (ad_record[0] & 0x08) != 0
-            return AdvFlagsField(
-                limited_disc=limited_disc,
-                general_disc=general_disc,
-                bredr_support=bredr_support,
-                le_bredr_support=lebredr_support,
-            )
+
+        limited_disc = (ad_record[0] & 0x01) != 0
+        general_disc = (ad_record[0] & 0x02) != 0
+        bredr_support = (ad_record[0] & 0x04) != 0
+        lebredr_support = (ad_record[0] & 0x08) != 0
+        return AdvFlagsField(
+            limited_disc=limited_disc,
+            general_disc=general_disc,
+            bredr_support=bredr_support,
+            le_bredr_support=lebredr_support
+        )
 
 
 class AdvShortenedLocalName(AdvDataField):
@@ -230,12 +226,19 @@ class AdvShortenedLocalName(AdvDataField):
         """Return this record shortened local name"""
         return self.__name
 
+    @name.setter
+    def name(self, value: bytes):
+        """Update shortened name
+        """
+        self.__name = value
+        self.set_value(value)
+
     @staticmethod
     def from_bytes(ad_record):
         """Deserialize an AdvShortenedLocalName
 
         :param bytes ad_record: Serialized AdvShortenedLocalName AD record
-        :returns: An AdvShortenedLocalName object
+        :return: An AdvShortenedLocalName object
         :rtype: AdvShortenedLocalName
         """
         return AdvShortenedLocalName(ad_record)
@@ -256,13 +259,18 @@ class AdvCompleteLocalName(AdvDataField):
     def name(self):
         """Return the complete device name"""
         return self.__name
+    
+    @name.setter
+    def name(self, value: bytes):
+        self.__name = value
+        self.set_value(value)
 
     @staticmethod
     def from_bytes(ad_record):
-        """Deserialize an AdvShortenedLocalName
+        """Deserialize an AdvCompleteLocalName
 
         :param bytes ad_record: Serialized AdvCompleteLocalName AD record
-        :returns: An AdvCompleteLocalName object
+        :return: An AdvCompleteLocalName object
         :rtype: AdvCompleteLocalName
         """
         return AdvCompleteLocalName(ad_record)
@@ -279,35 +287,63 @@ class AdvTxPowerLevel(AdvDataField):
         """Deserialize an AdvTxPowerLevel
 
         :param bytes ad_record: Serialized AdvTxPowerLevel AD record
-        :returns: An AdvTxPowerLevel object
+        :return: An AdvTxPowerLevel object
         :rtype: AdvTxPowerLevel
         """
         if len(ad_record) >= 1:
             return AdvTxPowerLevel(ad_record[0])
-        else:
-            raise AdvDataError
+        # parsing error
+        raise AdvDataError
 
 
 class AdvManufacturerSpecificData(AdvDataField):
     """Device Manufacturer Specific Data"""
 
     def __init__(self, company_id, data):
-        super().__init__(0xFF, pack("<H", company_id & 0xFFFF) + bytes(data))
+        super().__init__(0xFF, pack('<H', company_id&0xffff) + bytes(data))
+        self.__company = company_id
+        self.__data = data
+
+    @property
+    def company(self) -> int:
+        """Company ID
+        """
+        return self.__company
+    
+    @company.setter
+    def company(self, value):
+        """Update company ID
+        """
+        self.__company = value
+        self.set_value(pack('<H', value&0xffff) + bytes(self.__data))
+
+    @property
+    def data(self) -> bytes:
+        """Manufacturer data
+        """
+        return self.__data
+    
+    @data.setter
+    def data(self, value: bytes):
+        """Update manufacturer data
+        """
+        self.__data = value
+        self.set_value(pack('<H', self.__company&0xffff) + bytes(self.__data))
 
     @staticmethod
     def from_bytes(ad_record):
         """Deserialize an AdvManufacturerSpecificData
 
         :param bytes ad_record: Serialized AdvManufacturerSpecificData AD record
-        :returns: An AdvManufacturerSpecificData object
+        :return: An AdvManufacturerSpecificData object
         :rtype: AdvManufacturerSpecificData
         """
         if len(ad_record) >= 2:
             return AdvManufacturerSpecificData(
                 unpack("<H", ad_record[:2])[0], ad_record[2:]
             )
-        else:
-            raise AdvDataError
+        # Parsing error
+        raise AdvDataError
 
 
 class AdvIncServiceUuid16List(AdvUuid16List):
@@ -321,7 +357,7 @@ class AdvIncServiceUuid16List(AdvUuid16List):
         """Deserialize an AdvIncServiceUuid16List
 
         :param bytes ad_record: Serialized AdvIncServiceUuid16List AD record
-        :returns: An AdvIncServiceUuid16List object
+        :return: An AdvIncServiceUuid16List object
         :rtype: AdvIncServiceUuid16List
         """
         return AdvUuid16List.from_bytes(AdvIncServiceUuid16List, ad_record)
@@ -338,7 +374,7 @@ class AdvCompServiceUuid16List(AdvUuid16List):
         """Deserialize an AdvCompServiceUuid16List
 
         :param bytes ad_record: Serialized AdvCompServiceUuid16List AD record
-        :returns: An AdvCompServiceUuid16List object
+        :return: An AdvCompServiceUuid16List object
         :rtype: AdvCompServiceUuid16List
         """
         return AdvUuid16List.from_bytes(AdvCompServiceUuid16List, ad_record)
@@ -355,7 +391,7 @@ class AdvIncServiceUuid128List(AdvUuid128List):
         """Deserialize an AdvIncServiceUuid128List
 
         :param bytes ad_record: Serialized AdvIncServiceUuid128List AD record
-        :returns: An AdvIncServiceUuid128List object
+        :return: An AdvIncServiceUuid128List object
         :rtype: AdvIncServiceUuid128List
         """
         return AdvUuid128List.from_bytes(AdvIncServiceUuid128List, ad_record)
@@ -373,7 +409,7 @@ class AdvCompServiceUuid128List(AdvUuid128List):
         """Deserialize an AdvCompServiceUuid128List
 
         :param bytes ad_record: Serialized AdvCompServiceUuid128List AD record
-        :returns: An AdvCompServiceUuid128List object
+        :return: An AdvCompServiceUuid128List object
         :rtype: AdvCompServiceUuid128List
         """
         return AdvUuid128List.from_bytes(AdvCompServiceUuid128List, ad_record)
@@ -396,7 +432,7 @@ class AdvSlaveConnIntervalRange(AdvDataField):
         """Return the Slave connection interval range
 
         :rtype: list
-        :returns: Slave connection interval range
+        :return: Slave connection interval range
         """
         return self.__range
 
@@ -405,7 +441,7 @@ class AdvSlaveConnIntervalRange(AdvDataField):
         """Return the Slave connection minimal value.
 
         :rtype: int
-        :returns: Slave connection minimal value
+        :return: Slave connection minimal value
         """
         return self.__range[0]
 
@@ -414,7 +450,7 @@ class AdvSlaveConnIntervalRange(AdvDataField):
         """Return the Slave connection maximal value.
 
         :rtype: int
-        :returns: Slave connection maximal value
+        :return: Slave connection maximal value
         """
         return self.__range[1]
 
@@ -423,14 +459,14 @@ class AdvSlaveConnIntervalRange(AdvDataField):
         """Deserialize an AdvSlaveConnIntervalRange
 
         :param bytes ad_record: Serialized AdvSlaveConnIntervalRange AD record
-        :returns: An AdvSlaveConnIntervalRange object
+        :return: An AdvSlaveConnIntervalRange object
         :rtype: AdvSlaveConnIntervalRange
         """
         if len(ad_record) == 4:
             min_value, max_value = unpack("<HH", ad_record)
             return AdvSlaveConnIntervalRange(min_value, max_value)
-        else:
-            raise AdvDataError
+        # Parsing error
+        raise AdvDataError
 
 
 class AdvServiceSollicitationUuid16List(AdvUuid16List):
@@ -448,7 +484,7 @@ class AdvServiceSollicitationUuid16List(AdvUuid16List):
         """Deserialize an AdvServiceSollicitationUuid16List
 
         :param bytes ad_record: Serialized AdvServiceSollicitationUuid16List AD record
-        :returns: An AdvServiceSollicitationUuid16List object
+        :return: An AdvServiceSollicitationUuid16List object
         :rtype: AdvServiceSollicitationUuid16List
         """
         return AdvUuid16List.from_bytes(AdvServiceSollicitationUuid16List, ad_record)
@@ -469,7 +505,7 @@ class AdvServiceSollicitationUuid128List(AdvUuid128List):
         """Deserialize an AdvServiceSollicitationUuid128List
 
         :param bytes ad_record: Serialized AdvServiceSollicitationUuid128List AD record
-        :returns: An AdvServiceSollicitationUuid128List object
+        :return: An AdvServiceSollicitationUuid128List object
         :rtype: AdvServiceSollicitationUuid128List
         """
         return AdvUuid128List.from_bytes(AdvServiceSollicitationUuid128List, ad_record)
@@ -487,7 +523,7 @@ class AdvServiceData16(AdvDataField):
     def uuid(self):
         """Return Service 16-bit UUID
 
-        :returns: Service 16-bit UUID
+        :return: Service 16-bit UUID
         :rtype: UUID
         """
         return self.__uuid
@@ -496,7 +532,7 @@ class AdvServiceData16(AdvDataField):
     def data(self):
         """Returns Service data
 
-        :returns: Service data
+        :return: Service data
         :rtype: bytes
         """
         return self.__data
@@ -506,15 +542,15 @@ class AdvServiceData16(AdvDataField):
         """Deserialize an AdvServiceData16
 
         :param bytes ad_record: Serialized AdvServiceData16 AD record
-        :returns: An AdvServiceData16 object
+        :return: An AdvServiceData16 object
         :rtype: AdvServiceData16
         """
         if len(ad_record) >= 2:
             uuid = UUID(unpack("<H", ad_record[:2])[0])
             data = ad_record[2:]
             return AdvServiceData16(uuid, data)
-        else:
-            raise AdvDataError
+        # Parsing error
+        raise AdvDataError
 
 
 class AdvPublicTargetAddr(AdvDataField):
@@ -539,17 +575,17 @@ class AdvPublicTargetAddr(AdvDataField):
         return len(self.__addresses)
 
     def __getitem__(self, index):
-        if index >= 0 and index < len(self.__addresses):
+        if 0 <= index < len(self.__addresses):
             return self.__addresses[index]
-        else:
-            raise IndexError
+        # Parsing error.
+        raise IndexError
 
     @staticmethod
     def from_bytes(ad_record):
         """Deserialize an AdvPublicTargetAddr
 
         :param bytes ad_record: Serialized AdvPublicTargetAddr AD record
-        :returns: An AdvPublicTargetAddr object
+        :return: An AdvPublicTargetAddr object
         :rtype: AdvPublicTargetAddr
         """
         if len(ad_record) > 0 and ((len(ad_record) % 6) == 0):
@@ -558,8 +594,8 @@ class AdvPublicTargetAddr(AdvDataField):
             for i in range(nb_addr):
                 addresses.append(BDAddress.from_bytes(ad_record[6 * i : 6 * (i + 1)]))
             return AdvPublicTargetAddr(*addresses)
-        else:
-            raise AdvDataError
+        # Parsing error.
+        raise AdvDataError
 
 
 class AdvRandomTargetAddr(AdvDataField):
@@ -584,17 +620,17 @@ class AdvRandomTargetAddr(AdvDataField):
         return len(self.__addresses)
 
     def __getitem__(self, index):
-        if index >= 0 and index < len(self.__addresses):
+        if 0 <= index < len(self.__addresses):
             return self.__addresses[index]
-        else:
-            raise IndexError
+        # Parsing error.
+        raise IndexError
 
     @staticmethod
     def from_bytes(ad_record):
         """Deserialize an AdvRandomTargetAddr
 
         :param bytes ad_record: Serialized AdvRandomTargetAddr AD record
-        :returns: An AdvRandomTargetAddr object
+        :return: An AdvRandomTargetAddr object
         :rtype: AdvRandomTargetAddr
         """
         if len(ad_record) > 0 and ((len(ad_record) % 6) == 0):
@@ -603,8 +639,8 @@ class AdvRandomTargetAddr(AdvDataField):
             for i in range(nb_addr):
                 addresses.append(BDAddress.from_bytes(ad_record[6 * i : 6 * (i + 1)]))
             return AdvRandomTargetAddr(*addresses)
-        else:
-            raise AdvDataError
+        # Parsing error.
+        raise AdvDataError
 
 
 class AdvAppearance(AdvDataField):
@@ -615,7 +651,7 @@ class AdvAppearance(AdvDataField):
 
         :param int appearance: Device appearance (16-bit value)
         """
-        if appearance >= 0x0000 and appearance <= 0xFFFF:
+        if 0x0000 <= appearance <= 0xFFFF:
             self.__appearance = appearance
             super().__init__(0x19, pack("<H", appearance))
         else:
@@ -635,7 +671,7 @@ class AdvAppearance(AdvDataField):
 
         :returns int: Device sub-category
         """
-        return self.__appearance & 0x3F
+        return self.__appearance & 0x3f
 
     @staticmethod
     def from_bytes(ad_record):
@@ -643,13 +679,13 @@ class AdvAppearance(AdvDataField):
 
         :param bytes ad_record: Serialized data record.
         :rtype: AdvAppearance
-        :returns: A new AdvAppearance object that represents the device appearance.
+        :return: A new AdvAppearance object that represents the device appearance.
         """
         if len(ad_record) == 2:
             appearance = unpack("<H", ad_record)[0]
             return AdvAppearance(appearance)
-        else:
-            raise AdvDataError
+        # Parsing error.
+        raise AdvDataError
 
 
 class AdvURI(AdvDataField):
@@ -674,16 +710,18 @@ class AdvURI(AdvDataField):
         if url_info.scheme and url_info.scheme in AdvURI.SUPPORTED_SCHEMES:
             self.__scheme = url_info.scheme
             scheme = AdvURI.SUPPORTED_SCHEMES[url_info.scheme]
-            self.__uri = url_info._replace(scheme="").geturl()
-            encoded_uri = pack("<H", scheme) + self.__uri.encode("utf-8")
+            self.__uri = url_info._replace(scheme='').geturl()
+            encoded_uri = chr(scheme).encode("utf-8") + self.__uri.encode('utf-8')
             super().__init__(0x24, encoded_uri)
         else:
             raise AdvDataError
 
     @staticmethod
     def get_scheme(scheme_value):
-        for s in AdvURI.SUPPORTED_SCHEMES:
-            if AdvURI.SUPPORTED_SCHEMES[s] == scheme_value:
+        """Retrieve the associated scheme if known.
+        """
+        for s, value in AdvURI.SUPPORTED_SCHEMES.items():
+            if value == scheme_value:
                 return s
         return None
 
@@ -708,17 +746,22 @@ class AdvURI(AdvDataField):
         """Deserialize an AdvURI
 
         :param bytes ad_record: Serialized AdvURI AD record
-        :returns: An AdvURI object
+        :return: An AdvURI object
         :rtype: AdvURI
         """
         if len(ad_record) >= 2:
-            scheme = unpack("<H", ad_record[:2])[0]
+            # Fetch the first UTF-8 character codepoint
+            scheme = ord(ad_record.decode("utf-8")[0])
             uri = ad_record[2:]
             scheme_alias = AdvURI.get_scheme(scheme)
+            decoded_uri = uri.decode('utf-8')
             if scheme_alias is not None:
-                return AdvURI(AdvURI.get_scheme(scheme) + ":" + uri.decode("utf-8"))
-            else:
-                return AdvURI("<0x%04x>" % scheme + ":" + uri.decode("utf-8"))
+                scheme = AdvURI.get_scheme(scheme)
+                return AdvURI(f"{scheme}:{decoded_uri}")
+
+            return AdvURI(f"<0x{scheme:04x}>:{decoded_uri}")
+        # Not enough data.
+        return None
 
 
 class AdvAdvertisingInterval(AdvDataField):
@@ -749,6 +792,8 @@ class AdvAdvertisingInterval(AdvDataField):
 
     @property
     def interval(self):
+        """Advertising interval
+        """
         return self.__interval
 
     @staticmethod
@@ -757,19 +802,19 @@ class AdvAdvertisingInterval(AdvDataField):
 
         :param bytes ad_record: Serialized AdvAdvertisingInterval record
         :rtype: AdvAdvertisingInterval
-        :returns: An instance of AdvAdvertisingInterval
+        :return: An instance of AdvAdvertisingInterval
         """
         if len(ad_record) == 2:
             interval = unpack("<H", ad_record)[0]
             return AdvAdvertisingInterval(interval)
-        elif len(ad_record) == 3:
-            interval = ad_record[0] | (ad_record[1] << 8) | (ad_record[2] << 16)
+        if len(ad_record) == 3:
+            interval = ad_record[0] | (ad_record[1]<<8) | (ad_record[2]<<16)
             return AdvAdvertisingInterval(interval)
-        elif len(ad_record) == 4:
-            interval = unpack("<I", ad_record)[0]
+        if len(ad_record) == 4:
+            interval = unpack('<I', ad_record)[0]
             return AdvAdvertisingInterval(interval)
-        else:
-            raise AdvDataError
+        # Parsing error
+        raise AdvDataError
 
 
 class AdvBluetoothDeviceAddr(AdvDataField):
@@ -783,7 +828,8 @@ class AdvBluetoothDeviceAddr(AdvDataField):
 
         :param bd_address: Bluetooth Device Address
         :type bd_address: str, BDAddress
-        :param bool public: Set to True to specify a public BD address, False to specify a random BD address
+        :param bool public: Set to True to specify a public BD address, False to
+                            specify a random BD address
         """
         self.__public = public
 
@@ -823,14 +869,14 @@ class AdvBluetoothDeviceAddr(AdvDataField):
 
         :param bytes ad_record: Serialized AdvBluetoothDeviceAddr record
         :rtype: AdvBluetoothDeviceAddr
-        :returns: An instance of AdvBluetoothDeviceAddr
+        :return: An instance of AdvBluetoothDeviceAddr
         """
         if len(ad_record) == 7:
             public = ad_record[6] == 0x00
             address = BDAddress.from_bytes(ad_record[:6])
             return AdvBluetoothDeviceAddr(address, public=public)
-        else:
-            raise AdvDataError
+        # Parsing error
+        raise AdvDataError
 
 
 class AdvLeRole(AdvDataField):
@@ -863,13 +909,13 @@ class AdvLeRole(AdvDataField):
 
         :param bytes ad_record: Serialized AdvLeRole record
         :rtype: AdvLeRole
-        :returns: An instance of AdvLeRole
+        :return: An instance of AdvLeRole
         """
         if len(ad_record) == 1:
             role = ad_record[0]
             return AdvLeRole(role)
-        else:
-            raise AdvDataError
+        # Parsing error
+        raise AdvDataError
 
 
 class AdvServiceDataUuid128(AdvDataField):
@@ -904,46 +950,42 @@ class AdvServiceDataUuid128(AdvDataField):
 
         :param bytes ad_record: Serialized AdvServiceDataUuid128 record
         :rtype: AdvServiceDataUuid128
-        :returns: An instance of AdvServiceDataUuid128
+        :return: An instance of AdvServiceDataUuid128
         """
         if len(ad_record) >= 16:
             uuid = UUID(ad_record[:16])
             data = ad_record[16:]
             return AdvServiceDataUuid128(uuid, data)
-        else:
-            raise AdvDataError
+        # Parsing error
+        raise AdvDataError
 
 
 class AdvLeSupportedFeatures(AdvDataField):
     """LE Supported Features"""
 
-    def __init__(
-        self,
-        encryption=False,
-        conn_param_update=False,
-        ext_reject_ind=False,
-        slave_features_exchange=False,
-        ping=False,
-        data_packet_length=False,
-        privacy=False,
-        ext_scanner_filter_policies=False,
-    ):
+    def __init__(self, encryption=False, conn_param_update=False, ext_reject_ind=False,
+                 slave_features_exchange=False, ping=False, data_packet_length=False,
+                 privacy=False, ext_scanner_filter_policies=False):
         """Initialize an AdvLeSupportedFeatures AD record
 
         :param bool encryption: True if LE encryption is supported, False otherwise
-        :param bool conn_param_update: True if connection parameter update request procedure is supported, False otherwise
+        :param bool conn_param_update: True if connection parameter update request
+                                       procedure is supported, False otherwise
         :param bool ext_reject_ind: True if extended rejection is supported, False otherwise
-        :param bool slave_features_exchange: True if slave-initiated features exchange is supported, False otherwise
+        :param bool slave_features_exchange: True if slave-initiated features exchange is
+                                             supported, False otherwise
         :param bool slave_features_exchange: True if LE ping procedure is supported, False otherwise
-        :param bool data_packet_length: True if LE data packet length procedure is supported, False otherwise
+        :param bool data_packet_length: True if LE data packet length procedure is supported,
+                                        False otherwise
         :param bool privacy: True if privacy feature is supported, False otherwise
-        :param bool ext_scanner_filter_policies: True if extended scanner filtering policies are supported, False otherwise
+        :param bool ext_scanner_filter_policies: True if extended scanner filtering
+                                                 policies are supported, False otherwise
         """
         # Save parameters
         self.__encryption = encryption
         self.__conn_param_update = conn_param_update
         self.__ext_reject_ind = ext_reject_ind
-        self.__slave_features_exchange = (slave_features_exchange,)
+        self.__slave_features_exchange = slave_features_exchange
         self.__ping = ping
         self.__data_packet_length = data_packet_length
         self.__privacy = privacy
@@ -966,41 +1008,57 @@ class AdvLeSupportedFeatures(AdvDataField):
         if self.__privacy:
             features |= 1 << 6
         if self.__ext_scanner_filter_policies:
-            features |= 1 << 7
+            features |= (1 << 7)
 
-        # Since only 8 bits are used in version 5.3, we code this on a single byte
-        super().__init__(0x27, pack("<B", features))
+        # Since only 8 bits are used in version 5.3, we code this on a single byte
+        super().__init__(0x27, pack('<B', features))
 
     @property
     def has_encryption(self):
+        """Determine if encryption is supported.
+        """
         return self.__encryption
 
     @property
     def has_conn_param_update(self):
+        """Determine if connection parameters update procedure is supported.
+        """
         return self.__conn_param_update
 
     @property
     def has_ext_reject_ind(self):
+        """Determine if extended reject_ind is supported.
+        """
         return self.__ext_reject_ind
 
     @property
     def has_slave_features_exchange(self):
+        """Determine if the slave features exchange procedure is supported.
+        """
         return self.__slave_features_exchange
 
     @property
     def has_ping(self):
+        """Determine if GATT ping procedure is supported.
+        """
         return self.__ping
 
     @property
     def has_data_packet_length(self):
+        """Determine if packet length is supported.
+        """
         return self.__data_packet_length
 
     @property
     def has_privacy(self):
+        """Determine if device supports privacy features.
+        """
         return self.__privacy
 
     @property
     def has_ext_scanner_filter_policies(self):
+        """Determine if device supports extended scanning
+        """
         return self.__ext_scanner_filter_policies
 
     @staticmethod
@@ -1008,24 +1066,24 @@ class AdvLeSupportedFeatures(AdvDataField):
         """Deserialize an AdvDataError
 
         :param bytes ad_record: Serialized AdvDataError AD record
-        :returns: An AdvDataError object
+        :return: An AdvDataError object
         :rtype: AdvDataError
         """
         if len(ad_record) >= 1:
             # Parse features set
             features = 0x00
-            for i in range(len(ad_record)):
-                features |= ad_record[i] << (8 * i)
+            for i, record in enumerate(ad_record):
+                features |= (record << (8*i))
 
-            # Deduce our flags
+            # Deduce our flags
             encryption = (features & 1) != 0
-            conn_param_update = (features & (1 << 1)) != 0
-            ext_reject_ind = (features & (1 << 2)) != 0
-            slave_features_exchange = (features & (1 << 3)) != 0
-            ping = (features & (1 << 4)) != 0
-            data_packet_length = (features & (1 << 5)) != 0
-            privacy = (features & (1 << 6)) != 0
-            ext_scanner_filter_policies = (features & (1 << 7)) != 0
+            conn_param_update = (features & (1<<1)) != 0
+            ext_reject_ind = (features & (1<<2)) != 0
+            slave_features_exchange = (features & (1<<3)) != 0
+            ping = (features & (1<<4)) != 0
+            data_packet_length = (features & (1<<5)) != 0
+            privacy = (features & (1<<6)) != 0
+            ext_scanner_filter_policies = (features & (1<<7)) != 0
             return AdvLeSupportedFeatures(
                 encryption=encryption,
                 conn_param_update=conn_param_update,
@@ -1036,8 +1094,9 @@ class AdvLeSupportedFeatures(AdvDataField):
                 privacy=privacy,
                 ext_scanner_filter_policies=ext_scanner_filter_policies,
             )
-        else:
-            raise AdvDataError
+
+        # Parsing error
+        raise AdvDataError
 
 
 class AdvPbAdv(AdvDataField):
@@ -1141,11 +1200,12 @@ class EddystoneUrl(AdvServiceData16):
     ]
 
     def encode_url(self, url):
+        """Encode an URL
+        """
         i = 0
         data = []
 
-        for s in range(len(self.SCHEMES)):
-            scheme = self.SCHEMES[s]
+        for s, scheme in enumerate(self.SCHEMES):
             if url.startswith(scheme):
                 data.append(s)
                 i += len(scheme)
@@ -1154,9 +1214,8 @@ class EddystoneUrl(AdvServiceData16):
             raise AdvDataError
 
         while i < len(url):
-            if url[i] == ".":
-                for e in range(len(self.EXTENSIONS)):
-                    expansion = self.EXTENSIONS[e]
+            if url[i] == '.':
+                for e, expansion in enumerate(self.EXTENSIONS):
                     if url.startswith(expansion, i):
                         data.append(e)
                         i += len(expansion)
@@ -1175,11 +1234,10 @@ class EddystoneUrl(AdvServiceData16):
         :param str url: Url to embed into this Eddystone-URL record.
         """
         eddystone_url = self.encode_url(url)
-        print(eddystone_url)
         super().__init__(UUID(0xFEAA), bytes([0x10, 0xF8] + eddystone_url))
 
 
-class AdvDataFieldList(object):
+class AdvDataFieldList:
     """Advertisement field list
 
     This class provides a convenient way to manage BLE advertisement records
@@ -1237,16 +1295,35 @@ class AdvDataFieldList(object):
         return len(self.__fields)
 
     def __getitem__(self, index):
-        if index >= 0 and index < len(self.__fields):
+        if 0 <= index < len(self.__fields):
             return self.__fields[index]
-        else:
-            raise IndexError
+        # Error.
+        raise IndexError
 
     def add(self, item):
+        """Add item to advertising data
+        """
         if isinstance(item, AdvDataField):
             self.__fields.append(item)
         else:
             raise AttributeError
+
+    def get(self, adv_type) -> AdvDataField:
+        """Find the first advertising record of the specified type
+        """
+        for field in self.__fields:
+            if isinstance(field, adv_type):
+                return field
+        return None
+    
+    def remove(self, field: AdvDataField) -> bool:
+        """Remove a record from this list
+        """
+        for f in self.__fields:
+            if f == field:
+                self.__fields.remove(f)
+                return True
+        return False
 
     def to_bytes(self):
         """Convert field list to bytes
@@ -1268,29 +1345,27 @@ class AdvDataFieldList(object):
 
         :param bytes adv_data: Raw advertising data
         :rtype: AdvDataFieldList
-        :returns: Instance of AdvDataFieldList populated with records
+        :return: Instance of AdvDataFieldList populated with records
         """
         if len(adv_data) > 31:
             raise AdvDataFieldListOverflow
-        else:
-            adv_list = AdvDataFieldList()
-            while len(adv_data) >= 2:
-                # Unpack length and eir_tag
-                length, eir_tag = unpack("<BB", adv_data[:2])
 
-                # Check length
-                if len(adv_data[2:]) >= (length - 1):
-                    # Extract EIR data
-                    eir_payload = adv_data[2 : 2 + length - 1]
+        adv_list = AdvDataFieldList()
+        while len(adv_data) >= 2:
+            # Unpack length and eir_tag
+            length, eir_tag = unpack('<BB', adv_data[:2])
 
-                    # Add record based on EIR tag
-                    if eir_tag in AdvDataFieldList.EIR_HANDLERS:
-                        adv_list.add(
-                            AdvDataFieldList.EIR_HANDLERS[eir_tag].from_bytes(
-                                eir_payload
-                            )
-                        )
-                    adv_data = adv_data[length + 1 :]
-                else:
-                    raise AdvDataError
-            return adv_list
+            # Check length
+            if len(adv_data[2:]) >= (length - 1):
+                # Extract EIR data
+                eir_payload = adv_data[2:2 + length - 1]
+
+                # Add record based on EIR tag
+                if eir_tag in AdvDataFieldList.EIR_HANDLERS:
+                    adv_list.add(
+                        AdvDataFieldList.EIR_HANDLERS[eir_tag].from_bytes(eir_payload)
+                    )
+                adv_data = adv_data[length+1:]
+            else:
+                raise AdvDataError
+        return adv_list

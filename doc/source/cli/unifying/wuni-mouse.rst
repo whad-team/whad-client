@@ -26,6 +26,7 @@ Command-line options
 * ``--address`` (``-a``): specify the target wireless mouse address
 * ``--duplicate`` (``-d``): enable mouse duplication feature
 
+.. include:: ../generic/debug-options.rst
 
 Logging mouse moves and button presses
 --------------------------------------

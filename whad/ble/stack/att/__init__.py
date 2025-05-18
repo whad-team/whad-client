@@ -5,6 +5,8 @@ This layer manager mostly translates Scapy ATT packets into GATT messages requir
 layer, and exposes an interface to the GATT layer in order to allow ATT packets to be forged
 and sent to the underlying layer (L2CAP).
 """
+import logging
+
 from typing import List
 from scapy.layers.bluetooth import ATT_Error_Response, ATT_Exchange_MTU_Request, \
     ATT_Exchange_MTU_Response, ATT_Execute_Write_Request, ATT_Execute_Write_Response, \
@@ -12,43 +14,95 @@ from scapy.layers.bluetooth import ATT_Error_Response, ATT_Exchange_MTU_Request,
     ATT_Find_Information_Response, ATT_Prepare_Write_Request, ATT_Prepare_Write_Response, \
     ATT_Read_Blob_Request, ATT_Handle_Value_Indication, ATT_Handle_Value_Notification, \
     ATT_Read_Blob_Response, ATT_Read_By_Group_Type_Request, ATT_Read_By_Group_Type_Response, \
-    ATT_Read_By_Type_Request, ATT_Read_By_Type_Response, ATT_Read_Multiple_Request, ATT_Read_Multiple_Response, \
-    ATT_Read_Request, ATT_Read_Response, ATT_Write_Command, ATT_Write_Response, ATT_Write_Request, \
-    ATT_Read_By_Type_Request_128bit, ATT_Hdr, ATT_Handle
+    ATT_Read_By_Type_Request, ATT_Read_By_Type_Response, ATT_Read_Multiple_Request, \
+    ATT_Read_Multiple_Response, ATT_Read_Request, ATT_Read_Response, ATT_Write_Command, \
+    ATT_Write_Response, ATT_Write_Request, ATT_Read_By_Type_Request_128bit, ATT_Hdr, \
+    ATT_Handle
 from scapy.packet import bind_layers, Packet
 
 from whad.ble.stack.att.constants import BleAttOpcode, SecurityProperty, SecurityAccess
 
-from whad.common.stack import Layer, alias, source, instance
+from whad.common.stack import Layer, ContextualLayer, alias, instance
 
 #from whad.ble.stack.gatt import  Gatt
 from whad.ble.stack.gatt.message import GattExecuteWriteRequest, GattExecuteWriteResponse, \
-    GattFindInfoResponse, GattHandleValueIndication, GattHandleValueNotification, GattPrepareWriteRequest, \
-    GattPrepareWriteResponse, GattReadByGroupTypeResponse, GattErrorResponse, \
-    GattFindByTypeValueRequest, GattFindByTypeValueResponse, GattFindInfoRequest, GattReadByTypeResponse, \
-    GattReadRequest, GattReadResponse, GattReadBlobRequest, GattReadBlobResponse, GattReadMultipleRequest, \
-    GattReadMultipleResponse, GattWriteCommand, GattWriteRequest, GattWriteResponse, GattPrepareWriteRequest, \
-    GattPrepareWriteResponse, GattExecuteWriteRequest, GattExecuteWriteResponse, \
-    GattExchangeMtuResponse, GattReadByGroupTypeRequest, GattReadByTypeRequest, GattReadByTypeRequest128
+    GattFindInfoResponse, GattHandleValueIndication, GattHandleValueNotification, \
+    GattPrepareWriteRequest, GattPrepareWriteResponse, GattReadByGroupTypeResponse, \
+    GattErrorResponse, GattFindByTypeValueRequest, GattFindByTypeValueResponse, \
+    GattFindInfoRequest, GattReadByTypeResponse, GattReadRequest, GattReadResponse, \
+    GattReadBlobRequest, GattReadBlobResponse, GattReadMultipleRequest, \
+    GattReadMultipleResponse, GattWriteCommand, GattWriteRequest, GattWriteResponse, \
+    GattReadByGroupTypeRequest, GattReadByTypeRequest, GattReadByTypeRequest128, \
+    GattExchangeMtuResponse, GattExchangeMtuRequest
+
+logger = logging.getLogger(__name__)
 
 # Add missing ATT_Handle_Value_Confirmation class
-class ATT_Handle_Value_Confirmation(Packet):
+class AttHandleValueConfirmation(Packet):
+    """ATT Handle value confirmation packet, missing from Scapy BLE definitions
+    """
     name = "Handle Value Confirmation"
 
 # Bind ATT_Handle_Value_Confirmation with ATT_Hdr
-bind_layers(ATT_Hdr, ATT_Handle_Value_Confirmation, opcode=BleAttOpcode.HANDLE_VALUE_CONFIRMATION)
+bind_layers(ATT_Hdr, AttHandleValueConfirmation, opcode=BleAttOpcode.HANDLE_VALUE_CONFIRMATION)
 
 
 @alias('att')
 class ATTLayer(Layer):
+    """ATT layer implementation.
+    """
+
+    def configure(self, options=None):
+        """Layer configuration
+        """
+        # Initialize state
+        self.state.client_att_mtu = 23
+        self.state.server_att_mtu = 23
+
+    def set_client_mtu(self, mtu: int):
+        """Set ATT client MTU
+        """
+        if mtu >= 23:
+            self.state.client_att_mtu = mtu
+    
+    def get_client_mtu(self) -> int:
+        """Retrieve ATT client MTU
+        """
+        return self.state.client_att_mtu
+
+    def set_server_mtu(self, mtu: int):
+        """Set ATT server MTU
+        """
+        if mtu >= 23:
+            self.state.server_att_mtu = mtu
+
+    def get_server_mtu(self) -> int:
+        """Retrieve ATT server MTU
+        """
+        return self.state.server_att_mtu
+    
+    def notify_client_mtu(self):
+        """Notify l2cap that ATT MTU has changed for client
+        """
+        self.send("l2cap", self.state.client_att_mtu, tag="ATT_MTU")
+
+    def notify_server_mtu(self):
+        """Notify l2cap that ATT MTU has changed for server
+        """
+        self.send("l2cap", self.state.server_att_mtu, tag="ATT_MTU")
 
     ##########################################
     # Incoming requests and responses
     ##########################################
 
     @instance('l2cap')
-    def on_packet(self, instance, att_pkt):
+    def on_packet(self, inst: ContextualLayer, att_pkt: Packet):
         """Dispatch ATT packet.
+
+        :param inst: L2CAP instance object
+        :type inst: ContextualLayer
+        :param att_pkt: Incoming ATT packet to process
+        :type att_pkt: Packet
         """
         if ATT_Error_Response in att_pkt:
             self.on_error_response(att_pkt.getlayer(ATT_Error_Response))
@@ -119,7 +173,12 @@ class ATTLayer(Layer):
         elif att_pkt.opcode == BleAttOpcode.EXECUTE_WRITE_RESPONSE:
             self.on_execute_write_response(None)
 
-    def on_error_response(self, error_resp):
+    def on_error_response(self, error_resp: ATT_Error_Response):
+        """Process a generic ATT error response.
+
+        :param error_resp: Error response packet
+        :type error_resp: ATT_Error_Response
+        """
         # Send a GattErrorResponse message to gatt
         self.send(
             'gatt',
@@ -131,36 +190,39 @@ class ATTLayer(Layer):
             tag='GATT_ERROR_RSP',
         )
 
-    def on_exch_mtu_request(self, mtu_req):
+    def on_exch_mtu_request(self, mtu_req: ATT_Exchange_MTU_Request):
         """Handle ATT Exchange MTU request, update L2CAP TX MTU and returns
         our MTU.
 
-        :param ATT_Exchange_MTU_Request mtu_req: MTU request
+        :param mtu_req: MTU request
+        :type mtu_req: ATT_Exchange_MTU_Request
         """
-        # Update L2CAP Client MTU
-        self.get_layer('l2cap').set_remote_mtu(mtu_req.mtu)
+        logger.debug("[att] got an MTU exchange request (mtu: %d)", mtu_req.mtu)
 
         # Send back our MTU.
-        self.send_data(ATT_Exchange_MTU_Response(
-            mtu=self.get_layer('l2cap').get_local_mtu()
-        ))
+        #self.send_data(ATT_Exchange_MTU_Response(
+        #    mtu=mtu_req.mtu
+        #))
 
-    def on_exch_mtu_response(self, mtu_resp):
+        self.send("gatt", GattExchangeMtuRequest(mtu=mtu_req.mtu), tag="XCHG_MTU_REQ")
+
+    def on_exch_mtu_response(self, mtu_resp: ATT_Exchange_MTU_Response):
         """Update L2CAP remote MTU based on ATT_Exchange_MTU_Response.
 
-        :param mtu_resp ATT_Exchange_MTU_Response: MTU response
+        :param mtu_resp: MTU response
+        :type mtu_resp: ATT_Exchange_MTU_Request
         """
-        self.get_layer('l2cap').set_remote_mtu(mtu_resp.mtu)
 
         # Forward to GATT
-        #self.send('gatt', GattExchangeMtuResponse(mtu=mtu_resp.mtu),
-        #          tag='XCHG_MTU_RESP')
+        self.send('gatt', GattExchangeMtuResponse(mtu=mtu_resp.mtu),
+                  tag='XCHG_MTU_RESP')
 
 
-    def on_find_info_request(self, request):
+    def on_find_info_request(self, request: ATT_Find_Information_Request):
         """Handle ATT Find Information Request
 
-        :param ATT_Find_Information_Request request: Request
+        :param request: Request
+        :type request: ATT_Find_Information_Request
         """
         self.send('gatt', GattFindInfoRequest(
                 request.start,
@@ -168,8 +230,11 @@ class ATTLayer(Layer):
             ), tag='FIND_INFO_REQ'
         )
 
-    def on_find_info_response(self, response):
+    def on_find_info_response(self, response: ATT_Find_Information_Response):
         """Handle ATT Find Information Response
+
+        :param response: Find information response packet
+        :type response: ATT_Find_Information_Response
         """
         handles = b''.join([item.build() for item in response.handles])
         self.send('gatt', GattFindInfoResponse.from_bytes(
@@ -178,7 +243,12 @@ class ATTLayer(Layer):
             ), tag='FIND_INFO_RESP',
         )
 
-    def on_find_by_type_value_request(self, request):
+    def on_find_by_type_value_request(self, request: ATT_Find_By_Type_Value_Request):
+        """Handle ATT Find By Type Value request
+
+        :param request: Find by type request
+        :type request: ATT_Find_Information_Response
+        """
         self.send('gatt', GattFindByTypeValueRequest(
                 request.start,
                 request.end,
@@ -187,12 +257,20 @@ class ATTLayer(Layer):
             )
         )
 
-    def on_find_by_type_value_response(self, response):
+    def on_find_by_type_value_response(self, response: ATT_Find_By_Type_Value_Response):
+        """Handle ATT Find by type value response
+
+        :param response: Find by type value response packet
+        :type response: ATT_Find_Information_Response
+        """
         handles = b''.join([item.build() for item in response.handles])
         self.send('gatt', GattFindByTypeValueResponse.from_bytes(handles))
 
-    def on_read_by_type_request(self, request):
+    def on_read_by_type_request(self, request: ATT_Read_By_Type_Request):
         """Handle read by type request
+
+        :param request: ReadByType packet
+        :type request: ATT_Read_By_Type_Request
         """
         self.send('gatt', GattReadByTypeRequest(
             request.start,
@@ -200,8 +278,11 @@ class ATTLayer(Layer):
             request.uuid
         ))
 
-    def on_read_by_type_request_128bit(self, request):
+    def on_read_by_type_request_128bit(self, request: ATT_Read_By_Type_Request_128bit):
         """Handle ATT Read By Type Request 128-bit UUID
+
+        :param request: ReadByType request with 128-bit UUID
+        :type request: ATT_Read_By_Type_Request_128bit
         """
         self.send('gatt',
             request.start,
@@ -212,6 +293,9 @@ class ATTLayer(Layer):
 
     def on_read_by_type_response(self, response: GattReadByTypeResponse):
         """Handle read by type response
+
+        :param response: ReadByTypeResponse
+        :type response: GattReadByTypeResponse
         """
         # Must rebuild handles payload as bytes, since scapy parsed it :(
         handles = b''.join([item.build() for item in response.handles])
@@ -221,16 +305,22 @@ class ATTLayer(Layer):
             )
         )
 
-    def on_read_request(self, request):
+    def on_read_request(self, request: ATT_Read_Request):
         """Handle ATT Read Request
+
+        :param request: Read request
+        :type request: ATT_Read_Request
         """
         self.send('gatt', GattReadRequest(
                 request.gatt_handle
             )
         )
 
-    def on_read_response(self, response):
+    def on_read_response(self, response: ATT_Read_Response):
         """Handle ATT Read Response
+
+        :param response: Read response
+        :type response: ATT_Read_Response
         """
         if response is not None:
             self.send('gatt', GattReadResponse(
@@ -243,8 +333,11 @@ class ATTLayer(Layer):
                 )
             )
 
-    def on_read_blob_request(self, request):
+    def on_read_blob_request(self, request: ATT_Read_Blob_Request):
         """Handle ATT Read Blob Request
+
+        :param request: ReadBlobRequest
+        :type request: ATT_Read_Blob_Request
         """
         self.send('gatt', GattReadBlobRequest(
                 request.gatt_handle,
@@ -252,10 +345,11 @@ class ATTLayer(Layer):
             )
         )
 
-    def on_read_blob_response(self, response):
+    def on_read_blob_response(self, response: ATT_Read_Blob_Response):
         """Handle ATT Read Blob Response
 
         :param response: ATT response if provided, None otherwise.
+        :type response: ATT_Read_Blob_Response
         """
         if response is not None:
             self.send('gatt', GattReadBlobResponse(
@@ -268,18 +362,27 @@ class ATTLayer(Layer):
                 )
             )
 
-    def on_read_multiple_request(self, request):
+    def on_read_multiple_request(self, request: ATT_Read_Multiple_Request):
         """Handle ATT Read Multiple Request
+
+        :param request: ReadMultiple request
+        :type request: ATT_Read_Multiple_Request
         """
         self.send('gatt',GattReadMultipleRequest(request.handles))
 
-    def on_read_multiple_response(self, response):
+    def on_read_multiple_response(self, response: ATT_Read_Multiple_Response):
         """Handle ATT Read Multiple Response
+
+        :param response: ReadMultiple response
+        :type response: ATT_Read_Multiple_Response
         """
         self.send('gatt', GattReadMultipleResponse(response.values))
 
-    def on_read_by_group_type_request(self, request):
+    def on_read_by_group_type_request(self, request: ATT_Read_By_Group_Type_Request):
         """Handle ATT Read By Group Type Request
+
+        :param request: ReadByGroupType request
+        :type request: ATT_Read_By_Group_Type_Request
         """
         self.send('gatt', GattReadByGroupTypeRequest(
                 request.start,
@@ -288,8 +391,11 @@ class ATTLayer(Layer):
             )
         )
 
-    def on_read_by_group_type_response(self, response):
+    def on_read_by_group_type_response(self, response: ATT_Read_By_Group_Type_Response):
         """Handle ATT Read By Group Type Response
+
+        :param response: ReadByGroupType response
+        :type response: ATT_Read_By_Group_Type_Response
         """
         self.send('gatt', GattReadByGroupTypeResponse.from_bytes(
                 response.length,
@@ -297,8 +403,11 @@ class ATTLayer(Layer):
             )
         )
 
-    def on_write_request(self, request):
+    def on_write_request(self, request: ATT_Write_Request):
         """Handle ATT Write Request
+
+        :param request: Write request
+        :type request: ATT_Write_Request
         """
         self.send('gatt', GattWriteRequest(
                 request.gatt_handle,
@@ -306,13 +415,19 @@ class ATTLayer(Layer):
             )
         )
 
-    def on_write_response(self, response):
+    def on_write_response(self, response: ATT_Write_Response):
         """Handle ATT Write Response
+
+        :param response: Write response
+        :type response: ATT_Write_Response
         """
         self.send('gatt', GattWriteResponse())
 
-    def on_write_command(self, command):
+    def on_write_command(self, command: ATT_Write_Command):
         """Handle ATT Write Command
+
+        :param command: Write command
+        :type command: ATT_Write_Command
         """
         self.send('gatt', GattWriteCommand(
                 command.gatt_handle,
@@ -320,8 +435,11 @@ class ATTLayer(Layer):
             )
         )
 
-    def on_prepare_write_request(self, request):
+    def on_prepare_write_request(self, request:ATT_Prepare_Write_Request):
         """Handle ATT Prepare Write Request
+
+        :param request: PrepareWrite request
+        :type request: ATT_Prepare_Write_Request
         """
         self.send('gatt', GattPrepareWriteRequest(
                 request.gatt_handle,
@@ -330,8 +448,11 @@ class ATTLayer(Layer):
             )
         )
 
-    def on_prepare_write_response(self, response):
+    def on_prepare_write_response(self, response: ATT_Prepare_Write_Response):
         """Handle ATT Prepare Write Response
+
+        :param response: PrepareWrite response
+        :type response: ATT_Prepare_Write_Response
         """
         self.send('gatt', GattPrepareWriteResponse(
                 response.gatt_handle,
@@ -340,21 +461,30 @@ class ATTLayer(Layer):
             )
         )
 
-    def on_execute_write_request(self, request):
+    def on_execute_write_request(self, request: ATT_Execute_Write_Request):
         """Handle ATT Execute Write Request
+
+        :param request: ExecuteWrite request
+        :type request: ATT_Execute_Write_Request
         """
         self.send('gatt', GattExecuteWriteRequest(
                 request.flags
             )
         )
 
-    def on_execute_write_response(self, response):
+    def on_execute_write_response(self, response: ATT_Execute_Write_Response):
         """Handle ATT Execute Write Response
+
+        :param response: ExecuteWrite response
+        :type response: ATT_Execute_Write_Response
         """
         self.send('gatt', GattExecuteWriteResponse())
 
-    def on_handle_value_notification(self, notif):
+    def on_handle_value_notification(self, notif: ATT_Handle_Value_Notification):
         """Handle ATT Handle Value Notification
+
+        :param notif: Handle value notification packet
+        :type notif: ATT_Handle_Value_Notification
         """
         self.send('gatt', GattHandleValueNotification(
                 notif.gatt_handle,
@@ -362,8 +492,11 @@ class ATTLayer(Layer):
             )
         )
 
-    def on_handle_value_indication(self, notif):
+    def on_handle_value_indication(self, notif: ATT_Handle_Value_Indication):
         """Handle ATT Handle Value indication
+
+        :param notif: Handle value indication packet
+        :type notif: ATT_Handle_Value_Indication
         """
         self.send('gatt', GattHandleValueIndication(
                 notif.gatt_handle,
@@ -375,7 +508,12 @@ class ATTLayer(Layer):
     # Outgoing requests and responses
     ##########################################
 
-    def send_data(self, packet):
+    def send_data(self, packet: Packet):
+        """Send packet to underlying L2CAP layer
+
+        :param packet: Packet to send to L2CAP
+        :type packet: Packet
+        """
         self.send('l2cap', ATT_Hdr()/packet)
 
     def error_response(self, request, handle, reason):
@@ -398,7 +536,7 @@ class ATTLayer(Layer):
         :param int mtu: Maximum Transmission Unit
         """
         # Update local MTU first
-        self.get_layer('l2cap').set_local_mtu(mtu)
+        logger.debug("[att] sending an MTU exchange request (mtu: %d)", mtu)
         self.send_data(ATT_Exchange_MTU_Request(
             mtu=mtu
         ))
@@ -408,6 +546,7 @@ class ATTLayer(Layer):
 
         :param int mtu: Maximum Transmission Unit
         """
+        logger.debug("[att] sending an MTU exchange response (mtu: %d)", mtu)
         self.send_data(ATT_Exchange_MTU_Response(
             mtu=mtu
         ))
@@ -421,12 +560,12 @@ class ATTLayer(Layer):
             end=end
         ))
 
-    def  find_info_response(self, format, handles):
+    def  find_info_response(self, form, handles):
         """Sends an ATT Find Information Response
         """
 
         self.send_data(ATT_Find_Information_Response(
-            format=format,
+            format=form,
             handles=handles
         ))
 
@@ -659,4 +798,4 @@ class ATTLayer(Layer):
 
         Not supported yet
         """
-        self.send_data(ATT_Handle_Value_Confirmation())
+        self.send_data(AttHandleValueConfirmation())

@@ -7,15 +7,15 @@ This module provides a database that keeps track of discovered devices,
 are handled in :class:`whad.ble.scanning.AdvertisingDevice`.
 """
 from time import time
-from threading import Lock
-from whad.ble import BDAddress, AdvDataFieldList, \
-    AdvCompleteLocalName, AdvDataError, AdvDataFieldListOverflow, \
-    AdvShortenedLocalName
 
 from scapy.layers.bluetooth4LE import BTLE_ADV_IND, BTLE_ADV_NONCONN_IND, \
-    BTLE_ADV_DIRECT_IND, BTLE_SCAN_RSP, BTLE_ADV
+    BTLE_SCAN_RSP, BTLE_ADV
 
-class AdvertisingDevice(object):
+from whad.hub.ble import BDAddress
+from whad.ble.profile.advdata import AdvDataFieldList, AdvCompleteLocalName, \
+    AdvDataError, AdvDataFieldListOverflow, AdvShortenedLocalName
+
+class AdvertisingDevice:
     """Store information about a device:
 
     * Received Signal Strength Indicator (RSSI)
@@ -28,7 +28,8 @@ class AdvertisingDevice(object):
 
     SCAN_RSP_TIMEOUT = 0.5
 
-    def __init__(self, rssi, address_type, bd_address, adv_data, rsp_data=None, undirected=True, connectable=True):
+    def __init__(self, rssi, address_type, bd_address, adv_data, rsp_data=None,
+                 undirected=True, connectable=True):
         """Instantiate an AdvertisingDevice.
 
         :param  rssi:           Received Signal Strength Indicator
@@ -55,6 +56,7 @@ class AdvertisingDevice(object):
         self.__undirected = undirected
         self.__connectable = connectable
         self.__scanned = False
+        self.__reported = False
         self.__timestamp = time()
         self.__last_seen = self.__timestamp
 
@@ -118,33 +120,39 @@ class AdvertisingDevice(object):
                 short_name = record.name.decode('utf-8')
             elif isinstance(record, AdvCompleteLocalName):
                 complete_name = record.name.decode('utf-8')
-        
+
         # Return discovered name (if any)
         if complete_name is not None:
             return complete_name
-        elif short_name is not None:
+
+        if short_name is not None:
             return short_name
-        else:
-            return None
-        
+
+        return None
+
     @property
     def scanned(self) -> bool:
         """Device scanned status
         """
         return self.__scanned
-    
+
     @property
     def timestamp(self) -> float:
         """Device discovery timestamp.
         """
         return self.__timestamp
-    
+
     @property
     def last_seen(self) -> float:
         """Device last seen timestamp.
         """
         return self.__last_seen
-    
+
+    @property
+    def reported(self) -> bool:
+        """Reported status
+        """
+        return self.__reported
 
     @property
     def connectable(self) -> bool:
@@ -173,9 +181,9 @@ class AdvertisingDevice(object):
 
         # Pick the best name
         if complete_name:
-            name = 'name:"%s"' % complete_name
+            name = f'name:"{complete_name}"'
         elif short_name:
-            name = 'name:"%s"' % short_name
+            name = f'name:"{short_name}"'
         else:
             name = ''
 
@@ -186,12 +194,7 @@ class AdvertisingDevice(object):
             addrtype = '[RND]'
 
         # Generate device summary
-        return '[%4d dBm] %s %s %s' % (
-            self.__rssi,
-            addrtype,
-            self.__bd_address,
-            name
-        )
+        return f'[{self.__rssi:04d} dBm] {addrtype} {self.__bd_address} {name}'
 
 
     def seen(self):
@@ -199,6 +202,10 @@ class AdvertisingDevice(object):
         """
         self.__last_seen = time()
 
+    def mark_reported(self):
+        """Mark device as reported (avoid duplicates)
+        """
+        self.__reported = True
 
     def update(self, rssi : float = None, adv_data : bytes = None):
         """Update device RSSI and advertising data and check for scan response
@@ -211,7 +218,7 @@ class AdvertisingDevice(object):
         """
         if rssi is not None:
             self.__rssi = rssi
-        
+
         if adv_data is not None:
             self.__adv_data = adv_data
 
@@ -233,7 +240,7 @@ class AdvertisingDevice(object):
             self.__scanned = True
 
 
-class AdvertisingDevicesDB(object):
+class AdvertisingDevicesDB:
     """Bluetooth Low Energy devices database.
 
     This class stores information about discovered devices.
@@ -249,7 +256,7 @@ class AdvertisingDevicesDB(object):
         self.__db = {}
 
 
-    def find_device(self, address) -> AdvertisingDevice:
+    def find_device(self, address: str) -> AdvertisingDevice:
         """Find a device based on its BD address.
 
         :param      address: Device BD address
@@ -258,6 +265,7 @@ class AdvertisingDevicesDB(object):
         :rtype:     :class:`whad.ble.scanning.AdvertisingDevice`
         """
         device = None
+        address = address.lower()
         if address in self.__db:
             device = self.__db[address]
         return device
@@ -268,18 +276,21 @@ class AdvertisingDevicesDB(object):
         :param  device: Device to register.
         :type   device: :class:`whad.ble.scanning.AdvertisingDevice`
         """
-        self.__db[device.address] = device
+        if device.address not in self.__db:
+            self.__db[device.address] = device
+        else:
+            self.__db[device.address].seen()
 
 
     def __apply_scan_rsp_timeout(self):
         """Check every device to determine if our scan request has timed out.
         """
-        for address in self.__db:
-            device = self.__db[address]
+        for _, device in self.__db.items():
             if not device.scanned:
                 device.update()
-                if self.__db[address].scanned:
-                    yield device
+            if device.scanned and not device.reported:
+                device.mark_reported()
+                yield device
 
 
     def on_device_found(self, rssi, adv_packet, filter_addr=None):
@@ -309,24 +320,23 @@ class AdvertisingDevicesDB(object):
                     adv_list
                 )
 
-                # If bd address does not match, don't report it
-                if filter_addr is not None and filter_addr.lower() != str(bd_address).lower():
-                    return
 
-                if str(bd_address) not in self.__db:
-                    self.__db[str(bd_address)] = device
-                else:
-                    self.__db[str(bd_address)].seen()
-                
-            except AdvDataError as ad_error:
+                # Register device if it matches our criterias
+                if filter_addr is not None and filter_addr.lower() == str(bd_address).lower():
+                    self.register_device(device)
+                elif filter_addr is None:
+                    self.register_device(device)
+
+            except AdvDataError:
                 pass
-            except AdvDataFieldListOverflow as ad_ovf:
+            except AdvDataFieldListOverflow:
                 pass
 
         elif adv_packet.haslayer(BTLE_ADV_NONCONN_IND):
             try:
                 bd_address = BDAddress(adv_packet[BTLE_ADV_NONCONN_IND].AdvA)
-                adv_data = b''.join([ bytes(record) for record in adv_packet[BTLE_ADV_NONCONN_IND].data])
+                adv_data = b''.join([ bytes(record)
+                                     for record in adv_packet[BTLE_ADV_NONCONN_IND].data])
                 adv_list = AdvDataFieldList.from_bytes(adv_data)
                 device = AdvertisingDevice(
                     rssi,
@@ -336,18 +346,15 @@ class AdvertisingDevicesDB(object):
                     connectable=False
                 )
 
-                # If bd address does not match, don't report it
-                if filter_addr is not None and filter_addr.lower() != str(bd_address).lower():
-                    return
+                # Register device if it matches our criterias
+                if filter_addr is not None and filter_addr.lower() == str(bd_address).lower():
+                    self.register_device(device)
+                elif filter_addr is None:
+                    self.register_device(device)
 
-                if str(bd_address) not in self.__db:
-                    self.__db[str(bd_address)] = device
-                else:
-                    self.__db[str(bd_address)].seen()
-
-            except AdvDataError as ad_error:
+            except AdvDataError:
                 pass
-            except AdvDataFieldListOverflow as ad_ovf:
+            except AdvDataFieldListOverflow:
                 pass
 
         elif adv_packet.haslayer(BTLE_SCAN_RSP):
@@ -359,10 +366,9 @@ class AdvertisingDevicesDB(object):
                     device = self.__db[str(bd_address)]
                     if not device.got_scan_rsp:
                         device.set_scan_rsp(adv_list)
-                        devices.append(device)
-            except AdvDataError as ad_error:
+            except AdvDataError:
                 pass
-            except AdvDataFieldListOverflow as ad_ovf:
+            except AdvDataFieldListOverflow:
                 pass
 
         # Check if some devices scan response timeout is reached

@@ -198,10 +198,8 @@ def perform_write(app, device, args, without_response=False, profile_loaded=Fals
         app.error(("You must provide at least a characteristic value handle"
                    "or characteristic UUID, and a value to write."))
         return
-    else:
-        handle = None
-        offset = None
-        uuid = None
+
+    handle = None
 
     # Figure out what the handle is
     if args[0].lower().startswith('0x'):
@@ -234,7 +232,7 @@ def perform_write(app, device, args, without_response=False, profile_loaded=Fals
 
     if not isinstance(char_value, bytes):
         char_value = bytes(char_value,'utf-8')
-  
+
     # Perform ATT write by handle
     if not isinstance(handle, UUID):
         try:
@@ -252,7 +250,7 @@ def perform_write(app, device, args, without_response=False, profile_loaded=Fals
             device.discover()
 
         # Search characteristic from its UUID
-        target_charac = device.find_characteristic_by_uuid(handle)                       
+        target_charac = device.find_characteristic_by_uuid(handle)
         if target_charac is not None:
             try:
                 if without_response:

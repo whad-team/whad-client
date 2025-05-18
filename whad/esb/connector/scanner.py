@@ -23,7 +23,9 @@ an :class:`UnsupportedCapability` exception.
 """
 from typing import Iterator
 from scapy.packet import Packet
-from whad.esb.connector import ESB, message_filter, UnsupportedCapability
+from whad.esb.connector.base import ESB
+from whad.helpers import message_filter
+from whad.exceptions import UnsupportedCapability
 from whad.esb.scanning import CommunicatingDevicesDB, CommunicatingDevice
 from whad.hub.esb import PduReceived, RawPduReceived
 from whad.hub.message import AbstractPacket
@@ -45,9 +47,12 @@ class Scanner(ESB):
         # Check device accept sniffing mode
         if not self.can_sniff():
             raise UnsupportedCapability('Sniff')
-        else:
-            self.stop()
-            super().sniff(show_acknowledgements=True, address="FF:FF:FF:FF:FF")
+
+        # Stop current mode
+        self.stop()
+
+        # Switch to sniffing mode
+        super().sniff(show_acknowledgements=True, address="FF:FF:FF:FF:FF")
 
     def start(self):
         """Start the ESB scanner.
@@ -58,7 +63,7 @@ class Scanner(ESB):
         self.__db.reset()
         super().start()
 
-    def sniff(self) -> Iterator[Packet]:
+    def sniff(self, *_) -> Iterator[Packet]:
         """
         Listen and yield incoming ESB PDUs.
         """

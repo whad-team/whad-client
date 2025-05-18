@@ -1,0 +1,3 @@
+[submodule "whad/data/clues"]
+	path = whad/resources/clues
+	url = https://github.com/darkmentorllc/CLUES_Schema.git

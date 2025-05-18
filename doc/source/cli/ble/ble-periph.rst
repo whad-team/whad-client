@@ -29,7 +29,9 @@ Command-line options
 * ``--bdaddr`` (``-b``): specifies a Bluetooth Device address to use for the GATT server in the form *XX:XX:XX:XX:XX:XX*
 * ``--file`` (``-f``): provides a script to execute
 * ``--no-color``: disables colors in output
+* ``--profile`` (``-p``): specifies a device profile file (JSON) that will be used to populate GATT services, characteristics and advertisement info
 
+.. include:: ../generic/debug-options.rst
 
 Quick tutorial
 --------------
@@ -37,12 +39,13 @@ Quick tutorial
 Configuring a peripheral
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-We can create a custom BLE peripheral profile with the interactive shell. So let's get
-an interactive session from `wble-periph`:
+`wble-periph` exposes an interactive shell that provides all the required features
+to create a GATT peripheral with services and characteristics. It must be started
+with the specific interface you want to use (in this case *hci0*):
 
 .. code-block:: text
 
-    $ wble-periph -i hci0 interactive
+    $ wble-periph -i hci0
     wble-periph>
 
 First, we add a generic service (*Generic Access*):
@@ -103,9 +106,10 @@ json profile that will populate all the services and characteristics by using th
 
 .. code-block:: text
 
-    $ wble-periph -i hci0 -p mydevice.json interactive
+    $ wble-periph -i hci0 -p mydevice.json
 
-We can check the services and characteristics have been automatically populated:
+This will launch an interactive shell with the peripheral GATT profile populated with
+the specified JSON file. We can check the provided profile has been successfully loaded:
 
 .. code-block:: text
 
@@ -201,6 +205,20 @@ While a peripheral is running, we can write and read the values of characteristi
 If we write to a characteristic a device has subscribed to for notification/indication,
 it will send a notification/indication to the connected device.
 
+Changing the connection MTU
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The `mtu` command can be used when a connection is established to change the
+*maximum transmission unit* or *MTU*:
+
+.. code-block:: text
+
+    wble-periph[running]> mtu 200
+    Connection MTU set to 200.
+
+.. important::
+
+    MTU value must be equal to or greater than 23.
 
 Stopping our peripheral
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -443,3 +461,19 @@ stop
     stop
 
 This command stops the currently running peripheral. It will disconnect any connected device.
+
+mtu
+~~~
+
+.. code-block:: text
+
+    mtu [MTU]
+
+This command starts an ATT MTU exchange procedure: the GATT server will send an1 MTU exchange request
+with the specified MTU value to the connected Central device and await an MTU exchange response.
+The connection MTU is automatically updated when a response is received, or discarded if the Central
+device declined the MTU update.
+
+.. important::
+
+    The MTU value must be >= 23, as stated in the Bluetooth specification.

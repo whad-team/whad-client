@@ -3,6 +3,9 @@ from whad.zigbee.profile.nodes import CoordinatorNode, EndDeviceNode, RouterNode
 from whad.dot15d4.address import Dot15d4Address
 from random import randint
 from time import sleep
+import logging
+
+logger = logging.getLogger(__name__)
 
 class JoiningForbidden(Exception):
     """
@@ -88,18 +91,25 @@ class Network:
         devices = self.stack.get_layer('apl').get_application_by_name("zdo").device_and_service_discovery.discover_nodes()
         return self.nodes
 
-    def join(self):
+    def join(self, force: bool = False):
         """
         Join the network (if permitted).
 
         This method is blocking and wait until we are both associated AND authorized on the network.
+
+        :param force: If set to `True`, join network even if association is not allowed.
+        :type force: bool
         """
-        if self.is_joining_permitted():
-            join_success = self.stack.get_layer('apl').get_application_by_name("zdo").network_manager.join(self)
+        if self.is_joining_permitted() or force:
+            logger.debug("Start joining network (force=%s)", force)
+            join_success = self.stack.get_layer('apl').get_application_by_name("zdo").network_manager.join(self, force=force)
             if join_success:
                 while not self.is_authorized():
                     sleep(0.1)
+                logger.debug("Successfully joined network")
                 return True
+            
+            logger.debug("Failed joining network")
             return False
         else:
             raise JoiningForbidden

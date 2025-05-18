@@ -1,20 +1,21 @@
+"""Command-line interface UI helpers.
+"""
+import sys
+import json
+from hexdump import hexdump
 from prompt_toolkit import print_formatted_text, HTML
 from scapy.all import Packet, tcpdump , conf
-from hexdump import hexdump
-import sys
-import time
-import threading
-import json
+
 
 def success(message):
     """Display a success message in green (if color is enabled)
     """
-    print_formatted_text(HTML('<aaa fg="#027923"><b>%s</b></aaa>' % message))
+    print_formatted_text(HTML(f"<aaa fg=\"#027923\"><b>{message}</b></aaa>"))
 
 def warning(message):
     """Display a warning message in orange (if color is enabled)
     """
-    print_formatted_text(HTML('<aaa fg="#e97f11">/!\\ <b>%s</b></aaa>' % message))
+    print_formatted_text(HTML(f"<aaa fg=\"#e97f11\">/!\\ <b>{message}</b></aaa>"))
 
 def error(message):
     """Display an error message in red (if color is enabled)
@@ -24,7 +25,7 @@ def error(message):
 def info(message):
     """Display an error info message in cyan (if color is enabled)
     """
-    print_formatted_text(HTML('<ansicyan>[!] <b>%s</b></ansicyan>' % message))
+    print_formatted_text(HTML(f"<ansicyan>[!] <b>{message}</b></ansicyan>"))
 
 pkts = []
 
@@ -42,7 +43,6 @@ def display_packet(pkt, show_metadata=True, format='repr'):
     :param  pkt:        Received Signal Strength Indicator
     :type   pkt:        :class:`scapy.packet.packet`
     """
-    global tshark_count
     if isinstance(show_metadata, str):
         show_metadata = show_metadata == 'True'
     if isinstance(pkt, Packet):
@@ -99,7 +99,8 @@ def display_packet(pkt, show_metadata=True, format='repr'):
                     )
                 )
                 print_formatted_text(
-                    HTML("<i>{pkthex}</i>").format(pkthex=hexdump(bytes(pkt.decrypted), result="return"))
+                    HTML("<i>{pkthex}</i>").format(
+                        pkthex=hexdump(bytes(pkt.decrypted), result="return"))
                 )
         elif format == "tshark":
             pkts.append(pkt)
@@ -136,28 +137,37 @@ def display_event(event):
         )
     )
 
-def format_analyzer_output(output, mode="human_readable"):
+def format_analyzer_output(output, mode : str = "human_readable") -> str:
+    """Format given output depending on the provided mode.
+    """
     if mode == "human_readable":
         if isinstance(output, bytes):
             return output.hex()
-        elif isinstance(output, str):
+        if isinstance(output, str):
             return output
-        else:
-            return str(output)
-    elif mode == "raw":
+        return str(output)
+
+    if mode == "raw":
         return output
-    elif mode == "json":
+
+    if mode == "json":
         if hasattr(output, "export_json") and callable(output.export_json):
             return output.export_json()
-        elif isinstance(output, bytes):
-            return json.dumps(output.hex())
-        else:
-            try:
-                return json.dumps(output)
-            except TypeError:
-                return None
 
-def wait(message, suffix="", end=False):
+        if isinstance(output, bytes):
+            return json.dumps(output.hex())
+
+        try:
+            return json.dumps(output)
+        except TypeError:
+            return None
+
+    # Error
+    return None
+
+def wait(message, suffix : str = "", end : bool = False):
+    """Display and update a waiting message.
+    """
     spinner = [
         "∙∙∙",
         "●∙∙",
@@ -168,11 +178,12 @@ def wait(message, suffix="", end=False):
         "∙●∙",
         "●∙∙",
     ]
-    if hasattr(wait, "_count"):
-        wait._count = (wait._count + 1) % len(spinner)
+    if hasattr(wait, "count"):
+        wait.count = (wait.count + 1) % len(spinner)
     else:
-        wait._count = 0
-    output = "\r\x1b[1;36m[{spinner}]".format(spinner=spinner[wait._count]) + message + "\x1b[0;0m" + suffix
+        wait.count = 0
+    output = f"\r\x1b[1;36m[{spinner[wait.count]}]"
+    output += message + "\x1b[0;0m" + suffix
     if end:
         output = "\r" + len(output) * " " + "\x1b[#1\r"
     sys.stdout.write(output)

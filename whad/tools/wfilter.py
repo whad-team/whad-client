@@ -3,21 +3,26 @@
 This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
-from prompt_toolkit import print_formatted_text, HTML
-
-from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLineApp, ApplicationError, run_app
-from scapy.all import *
-from whad.device.unix import UnixSocketServerDevice, UnixConnector
-from whad.device import Bridge, ProtocolHub
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
-from whad.cli.ui import error, warning, success, info, display_event, display_packet
+import sys
 import logging
 from time import sleep
+
+# We need all scapy layers to craft filter expressions
+# pylint: disable-next=wildcard-import
+from scapy.layers.all import *
+from scapy.packet import Packet
+
+# Required to configure scapy theme.
+from scapy.themes import BrightTheme
 from scapy.config import conf
 
+from whad.cli.app import CommandLineApp, run_app
+from whad.device.unix import UnixSocketServerDevice, UnixConnector
+from whad.device import Bridge
+from whad.hub import ProtocolHub
+from whad.cli.ui import display_packet, error
+
 logger = logging.getLogger(__name__)
-#logging.basicConfig(level=logging.DEBUG)
 
 class WhadFilterPipe(Bridge):
     """Whad filter output pipe
@@ -26,6 +31,7 @@ class WhadFilterPipe(Bridge):
     based on the specified profile using the specified WHAD adapter and forward
     it to the chained tool. The chained tool will then forward packets back and forth.
     """
+
     def __init__(self, input_connector, output_connector, on_rx_packet_cb, on_tx_packet_cb):
         super().__init__(input_connector, output_connector)
         self.on_rx_packet = on_rx_packet_cb
@@ -45,7 +51,7 @@ class WhadFilterPipe(Bridge):
                 msg = message.from_packet(pkt)
                 super().on_outbound(msg)
         else:
-            logger.debug('[wfilter][input-pipe] forward default outbound message %s' % message)
+            logger.debug("[wfilter][input-pipe] forward default outbound message %s", message)
             # Forward other messages
             super().on_outbound(message)
 
@@ -63,12 +69,14 @@ class WhadFilterPipe(Bridge):
                 msg = message.from_packet(pkt)
                 super().on_inbound(msg)
         else:
-            logger.debug('[wfilter][input-pipe] forward default inbound message %s' % message)
+            logger.debug("[wfilter][input-pipe] forward default inbound message %s", message)
             # Forward other messages
             super().on_inbound(message)
 
 
 class WhadFilterApp(CommandLineApp):
+    """wfilter CLI application class.
+    """
 
     def __init__(self):
         """Application uses an interface and has commands.
@@ -130,18 +138,46 @@ class WhadFilterApp(CommandLineApp):
             default=False,
             help='forward packets not matched by the filter (dropped by default)'
         )
+
+        self.add_argument(
+            '-l',
+            '--load',
+            dest='loadables',
+            default=None,
+            action="append",
+            help='load Scapy packet definitions from external Python file'
+        )
+
+        # Initialize our packet filter
+        self.packet_filter = None
+
     def build_filter(self):
+        """Build filter from provided args.
+        """
         if self.args.filter is None:
             self.args.filter = "True"
-        filter_template = "lambda p : not %s" if self.args.invert else "lambda p : %s"
-        if "packet." in self.args.filter:
-            self.args.filter.replace("packet.", "p.")
-        elif "pkt." in self.args.filter:
-            self.args.filter.replace("pkt.", "p.")
 
-        return eval(filter_template % (self.args.filter))
+        # Generate our packet filter lambda.
+        if self.args.invert:
+            filter_lambda = f"lambda p,pkt,packet: not {self.args.filter}"
+        else:
+            filter_lambda = f"lambda p,pkt,packet: {self.args.filter}"
+
+        # Create our lambda function.
+        try:
+            # pylint: disable-next=eval-used
+            return eval(filter_lambda)
+        except SyntaxError:
+            return None
+
 
     def on_rx_packet(self, pkt):
+        """Packet reception callback.
+
+        We apply our filter function to each packet received to determine if
+        we must keep it or not. If no filter function is provided, we keep all
+        of them.
+        """
         if not self.args.down:
             if not self.is_stdout_piped():
                 display_packet(
@@ -151,12 +187,24 @@ class WhadFilterApp(CommandLineApp):
                 )
             return pkt
 
-        filter = self.build_filter()
         try:
-            if filter(pkt):
+            # We call our packet filter with the same arguments 3 times to
+            # cover the `p`, `pkt` and `packet` variables in our lambda.
+            if self.packet_filter(pkt, pkt, pkt):
                 if self.args.transform is not None:
-                    p = packet = pkt
-                    exec(self.args.transform)
+
+                    # Build our custom environment.
+                    env = dict(globals())
+                    env.update({
+                        'p': pkt,
+                        'pkt': pkt,
+                        'packet': pkt
+                    })
+
+                    # Execute our transform.
+                    # pylint: disable-next=exec-used
+                    exec(self.args.transform, env)
+
                     # recompute CRC ?
                 if not self.is_stdout_piped():
                     display_packet(
@@ -165,17 +213,7 @@ class WhadFilterApp(CommandLineApp):
                         format = self.args.format
                     )
                 return pkt
-            else:
 
-                if self.args.forward:
-                    display_packet(
-                        pkt,
-                        show_metadata = self.args.metadata,
-                        format = self.args.format
-                    )
-                    return pkt
-                return None
-        except:
             if self.args.forward:
                 display_packet(
                     pkt,
@@ -183,9 +221,29 @@ class WhadFilterApp(CommandLineApp):
                     format = self.args.format
                 )
                 return pkt
+
+            # No packet to forward.
+            return None
+
+        # We catch all types of exception here as the python code used by
+        # the user may cause any issue.
+        #
+        # pylint: disable-next=broad-exception-caught
+        except Exception:
+            if self.args.forward:
+                display_packet(
+                    pkt,
+                    show_metadata = self.args.metadata,
+                    format = self.args.format
+                )
+                return pkt
+
+            # No packet to forward.
             return None
 
     def on_tx_packet(self, pkt):
+        """Packet transmission callback.
+        """
         if not self.args.up:
             if not self.is_stdout_piped():
                 display_packet(
@@ -195,12 +253,23 @@ class WhadFilterApp(CommandLineApp):
                 )
             return pkt
 
-        filter = self.build_filter()
         try:
-            if filter(pkt):
+            # We call our packet filter with the same arguments 3 times to
+            # cover the `p`, `pkt` and `packet` variables in our lambda.
+            if self.packet_filter(pkt, pkt, pkt):
                 if self.args.transform is not None:
-                    p = packet = pkt
-                    exec(self.args.transform)
+                    # Build our custom environment.
+                    env = dict(globals())
+                    env.update({
+                        'p': pkt,
+                        'pkt': pkt,
+                        'packet': pkt
+                    })
+
+                    # Execute our transform.
+                    # pylint: disable-next=exec-used
+                    exec(self.args.transform, env)
+
                 if not self.is_stdout_piped():
                     display_packet(
                         pkt,
@@ -208,16 +277,21 @@ class WhadFilterApp(CommandLineApp):
                         format = self.args.format
                     )
                 return pkt
-            else:
-                if self.args.forward:
-                    display_packet(
-                        pkt,
-                        show_metadata = self.args.metadata,
-                        format = self.args.format
-                    )
-                    return pkt
-                return None
-        except:
+
+            if self.args.forward:
+                display_packet(
+                    pkt,
+                    show_metadata = self.args.metadata,
+                    format = self.args.format
+                )
+                return pkt
+            return None
+
+        # We catch all types of exception here as the python code used by
+        # the user may cause any issue.
+        #
+        # pylint: disable-next=broad-exception-caught
+        except Exception:
             if self.args.forward:
                 display_packet(
                     pkt,
@@ -228,13 +302,34 @@ class WhadFilterApp(CommandLineApp):
             return None
 
     def run(self):
+        """wfilter main function.
+        """
         # Launch pre-run tasks
         self.pre_run()
+
         if self.args.down is None and self.args.up is None:
             self.args.up   = True
             self.args.down = True
 
+        # Load any Scapy definition files if provided
+        if self.args.loadables is not None:
+            for loadable in self.args.loadables:
+                l = __import__(loadable)
+                for obj in dir(l):
+                    o = getattr(l, obj)
+                    try:
+                        if issubclass(o, Packet) and o != Packet:
+                            globals()[obj] = o
+                    except TypeError:
+                        pass
+
         try:
+            # Build our packet filter, exit if invalid.
+            self.packet_filter = self.build_filter()
+            if self.packet_filter is None:
+                error("Syntax error in provided filter expression.")
+                return
+
             if self.is_piped_interface():
                 interface = self.input_interface
             else:
@@ -246,44 +341,43 @@ class WhadFilterApp(CommandLineApp):
 
                 parameters = self.args.__dict__
                 connector = UnixConnector(interface)
-
                 connector.domain = self.args.domain
                 hub = ProtocolHub(2)
                 connector.format = hub.get(self.args.domain).format
 
-                #connector.translator = get_translator(self.args.domain)(connector.hub)
-                #connector.format = connector.translator.format
-
                 if self.is_stdout_piped():
-                    unix_server = UnixConnector(UnixSocketServerDevice(parameters={
-                        'domain': self.args.domain,
-                        'format': self.args.format,
-                        'metadata' : self.args.metadata
-                    }))
+                    unix_server = UnixConnector(UnixSocketServerDevice(parameters=parameters))
 
 
                     while not unix_server.device.opened:
                         if unix_server.device.timedout:
                             return
-                        else:
-                            sleep(0.1)
+                        sleep(0.1)
+
                     # Create our packet bridge
                     logger.info("[wfilter] Starting our output pipe")
-                    output_pipe = WhadFilterPipe(connector, unix_server, self.on_rx_packet, self.on_tx_packet)
+                    _ = WhadFilterPipe(connector, unix_server, self.on_rx_packet,
+                                                 self.on_tx_packet)
 
                 else:
+                    # Unlock Unix connector
+                    connector.unlock()
+
+                    # Overwrite its packet rx method
                     connector.on_packet = self.on_rx_packet
 
                 # Keep running while interface is active
                 while interface.opened:
                     sleep(.1)
             else:
-                exit(1)
+                sys.exit(1)
         except KeyboardInterrupt:
             # Launch post-run tasks
             self.post_run()
 
 
 def wfilter_main():
+    """Launcher for wfilter CLI application.
+    """
     app = WhadFilterApp()
     run_app(app)

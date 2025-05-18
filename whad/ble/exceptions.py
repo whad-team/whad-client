@@ -4,24 +4,20 @@
 class InvalidSerialPortException(Exception):
     """Exception raised whan an invalid serial port is provided
     """
-    def __init__(self):
-        super().__init()
 
 class InvalidUUIDException(Exception):
     """Exception raised when an invalid UUID is used.
     """
-    def __init__(self):
-        super().__init__()
 
 
 class InvalidHandleValueException(Exception):
-    def __init__(self):
-        super().__init__()
+    """Exception raised when an invalid handle value is used.
+    """
 
 
 class InvalidAccessAddressException(Exception):
-    def __init__(self):
-        super().__init__()
+    """Exception raised when an invalid access address is used.
+    """
 
 
 ################################
@@ -45,12 +41,10 @@ class NotConnected(Exception):
 class NotSynchronized(Exception):
     """This exception is raised when a connection is used while not synchronized.
     """
-    def __init__(self):
-        super().__init__()
 
     def __repr__(self):
         return "NotSynchronized"
-        
+
 class ConnectionLostException(Exception):
     """This exception is raised when a connection is unexpectedly terminated.
     """
@@ -67,20 +61,19 @@ class HookDontForward(Exception):
     """Raise this exception in a hook to avoid forwarding.
     """
 
-    def __init__(self):
-        super().__init__()
-
 class HookReturnValue(Exception):
     """Raise this exception in a hook to return a specific value to the
     caller.
     """
 
-    def __init__(self, value):
+    def __init__(self, value: bytes):
         super().__init__()
         self.__value = value
 
     @property
-    def value(self):
+    def value(self) -> bytes:
+        """Return value
+        """
         return self.__value
 
 class HookReturnGattError(Exception):
@@ -101,14 +94,20 @@ class HookReturnGattError(Exception):
 
     @property
     def request(self):
+        """Corresponding GATT request
+        """
         return self.__request
 
     @property
-    def handle(self):
+    def handle(self) -> int:
+        """Related attribute GATT handle value
+        """
         return self.__handle
 
     @property
-    def error(self):
+    def error(self) -> int:
+        """Error code
+        """
         return self.__error
 
 
@@ -117,23 +116,14 @@ class HookReturnNotFound(Exception):
     been found.
     """
 
-    def __init__(self):
-        super().__init__()
-
 class HookReturnAccessDenied(Exception):
     """Raise this exception in a hook to return an error (access not allowed)
     """
-
-    def __init__(self):
-        super().__init__()
 
 
 class HookReturnAuthentRequired(Exception):
     """Raise this exception in a hook to ask for authentication.
     """
-
-    def __init__(self):
-        super().__init__()
 
 
 class HookReturnAuthorRequired(Exception):
@@ -141,16 +131,11 @@ class HookReturnAuthorRequired(Exception):
     to access an attribute.
     """
 
-    def __init__(self):
-        super().__init__()
-
 #######################
 #Crypto Exceptions
 #######################
 
 class MissingCryptographicMaterial(Exception):
-    """Raise this exception if a decryption is attempted without having cryptographic material available.
+    """Raise this exception if a decryption is attempted without having
+    cryptographic material available.
     """
-
-    def __init__(self):
-        super().__init__()

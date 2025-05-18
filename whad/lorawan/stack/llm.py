@@ -35,7 +35,7 @@ class LWGwLinkLayerState(LayerState):
         :param dev_addr: Device address
         :type dev_addr: int
 
-        :returns: True if device address is known, False otherwise.
+        :return: True if device address is known, False otherwise.
         :rtype: bool
         """
         return (dev_addr in self.connections)
@@ -86,7 +86,7 @@ class LWGwLinkLayerState(LayerState):
 
         :param dev_addr: device address
         :type dev_addr: int
-        :returns: connection data
+        :return: connection data
         :rtype: dict
         """
         if self.has_devaddr(dev_addr):
@@ -101,7 +101,7 @@ class LWGwLinkLayerState(LayerState):
         :param mac_node: MACLayer instance name
         :type mac_node: str
         
-        :returns: Connection data or None if not found
+        :return: Connection data or None if not found
         :rtype: dict
         """
         for dev_addr in self.connections:
@@ -136,7 +136,7 @@ class LWGwLinkLayer(Layer):
     def generate_devaddr(self) -> int:
         """Generate a free device network address
 
-        :returns: Attributed device network address
+        :return: Attributed device network address
         :rtype: int
         """
         nok = True
@@ -183,7 +183,7 @@ class LWGwLinkLayer(Layer):
                 dev_appskey = derive_appskey(self.appkey, join_nonce, 0x13, join_req.dev_nonce)
                 dev_nwkskey = derive_nwkskey(self.appkey, join_nonce, 0x13, join_req.dev_nonce)
 
-                # Instanciate a node for our connection
+                # Instantiate a node for our connection
                 conn_mac = self.instantiate(LWMacLayer)
                 conn_mac.set_devaddr(dev_addr)
 
@@ -256,7 +256,7 @@ class LWGwLinkLayer(Layer):
             dev_addr, dev_eui
         ))
 
-        # Instanciate a node for our connection
+        # Instantiate a node for our connection
         conn_mac = self.instantiate(LWMacLayer)
         conn_mac.set_devaddr(dev_addr)
         logger.debug('created a LWMACLayer instance for device: %s' % conn_mac.name)

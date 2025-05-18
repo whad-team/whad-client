@@ -1,16 +1,20 @@
 """ESB Packet translator
 """
+import logging
+
+from scapy.packet import Packet
+
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
 from whad.hub.esb import generate_esb_metadata
-from whad.protocol.whad_pb2 import Message
 from whad.hub import ProtocolHub
+from whad.hub.message import HubMessage
 from whad.hub.esb import RawPduReceived as EsbRawPduReceived, PduReceived as EsbPduReceived
 from whad.hub.unifying import RawPduReceived as UniRawPduReceived, PduReceived as UniPduReceived
-import logging
+
 
 logger = logging.getLogger(__name__)
 
-class ESBMessageTranslator(object):
+class ESBMessageTranslator:
     """ESB Whad message translator.
 
     This translator is used to provide the format of a specific scapy packet
@@ -20,7 +24,6 @@ class ESBMessageTranslator(object):
 
     def __init__(self, domain="esb", protocol_hub: ProtocolHub=None):
         self.__cached_address = None
-        self.__cached_channel = None
         self.__domain = domain
         self.__hub = protocol_hub
 
@@ -42,9 +45,15 @@ class ESBMessageTranslator(object):
         return formatted_packet, timestamp
 
 
-    def from_message(self, message):
+    def from_message(self, message: HubMessage) -> Packet:
+        """Translate a specific WHAD message into the corresponding scapy packet.
+
+        :param message: WHAD message
+        :return: Corresponding scapy packet
+        :rtype: Packet
+        """
         try:
-            if isinstance(message, EsbRawPduReceived) or isinstance(message, UniRawPduReceived):
+            if isinstance(message, (EsbRawPduReceived, UniRawPduReceived)):
                 packet = ESB_Hdr(bytes(message.pdu))
                 packet.preamble = 0xAA # force a rebuild
 
@@ -54,14 +63,28 @@ class ESBMessageTranslator(object):
                 packet.metadata = generate_esb_metadata(message)
                 return packet
 
-            elif isinstance(message, EsbPduReceived) or isinstance(message, UniPduReceived):
+            if isinstance(message, (EsbPduReceived, UniPduReceived)):
                 packet = ESB_Payload_Hdr(bytes(message.pdu))
                 packet.metadata = generate_esb_metadata(message)
                 return packet
+
+            # Cannot convert message into packet
+            return None
         except AttributeError:
             return None
 
-    def from_packet(self, packet, channel=None, retransmission_count=1):
+    def from_packet(self, packet, channel=None, retransmission_count=1) -> HubMessage:
+        """Translate a packet into the corresponding WHAD message.
+
+        :param packet: Packet to translate
+        :type packet: Packet
+        :param channel: Channel to use
+        :type channel: int, optional
+        :param retransmission_count: Maximum number of retransmissions
+        :type retransmission_count: int
+        :return: Hub message
+        :rtype: HubMessage
+        """
         if ESB_Hdr in packet:
             # Force packet preamble to 0xAA
             packet.preamble = 0xAA

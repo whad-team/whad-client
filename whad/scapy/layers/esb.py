@@ -4,7 +4,7 @@ from scapy.fields import StrField, StrFixedLenField, XByteField, \
 from scapy.config import conf
 from struct import pack, unpack
 
-from whad.helpers import bits_to_bytes, bytes_to_bits, bitwise_xor
+from whad.helpers import bits_to_bytes, bytes_to_bits
 
 USER_DLT = 148
 

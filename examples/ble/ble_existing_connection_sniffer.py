@@ -1,4 +1,5 @@
 from whad.ble import Sniffer
+from whad.hub.ble import ChannelMap
 from whad.ble.connector.sniffer import SynchronizedConnection
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
@@ -21,7 +22,7 @@ if __name__ == '__main__':
                 active_connection = SynchronizedConnection(
                         access_address=0x9096cd63,
                         crc_init=0xa4f31c,
-                        channel_map=bytes.fromhex("ffefffff1f")
+                        channel_map=ChannelMap.from_bytes(bytes.fromhex("ffefffff1f"))
                 )
             )
             

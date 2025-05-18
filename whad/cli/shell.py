@@ -1,28 +1,29 @@
 """WHAD CLI Interactive shell module
 """
-import os
 import re
 import shlex
 from prompt_toolkit import PromptSession, HTML, print_formatted_text
 from prompt_toolkit.completion import NestedCompleter, DynamicCompleter
-from whad.cli.ui import error, warning, success, info
+from whad.cli.ui import error, warning, success
 
-class category(object):
+# decorator for category
+#pylint: disable-next=invalid-name
+class category:
     """Shell command handler decorator.
 
     This decorator adds a category to the command handler (do_<something>)
     that will be used to group commands in help menu.
     """
 
-    def __init__(self, category: str):
-        self.category = category
+    def __init__(self, cat: str):
+        self.category = cat
 
     def __call__(self, handler):
         handler.category = self.category
         return handler
 
 
-class InteractiveShell(object):
+class InteractiveShell:
 
     """Interactive shell for WHAD CLI applications.
 
@@ -76,8 +77,8 @@ class InteractiveShell(object):
                         self.__categories[member_category].append(command)
 
                     # Look for autocomplete method
-                    if hasattr(self, 'complete_%s' % command):
-                        command_ac = getattr(self, 'complete_%s' % command)
+                    if hasattr(self, f"complete_{command}"):
+                        command_ac = getattr(self, f"complete_{command}")
                         if callable(command_ac):
                             # Save autocomplete method
                             self.__commands_ac[command] = command_ac
@@ -104,12 +105,12 @@ class InteractiveShell(object):
         current state.
         """
         commands_autocomplete = {}
-        for command in self.__commands_ac:
-            if self.__commands_ac[command] is not None:
-                nested_autocomplete = self.__commands_ac[command]()
-                commands_autocomplete[command] = nested_autocomplete
+        for name, cmd in self.__commands_ac.items():
+            if cmd is not None:
+                nested_autocomplete = cmd()
+                commands_autocomplete[name] = nested_autocomplete
             else:
-                commands_autocomplete[command] = {}
+                commands_autocomplete[name] = {}
         return NestedCompleter.from_nested_dict(commands_autocomplete)
 
     def autocomplete_env(self, pattern=None):
@@ -118,20 +119,20 @@ class InteractiveShell(object):
         :param str pattern: regular expression to filter variables
         """
         completions = {}
-        for var in self.__env:
+        for name, value in self.__env.items():
             if pattern is not None:
-                if re.match(pattern, self.__env[var]):
-                    completions['$'+var] = {}
+                if re.match(pattern, value):
+                    completions['$'+name] = {}
             else:
-                completions['$'+var] = {}
+                completions['$'+name] = {}
         return completions
 
-    def process(self, input):
+    def process(self, input_line):
         """Process input commands.
         """
         try:
             # Dispatch commands
-            tokens = shlex.split(input)
+            tokens = shlex.split(input_line)
             if len(tokens) >= 1:
                 command = tokens[0]
                 if command in self.__commands:
@@ -139,9 +140,10 @@ class InteractiveShell(object):
                     try:
                         # Command is supported, follow to method
                         return self.__commands[command](resolved_args)
-                    except KeyboardInterrupt as kbd_int:
-                        print('\rInterrupted by user.')
-        except ValueError:
+                    except KeyboardInterrupt:
+                        print("\rInterrupted by user.")
+        except ValueError as e:
+            print(e)
             self.warning('An error occurred while processing your command.')
 
     def run(self):
@@ -150,14 +152,14 @@ class InteractiveShell(object):
         try:
             self.__session = PromptSession(completer=DynamicCompleter(self.update_autocomplete))
             while not self.__quit:
-                input = self.__session.prompt(self.__prompt)
-                res = self.process(input)
+                input_line = self.__session.prompt(self.__prompt)
+                res = self.process(input_line)
                 if res:
                     break
-        except KeyboardInterrupt as kbd:
+        except KeyboardInterrupt:
             # Call do_quit() to terminate
             self.do_quit([])
-        except EOFError as eof:
+        except EOFError:
             # Call do_quit() to terminate
             self.do_quit([])
 
@@ -168,18 +170,18 @@ class InteractiveShell(object):
         """
         try:
             # run script
-            commands = open(script_path,'r').readlines()
-            for command in commands:
-                res = self.process(command)
-                if res:
-                    break
-        except IOError as ioerr:
-            self.error('Cannot access script file "%s"' % script_path)
+            with open(script_path, 'r', encoding="utf-8") as script:
+                commands = script.readlines()
+                for cmd in commands:
+                    res = self.process(cmd)
+                    if res:
+                        break
+        except IOError:
+            self.error(f"Cannot access script file \"{script_path}\"")
 
     def do_quit(self, args):
         """This method must be overriden to handle tool termination.
         """
-        pass
 
     def stop(self):
         """Stop the interactive shell.
@@ -215,17 +217,17 @@ class InteractiveShell(object):
                     print_formatted_text(HTML(desc.strip()))
                     print('')
                 else:
-                    self.warning('command <u>%s</u> is not documented' % command)
+                    self.warning(f"command <u>{command}</u> is not documented")
             else:
-                self.error('command <u>%s</u> does not exist.' % command)
+                self.error(f"command <u>{command}</u> does not exist.")
         else:
             max_cmd_size = max([len(cmd) for cmd in list(self.__commands.keys())])
 
             # List available commands, categories first and then uncategorized.
             categorized_commands = []
-            for category in self.__categories:
+            for name, cat_obj in self.__categories.items():
                 commands = []
-                for command in self.__categories[category]:
+                for command in cat_obj:
                     # Get command docstring
                     handler = self.__commands[command]
                     if handler is not None and hasattr(handler, '__doc__'):
@@ -238,7 +240,7 @@ class InteractiveShell(object):
                     categorized_commands.append(command)
 
                 # Show commands
-                print_formatted_text(HTML('<ansimagenta><b>%s:</b></ansimagenta>' % category))
+                print_formatted_text(HTML(f"<ansimagenta><b>{name}:</b></ansimagenta>"))
                 #max_cmd_size = max([len(cmd) for cmd,doc in commands])
                 cmd_fmt = "  <ansicyan>{0:<%d}</ansicyan>\t\t{1}" % max_cmd_size
                 for cmd, doc in commands:
@@ -246,17 +248,16 @@ class InteractiveShell(object):
                 print('')
 
             commands = []
-            for command in self.__commands:
-                if command not in categorized_commands:
+            for name, cmd in self.__commands.items():
+                if name not in categorized_commands:
                     # Get command docstring
-                    handler = self.__commands[command]
-                    if handler is not None and hasattr(handler, '__doc__'):
+                    if cmd is not None and hasattr(cmd, '__doc__'):
                         # Read docstring
-                        docstr = getattr(handler,'__doc__')
+                        docstr = getattr(cmd,'__doc__')
                         short_desc = docstr.splitlines()[0].lstrip()
                     else:
                         short_desc = ''
-                    commands.append((command, short_desc))
+                    commands.append((name, short_desc))
 
             # Show commands
             print_formatted_text(HTML('<ansimagenta><b>Generic commands:</b></ansimagenta>'))
@@ -278,12 +279,12 @@ class InteractiveShell(object):
         if arg.startswith('$'):
             if arg[1:] in self.__env:
                 return self.__env[arg[1:]]
-            else:
-                return arg
-        elif arg.startswith('\\$'):
-            return arg[1:]
-        else:
             return arg
+
+        if arg.startswith('\\$'):
+            return arg[1:]
+
+        return arg
 
     def do_set(self, args):
         """set environment variable
@@ -310,17 +311,15 @@ class InteractiveShell(object):
         else:
             self.error('Missing argument (see help)')
 
-    def do_env(self, args):
+    def do_env(self, _):
         """show environment variables
 
         <ansicyan><b>env</b></ansicyan>
 
         List environment variables.
         """
-        for var in self.__env:
-            print_formatted_text(HTML('<ansicyan>%s</ansicyan>=%s' % (
-                var, self.__env[var]
-            )))
+        for name, value in self.__env.items():
+            print_formatted_text(HTML(f"<ansicyan>{name}</ansicyan>={value}"))
 
     def do_unset(self, args):
         """remove environment variable
@@ -351,7 +350,7 @@ class InteractiveShell(object):
 
         # Show message and wait for a keypress
         try:
-            print_formatted_text(HTML('<i>%s</i>' % message))
+            print_formatted_text(HTML(f"<i>{message}</i>"))
             input()
         except EOFError:
             self.warning("Cannot wait for keyboard input, is your stdin piped to another app ?")
@@ -384,14 +383,18 @@ class InteractiveShell(object):
         """
         error(message)
 
-
-
 if __name__ == '__main__':
     class MyShell(InteractiveShell):
+        """Interactive shell wrapper for testing.
+        """
         def __init__(self):
+            """Constructor.
+            """
             super().__init__('> ')
 
         def complete_test(self):
+            """Test auto-complete.
+            """
             return {'this':None, 'that':None}
 
         def do_test(self, args):

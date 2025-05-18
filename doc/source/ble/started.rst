@@ -4,7 +4,7 @@ Getting started
 Scan available devices
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Use the :class:`whad.ble.connector.scanner.Scanner` class to instanciate
+Use the :class:`whad.ble.connector.scanner.Scanner` class to instantiate
 a BLE device scanner and detect all the available devices.
 
 .. code-block:: python
@@ -149,12 +149,12 @@ the device services and characteristics:
             ),
         )
 
-Once this profile defined, instanciate a :class:`whad.ble.connector.Peripheral` object
+Once this profile defined, instantiate a :class:`whad.ble.connector.Peripheral` object
 using this profile:
 
 .. code-block:: python
 
-    # Instanciate our peripheral
+    # Instantiate our peripheral
     my_profile = MyPeripheral()
 
     # Create a periphal device based on this profile
@@ -198,8 +198,8 @@ and :py:class:`whad.ble.connector.Central` connector provides a nifty way to do 
     # Make sure connection has succeeded
     if device is not None:
         
-        # Disable auto mode
-        central.auto(False)
+        # Enable synchronous mode: we must process any incoming BLE packet.
+        central.enable_synchronous(True)
 
         # Send a LL_VERSION_PDU
         central.send_pdu(BTLE_DATA()/BTLE_CTRL()/LL_VERSION_IND(
@@ -208,9 +208,9 @@ and :py:class:`whad.ble.connector.Central` connector provides a nifty way to do 
             subversion = 0x0001
         ))
 
-        # Wait for a PDU
+        # Wait for a packet
         while central.is_connected():
-            pdu = central.wait_pdu()
+            pdu = central.wait_packet()
             if pdu.haslayer(LL_VERSION_IND):
                 pdu[LL_VERSION_IND].show()
                 break
@@ -221,22 +221,24 @@ and :py:class:`whad.ble.connector.Central` connector provides a nifty way to do 
 The above example connects to a target device, sends an `LL_VERSION_IND`
 PDU and waits for an `LL_VERSION_IND` PDU from the remote device.
 
-Normally, when a :class:`whad.ble.connector.Central` or :class:`whad.ble.connector.Peripheral`
-connector is used it relies on a protocol stack to handle outgoing and ingoing
-PDUs. By doing so, there is no way to get access to the received PDUs and avoid
-them to be forwarded to the connector's internal stack.
+Normally, when a :class:`whad.device.connector.WhadDeviceConnector`
+(or any of its inherited classes) is used it may rely on a protocol stack to process
+outgoing and ingoing PDUs. By doing so, there is no way to get access to the received
+PDUs and avoid them to be forwarded to the connector's protocol stack.
 
-However, these connectors expose a method called :meth:`whad.ble.connector.Central.auto`
-that can enable or disable this automatic processing of PDUs. By default, the
-PDUs are passed to the underlying protocol stack, but a simple line of code
-can disable this behavior:
+However, all connectors expose a method called :meth:`whad.device.connector.WhadDeviceConnector.enable_synchronous`
+that can enable or disable this automatic processing of PDUs. By default,
+PDUs are passed to the underlying protocol stack but we can force the connector
+to keep them in a queue and to wait for us to retrieve them:
 
 .. code:: python
 
     # Disable automatic PDU processing
-    central.auto(False)
+    central.enable_synchronous(True)
 
-Once this automatic processing disabled, every received PDU is then stored by
-the connector in a dedicated queue, and can be retrieved using a method called
-:py:meth:`whad.ble.connector.Central.wait_pdu`. This method is by default synchronous
-and will return only when a PDU has been received and put in queue.
+With the connector set in synchronous mode, every received PDU is then stored by
+the connector in a dedicated queue and can be retrieved using 
+:py:meth:`whad.device.connector.WhadDeviceConnector.wait_packet`.
+This method requires the connector to be in synchronous mode and will return
+a PDU from the connector's queue, or `None` if the queue is empty once the
+specified timeout period expired.

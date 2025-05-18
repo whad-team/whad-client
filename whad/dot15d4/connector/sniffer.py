@@ -3,6 +3,7 @@
 This module provides a Sniffer class for Dot15d4 protocol, that is used by
 `whad-sniff` to sniff dot15d4-based protocols.
 """
+from time import time
 from typing import Generator, List
 
 # Required by type hints
@@ -10,8 +11,8 @@ from scapy.packet import Packet
 
 from whad.dot15d4.connector import Dot15d4
 from whad.dot15d4.sniffing import SnifferConfiguration
-from whad.exceptions import UnsupportedCapability
-from whad.helpers import message_filter, is_message_type
+from whad.exceptions import UnsupportedCapability, WhadDeviceDisconnected
+from whad.helpers import message_filter
 from whad.common.sniffing import EventsManager
 from whad.hub.dot15d4 import RawPduReceived, PduReceived
 
@@ -71,21 +72,34 @@ class Sniffer(Dot15d4, EventsManager):
         actions = []
         return [action for action in actions if filter is None or isinstance(action, filter)]
 
-    def sniff(self) -> Generator[Packet, None , None]:
+    def sniff(self, timeout: float = None) -> Generator[Packet, None , None]:
         """Main sniffing loop.
 
         This method waits for raw PDUs or PDUs, depending on hardware capability, and report
         them to the caller by yielding Scapy packets created from sniffed PDUs. These packets
         also include metadata (reception timestamp, channel, ...).
-        """
-        while True:
-            if self.support_raw_pdu():
-                message_type = RawPduReceived
-            else:
-                message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
-            if message is not None:
-                packet = message.to_packet()
-                self.monitor_packet_rx(packet)
-                yield packet
+        :param timeout: Timeout in seconds (disabled if set to `None`)
+        :type timeout: float, optional
+        """
+        start = time()
+        try:
+            while True:
+                if self.support_raw_pdu():
+                    message_type = RawPduReceived
+                else:
+                    message_type = PduReceived
+
+                # Wait for a message to be received
+                message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
+                if message is not None:
+                    packet = message.to_packet()
+                    self.monitor_packet_rx(packet)
+                    yield packet
+
+                # Check if timeout has been reached (if provided)
+                if timeout is not None:
+                    if time() - start >= timeout:
+                        break
+        except WhadDeviceDisconnected:
+            return

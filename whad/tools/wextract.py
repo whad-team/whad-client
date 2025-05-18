@@ -3,27 +3,26 @@
 This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
-from prompt_toolkit import print_formatted_text, HTML
-
-from whad.common.monitors.pcap import PcapWriterMonitor
-from whad.cli.app import CommandLineApp, ApplicationError, run_app
-from scapy.all import *
-from whad.device.unix import  UnixSocketConnector
-from whad.device import Bridge, ProtocolHub
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
-from whad.cli.ui import error, warning, success, info, display_event, display_packet
-
-import logging
-import time
 import sys
+import time
+import logging
+from typing import List, Tuple
+
+from scapy.layers.all import *
+from scapy.packet import Packet
+from scapy.config import conf
+from scapy.themes import BrightTheme
+
+from whad.cli.app import CommandLineApp, run_app
+from whad.device.unix import  UnixSocketConnector
+from whad.hub import ProtocolHub
 
 logger = logging.getLogger(__name__)
-#logging.basicConfig(level=logging.DEBUG)
-
-class WhadExtractUnixSocketConnector(UnixSocketConnector):
-    pass
 
 class WhadExtractApp(CommandLineApp):
+    """
+    Main `wextract` CLI application class.
+    """
 
     def __init__(self):
         """Application uses an interface and has commands.
@@ -51,7 +50,30 @@ class WhadExtractApp(CommandLineApp):
             help='delimiter between extractor'
         )
 
-    def build_extractors(self):
+        self.add_argument(
+            '-l',
+            '--load',
+            dest='loadables',
+            default=None,
+            action="append",
+            help='load Scapy packet definitions from external Python file'
+        )
+
+        self.add_argument(
+            '-x',
+            '--exceptions',
+            dest="show_exc",
+            action="store_true",
+            default=False,
+            help="Show exceptions raised when extracting requested values (debug)"
+        )
+
+    def build_extractors(self) -> List[Tuple[str, callable]]:
+        """Build extractors based on provided arguments.
+
+        :rtype: list
+        :return: list of extractors
+        """
         extractor_template = "lambda p : %s"
         extractors = []
         for extractor in self.args.extractor:
@@ -63,23 +85,49 @@ class WhadExtractApp(CommandLineApp):
 
         return extractors
 
-    def on_packet(self, pkt):
+    def on_packet(self, pkt) -> Packet:
+        """
+        Packet processing callback
+
+        :param pkt: Packet to process
+        :type pkt: Packet
+        :return: Processed packet
+        :rtype: Packet
+        """
         extractors = self.build_extractors()
         output = []
-        try:
-            for extractor,processor in extractors:
+        for extractor,processor in extractors:
+            try:
                 output.append(str(processor(pkt)))
-            print(self.args.delimiter.join(output))
-            sys.stdout.flush()
-            return pkt
-        except Exception as e:
-            sys.stderr.write(f"Exception raised when evaluating {extractor}\n")
-            sys.stderr.flush()
-            return pkt
+            except Exception as err:
+                if self.args.show_exc:
+                    sys.stderr.write("-------------------------------------------------------\n")
+                    sys.stderr.write(f"Exception raised when evaluating {extractor}:\n")
+                    sys.stderr.write(str(err)+"\n")
+                    sys.stderr.write("-------------------------------------------------------\n")
+                    sys.stderr.flush()
+                return pkt
+
+        print(self.args.delimiter.join(output))
+        sys.stdout.flush()
+        return pkt
+
 
     def run(self):
         # Launch pre-run tasks
         self.pre_run()
+
+        # Load any Scapy definition files if provided
+        if self.args.loadables is not None:
+            for loadable in self.args.loadables:
+                l = __import__(loadable)
+                for obj in dir(l):
+                    o = getattr(l, obj)
+                    try:
+                        if issubclass(o, Packet) and o != Packet:
+                            globals()[obj] = o
+                    except TypeError:
+                        pass
         try:
             if self.is_piped_interface():
                 interface = self.input_interface
@@ -92,19 +140,19 @@ class WhadExtractApp(CommandLineApp):
 
                 parameters = self.args.__dict__
 
-                connector = WhadExtractUnixSocketConnector(interface)
+                # Create a Unix socket connector
+                connector = UnixSocketConnector(interface)
                 for parameter_name, parameter_value in parameters.items():
                     connector.add_parameter(parameter_name, parameter_value)
 
+                # Set the connector domain
                 connector.domain = self.args.domain
                 hub = ProtocolHub(2)
                 connector.format = hub.get(self.args.domain).format
-
-                #connector.translator = get_translator(self.args.domain)(connector.hub)
-                #connector.format = connector.translator.format
                 connector.on_packet = self.on_packet
 
-                #interface.open()
+                # Unlock to start processing incoming messages
+                connector.unlock()
 
                 while interface.opened:
                     time.sleep(.1)
@@ -115,5 +163,7 @@ class WhadExtractApp(CommandLineApp):
 
 
 def wextract_main():
+    """Launcher for `wextract` CLI application.
+    """
     app = WhadExtractApp()
     run_app(app)

@@ -19,7 +19,7 @@ from scapy.packet import Packet
 
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceDisconnected
-from whad.esb.connector import ESB
+from whad.esb.connector.base import ESB
 from whad.esb.sniffing import SnifferConfiguration
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter
@@ -157,4 +157,4 @@ class Sniffer(ESB, EventsManager):
 
         # Handle device disconnection
         except WhadDeviceDisconnected:
-            return
+            pass

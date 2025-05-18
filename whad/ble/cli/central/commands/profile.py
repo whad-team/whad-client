@@ -1,17 +1,15 @@
 """BLE profile command handler
 """
-import logging
-
-from time import time, sleep
 from json import loads, dumps
 from binascii import hexlify
-from prompt_toolkit import print_formatted_text, HTML
 from argparse import Namespace
+
+from prompt_toolkit import print_formatted_text, HTML
 
 from whad.ble.profile.characteristic import CharacteristicProperties
 from whad.cli.app import command, CommandLineApp
 from whad.ble import Central, Scanner
-from whad.ble.exceptions import ConnectionLostException
+from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
 from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.stack.att.exceptions import AttError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
@@ -27,22 +25,24 @@ EXPECTED_BLE_PARAMS = [
     "conn_handle",
 ]
 
-def profile_discover(app: CommandLineApp, device):
+def profile_discover(app: CommandLineApp, device, include_values: bool = False) -> bool:
     """Discover the GATT profile of a given device
 
     :param app: WHAD application instance
     :type app: :class:ẁhad.cli.app.CommandLineApp`
     :param device: Peripheral device to enumerate
     :type device: :class:`whad.ble.profile.PeripheralDevice`
+    :return: `True` on success, `False` if an error occurred during profile discovery
+    :rtype: bool
     """
     try:
-        device.discover()
+        device.discover(include_values=include_values)
     except AttError as atterr:
         show_att_error(app, atterr)
-        return
+        return False
     except GattTimeoutException:
         app.error("GATT Timeout while discovering services and characteristics. Aborted.")
-        return
+        return False
 
     # Show discovered services and characteristics
     for service in device.services():
@@ -88,7 +88,17 @@ def profile_discover(app: CommandLineApp, device):
                         .format(name=desc.name, handle=desc.handle)
                 )
 
+
+            # Show values if requested
+            if include_values:
+                print_formatted_text(
+                    HTML("    <ansiblue>Value</ansiblue>: {value}")
+                        .format(value=charac.value.hex())
+                )
         print('')
+
+    # Success
+    return True
 
 def profile_export(app, command_args: list, device, device_metadata: dict):
     """Export a discovered GATT profile into a JSON file.
@@ -102,7 +112,8 @@ def profile_export(app, command_args: list, device, device_metadata: dict):
     json_data = dumps(profile)
     try:
         print(f"Writing profile JSON data to {command_args[0]} ...")
-        open(command_args[0], 'w', encoding='utf-8').write(json_data)
+        with open(command_args[0], 'w', encoding='utf-8') as profile:
+            profile.write(json_data)
     except IOError:
         app.error("An error occured when writing to %s", command_args[0])
 
@@ -120,57 +131,82 @@ def profile_handler(app, command_args):
     # We need to have an interface specified
     if app.interface is not None and app.args.bdaddr is not None:
 
+        print(f"Searching for target device {app.args.bdaddr} ...")
+
         # Switch to Scanner mode, search our device
         scanner = Scanner(app.interface)
         scanner.start()
 
-        start_time = time()
-        for device in scanner.discover_devices():
-            if device.address.lower() == app.args.bdaddr.lower():
-                if device.got_scan_rsp or (time() - start_time) >= 10.0:
+        device = None
+        for scanned_device in scanner.discover_devices(timeout=30.0):
+            if scanned_device.address.lower() == app.args.bdaddr.lower():
+                device = scanned_device
+                if device.got_scan_rsp:
                     break
+
+        # Check device is our device
+        if device is None:
+            # Stop scanner
+            scanner.stop()
+
+            # Display error message
+            app.error(f"BLE peripheral {app.args.bdaddr} cannot be found.")
+            return
 
         # Generate device advertising information
         device_metadata = {
             'adv_data': hexlify(device.adv_records.to_bytes()).decode('utf-8'),
-            'scan_rsp': hexlify(device.scan_rsp_records.to_bytes()).decode('utf-8') if device.scan_rsp_records is not None else None,
             'bd_addr': str(device.address),
-            'addr_type': device.address_type
+            'addr_type': device.address_type,
+            'scan_rsp': None
         }
+        if device.scan_rsp_records is not None:
+            device_metadata['scan_rsp'] = (
+                hexlify(device.scan_rsp_records.to_bytes()).decode('utf-8')
+            )
+
         scanner.stop()
 
         # Switch to central mode
         central = Central(app.interface)
         central.start()
 
-        # Connect to target device
-        device = central.connect(app.args.bdaddr, random=app.args.random)
-        if device is None:
-            app.error("Cannot connect to %s, device does not respond.", app.args.bdaddr)
-        else:
-            try:
-                # Perform profile discovery
-                profile_discover(app, device)
+        try:
+            print("Connecting to target device ...")
 
-                # Export profile to JSON file if required
-                if len(command_args) >= 1:
-                    # Load GATT profile JSON data
-                    json_data = device.export_json()
-                    profile = loads(json_data)
+            # Connect to target device
+            device = central.connect(app.args.bdaddr, random=app.args.random)
+            if device is None:
+                app.error("Cannot connect to %s, device does not respond.", app.args.bdaddr)
+            else:
+                try:
+                    print("Enumerating services and characteristics ...")
+                    # Perform profile discovery
+                    result = profile_discover(app, device, include_values=(len(command_args) >= 1))
 
-                    # Add specific device info (for emulating)
-                    profile['devinfo'] = device_metadata
-                    json_data = dumps(profile)
-                    try:
-                        print('Writing profile JSON data to %s ...' % command_args[0])
-                        open(command_args[0], 'w', encoding='utf-8').write(json_data)
-                    except IOError:
-                        app.error("An error occured when writing to %s", command_args[0])
+                    # Export profile to JSON file if required
+                    if result and len(command_args) >= 1:
+                        # Load GATT profile JSON data
+                        json_data = device.export_json()
+                        profile = loads(json_data)
 
-                # Disconnect
-                device.disconnect()
-            except ConnectionLostException:
-                app.error("BLE device disconnected during discovery.")
+                        # Add specific device info (for emulating)
+                        profile['devinfo'] = device_metadata
+                        json_data = dumps(profile)
+                        try:
+                            print(f"Writing profile JSON data to {command_args[0]} ...")
+                            with open(command_args[0], 'w', encoding='utf-8') as profile:
+                                profile.write(json_data)
+                        except IOError:
+                            app.error(f"An error occured when writing to {command_args[0]}")
+
+                    # Disconnect
+                    device.disconnect()
+                except ConnectionLostException:
+                    app.error("BLE device disconnected during discovery.")
+
+        except PeripheralNotFound:
+            app.error(f"BLE peripheral {app.args.bdaddr} cannot be found.")
 
         # Terminate central
         central.stop()
@@ -200,7 +236,7 @@ def profile_handler(app, command_args):
 
         try:
             # Read GATT characteristic
-            profile_discover(app, device)
+            profile_discover(app, device, include_values=False)
 
             # Export profile to JSON file if required
             if len(command_args) >= 1:

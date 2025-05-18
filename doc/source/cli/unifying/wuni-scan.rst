@@ -18,6 +18,8 @@ A compatible WHAD *interface* is required to listen to packets transmitted by a
 Logitech Unifying device. Channel (*CHANNEL*) and device address (*ADDRESS*) are
 optional and will allow `wuni-scan` to better track a device and not miss a packet.
 
+.. include:: ../generic/debug-options.rst
+
 Searching for Logitech Unifying devices on any channel
 ------------------------------------------------------
 

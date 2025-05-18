@@ -25,8 +25,11 @@ ZigBee frames sent on channel 11:
     # Set channel
     sniffer.channel = 11
 
-    # Sniff packets
-    for packet in sniffer.sniff():
+    # Start sniffer
+    sniffer.start()
+
+    # Sniff packets for 30 seconds
+    for packet in sniffer.sniff(timeout=30.0):
         packet.show()
 
 Decrypting ZigBee packets on-the-fly while sniffing
@@ -54,7 +57,8 @@ To enable this feature, simply set the sniffer's ``decrypt`` property to True:
     sniffer.channel = 11
     sniffer.decrypt = True
 
-    # Sniff packets
+    # Sniff packets with no timeout
+    # (sniffing must be interrupted by the user)
     for packet in sniffer.sniff():
         packet.show()
 

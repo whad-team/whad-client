@@ -34,6 +34,7 @@ Command-line options
 * ``--link-layer``: enable link-layer mode (default mode is GATT)
 * ``--output`` (``-o``): specifies a target PCAP file in which all exchanged packets will be saved
 
+.. include:: ../generic/debug-options.rst
 
 Create a GATT proxy and monitor traffic
 ---------------------------------------

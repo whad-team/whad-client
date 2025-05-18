@@ -13,8 +13,8 @@ class LoRa(Phy):
     '''LoRa modulation/demodulation connector.
     '''
 
-    SYNCWORD_M2M = b'\x24\x14'
-    SYNCWORD_LORAWAN = b'\x44\x34'
+    SYNCWORD_M2M = b'\x12'
+    SYNCWORD_LORAWAN = b'\x34'
 
     domain = "lora"
 

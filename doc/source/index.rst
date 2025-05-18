@@ -35,6 +35,7 @@ Welcome to WHAD's documentation!
     ble/central
     ble/peripheral
     ble/profile
+    ble/exceptions
 
 .. toctree::
     :maxdepth: 1
@@ -83,3 +84,11 @@ Welcome to WHAD's documentation!
     :caption: Contributing
 
     device/firmware
+
+
+.. toctree::
+    :maxdepth: 1
+    :caption: Python API Reference
+
+    api/device
+    api/monitors

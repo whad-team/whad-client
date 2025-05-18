@@ -1,15 +1,17 @@
-import json
-
-from whad.ble.connector import BLE, Central, Peripheral
-from whad.ble.profile import GenericProfile
+"""Bluetooth Low Energy connection hijacker connector.
+"""
+from whad.ble.connector.base import BLE
+from whad.ble.connector.central import Central
+from whad.ble.connector.peripheral import Peripheral
 from whad.ble.exceptions import ConnectionLostException
-from whad.ble import UnsupportedCapability, message_filter
-
+from whad.exceptions import UnsupportedCapability
+from whad.helpers import message_filter
 from whad.hub.events import ConnectionEvt
 from whad.hub.ble import Hijacked
 
-
 class Hijacker(BLE):
+    """Bluetooth Low Energy hijacking connector.
+    """
 
     def __init__(self, device, connection=None):
         super().__init__(device)
@@ -23,24 +25,30 @@ class Hijacker(BLE):
             raise UnsupportedCapability("Hijack")
 
     @property
-    def central(self):
+    def central(self) -> Central:
+        """Return the hijacker central.
+        """
         available_actions = self.available_actions(Central)
         if len(available_actions) == 1:
             return available_actions[0]
         return None
 
-
     @property
     def peripheral(self):
+        """Return the hijacker peripheral.
+        """
         available_actions = self.available_actions(Peripheral)
         if len(available_actions) == 1:
             return available_actions[0]
         return None
 
-    def available_actions(self, filter=None):
+    def available_actions(self, action_filter=None):
+        """Determine the possible actions once a connection has been hijacked.
+        """
         actions = []
         if self.__status:
-            # It should be replaced by arguments in function calls, building a pseudo packet seems dirty
+            # It should be replaced by arguments in function calls, building a\
+            # pseudo packet seems dirty
             if self.__hijack_master:
                 pseudo_connection = ConnectionEvt()
                 pseudo_connection.conn_handle = 0
@@ -63,7 +71,7 @@ class Hijacker(BLE):
                         existing_connection = pseudo_connection
                     )
                 )
-        return [action for action in actions if filter is None or isinstance(action, filter)]
+        return [action for action in actions if action_filter is None or isinstance(action, filter)]
 
 
     def hijack(self, master = True, slave = False):
@@ -85,11 +93,14 @@ class Hijacker(BLE):
 
             message = self.wait_for_message(filter=message_filter(Hijacked))
             self.__status = message.success
-            return (message.success)
-        else:
-            raise self.__exception
+            return message.success
 
-    def on_desynchronized(self, access_address):
+        # Connection failed
+        raise self.__exception
+
+    def on_desynchronized(self, access_address=None):
+        """Desynchronization callback
+        """
         if access_address == self.__connection.access_address:
             self.__exception = ConnectionLostException(self.__connection)
             self.__connection = None

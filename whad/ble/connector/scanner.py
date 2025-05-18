@@ -26,14 +26,17 @@ If the underlying device does not support scanning, this connector will raise
 an :class:`UnsupportedCapability` exception.
 
 """
-from scapy.packet import Packet
+from time import time
 from typing import Iterator
+
+from scapy.packet import Packet
+from scapy.layers.bluetooth4LE import BTLE_ADV
+
 from whad.hub.ble import BleAdvPduReceived, BleRawPduReceived
-from whad.ble.connector import BLE
+from whad.ble.connector.base import BLE
 from whad.ble.scanning import AdvertisingDevicesDB, AdvertisingDevice
-from whad.ble import UnsupportedCapability, message_filter, BleAdvType,\
-    BTLE_ADV_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_NONCONN_IND, BTLE_ADV_SCAN_IND,\
-    BTLE_SCAN_RSP, BTLE_ADV
+from whad.exceptions import UnsupportedCapability
+from whad.helpers import message_filter
 
 class Scanner(BLE):
     """
@@ -71,8 +74,17 @@ class Scanner(BLE):
         self.__db.reset()
         super().start()
 
+    def stop(self):
+        """Stop scanning.
 
-    def discover_devices(self, minimal_rssi = None, filter_address = None) -> Iterator[AdvertisingDevice]:
+        Stop scanning for devices, disable scan mode if used.
+        """
+        if self.can_scan():
+            self.enable_scan_mode(False)
+        super().stop()
+
+    def discover_devices(self, minimal_rssi = None, filter_address = None,
+                         timeout: float = None) -> Iterator[AdvertisingDevice]:
         """
         Parse incoming advertisements and yield discovered devices.
 
@@ -80,39 +92,48 @@ class Scanner(BLE):
         :type   minimal_rssi:       float, optional
         :param  filter_address:     BD address of a device to discover
         :type   filter_address:     :class:`whad.ble.bdaddr.BDAddress`, optional
+        :param  timeout:            Timeout in seconds
+        :type   timeout:            float, optional
         """
-        for advertisement in self.sniff():
+        start_time = time()
+        for advertisement in self.sniff(timeout=timeout):
             if minimal_rssi is None or advertisement.metadata.rssi > minimal_rssi:
                 devices = self.__db.on_device_found(
                     advertisement.metadata.rssi,
                     advertisement,
                     filter_addr=filter_address
                 )
+
                 for device in devices:
-                    if device is not None and device.scanned:
-                        yield device
+                    yield device
 
+            if (timeout is not None) and (time() - start_time > timeout):
+                break
 
-    def sniff(self) -> Iterator[Packet]:
+    def sniff(self, timeout: float = None) -> Iterator[Packet]:
         """
         Listen and yield incoming advertising PDUs.
         """
-
+        start_time = time()
         while True:
             if self.support_raw_pdu():
                 message_type = BleRawPduReceived
             else:
                 message_type = BleAdvPduReceived
 
-            message = self.wait_for_message(filter=message_filter(message_type))
-            # Convert message from rebuilt PDU
-            packet = message.to_packet()
-            self.monitor_packet_rx(packet)
-            # Force TxAdd value to propagate the address type
-            if isinstance(message, BleAdvPduReceived):
-                if message.addr_type > 0:
-                    packet.getlayer(BTLE_ADV).TxAdd = 1
-            yield packet
+            message = self.wait_for_message(filter=message_filter(message_type), timeout=timeout)
+            if message is not None:
+                # Convert message from rebuilt PDU
+                packet = message.to_packet()
+                self.monitor_packet_rx(packet)
+                # Force TxAdd value to propagate the address type
+                if isinstance(message, BleAdvPduReceived):
+                    if message.addr_type > 0:
+                        packet.getlayer(BTLE_ADV).TxAdd = 1
+                yield packet
+
+            if timeout is not None and time() - start_time > timeout:
+                break
 
     def clear(self):
         """

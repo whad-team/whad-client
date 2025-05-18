@@ -1,7 +1,14 @@
+"""
+WHAD Enhanced ShockBurst PHY utility functions.
+
+This module provides some functions related to ESB PHY, allowing
+channel to frequency conversion or basic PHY configurations.
+"""
+from enum import IntEnum
+
 from whad.phy import PhysicalLayer, GFSKModulationScheme, Endianness
 from whad.scapy.layers.esb import ESB_Hdr
-from whad.esb.esbaddr import ESBAddress
-from enum import IntEnum
+
 
 class FieldsSize(IntEnum):
     '''
@@ -13,21 +20,25 @@ class FieldsSize(IntEnum):
     CRC_SIZE = 2
 
 
-def frequency_to_channel(frequency):
-  """
-  Converts a frequency (in Hz) to an Enhanced ShockBurst channel.
-  """
-  return int(frequency/1000000) - 2400
+def frequency_to_channel(frequency) -> int:
+    """
+    Converts a frequency (in Hz) to an Enhanced ShockBurst channel.
+    """
+    return int(frequency/1000000) - 2400
 
-def channel_to_frequency(channel):
-  """
-  Converts an Enhanced ShockBurst channel into a frequency (in Hz).
-  """
-  return (2400 + channel) * 1000000
+def channel_to_frequency(channel) -> int:
+    """
+    Converts an Enhanced ShockBurst channel into a frequency (in Hz).
+    """
+    return (2400 + channel) * 1000000
 
-def decoding(pkt, configuration):
-    size = ((pkt[6] & 0b11111100) >> 2)
-    return pkt[:FieldsSize.PREAMBLE_SIZE + FieldsSize.CRC_SIZE + FieldsSize.ADDRESS_SIZE+FieldsSize.HEADER_SIZE+size]
+def decoding(pkt, configuration = None):
+    """Decode a received packet depending on the current configuration.
+    """
+    size = (pkt[6] & 0b11111100) >> 2
+    pkt_size = FieldsSize.PREAMBLE_SIZE + FieldsSize.CRC_SIZE + FieldsSize.ADDRESS_SIZE
+    pkt_size += FieldsSize.HEADER_SIZE + size
+    return pkt[:pkt_size]
 
 
 PHYS = {

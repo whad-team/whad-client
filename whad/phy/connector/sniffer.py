@@ -1,4 +1,8 @@
 from queue import Queue
+from time import time
+from typing import Generator
+
+from scapy.packet import Packet
 
 from whad.exceptions import WhadDeviceDisconnected
 from whad.phy.connector import Phy
@@ -56,7 +60,7 @@ class Sniffer(Phy, EventsManager):
                 self.__configuration.lora_configuration.spreading_factor,
                 self.__configuration.lora_configuration.coding_rate,
                 self.__configuration.lora_configuration.bandwidth,
-                12,
+                self.__configuration.lora_configuration.preamble_length,
                 crc=self.__configuration.lora_configuration.enable_crc,
                 explicit=self.__configuration.lora_configuration.enable_explicit_mode
             )
@@ -97,8 +101,15 @@ class Sniffer(Phy, EventsManager):
         actions = []
         return [action for action in actions if filter is None or isinstance(action, filter)]
 
-    def sniff(self):
+    def sniff(self, timeout: float = None) -> Generator[Packet, None, None]:
+        """Sniff packets out of thin air.
+
+        :param timeout: Specify the number of seconds after which sniffing will stop.
+                        Wait forever if set to `None`.
+        :type timeout: float
+        """
         try:
+            start = time()
             while True:
                 if self.support_raw_iq_stream():
                     message_type = RawPacketReceived
@@ -110,5 +121,10 @@ class Sniffer(Phy, EventsManager):
                     packet = message.to_packet()
                     self.monitor_packet_rx(packet)
                     yield packet
+                
+                # Check if timeout has been reached
+                if timeout is not None:
+                    if time() - start >= timeout:
+                        break
         except WhadDeviceDisconnected:
             return

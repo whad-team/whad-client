@@ -1,6 +1,13 @@
+"""
+RZUSBStick adaptation layer.
+"""
+import logging
+from struct import unpack, pack
+
+from usb.core import find, USBError, USBTimeoutError
+
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.device.virtual import VirtualDevice
-from whad.helpers import message_filter,is_message_type,bd_addr_to_bytes
+from whad.device import VirtualDevice
 from whad.hub.discovery import Domain, Capability
 
 from whad.hub.generic.cmdresult import CommandResult
@@ -9,48 +16,59 @@ from whad.hub.dot15d4 import Commands
 from whad.device.virtual.rzusbstick.constants import RZUSBStickInternalStates, \
     RZUSBStickId, RZUSBStickModes, RZUSBStickEndPoints, RZUSBStickCommands, \
     RZUSBStickResponses
-from usb.core import find, USBError, USBTimeoutError
-from usb.util import get_string
-from struct import unpack, pack
-from time import sleep
+
+
+logger = logging.getLogger(__name__)
 
 # Helpers functions
-def get_rzusbstick(id=0,bus=None, address=None):
-    '''
+def get_rzusbstick(index=0,bus=None, address=None):
+    """
     Returns a RZUSBStick USB object based on index or bus and address.
-    '''
-    devices = list(find(idVendor=RZUSBStickId.RZUSBSTICK_ID_VENDOR, idProduct=RZUSBStickId.RZUSBSTICK_ID_PRODUCT,find_all=True))
+    """
+    devices = list(find(idVendor=RZUSBStickId.RZUSBSTICK_ID_VENDOR,
+                        idProduct=RZUSBStickId.RZUSBSTICK_ID_PRODUCT,
+                        find_all=True))
     if bus is not None and address is not None:
         for device in devices:
             if device.bus == bus and device.address == address:
                 return (devices.index(device), device)
         # No device found with the corresponding bus/address, return None
         return None
-    else:
-        try:
-            return (id, devices[id])
-        except IndexError:
-            return None
+
+    try:
+        return (index, devices[index])
+    except IndexError:
+        return None
 
 class RZUSBStickDevice(VirtualDevice):
+    """ATMEL RZAVRUSB stick virtual device.
+    """
 
     INTERFACE_NAME = "rzusbstick"
 
     @classmethod
     def list(cls):
-        '''
+        """
         Returns a list of available RZUSBStick devices.
-        '''
+        """
         available_devices = []
-        for rzusbstick in find(idVendor=RZUSBStickId.RZUSBSTICK_ID_VENDOR, idProduct=RZUSBStickId.RZUSBSTICK_ID_PRODUCT,find_all=True):
-            available_devices.append(RZUSBStickDevice(bus=rzusbstick.bus, address=rzusbstick.address))
+        try:
+            for rzusbstick in find(idVendor=RZUSBStickId.RZUSBSTICK_ID_VENDOR,
+                                   idProduct=RZUSBStickId.RZUSBSTICK_ID_PRODUCT,
+                                   find_all=True):
+                available_devices.append(RZUSBStickDevice(bus=rzusbstick.bus,
+                                                          address=rzusbstick.address))
+        except ValueError:
+            logger.warning("Cannot access RZUSBStick, root privileges may be required.")
+
         return available_devices
 
     @property
     def identifier(self):
-        '''
-        Returns the identifier of the current device (e.g., bus + address in format "<bus>-<address>").
-        '''
+        """
+        Returns the identifier of the current device (e.g., bus + address in
+        format "<bus>-<address>").
+        """
         return str(self.__rzusbstick.bus)+"-"+str(self.__rzusbstick.address)
 
 
@@ -62,22 +80,31 @@ class RZUSBStickDevice(VirtualDevice):
         if device is None:
             raise WhadDeviceNotFound
 
+        self.__input_header = None
+        self.__input_buffer = None
+        self.__input_buffer_length = 0
         self.__opened = False
         self.__opened_stream = False
         self.__channel = 11
         self.__future_channel = 11
         self.__internal_state = RZUSBStickInternalStates.NONE
-        self.__index, self.__rzusbstick = device
+        _, self.__rzusbstick = device
         super().__init__()
+
+    @property
+    def internal_state(self):
+        """Get the device internal state.
+        """
+        return self.__internal_state
 
     def open(self):
         try:
             self.__rzusbstick.set_configuration()
         except USBError as err:
             if err.errno == 13:
-                raise WhadDeviceAccessDenied("rzusbstick")
-            else:
-                raise WhadDeviceNotReady()
+                raise WhadDeviceAccessDenied("rzusbstick") from err
+            raise WhadDeviceNotReady() from err
+
         self._dev_id = self._get_serial_number()
         self._fw_author = self._get_manufacturer()
         self._fw_url = self._get_url()
@@ -93,6 +120,8 @@ class RZUSBStickDevice(VirtualDevice):
             raise WhadDeviceNotReady()
 
     def read(self):
+        """Read data from device.
+        """
         if not self.__opened:
             raise WhadDeviceNotReady()
         if self.__opened_stream:
@@ -114,16 +143,13 @@ class RZUSBStickDevice(VirtualDevice):
 
                 if len(self.__input_header) == 9 and self.__input_buffer_length == len(self.__input_buffer):
                     rssi = 3 * self.__input_header[6] - 91
-                    valid_fcs = (self.__input_header[7] == 0x01)
+                    valid_fcs = self.__input_header[7] == 0x01
                     packet = self.__input_buffer[:-1]
-                    link_quality_indicator = self.__input_buffer[-1]
+                    #link_quality_indicator = self.__input_buffer[-1]
                     self._send_whad_zigbee_raw_pdu(packet, rssi=rssi, is_fcs_valid=valid_fcs)
 
     def reset(self):
         self.__rzusbstick.reset()
-
-    def close(self):
-        super().close()
 
     # Virtual device whad message builder
     def _send_whad_zigbee_raw_pdu(self, packet, rssi=None, is_fcs_valid=None, timestamp=None):
@@ -186,10 +212,12 @@ class RZUSBStickDevice(VirtualDevice):
     # RZUSBStick low level communication primitives
 
     def __rzusbstick_read_packet(self, timeout=200):
-        return bytes(self.__rzusbstick.read(RZUSBStickEndPoints.RZ_PACKET_ENDPOINT, self.__rzusbstick.bMaxPacketSize0, timeout=timeout))
+        return bytes(self.__rzusbstick.read(RZUSBStickEndPoints.RZ_PACKET_ENDPOINT,
+                                            self.__rzusbstick.bMaxPacketSize0, timeout=timeout))
 
     def _rzusbstick_read_response(self, timeout=200):
-        return bytes(self.__rzusbstick.read(RZUSBStickEndPoints.RZ_RESPONSE_ENDPOINT, self.__rzusbstick.bMaxPacketSize0, timeout=timeout))
+        return bytes(self.__rzusbstick.read(RZUSBStickEndPoints.RZ_RESPONSE_ENDPOINT,
+                                            self.__rzusbstick.bMaxPacketSize0, timeout=timeout))
 
     def _rzusbstick_send_command(self, command, data=b"", timeout=200):
         data = [command] + list(data)
@@ -218,14 +246,12 @@ class RZUSBStickDevice(VirtualDevice):
     def _get_manufacturer(self):
         if "KILLERB" in self.__rzusbstick.product:
             return "Joshua Wright (KillerBee version)".encode('utf-8')
-        else:
-            return (self.__rzusbstick.manufacturer + "(Factory version)").encode('utf-8')
+        return (self.__rzusbstick.manufacturer + "(Factory version)").encode('utf-8')
 
     def _get_serial_number(self):
         return bytes.fromhex(
-                                self.__rzusbstick.serial_number[:-1] +
-                                "{:04x}".format(self.__rzusbstick.bus)  +
-                                "{:04x}".format(self.__rzusbstick.address)
+            self.__rzusbstick.serial_number[:-1] +
+            f"{self.__rzusbstick.bus:04x}{self.__rzusbstick.address:04x}"
         )
 
     def _get_firmware_version(self):
@@ -234,8 +260,10 @@ class RZUSBStickDevice(VirtualDevice):
     def _get_url(self):
         if "KILLERB" in self.__rzusbstick.product:
             return "https://github.com/riverloopsec/killerbee".encode('utf-8')
-        else:
-            return "https://www.microchip.com/en-us/development-tool/ATAVRRZUSBSTICK".encode('utf-8')
+
+        return (
+            "https://www.microchip.com/en-us/development-tool/ATAVRRZUSBSTICK"
+        ).encode('utf-8')
 
     # RZUSBStick commands
 
@@ -287,6 +315,10 @@ class RZUSBStickDevice(VirtualDevice):
     def _send_packet(self, data):
         if len(data) >= 1 and len(data) <= 125:
             self._close_stream()
-            success = self._rzusbstick_send_command(RZUSBStickCommands.RZ_INJECT_FRAME, bytes([len(data)])+data, timeout=700)
+            success = self._rzusbstick_send_command(RZUSBStickCommands.RZ_INJECT_FRAME,
+                                                    bytes([len(data)])+data, timeout=700)
             self._open_stream()
             return success
+
+        # Error.
+        return False

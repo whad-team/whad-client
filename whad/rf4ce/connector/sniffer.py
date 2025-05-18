@@ -1,3 +1,9 @@
+import logging
+from typing import Generator
+from time import time
+
+from scapy.packet import Packet
+
 from whad.rf4ce.connector import RF4CE
 from whad.rf4ce.sniffing import SnifferConfiguration
 from whad.rf4ce.crypto import RF4CEDecryptor, RF4CEKeyDerivation
@@ -10,7 +16,7 @@ from whad.common.sniffing import EventsManager
 from whad.hub.dot15d4 import RawPduReceived, PduReceived
 from whad.hub.message import AbstractPacket
 from whad.exceptions import WhadDeviceDisconnected
-import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +134,14 @@ class Sniffer(RF4CE, EventsManager):
                 pass
         return packet
 
-    def sniff(self):
+    def sniff(self, timeout: float = None) -> Generator[Packet, None, None]:
+        """Sniff RF4CE packets out of thin air.
+
+        :param timeout: Number of seconds after which sniffing will stop. Wait
+                        forever if set to `None`.
+        :type timeout: float
+        """
+        start = time()
         try:
             while True:
                 if self.support_raw_pdu():
@@ -139,10 +152,14 @@ class Sniffer(RF4CE, EventsManager):
                 message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
-                    packet = self.process_packet(packet)
+                    if packet is not None:
+                        packet = self.process_packet(packet)
+                        self.monitor_packet_rx(packet)
+                        yield packet
 
-                    self.monitor_packet_rx(packet)
-
-                    yield packet
+                # Check if timeout has been reached
+                if timeout is not None:
+                    if time() - start >= timeout:
+                        break
         except WhadDeviceDisconnected:
             return

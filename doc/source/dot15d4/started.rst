@@ -28,8 +28,11 @@ channel and sniff packets:
     # Set channel
     sniffer.channel = 11
 
-    # Listen for packets
-    for packet in sniffer.sniff():
+    # Start sniffing
+    sniffer.start()
+
+    # Listen for packets for 30 seconds
+    for packet in sniffer.sniff(timeout=30.0):
         packet.show()
 
 Sending packets
@@ -41,7 +44,7 @@ Sending IEEE 802.15.4 packets is as easy as it sounds, simply use the
 .. code-block:: python
 
     from whad.device import WhadDevice
-    from whad.dot15d4 import Sniffer
+    from whad.dot15d4 import Dot15d4
 
     # Create a compatible device instance
     device = WhadDevice.create("uart0")

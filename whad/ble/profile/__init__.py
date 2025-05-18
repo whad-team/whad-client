@@ -1,20 +1,21 @@
 """This module provides different classes that represent a BLE device and
 allows to interact with it:
 
-* :class:`whad.ble.profile.GenericProfile` is a base class used to register all the ATT attributes, including
-  services, characteristics, characteristic values and descriptors. It is able to
-  inspect any derived class and build the corresponding profile based on properties
-  declared with :class:`whad.ble.profile.service.PrimaryService` and
+* :class:`whad.ble.profile.GenericProfile` is a base class used to register all
+  the ATT attributes, including services, characteristics, characteristic values
+  and descriptors. It is able to inspect any derived class and build the
+  corresponding profile based on properties declared with
+  :class:`whad.ble.profile.service.PrimaryService` and
   :class:`whad.ble.profile.characteristic.Characteristic`.
 
 """
 import json
+import logging
 from typing import List, Iterator
-from whad.ble.stack.smp import Pairing
+
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,\
     CharacteristicProperties, ClientCharacteristicConfig, \
-    CharacteristicValue as BleCharacteristicValue, \
     CharacteristicDescriptor as BleCharacteristicDescriptor, \
     ReportReferenceDescriptor as BleReportReferenceDescriptor, \
     CharacteristicUserDescriptionDescriptor as BleCharacteristicUserDescriptionDescriptor
@@ -23,40 +24,44 @@ from whad.ble.profile.service import PrimaryService as BlePrimaryService, \
     SecondaryService as BleSecondaryService, IncludeService as BleIncludeService, \
     Service
 from whad.ble.exceptions import InvalidHandleValueException
-from whad.ble.stack.att.constants import BleAttProperties, SecurityProperty, \
-    SecurityAccess, ReadAccess, WriteAccess, Authentication, Authorization, Encryption
+from whad.ble.stack.att.constants import SecurityAccess
 
-import logging
 logger = logging.getLogger(__name__)
 
 ###################################
 # Decorators for GenericProfile
 ###################################
 
-class CharacteristicHook(object):
+class CharacteristicHook:
+    """Characteristic hook decorator.
+
+    This class defines the base hook decorator class and must be inherited.
+    """
 
     def __init__(self, *args):
         if len(args) == 1:
             characteristic = args[0]
             if isinstance(characteristic, Characteristic):
-                self.__characteristic = str(characteristic.service.uuid)+':'+str(characteristic.uuid)
+                self.__characteristic = f"{characteristic.service.uuid}:{characteristic.uuid}"
             else:
                 raise TypeError
         elif len(args) == 2:
             service = args[0]
             charac = args[1]
             if isinstance(service, str) and isinstance(charac, str):
-                self.__characteristic = str(UUID(service)) + ':' + str(UUID(charac))
+                self.__characteristic = f"{UUID(service)}:{UUID(charac)}"
             elif isinstance(service, UUID) and isinstance(charac, UUID):
-                self.__characteristic = str(service) + ':' + str(charac)
+                self.__characteristic = f"{service}:{charac}"
 
     def __call__(self, method):
-        if not hasattr(method, 'hooks'):
+        if not hasattr(method, "hooks"):
             method.hooks = []
-        if not hasattr(method, 'characteristic'):
+        if not hasattr(method, "characteristic"):
             method.characteristic = self.__characteristic
         return method
 
+# Decorator name does not start with a capital letter for ease of use
+# pylint: disable-next=invalid-name
 class read(CharacteristicHook):
     """Read hook decorator
 
@@ -68,55 +73,85 @@ class read(CharacteristicHook):
         """Add a specific hook to the method
         """
         super().__call__(method)
-        if 'read' not in method.hooks:
+        if "read" not in method.hooks:
             method.hooks.append('read')
         return method
 
+# Decorator name does not start with a capital letter for ease of use
+# pylint: disable-next=invalid-name
 class write(CharacteristicHook):
+    """Write hook decorator
+
+    This decorator is used to declare a callback method for write operations
+    on a specific characteristic. This callback will be called **before** the
+    write operation happens.
+    """
 
     def __call__(self, method):
         """Add a specific hook to the method
         """
         super().__call__(method)
-        if 'write' not in method.hooks:
+        if "write" not in method.hooks:
             method.hooks.append('write')
         return method
 
+# Decorator name does not start with a capital letter for ease of use
+# pylint: disable-next=invalid-name
 class written(CharacteristicHook):
+    """Written hook decorator
+
+    This decorator is used to declare a callback method for write operations
+    on a specific characteristic. This callback will be called **after** the
+    write operation happens.
+    """
 
     def __call__(self, method):
         """Add a specific hook to the method
         """
         super().__call__(method)
-        if 'written' not in method.hooks:
-            method.hooks.append('written')
+        if "written" not in method.hooks:
+            method.hooks.append("written")
         return method
 
+# Decorator name does not start with a capital letter for ease of use
+# pylint: disable-next=invalid-name
 class subscribed(CharacteristicHook):
+    """Subscribe hook decorator
+
+    This decorator is used to declare a callback method for subscribe operations
+    on a specific characteristic.
+    """
 
     def __call__(self, method):
         """Add a specific hook to the method
         """
         super().__call__(method)
-        if 'sub' not in method.hooks:
-            method.hooks.append('sub')
+        if "sub" not in method.hooks:
+            method.hooks.append("sub")
         return method
 
+# Decorator name does not start with a capital letter for ease of use
+# pylint: disable-next=invalid-name
 class unsubscribed(CharacteristicHook):
+    """Unsubscribe hook decorator
+
+    This decorator is used to declare a callback method for unsubscribe operations
+    on a specific characteristic.
+    """
 
     def __call__(self, method):
         """Add a specific hook to the method
         """
         super().__call__(method)
-        if 'unsub' not in method.hooks:
-            method.hooks.append('unsub')
+        if "unsub" not in method.hooks:
+            method.hooks.append("unsub")
         return method
 
 def is_method_hook(method):
     """Determine if a method is a characteristic operation hook
     """
-    if hasattr(method, 'hooks') and hasattr(method, 'characteristic'):
-        return (len(method.hooks) > 0)
+    if hasattr(method, "hooks") and hasattr(method, "characteristic"):
+        return len(method.hooks) > 0
     return False
 
 ################################
@@ -128,11 +163,12 @@ def is_method_hook(method):
 # instance with the corresponding properties and objects.
 ################################
 
-class CharacteristicDescriptor(object):
+class CharacteristicDescriptor:
     """Generic CharacteristicDescriptor model
     """
+
     def __init__(self, bleclass=None):
-        """Instanciate a characteristic descriptor model
+        """Instantiate a characteristic descriptor model
 
         :param str name: attribute name to access this descriptor
         :param class bleclass: BLE descriptor class to use when instanciating the model
@@ -142,35 +178,37 @@ class CharacteristicDescriptor(object):
         self.__class = bleclass
 
     @property
-    def handle(self):
+    def handle(self) -> int:
+        """Descriptor handle value
+        """
         return self.__handle
 
     @handle.setter
-    def handle(self, value):
+    def handle(self, value: int):
+        """Set descriptor handle value
+        """
         self.__handle = value
 
     @property
     def bleclass(self):
+        """BLE descriptor class used for instanciation
+        """
         return self.__class
 
 
 class ReportReferenceDescriptor(CharacteristicDescriptor):
     """Report Reference Descriptor model
+
+    TODO: does it require specific permissions to be set ?
     """
-    def __init__(self, permissions=None):
+    def __init__(self):
         super().__init__(BleReportReferenceDescriptor)
 
-class UserDescriptionDescriptor(CharacteristicDescriptor):
-    """User description model
-    """
-    def __init__(self, description=''):
-        super().__init__(BleCharacteristicUserDescriptionDescriptor)
-
-
-class Characteristic(object):
+class Characteristic:
     """GATT characteristic.
     """
-    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False, indicate=False, description=None, security = [], **kwargs):
+    def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False,
+                 indicate=False, description=None, security: list = None, **kwargs):
         """Declares a GATT characteristic.
 
         Other named arguments are used to declare characteristic's descriptors.
@@ -179,7 +217,8 @@ class Characteristic(object):
         :type   name:           str
         :param  uuid:           Characteristic UUID
         :type   uuid:           :class:`whad.ble.profile.attribute.UUID`
-        :param  permissions:    List of permissions for this characteristic (*read*, *write*, *notify*, *indicate*)
+        :param  permissions:    List of permissions for this characteristic (*read*,
+                                *write*, *notify*, *indicate*)
         :type   permissions:    list
         :param  notify:         Enable notifications
         :type   notify:         bool
@@ -197,15 +236,15 @@ class Characteristic(object):
         self.__perms = permissions
         self.__notify = notify
         self.__indicate = indicate
-        self.__security = SecurityAccess.generate(security)
+        self.__security = SecurityAccess.generate(security if security is not None else [])
         self.__service = None
         self.__description = description
         self.__descriptors = []
 
         # Loop on kwargs to find descriptors
-        for arg in kwargs:
-            if isinstance(kwargs[arg], CharacteristicDescriptor):
-                descriptor = kwargs[arg]
+        for arg, argval in kwargs.items():
+            if isinstance(argval, CharacteristicDescriptor):
+                descriptor = argval
                 descriptor.handle = 0
                 descriptor.name = arg
                 self.add_descriptor(descriptor)
@@ -227,8 +266,7 @@ class Characteristic(object):
 
         This method will yield every descriptor attached to the characteristic.
         """
-        for descriptor in self.__descriptors:
-            yield descriptor
+        yield from self.__descriptors
 
     def get_required_handles(self) -> int:
         """Compute the number of handles this characteristic will consume
@@ -269,7 +307,7 @@ class Characteristic(object):
     def end_handle(self) -> int:
         """Characteristic end handle (including characteristic value and descriptors).
         """
-        return self.handle + self.get_required_handles()
+        return self.handle + self.get_required_handles() - 1
 
     @property
     def name(self) -> str:
@@ -288,11 +326,13 @@ class Characteristic(object):
 
     @property
     def uuid(self):
+        """Characteristic UUID
+        """
         return self.__uuid
 
     @property
     def value(self) -> UUID:
-        """Characteristic UUID
+        """Characteristic value UUID
         """
         return self.__value
 
@@ -332,12 +372,14 @@ class Characteristic(object):
         """
         return self.__security
 
-class ServiceModel(object):
+class ServiceModel:
+    """Bluetooth Low Energy service model used to describe a GATT service.
+    """
 
     PRIMARY = 1
     SECONDARY = 2
 
-    def __init__(self, uuid=None, start_handle=None, end_handle=None, name=None, service_type=PRIMARY, **kwargs):
+    def __init__(self, uuid=None, start_handle=None, end_handle=None, name=None, **kwargs):
         self.__handle = 0
         self.__end_handle = 0
         self.__uuid = uuid
@@ -356,9 +398,9 @@ class ServiceModel(object):
             self.__end_handle = end_handle
 
         # Loop on kwargs to find characteristics and included services
-        for arg in kwargs:
-            if isinstance(kwargs[arg], Characteristic):
-                charac = kwargs[arg]
+        for arg, argval in kwargs.items():
+            if isinstance(argval, Characteristic):
+                charac = argval
                 charac.handle = 0
                 charac.name = arg
                 self.add_characteristic(charac)
@@ -367,9 +409,9 @@ class ServiceModel(object):
                 # Add characteristic to a property to this ServiceModel instance
                 if not hasattr(self, arg):
                     setattr(self, arg, charac)
-            elif isinstance(kwargs[arg], SecondaryService):
+            elif isinstance(argval, SecondaryService):
                 # We must include this secondary service in this service
-                service = kwargs[arg]
+                service = argval
                 self.add_included_service(service)
 
                 # Add included service to a property to this ServiceModel instance
@@ -380,12 +422,11 @@ class ServiceModel(object):
     def add_characteristic(self, characteristic_model):
         """Add a characteristic to the model
         """
-        # Add characteristic to the list of our characteristics
+        # Add characteristic to the list of our characteristics
         self.__characteristics.append(characteristic_model)
 
-        # Update end handle value (include definition is a single attribute)
-        if characteristic_model.handle >= self.__end_handle:
-            self.__end_handle = characteristic_model.handle
+        # Update end handle value (include definition is a single attribute)
+        self.__end_handle = max(self.__end_handle, characteristic_model.end_handle)
 
     def add_included_service(self, service_model):
         """Add an included service to the model
@@ -393,83 +434,71 @@ class ServiceModel(object):
         self.__included_services.append(service_model)
 
         # Update end handle value
-        if service_model.end >= self.__end_handle:
-            self.__end_handle = service_model.end
+        self.__end_handle = max(self.__end_handle, service_model.end)
 
     @property
-    def uuid(self):
+    def uuid(self) -> UUID:
+        """Service UUID
+        """
         return self.__uuid
 
     @property
-    def handle(self):
+    def handle(self) -> int:
+        """Handle value
+        """
         return self.__handle
 
     @property
-    def end(self):
+    def end(self) -> int:
+        """End handle value
+        """
         return self.__end_handle
 
     @property
-    def name(self):
+    def name(self) -> str:
+        """Service name
+        """
         return self.__name
 
     @name.setter
-    def name(self, value):
+    def name(self, value: str):
+        """Set service name
+        """
         self.__name = value
 
     @handle.setter
-    def handle(self, value):
+    def handle(self, value: int):
+        """Set service handle value
+        """
         self.__handle = value
 
-    def characteristics(self):
-        for charac in self.__characteristics:
-            yield charac
+    def characteristics(self) -> Iterator[Characteristic]:
+        """Enumerate characteristics
+        """
+        yield from self.__characteristics
 
     def included_services(self):
-        for inc_service in self.__included_services:
-            yield inc_service
+        """Enumerate services
+        """
+        yield from self.__included_services
+
 
 class PrimaryService(ServiceModel):
-    def __init__(self, uuid=None, start_handle=0, end_handle=0, name=None, **kwargs):
-        """Declares a GATT primary service.
-
-        Other named arguments are used to add service's characteristics.
-
-        :param  uuid:           Primary service UUID
-        :type   uuid:           :class:`whad.ble.profile.attribute.UUID`
-        :param  start_handle:   Service start handle
-        :type   start_handle:   int, optional
-        :param  end_handle:     Service end handle
-        :type   end_handle:     int, optional
-        :param  name:           Service name
-        :type   name:           str
-        """
-        super().__init__(uuid, start_handle, end_handle, service_type=ServiceModel.PRIMARY, name=name, **kwargs)
+    """Primary service model.
+    """
 
 
 class SecondaryService(ServiceModel):
-    def __init__(self, uuid=None, start_handle=0, end_handle=0, name=None, **kwargs):
-        """Declares a GATT secondary service.
-
-        Other named arguments are used to add service's characteristics.
-
-        :param  uuid:           Primary service UUID
-        :type   uuid:           :class:`whad.ble.profile.attribute.UUID`
-        :param  start_handle:   Service start handle
-        :type   start_handle:   int, optional
-        :param  end_handle:     Service end handle
-        :type   end_handle:     int, optional
-        :param  name:           Service name
-        :type   name:           str
-        """
-        super().__init__(uuid, start_handle, end_handle, service_type=ServiceModel.SECONDARY, name=name, **kwargs)
+    """Secondary service model.
+    """
 
 
-class GenericProfile(object):
+class GenericProfile:
     """Generic Profile
     """
 
     def __init__(self, start_handle=0, from_json=None):
-        """Parse the device model, instanciate all the services, characteristics
+        """Parse the device model, instantiate all the services, characteristics
         and descriptors, compute all handle values and registers everything
         inside this instance for further use.
 
@@ -496,8 +525,6 @@ class GenericProfile(object):
                 # Loop on services
                 for service in from_json['services']:
                     # Collect characteristics
-                    service_characs = []
-                    service_last_handle = service['start_handle']
                     if UUID(service['type_uuid']) == UUID(0x2800):
                         service_obj = BlePrimaryService(
                             uuid=UUID(service['uuid']),
@@ -515,23 +542,33 @@ class GenericProfile(object):
 
                     if 'characteristics' in service:
                         for charac in service['characteristics']:
+                            # Load characteristic data (if provided)
+                            charac_data = b''
+                            if 'data' in charac['value']:
+                                charac_data = bytes.fromhex(charac['value']['data'])
+                            
+                            # Create characteristic model
                             charac_obj = BleCharacteristic(
                                 uuid=UUID(charac['value']['uuid']),
                                 handle=charac['handle'],
-                                value=b'',
+                                value=charac_data,
                                 properties=charac['properties'],
                                 security=SecurityAccess.int_to_accesses(charac['security'])
                             )
 
-                            # Loop on descriptors, only support CCC at the moment
+                            # Loop on descriptors for the current characteristic
                             for desc in charac['descriptors']:
-                                if UUID(desc['uuid']) == UUID(0x2902):
-                                    desc_obj = ClientCharacteristicConfig(
-                                        charac_obj,
-                                        handle=desc['handle'],
-                                        notify=charac_obj.must_notify(),
-                                        indicate=charac_obj.must_indicate()
-                                    )
+                                # Try to convert this descriptor to an instance
+                                # of one of our supported descriptors
+                                desc_obj = BleCharacteristicDescriptor.from_uuid(
+                                    charac_obj,
+                                    handle=desc['handle'],
+                                    uuid=UUID(desc['uuid']),
+                                    value=bytes.fromhex(desc['value']) if 'value' in desc else b''
+                                )
+
+                                # Add descriptor
+                                if desc_obj is not None:
                                     charac_obj.add_descriptor(desc_obj)
                                     self.register_attribute(desc_obj)
 
@@ -555,12 +592,11 @@ class GenericProfile(object):
                         service.name = prop
                         services.append(service)
 
-
-            # Instanciate each service, and for each of them the corresponding
+            # Instantiate each service, and for each of them the corresponding
             # characteristics
             for service in services:
                 if isinstance(service, PrimaryService):
-                    logger.info('creating primary service %s' % service.uuid)
+                    logger.info("creating primary service %s", service.uuid)
                     # Create service
                     service_obj = BlePrimaryService(
                         uuid=service.uuid,
@@ -568,7 +604,7 @@ class GenericProfile(object):
                     )
 
                 elif isinstance(service, SecondaryService):
-                    logger.info('creating secondary service %s' % service.uuid)
+                    logger.info("creating secondary service %s", service.uuid)
                     # Create service
                     service_obj = BleSecondaryService(
                         uuid=service.uuid,
@@ -615,9 +651,9 @@ class GenericProfile(object):
                         properties=charac_props,
                         security=charac.security
                     )
-                    logger.info(' creating characteristic %s (handle:%d)' % (
+                    logger.info(" creating characteristic %s (handle:%d)",
                         charac_obj.uuid, charac_obj.handle
-                    ))
+                    )
                     self.__handle = charac_obj.end_handle
 
                     # Register this characteristic
@@ -632,9 +668,7 @@ class GenericProfile(object):
                             notify=charac.must_notify,
                             indicate=charac.must_indicate
                         )
-                        logger.info('  creating cccd (handle:%d)' % (
-                            ccc_desc.handle
-                        ))
+                        logger.info("  creating cccd (handle:%d)", ccc_desc.handle)
                         charac_obj.add_descriptor(ccc_desc)
                         self.register_attribute(ccc_desc)
 
@@ -645,24 +679,30 @@ class GenericProfile(object):
                             handle=self.__alloc_handle(),
                             description=charac.description
                         )
-                        logger.info('  creating cudd (handle:%d) with text "%s"' % (
+                        logger.info("  creating cudd (handle:%d) with text \"%s\"",
                             cudd_desc.handle,
                             charac.description
-                        ))
+                        )
                         charac_obj.add_descriptor(cudd_desc)
                         self.register_attribute(cudd_desc)
 
 
-                    # Loop on other characteristic descriptors and add them
+                    # Loop on other characteristic descriptors and add them,
+                    # if different from CUDD and CCCD.
                     for descriptor in charac.descriptors():
+                        # Exclude CCCD
+                        if descriptor.uuid == UUID(0x2902):
+                            continue
+
+                        # Add descriptor
                         desc = descriptor.bleclass(
                             charac_obj,
                             handle=self.__alloc_handle()
                         )
-                        logger.info('  creating %s descriptor (handle:%d)' % (
+                        logger.info("  creating %s descriptor (handle:%d)",
                             type(desc),
                             desc.handle
-                        ))
+                        )
                         charac_obj.add_descriptor(desc)
                         self.register_attribute(desc)
 
@@ -676,9 +716,9 @@ class GenericProfile(object):
             for inc_service in self.included_services():
                 # Retrieve the included service UUID
                 service_uuid = inc_service.service_uuid
-                
+
                 # Retrieve the corresponding object by UUID
-                service_obj = self.get_service_by_UUID(service_uuid)
+                service_obj = self.get_service_by_uuid(service_uuid)
 
                 # If found, update start and end handles
                 if service_obj is not None:
@@ -713,14 +753,18 @@ class GenericProfile(object):
     def __repr__(self):
         output = ''
         for service in self.services():
-            output += 'Service %s (handles from %d to %d):\n' % (
-                service.uuid,
-                service.handle,
-                service.end_handle
+            output += (
+                f"Service {service.uuid} (handles from {service.handle:d} to "
+                f"{service.end_handle:d}):\n"
             )
 
             for inc_service in service.included_services():
-                output += '  Included service %s (handle:%d, start_handle:%d, end_handle:%d)\n' % (inc_service.service_uuid, inc_service.handle, inc_service.service_start_handle, inc_service.service_end_handle)
+                output += (
+                    f"  Included service {inc_service.service_uuid} "
+                    f"(handle:{inc_service.handle:d}, "
+                    f"start_handle:{inc_service.service_start_handle:d}, "
+                    f"end_handle:{inc_service.service_end_handle:d})\n"
+                )
             for charac in service.characteristics():
                 properties = charac.properties
                 charac_rights = ''
@@ -733,17 +777,13 @@ class GenericProfile(object):
                 if properties & CharacteristicProperties.NOTIFY != 0:
                     charac_rights += 'N'
 
-                output += '  Characteristic %s (handle:%d, value handle: %d, props: %s)\n' % (
-                    charac.uuid,
-                    charac.handle,
-                    charac.value_handle,
-                    charac_rights
+                output += (
+                    f"  Characteristic {charac.uuid} (handle:{charac.handle:d}, "
+                    f"value handle: {charac.value_handle:d}, "
+                    f"props: {charac_rights})\n"
                 )
                 for desc in charac.descriptors():
-                    output += '    Descriptor %s (handle: %d)\n' % (
-                        desc.type_uuid,
-                        desc.handle
-                    )
+                    output += f"    Descriptor {desc.type_uuid} (handle: {desc.handle:d})\n"
         return output
 
     def register_attribute(self, attribute):
@@ -764,7 +804,7 @@ class GenericProfile(object):
         :param  handles_only:   Add only service handles if set to ``True``
         :type   handles_only:   bool
         """
-        logger.debug('add service %s' % service.uuid)
+        logger.debug("add service %s", service.uuid)
         if service.handle == 0:
             # Service has not been fully configured, update its handle
             # and the handles of its characteristics and descriptors.
@@ -802,10 +842,10 @@ class GenericProfile(object):
         :param  handles_only:   Remove only handles if set to ``True``
         :type   handles_only:   bool
         """
-        if isinstance(service, BlePrimaryService) or isinstance(service, BleSecondaryService):
-            service_obj = self.get_service_by_UUID(service.uuid)
+        if isinstance(service, (BlePrimaryService, BleSecondaryService)):
+            service_obj = self.get_service_by_uuid(service.uuid)
         elif isinstance(service, UUID):
-            service_obj = self.get_service_by_UUID(service)
+            service_obj = self.get_service_by_uuid(service)
         else:
             service_obj = None
 
@@ -865,7 +905,7 @@ class GenericProfile(object):
                 handle = remaining_service.end_handle
             self.__handle = handle
             return True
-        except IndexError as notfound:
+        except IndexError:
             return False
 
     def find_object_by_handle(self, handle) -> Attribute:
@@ -879,8 +919,9 @@ class GenericProfile(object):
         """
         if handle in self.__attr_db:
             return self.__attr_db[handle]
-        else:
-            raise IndexError
+
+        # Error.
+        raise IndexError
 
     def find_objects_by_range(self, start, end) -> List[Attribute]:
         """Find attributes with handles belonging in the [start, end+1] interval.
@@ -894,7 +935,7 @@ class GenericProfile(object):
         """
         handles = []
         for handle in self.__attr_db:
-            if handle>=start and handle<=end:
+            if start <= handle <= end:
                 handles.append(handle)
         handles.sort()
         return [self.find_object_by_handle(handle) for handle in handles]
@@ -912,9 +953,10 @@ class GenericProfile(object):
             char_value = self.find_object_by_handle(value_handle)
             if char_value is not None and hasattr(char_value, 'characteristic'):
                 return char_value.characteristic
-            else:
-                return None
-        except InvalidHandleValueException as bad_handle:
+
+            # Not found.
+            return None
+        except InvalidHandleValueException:
             return None
 
 
@@ -941,8 +983,8 @@ class GenericProfile(object):
             idx = service_char_handles.index(handle)
             if idx == len(service_char_handles) - 1:
                 return service.end_handle
-            else:
-                return (service_char_handles[idx+1] - 1)
+
+            return service_char_handles[idx+1] - 1
 
         except InvalidHandleValueException:
             return None
@@ -962,10 +1004,11 @@ class GenericProfile(object):
         try:
             if handle in self.__service_by_characteristic_handle:
                 return self.__service_by_characteristic_handle[handle]
-            else:
-                raise InvalidHandleValueException
-        except IndexError:
+
+            # Invalid handle
             raise InvalidHandleValueException
+        except IndexError as err:
+            raise InvalidHandleValueException from err
 
 
     def services(self) -> Iterator[Service]:
@@ -974,18 +1017,18 @@ class GenericProfile(object):
         This method is a generator and will yield service objects registered
         into the profile.
         """
-        for handle in self.__attr_db:
-            object = self.__attr_db[handle]
-            if isinstance(object, BlePrimaryService) or isinstance(object, BleSecondaryService):
-                yield object
+        for _, obj in self.__attr_db.items():
+            if isinstance(obj, (BlePrimaryService, BleSecondaryService)):
+                yield obj
 
     def included_services(self) -> Iterator[BleIncludeService]:
-        for handle in self.__attr_db:
-            object = self.__attr_db[handle]
-            if isinstance(object, BleIncludeService):
-                yield object
+        """Enumerate included services.
+        """
+        for _, obj in self.__attr_db.items():
+            if isinstance(obj, BleIncludeService):
+                yield obj
 
-    def get_service_by_UUID(self, service_uuid: UUID):
+    def get_service_by_uuid(self, service_uuid: UUID):
         """Get a service by its UUID.
 
         :param      service_uuid:   Service UUID to look for
@@ -993,16 +1036,15 @@ class GenericProfile(object):
         :return:    Service if found, ``None`` otherwise
         :rtype:     :class:`whad.ble.profile.service.Service`
         """
-        for handle in self.__attr_db:
-            object = self.__attr_db[handle]
-            if isinstance(object, BlePrimaryService) or isinstance(object, BleSecondaryService):
-                if object.uuid == service_uuid:
-                    return object
+        for _, obj in self.__attr_db.items():
+            if isinstance(obj, (BlePrimaryService, BleSecondaryService)):
+                if obj.uuid == service_uuid:
+                    return obj
 
         # Not found
         return None
 
-    def get_characteristic_by_UUID(self, charac_uuid: UUID):
+    def get_characteristic_by_uuid(self, charac_uuid: UUID):
         """Get characteristic by its UUID.
 
         :param      charac_uuid:   Characteristic UUID to look for
@@ -1010,11 +1052,13 @@ class GenericProfile(object):
         :return:    Characteristic if found, ``None`` otherwise
         :rtype:     :class:`whad.ble.profile.characteristic.Characteristic`
         """
-        for handle in self.__attr_db:
-            object = self.__attr_db[handle]
-            if isinstance(object, BleCharacteristic):
-                if object.uuid == charac_uuid:
-                    return object
+        for _, obj in self.__attr_db.items():
+            if isinstance(obj, BleCharacteristic):
+                if obj.uuid == charac_uuid:
+                    return obj
+
+        # Not found
+        return None
 
 
     def attr_by_type_uuid(self, uuid, start=1, end=0xFFFF) -> Iterator[Attribute]:
@@ -1027,10 +1071,9 @@ class GenericProfile(object):
         :param  end:    End handle
         :type   end:    int
         """
-        for handle in self.__attr_db:
-            object = self.__attr_db[handle]
-            if object.type_uuid == uuid and object.handle >= start and object.handle <= end:
-                yield object
+        for _, obj in self.__attr_db.items():
+            if obj.type_uuid == uuid and start <= obj.handle <= end:
+                yield obj
 
     def export_json(self):
         """Export profile as JSON data, including services, characteristics and descriptors
@@ -1058,13 +1101,15 @@ class GenericProfile(object):
                     'value': {
                         'handle': charac.value_handle,
                         'uuid': str(charac.uuid),
+                        'data': charac.value.hex()
                     }
                 }
                 charac_dict['descriptors'] = []
                 for desc in charac.descriptors():
                     desc_dict = {
                         'handle': desc.handle,
-                        'uuid': str(desc.type_uuid)
+                        'uuid': str(desc.type_uuid),
+                        'value': desc.value.hex()
                     }
                     charac_dict['descriptors'].append(desc_dict)
                 service_dict['characteristics'].append(charac_dict)
@@ -1104,7 +1149,6 @@ class GenericProfile(object):
         :param  conn_handle:    Connection handle
         :type   conn_handle:    int
         """
-        pass
 
     def on_disconnect(self, conn_handle):
         """Disconnection hook.
@@ -1114,7 +1158,6 @@ class GenericProfile(object):
         :param  conn_handle:    Connection handle
         :type   conn_handle:    int
         """
-        pass
 
 
     ################################################
@@ -1150,7 +1193,8 @@ class GenericProfile(object):
         # If no hook registered, then return the characteristic value
         return characteristic.value[offset:offset + length]
 
-    def on_characteristic_write(self, service, characteristic, offset=0, value=b'', without_response=False):
+    def on_characteristic_write(self, service, characteristic, offset=0, value=b'',
+                                without_response=False):
         """Characteristic write hook
 
         This hook is called whenever a charactertistic is about to be written by a GATT
@@ -1175,7 +1219,11 @@ class GenericProfile(object):
                 without_response=without_response
             )
 
-    def on_characteristic_written(self, service, characteristic, offset=0, value=b'', without_response=False):
+        # No action
+        return None
+
+    def on_characteristic_written(self, service, characteristic, offset=0, value=b'',
+                                  without_response=False):
         """Characteristic written hook
 
         This hook is called whenever a charactertistic has been written by a GATT
@@ -1202,7 +1250,11 @@ class GenericProfile(object):
                 without_response=without_response
             )
 
-    def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
+        # No action
+        return None
+
+    def on_characteristic_subscribed(self, service, characteristic, notification=False,
+                                     indication=False):
         """Characteristic subscribed hook
 
         This hook is called whenever a characteristic has been subscribed to.
@@ -1225,6 +1277,9 @@ class GenericProfile(object):
                 indication=indication
             )
 
+        # No action
+        return None
+
     def on_characteristic_unsubscribed(self, service, characteristic):
         """Characteristic unsubscribed hook
 
@@ -1241,6 +1296,9 @@ class GenericProfile(object):
             # Call our hook
             return hook()
 
+        # No action
+        return None
+
     def on_notification(self, service, characteristic, value):
         """Characteristic notification hook.
 
@@ -1253,7 +1311,6 @@ class GenericProfile(object):
         :param  value:              Characteristic value
         :type   value:              bytes
         """
-        pass
 
     def on_indication(self, service, characteristic, value):
         """Characteristic indication hook.
@@ -1267,4 +1324,10 @@ class GenericProfile(object):
         :param  value:              Characteristic value
         :type   value:              bytes
         """
-        pass
+
+    def on_mtu_changed(self, mtu: int):
+        """MTU change callback
+
+        :param  mtu: New MTU value
+        :type   mtu: int
+        """

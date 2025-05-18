@@ -11,6 +11,7 @@ from whad.hub.message import HubMessage, pb_bind
 from whad.hub import ProtocolHub
 from whad.hub.metadata import Metadata
 from whad.scapy.layers.phy import Phy_Packet_Hdr
+
 class Commands:
     """PHY Commands
     """

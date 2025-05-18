@@ -1,14 +1,22 @@
+import logging
 from typing import Union, Tuple
 
+# packaging
+from packaging.version import Version
+
 # Scapy imports
+from scapy.packet import Packet, Raw
 from scapy.compat import raw
 from scapy.config import conf
 from scapy.layers.dot15d4 import Dot15d4 as Dot15d4NoFCS
 from scapy.layers.dot15d4 import Dot15d4FCS
+
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr
 from whad.hub.dot15d4 import Dot15d4Metadata
 # Main whad imports
+from whad.scapy.layers.dot15d4tap import Dot15d4Raw
 from whad.hub.discovery import Domain, Capability
+from whad.cli.app import CommandLineApp
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
@@ -20,6 +28,7 @@ from whad.hub.dot15d4 import NodeAddress, Commands, NodeAddressType, PduReceived
     RawPduReceived, EnergyDetectionSample
 from whad.hub.events import JammedEvt
 
+logger = logging.getLogger(__name__)
 
 class Dot15d4(WhadDeviceConnector):
     """
@@ -46,6 +55,27 @@ class Dot15d4(WhadDeviceConnector):
         # Open device and make sure it is compatible
         self.device.open()
         self.device.discover()
+
+        # Display a warning message if ButteRFly version is less than 1.1.0 as
+        # a critical bug has been found and fixed in version 1.1.0. FCS values
+        # will be wrong if using a version prior to 1.1.0.
+        if device.info.fw_url == "https://github.com/whad-team/butterfly":
+            if Version(device.info.version_str) < Version("1.1.0"):
+                message = ((
+                    "You are using a ButteRFly version prior to 1.1.0 that does not correctly compute FCS values, "
+                    "this will result in invalid FCS values in packets and PCAP files that may cause errors when "
+                    "used with other WHAD tools. Please consider upgrading firmware to the latest version "
+                    "(see https://github.com/whad-team/butterfly). "
+                    "You can also use `winstall --flash butterfly` to reprogram your USB dongle."
+                ))
+
+                # Use application warning method if available
+                app = CommandLineApp.get_instance()
+                if app is not None:
+                    app.warning(message)
+                else:
+                    # If not available, use basic logging capabilities
+                    logger.warning(message)
 
         # Check if device supports 802.15.4
         if not self.device.has_domain(Domain.Dot15d4):
@@ -199,7 +229,7 @@ class Dot15d4(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def send(self, pdu, channel:int = 11) -> bool:
+    def send(self, pdu: Union[Packet, bytes, Dot15d4NoFCS, Dot15d4FCS], channel:int = 11) -> bool:
         """
         Send 802.15.4 packets (on a single channel).
 
@@ -214,19 +244,26 @@ class Dot15d4(WhadDeviceConnector):
             metadata = Dot15d4Metadata()
             metadata.raw = False
             metadata.channel = channel
+
+            # If PDU is provided as bytes, wrap it into a Raw packet
+            if isinstance(pdu, bytes):
+                pdu = Raw(pdu)
+
             if self.support_raw_pdu():
                 metadata.raw = True
 
                 if Dot15d4FCS not in pdu:
+                    # Compute FCS if required by the hardware
                     packet = Dot15d4FCS(raw(pdu) + Dot15d4FCS().compute_fcs(raw(pdu)))
                 else:
                     packet = pdu
 
             elif Dot15d4FCS in pdu:
+                # Remove FCS if hardware cannot set it
                 packet = Dot15d4NoFCS(raw(pdu)[:-2])
             else:
                 packet = pdu
-            
+
             if hasattr(packet, "reserved"):
                 packet.reserved = packet.reserved
 
@@ -238,24 +275,53 @@ class Dot15d4(WhadDeviceConnector):
             return False
 
 
-    def send_mac(self, pdu, channel=11, add_fcs=False):
+    def send_mac(self, pdu: bytes, channel: int = 11, add_fcs: bool = False):
+        """
+        Send raw 802.15.4 packets (on a single channel).
+
+        :param pdu: 802.15.4 packet to send
+        :type pdu: bytes
+        :param channel: Channel on which the packet has to be sent
+        :type channel: int
+        :param add_fcs: Add FCS field if set to `True`
+        :type add_fcs: bool
+        :return: `True` if packet has been correctly sent, `False` otherwise.
+        :rtype: bool
+        """
         if self.can_send():
-            if add_fcs:
-                fcs = Dot15d4FCS().compute_fcs(bytes(pdu))
-                pdu += fcs
+            # If raw mode is supported by the hardware, handle FCS value
+            if self.support_raw_pdu():
+                # Enable raw mode
                 raw_mode = True
+
+                # Add FCS if required
+                if add_fcs:
+                    fcs = Dot15d4FCS().compute_fcs(bytes(pdu))
+                    packet = Dot15d4Raw(pdu + fcs)
+                else:
+                    packet = Dot15d4Raw(pdu)
             else:
-                packet = pdu / raw(b'\x00\x00')
+                # Disable raw mode
                 raw_mode = False
+
+                # Cannot add/remove FCS, let hardware generate it
+                logger.debug((
+                    "[dot15d4::send_mac()] cannot add or remove FCS because HW"
+                    "does not support raw packets, rollback to classic 802.15.4"
+                    "frames with valid FCS."
+                ))
+                packet = Dot15d4Raw(pdu)
 
             # Add Dot15d4 metadata
             packet.metadata = Dot15d4Metadata()
             packet.metadata.raw = raw_mode
+            packet.metadata.channel = channel
 
             # Send packet
             return super().send_packet(packet)
-        else:
-            return False
+
+        # Failed at sending packet.
+        return False
 
     def perform_ed_scan(self, channel:int = 11) -> bool:
         """
@@ -294,13 +360,11 @@ class Dot15d4(WhadDeviceConnector):
         """
         Generic message handler.
         """
-        pass
 
     def on_discovery_msg(self, message):
         """
         Discovery message handler.
         """
-        pass
 
     def on_domain_msg(self, domain:str, message):
         """

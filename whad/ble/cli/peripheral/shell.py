@@ -1,18 +1,25 @@
-import re
-import logging
+"""wble-peripheral interactive shell.
+"""
+import json
+from typing import Union, List, Tuple
+from binascii import unhexlify, Error as BinasciiError
+
+# pylint: disable-next=wildcard-import,unused-wildcard-import
+from scapy.layers.bluetooth4LE import *
 
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
-from binascii import unhexlify, Error as BinasciiError
 
-from scapy.layers.bluetooth4LE import *
-
-from whad.ble.exceptions import InvalidHandleValueException
-from whad.ble.utils.validators import InvalidUUIDException
+from whad.ble.exceptions import InvalidHandleValueException, \
+    InvalidUUIDException as AttrInvalidUUIDException
+from whad.ble.utils.validators import validate_attribute_uuid, InvalidUUIDException
 from whad.exceptions import ExternalToolNotFound
 from whad.device import WhadDevice, WhadDeviceConnector
 from whad.ble import Peripheral, GenericProfile, AdvDataFieldList, \
-    AdvCompleteLocalName, AdvShortenedLocalName, AdvFlagsField
+    AdvCompleteLocalName, AdvShortenedLocalName, AdvFlagsField, AdvDataField, \
+    AdvDataFieldListOverflow, AdvManufacturerSpecificData
+from whad.ble.connector.peripheral import PeripheralEventListener, PeripheralEventConnected
+
 from whad.ble.profile.service import PrimaryService
 from whad.ble.profile.characteristic import Characteristic, CharacteristicProperties, \
     ClientCharacteristicConfig, CharacteristicValue
@@ -23,7 +30,6 @@ from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
     InsufficientAuthenticationError, InsufficientAuthorizationError, \
     InsufficientEncryptionKeySize, ReadNotPermittedError, \
     WriteNotPermittedError
-from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.common.monitors import WiresharkMonitor
 
 from whad.cli.shell import InteractiveShell, category
@@ -32,7 +38,7 @@ INTRO='''
 wble-periph, the WHAD Bluetooth Low Energy peripheral utility
 '''
 
-BDADDR_REGEXP = '^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$'
+BDADDR_REGEXP = "^([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}$"
 
 ADRECORDS = {
 }
@@ -42,21 +48,284 @@ def validate_uuid(uuid: str) -> str:
 
     :param uuid: UUID to validate
     :type uuid: str
-    :return-type: str
+    :rtype: str
     :return: Validated UUID
     """
-    # Parse provided UUID
-    if uuid.lower().startswith("0x"):
-        uuid = str(UUID(int(uuid, 16)))
-    else:
-        uuid = str(UUID(uuid))
+    try:
+        # Parse provided UUID
+        if isinstance(uuid, str) and uuid.lower().startswith("0x"):
+            uuid = str(UUID(int(uuid, 16)))
+        else:
+            uuid = str(UUID(uuid))
+    except TypeError as type_err:
+        raise InvalidUUIDException(uuid) from type_err
+    except InvalidUUIDException as uuid_err:
+        raise InvalidUUIDException(uuid) from uuid_err
 
     # Return the normalized UUID
     return uuid
 
+class AdvRecordsManager:
+    """Advertising records manager
+
+    This class manages the advertising data and scan response data of a
+    device in order to optimize them.
+
+    It is a bit limited for now as you may only have one field of each type
+    in the advertising data, however it tries to store as much records as
+    possible in the advertisement data and the scan response data.
+    """
+
+    def __init__(self, adv_data: AdvDataFieldList = None, scan_rsp_data: AdvDataFieldList = None):
+        """Initialize manager
+        """
+        # Load advertising records
+        self.__records = []
+        if adv_data is not None:
+            for r in adv_data:
+                self.__records.append(r)
+        if scan_rsp_data is not None:
+            for r in scan_rsp_data:
+                self.__records.append(r)
+
+        # Save adv_data and scan_rsp_data in case no modification is
+        # requested.
+        self.__tainted = False
+        self.__adv_data = adv_data
+        self.__scan_rsp_data = scan_rsp_data
+
+    @property
+    def adv_data(self):
+        """Return the advertising data (max 31 bytes)
+        """
+        # Pack records if they have been tainted
+        if self.__tainted:
+            self.pack()
+        
+        # Return the advertising data
+        return self.__adv_data
+    
+    @property
+    def scan_rsp_data(self):
+        """Return the scan response data (max 31 bytes)
+        """
+        # Pack records if they have been tainted
+        if self.__tainted:
+            self.pack()
+
+        # Return the scan response data
+        return self.__scan_rsp_data
+
+    @property
+    def complete_name(self) -> str:
+        """Parses current records and return the complete name value, if found.
+
+        :return: Complete local name
+        :rtype: str
+        """
+        cln = self.get_record(AdvCompleteLocalName)
+        if cln is not None:
+            return cln.name.decode("utf-8")
+
+    @complete_name.setter
+    def complete_name(self, value: str):
+        """Update complete name
+        """
+        cln = self.get_record(AdvCompleteLocalName)
+        if cln is not None:
+            old_value = cln.name
+            cln.name = bytes(value, "utf-8")
+            try:
+                self.update_record(cln)
+            except AdvDataFieldListOverflow as overflow:
+                cln.name = old_value
+                self.update_record(cln)
+                raise AdvDataFieldListOverflow() from overflow
+        else:
+            self.add_record(AdvCompleteLocalName(bytes(value, "utf-8")))
+
+    @property
+    def short_name(self) -> str:
+        """Parses current records and return short name value, if found.
+
+        :return: Short name
+        :rtype: str
+        """
+        cln = self.get_record(AdvShortenedLocalName)
+        if cln is not None:
+            return cln.name.decode("utf-8")
+
+    @short_name.setter
+    def short_name(self, value: str):
+        """Update shortened name
+        """
+        cln = self.get_record(AdvShortenedLocalName)
+        if cln is not None:
+            old_value = cln.name
+            try:
+                cln.name = bytes(value, "utf-8")
+                self.update_record(cln)
+            except AdvDataFieldListOverflow as overflow:
+                cln.name = old_value
+                self.update_record(cln)
+                raise AdvDataFieldListOverflow() from overflow
+        else:
+            self.add_record(AdvShortenedLocalName(bytes(value, "utf-8")))
+
+    @property
+    def manufacturer_data(self):
+        """Manufacturer data
+        """
+        cln = self.get_record(AdvManufacturerSpecificData)
+        if cln is not None:
+            return (cln.company, cln.data)
+        
+    @manufacturer_data.setter
+    def manufacturer_data(self, data: Tuple[int, bytes]):
+        if isinstance(data, tuple) and len(data) == 2:
+            comp_id, data = data
+            if isinstance(comp_id, int) and isinstance(data, bytes):
+                cln = self.get_record(AdvManufacturerSpecificData)
+                if cln is not None:
+                    old_id, old_data = cln.company, cln.data
+                    cln.company = comp_id
+                    cln.data = data
+                    try:
+                        self.update_record(cln)
+                    except AdvDataFieldListOverflow as overflow:
+                        cln.company = old_id
+                        cln.data = old_data
+                        self.update_record(cln)
+                        raise AdvDataFieldListOverflow() from overflow
+                else:
+                    self.add_record(AdvManufacturerSpecificData(comp_id, data))
+
+    def __fit_records(self, records: List[AdvDataField], length: int = 31):
+        """Find the records that may best fit in the given space
+        """
+        fitting_records = []
+
+        # Sort records
+        records.sort(key=lambda r: len(r.to_bytes()), reverse=True)
+        
+        # Find the biggest record that may fit in the given space
+        used_space = 0
+        found = True
+        while found:
+            found = False
+            for r in records:
+                if len(r.to_bytes()) <= length:
+                    # Add record
+                    fitting_records.append(r)
+                    used_space += len(r.to_bytes())
+                    length -= len(r.to_bytes())
+                    records.remove(r)
+                    found = True
+                    break
+        
+        # Return the fitting records and the remaining list
+        return (fitting_records, records)
+
+    def pack(self):
+        """Pack records into advertising and scan response data.
+        """
+        # Copy our records array
+        records = [r for r in self.__records]
+
+        # Pack records to fit advertising data
+        adv_records, remaining = self.__fit_records(records, 31)
+
+        # If some records remain, try to pack them into a scan response data
+        if len(remaining) > 0:
+            scan_rsp_records, remaining = self.__fit_records(records, 31)
+        else:
+            scan_rsp_records = None
+
+        # If no remaining records, we're good.
+        if len(remaining) > 0:
+            raise AdvDataFieldListOverflow()
+        else:
+            # Update advertising data and scan
+            self.__adv_data = AdvDataFieldList()
+            for r in adv_records:
+                self.__adv_data.add(r)
+            if scan_rsp_records is not None:
+                self.__scan_rsp_data = AdvDataFieldList()
+                for r in scan_rsp_records:
+                    self.__scan_rsp_data.add(r)
+            
+            # Advertising data and scan response data is up-to-date.
+            self.__tainted = False
+
+    def taint(self):
+        """Mark advertising data as modified
+        """
+        if not self.__tainted:
+            self.__tainted = True
+
+    def get_record(self, record_type) -> AdvDataField:
+        """Find a specific record.
+        """
+        if not self.__tainted:
+            # Look into adv_data
+            for r in self.__adv_data:
+                if isinstance(r, record_type):
+                    return r
+                
+            # Look into scan response data (if any)
+            if self.__scan_rsp_data is not None:
+                for r in self.__scan_rsp_data:
+                    if isinstance(r, record_type):
+                        return r
+        else:
+            # Look in our records
+            for r in self.__records:
+                if isinstance(r, record_type):
+                    return r
+
+        # No record found
+        return None
+    
+    def remove_record(self, record_type) -> bool:
+        """Remove a record of a specific type.
+        """
+        # Find and remove record
+        record = self.get_record(record_type)
+        if record is not None:
+            # Remove record
+            self.__records.remove(record)
+            self.taint()
+
+            # Success
+            return True
+        
+        # Not found
+        return False
+
+    def update_record(self, record: AdvDataField):
+        """Update a specific record.
+        """
+        # Remove record and add it again
+        old_record = self.get_record(record.__class__)
+        self.remove_record(record.__class__)
+        self.add_record(record)
+        
+        # Make sure it fits
+        self.pack()
+
+    def add_record(self, record: AdvDataField) -> bool:
+        """Add a record into the device advertising data, optimize storage.
+        """
+        # Mark as modified
+        self.taint()
+
+        # Add record to our records list
+        self.__records.append(record)
+
 
 class MonitoringProfile(GenericProfile):
-
+    """Peripheral monitoring profile.
+    """
 
     def on_characteristic_read(self, service, characteristic, offset=0, length=0):
         """Characteristic read hook.
@@ -73,49 +342,53 @@ class MonitoringProfile(GenericProfile):
         :param int length: Max read length
         :return: Value to return to the GATT client
         """
-        print_formatted_text(HTML(
-            '<ansigreen>Reading</ansigreen> characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
-                characteristic.uuid,
-                service.uuid
-            )
-        ))
+        print_formatted_text(HTML((
+            f"<ansigreen>Reading</ansigreen> characteristic "
+            f"<ansicyan>{characteristic.uuid}</ansicyan> of service "
+            f"<ansicyan>{service.uuid}</ansicyan>"
+        )))
         if len(characteristic.value) > 0:
-            print_formatted_text(HTML(' <i>%s</i>' % hexdump(characteristic.value, result='return')))
+            print_formatted_text(HTML(
+                f" <i>{hexdump(characteristic.value, result='return')}</i>"
+            ))
         else:
-            print_formatted_text(HTML(' <i>Empty value</i>'))
+            print_formatted_text(HTML(" <i>Empty value</i>"))
 
     def on_connect(self, conn_handle):
-        print_formatted_text(HTML('<ansired>New connection</ansired> handle:%d' % conn_handle))
+        print_formatted_text(HTML(f"<ansired>New connection</ansired> handle:{conn_handle:d}"))
 
     def on_disconnect(self, conn_handle):
-        print_formatted_text(HTML('<ansired>Disconnection</ansired> handle:%d' % conn_handle))
+        print_formatted_text(HTML(f"<ansired>Disconnection</ansired> handle:{conn_handle:d}"))
 
-    def on_characteristic_written(self, service, characteristic, offset=0, value=b'', without_response=False):
+    def on_characteristic_written(self, service, characteristic, offset=0, value=b'',
+                                  without_response=False):
         """Characteristic written hook
 
         This hook is called whenever a charactertistic has been written by a GATT
         client.
         """
-        print_formatted_text(HTML(
-            '<ansimagenta>Wrote</ansimagenta> to characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
-                characteristic.uuid,
-                service.uuid
-            )
-        ))
-        print_formatted_text(HTML(' <i>%s</i>' % hexdump(value, result='return')))
+        print_formatted_text(HTML((
+            f"<ansimagenta>Wrote</ansimagenta> to characteristic "
+            f"<ansicyan>{characteristic.uuid}</ansicyan> of service "
+            f"<ansicyan>{service.uuid}</ansicyan>"
+        )))
+        print_formatted_text(HTML(f" <i>{hexdump(value, result='return')}</i>"))
 
-        
-    def on_characteristic_subscribed(self, service, characteristic, notification=False, indication=False):
+
+    def on_characteristic_subscribed(self, service, characteristic, notification=False,
+                                     indication=False):
         # Check if we have a hook to call
-        print_formatted_text(HTML('<ansicyan>Subscribed</ansicyan> to characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
-            characteristic.uuid,
-            service.uuid
+        print_formatted_text(HTML((
+            f"<ansicyan>Subscribed</ansicyan> to characteristic "
+            f"<ansicyan>{characteristic.uuid}</ansicyan> of service "
+            f"<ansicyan>{service.uuid}</ansicyan>"
         )))
 
     def on_characteristic_unsubscribed(self, service, characteristic):
-        print_formatted_text(HTML('<ansicyan>Unsubscribed</ansicyan> to characteristic <ansicyan>%s</ansicyan> of service <ansicyan>%s</ansicyan>' % (
-            characteristic.uuid,
-            service.uuid
+        print_formatted_text(HTML((
+            f"<ansicyan>Unsubscribed</ansicyan> to characteristic "
+            f"<ansicyan>{characteristic.uuid}</ansicyan> of service "
+            f"<ansicyan>{service.uuid}</ansicyan>"
         )))
 
 
@@ -128,16 +401,16 @@ class BlePeriphShell(InteractiveShell):
     MODE_STARTED = 2
 
     def __init__(self, interface: WhadDevice = None, dev_profile=None):
-        super().__init__(HTML('<b>wble-periph></b> '))
+        super().__init__(HTML("<b>wble-periph></b> "))
 
         self.__current_mode = self.MODE_NORMAL
 
         # Device parameters
-        self.__complete_name = 'WhadDev'
+        self.__complete_name = "WhadDev"
         self.__shortened_name = None
         self.__manuf_data = []
         self.__manuf_comp = None
-        
+
         # If interface is None, pick the first matching our needs
         self.__interface = interface
 
@@ -145,11 +418,49 @@ class BlePeriphShell(InteractiveShell):
         if dev_profile is not None:
             # Set profile
             self.__profile = MonitoringProfile(from_json=dev_profile)
+
+            # Set advertising data
+            profile = json.loads(dev_profile)
+            if "devinfo" in profile and "adv_data" in profile["devinfo"]:
+                self.adv_data = AdvDataFieldList.from_bytes(
+                    bytes.fromhex(profile["devinfo"]["adv_data"])
+                )
+                if "scan_rsp" in profile["devinfo"]:
+                    self.scan_rsp_data = AdvDataFieldList.from_bytes(
+                        bytes.fromhex(profile["devinfo"]["scan_rsp"])
+                    )
+                else:
+                    self.scan_rsp_data = None
+            else:
+                # No advertising data (should not be the case)
+                self.warning("No advertising data in JSON profile !")
+                self.adv_data = AdvDataFieldList(AdvFlagsField())
+                self.scan_rsp_data = None
         else:
+            # Create a default profile
             self.__profile = MonitoringProfile()
 
+            # Generate AD data
+            self.adv_data = AdvDataFieldList()
+            if self.__complete_name is not None:
+                self.adv_data.add(AdvCompleteLocalName(
+                    bytes(self.__complete_name, "utf-8")
+                ))
+            if self.__shortened_name is not None:
+                self.adv_data.add(AdvShortenedLocalName(
+                    bytes(self.__shortened_name, "utf-8")
+                ))
+            self.adv_data.add(AdvFlagsField(
+                bredr_support=False,
+            ))
+
+            # Set advertising data
+            self.scan_rsp_data = None
+
+        self.__adv_manager = AdvRecordsManager(self.adv_data, self.scan_rsp_data)
         self.__selected_service = None
         self.__connector: WhadDeviceConnector = None
+        self.__listener: PeripheralEventListener = None
         self.__wireshark = None
         self.__central_bd = None
         self.intro = INTRO
@@ -162,16 +473,19 @@ class BlePeriphShell(InteractiveShell):
         """
         # Are we in service edit mode ?
         if self.__current_mode == self.MODE_SERVICE_EDIT:
-            self.set_prompt(HTML('<b>wble-periph|<ansicyan>service(%s)</ansicyan>></b> ' % (
-                self.__selected_service
-            )), force)
+            self.set_prompt(HTML(
+                f"<b>wble-periph|<ansicyan>service({self.__selected_service})</ansicyan>></b> "),
+                force)
         elif self.__current_mode == self.MODE_NORMAL:
             if not self.__central_bd:
-                self.set_prompt(HTML('<b>wble-periph></b> '), force)
+                self.set_prompt(HTML("<b>wble-periph></b> "), force)
             else:
-                self.set_prompt(HTML('<b>wble-periph|<ansicyan>%s</ansicyan>></b> ' % self.__central_bd), force)
+                self.set_prompt(
+                    HTML(f"<b>wble-periph|<ansicyan>{self.__central_bd}</ansicyan>></b> "),
+                    force)
         elif self.__current_mode == self.MODE_STARTED:
-            self.set_prompt(HTML('<b>wble-periph<ansimagenta>[running]</ansimagenta>></b>'))
+            self.set_prompt(
+                HTML("<b>wble-periph<ansimagenta>[running]</ansimagenta>></b>"))
 
 
     def switch_role(self, new_role):
@@ -190,19 +504,19 @@ class BlePeriphShell(InteractiveShell):
         """Parse ATT error and show exception.
         """
         if isinstance(error, InvalidHandleValueException):
-            self.error('ATT Error: wrong value handle')
+            self.error("ATT Error: wrong value handle")
         elif isinstance(error, ReadNotPermittedError):
-            self.error('ATT error: read operation not allowed')
+            self.error("ATT error: read operation not allowed")
         elif isinstance(error, WriteNotPermittedError):
-            self.error('ATT error: write operation not allowed')
+            self.error("ATT error: write operation not allowed")
         elif isinstance(error, InsufficientAuthenticationError):
-            self.error('ATT error: insufficient authentication')
+            self.error("ATT error: insufficient authentication")
         elif isinstance(error, InsufficientAuthorizationError):
-            self.error('ATT error: insufficient authorization')
+            self.error("ATT error: insufficient authorization")
         elif isinstance(error, AttributeNotFoundError):
-            self.error('ATT error: attribute not found')
+            self.error("ATT error: attribute not found")
         elif isinstance(error, InsufficientEncryptionKeySize):
-            self.error('ATT error: insufficient encryption')
+            self.error("ATT error: insufficient encryption")
 
     ##################################################
     # GATT Service management
@@ -211,16 +525,17 @@ class BlePeriphShell(InteractiveShell):
     def has_service(self, uuid: str):
         """Check if a service is already registered
         """
-        return (self.__profile.get_service_by_UUID(UUID(uuid)) is not None)
+        return self.__profile.get_service_by_uuid(UUID(uuid)) is not None
 
     def get_service(self, uuid: str):
         """Return service characteristics
         """
-        service_obj = self.__profile.get_service_by_UUID(UUID(uuid))
+        service_obj = self.__profile.get_service_by_uuid(UUID(uuid))
         if service_obj is not None:
             return service_obj
-        else:
-            raise IndexError
+
+        # Cannot find UUID
+        raise IndexError
 
     def register_service(self, uuid: str):
         """Register a service
@@ -228,7 +543,7 @@ class BlePeriphShell(InteractiveShell):
         @param  str     uuid    Service UUID
         @retval bool    True if service has been successfully registered, False otherwise
         """
-        service_obj = self.__profile.get_service_by_UUID(UUID(uuid))
+        service_obj = self.__profile.get_service_by_uuid(UUID(uuid))
         if service_obj is None:
             self.__profile.add_service(PrimaryService(uuid=UUID(uuid)))
             return True
@@ -238,7 +553,7 @@ class BlePeriphShell(InteractiveShell):
     def unregister_service(self, uuid: str):
         """Unregister a service
         """
-        service_obj = self.__profile.get_service_by_UUID(UUID(uuid))
+        service_obj = self.__profile.get_service_by_uuid(UUID(uuid))
         if service_obj is not None:
             self.__profile.remove_service(service_obj)
             return True
@@ -264,13 +579,13 @@ class BlePeriphShell(InteractiveShell):
         """
         services = [str(s.uuid) for s in list(self.__profile.services())]
         completions = {}
-        for action in ['add', 'edit', 'remove']:
+        for action in ["add", "edit", "remove"]:
             completions[action] = {}
             for service in services:
                 completions[action][service]={}
         return completions
 
-    @category('GATT profile')
+    @category("GATT profile")
     def do_service(self, args):
         """Manage peripheral's GATT services
 
@@ -292,22 +607,22 @@ class BlePeriphShell(InteractiveShell):
         """
         if self.__current_mode != self.MODE_NORMAL:
             if self.__current_mode == self.MODE_SERVICE_EDIT:
-                self.error('Already editing services.')
+                self.error("Already editing services.")
             else:
-                self.error('Cannot edit services while peripheral is running.')
+                self.error("Cannot edit services while peripheral is running.")
             return
 
         if len(args) > 0:
             action = args[0].lower()
-            if action == 'add':
+            if action == "add":
                 if len(args) >= 2:
                     try:
                         # Validate UUID
-                        service_uuid = validate_uuid(args[1])
+                        service_uuid = validate_attribute_uuid(args[1])
 
-                        # If service already exists, error. 
-                        if self.has_service(service_uuid):                        
-                            self.error('Service %s already exists !' % service_uuid)
+                        # If service already exists, error.
+                        if self.has_service(service_uuid):
+                            self.error(f"Service {service_uuid} already exists !")
                             return
 
                         # Register service
@@ -317,52 +632,55 @@ class BlePeriphShell(InteractiveShell):
                         self.select_service(service_uuid)
 
                         # Success
-                        self.success('Service %s successfully added.' % service_uuid)
-                    except InvalidUUIDException as uuid_err:
-                        self.error('Invalid UUID: %s' % args[1])
+                        self.success(f"Service {service_uuid} successfully added.")
+                    except InvalidUUIDException as bad_uuid:
+                        self.error(bad_uuid.description)
                 else:
-                    self.error('You need to provide a valid UUID.')
-            elif action == 'remove':
+                    self.error("You need to provide a valid UUID.")
+            elif action == "remove":
                 # Not allowed in edit mode
                 if self.__current_mode == self.MODE_SERVICE_EDIT:
-                    self.error('You cannot add or remove service in service edit mode. Use <ansicyan>back</ansicyan> to exit edit mode and try again.')
+                    self.error((
+                        "You cannot add or remove service in service edit mode. "
+                        "Use <ansicyan>back</ansicyan> to exit edit mode and try again."))
                 else:
                     if len(args) >= 2:
                         try:
                             # Validate UUID
-                            service_uuid = validate_uuid(args[1])
+                            service_uuid = validate_attribute_uuid(args[1])
 
                             if self.has_service(service_uuid):
                                 self.unregister_service(service_uuid)
-                                self.success('Successfully removed service %s.' % service_uuid)
+                                self.success(f"Successfully removed service {service_uuid}.")
                             else:
-                                self.error('Service %s is not a registered service.' % service_uuid)
-                        except InvalidUUIDException as uuid_err:
-                            self.error('Invalid UUID: %s' % args[1])
+                                self.error(f"Service {service_uuid} is not a registered service.")
+                        except InvalidUUIDException as bad_uuid:
+                            self.error(bad_uuid.description)
                     else:
-                        self.error('You need to provide a valid UUID.')
-            elif action == 'edit':
+                        self.error("You need to provide a valid UUID.")
+            elif action == "edit":
                 if self.__current_mode == self.MODE_SERVICE_EDIT:
-                    self.error('Already in edit mode.')
+                    self.error("Already in edit mode.")
                     return
 
                 if len(args) >= 2:
                     try:
                         # Validate UUID
-                        service_uuid = validate_uuid(args[1])
+                        service_uuid = validate_attribute_uuid(args[1])
 
                         if self.has_service(service_uuid):
                             self.select_service(service_uuid)
                             self.update_prompt()
                             return
-                        else:
-                            self.error('Service %s is not a registered service.' % service_uuid)
-                    except InvalidUUIDException as uuid_err:
-                        self.error('Invalid UUID: %s' % args[1])
+
+                        # Error, not registered
+                        self.error(f"Service {service_uuid} is not a registered service.")
+                    except InvalidUUIDException as bad_uuid:
+                        self.error(bad_uuid.description)
                 else:
-                    self.error('You need to provide a valid UUID.')
+                    self.error("You need to provide a valid UUID.")
             else:
-                self.error('Unknown action <i>%s</i>.' % action)
+                self.error(f"Unknown action <i>{action}</i>.")
         else:
             # Enumerate services and store them in a list
             services = list(self.__profile.services())
@@ -373,37 +691,27 @@ class BlePeriphShell(InteractiveShell):
                     service_uuid = str(service.uuid)
                     if service.uuid.type == UUID.TYPE_16:
                         uuid_val = int(service_uuid, 16)
-                        if uuid_val in SERVICES_UUID:
-                            service_name = SERVICES_UUID[uuid_val]
-                        else:
-                            service_name = None
+                        service_name = SERVICES_UUID.get(uuid_val)
                     else:
                         service_name = None
 
                     if service_name is not None:
-                        print_formatted_text(HTML(
-                            '<ansicyan><b>Service %s</b> (%s)</ansicyan> (handles from %d to %d):' % (
-                                service.uuid,
-                                service_name,
-                                service.handle,
-                                service.end_handle,
-                            )
-                        ))
+                        print_formatted_text(HTML((
+                            f"<ansicyan><b>Service {service.uuid}</b> ({service_name})</ansicyan>"
+                            f" (handles from {service.handle:d} to {service.end_handle:d}):"
+                        )))
                     else:
-                        print_formatted_text(HTML(
-                            '<ansicyan><b>Service %s</b></ansicyan> (handles from %d to %d):' % (
-                                service.uuid,
-                                service.handle,
-                                service.end_handle
-                            )
-                        ))
+                        print_formatted_text(HTML((
+                            f"<ansicyan><b>Service {service.uuid}</b></ansicyan>"
+                            f" (handles from {service.handle:d} to {service.end_handle:d}):"
+                        )))
 
                     characteristics = list(service.characteristics())
                     if len(characteristics) > 0:
                         for i, charac in enumerate(characteristics):
 
-                            char_chevron = '├' if i < (len(characteristics) - 1) else '└'
-                            handle_chevron = '│' if i < (len(characteristics) - 1) else ' '
+                            char_chevron = "├" if i < (len(characteristics) - 1) else "└"
+                            handle_chevron = "│" if i < (len(characteristics) - 1) else " "
 
 
                             # Retrieve characteristic name if 16-bit UUID
@@ -411,50 +719,43 @@ class BlePeriphShell(InteractiveShell):
                             charac_name = None
                             if charac_uuid.type == UUID.TYPE_16:
                                 uuid_val = int(str(charac_uuid), 16)
-                                if uuid_val in CHARACS_UUID:
-                                    charac_name = CHARACS_UUID[uuid_val]
+                                charac_name = CHARACS_UUID.get(uuid_val)
 
                             properties = charac.properties
                             perms = []
                             if properties & CharacteristicProperties.READ != 0:
-                                perms.append('read')
+                                perms.append("read")
                             if properties & CharacteristicProperties.WRITE != 0:
-                                perms.append('write')
+                                perms.append("write")
                             if properties & CharacteristicProperties.INDICATE != 0:
-                                perms.append('indicate')
+                                perms.append("indicate")
                             if properties & CharacteristicProperties.NOTIFY != 0:
-                                perms.append('notify')
+                                perms.append("notify")
 
                             if charac_name is not None:
-                                print_formatted_text(HTML(
-                                    '%s─ <ansicyan><b>Characteristic %s</b> (%s)</ansicyan>' % (
-                                        char_chevron,
-                                        charac.uuid,
-                                        charac_name
-                                    )
-                                ))
-                            else:
-                                print_formatted_text(HTML('%s─ <ansicyan><b>Characteristic %s</b></ansicyan>' % (
-                                    char_chevron,
-                                    charac.uuid
+                                print_formatted_text(HTML((
+                                    f"{char_chevron}─ <ansicyan><b>Characteristic "
+                                    f"{charac.uuid}</b> ({charac_name})</ansicyan>"
                                 )))
-                            print_formatted_text(HTML('%s └─ handle:%d, value handle: %d, props: %s' % (
-                                handle_chevron,
-                                charac.handle,
-                                charac.value_handle,
-                                ','.join(perms)
+                            else:
+                                print_formatted_text(HTML((
+                                    f"{char_chevron}─ <ansicyan><b>Characteristic "
+                                    f"{charac.uuid}</b></ansicyan>"
+                                )))
+                            print_formatted_text(HTML((
+                                f"{handle_chevron} └─ handle:{charac.handle:d}, "
+                                f"value handle: {charac.value_handle:d}, props: {','.join(perms)}"
                             )))
 
                             for desc in charac.descriptors():
-                                print_formatted_text(HTML('%s └─ <b>Descriptor %s</b> (handle: %d)' % (
-                                    handle_chevron,
-                                    desc.type_uuid,
-                                    desc.handle
+                                print_formatted_text(HTML((
+                                    f"{handle_chevron} └─ <b>Descriptor {desc.type_uuid}</b>"
+                                    f" (handle: {desc.handle:d})"
                                 )))
                     else:
-                        print_formatted_text(HTML(' <i>No characteristics defined</i>'))
+                        print_formatted_text(HTML(" <i>No characteristics defined</i>"))
             else:
-                self.error('No service registered yet.')
+                self.error("No service registered yet.")
 
     ##################################################
     # GATT Characteristic management
@@ -463,13 +764,13 @@ class BlePeriphShell(InteractiveShell):
     def has_service_char(self, service_uuid:str, char_uuid:str):
         """Check if a characteristic is already registered for a specific service
         """
-        service_obj = self.__profile.get_service_by_UUID(UUID(service_uuid))
+        service_obj = self.__profile.get_service_by_uuid(UUID(service_uuid))
         if service_obj is not None:
             charac = service_obj.get_characteristic(UUID(char_uuid))
-            return (charac is not None)
-        else:
-            # Not found
-            return False
+            return charac is not None
+
+        # Not found
+        return False
 
 
     def register_char(self, service_uuid: str, char_uuid: str, perms: list):
@@ -483,18 +784,18 @@ class BlePeriphShell(InteractiveShell):
         if not self.has_service_char(service_uuid, char_uuid):
             # Get service
             service_obj = self.get_service(service_uuid)
-            
+
             # Build charac properties
             props = 0
-            if 'read' in perms:
+            if "read" in perms:
                 props |= CharacteristicProperties.READ
-            if 'write' in perms:
+            if "write" in perms:
                 props |= CharacteristicProperties.WRITE
-            if 'writecmd' in perms:
+            if "writecmd" in perms:
                 props |= CharacteristicProperties.WRITE_WITHOUT_RESPONSE
-            if 'notify' in perms:
+            if "notify" in perms:
                 props |= CharacteristicProperties.NOTIFY
-            if 'indicate' in perms:
+            if "indicate" in perms:
                 props |= CharacteristicProperties.INDICATE
 
             # Build characteristic object
@@ -503,11 +804,11 @@ class BlePeriphShell(InteractiveShell):
                 properties=props,
             )
 
-            if 'notify' in perms or 'indicate' in perms:
+            if "notify" in perms or "indicate" in perms:
                 cccd = ClientCharacteristicConfig(
                     characteristic=charac_obj,
-                    indicate=('indicate' in perms),
-                    notify=('notify' in perms) 
+                    indicate=("indicate" in perms),
+                    notify=("notify" in perms)
                 )
 
                 charac_obj.add_descriptor(cccd)
@@ -521,9 +822,9 @@ class BlePeriphShell(InteractiveShell):
             self.__profile.update_service(service_obj)
 
             # Success
-            self.success('Successfully added characteristic %s' % char_uuid)
+            self.success(f"Successfully added characteristic {char_uuid}")
             return True
-        
+
         # Fail
         return False
 
@@ -533,13 +834,13 @@ class BlePeriphShell(InteractiveShell):
         if self.has_service_char(service_uuid, char_uuid):
             # Get service
             service_obj = self.get_service(service_uuid)
-            
+
             charac = service_obj.get_characteristic(UUID(char_uuid))
             if charac is not None:
                 service_obj.remove_characteristic(charac)
                 self.__profile.update_service(service_obj)
                 return True
-        
+
         # Fail
         return False
 
@@ -547,11 +848,11 @@ class BlePeriphShell(InteractiveShell):
         """Parse permissions
         """
         allowed_keywords = [
-            'read',
-            'write',
-            'writecmd',
-            'notify',
-            'indicate'
+            "read",
+            "write",
+            "writecmd",
+            "notify",
+            "indicate"
         ]
 
         out_perms = []
@@ -566,16 +867,16 @@ class BlePeriphShell(InteractiveShell):
         """
         completions = {}
         if self.__selected_service is not None:
-            service = self.__profile.get_service_by_UUID(UUID(self.__selected_service))
+            service = self.__profile.get_service_by_uuid(UUID(self.__selected_service))
             if service is not None:
                 chars = list(service.characteristics())
-                for action in ['add', 'remove']:
+                for action in ["add", "remove"]:
                     completions[action] = {}
                     for char in chars:
                         completions[action][str(char.uuid)] = {}
         return completions
 
-    @category('GATT profile')
+    @category("GATT profile")
     def do_char(self, args):
         """Manage peripheral's GATT characteristics
 
@@ -593,56 +894,53 @@ class BlePeriphShell(InteractiveShell):
         if self.__current_mode == self.MODE_SERVICE_EDIT:
             if len(args)>0:
                 action = args[0]
-                if action == 'add':
+                if action == "add":
                     if len(args)>=2:
                         try:
                             # Retrieve characteristic UUID
-                            char_uuid = validate_uuid(args[1])
+                            char_uuid = validate_attribute_uuid(args[1])
 
                             # Parse permissions
                             if len(args) >= 3:
                                 perms = self.char_parse_perms(args[2:])
                             else:
-                                perms = ['read']
+                                perms = ["read"]
 
                             if not self.has_service_char(self.__selected_service, char_uuid):
                                 self.register_char(self.__selected_service, char_uuid, perms)
                             else:
-                                self.error('Characteristic %s already exist in service %s' % (
-                                    char_uuid, self.__selected_service
-                                ))
-                        except InvalidUUIDException as uuid_err:
-                            self.error('Invalid UUID for characteristic.')
+                                self.error((f"Characteristic {char_uuid} already exist in "
+                                           f"service {self.__selected_service}"))
+                        except InvalidUUIDException as bad_uuid:
+                            self.error(bad_uuid.description)
                     else:
                         print_formatted_text(HTML(
-                            '<b>Usage:</b> <ansicyan>add</ansicyan> <i>UUID</i> [<i>PERM,</i> ...]'
+                            "<b>Usage:</b> <ansicyan>add</ansicyan> <i>UUID</i> [<i>PERM,</i> ...]"
                         ))
-                elif action == 'remove':
+                elif action == "remove":
                     if len(args)>=2:
                         try:
                             # Retrieve characteristic UUID
-                            char_uuid = validate_uuid(args[1])
+                            char_uuid = validate_attribute_uuid(args[1])
 
                             # Remove characteristic
                             if self.has_service_char(self.__selected_service, char_uuid):
                                 self.unregister_char(self.__selected_service, char_uuid)
-                                self.success('Successfully removed characteristic %s' % char_uuid)
+                                self.success(f"Successfully removed characteristic {char_uuid}")
                             else:
-                                self.error('Characteristic %s does not exist.' % char_uuid)
-                        except InvalidUUIDException as uuid_err:
-                            self.error('Invalid UUID for characteristic.')
+                                self.error(f"Characteristic {char_uuid} does not exist.")
+                        except InvalidUUIDException as bad_uuid:
+                            self.error(bad_uuid.description)
                     else:
                         print_formatted_text(HTML(
-                            '<b>Usage:</b> <ansicyan>remove</ansicyan> <i>UUID</i>'
+                            "<b>Usage:</b> <ansicyan>remove</ansicyan> <i>UUID</i>"
                         ))
             else:
                 # List characteristics
                 print_formatted_text(HTML(
-                    '<ansicyan>Characteristics for service %s:</ansicyan>' % (
-                        self.__selected_service
-                    )
+                    f"<ansicyan>Characteristics for service {self.__selected_service}:</ansicyan>"
                 ))
-                selected_service = self.__profile.get_service_by_UUID(UUID(self.__selected_service))
+                selected_service = self.__profile.get_service_by_uuid(UUID(self.__selected_service))
                 if selected_service is not None:
                     characs = list(selected_service.characteristics())
                     if len(characs) > 0:
@@ -650,37 +948,32 @@ class BlePeriphShell(InteractiveShell):
                             uuid = charac.uuid
                             if uuid.type == UUID.TYPE_16:
                                 uuid_val = int(str(uuid), 16)
-                                if uuid_val in CHARACS_UUID:
-                                    charac_name = CHARACS_UUID[uuid_val]
-                                else:
-                                    charac_name = None
+                                charac_name = CHARACS_UUID.get(uuid_val)
                             else:
                                 charac_name = None
 
                             properties = charac.properties
                             perms = []
                             if properties & CharacteristicProperties.READ != 0:
-                                perms.append('read')
+                                perms.append("read")
                             if properties & CharacteristicProperties.WRITE != 0:
-                                perms.append('write')
+                                perms.append("write")
                             if properties & CharacteristicProperties.INDICATE != 0:
-                                perms.append('indicate')
+                                perms.append("indicate")
                             if properties & CharacteristicProperties.NOTIFY != 0:
-                                perms.append('notify')
+                                perms.append("notify")
 
+                            access = ",".join([f"<b>{perm}</b>" % perm for perm in perms])
                             if charac_name is not None:
-                                print_formatted_text(HTML(' %s (%s): %s' % (
-                                    charac.uuid,
-                                    charac_name,
-                                    ','.join(['<b>%s</b>' % perm for perm in perms])
-                                )))
+                                print_formatted_text(HTML(
+                                    f" {charac.uuid} ({charac_name}): {access}"
+                                ))
                             else:
-                                print_formatted_text(HTML(' %s: %s)' % (
-                                    charac.uuid,
-                                    ','.join(['<b>%s</b>' % perm for perm in perms])
-                                )))
+                                print_formatted_text(HTML(
+                                    f" {charac.uuid}: ({access})"
+                                ))
                     else:
-                        print_formatted_text(HTML(' No characteristic registered.'))
+                        print_formatted_text(HTML(" No characteristic registered."))
 
 
     def char_set_value(self, handle_uuid, value):
@@ -688,28 +981,31 @@ class BlePeriphShell(InteractiveShell):
         """
         if isinstance(handle_uuid, int):
             if self.__current_mode != self.MODE_STARTED:
-                self.error('Cannot set a characteristic value by its handle')
-            
+                self.error("Cannot set a characteristic value by its handle")
+
             # Search characteristic by its handle
             if self.__profile is not None:
-                charac = self.__profile.find_object_by_handle(handle_uuid)
-                if isinstance(charac, Characteristic):
-                    # Update value
-                    charac.value = value
+                try:
+                    charac = self.__profile.find_object_by_handle(handle_uuid)
+                    if isinstance(charac, Characteristic):
+                        # Update value
+                        charac.value = value
+                except IndexError:
+                    self.error("Cannot find characteristic with UUID %s" % handle_uuid)
             else:
-                self.error('GATT profile has not been set.')
+                self.error("GATT profile has not been set.")
         elif isinstance(handle_uuid, UUID):
             # Are we started ?
             if self.__current_mode == self.MODE_STARTED:
                 # Find characteristic handle
-                for service_uuid, service in self.enum_services():
+                for _, service in self.enum_services():
                     charac_obj = service.get_characteristic(handle_uuid)
                     if charac_obj is not None:
                         charac_obj.value = value
                         return
             else:
                 # Find characteristic handle
-                for service_uuid, service in self.enum_services():
+                for _, service in self.enum_services():
                     charac_obj = service.get_characteristic(handle_uuid)
                     if charac_obj is not None:
                         charac_obj.value = value
@@ -719,49 +1015,48 @@ class BlePeriphShell(InteractiveShell):
         """
         # parse target arguments
         if len(args) <2:
-            self.error('You must provide at least a characteristic value handle or characteristic UUID, and a value to write.')
+            self.error(("You must provide at least a characteristic value handle"
+                        " or characteristic UUID, and a value to write."))
             return
-        else:
-            handle = None
-            offset = None
-            uuid = None
+
+        handle = None
 
         # Figure out what the handle is
-        if args[0].lower().startswith('0x'):
+        if args[0].lower().startswith("0x"):
             try:
                 handle = int(args[0].lower(), 16)
-            except ValueError as badval:
-                self.error('Wrong handle: %s' % args[0])
+            except ValueError:
+                self.error("Wrong handle: {args[0]}")
                 return
         else:
             try:
                 handle = int(args[0])
-            except ValueError as badval:
+            except ValueError:
                 try:
-                    handle = UUID(args[0].replace('-',''))
-                except:
-                    self.error('Wrong UUID: %s' % args[0])
+                    handle = UUID(args[0].replace("-",''))
+                except Exception:
+                    self.error("Wrong UUID: {args[0]}")
                     return
 
         # Do we have hex data ?
-        if args[1].lower() == 'hex':
+        if args[1].lower() == "hex":
             # Decode hex data
             hex_data = ''.join(args[2:])
             try:
-                char_value = unhexlify(hex_data.replace('\t',''))
-            except BinasciiError as err:
-                self.error('Provided hex value contains non-hex characters.')
+                char_value = unhexlify(hex_data.replace("\t",''))
+            except BinasciiError:
+                self.error("Provided hex value contains non-hex characters.")
                 return
         else:
             char_value = args[1]
 
         if not isinstance(char_value, bytes):
-            char_value = bytes(char_value,'utf-8')
-            
+            char_value = bytes(char_value,"utf-8")
+
         # Update characteristic value
         self.char_set_value(handle, char_value)
 
-    @category('GATT profile')
+    @category("GATT profile")
     def do_writecmd(self, args):
         """write data to a GATT attribute without waiting for a response.
 
@@ -783,7 +1078,7 @@ class BlePeriphShell(InteractiveShell):
         """
         self.perform_write(args, without_response=True)
 
-    @category('GATT profile')
+    @category("GATT profile")
     def do_write(self, args):
         """write data to a a GATT attribute.
 
@@ -805,7 +1100,7 @@ class BlePeriphShell(InteractiveShell):
         """
         self.perform_write(args, without_response=False)
 
-    @category('GATT profile')
+    @category("GATT profile")
     def do_read(self, args):
         """read a GATT attribute
 
@@ -822,77 +1117,99 @@ class BlePeriphShell(InteractiveShell):
         if len(args) >= 1:
             try:
                 charac_uuid = UUID(args[0])
-                charac = self.__profile.get_characteristic_by_UUID(charac_uuid)
+                charac = self.__profile.get_characteristic_by_uuid(charac_uuid)
                 if charac is not None:
-                    print_formatted_text(HTML(' <i>%s</i>' % hexdump(charac.value, result='return')))
+                    print_formatted_text(HTML(
+                        f" <i>{hexdump(charac.value, result='return')}</i>"
+                    ))
                 else:
-                    self.error('Unknown characteristic %s' % charac_uuid)
-            except InvalidUUIDException as no_uuid:
+                    self.error("Unknown characteristic {charac_uuid}")
+            except AttrInvalidUUIDException:
                 try:
                     # Decode handle
-                    if args[0].lower().startswith('0x'):
+                    if args[0].lower().startswith("0x"):
                         charac_handle = int(args[0], 16)
                     else:
                         charac_handle = int(args[0], 10)
-                    
+
                     # Retrieve characteristic by handle
                     charac = self.__profile.find_object_by_handle(charac_handle)
                     if isinstance(charac, Characteristic):
-                        print_formatted_text(HTML(' <i>%s</i>' % hexdump(charac.value, result='return')))
+                        print_formatted_text(HTML(
+                            f" <i>{hexdump(charac.value, result='return')}</i>"
+                        ))
                     elif isinstance(charac, CharacteristicValue):
-                        print_formatted_text(HTML(' <i>%s</i>' % hexdump(charac.characteristic.value, result='return')))
+                        print_formatted_text(HTML(
+                            f" <i>{hexdump(charac.characteristic.value, result='return')}</i>"
+                        ))
                     else:
-                        self.error('Unknown characteristic with handle %d' % charac_handle)
-                except ValueError as wrong_handle:
-                    self.error("Wrong UUID or handle: %s" % args[0])
+                        self.error(f"Unknown characteristic with handle {charac_handle:d}")
+                except ValueError:
+                    self.error(f"Wrong UUID or handle: {args[0]}")
 
 
     ##################################################
     # Peripheral emulation
-    ##################################################    
+    ##################################################
 
-    @category('Peripheral control')
-    def do_start(self, args):
+    @category("Peripheral control")
+    def do_start(self, _):
         """Start peripheral.
 
         <ansicyan><b>start</b></ansicyan>
 
         Starts the peripheral with its configured services and characteristics.
         """
-        
-        # Generate AD data
-        adv_data = AdvDataFieldList()
-        if self.__complete_name is not None:
-            adv_data.add(AdvCompleteLocalName(
-                bytes(self.__complete_name, 'utf-8')
-            ))
-        if self.__shortened_name is not None:
-            adv_data.add(AdvShortenedLocalName(
-                bytes(self.__shortened_name, 'utf-8')
-            ))
-        adv_data.add(AdvFlagsField(
-            bredr_support=False,
-        ))
 
         # Switch to emulation mode
         self.__current_mode = self.MODE_STARTED
         self.update_prompt()
 
-        # Instanciate our Peripheral
-        self.__connector = Peripheral(
-            self.__interface,
-            profile=self.__profile,
-            adv_data=adv_data
-        )
-        self.__connector.start()
+        try:
+            # Instantiate our Peripheral
+            self.__connector = Peripheral(
+                self.__interface,
+                profile=self.__profile,
+                adv_data=self.__adv_manager.adv_data,
+                scan_data=self.__adv_manager.scan_rsp_data
+            )
 
-    @category('Peripheral control')
-    def do_stop(self, arg):
+            # Start advertising
+            self.__connector.start()
+        except AdvDataFieldListOverflow:
+            self.error("Advertising data is too big to fit in advertisement !")
+        
+        # Instantiate our Peripheral
+        # self.__connector = Peripheral(
+        #    self.__interface,
+        #    profile=self.__profile,
+        #    adv_data=adv_data
+        #)
+        # create our event listener
+        # self.__listener = PeripheralEventListener(callback=self.on_periph_event)
+        # self.__listener.start()
+        # self.__connector.attach_event_listener(self.__listener)
+
+        # Start peripheral
+        # self.__connector.start()
+
+
+    def on_periph_event(self, event):
+        if isinstance(event, PeripheralEventConnected):
+            print("Got a connection from a central, updating MTU")
+            self.__connector.set_mtu(200)
+
+    @category("Peripheral control")
+    def do_stop(self, _):
         """Stop peripheral
         """
         if self.__connector is not None:
             self.__connector.stop()
             self.__connector.close()
+        
+        if self.__listener is not None:
+            self.__listener.stop()
+            self.__listener.join()
 
         self.__current_mode = self.MODE_NORMAL
         self.update_prompt()
@@ -903,12 +1220,12 @@ class BlePeriphShell(InteractiveShell):
         """
         completions = {}
         if self.__wireshark is not None:
-            completions['off'] = {}
+            completions["off"] = {}
         else:
-            completions['on'] = {}
+            completions["on"] = {}
         return completions
 
-    @category('Monitoring')
+    @category("Monitoring")
     def do_wireshark(self, arg):
         """launch wireshark to monitor packets
 
@@ -926,10 +1243,11 @@ class BlePeriphShell(InteractiveShell):
                         if self.__connector is not None:
                             self.__wireshark.attach(self.__connector)
                             self.__wireshark.start()
-                    except ExternalToolNotFound as notfound:
-                        self.error('Cannot launch Wireshark, please make sure it is installed.')
+                    except ExternalToolNotFound:
+                        self.error("Cannot launch Wireshark, please make sure it is installed.")
                 else:
-                    self.error('Wireshark is already launched, see <ansicyan>wireshark off</ansicyan>')
+                    self.error(("Wireshark is already launched, see "
+                                "<ansicyan>wireshark off</ansicyan>"))
             else:
                 # Detach monitor if any
                 if self.__wireshark is not None:
@@ -937,9 +1255,9 @@ class BlePeriphShell(InteractiveShell):
                     self.__wireshark.close()
                     self.__wireshark = None
         else:
-            self.error('Missing arguments, see <ansicyan>help wireshark</ansicyan>.')
+            self.error("Missing arguments, see <ansicyan>help wireshark</ansicyan>.")
 
-    @category('Advertising data')
+    @category("Advertising data")
     def do_name(self, args):
         """Set device advertising complete local name
 
@@ -948,13 +1266,26 @@ class BlePeriphShell(InteractiveShell):
         This command sets the complete local name for the emulated peripheral.
         """
         if len(args) > 0:
-            self.__complete_name = args[0]
-            self.success('Device name set to "%s"' % self.__complete_name)
+            # Save name
+            name = args[0]
+
+            try:
+                self.__adv_manager.complete_name = name
+                self.success(f"Device name set to \"{name}\"")
+            except AdvDataFieldListOverflow:
+                self.error("Advertising data is full, cannot set complete local name.")
+
         else:
-            print_formatted_text(HTML('<ansicyan>Device complete name:</ansicyan> %s' % self.__complete_name))
+            # Complete name
+            complete_name = self.__adv_manager.complete_name
+            if complete_name is not None:
+                print_formatted_text(HTML(
+                    f"<ansicyan>Device complete name:</ansicyan> {complete_name}"
+                ))
+            else:
+                self.warning("Complete local name not set.")
 
-
-    @category('Advertising data')
+    @category("Advertising data")
     def do_shortname(self, args):
         """Set device short name
 
@@ -963,70 +1294,118 @@ class BlePeriphShell(InteractiveShell):
         This command sets the shortened local name for the emulated peripheral.
         """
         if len(args) > 0:
-            self.__shortened_name = args[0]
-            self.success('Device short name set to "%s"' % self.__shortened_name)
-        else:
-            print_formatted_text(HTML('<ansicyan>Device short name:</ansicyan> %s' % self.__shortened_name))
+            # Save name
+            name = args[0]
 
-    @category('Advertising data')
+            try:
+                self.__adv_manager.short_name = name
+                self.success(f"Device shortened local name set to \"{name}\"")
+            except AdvDataFieldListOverflow:
+                self.error("Advertising data is full, cannot set shortened local name")
+        else:
+            # Short name
+            short_name = self.__adv_manager.short_name
+            if short_name is not None:
+                print_formatted_text(HTML(
+                    f"<ansicyan>Device shortened name:</ansicyan> {short_name}"
+                ))
+            else:
+                self.error("No shortened local name has been set yet.")
+
+    @category("Advertising data")
     def do_manuf(self, args):
         """Set device manufacturer company ID and data.
 
-        <ansicyan><b>shortname</b> [<i>COMPANY_ID</i> <i>HEX DATA</i>]</ansicyan>
+        <ansicyan><b>manuf</b> [<i>COMPANY_ID</i> <i>HEX_DATA</i>]</ansicyan>
 
         This commands defines the company ID to use in BLE advertising record
-        along with manufacturer data if a COMPANY_ID and HEX DATA are provided,
+        along with manufacturer data if a COMPANY_ID and HEX_DATA are provided,
         or simply manufacturer data otherwise.
         """
         if len(args) >= 2:
             comp_id = args[0]
             manuf_data = args[1]
-            if comp_id.lower().startswith('0x'):
-                self.__manuf_comp = int(comp_id, 16)
+            manuf_comp = None
+            if comp_id.lower().startswith("0x"):
+                manuf_comp = int(comp_id, 16)
             else:
                 # First, search for company in our list of known companies (no case compare)
                 for cid, comp_name in BT_MANUFACTURERS.items():
                     if comp_name.lower() == comp_id:
-                        self.__manuf_comp = cid
+                        manuf_comp = cid
                         break
 
-                if self.__manuf_comp is None:
+                if manuf_comp is None:
                     try:
-                        self.__manuf_comp = int(comp_id)
-                    except ValueError as e:
-                        self.error('Bad company ID (%s)' % comp_id)
+                        manuf_comp = int(comp_id)
+                    except ValueError:
+                        self.error("Bad company ID ({comp_id})")
                         return
 
             try:
-                self.__manuf_data = unhexlify(manuf_data)
-                self.success('Manufacturer data set.')
-            except Exception as exc:
+                self.__adv_manager.manufacturer_data = (manuf_comp, unhexlify(manuf_data))
+                self.success("Manufacturer data set.")
+            except BinasciiError:
                 self.__manuf_data = []
-                self.error('Error while parsing manufacturer data (not valid hex)')
+                self.error("Error while parsing manufacturer data (not valid hex)")
+            except AdvDataFieldListOverflow:
+                self.error("Advertising data is full, cannot set manufacturer specific data")
         else:
-            if self.__manuf_comp is not None:
-                if self.__manuf_comp in BT_MANUFACTURERS:
-                    manuf_name = BT_MANUFACTURERS[self.__manuf_comp]
+            if self.__adv_manager.manufacturer_data is not None:
+                manuf_comp, manuf_data = self.__adv_manager.manufacturer_data
+                if manuf_comp in BT_MANUFACTURERS:
+                    manuf_name = BT_MANUFACTURERS[manuf_comp]
                 else:
-                    manuf_name = 'Unknown'
-                print_formatted_text(HTML('<ansicyan>Device Manufacturer data record:</ansicyan>'))
-                print_formatted_text(HTML(' <b>Company ID:</b> 0x%04x (%s)' % (
-                    self.__manuf_comp, manuf_name
-                )))
-                if self.__manuf_data != []:
-                    print_formatted_text(HTML(' <b>Manuf. Data:</b>'))
-                    nb_lines = int(len(self.__manuf_data)/16)
-                    if nb_lines*16 < len(self.__manuf_data):
+                    manuf_name = "Unknown"
+                print_formatted_text(HTML("<ansicyan>Device Manufacturer data record:</ansicyan>"))
+                print_formatted_text(HTML(
+                    f" <b>Company ID:</b> 0x{manuf_comp:04x} ({manuf_name})"
+                ))
+                if manuf_data != []:
+                    print_formatted_text(HTML(" <b>Manuf. Data:</b>"))
+                    nb_lines = int(len(manuf_data)/16)
+                    if nb_lines*16 < len(manuf_data):
                         nb_lines += 1
                     for i in range(nb_lines):
-                        print_formatted_text(HTML('   <i>%s</i>') % (
-                            ' '.join(['%02x' % v for v in self.__manuf_data[i*16:(i+1)*16]])
-                        ))
-
+                        data = " ".join(
+                            [f"{v:02x}" for v in manuf_data[i*16:(i+1)*16]]
+                        )
+                        print_formatted_text(HTML(f"   <i>{data}</i>"))
             else:
-                self.error('No manufacturer data has been set yet.')
+                self.error("No manufacturer data has been set yet.")
 
-    def do_back(self, arg):
+    @category("Peripheral control")
+    def do_mtu(self, args):
+        """Set peripheral MTU.
+
+        <ansicyan><b>mtu</b> [<i>MTU</i>]</ansicyan>
+
+        Send a MTU exchange request to the connected Central device.
+        MTU value must be equal to or greater than 23.
+        """
+        if len(args) == 1:
+            try:
+                mtu = int(args[0])
+
+                # Make sure we have a connector
+                if self.__connector is None:
+                    self.error("No active connection, cannot set MTU.")
+                    return
+
+                # Update MTU value
+                if mtu >= 23:
+                    self.__connector.set_mtu(mtu)
+                    print(f"Connection MTU set to {mtu}.")
+                else:
+                    self.error("MTU must be greater or equal to 23.")
+            except ValueError:
+                self.error("MTU is not a valid integer")
+        elif len(args) < 1:
+            self.error("MTU value is missing")
+        elif len(args) > 1:
+            self.error("Too many arguments !")
+
+    def do_back(self, _):
         """Return to normal mode.
 
         <ansicyan><b>back</b></ansicyan>
@@ -1039,7 +1418,7 @@ class BlePeriphShell(InteractiveShell):
             self.__selected_service = None
         self.update_prompt()
 
-    def do_quit(self, arg):
+    def do_quit(self, _):
         """close ble-peripheral
         """
         if self.__connector is not None:

@@ -1,18 +1,20 @@
 """
-BLE Scanning device database
+ESB Scanning device database
 ============================
 
 This module provides a database that keeps track of discovered devices,
-:class:`whad.ble.scanning.AdvertisingDevicesDB`. Discovered devices information
-are handled in :class:`whad.ble.scanning.AdvertisingDevice`.
+:class:`whad.esb.scanning.CommunicatingDevicesDB`. Discovered devices information
+are handled in :class:`whad.ble.scanning.CommunicatingDevice`.
 """
+from typing import List
 
 from whad.esb.stack.llm.constants import ESBRole
 from whad.esb.esbaddr import ESBAddress
-from typing import List
-from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response
+from whad.scapy.layers.esb import ESB_Payload_Hdr, ESB_Ack_Response
 
-class CommunicatingDevice(object):
+UNIFYING_COMMAND_BYTES = (0x51,0xC2,0x40,0x4F,0xD3,0xC1, 0xC3,0x5F,0x1F,0x0F,0x0E,0x10)
+
+class CommunicatingDevice:
     """Store information about a device:
 
     * Received Signal Strength Indicator (RSSI)
@@ -62,8 +64,13 @@ class CommunicatingDevice(object):
     @property
     def channels(self) -> List[int]:
         """Channels used by the device.
+
+        :return: list of channels used by the device in ascending order
+        :rtype: list
         """
-        return list(set(self.__channels))
+        channels = list(set(self.__channels))
+        channels.sort()
+        return channels
 
     @property
     def last_channel(self) -> int:
@@ -78,40 +85,27 @@ class CommunicatingDevice(object):
         """
         # Do we have an applicative protocol identified ?
         if self.__applicative_layer is None:
-            applicative_layer = ""
+            app_layer = ""
         else:
-            applicative_layer = "(%s)"  % (self.__applicative_layer)
+            app_layer = f"{self.__applicative_layer}"
 
         # Display device role
         if self.__role == ESBRole.PRX:
-            role = '[PRX]'
+            role = "[PRX]"
         else:
-            role = '[PTX]'
+            role = "[PTX]"
 
         # Display channels list
+        channels_list = ", ".join([str(i) for i in self.channels])
         channels = (
-            "channels=[%s] / last_channel=%4d" % (
-                ", ".join([str(i) for i in self.channels]),
-                self.last_channel
-            )
+            f"channels=[{channels_list}] / last_channel={self.last_channel:4d}"
         )
         if self.__rssi is not None:
-            return '[%4d dBm] %s %s %s %s' % (
-                self.__rssi,
-                role,
-                self.__address,
-                channels,
-                applicative_layer
-            )
-        else:
-           return '%s %s %s %s' % (
-                role,
-                self.__address,
-                channels,
-                applicative_layer
-            )
+            return f"[{self.__rssi:4d} dBm] {role} {self.__address} {channels} {app_layer}"
+        return f"{role} {self.__address} {channels} {app_layer}"
 
-    def update_rssi(self, rssi=0):
+
+    def update_rssi(self, rssi: int =0):
         """Update device RSSI.
 
         :param  rssi: New RSSI value.
@@ -120,11 +114,11 @@ class CommunicatingDevice(object):
         self.__rssi = rssi
 
 
-    def update_channel(self, channel):
+    def update_channel(self, channel: int):
         """Update device channels in use.
 
-        :param  channel: New RSSI value.
-        :type   channel: float
+        :param  channel: New channel value.
+        :type   channel: int
         """
         self.__channels.append(channel)
 
@@ -138,7 +132,7 @@ class CommunicatingDevice(object):
             self.__applicative_layer = applicative_layer
 
 
-class CommunicatingDevicesDB(object):
+class CommunicatingDevicesDB:
     """Enhanced ShockBurst devices database.
 
     This class stores information about discovered devices.
@@ -166,17 +160,37 @@ class CommunicatingDevicesDB(object):
         """
         if (address,role) in self.__db:
             return self.__db[(address,role)]
-        else:
-            return None
+        return None
 
 
-    def register_device(self, device):
+    def register_device(self, device: CommunicatingDevice):
         """Register or update a device.
 
-        :param  device: Device to register.
-        :type   device: :class:`whad.esb.scanning.CommunicatingDevice`
+        :param device: Device to register
+        :type device: CommunicatingDevice
         """
+        # Save it into our DB
         self.__db[(device.address,device.role)] = device
+
+
+    def update_device(self, device: CommunicatingDevice, rssi: int, channel: int,
+                      app_layer: str):
+        """Update a device 
+
+        :param device: Device to update
+        :type device: CommunicatingDevice
+        :param rssi: Device received signal strength indicator
+        :type rssi: int
+        :param channel: Channel on which the device has been last seen
+        :type channel: int
+        :param app_layer: Application layer for this device
+        :type app_layer: str
+        """
+        # Update existing device RSSI and channel
+        device.update_rssi(rssi)
+        device.update_channel(channel)
+        if app_layer is not None:
+            device.set_applicative_layer(app_layer)
 
 
     def on_device_found(self, rssi, packet, filter_addr):
@@ -207,7 +221,7 @@ class CommunicatingDevicesDB(object):
 
         payload = bytes(pdu)
         # Check if the payload is unifying
-        if len(payload) >= 2 and payload[1] in (0x51,0xC2,0x40,0x4F,0xD3,0xC1,0xC3,0x5F,0x1F,0x0F,0x0E,0x10):
+        if len(payload) >= 2 and payload[1] in UNIFYING_COMMAND_BYTES:
             checksum = 0x00
             for i in payload[:-1]:
                 checksum = (checksum  - i) & 0xFF
@@ -216,21 +230,20 @@ class CommunicatingDevicesDB(object):
 
         # If bd address does not match, don't report it
         if filter_addr is not None and filter_addr.lower() != str(address).lower():
-            return
+            return None
 
+        # No new device found for now
+        new_device = None
+
+        # Have we already discovered this device ?
         existing_device = self.find_device(str(address),role)
         if existing_device is None:
-            new_device = CommunicatingDevice(
-                rssi,
-                str(address),
-                role,
-                applicative_layer,
-                channel
-            )
+            # No, create and register new device
+            new_device = CommunicatingDevice(rssi, str(address), role, applicative_layer, channel)
             self.register_device(new_device)
-            return new_device
         else:
-            existing_device.update_rssi(rssi)
-            existing_device.update_channel(channel)
-            if applicative_layer is not None:
-                existing_device.set_applicative_layer(applicative_layer)
+            # Yes, update existing device RSSI and channel
+            self.update_device(existing_device, rssi, channel, applicative_layer)
+
+        # Return discovered device
+        return new_device

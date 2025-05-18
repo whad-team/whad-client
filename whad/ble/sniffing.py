@@ -1,15 +1,22 @@
-from whad.ble.exceptions import InvalidAccessAddressException
+"""Bluetooth Low Energy sniffing classes used by `wsniff` for generic
+sniffing.
+"""
 from dataclasses import dataclass, field
+
+from whad.ble.exceptions import InvalidAccessAddressException
 from whad.ble.utils.phy import is_access_address_valid
 from whad.common.sniffing import SniffingEvent
+from whad.hub.ble import ChannelMap
 
 @dataclass
 class SynchronizedConnection:
+    """Synchronized connection data class.
+    """
     access_address : int = None
     crc_init : int = None
     hop_interval : int = None
     hop_increment : int = None
-    channel_map : bytes = None
+    channel_map : ChannelMap = None
 
 class ConnectionConfiguration(SynchronizedConnection):
     """
@@ -21,25 +28,32 @@ class ConnectionConfiguration(SynchronizedConnection):
     :param hop_increment: indicate Hop Increment of the targeted connection (inc)
     :param channel_map: indicate Channel Map of the targeted connection (chm)
     """
-    pass
 
 class SynchronizationEvent(SniffingEvent):
+    """Synchronization event
+    """
+
     def __init__(self, connection):
         super().__init__("Connection synchronized")
         self.synchronized_connection = connection
 
     @property
     def message(self):
-        return "access_address={}, crc_init={}, hop_interval={} ({} us), hop_increment={}, channel_map={}".format(
-                    "0x{:08x}".format(self.synchronized_connection.access_address),
-                    "0x{:06x}".format(self.synchronized_connection.crc_init),
-                    str(self.synchronized_connection.hop_interval), str(self.synchronized_connection.hop_interval*1250),
-                    str(self.synchronized_connection.hop_increment),
-                    "0x"+self.synchronized_connection.channel_map.hex()
+        """Readable representation of this event
+        """
+        return (
+            f"access_address=0x{self.synchronized_connection.access_address:08x}, "
+            f"crc_init=0x{self.synchronized_connection.crc_init:06x}, "
+            f"hop_interval={self.synchronized_connection.hop_interval} "
+            f"({self.synchronized_connection.hop_interval*1250} us), "
+            f"hop_increment={self.synchronized_connection.hop_increment}, "
+            f"channel_map=0x{self.synchronized_connection.channel_map.value.hex()}"
         )
 
 
 class DesynchronizationEvent(SniffingEvent):
+    """Event indicating a desynchronization
+    """
     def __init__(self):
         super().__init__("Connection desynchronized")
 
@@ -54,7 +68,7 @@ class KeyExtractedEvent(SniffingEvent):
 
     @property
     def message(self):
-        return "key={}".format(self.key.hex())
+        return f"key={self.key.hex()}"
 
 @dataclass
 class SnifferConfiguration:
@@ -84,6 +98,9 @@ class SnifferConfiguration:
     keys : list = field(default_factory=lambda: [])
 
 class AccessAddress:
+    """Bluetooth connection Access Address.
+    """
+
     def __init__(self, access_address, timestamp=None, rssi=None):
         if not is_access_address_valid(access_address):
             raise InvalidAccessAddressException()
@@ -93,13 +110,20 @@ class AccessAddress:
         self.__rssi = rssi
         self.__count = 1
 
-    def __int__(self):
+    def __int__(self) -> int:
+        """Integer conversion
+        """
         return self.__access_address
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
+        """Compare two access addresses.
+        """
         return int(other) == int(self)
 
     def update(self, timestamp=None, rssi=None):
+        """Update access address RSSI and timestamp, and
+        increment the internal counter for statistics.
+        """
         self.__count += 1
         if timestamp is not None:
             self.__timestamp = timestamp
@@ -107,21 +131,30 @@ class AccessAddress:
             self.__rssi = rssi
 
     @property
-    def last_timestamp(self):
+    def last_timestamp(self) -> int:
+        """Last seen timestamp
+        """
         return self.__timestamp
 
     @property
-    def last_rssi(self):
+    def last_rssi(self) -> int:
+        """Last RSSI
+        """
         return self.__rssi
 
     @property
-    def count(self):
+    def count(self) -> int:
+        """Current count
+        """
         return self.__count
 
-    def __repr__(self):
-        printable_string =  ("0x{:08x}".format(self.__access_address) +
-                            " (seen "+str(self.__count)+" times" +
-                            (", rssi = "+str(self.__rssi) if self.__rssi is not None else "") +
-                            (", last_timestamp = "+str(self.__timestamp) if self.__timestamp is not None else "") +
-                            ")")
+    def __repr__(self) -> str:
+        """String representation
+        """
+        rssi = self.__rssi if self.__rssi is not None else ""
+        timestamp = self.__timestamp if self.__timestamp is not None else ""
+        printable_string =  (
+            f"0x{self.__access_address:08x} (seen {self.count} times), "
+            f"rssi = {rssi}, last_timestamp = {timestamp})"
+        )
         return printable_string

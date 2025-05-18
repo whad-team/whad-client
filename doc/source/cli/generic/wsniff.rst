@@ -40,6 +40,8 @@ with all their consecutive layers and fields as produced by *Scapy* packet's ``s
 ``repr`` format will show a packet's Python object representation by calling its ``__repr__()``
 method.
 
+.. include:: debug-options.rst
+
 Capture raw demodulated data
 ----------------------------
 
@@ -89,6 +91,7 @@ Specific LoRa options
 * ``--bandwidth`` (``-bw``): set LoRa bandwidth in Hz
 * ``--enable-crc`` (``-crc``): enable LoRa CRC
 * ``--enable-explicit_mode`` (``-em``): enable explicit mode
+* ``--preamble-length`` (``-pl``): set preamble length in number of symbols
 
 Example of raw demodulation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
