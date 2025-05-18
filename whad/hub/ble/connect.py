@@ -3,6 +3,7 @@
 from whad.protocol.whad_pb2 import Message
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper
 from whad.hub.ble import BleDomain
+from whad.hub.ble.chanmap import ChannelMap
 from whad.hub.events import ConnectionEvt, DisconnectionEvt, DesyncEvt, SyncEvt
 
 @pb_bind(BleDomain, 'connect', 1)
@@ -44,9 +45,9 @@ class Synchronized(PbMessageWrapper):
             crc_init=self.crc_init,
             hop_interval=self.hop_interval,
             hop_increment=self.hop_increment,
-            channel_map=self.channel_map
+            channel_map=ChannelMap.from_bytes(self.channel_map)
         )
-    
+
     @staticmethod
     def from_event(event):
         return Synchronized(
@@ -54,7 +55,7 @@ class Synchronized(PbMessageWrapper):
             crc_init=event.crc_init,
             hop_interval=event.hop_interval,
             hop_increment=event.hop_increment,
-            channel_map=event.channel_map
+            channel_map=event.channel_map.value
         )
 
 @pb_bind(BleDomain, 'connected', 1)
