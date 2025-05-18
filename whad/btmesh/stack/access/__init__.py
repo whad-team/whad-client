@@ -15,17 +15,14 @@ from whad.btmesh.stack.utils import (
     GROUP_ADDR_TYPE,
     VIRTUAL_ADDR_TYPE,
 )
-from whad.btmesh.stack.constants import (
-    DIRECTED_FORWARDING_CREDS,
-    MANAGED_FLOODING_CREDS,
-)
 from queue import Queue
 from threading import Event
 from whad.scapy.layers.btmesh import (
     BTMesh_Model_Generic_OnOff_Set,
-    BTMesh_Model_Generic_OnOff_Set_Unacknowledged,
     BTMesh_Model_Message,
 )
+
+from whad.btmesh.models import ModelServer
 
 
 logger = logging.getLogger(__name__)
@@ -158,7 +155,7 @@ class AccessLayer(Layer):
                 if e.check_virtual_subscription(dst_addr):
                     target_elements.append(e)
 
-        # for all the element that are supposed to receive the message, handle it
+        # for all the element that are supposed to receive the message, check it and process it if ok
         for e in target_elements:
             if e is None:
                 continue
@@ -168,16 +165,29 @@ class AccessLayer(Layer):
             if model is None:
                 continue
 
-            # check if app_key used is bound to the model
-            app_key_indexes = (
-                self.state.profile.get_configuration_server_model()
-                .get_state("model_to_app_key_list")
-                .get_value(model.model_id)
-            )
+            # if dev key is used, check if the model allows the dev_key used
+            if ctx.application_key_index == -1:
+                # If dev_key not allowed, skip model
+                if not model.allows_dev_keys:
+                    continue
+                # if model is Server, only our own dev_key can be used, otherwise skip
+                elif (
+                    isinstance(model, ModelServer)
+                    and ctx.dev_key_address
+                    != self.state.profile.primary_element_addr.to_bytes(2, "big")
+                ):
+                    continue
 
-            # if dev_key used, index is -1 ! (dont forget to add it when creating the model ...)
-            if ctx.application_key_index not in app_key_indexes:
-                continue
+            else:
+                # check if app_key used is bound to the model
+                app_key_indexes = (
+                    self.state.profile.get_configuration_server_model()
+                    .get_state("model_to_app_key_list")
+                    .get_value(model.model_id)
+                )
+
+                if ctx.application_key_index not in app_key_indexes:
+                    continue
 
             response = model.handle_message(message)
 
@@ -186,12 +196,14 @@ class AccessLayer(Layer):
                 new_ctx = MeshMessageContext()
                 new_ctx.aid = ctx.aid
                 new_ctx.application_key_index = ctx.application_key_index
+                new_ctx.dev_key_address = ctx.dev_key_address
                 new_ctx.src_addr = (
                     e.index + self.state.profile.primary_element_addr
                 ).to_bytes(2, "big")
                 new_ctx.dest_addr = ctx.src_addr
                 new_ctx.net_key_id = ctx.net_key_id
                 new_ctx.is_ctl = False
+                new_ctx.azsmic = 0
                 if ctx.ttl == 0:
                     new_ctx.ttl = 0
                 else:
@@ -204,61 +216,32 @@ class AccessLayer(Layer):
 
     def process_new_message(self, message):
         """
-        Process a message originating from us directly (not in response from another message, usually a message from a keypress and a ModelClient)
+        Process a message originating from us directly (not in response from another message, usually a message from a ModelClient/Shell)
 
-        :param message: [TODO:description]
-        :type message: [TODO:type]
+        :param message: Packet and its context
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         pkt, ctx = message
         ctx.is_ctl = False
+        ctx.azsmic = 0
         self.send_to_upper_transport(message)
 
-    def do_onoff(self, value, addr, acked, df):
+    def do_onoff(self, value, ctx, tid):
         """
         Sends a Generic On/Off set message (acked or unacked)
 
         :param value: Value to be set (0 or 1)
         :type value: int
-        :param addr: Destination addr
-        :type addr: int
-        :param acked: Whether the messages is acked or not
-        :type acked: Bool
-        :param df: Whether message is sent via DF or not (MF if not)
-        :type df: Bool
+        :param ctx: Context of the message
+        :type ctx: MeshMessageContext
+        :param tid: Transaction Id
+        :type tid: int
         """
+        if tid is None:
+            tid = self.transaction_id
+            self.transaction_id = (self.transaction_id + 1) % 256
 
-        app_key = (
-            self.state.profile.get_configuration_server_model()
-            .get_state("app_key_list")
-            .get_value(0)
-        )
-
-        if app_key is None:
-            return
-
-        if acked:
-            pkt = BTMesh_Model_Generic_OnOff_Set(
-                onoff=value,
-                transaction_id=self.transaction_id,
-            )
-        else:
-            pkt = BTMesh_Model_Generic_OnOff_Set_Unacknowledged(
-                onoff=value, transaction_id=self.transaction_id
-            )
-
-        self.transaction_id = (self.transaction_id + 1) % 256
-        ctx = MeshMessageContext()
-        if df:
-            ctx.creds = DIRECTED_FORWARDING_CREDS
-        else:
-            ctx.creds = MANAGED_FLOODING_CREDS
-        ctx.src_addr = self.state.profile.primary_element_addr.to_bytes(2, "big")
-        ctx.dest_addr = addr.to_bytes(2, "big")
-        ctx.ttl = 127
-        ctx.is_ctl = False
-        ctx.net_key_id = 0
-        ctx.application_key_index = 0
-        ctx.aid = app_key.aid
+        pkt = BTMesh_Model_Generic_OnOff_Set(onoff=value, transaction_id=tid)
 
         pkt = BTMesh_Model_Message() / pkt
         self.process_new_message((pkt, ctx))

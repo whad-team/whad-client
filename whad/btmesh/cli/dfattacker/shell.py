@@ -165,6 +165,9 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
     def __init__(self, interface=None, profile=BaseMeshProfile):
         super().__init__(interface=interface, profile=profile)
 
+        # Instanciate our Peripheral
+        self._connector = DFAttacks(self._interface, profile=self._profile)
+
         # Since its set in Provisionee init, need to set it after super
         self.update_prompt()
 
@@ -185,37 +188,6 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             self.set_prompt(
                 HTML("<b>wbtmesh-dfattacker<ansimagenta> [running]</ansimagenta>></b> ")
             )
-
-    @category(SETUP_CAT)
-    def do_start(self, arg):
-        """Start the DFAttacker.
-        Recalling it will reset the node.
-
-        <ansicyan><b>start</b> <i>["auto"]</i></ansicyan>
-
-        Starts the provisionee.
-
-        This command can auto the node if specified with :
-
-        > start auto
-
-        If not specified, will send Unprovisioned Device Beacons to be provisioned.
-        """
-
-        # Switch to emulation mode
-        self._current_mode = self.MODE_STARTED
-        self.update_prompt()
-
-        auto_provision = False
-
-        if len(arg) >= 1:
-            auto_provision = arg[0].lower() == "auto"
-
-        # Instanciate our Peripheral
-        self._connector = DFAttacks(
-            self._interface, profile=self._profile, auto_provision=auto_provision
-        )
-        self._connector.start()
 
     @category(ATTACK_CAT)
     def do_network_discovery(self, args):
@@ -238,10 +210,10 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             return
 
         try:
-            addr_low = int(args[0], 16)
-            addr_high = int(args[1], 16)
+            addr_low = int(args[0], 0) & 0xFFFF
+            addr_high = int(args[1], 0) & 0xFFFF
         except ValueError:
-            self.error("Please provide the addresses in hex format")
+            self.error("Please provide the addresses as ints")
             return
 
         if addr_low > addr_high:
@@ -313,9 +285,9 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
 
         if len(arg) > 0:
             try:
-                addr = int(arg[0], 16)
+                addr = int(arg[0], 0) & 0xFFFF
             except ValueError:
-                self.error("Addr should be in hex format.")
+                self.error("Addr should be an int.")
                 return
         else:
             addr = 0xFFFF
@@ -345,10 +317,10 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
         )
 
     @category(ATTACK_CAT)
-    def do_a5_attack(self, arg):
-        """Perform the A5 attack.
+    def do_a3_attack(self, arg):
+        """Perform the A3 attack.
 
-        <ansicyan><b>a5_attack</b> <i>VICTIM_ADDR</i></ansicyan>
+        <ansicyan><b>a3_attack</b> <i>VICTIM_ADDR</i></ansicyan>
 
         > a5_attack 0x000A
         """
@@ -358,23 +330,23 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             return
 
         try:
-            victim_addr = int(arg[0], 16)
+            victim_addr = int(arg[0], 0) & 0xFFFF
         except ValueError:
-            self.error("You need to use hex format for the victim addr.")
+            self.error("You need to use an int for the victim addr.")
             return
 
         self.warning("Waiting for the Path Reply from 0x%x ..." % (victim_addr))
-        result = self._connector.a5_attack(victim_addr)
+        result = self._connector.a3_attack(victim_addr)
         if result:
             self.success(
-                "Successfully launched A5 attack on 0x%d. Check table to see if successfull"
+                "Successfully launched A3 attack on 0x%d. Check table to see if successfull"
                 % victim_addr
             )
         else:
             self.error("Attack failed, did not received Reply. Retry.")
 
     @category(ATTACK_CAT)
-    def do_a3_attack(self, args):
+    def do_a4_attack(self, args):
         """Perform the A3 attack (based on Path Request Solicitations)
 
         <ansicyan><b>a3_attack</b> <i>ADDR_1</i> [<i>ADDR_N</i>]</ansicyan>
@@ -392,13 +364,13 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
         addr_list = []
         for addr in args:
             try:
-                addr_list.append(int(addr, 16))
+                addr_list.append(int(addr, 0))
             except ValueError:
-                self.error("You need to specify the addresses in hex format")
+                self.error("You need to specify the addresses as ints")
                 return
 
-        self._connector.a3_attack(addr_list)
-        self.success("Successfully launched A3 attack on surrounding nodes.")
+        self._connector.a4_attack(addr_list)
+        self.success("Successfully launched A4 attack on surrounding nodes.")
 
     @category(ATTACK_CAT)
     def do_a2_attack(self, arg):
@@ -431,9 +403,9 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             return
 
         try:
-            dest = int(args[0], 16)
+            dest = int(args[0], 0)
         except ValueError:
-            self.error("You need to specify the addresses in hex format")
+            self.error("You need to specify the addresses as int")
             return
 
         self.warning("Waiting for the response from 0x%x ..." % (dest))
@@ -459,11 +431,11 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             return
 
         try:
-            dest = int(args[0], 16)
-            po = int(args[1], 16)
-            pt = int(args[2], 16)
+            dest = int(args[0], 0)
+            po = int(args[1], 0)
+            pt = int(args[2], 0)
         except ValueError:
-            self.error("You need to specify the addresses in hex format")
+            self.error("You need to specify the addresses as ints")
             return
 
         dependent_status = self._connector.df_dependents(dest, po, pt)
@@ -498,13 +470,20 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             addr = 0xFFFF
         else:
             try:
-                addr = int(arg[0], 16)
+                addr = int(arg[0], 0)
             except ValueError:
-                self.error("Address must be in hex form.")
+                self.error("Address must be ints.")
                 return
 
         self._connector.df_reset(addr)
         self.success("Successfully reset the DF of specified node(s).")
+
+    def complete_topology(self):
+        """autocomplete wireshark command"""
+        completions = {}
+        completions["linear"] = {}
+        completions["grid"] = {}
+        return completions
 
     @category(SETUP_CAT)
     def do_topology(self, args):
@@ -546,9 +525,9 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
                 return
 
             try:
-                grid_size = int(args[1])
+                grid_size = int(args[1], 0)
             except ValueError:
-                self.error("Grid size is an integer decimal form")
+                self.error("Grid size is an integer")
                 return
 
             self._connector.reset_whitelist()

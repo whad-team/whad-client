@@ -20,11 +20,13 @@ from whad.scapy.layers.btmesh import (
     BTMesh_Provisioning_Hdr,
 )
 from whad.common.stack import ContextualLayer, alias, source
-from whad.btmesh.stack.utils import ProvisioningCompleteData
+from whad.btmesh.stack.utils import (
+    ProvisioningCompleteData,
+    ProvisioningAuthenticationData,
+)
 from whad.btmesh.stack.gen_prov.message import GenericProvisioningMessage
 from whad.btmesh.stack.exceptions import (
     InvalidFrameCheckSequenceError,
-    UnexepectedGenericProvisioningPacketError,
 )
 from scapy.all import raw, Raw
 from whad.btmesh.stack.provisioning import (
@@ -134,7 +136,7 @@ class GenericProvisioningLayer(ContextualLayer):
         """
         Sends one ack to the peer. Is resent when we receive again a packet from a transaction from which we have received all segments
         """
-        print("SENDING ACK FOR TRANSACTION " + hex(transaction_number))
+        logger.debug("SENDING ACK FOR TRANSACTION " + hex(transaction_number))
         self.send_to_peer(
             transaction_number, BTMesh_Generic_Provisioning_Transaction_Ack()
         )
@@ -193,8 +195,13 @@ class GenericProvisioningLayer(ContextualLayer):
 
     @source("provisioning")
     def on_provisioning_packet(self, packet):
-        # check if is provisioning complete message
-        if isinstance(packet, ProvisioningCompleteData):
+        """
+        Handler when receiving a packet from the Provisioning Layer
+        """
+        # check if is provisioning complete message or ProvisioningAuthenticationData
+        if isinstance(packet, ProvisioningCompleteData) or isinstance(
+            packet, ProvisioningAuthenticationData
+        ):
             self.send("pb_adv", packet)
             return
 
@@ -213,7 +220,13 @@ class GenericProvisioningLayer(ContextualLayer):
         self._queue.put(packet)
 
     @source("pb_adv")
-    def on_pb_adv_packet(self, message: GenericProvisioningMessage):
+    def on_pb_adv_packet(self, message):
+        """
+        Handler for messages received from the GenericProvisioningLayer
+        """
+        if isinstance(message, ProvisioningAuthenticationData):
+            self.send_to_upper_layer(message)
+            return
         pkt = message.gen_prov_pkt
         # if we get here, we have the packet we were waiting for
         self._handlers[type(pkt)](message)
@@ -257,17 +270,23 @@ class GenericProvisioningLayer(ContextualLayer):
         pass
 
     def on_link_open(self, message):
-        """IN subclass, provisioner should never receive this"""
+        """In subclass, provisioner should never receive this"""
         pass
 
     def on_link_ack(self, message):
-        """IN subclass, provisionee should never receieve this"""
+        """In subclass, provisionee should never receieve this"""
         pass
 
     def on_link_close(self, message):
+        """
+        Handler for BTMesh_Generic_Provisioning_Link_Close message
+        """
         self.state.is_link_open = False
 
     def on_transaction_start(self, message):
+        """
+        Handler for BTMesh_Generic_Provisioning_Transaction_Start message
+        """
         pkt = message.gen_prov_pkt
         transaction_number = message.transaction_number
 
@@ -282,7 +301,6 @@ class GenericProvisioningLayer(ContextualLayer):
 
         self.state.in_transaction = True
 
-
         # Create Transaction object for this transaction
         self.state.current_transaction = ReceivingTransaction(
             transaction_number=transaction_number,
@@ -295,12 +313,11 @@ class GenericProvisioningLayer(ContextualLayer):
             try:
                 prov_packet = pkt[1]
             except IndexError:
-                logger.error("Missing upper layer in Transaction Start packet")
-                pkt.show()
+                logger.debug("Missing upper layer in Transaction Start packet")
+                return
 
             # check FCS (we dont use the Hdr)
             fcs = self.compute_fcs(raw(prov_packet))
-            prov_packet.show()
 
             if fcs != pkt.frame_check_sequence:
                 raise InvalidFrameCheckSequenceError
@@ -318,6 +335,9 @@ class GenericProvisioningLayer(ContextualLayer):
             self.state.current_transaction.add_fragment(pkt.getlayer(Raw).load)
 
     def on_transaction_continuation(self, message):
+        """
+        Handler for BTMesh_Generic_Provisioning_Transaction_Continuation message
+        """
         pkt = message.gen_prov_pkt
         transaction_number = message.transaction_number
 
@@ -337,11 +357,11 @@ class GenericProvisioningLayer(ContextualLayer):
         if pkt.segment_index < len(self.state.current_transaction.fragments):
             return
 
-        # on wrong segment nb (below the one we have), reset Transaction and wait for resent (in spec) 
+        # on wrong segment nb (below the one we have), reset Transaction and wait for resent (in spec)
         if pkt.segment_index != len(self.state.current_transaction.fragments):
             self.state.current_transaction = None
             self.state.in_transaction = False
-            logger.warning(
+            logger.debug(
                 f"Received Transaction Continuation with wrong segment_index (received: {pkt.segment_index})"
             )
             return
@@ -372,13 +392,16 @@ class GenericProvisioningLayer(ContextualLayer):
             self.check_queue()
 
     def on_transaction_ack(self, message):
+        """
+        Handler for BTMesh_Generic_Provisioning_Transaction_Ack message
+        """
         # Check if ack for the correct transaction
         if (
             not self.state.in_transaction
             or self.state.current_transaction.transaction_number
             != message.transaction_number
         ):
-            logger.warning(
+            logger.debug(
                 f"Received Ack for wrong transaction. Pkt transaction : {message.transaction_number}"
             )
             return
@@ -403,11 +426,10 @@ class GenericProvisioningLayer(ContextualLayer):
 
         # limit size of a fragment is 23 bytes
         self.state.in_transaction = True
-        print(
+        logger.debug(
             "SENDING, Transaction Nb : "
             + hex(self.state.last_sent_transaction_number + 1)
         )
-        packet.show()
 
         # compute fcs (dont use the Hdr)
         fcs = self.compute_fcs(raw(packet))
@@ -436,7 +458,9 @@ class GenericProvisioningLayer(ContextualLayer):
 
 
 class GenericProvisioningLayerProvisioner(GenericProvisioningLayer):
-    """Provisioner subclass UUID of peer device should be in options !"""
+    """
+    Subclass of the GenericProvisioningLayer used for Provisioner nodes
+    """
 
     def configure(self, options):
         super().configure(options)
@@ -446,7 +470,14 @@ class GenericProvisioningLayerProvisioner(GenericProvisioningLayer):
         # Link Open sending thread
         self.state.link_open_thread = None
 
+        # UUID of peer device, need to be set if not in options
+        if "uuid" in options:
+            self.state.peer_uuid = options["uuid"]
+
     def send_link_open_thread(self):
+        """
+        Function running in a seperate thread to send BTMesh_Generic_Provisioning_Link_Open messages until received
+        """
         while self.state.is_link_open_thread_running:
             self.send_to_peer(
                 transaction_number=0x00,
@@ -472,17 +503,23 @@ class GenericProvisioningLayerProvisioner(GenericProvisioningLayer):
 
     def on_link_close(self, message):
         super().on_link_close(message)
-        print(
+        logger.debug(
             f"LINK CLOSE, reason : {message.gen_prov_pkt.reason}, peer UUID : {self.state.peer_uuid}"
         )
 
     def on_link_ack(self, message):
+        """
+        Handler for BTMesh_Generic_Provisioning_Link_Ack messages
+        """
         if not self.state.is_link_open:
             self.stop_link_open_thread()
             self.state.is_link_open = True
             self.check_queue()
 
     def open_link(self):
+        """
+        Initiates the creation of a Link to the provisionee
+        """
         self.state.current_transaction = SendingTransaction(
             transaction_number=0x00,
             packet=BTMesh_Generic_Provisioning_Link_Open(),
@@ -499,7 +536,14 @@ class GenericProvisioningLayerProvisionee(GenericProvisioningLayer):
 
         self.state.last_sent_transaction_number = 0x7F
 
+        # Our UUID, need to be set if not in options
+        if "uuid" in options:
+            self.state.own_uuid = options["uuid"]
+
     def on_link_open(self, message):
+        """
+        Handler for BTMesh_Generic_Provisioning_Link_Open message received from the Provisioner
+        """
         self.send_to_peer(
             transaction_number=0x00, packet=BTMesh_Generic_Provisioning_Link_Ack()
         )

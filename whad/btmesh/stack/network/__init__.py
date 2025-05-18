@@ -74,14 +74,18 @@ class NetworkLayer(Layer):
         """
         Update the nid_to_net_key_id. Called when nid received that doesnt match anything
         """
-        for net_key in (
-            self.state.profile.get_configuration_server_model()
-            .get_state("net_key_list")
-            .get_all_values()
-        ):
-            if net_key is not None:
-                self.state.mf_nid_to_net_key_id[net_key.nid_mf] = net_key.key_index
-                self.state.df_nid_to_net_key_id[net_key.nid_df] = net_key.key_index
+        self.state.mf_nid_to_net_key_id = {}
+        self.state.df_nid_to_net_key_id = {}
+        for subnet in self.state.profile.get_all_subnets():
+            if subnet is not None:
+                net_key = self.state.profile.get_net_key(subnet.net_key_index)
+                if net_key is not None:
+                    self.state.mf_nid_to_net_key_id[net_key.nid_mf] = (
+                        subnet.net_key_index
+                    )
+                    self.state.df_nid_to_net_key_id[net_key.nid_df] = (
+                        subnet.net_key_index
+                    )
 
     def __check_nid(self, net_pdu):
         """
@@ -95,19 +99,19 @@ class NetworkLayer(Layer):
         """
         if net_pdu.nid in self.state.mf_nid_to_net_key_id.keys():
             key_id = self.state.mf_nid_to_net_key_id[net_pdu.nid]
-            return (
-                self.state.profile.get_configuration_server_model()
-                .get_state("net_key_list")
-                .get_value(key_id)
-            )
+            key = self.state.profile.get_net_key(key_id)
+
+            # Recheck in case key got updated ...
+            if key.nid_mf == net_pdu.nid:
+                return key
 
         if net_pdu.nid in self.state.df_nid_to_net_key_id.keys():
             key_id = self.state.df_nid_to_net_key_id[net_pdu.nid]
-            return (
-                self.state.profile.get_configuration_server_model()
-                .get_state("net_key_list")
-                .get_value(key_id)
-            )
+            key = self.state.profile.get_net_key(key_id)
+
+            # Recheck in case key got updated ...
+            if key.nid_df == net_pdu.nid:
+                return key
 
         return None
 
@@ -323,11 +327,7 @@ class NetworkLayer(Layer):
         :type iv_update: int
         """
 
-        net_key = (
-            self.state.profile.get_configuration_server_model()
-            .get_state("net_key_list")
-            .get_value(0)
-        )
+        net_key = self.state.profile.get_net_key(0)
 
         message = BTMesh_Secure_Network_Beacon(
             iv_update_flag=iv_update,
@@ -340,9 +340,7 @@ class NetworkLayer(Layer):
         thread = Thread(
             target=self.sending_thread,
             args=EIR_Hdr(type=0x2B)
-            / EIR_BTMesh_Beacon(
-                mesh_beacon_type=0x01, secure_beacon_data=message
-            ),
+            / EIR_BTMesh_Beacon(mesh_beacon_type=0x01, secure_beacon_data=message),
         )
         thread.start()
 
@@ -356,11 +354,7 @@ class NetworkLayer(Layer):
         """
         pkt, ctx = message
 
-        net_key = (
-            self.state.profile.get_configuration_server_model()
-            .get_state("net_key_list")
-            .get_value(ctx.net_key_id)
-        )
+        net_key = self.state.profile.get_net_key(ctx.net_key_id)
 
         # get the correct nid based on credentials used
         if ctx.creds == MANAGED_FLOODING_CREDS:
@@ -378,7 +372,6 @@ class NetworkLayer(Layer):
         )
 
         # encrypt the message
-        net_key: NetworkLayerCryptoManager
         enc = net_key.encrypt(
             raw(pkt),
             ctx.dest_addr,

@@ -23,53 +23,68 @@ from whad.btmesh.models.states import (
     KeyRefreshPhaseState,
     TwoWayPathState,
 )
+from whad.btmesh.stack.constants import (
+    OUTPUT_NUMERIC_AUTH,
+    OUTPUT_ALPHANUM_AUTH,
+    INPUT_ALPHANUM_AUTH,
+    INPUT_NUMERIC_AUTH,
+)
+from random import randrange, choices
+from string import ascii_letters, digits
 
 
 class MeshMessageContext:
+    """
+    Context of a BTMesh message (Rx and Tx)
+    Is passed from layers to layers alongside the scapy packets.
+    """
+
     def __init__(self):
-        self.src_addr = None
-        self.dest_addr = None
+        self.src_addr: bytes = None
+        self.dest_addr: bytes = None
 
         # Credentials used at the network layer (managed flooding or directed forwarding) (frienship creds not supported)
-        self.creds = MANAGED_FLOODING_CREDS
+        self.creds: int = MANAGED_FLOODING_CREDS
 
         # Should be equal to the sequence number of the PDU
-        self.seq_number = None
+        self.seq_number: int = None
 
         # if segmentention used in Lower transport layer, set to the segment number
-        self.segment_number = None
+        self.segment_number: int = None
 
         # AID of the app_key if app_key used, -1 if device_key used
-        self.aid = None
+        self.aid: int = None
 
-        # Index of the app key if not device_key used
-        self.application_key_index = None
+        # Index of the app key if not device_key used, -1 if device key used
+        self.application_key_index: int = None
+
+        # Address of the node we use the DevKey of to decrypt/encrypt the message (should be dst or src addr)
+        self.dev_key_address: bytes = None
 
         # Net key id used
-        self.net_key_id = None
+        self.net_key_id: int = None
 
         # lower transport value (size of mic)
-        self.azsmic = 0
+        self.aszmic: int = 0
 
         # If src_addr is Virtual Addr
-        self.uuid = None
+        self.uuid: bytes = None
 
         # Either received TTL or sending TTL
-        self.ttl = None
+        self.ttl: int = None  # int
 
         # True if Upper Transport Control Message/Ack messgae (network_ctl field to 1), false otherwise
-        self.is_ctl = None
+        self.is_ctl: bool = False
 
         # Seq auth value set by the Upper Transport Layer when encrypting the access pdu
         # Set by the Network layer on Rx messages
-        # int !
-        self.seq_auth = None
+        self.seq_auth: int = None
 
         # Set by model layer, if the message is too small to be segmented but still want acknowlegment on network layer
-        self.force_segment = False
+        self.force_segment: bool = False
 
         # Received RSSI of a packet (sending RSSI when feature available for Adv mode)
-        self.rssi = None
+        self.rssi: float = 0
 
     def print(self):
         for attribute, value in self.__dict__.items():
@@ -77,6 +92,11 @@ class MeshMessageContext:
 
 
 class Subnet(StatesManager):
+    """
+    Represents a subnet associated with one NetKey.
+    The states bound to a subnet are accessible from this object.
+    """
+
     def __init__(self, net_key_index):
         """
         Initializes the subnet with its netkey
@@ -121,6 +141,7 @@ class ProvisioningCompleteData:
         """
         Init the Data with the received provisioning data
         Also the provisionning_crypto_manager is sent to comptute the device_key
+        Or we use the dev_key value in arg. ONE OR THE OTHER ARGUMENT IS PRESENT (not both)
 
         :param net_key: The value of the netkey
         :type net_key: Bytes
@@ -141,6 +162,52 @@ class ProvisioningCompleteData:
         self.iv_index = iv_index
         self.unicast_addr = unicast_addr
         self.provisionning_crypto_manager = provisionning_crypto_manager
+
+
+class ProvisioningAuthenticationData:
+    """
+    Message sent/received by the Provisioning layer and the connector in order to manage authentication (input, output)
+    Allows to notify the connector (hence the user) that an authentication value is needed.
+
+    Constants for methods and actions in btmesh/provisioning/constants.py
+    """
+
+    def __init__(self, auth_method, auth_action, size, value=None):
+        """
+        Inits the ProvisioningAuthenticationData object with the type needed and the value if relevant
+
+        :param auth_method: The auth_method (INPUT, OUTUT or STATIC OOB)
+        :type auth_method: int
+        :param: auth_action: The auth_action (numeric, alphanum, beep ....)
+        :type auth_action: int
+        :param size: The size of the auth value
+        :type size: int
+        :param value: Auth value
+        :type value: str | int
+        """
+        self.auth_method = auth_method
+        self.auth_action = auth_action
+        self.size = size
+        self.value = value
+
+    def generate_value(self):
+        """
+        Based on the parameters of the object, generate a random auth value
+        For now supports numeric or alphanum only
+        """
+        if (
+            self.auth_action == INPUT_NUMERIC_AUTH
+            or self.auth_method == OUTPUT_NUMERIC_AUTH
+        ):
+            lower_bound = 10 ** (self.size - 1)
+            upper_bound = 10**self.size
+            self.value = randrange(lower_bound, upper_bound)
+
+        elif (
+            self.auth_action == INPUT_ALPHANUM_AUTH
+            or self.auth_action == OUTPUT_ALPHANUM_AUTH
+        ):
+            self.value = "".join(choices(ascii_letters + digits, k=self.size))
 
 
 def get_address_type(address):
@@ -283,17 +350,6 @@ def calculate_seq_auth(iv_index: bytes, seq: int, seq_zero: int) -> int:
     :rtype: int
     """
     iv_index_int = int.from_bytes(iv_index, byteorder="big")
-
-    """
-    # Compute the 14-bit and 13-bit masks
-    seq_mask_14 = (1 << 14) - 1
-    seq_mask_13 = (1 << 13) - 1
-
-    # Compute the sequence adjustment from seq_zero
-    seq_diff = ((seq & seq_mask_14) - seq_zero) & seq_mask_13
-
-    adjusted_seq = seq - seq_diff
-    """
 
     TRANSPORT_SAR_SEQZERO_MASK = 0x1FFF
     masked_seqnum = seq & TRANSPORT_SAR_SEQZERO_MASK

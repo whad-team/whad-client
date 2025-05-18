@@ -174,13 +174,31 @@ class ProvisioningBearerAdvCryptoManager:
             self.compute_ecdh_secret()
         # if not in test, set default auth_value if no OOB will be used
         else:
-            if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
-                self.auth_value = b"\x00" * 16
-            elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
-                self.auth_value = b"\x00" * 32
+            self.set_auth_value(0)
 
     def set_alg(self, alg):
         self.alg = alg
+
+    def set_auth_value(self, value):
+        """
+        Sets the auth value in the correct format
+
+        :param value: The auth_value
+        :type value: int | bytes
+        """
+
+        if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
+            size = 16
+        elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
+            size = 32
+
+        if type(value) is int:
+            self.auth_value = value.to_bytes(size, "big")
+        elif type(value) is str:
+            try:
+                self.auth_value = value.encode("ascii").ljust(size, b"\x00")[:size]
+            except UnicodeEncodeError:
+                return
 
     def compute_ecdh_secret(self):
         """
@@ -1030,7 +1048,7 @@ class UpperTransportLayerAppKeyCryptoManager:
 class UpperTransportLayerDevKeyCryptoManager:
     """
     This manages the Device Key (that sits in the UpperTransportLayer).
-    ONE PER DEVICE (bound to all networks). Every instance of Upper Transport Layer will have a reference to this object.
+    ONE PER DEVICE (in theory) (bound to all networks).
     Generated after provisioning complete.
     """
 
@@ -1053,7 +1071,9 @@ class UpperTransportLayerDevKeyCryptoManager:
                 provisioning_crypto_manager.provisioning_salt,
                 b"prdk",
             )
-            print("DEV KEY : " + self.device_key.hex())
+
+        # place holder (used only in app keys)
+        self.aid = -1
 
     def __compute_nonce(self, aszmic, seq_auth, src_addr, dst_addr, iv_index):
         return (
@@ -1138,18 +1158,6 @@ class UpperTransportLayerDevKeyCryptoManager:
         """
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
         nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
-        """
-        print("DECRYPT WITH DEV KEY")
-        print("aszmic : " + str(aszmic))
-        print("seq_number : " + str(seq_number))
-        print(b"src_addr : " + src_addr)
-        print(b"dst_addr : " + dst_addr)
-        print(b"iv_index : " + iv_index)
-        print("enc : " + enc_data.hex())
-
-        print("NONCE : " + nonce.hex())
-        """
-
         if aszmic == 1:
             mac_len = 8
         else:

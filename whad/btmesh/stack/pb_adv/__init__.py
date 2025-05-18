@@ -6,8 +6,14 @@ Mostly instanciate a generic provisioning layer. Only once for a provisionee, an
 
 from random import randbytes
 from whad.common.stack import Layer, alias, instance
-from whad.btmesh.stack.utils import ProvisioningCompleteData
-from whad.scapy.layers.btmesh import EIR_PB_ADV_PDU
+from whad.btmesh.stack.utils import (
+    ProvisioningCompleteData,
+    ProvisioningAuthenticationData,
+)
+from whad.scapy.layers.btmesh import (
+    EIR_PB_ADV_PDU,
+    BTMesh_Generic_Provisioning_Link_Open,
+)
 from scapy.layers.bluetooth import EIR_Hdr
 from whad.btmesh.stack.gen_prov import (
     GenericProvisioningLayerProvisionee,
@@ -19,45 +25,86 @@ from threading import Thread
 
 @alias("pb_adv")
 class PBAdvBearerLayer(Layer):
-    def __init__(self, connector, options={}):
+    def __init__(
+        self,
+        connector,
+        is_provisioner=False,
+        options={},
+    ):
+        """
+        Initiates the PB-ADV layer.
+
+        :param connector: The connector that creates this layer
+        :type connector: BTMesh
+        :param is_provisioner: Is the device a provisioner node ?, defaults to False
+        :type is_provisioner: bool, optional
+        :param options: [TODO:description], defaults to {}
+        :type options: [TODO:type], optional
+        """
         # list of Generic provisioning layers for each link_id
         super().__init__(options=options)
-        self.state.gen_prov_dict = {}
+
+        # Current link_id (the current Provisining process running)
+        self.state.current_link_id = None
+
+        # Current instance of the GenericProvisioningLayer used
+        self.state.gen_prov_layer = None
 
         # save connector (BLE Phy stack, send RAW adv pdu)
         self.__connector = connector
 
-        if "role" in options and options["role"] == "provisioner":
+        self.state.is_provisioner = is_provisioner
+
+        if self.state.is_provisioner:
             self.state.generic_prov_layer_class = GenericProvisioningLayerProvisioner
         else:
             self.state.generic_prov_layer_class = GenericProvisioningLayerProvisionee
 
-    def send_to_gen_prov(self, packet: EIR_PB_ADV_PDU):
+        # Capabilities of the Device, set via shell or user function in this class. Passed to Provisioning layer when GenericProvisioningLayer instanciated
+        self.state.capabilities = dict(
+            algorithms=0b11,  # default support 2 algs
+            public_key_type=0x00,  # default no OOB public key support
+            oob_type=0b00,  # no static OOB supported
+            output_oob_size=0x00,
+            output_oob_action=0b00000,  # default no output OOB action available
+            input_oob_size=0x00,
+            input_oob_action=0b0000,  # default no input OOB a available
+        )
+
+    def send_to_gen_prov(self, packet):
         """
         Sent packet to Upper layer. Instance chosen based on packet's link_id field
 
         :param packet: [TODO:description]
+        :type packet: EIR_PB_ADV_PDU | ProvisioningAuthenticationData
         """
-        transaction_number = packet.transaction_number
-        link_id = packet.link_id
-        message = GenericProvisioningMessage(packet.data, transaction_number)
-        self.send(self.state.gen_prov_dict[link_id].name, message)
+        if isinstance(packet, EIR_PB_ADV_PDU):
+            transaction_number = packet.transaction_number
+            message = GenericProvisioningMessage(packet.data, transaction_number)
+        elif isinstance(packet, ProvisioningAuthenticationData):
+            message = packet
 
-    def get_link_id_from_instance_name(self, search_instance_name):
-        """
-        Reverse search of link_id/gen_prov_instances dictionnary
-
-        :param search_instance_name: Generic Provisining Instance name
-        :type search_instance_name: [TODO:type]
-        """
-        for link_id, gen_prov_instance in self.state.gen_prov_dict.items():
-            if gen_prov_instance.name == search_instance_name:
-                return link_id
+        self.send(self.state.gen_prov_layer.name, message)
 
     def instantiate_gen_prov(self, link_id, peer_uuid=None):
+        """
+        Create an Instance of GenericProvisioningLayer when a provisioning process is started
+        A new one is created for each provisioning process.
+
+        :param link_id: link_id of the provisioning process
+        :type link_id: str
+        :param peer_uuid: The uuid of the peer node, defaults to None
+        :type peer_uuid: str, optional
+        """
         new_gen_prov = self.instantiate(self.state.generic_prov_layer_class)
         new_gen_prov.state.peer_uuid = peer_uuid
-        self.state.gen_prov_dict[link_id] = new_gen_prov
+        new_gen_prov.get_layer("provisioning").set_capabilities(self.state.capabilities)
+
+        if self.state.gen_prov_layer is not None:
+            self.state.gen_prov_layer.destroy()
+
+        self.state.gen_prov_layer = new_gen_prov
+        self.state.current_link_id = link_id
         return new_gen_prov
 
     def on_provisioning_pdu(self, packet):
@@ -67,9 +114,37 @@ class PBAdvBearerLayer(Layer):
         :param packet: [TODO:description]
         :type packet: EIR_PB_ADV_PDU
         """
-        if packet.link_id not in self.state.gen_prov_dict:
-            self.instantiate_gen_prov(packet.link_id)
+        if self.state.gen_prov_layer is None:
+            # If no gen_prov layer existing and Provisioner mode, somthing went wrong ...
+            if self.state.is_provisioner:
+                return
+
+            else:
+                # We check that the packet is,a Link Open corresponding to out uuid if provisionee mode
+                if (
+                    packet.transaction_number == 0
+                    and isinstance(packet.data, BTMesh_Generic_Provisioning_Link_Open)
+                    and packet.data.device_uuid == self.__connector.uuid
+                ):
+                    self.instantiate_gen_prov(packet.link_id)
+
+                    # if a provisionee, stop beacons
+                    if not self.state.is_provisioner:
+                        self.__connector.stop_unprovisioned_beacons()
+
+                else:
+                    return
+
         self.send_to_gen_prov(packet)
+
+    def on_auth_data(self, auth_data):
+        """
+        Process a ProvisioningAuthenticationData sent by the connector when the user typed an auth value (interactive shell or cli)
+
+        :param auth_data: The auth data
+        :type auth_data: ProvisioningAuthenticationData
+        """
+        self.send_to_gen_prov(auth_data)
 
     def on_new_unprovisoned_device(self, peer_uuid):
         """
@@ -80,13 +155,14 @@ class PBAdvBearerLayer(Layer):
         :type peer_uuid: str
         """
         link_id = randbytes(4)
-        new_gen_prov = self.instantiate_gen_prov(link_id, peer_uuid)
-        new_gen_prov.get_layer("provisioning").initiate_provisioning()
+        self.state.gen_prov_layer = self.instantiate_gen_prov(link_id, peer_uuid)
+        self.state.current_link_id = link_id
+        self.state.gen_prov_layer.get_layer("provisioning").initiate_provisioning()
 
     @instance("gen_prov")
     def on_gen_prov_received(self, source, message):
         """
-        Provess a packet sent by a Generic Provisining Layer Instance to be sent to peer
+        Process a packet sent by a Generic Provisining Layer Instance to be sent to peer
 
         :param self: [TODO:description]
         :type self: [TODO:type]
@@ -94,18 +170,25 @@ class PBAdvBearerLayer(Layer):
         :type source: [TODO:type]
         :param message: [TODO:description]
         """
+
         # if message is ProvisioningCompleteData, we complete the provisonning
         if isinstance(message, ProvisioningCompleteData):
+            self._is_provisioning = False
             self.__connector.provisionning_complete(message)
+            return
+
+        if isinstance(message, ProvisioningAuthenticationData):
+            self.__connector.provisonning_auth_data(message)
             return
 
         packet = message.gen_prov_pkt
         transaction_number = message.transaction_number
-        link_id = self.get_link_id_from_instance_name(source)
         pkt = EIR_Hdr(type=0x29) / EIR_PB_ADV_PDU(
-            link_id=link_id, transaction_number=transaction_number, data=packet
+            link_id=self.state.current_link_id,
+            transaction_number=transaction_number,
+            data=packet,
         )
-        #self.__connector.send_raw(pkt)
+        # self.__connector.send_raw(pkt)
         thread = Thread(
             target=self.sending_thread,
             args=(pkt),
@@ -115,3 +198,31 @@ class PBAdvBearerLayer(Layer):
 
     def sending_thread(self, pkt):
         self.__connector.send_raw(pkt)
+
+    def set_capability(self, name, value):
+        """
+        Sets the capablity whose key is name arg with the value. Used when instanciating a new GenericProvisioningLayer and Provisioning layers
+        Need to be set before the provisioning started ...
+
+        :param name: Name (key in the dict) of the capablity
+        :type name: str
+        :param value: Value to set
+        :type value: int
+        :returns: True if success, False if fail
+        :rtype: bool
+        """
+
+        if name not in self.state.capabilities.keys():
+            return False
+
+        self.state.capabilities[name] = value
+        return True
+
+    def get_capabilities(self):
+        """
+        Returns the dict of capablities that will be used/has been used when instanciating a new GenericProvisioningLayer and Provisining layers.
+
+        :returns: The dict of capablities in ProvisioningState
+        :rtype: dict
+        """
+        return self.state.capabilities

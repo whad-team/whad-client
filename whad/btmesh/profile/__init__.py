@@ -15,8 +15,18 @@ from whad.btmesh.stack.constants import (
     UNASSIGNED_ADDR_TYPE,
 )
 from whad.btmesh.stack.utils import Subnet, MeshMessageContext
-from whad.btmesh.crypto import NetworkLayerCryptoManager
-from whad.scapy.layers.btmesh import BTMesh_Model_Config_Net_Key_Add
+from whad.btmesh.crypto import (
+    NetworkLayerCryptoManager,
+    UpperTransportLayerAppKeyCryptoManager,
+    UpperTransportLayerDevKeyCryptoManager,
+)
+from whad.scapy.layers.btmesh import (
+    BTMesh_Model_Config_Net_Key_Add,
+    BTMesh_Model_Config_Net_Key_Delete,
+    BTMesh_Model_Config_App_Key_Add,
+    BTMesh_Model_Config_App_Key_Update,
+    BTMesh_Model_Config_App_Key_Delete,
+)
 
 from threading import Lock
 
@@ -43,10 +53,35 @@ class BaseMeshProfile(object):
     Base class for Blutooth Mesh Profile.
     Should be inherited by BaseMeshProvisioneeProfile and BaseMeshProvisionerProfile
 
+    Manages the local data of the node and allows interaction from user code or shell to manage the device (no interaction with network)
+
     All nodes should have the ConfigurationModelServer and HealthModelServer on the primary element (stack does not function without it)
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        auto_prov_net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
+        # auto_prov_net_key=bytes.fromhex("efb2255e6422d330088e09bb015ed707"),
+        auto_prov_dev_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
+        auto_prov_app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
+        auto_prov_unicast_addr=b"\x00\x02",
+    ):
+        """
+        Init of the BTMesh generic profile.
+
+        :param auto_prov_net_key: Primary net key of the node (index 0) if auto_provisioned, defaults to bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00")
+        :type auto_prov_net_key: bytes, optional
+        :param auto_prov_dev_key: Dev key of the node if auto_provisioned , defaults to bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
+        :type auto_prov_dev_key: bytes, optional
+        :param auto_prov_app_key: App key of the node (index 0, binded to net_key at index 0) if auto_provisioned, defaults to bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
+        :type auto_prov_app_key: bytes, optional
+        :param auto_prov_unicast_addr: Primary unicast_addr if auto_provisioned, defaults to b"\x00\x02"
+        :type auto_prov_unicast_addr: bytes, optional
+        """
+
+        # Is the node provisioned ? (should be True on start if Provisioner)
+        self.is_provisioned = False
+
         # Elements of the node. Ordered.
         self.__elements = []
 
@@ -67,14 +102,16 @@ class BaseMeshProfile(object):
         # lock to access the seq_number
         self.__seq_lock = Lock()
 
-        self.iv_index = b"\x00\x00\x00\x00"
-
         # Sequence number of the device for the iv_index
         # used by basically every layer ...
         self.__seq_number = 0
 
         # the forwarding number for "legitimate" PATH_REQUEST packets from our primary unicast addr
         self.__forwarding_number = 0
+
+        # Dev keys of other nodes AND ours
+        # Key is primary address of the node
+        self.__dev_keys = {}
 
         # lock to access the seq_number
         self.__seq_lock = Lock()
@@ -85,7 +122,7 @@ class BaseMeshProfile(object):
         # dict of the subnets of the node. (Subnet objects)
         self.__subnets = []
 
-        self.__populate_base_models()
+        self._populate_elements_and_models()
 
         primary_element = self.get_element(0)
 
@@ -97,9 +134,15 @@ class BaseMeshProfile(object):
         conf_model = ConfigurationModelServer(profile=self)
         primary_element.register_model(conf_model)
 
-    def __populate_base_models(self):
+        # Default values used when auto_provisioning
+        self._auto_prov_net_key = auto_prov_net_key
+        self._auto_prov_dev_key = auto_prov_dev_key
+        self._auto_prov_app_key = auto_prov_app_key
+        self._auto_prov_unicast_addr = auto_prov_unicast_addr
+
+    def _populate_elements_and_models(self):
         """
-        Populate elements and models for the node (except the ConfigurationModelServer and primary element creation, by default)
+        Populate elements and models for the node (except the ConfigurationModelServer, HealthModelServer and primary element creation, by default)
         """
         primary_element = self.get_element(0)
         primary_element.register_model(GenericOnOffServer())
@@ -223,13 +266,11 @@ class BaseMeshProfile(object):
         configuration_server_model.get_state("net_key_list").set_value(
             field_name=primary_net_key.key_index, value=primary_net_key
         )
-        configuration_server_model.get_state("app_key_list").set_value(
-            field_name=-1, value=dev_key
-        )
+        self.__dev_keys[unicast_addr] = dev_key
         self.iv_index = iv_index
         self.primary_element_addr = int.from_bytes(unicast_addr, "big")
 
-        # Add an app ley if specified in arguments
+        # Add an app key if specified in arguments
         if app_key is not None:
             configuration_server_model.get_state("app_key_list").set_value(
                 field_name=app_key.key_index, value=app_key
@@ -238,6 +279,40 @@ class BaseMeshProfile(object):
         # Create subnet from the provisioning data
         subnet = Subnet(primary_net_key.key_index)
         self.add_subnet(subnet)
+
+        self.is_provisioned = True
+
+    def auto_provision(
+        self,
+    ):
+        """
+        Auto provisioning with data given in constructor of the profile or set with the setters
+        Will automatically bind all the non config models of the node to the primary app key (index 0)
+
+        :returns: True if successfull, False otherwise
+        :rtype: bool
+        """
+        primary_net_key = NetworkLayerCryptoManager(
+            key_index=0, net_key=self._auto_prov_net_key
+        )
+        dev_key = UpperTransportLayerDevKeyCryptoManager(
+            device_key=self._auto_prov_dev_key
+        )
+        primary_app_key = UpperTransportLayerAppKeyCryptoManager(
+            app_key=self._auto_prov_app_key
+        )
+        self.provision(
+            primary_net_key,
+            dev_key,
+            b"\x00\x00\x00\x00",
+            0,
+            self._auto_prov_unicast_addr,
+            primary_app_key,
+        )
+        # create app key and bind it to all models
+        self.bind_all(primary_app_key.key_index)
+
+        return True
 
     def bind_all(self, app_key_index):
         """
@@ -253,6 +328,69 @@ class BaseMeshProfile(object):
                     self.get_configuration_server_model().get_state(
                         "model_to_app_key_list"
                     ).set_value(field_name=model.model_id, value=[0])
+
+    def get_dev_key(self, address=None):
+        """
+        Retrieves the dev_key of the address in argument. If address is None, returns the dev key of this node.
+        Returns None is no dev_key stored for the adress in argument
+
+        :param address: Primary Address of the node we want the dev_key of, defaults to None
+        :type address: bytes, optional
+        :returns: The dev_key asked, None if not found
+        :rtype: UpperTransportLayerDevKeyCryptoManager | None
+        """
+        if address is None or self.primary_element_addr.to_bytes(2, "big") == address:
+            address = self.primary_element_addr.to_bytes(2, "big")
+
+        if address in self.__dev_keys.keys():
+            return self.__dev_keys[address]
+        else:
+            return None
+
+    def get_all_dev_keys(self):
+        """
+        Returns a dict of all the devkeys this node stores (at least it has its own)
+
+        :returns: The dev_keys this node stores (dict, key is primary_element_addr of the node in question)
+        :rtype: dict
+        """
+        return self.__dev_keys
+
+    def update_dev_key(self, address, dev_key):
+        """
+        Update or add a dev_key associated witht the given address
+        Returns True if success, False otherwise
+
+        :param address: Address to bind to the dev_key
+        :type address: bytes
+        :param dev_key: The dev key to add
+        :type dev_key: UpperTransportLayerDevKeyCryptoManager
+        :returns: True is success, False otherwise
+        :rtype: Bool
+        """
+        self.__dev_keys[address] = UpperTransportLayerDevKeyCryptoManager(
+            device_key=dev_key
+        )
+        return True
+
+    def remove_dev_key(self, address):
+        """
+        Removes a dev_key from the list we have
+        Address cannot be the current primary adress of this node
+        Returns True if success, False if fail
+
+
+        :param address: Address to remove the dev_key of
+        :type address: bytes
+        """
+        if (
+            address in self.__dev_keys.keys()
+            and address != self.primary_element_addr.to_bytes(2, "big")
+        ):
+            self.__dev_keys.pop(address)
+            return True
+
+        return False
 
     def get_element(self, index):
         """
@@ -307,7 +445,7 @@ class BaseMeshProfile(object):
 
     def get_net_key(self, index):
         """
-        Returns the NetworkLayerCryptoManager object associated with net_key_index.
+        Returns the NetworkLayerCryptoManager object associated with net_key_index. (the actual key object, not Subnet object)
         None if not exist
 
         :param index: net_key_index
@@ -322,7 +460,7 @@ class BaseMeshProfile(object):
     def update_net_key(self, net_key_index, key):
         """
         Updates the net_key at index if it exists, or creates it alongisde the corresponding Subnet object
-        For update, does not follow the proper Key refresh procedure (simply replaces the value)
+        For update, does not follow the proper Key refresh procedure (simply replaces the value --force)
 
         Returns False if problem, True if successfull
 
@@ -332,6 +470,7 @@ class BaseMeshProfile(object):
         :type key: Bytes
         """
 
+        # If net_key already exist, update by hand and not via ConfigurationModelServer since procedure is different (key refresh)
         if self.get_subnet(net_key_index) is not None:
             self.get_configuration_server_model().get_state("net_key_list").set_value(
                 field_name=net_key_index,
@@ -351,6 +490,23 @@ class BaseMeshProfile(object):
 
             self.add_subnet(Subnet(net_key_index))
             return True
+
+    def remove_net_key(self, index):
+        """
+        Launches the Net Key delete procedure. The handler of the ConfigurationModelServer manages everything.
+        Return True if ok, False if fail
+
+        :param index: NetKey index of the key to remove
+        :type index: int
+        :returns: True if ok, False if fail
+        :rtype: bool
+        """
+        message = BTMesh_Model_Config_Net_Key_Delete(net_key_index=index)
+        response = self.get_configuration_server_model().on_net_key_delete((
+            message,
+            MeshMessageContext(),
+        ))
+        return response.status == 0
 
     def get_subnet(self, index):
         """
@@ -385,16 +541,137 @@ class BaseMeshProfile(object):
 
     def remove_subnet(self, index):
         """
-        Removes a subnet with the given net_key_index.
-        Returns the removed subnet if found, None otherwise
+        Removes a subnet with the given net_key_index
+        Returns the removed subnet if found, None otherwise (or if a single subnet is present)
 
         :param index: Index of the NetKey associated with the subnet
         :type index: int
-        :returns: The removed subnet
-        :rtype: Subnet | None
+        :returns: True if success, False if fail
+        :rtype: bool
         """
-        for i in range(len(self.__subnets)):
-            if self.__subnets[i].net_key_index == index:
-                return self.__subnets.pop(i)
 
-        return None
+        for i, subnet in enumerate(self.__subnets):
+            if subnet.net_key_index == index:
+                self.__subnets.pop(i)
+                return True
+
+        return False
+
+    def get_app_key(self, index):
+        """
+        Returns the UpperTransportLayerAppKeyCryptoManager/UpperTransportLayerDevKeyCryptoManager object associated with app_key_index.
+        None if not exist
+
+        :param index: app_key_index
+        :type index: int
+        :returns: The AppKey for the index from the app_key_list state in ConfigurationModelServer, None if not found
+        :rtype: UpperTransportLayerAppKeyCryptoManager | None
+        """
+        return (
+            self.get_configuration_server_model()
+            .get_state("app_key_list")
+            .get_value(index)
+        )
+
+    def get_all_app_keys(self):
+        """
+        Returns a List of the App keys/Dev keys of UpperTransportLayerAppKeyCryptoManager
+        From the app_key_list state in ConfigurationModelServer
+
+        :returns: The list if UpperTransportLayerAppKeyCryptoManager of the node
+        :rtype: List(UpperTransportLayerAppKeyCryptoManager)
+        """
+        return (
+            self.get_configuration_server_model()
+            .get_state("app_key_list")
+            .get_all_values()
+        )
+
+    def update_app_key(self, app_key_index, net_key_index, value):
+        """
+        Updates the app_key at index if it exists, or creates it alongisde the corresponding Subnet object
+        For update, does not follow the proper Key refresh procedure (simply replaces the value --force)
+
+        Returns False if problem, True if successfull.
+
+        :param app_key_index: The app_key_index
+        :type app_key_index: int
+        :param: net_key_index: the net_key_index the key is bounded to
+        ;type net_key_index: int
+        :param key: The key value to add/update
+        :type key: Bytes
+        """
+
+        if self.get_app_key(app_key_index) is not None:
+            message = BTMesh_Model_Config_App_Key_Update(
+                app_key_index=app_key_index, net_key_index=net_key_index, app_key=value
+            )
+            response = self.get_configuration_server_model().on_app_key_update((
+                message,
+                MeshMessageContext(),
+            ))
+        else:
+            message = BTMesh_Model_Config_App_Key_Add(
+                app_key_index=app_key_index, net_key_index=net_key_index, app_key=value
+            )
+            response = self.get_configuration_server_model().on_app_key_add((
+                message,
+                MeshMessageContext(),
+            ))
+
+        return response.status == 0
+
+    def remove_app_key(self, app_key_index, net_key_index):
+        """
+        Removes an app_key with the given app_key_index and net_key_index from the app_key_list in the ConfigurationModelServer
+        Returns the removed app_key if found, None otherwise (or if only one app_key is present)
+
+        :param index: Index of the AppKey
+        :type index: int
+        :returns: True if success, False if fail
+        :rtype: bool
+        """
+        message = BTMesh_Model_Config_App_Key_Delete(
+            app_key_index=app_key_index, net_key_index=net_key_index
+        )
+        response = self.get_configuration_server_model().on_app_key_delete((
+            message,
+            MeshMessageContext(),
+        ))
+        return response.status == 0
+
+    def set_auto_prov_unicast_addr(self, unicast_addr):
+        """
+        Sets the value to use for the unicast_addr of the node if auto_provision used
+
+        :param unicast_addr: Unicast address to set
+        :type unicast_addr: bytes
+        """
+        self._auto_prov_unicast_addr = unicast_addr
+
+    def set_auto_prov_net_key(self, net_key):
+        """
+        Sets the value to use for the primary_net_key of the node if auto_provision used
+
+        :param net_key: net key value
+        :type  net_key: bytes
+        """
+        self._auto_prov_net_key = net_key
+
+    def set_auto_prov_app_key(self, app_key):
+        """
+        Sets the value to use for the app_key at index 0 if auto_provision used
+
+        :param app_key: App key value
+        :type app_key: bytes
+        """
+        self._auto_prov_app_key = app_key
+
+    def set_auto_prov_dev_key(self, dev_key):
+        """
+        Sets the value to use for the dev_key of the node if auto_provision used
+
+        :param dev_key: Dev key value
+        :type dev_key: bytes
+        """
+        self._auto_prov_dev_key = dev_key

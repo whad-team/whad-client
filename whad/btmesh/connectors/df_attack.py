@@ -18,11 +18,7 @@ react on specific events.
 from whad.btmesh.connectors.provisionee import Provisionee
 
 from whad.scapy.layers.btmesh import *
-from whad.btmesh.stack.utils import MeshMessageContext
-from whad.btmesh.stack.constants import (
-    MANAGED_FLOODING_CREDS,
-    DIRECTED_FORWARDING_CREDS,
-)
+from whad.btmesh.stack.network import NetworkLayer
 
 from whad.btmesh.profile import BaseMeshProfile
 
@@ -34,35 +30,17 @@ class DFAttacks(Provisionee):
         self,
         device,
         profile=BaseMeshProfile(),
-        auto_provision=False,
-        net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
-        #net_key=bytes.fromhex("efb2255e6422d330088e09bb015ed707"),
-        app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
-        unicast_addr=b"\x00\x02",
     ):
         """
-        Contructor of a Provisionee (node) device
-        Support for only one element per node
+        Contructor of a Provisionee (node) device with Directed forwarding attacks capabilities
 
         :param device: Device object
         :type device: Device
         :param profile: Profile class used for the node (elements and models layout), defaults to BaseMeshProfile
-        :param auto_provision: Is the node auto provisioned ?, defaults to False
-        :type auto_provision: Bool, optional
-        :param net_key: If auto provisioned : primary NetKey , defaults to bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00")
-        :type net_key: Bytes, optional
-        :param app_key: If auto provisioned : primary app key and dev key, defaults to bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
-        :type app_key: Bytes, optional
-        :param unicast_addr: If auto provisioned, unicast addr, defaults to b"\x00\x02"
-        :type unicast_addr: Bytes, optional
         """
         super().__init__(
             device,
             profile,
-            auto_provision=False,
-            net_key=net_key,
-            app_key=app_key,
-            unicast_addr=unicast_addr,
         )
 
         self.whitelist = []
@@ -80,8 +58,7 @@ class DFAttacks(Provisionee):
             },
         }
 
-        if auto_provision:
-            self.auto_provision(net_key, app_key, unicast_addr)
+        self._main_stack = NetworkLayer(connector=self, options=self.options)
 
     def do_network_discovery(self, addr_low, addr_high, delay=3.5):
         """
@@ -126,7 +103,7 @@ class DFAttacks(Provisionee):
         """
         return self._main_stack.get_layer("access").df_set(dest)
 
-    def a5_attack(self, victim_addr):
+    def a3_attack(self, victim_addr):
         """
         Perform the A5 attack
 
@@ -135,14 +112,14 @@ class DFAttacks(Provisionee):
         """
         return self._main_stack.get_layer("upper_transport").a5_attack(victim_addr)
 
-    def a3_attack(self, addr_list):
+    def a4_attack(self, addr_list):
         """
-        Perform the A3 attack
+        Perform the A4 attack
 
         :param addr_list: List of addr to put in the Path Request Solicitation message
         :type addr_list: List[int]
         """
-        self._main_stack.get_layer("upper_transport").a3_attack(addr_list)
+        self._main_stack.get_layer("upper_transport").a4_attack(addr_list)
 
     def a2_attack(self, action):
         """

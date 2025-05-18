@@ -73,6 +73,21 @@ class ModelState(object):
         t = Timer(delay / 1000, self.__set_value, args=[value, field_name])
         t.start()
 
+    def remove_value(self, field_name):
+        """
+        Removes the value with field_name from this state and returns it.
+        None if the field_name doesnt exist in this state
+
+        :param field_name: The value's field_name to remove
+        :type field_name: int
+        :returns: The value removed or None if not found
+        :rtype: Any
+        """
+        if field_name in self.values.keys():
+            return self.values.pop(field_name)
+        else:
+            return None
+
     def get_value(self, field_name="default"):
         """
         Gets the value of a State.
@@ -91,7 +106,11 @@ class ModelState(object):
         """
         Returns the full list of values.
         """
-        return self.values.values()
+        values = list(self.values.values())
+        values.remove(
+            None
+        )  # remove default value if it is None (no state should have None value)
+        return values
 
     def remove_value(self, field_name="default"):
         """
@@ -145,6 +164,15 @@ class CompositeModelState:
         except Exception:
             return None
 
+    def get_all_sub_states(self):
+        """
+        Returns a list of all the sub states of the CompositeModelState
+
+        :returns: A list of the the substates of the object
+        :rtype: List(ModelState)
+        """
+        return list(self.sub_states.values())
+
 
 # metaclass to implemenet Singleton
 class SingletonMeta(type):
@@ -176,7 +204,7 @@ def lock(f):
 
 class StatesManager:
     """
-    Parent class for objects that managed states. (Subnet and ModelServer).
+    Parent class for objects that manage states. (Subnet and ModelServer).
     """
 
     def __init__(self):
@@ -203,7 +231,7 @@ class StatesManager:
         """
         Retrieves the state object that corresponds to the given name.
 
-        :param state_name: Name of the State
+        :param state_name: Name of the ModelState
         :type state_name: str
         :returns: The state corrsponding to the name on the model. Searches for states in parent models if not found on this one. None if not found
         :rtype: ModelState | CompositeModelState | None
@@ -218,6 +246,15 @@ class StatesManager:
                     if state is not None:
                         return state
             return None
+
+    def get_all_states(self):
+        """
+        Return a list of all ModelState and CompositeModelState of the object
+
+        :returns: List of the states of the object
+        :rtype: List(ModelState|CompositeModelState)
+        """
+        return list(self.states.values())
 
 
 class Model(object):
@@ -239,6 +276,10 @@ class Model(object):
 
         # If set to true, need to add corresponding state subscription_list
         self.supports_subscribe = False
+
+        # If this attribute if True, Model will allows sending/receiving with DevKey
+        # If Server model, only with our own DevKey. If Client Model, with any DevKey we have
+        self.allows_dev_keys = False
 
     def handle_message(self, message):
         """

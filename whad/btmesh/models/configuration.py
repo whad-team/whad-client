@@ -235,6 +235,8 @@ class ConfigurationModelServer(ModelServer):
 
         self.composition_data = CompositionDataState()
 
+        self.allows_dev_keys = True
+
         self.__init_states()
 
     def __init_states(self):
@@ -1150,8 +1152,15 @@ class ConfigurationModelServer(ModelServer):
         stored_net_key = self.get_state("net_key_list").get_value(net_key_index)
 
         if stored_net_key is not None:
-            # Cannot delete key if its the one used to send the message ...
-            if stored_net_key.key_index == net_key_index:
+            # Check is net key is not the only one we have
+            net_keys = self.get_state("net_key_list").get_all_values()
+
+            # Cannot delete key if its the one used to send the message or if we have only one
+            # Check if ctx net_key_index is not None for local delete
+            if (
+                ctx.net_key_id is not None
+                and stored_net_key.key_index == ctx.net_key_id
+            ) or len(net_keys) <= 1:
                 response = BTMesh_Model_Config_Net_Key_Status(
                     status=0x0C, net_key_index=net_key_index
                 )
@@ -1162,13 +1171,13 @@ class ConfigurationModelServer(ModelServer):
 
             # remove all appKey bound to this netkey
             for app_key_index in stored_net_key.app_key_indexes:
-                self.get_state("app_key_list").remove(app_key_index)
+                self.get_state("app_key_list").remove_value(app_key_index)
 
                 # disable publication for app_key that are deleted
                 self.__disable_model_publication(app_key_index)
 
             self.profile.remove_subnet(net_key_index)
-            self.get_state("net_key_list").remove(net_key_index)
+            self.get_state("net_key_list").remove_value(net_key_index)
 
         response = BTMesh_Model_Config_Net_Key_Status(
             status=0, net_key_index=net_key_index
@@ -1206,7 +1215,9 @@ class ConfigurationModelServer(ModelServer):
             status = 0x4
         else:
             app_key_crypto_manager = UpperTransportLayerAppKeyCryptoManager(
-                app_key=pkt.app_key, net_key_index=net_key_index
+                app_key=pkt.app_key,
+                key_index=app_key_index,
+                net_key_index=net_key_index,
             )
             self.get_state("app_key_list").set_value(
                 field_name=app_key_index, value=app_key_crypto_manager
@@ -1234,7 +1245,9 @@ class ConfigurationModelServer(ModelServer):
             status = 0x11
         else:
             app_key_crypto_manager = UpperTransportLayerAppKeyCryptoManager(
-                app_key=pkt.app_key, net_key_index=net_key_index
+                app_key=pkt.app_key,
+                key_index=app_key_index,
+                net_key_index=net_key_index,
             )
             self.get_state("app_key_list").set_value(
                 field_name=app_key_index, value=app_key_crypto_manager
@@ -1251,7 +1264,8 @@ class ConfigurationModelServer(ModelServer):
         # need to update model publication states ....
         app_key_index = pkt.app_key_index
         net_key_index = pkt.net_key_index
-        stored_app_key = self.get_state("app_key_list").get_value(app_key_index)
+        app_key_list = self.get_state("app_key_list")
+        stored_app_key = app_key_list.get_value(app_key_index)
         stored_net_key = self.get_state("net_key_list").get_value(net_key_index)
         status = 0
         if stored_net_key is None:
@@ -1261,7 +1275,7 @@ class ConfigurationModelServer(ModelServer):
             # disable publication for models that use this app key
             self.__disable_model_publication(app_key_index)
 
-            stored_net_key.app_key_indexes.remove(app_key_index)
+            app_key_list.remove_value(app_key_index)
 
         response = BTMesh_Model_Config_App_Key_Status(
             status=status, app_key_index=app_key_index, net_key_index=net_key_index
@@ -1328,6 +1342,7 @@ class ConfigurationModelServer(ModelServer):
             app_key_list = self.get_state("model_to_app_key_list").get_value(model_id)
             if app_key_index in app_key_index:
                 app_key_list.remove(app_key_index)
+
         response = BTMesh_Model_Config_Model_App_Status(
             status=status,
             element_addr=pkt.element_addr,

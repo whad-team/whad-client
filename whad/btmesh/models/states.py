@@ -283,7 +283,7 @@ class HeartbeatPublicationNetKeyIndexState(ModelState):
 class HeartbeatPublicationCompositeState(CompositeModelState):
     def __init__(self):
         super().__init__(
-            name="hearbeat_publication",
+            name="heartbeat_publication",
             sub_states_cls=[
                 HeartbeatPublicationDestinationState,
                 HeartbeatPublicationCountState,
