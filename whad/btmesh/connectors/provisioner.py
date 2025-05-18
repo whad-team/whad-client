@@ -21,6 +21,8 @@ from whad.scapy.layers.btmesh import (
     EIR_BTMesh_Beacon,
 )
 from whad.btmesh.profile import BaseMeshProfile
+from whad.btmesh.stack.constants import OUTPUT_OOB_AUTH, INPUT_OOB_AUTH
+from threading import Event
 
 
 class UnprovisionedDeviceList:
@@ -82,11 +84,8 @@ class Provisioner(BTMesh):
     def __init__(
         self,
         device,
+        prov_stack=PBAdvBearerLayer,
         profile=BaseMeshProfile(),
-        auto_provision=False,
-        net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
-        app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
-        unicast_addr=b"\x00\x01",
     ):
         """
         Create a Provisionner device (listening to beacons)
@@ -95,22 +94,10 @@ class Provisioner(BTMesh):
         :param device: Device object
         :type device: Device
         :param profile: Profile class used, defaults to BaseMeshProfile
-        :param auto_provision: Choose if auto provisioning needed to be node, defaults to False
-        :type auto_provision: Bool, optional
-        :param net_key: If auto provisioned : primary NetKey , defaults to bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00")
-        :type net_key: Bytes, optional
-        :param app_key: If auto provisioned : primary app key and dev key, defaults to bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
-        :type app_key: Bytes, optional
-        :param unicast_addr: If auto provisioned, unicast addr, defaults to b"\x00\x01"
-        :type unicast_addr: Bytes, optional
         """
-        super().__init__(
-            device, profile, stack=PBAdvBearerLayer, options={"role": "provisioner"}
-        )
+        super().__init__(device, profile, prov_stack=prov_stack, is_provisioner=True)
         self.__unprovisioned_devices = UnprovisionedDeviceList()
-
-        if auto_provision:
-            self.auto_provision(net_key, app_key, unicast_addr)
+        self._is_listening_for_beacons = False
 
     def process_rx_packets(self, packet):
         """
@@ -123,11 +110,25 @@ class Provisioner(BTMesh):
         if packet.haslayer(EIR_BTMesh_Beacon):
             self.process_beacon(packet.getlayer(EIR_BTMesh_Beacon))
         elif packet.haslayer(EIR_PB_ADV_PDU):
-            self._stack.on_provisioning_pdu(packet.getlayer(EIR_PB_ADV_PDU))
-        elif self.is_provisioned and packet.haslayer(BTMesh_Obfuscated_Network_PDU):
+            self._prov_stack.on_provisioning_pdu(packet.getlayer(EIR_PB_ADV_PDU))
+        elif self.profile.is_provisioned and packet.haslayer(
+            BTMesh_Obfuscated_Network_PDU
+        ):
             self._main_stack.on_net_pdu_received(
                 packet.getlayer(BTMesh_Obfuscated_Network_PDU), packet.metadata.rssi
             )
+
+    def stop_listening_beacons(self):
+        """
+        Stops the listening for beacons
+        """
+        self._is_listening_for_beacons = False
+
+    def start_listening_beacons(self):
+        """
+        Starts the listening for beacons
+        """
+        self._is_listening_for_beacons = True
 
     def process_beacon(self, packet):
         """
@@ -138,15 +139,64 @@ class Provisioner(BTMesh):
         """
         if packet.mesh_beacon_type == 0x00:
             beacon_data = packet.unprovisioned_device_beacon_data
-            self.__unprovisioned_devices.update(beacon_data.device_uuid)
-            if self.__unprovisioned_devices.check(beacon_data.device_uuid):
-                print(
-                    "UNPROVISIONED BEACON RECEIVED FOR > "
-                    + str(beacon_data.device_uuid)
-                )
-                choice = input("PROVISION DEVICE ? Y/N :")
-                if choice == "Y":
-                    self.__unprovisioned_devices.add_provisioned_node(
-                        beacon_data.device_uuid
-                    )
-                    self._stack.on_new_unprovisoned_device(beacon_data.device_uuid)
+            if self._is_listening_for_beacons:
+                self.__unprovisioned_devices.update(beacon_data.device_uuid)
+
+    def get_unprovisioned_devices(self):
+        """
+        Returns the lastly received Unprovisioned Device Beacons info we received
+        """
+        return self.__unprovisioned_devices.list()
+
+    def provision_distant_node(self, dev_uuid):
+        """
+        Provisions the node with the given dev_uuid if it is in the Unprovisioned devices list
+
+        :param dev_uuid: The dev_uuid of the node we want to provision
+        :type dev_uuid: UUID
+        """
+        if (
+            self.__unprovisioned_devices.check(dev_uuid)
+            and self._is_listening_for_beacons
+        ):
+            self.__unprovisioned_devices.add_provisioned_node(dev_uuid)
+            self.__unprovisioned_devices.remove(dev_uuid)
+            self._prov_stack.on_new_unprovisoned_device(dev_uuid)
+
+            self.prov_event = Event()
+
+            auth_done = False
+
+            start_time = time()
+            duration = 50
+
+            while time() - start_time < duration:
+                # Check if event timedout, we fail
+                if not self.prov_event.wait(timeout=10):
+                    return False
+
+                elif not auth_done and self.prov_auth_data is not None:
+                    auth_done = True
+                    if self.prov_auth_data.auth_method == INPUT_OOB_AUTH:
+                        print("AUTH VALUE IS : ")
+                        print(self.prov_auth_data.value)
+
+                    # ouput auth should be handled by user code or shell
+                    elif self.prov_auth_data.auth_method == OUTPUT_OOB_AUTH:
+                        return self.prov_auth_data
+
+            return True
+
+    def resume_provisioning_with_auth(self, value):
+        """
+        Resume the provisioning process with the user.
+
+        :param value: The value types by the user
+        :type value: str
+        """
+
+        self.prov_auth_data.value = value
+        self._prov_stack.get_layer("pb_adv").on_auth_data(self.prov_auth_data)
+        self.prov_event = Event()
+        self.prov_event.wait(20)
+        return True

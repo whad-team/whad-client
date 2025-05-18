@@ -164,6 +164,100 @@ class UpperTransportLayer(Layer):
 
         return list(set(label_uuids))
 
+    def __try_decrypt_with_key(self, pkt, ctx, key):
+        """
+        Tries to decrypt the message with the given key in argument
+
+        Returns the plaintext message if success, None otherwise
+
+        :param pkt: The packet the decypher
+        :type pkt: BTMesh_Upper_Transport_Access_PDU
+        :param ctx: the context of the message
+        :type ctx: MeshMessageContext
+        :param key: The key to use to decrypt
+        :type key: UpperTransportLayerAppKeyCryptoManager | UpperTransportLayerDevKeyCryptoManager
+        :returns: The plaintext of the message if success, None otherwise
+        :rtype: bytes | None
+        """
+        if get_address_type(ctx.dest_addr) == VIRTUAL_ADDR_TYPE:
+            # get all the label uuids we know in the device (we cannot know the target model, so we need to get all of them ...)
+            label_uuids = self.__get_all_label_uuids()
+            (plaintext_message, is_auth_valid, label_uuid) = key.decrypt_virtual(
+                enc_data=raw(pkt),
+                aszmic=ctx,
+                seq_number=ctx.seq_number,
+                src_addr=ctx.src_addr,
+                dst_addr=ctx.dest_addr,
+                iv_index=self.state.profile.iv_index,
+                label_uuid=label_uuids,
+            )
+            ctx.uuid = label_uuid
+        else:
+            (plaintext_message, is_auth_valid) = key.decrypt(
+                enc_data=raw(pkt),
+                aszmic=0,
+                seq_number=ctx.seq_number,
+                src_addr=ctx.src_addr,
+                dst_addr=ctx.dest_addr,
+                iv_index=self.state.profile.iv_index,
+            )
+
+        if not is_auth_valid and plaintext_message is not None:
+            logger.debug("WRONG AUTHENTICATION VALUE IN UpperTransportlayer")
+            logger.debug(key)
+            logger.debug(is_auth_valid)
+            logger.debug(plaintext_message)
+            return None
+
+        return plaintext_message
+
+    def __try_decrypt(self, pkt, ctx):
+        """
+        Tries to decrypt the message based on the context (fetch the keys and try to decipher)
+        Will try to decrypt with appropriate AppKey if we have it, or DevKey if we have it.
+
+        If decryption fails (no key, or wrong MIC), returns None
+        if decryption pass, returns the plaintext
+
+        :param pkt: The packet the decypher
+        :type pkt: BTMesh_Upper_Transport_Access_PDU
+        :param ctx: the context of the message
+        :type ctx: MeshMessageContext
+        :returns: The plaintext of the message if success, None otherwise
+        :rtype: bytes | None
+        """
+        # get the actual application_key_index from aid if AppKey
+        if ctx.application_key_index != -1:
+            ctx.application_key_index = self.__get_app_key_index_from_aid(ctx.aid)
+            app_key = (
+                self.state.profile.get_configuration_server_model()
+                .get_state("app_key_list")
+                .get_value(ctx.application_key_index)
+            )
+
+            # If we dont have the app_key, we discard the message
+            if app_key is None:
+                return
+
+            return self.__try_decrypt_with_key(pkt, ctx, app_key)
+
+        # if device key used, we don't know if its dst or src dev key.
+        else:
+            dev_key_src = self.state.profile.get_dev_key(ctx.src_addr)
+            # if we have no key to decrypt, discard
+            if dev_key_src is not None:
+                plaintext_message = self.__try_decrypt_with_key(pkt, ctx, dev_key_src)
+                if plaintext_message is not None:
+                    ctx.dev_key_address = ctx.src_addr
+                    return plaintext_message
+
+            dev_key_dst = self.state.profile.get_dev_key(ctx.dest_addr)
+            if dev_key_dst:
+                ctx.dev_key_address = ctx.dest_addr
+                return self.__try_decrypt_with_key(pkt, ctx, dev_key_dst)
+
+        return None
+
     @source("access")
     def on_access_message(self, message):
         """
@@ -174,20 +268,28 @@ class UpperTransportLayer(Layer):
         """
         pkt, ctx = message
 
-        # encrypt the message with the key
-        key = (
-            self.state.profile.get_configuration_server_model()
-            .get_state("app_key_list")
-            .get_value(ctx.application_key_index)
-        )
+        # Get the appropriate key from context
+        if ctx.application_key_index == -1:
+            key = self.state.profile.get_dev_key(address=ctx.dev_key_address)
+        else:
+            key = self.state.profile.get_app_key(ctx.application_key_index)
+
+        if key is None:
+            logger.debug("No key found for the message !")
+            return
+
+        ctx.aid = key.aid
 
         # set the PDU sequence number
         # max 4 fragments !
-        ctx.seq_number = self.state.profile.get_next_seq_number(inc=4)
+        # Only if the seq_num is None, otherwise means we hardcoded it (in shell for ex)
+        if ctx.seq_number is None:
+            ctx.seq_number = self.state.profile.get_next_seq_number(inc=4)
+
         if get_address_type(ctx.dest_addr) == VIRTUAL_ADDR_TYPE:
             encrypted_message, ctx.seq_auth = key.encrypt(
                 access_message=raw(pkt),
-                aszmic=0,
+                aszmic=ctx.aszmic,
                 seq_number=ctx.seq_number,
                 src_addr=ctx.src_addr,
                 dst_addr=ctx.dest_addr,
@@ -197,7 +299,7 @@ class UpperTransportLayer(Layer):
         else:
             encrypted_message, ctx.seq_auth = key.encrypt(
                 access_message=raw(pkt),
-                aszmic=0,
+                aszmic=ctx.aszmic,
                 seq_number=ctx.seq_number,
                 src_addr=ctx.src_addr,
                 dst_addr=ctx.dest_addr,
@@ -243,48 +345,13 @@ class UpperTransportLayer(Layer):
             self._handlers[type(pkt)](message)
             return
 
-        # get the actual application_key_index from aid
-        if ctx.application_key_index != -1:
-            ctx.application_key_index = self.__get_app_key_index_from_aid(ctx.aid)
+        plaintext = self.__try_decrypt(pkt, ctx)
 
-        # get the application or device key for the message
-        key = (
-            self.state.profile.get_configuration_server_model()
-            .get_state("app_key_list")
-            .get_value(ctx.application_key_index)
-        )
-
-        if get_address_type(ctx.dest_addr) == VIRTUAL_ADDR_TYPE:
-            # get all the label uuids we know in the device (we cannot know the target model, so we need to get all of them ...)
-            label_uuids = self.__get_all_label_uuids()
-            (plaintext_message, is_auth_valid, label_uuid) = key.decrypt_virtual(
-                enc_data=raw(pkt),
-                aszmic=ctx,
-                seq_number=ctx.seq_number,
-                src_addr=ctx.src_addr,
-                dst_addr=ctx.dest_addr,
-                iv_index=self.state.profile.iv_index,
-                label_uuid=label_uuids,
-            )
-            ctx.uuid = label_uuid
-        else:
-            (plaintext_message, is_auth_valid) = key.decrypt(
-                enc_data=raw(pkt),
-                aszmic=0,
-                seq_number=ctx.seq_number,
-                src_addr=ctx.src_addr,
-                dst_addr=ctx.dest_addr,
-                iv_index=self.state.profile.iv_index,
-            )
-
-        if not is_auth_valid:
-            logger.warn("WRONG AUTHENTICATION VALUE IN UpperTransportlayer")
-            logger.debug(key)
-            logger.debug(is_auth_valid)
-            logger.debug(plaintext_message)
+        if plaintext is None:
+            logger.debug("Decryption failed in UpperTransportlayer")
             return
 
-        pkt = BTMesh_Model_Message(plaintext_message)
+        pkt = BTMesh_Model_Message(plaintext)
         self.send_to_access_layer((pkt, ctx))
 
     def default_ctl_handler(self, message):

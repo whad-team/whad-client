@@ -79,7 +79,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
 
     def on_path_request_react(self, message):
         """
-        On path request react, attacks A2 and A3
+        On path request react, attacks A2 and A4
         We admit that the unused address in the Path Soliciation is 0x7E00
 
         :param message: The Path request message and its context
@@ -96,7 +96,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
 
         self.path_requests_processed[key] = message
         if pkt.destination == 0x7E00:
-            self.a3_path_request_react(message)
+            self.a4_path_request_react(message)
 
         if (
             self.state.profile.is_unicast_addr_ours(pkt.destination)
@@ -107,9 +107,9 @@ class UpperTransportDFAttacks(UpperTransportLayer):
         elif self.a2_activated:
             self.a2_path_request_react(message)
 
-    def a3_path_request_react(self, message):
+    def a4_path_request_react(self, message):
         """
-        Actions for the A3 attack on a path request
+        Actions for the A4 attack on a path request
 
         :param message: Packet and its context
         :type message: (BTMesh_Upper_Transport_Control_Path_Request, MeshMessageContext)
@@ -430,14 +430,14 @@ class UpperTransportDFAttacks(UpperTransportLayer):
             ctx_send = copy(ctx)
             ctx_send.dest_addr = addr.to_bytes(2, "big")
             self.send_control_message((pkt, ctx_send))
-            sleep(0.5)
+            sleep(1)
 
     def get_network_topology(self):
         return self.topology
 
-    def a3_attack(self, addr_list):
+    def a4_attack(self, addr_list):
         """
-        Lauches the a2 attack (path_request_solicitation)
+        Lauches the a4 attack (path_request_solicitation)
         The list of addresses is the list to put in the Path Request Soliciation message.
         The unused address for the malicious path is always
 
@@ -471,7 +471,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
         """
         self.a2_activated = action
 
-    def a5_attack(self, victim_addr):
+    def a3_attack(self, victim_addr):
         """
         Launched the A5 attack.
         Sends a Path Request to the victim. Expects a Path Reply with confirmation.

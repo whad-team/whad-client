@@ -7,6 +7,8 @@ import sys
 from whad.btmesh.connectors.provisionee import Provisionee
 from threading import Thread
 
+from whad.btmesh.stack.utils import MeshMessageContext
+
 from whad.scapy.layers.btmesh import *
 
 
@@ -21,15 +23,25 @@ interface = sys.argv[1]
 try:
     dev = WhadDevice.create(interface)
 
-    provisionee = Provisionee(dev, auto_provision=True)
-    provisionee.configure(advertisements=True, connection=False)
+    provisionee = Provisionee(dev)
+    profile = provisionee.profile
+    profile.auto_provision()
     provisionee.start()
 
     onoff = 0
     transaction_id = 1
+
     while True:
+        # create context in loop! (otherwise values get overwritten when sending ...)
+        ctx = MeshMessageContext()
+        ctx.src_addr = profile.primary_element_addr.to_bytes(2, "big")
+        ctx.dest_addr = b"\xff\xff"
+        ctx.application_key_index = 0
+        ctx.net_key_id = 0
+        ctx.ttl = 127
+
         i = input("Press a key to send a Generic On/Off to the broadcast address ...")
-        provisionee.handle_key_press(onoff, transaction_id)
+        provisionee.do_onoff(onoff, ctx, transaction_id)
         onoff = int(not onoff)
         transaction_id += 1
 

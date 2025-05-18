@@ -24,6 +24,8 @@ class HealthModelServer(ModelServer):
 
         self.__init_states()
 
+        self.allows_dev_keys = True
+
     def __init_states(self):
         self.add_state(CurrentHealthFaultCompositeState())
         self.add_state(AttentionTimeState())

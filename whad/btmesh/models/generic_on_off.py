@@ -23,6 +23,9 @@ class GenericOnOffServer(ModelServer):
         self.handlers[0x8202] = self.on_onoff_set
         self.handlers[0x8203] = self.on_onoff_set_unack
 
+        # already to false by default, but for clarity
+        self.allows_dev_keys = False
+
         self.__init_states()
 
     def __init_states(self):

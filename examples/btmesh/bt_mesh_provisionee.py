@@ -6,8 +6,7 @@ from whad.ble.exceptions import ConnectionLostException
 import sys
 from whad.btmesh.connectors.provisionee import Provisionee
 from time import sleep
-from threading import Event
-import logging
+from whad.btmesh.stack.utils import MeshMessageContext
 
 from whad.scapy.layers.btmesh import *
 
@@ -22,27 +21,37 @@ if len(sys.argv) != 2:
 
 interface = sys.argv[1]
 
-beacon_data = BTMesh_Unprovisioned_Device_Beacon(
-    device_uuid="7462d668-bc88-3473-0000-000000000020", uri_hash=1
-)
-
-pkt_beacon = EIR_Hdr(type=0x2B) / EIR_BTMesh_Beacon(
-    mesh_beacon_type=0x00, unprovisioned_device_beacon_data=beacon_data
-)
 try:
     dev = WhadDevice.create(interface)
 
     provisionee = Provisionee(dev)
-    provisionee.configure(advertisements=True, connection=False)
     provisionee.start()
-    provisionee.sniffer_channel_switch_thread.start()
-    provisionee.send_raw(pkt_beacon)
-    provisionee.send_raw(pkt_beacon)
-    provisionee.send_raw(pkt_beacon)
-    provisionee.send_raw(pkt_beacon)
-    provisionee.send_raw(pkt_beacon)
+    provisionee.start_unprovisioned_beacons_sending()
 
-    provisionee.polling_rx_packets()
+    print("Sending Unprovisioned Device Beacons, waiting for provisioning ....")
+
+    while not provisionee.profile.is_provisioned:
+        sleep(1)
+
+    print("Node is provisioned !")
+
+    onoff = 0
+    transaction_id = 1
+
+    while True:
+        # create context in loop! (otherwise values get overwritten when sending ...)
+        ctx = MeshMessageContext()
+        ctx.src_addr = provisionee.profile.primary_element_addr.to_bytes(2, "big")
+        ctx.dest_addr = b"\xff\xff"
+        ctx.application_key_index = 0
+        ctx.net_key_id = 0
+        ctx.ttl = 127
+
+        i = input("Press a key to send a Generic On/Off to the broadcast address ...")
+        provisionee.do_onoff(onoff, ctx, transaction_id)
+        onoff = int(not onoff)
+        transaction_id += 1
+
 
 except ConnectionLostException as e:
     print("Connection lost", e)

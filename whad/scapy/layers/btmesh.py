@@ -832,10 +832,11 @@ class BTMesh_Provisioning_Invite(Packet):
     fields_desc = [ByteField("attention_duration", 0x00)]
 
 
+"""
 class BTMesh_Provisioning_Capabilities(Packet):
     name = "Bluetooth Mesh Provisioning Capabilities"
     fields_desc = [
-        ByteField("number_of_elements", None),
+        ByteField("number_of_elements", 1),
         BitField("RFU_alg", 0, 14),
         FlagsField(
             "algorithms",
@@ -863,7 +864,72 @@ class BTMesh_Provisioning_Capabilities(Packet):
             2,
             {
                 0b01: "Static OOB Information not available",
-                0b10: "Static OOB Information available",
+                0b10: "OOB authentication provisioning only",
+            },
+        ),
+        ByteField("output_oob_size", None),
+        BitField("RFU_output_oob_action", 0, 11),
+        FlagsField(
+            "output_oob_action",
+            None,
+            5,
+            {
+                0b00001: "Blink",
+                0b00010: "Beep",
+                0b00100: "Vibrate",
+                0b01000: "Output Numeric",
+                0b10000: "Output Alphanumeric",
+            },
+        ),
+        ByteField("input_oob_size", None),
+        BitField("RFU_input_oob_action", 0, 12),
+        FlagsField(
+            "input_oob_action",
+            None,
+            4,
+            {
+                0b0001: "Push",
+                0b0010: "Twist",
+                0b0100: "Input Numeric",
+                0b1000: "Input Alphanumeric",
+            },
+        ),
+    ]
+"""
+
+
+class BTMesh_Provisioning_Capabilities(Packet):
+    name = "Bluetooth Mesh Provisioning Capabilities"
+    fields_desc = [
+        ByteField("number_of_elements", 1),
+        BitField("RFU_alg", 0, 14),
+        FlagsField(
+            "algorithms",
+            None,
+            2,
+            {
+                0b01: "BTM_ECDH_P256_CMAC_AES128_AES_CCM",
+                0b10: "BTM_ECDH_P256_HMAC_SHA256_AES_CCM",
+            },
+        ),
+        BitField("RFU_pub_key_type", 0, 6),
+        FlagsField(
+            "public_key_type",
+            None,
+            2,
+            {
+                0b01: "No OOB Public Key is used",
+                0b10: "OOB Public Key is used",
+            },
+        ),
+        BitField("RFU_oob_type", 0, 6),
+        FlagsField(
+            "oob_type",
+            None,
+            2,
+            {
+                0b01: "Static OOB Information available",
+                0b10: "OOB authentication provisioning only",
             },
         ),
         ByteField("output_oob_size", None),
