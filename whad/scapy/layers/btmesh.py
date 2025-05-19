@@ -448,8 +448,8 @@ class LittleEndianPacketField(PacketField):
     Little Endian Packet Field
     """
 
-    def __init__(self, name, default, cls):
-        super().__init__(name, default, cls)
+    def __init__(self, name, default, cls_arg):
+        super().__init__(name, default, cls_arg)
 
     def i2m(self, pkt, val):
         if val is None:
@@ -470,8 +470,8 @@ class LittleEndianPacketLenField(PacketLenField):
     Little Endian PacketLenField
     """
 
-    def __init__(self, name, default, cls, length_from=None):
-        super().__init__(name=name, default=default, cls=cls, length_from=length_from)
+    def __init__(self, name, default, cls_arg, length_from=None):
+        super().__init__(name=name, default=default, cls=cls_arg, length_from=length_from)
 
     def i2m(self, pkt, val):
         if val is None:
@@ -653,7 +653,7 @@ class ForwardingTableEntry(Packet):
         LittleEndianPacketLenField(
             name="forwarding_table_entry_header",
             default=ForwardingTableEntryHeader(),
-            cls=ForwardingTableEntryHeader,
+            cls_arg=ForwardingTableEntryHeader,
             length_from=lambda pkt: 2,
         ),
         ConditionalField(
