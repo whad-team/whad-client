@@ -139,7 +139,6 @@ class HCIConverter:
             # No fragmentation, send data as-is.
             hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle)
             hci_packet = hci_packet / ll_packet[L2CAP_Hdr:]
-            print(bytes(hci_packet).hex())
             logger.debug("l2cap does not need frag")
             return [hci_packet]
 
@@ -234,7 +233,6 @@ class HCIConverter:
                 # Process a data length change
                 length = event[HCI_LE_Meta_Data_Length_Change].max_tx_octets
                 logger.debug("[hci][%s] update HCI data length to %d", self.__device.interface, length)
-                print("HCI ACL length changed to %d" % length)
                 self.__device._update_max_acl_len(length)
 
 
