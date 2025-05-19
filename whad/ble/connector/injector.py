@@ -16,8 +16,10 @@ from whad.ble.injecting import InjectionConfiguration
 from ..exceptions import NotSynchronized
 from .base import BLE
 
-
 class Injector(BLE):
+    """BLE injecion connector.
+    """
+
     def __init__(self, device, connection=None):
         super().__init__(device)
         self.__connection = connection
@@ -28,6 +30,7 @@ class Injector(BLE):
             raise UnsupportedCapability("Inject")
 
         self.__configuration = InjectionConfiguration()
+
 
     def _enable_configuration(self):
         """Enable configuration for injection.
@@ -50,12 +53,12 @@ class Injector(BLE):
                 if self.__configuration.channel is not None:
                     channel = self.__configuration.channel
                 else:
-                    channel = 37  # fallback
+                    channel = 37 # fallback
                 self.sniff_new_connection(
                     channel=channel,
                     show_advertisements=False,
                     show_empty_packets=False,
-                    bd_address=self.__configuration.filter,
+                    bd_address=self.__configuration.filter
                 )
             self.start()
             while not self.__synchronized:
@@ -73,6 +76,7 @@ class Injector(BLE):
         self.__configuration.channel = channel
         self.__configuration.filter = bd_filter
         self._enable_configuration()
+
 
     @property
     def configuration(self):
@@ -107,7 +111,7 @@ class Injector(BLE):
         if BTLE in packet:
             access_address = packet.access_addr
         elif BTLE_ADV in packet:
-            access_address = 0x8E89BED6
+            access_address = 0x8e89bed6
         elif BTLE_DATA in packet:
             if self.__connection is not None:
                 access_address = self.__connection.access_address
@@ -122,7 +126,7 @@ class Injector(BLE):
         if hasattr(packet, "metadata") and hasattr(packet.metadata, "channel"):
             channel = packet.metadata.channel
         else:
-            channel = 37  # fallback to channel 37
+            channel = 37 # fallback to channel 37
 
         return self.send_pdu(packet, access_address=access_address, conn_handle=channel,
                              direction=BleDirection.UNKNOWN)
@@ -155,11 +159,11 @@ class Injector(BLE):
     def on_synchronized(self, access_address=None, crc_init=None, hop_increment=None,
                         hop_interval=None, channel_map=None):
         self.__connection = SynchronizedConnection(
-            access_address=access_address,
-            crc_init=crc_init,
-            hop_increment=hop_increment,
-            hop_interval=hop_interval,
-            channel_map=channel_map,
+            access_address = access_address,
+            crc_init = crc_init,
+            hop_increment = hop_increment,
+            hop_interval = hop_interval,
+            channel_map = channel_map
         )
         self.__synchronized = True
 

@@ -171,6 +171,14 @@ class PBAdvBearerLayer(Layer):
         :param message: [TODO:description]
         """
 
+        # In provisioner mode only, we finished the provisininning of the target node
+        if message == "FINISHED_PROV":
+            self.__connector.distant_node_provisioned = True
+            if self.__connector.prov_event is not None:
+                self.__connector.prov_event.set()
+
+            return
+
         # if message is ProvisioningCompleteData, we complete the provisonning
         if isinstance(message, ProvisioningCompleteData):
             self._is_provisioning = False

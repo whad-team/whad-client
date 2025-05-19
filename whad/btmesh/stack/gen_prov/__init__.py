@@ -414,14 +414,16 @@ class GenericProvisioningLayer(ContextualLayer):
     def process_provisioning_packet(self, packet):
         """
         Process a Provisioning packet to divide it into fragments, set the expected next packets, and send the first fragment
-        If packet is equal to "CLOSE_LINK", means we close the link
+        If packet is equal to "FINISHED_PROV", means we close the link
         """
 
-        # if packet is CLOSE_LINK, signal from the Provisioning Layer that we need to close on complete
-        if packet == "CLOSE_LINK":
+        # if packet is FINISHED_PROV, signal from the Provisioning Layer that we need to close on complete
+        if packet == "FINISHED_PROV":
             self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
             self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
             self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
+
+            self.send("pb_adv", "FINISHED_PROV")
             return
 
         # limit size of a fragment is 23 bytes

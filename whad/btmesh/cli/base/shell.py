@@ -49,10 +49,10 @@ class BTMeshBaseShell(InteractiveShell):
         self._shortened_name = None
 
         #        self._main_stack = NetworkLayer(connector=self, options=self.options) If interface is None, pick the first matching our needs
-        self._interface = interface
+        self.interface = interface
 
         # Profile
-        self._profile = profile()
+        self.profile = profile()
 
         # Index of element in MODE_ELEMENT_EDIT and MODE_MODEL_EDIT modes
         self._selected_element = None
@@ -78,7 +78,7 @@ class BTMeshBaseShell(InteractiveShell):
 
         # Instanciate our Peripheral
         # PLACEHOLDER, OVERWRITE IN SUBCLASSES WITH OTHER CONNECTOR
-        self._connector = BTMesh(self._interface, profile=self._profile)
+        self._connector = BTMesh(self.interface, profile=self.profile)
 
     def create_msg_context(self, is_ctl):
         """
@@ -89,20 +89,20 @@ class BTMeshBaseShell(InteractiveShell):
         :type is_ctl: boolean
         :returns: MeshMessageContext
         """
-        if not self._profile.is_provisioned:
+        if not self.profile.is_provisioned:
             return None
 
         ctx = MeshMessageContext()
 
         # if src_addr has the 0 value, the msg_context has not been init since provisioning
         if self._src_addr == 0x0000:
-            self._src_addr = self._profile.primary_element_addr
-            subnets = self._profile.get_all_subnets()
+            self._src_addr = self.profile.primary_element_addr
+            subnets = self.profile.get_all_subnets()
             if subnets is None:
                 self.error("No NetKey after provisioning, fatal error, need to reset")
                 return
             self._net_key_index = subnets[0].net_key_index
-            self._dev_key_address = self._profile.primary_element_addr
+            self._dev_key_address = self.profile.primary_element_addr
             # Set to 0 for convenience for now, but we need to check !
             self._app_key_index = 0
 
@@ -165,7 +165,7 @@ class BTMeshBaseShell(InteractiveShell):
         action = args[0].lower()
 
         if action == "start":
-            res = self._profile.auto_provision()
+            res = self.profile.auto_provision()
 
             if res:
                 self.success("Node has been successfully auto provisioned")
@@ -175,14 +175,14 @@ class BTMeshBaseShell(InteractiveShell):
 
             self._connector.start()
 
-            self._src_addr = self._profile.primary_element_addr
-            subnets = self._profile.get_all_subnets()
+            self._src_addr = self.profile.primary_element_addr
+            subnets = self.profile.get_all_subnets()
             if subnets is None:
                 self.error("No NetKey after provisioning, fatal error, need to reset")
                 return
 
             self._net_key_index = subnets[0].net_key_index
-            self._dev_key_address = self._profile.primary_element_addr
+            self._dev_key_address = self.profile.primary_element_addr
             # Set to 0 for convenience for now, but we need to check !
             self._app_key_index = 0
 
@@ -203,7 +203,7 @@ class BTMeshBaseShell(InteractiveShell):
                 self.error("Address is a 2 bytes int")
                 return
 
-            self._profile.set_auto_prov_unicast_addr(unicast_addr.to_bytes(2, "big"))
+            self.profile.set_auto_prov_unicast_addr(unicast_addr.to_bytes(2, "big"))
             self.success("Set the auto_provision unicast_addr to 0x%x" % unicast_addr)
             return
 
@@ -215,17 +215,17 @@ class BTMeshBaseShell(InteractiveShell):
             return
 
         if action == "net_key":
-            self._profile.set_auto_prov_net_key(key)
+            self.profile.set_auto_prov_net_key(key)
             self.success("Successfully set the primary net key for auto_provision.")
             return
 
         elif action == "app_key":
-            self._profile.set_auto_prov_app_key(key)
+            self.profile.set_auto_prov_app_key(key)
             self.success("Successfully set the app_key for auto_provision.")
             return
 
         elif action == "dev_key":
-            self._profile.set_auto_prov_dev_key(key)
+            self.profile.set_auto_prov_dev_key(key)
             self.success("Successfully set the dev_key for auto_provision.")
             return
 
@@ -307,26 +307,26 @@ class BTMeshBaseShell(InteractiveShell):
                 return
 
             # Add the same dev key we have with previous address if none available with new one
-            if self._profile.get_dev_key(addr.to_bytes(2, "big")) is None:
-                self._profile.update_dev_key(
-                    addr.to_bytes(2, "big"), self._profile.get_dev_key().device_key
+            if self.profile.get_dev_key(addr.to_bytes(2, "big")) is None:
+                self.profile.update_dev_key(
+                    addr.to_bytes(2, "big"), self.profile.get_dev_key().device_key
                 )
 
             # If msg_context for src_addr or dst_addr, or dev_key_addr was the previous addr of the node, update
-            if self._src_addr == self._profile.primary_element_addr:
+            if self._src_addr == self.profile.primary_element_addr:
                 self._src_addr = addr
-            if self._dst_addr == self._profile.primary_element_addr:
+            if self._dst_addr == self.profile.primary_element_addr:
                 self._dst_addr = addr
-            if self._dev_key_address == self._profile.primary_element_addr:
+            if self._dev_key_address == self.profile.primary_element_addr:
                 self._dev_key_address = addr
 
-            self._profile.set_primary_element_addr(addr)
+            self.profile.set_primary_element_addr(addr)
 
             self.success("Address of the device is now : 0x%x" % addr)
         else:
             self.success(
                 "The primary unicast address of the node is 0x%x"
-                % self._profile.primary_element_addr
+                % self.profile.primary_element_addr
             )
 
     def complete_relay(self):
@@ -416,7 +416,7 @@ class BTMeshBaseShell(InteractiveShell):
                     self.error("Cannot add elements after provisioning")
                     return
 
-                index = self._profile.register_element(is_primary=False)
+                index = self.profile.register_element(is_primary=False)
 
                 self.success("Element %d successfully added." % index)
 
@@ -435,7 +435,7 @@ class BTMeshBaseShell(InteractiveShell):
                     if index == 0:
                         self.error("Cannot delete primary element")
 
-                    elif self._profile.remove_elements(index):
+                    elif self.profile.remove_elements(index):
                         self.success(
                             "Successfully removed element at index %d." % index
                         )
@@ -453,7 +453,7 @@ class BTMeshBaseShell(InteractiveShell):
                         self.error("Index needs to be an int")
                         return
 
-                    element = self._profile.get_element(index)
+                    element = self.profile.get_element(index)
                     if element is None:
                         self.error(
                             "Invalid element index, element %d does not exist." % index
@@ -470,7 +470,7 @@ class BTMeshBaseShell(InteractiveShell):
                     self.error("Need to specify an element index to edit")
 
         else:
-            elements = self._profile.get_all_elements()
+            elements = self.profile.get_all_elements()
 
             for element in elements:
                 print_formatted_text(
@@ -546,7 +546,7 @@ class BTMeshBaseShell(InteractiveShell):
             self.error("Can only edit models whilst in Element edit mode.")
             return
 
-        element = self._profile.get_element(self._selected_element)
+        element = self.profile.get_element(self._selected_element)
 
         if len(args) >= 2:
             try:
@@ -879,7 +879,7 @@ class BTMeshBaseShell(InteractiveShell):
 
         action = args[0].lower() if len(args) >= 1 else "list"
         if action == "list":
-            dev_keys = self._profile.get_all_dev_keys()
+            dev_keys = self.profile.get_all_dev_keys()
             for address, dev_key in dev_keys.items():
                 print_formatted_text(
                     HTML(
@@ -900,7 +900,7 @@ class BTMeshBaseShell(InteractiveShell):
                 self.error("The address is 2 bytes int and the key is a hex string.")
                 return
 
-            success = self._profile.update_dev_key(address, key)
+            success = self.profile.update_dev_key(address, key)
             if not success:
                 self.error("Update of dev_key failed")
                 return
@@ -921,7 +921,7 @@ class BTMeshBaseShell(InteractiveShell):
                 self.error("Cannot delete this key for now, used in message context ! ")
                 return
 
-            success = self._profile.remove_dev_key(address)
+            success = self.profile.remove_dev_key(address)
 
             if not success:
                 self.error(
@@ -966,9 +966,9 @@ class BTMeshBaseShell(InteractiveShell):
 
         action = args[0].lower() if len(args) >= 1 else "list"
         if action == "list":
-            subnets = self._profile.get_all_subnets()
+            subnets = self.profile.get_all_subnets()
             for subnet in subnets:
-                net_key = self._profile.get_net_key(subnet.net_key_index)
+                net_key = self.profile.get_net_key(subnet.net_key_index)
                 if net_key is None:
                     continue
                 print_formatted_text(
@@ -992,7 +992,7 @@ class BTMeshBaseShell(InteractiveShell):
                 )
                 return
 
-            success = self._profile.update_net_key(net_key_index, key)
+            success = self.profile.update_net_key(net_key_index, key)
             if not success:
                 self.error("Update of net_key failed")
                 return
@@ -1013,7 +1013,7 @@ class BTMeshBaseShell(InteractiveShell):
                 self.error("Cannot delete this key for now, used in message context ! ")
                 return
 
-            success = self._profile.remove_net_key(net_key_index)
+            success = self.profile.remove_net_key(net_key_index)
 
             if not success:
                 self.error(
@@ -1058,7 +1058,7 @@ class BTMeshBaseShell(InteractiveShell):
 
         action = args[0].lower() if len(args) >= 1 else "list"
         if action == "list":
-            app_keys = self._profile.get_all_app_keys()
+            app_keys = self.profile.get_all_app_keys()
             for app_key in app_keys:
                 print_formatted_text(
                     HTML(
@@ -1086,7 +1086,7 @@ class BTMeshBaseShell(InteractiveShell):
                 )
                 return
 
-            success = self._profile.update_app_key(app_key_index, net_key_index, key)
+            success = self.profile.update_app_key(app_key_index, net_key_index, key)
             if not success:
                 self.error("Update of app_key failed")
                 return
@@ -1108,7 +1108,7 @@ class BTMeshBaseShell(InteractiveShell):
                 self.error("Cannot delete this key for now, used in message context ! ")
                 return
 
-            success = self._profile.remove_app_key(app_key_index, net_key_index)
+            success = self.profile.remove_app_key(app_key_index, net_key_index)
 
             if not success:
                 self.error(
@@ -1272,7 +1272,7 @@ class BTMeshBaseShell(InteractiveShell):
                     self.error("Net Key Index must be an int")
                     return
 
-                if self._profile.get_subnet(net_key_index) is None:
+                if self.profile.get_subnet(net_key_index) is None:
                     self.error("Net Key Index %d does not exist, fail." % net_key_index)
                     return
 
@@ -1292,7 +1292,7 @@ class BTMeshBaseShell(InteractiveShell):
 
                 if (
                     app_key_index != -1
-                    and self._profile.get_app_key(app_key_index) is None
+                    and self.profile.get_app_key(app_key_index) is None
                 ):
                     self.error("App Key Index %d does not exist, fail." % app_key_index)
                     return
@@ -1324,7 +1324,7 @@ class BTMeshBaseShell(InteractiveShell):
                     self.error("dev_key_addr is a 2 bytes int")
                     return
 
-                if self._profile.get_dev_key(dev_key_addr.to_bytes(2, "big")) is None:
+                if self.profile.get_dev_key(dev_key_addr.to_bytes(2, "big")) is None:
                     self.error(
                         "Dev Key for address 0x%x does not exist in this node"
                         % dev_key_addr

@@ -182,7 +182,6 @@ class Provisionee(BTMesh):
 
         :param value: The value types by the user
         :type value: str
-        :returns:
         """
 
         self.prov_auth_data.value = value

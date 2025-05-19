@@ -7,7 +7,9 @@ Manages basic Tx/Rx. (Based on BLE sniffer because it works)
 
 from whad.ble.connector import Sniffer
 from scapy.layers.bluetooth4LE import BTLE_ADV, BTLE_ADV_NONCONN_IND, EIR_Hdr
-from whad.ble import UnsupportedCapability, BleDirection, Peripheral
+from whad.ble import Peripheral
+from whad.hub.ble import Direction as BleDirection
+from whad.exceptions import UnsupportedCapability
 from whad.exceptions import WhadDeviceDisconnected
 from queue import Queue, Empty
 from time import sleep
@@ -106,6 +108,9 @@ class BTMesh(Sniffer):
 
         # Provisionning auth data received from the stack (Provisioner and provisionee)
         self.prov_auth_data = None
+
+        # Set to True in BTMeshSniffer to print packets
+        self.sniffing_only = False
 
     def lock_tx(self):
         self.__tx_lock.acquire()

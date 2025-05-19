@@ -12,7 +12,6 @@ from whad.btmesh.stack.access import AccessLayer
 from whad.btmesh.stack.utils import MeshMessageContext
 from whad.btmesh.stack.constants import (
     MANAGED_FLOODING_CREDS,
-    DIRECTED_FORWARDING_CREDS,
 )
 from whad.scapy.layers.btmesh import (
     BTMesh_Model_Directed_Forwarding_Control_Set,
@@ -24,10 +23,7 @@ from whad.scapy.layers.btmesh import (
     BTMesh_Model_Directed_Forwarding_Table_Dependents_Get,
     BTMesh_Model_Directed_Forwarding_Table_Dependents_Get_Status,
     BTMesh_Model_Directed_Forwarding_Two_Way_Path_Set,
-    BTMesh_Model_Generic_OnOff_Set,
-    BTMesh_Model_Generic_OnOff_Set_Unacknowledged,
     BTMesh_Model_Message,
-    ForwardingTableEntry,
 )
 from copy import copy
 from time import sleep

@@ -1,4 +1,4 @@
-from whad.cli.shell import category, InteractiveShell
+from whad.cli.shell import category
 from whad.btmesh.profile import BaseMeshProfile
 from whad.btmesh.connectors.df_attack import DFAttacks
 from prompt_toolkit import HTML, print_formatted_text
@@ -166,7 +166,7 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
         super().__init__(interface=interface, profile=profile)
 
         # Instanciate our Peripheral
-        self._connector = DFAttacks(self._interface, profile=self._profile)
+        self._connector = DFAttacks(self.interface, profile=self.profile)
 
         # Since its set in Provisionee init, need to set it after super
         self.update_prompt()
@@ -322,7 +322,7 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
 
         <ansicyan><b>a3_attack</b> <i>VICTIM_ADDR</i></ansicyan>
 
-        > a5_attack 0x000A
+        > a3_attack 0x000A
         """
 
         if len(arg) < 1:
@@ -460,7 +460,6 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
     def do_df_reset(self, arg):
         """Deactivates the DF for the specified destination address (can be broadcast). Deletes all entries at the same time
 
-
         <ansicyan><b>df_reset</b> [<i>dest</i>]</ansicyan>
 
         By default sends to the broadcast addr.
@@ -510,7 +509,7 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             return
 
         topology = args[0].lower()
-        own_addr = self._profile.primary_element_addr
+        own_addr = self.profile.primary_element_addr
         base = "aa:aa:aa:aa:aa:"
         if topology == "linear":
             self._connector.reset_whitelist()
