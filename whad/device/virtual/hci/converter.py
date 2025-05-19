@@ -63,6 +63,21 @@ class HCIConverter:
         """
         self.__locked = False
 
+    def split_l2cap_into_hci(self, l2cap_data: bytes, conn_handle: int):
+        """Split L2CAP packet into multiple HCI packets.
+        """
+        max_acl_len = self.__device.get_max_acl_len()
+        nb_hci_packets = len(l2cap_data)//max_acl_len
+        if len(l2cap_data)%max_acl_len > 0:
+            nb_hci_packets += 1
+        hci_packets = []
+        for i in range(nb_hci_packets):
+            pkt = HCI_Hdr() / HCI_ACL_Hdr(handle = conn_handle, PB=1 if i>0 else 0)
+            pkt = pkt / l2cap_data[i*max_acl_len:(i+1)*max_acl_len]
+            hci_packets.append(pkt)
+        logger.debug("[hci converter] split ACL data into %d chunks (total: %d, acl_len: %d)", nb_hci_packets, len(l2cap_data), max_acl_len)
+        return hci_packets
+
     def process_message(self, message: HubMessage):
         """This function turns a BLE hub message into the corresponding HCI
         packet.
@@ -93,26 +108,37 @@ class HCIConverter:
 
                     # L2CAP data has been reassembled, then split in respect of
                     # the underlying device max ACL length
-                    l2cap_data = bytes(L2CAP_Hdr(self.cached_l2cap_payload))
-                    max_acl_len = self.__device.get_max_acl_len()
-                    nb_hci_packets = len(l2cap_data)//max_acl_len
-                    if len(l2cap_data)%max_acl_len > 0:
-                        nb_hci_packets += 1
-                    hci_packets = []
-                    for i in range(nb_hci_packets):
-                        pkt = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle)
-                        pkt = pkt / l2cap_data[i*max_acl_len:(i+1)*max_acl_len]
-                        hci_packets.append(pkt)
-                    logger.debug("[hci converter] split ACL data into %d chunks (total: %d, acl_len: %d)", nb_hci_packets, len(l2cap_data), max_acl_len)
-                    return hci_packets
+                    return self.split_l2cap_into_hci(
+                        bytes(L2CAP_Hdr(self.cached_l2cap_payload)),
+                        message.conn_handle
+                    )
+
+                    #l2cap_data = bytes(L2CAP_Hdr(self.cached_l2cap_payload))
+                    #max_acl_len = self.__device.get_max_acl_len()
+                    #nb_hci_packets = len(l2cap_data)//max_acl_len
+                    #if len(l2cap_data)%max_acl_len > 0:
+                    #    nb_hci_packets += 1
+                    #hci_packets = []
+                    #for i in range(nb_hci_packets):
+                    #    pkt = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle, PB=1 if i>0 else 0)
+                    #    pkt = pkt / l2cap_data[i*max_acl_len:(i+1)*max_acl_len]
+                    #    hci_packets.append(pkt)
+                    #logger.debug("[hci converter] split ACL data into %d chunks (total: %d, acl_len: %d)", nb_hci_packets, len(l2cap_data), max_acl_len)
+                    #return hci_packets
 
                 # No HCI packet for now.
-                logger.debug("l2cap is incomplete, more fragments")
+                logger.debug("l2cap is incomplete, more fragments needed.")
                 return []
+
+            # L2CAP packet is complete but must be split
+            l2cap_data = bytes(ll_packet[L2CAP_Hdr:])
+            if len(l2cap_data) > self.__device.get_max_acl_len():
+                return self.split_l2cap_into_hci(l2cap_data, message.conn_handle)
 
             # No fragmentation, send data as-is.
             hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle)
             hci_packet = hci_packet / ll_packet[L2CAP_Hdr:]
+            print(bytes(hci_packet).hex())
             logger.debug("l2cap does not need frag")
             return [hci_packet]
 
@@ -207,6 +233,7 @@ class HCIConverter:
                 # Process a data length change
                 length = event[HCI_LE_Meta_Data_Length_Change].max_tx_octets
                 logger.debug("[hci][%s] update HCI data length to %d", self.__device.interface, length)
+                print("HCI ACL length changed to %d" % length)
                 self.__device._update_max_acl_len(length)
 
 
