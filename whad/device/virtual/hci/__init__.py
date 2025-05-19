@@ -16,7 +16,7 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Event_Disconnection_Complete, HCI_Cmd_LE_Set_Scan_Response_Data, \
     HCI_Cmd_LE_Set_Random_Address, HCI_Cmd_LE_Long_Term_Key_Request_Reply, \
     HCI_Cmd_LE_Start_Encryption_Request, HCI_Cmd_LE_Set_Advertising_Parameters, \
-    HCI_Cmd_LE_Read_Buffer_Size
+    HCI_Cmd_LE_Read_Buffer_Size, BluetoothUserSocket
 from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, HCI_Cmd_Read_Buffer_Size, \
     HCI_Cmd_Complete_Read_Buffer_Size
 
@@ -54,7 +54,7 @@ def get_hci(index):
     '''
     try:
         logger.debug("Creating bluetooth socket ...")
-        socket = BluetoothUserSocketFixed(index)
+        socket = BluetoothUserSocket(index)
         logger.debug("Bluetooth socket successfully created.")
         return socket
     except BluetoothSocketError:
@@ -63,7 +63,7 @@ def get_hci(index):
             logger.debug("Shutting down HCI interface #%d", index)
             HCIConfig.down(index)
             logger.debug("HCI interface %d shut down, creating Bluetooth socket ...", index)
-            socket = BluetoothUserSocketFixed(index)
+            socket = BluetoothUserSocket(index)
             logger.debug("Bluetooth socket successfully created.")
             return socket
         except BluetoothSocketError as err:
