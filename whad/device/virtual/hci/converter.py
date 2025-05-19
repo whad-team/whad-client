@@ -101,8 +101,9 @@ class HCIConverter:
 
             if self.waiting_l2cap_fragments:
                 self.cached_l2cap_payload += raw(ll_packet[BTLE_DATA:][1:])
-                if self.cached_l2cap_length == (len(self.cached_l2cap_payload) - 4):
-
+                if self.cached_l2cap_length <= (len(self.cached_l2cap_payload) - 4):
+                    if self.cached_l2cap_length < len(self.cached_l2cap_payload) - 4:
+                        self.debug("[hci device][%s] too much data (got %d, expected %d)", self.__device.interface, len(self.cached_l2cap_payload) - 4, self.cached_l2cap_length)
                     self.waiting_l2cap_fragments = False
                     logger.debug("[hci device] reassembled l2cap data !")
 
