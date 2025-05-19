@@ -5,8 +5,9 @@ This module provides classes corresponding to every supported Advertisement Reco
 
 These classes are intended to be used when declaring a BLE peripheral device with
 :class:`whad.ble.connector.peripheral.Peripheral`, but can also be helpful to
-parse raw advertising data through class :class:`AdvDataFieldList`. 
+parse raw advertising data through class :class:`AdvDataFieldList`.
 """
+
 from struct import pack, unpack
 from urllib.parse import urlparse
 from whad.hub.ble.bdaddr import BDAddress
@@ -16,6 +17,7 @@ from whad.ble.profile.attribute import UUID
 class AdvDataError(Exception):
     """Advertisement Data error
     """
+
 
 class AdvDataFieldListOverflow(Exception):
     """Advertisement data field list overflow
@@ -28,7 +30,7 @@ class AdvDataField:
     serialization.
     """
 
-    def __init__(self, adv_type, value=b''):
+    def __init__(self, adv_type, value=b""):
         """Initialize an advertisement data record.
 
         :param int adv_type: Record type
@@ -39,8 +41,7 @@ class AdvDataField:
 
     @property
     def type(self):
-        """Return the record type
-        """
+        """Return the record type"""
         return self.__type
     
     def set_value(self, value):
@@ -54,7 +55,7 @@ class AdvDataField:
         :return: Serialized record
         :rtype: bytes
         """
-        return pack('<BB', len(self.__value) + 1, self.__type) + self.__value
+        return pack("<BB", len(self.__value) + 1, self.__type) + self.__value
 
 
 class AdvUuid16List(AdvDataField):
@@ -80,8 +81,8 @@ class AdvUuid16List(AdvDataField):
             # Append UUID
             self.__uuids.append(arg)
 
-        # Pack data
-        super().__init__(eir_tag, b''.join([uuid.packed for uuid in self.__uuids]))
+        # Pack data
+        super().__init__(eir_tag, b"".join([uuid.packed for uuid in self.__uuids]))
 
     def __len__(self):
         return len(self.__uuids)
@@ -100,11 +101,12 @@ class AdvUuid16List(AdvDataField):
         :param class clazz: Class that will be instantiated (must inherit from AdvUuid16List)
         :param bytes ad_record: AD record to deserialize.
         """
-        nb_uuids = int(len(ad_record)/2)
+        nb_uuids = int(len(ad_record) / 2)
         uuids = []
         for i in range(nb_uuids):
-            uuids.append(UUID(ad_record[i*2:(i+1)*2]))
+            uuids.append(UUID(ad_record[i * 2 : (i + 1) * 2]))
         return clazz(*uuids)
+
 
 class AdvUuid128List(AdvDataField):
     """128-bit UUID list.
@@ -129,8 +131,8 @@ class AdvUuid128List(AdvDataField):
             # Append UUID
             self.__uuids.append(arg)
 
-        # Pack data
-        super().__init__(eir_tag, b''.join([uuid.packed for uuid in self.__uuids]))
+        # Pack data
+        super().__init__(eir_tag, b"".join([uuid.packed for uuid in self.__uuids]))
 
     def __len__(self):
         return len(self.__uuids)
@@ -148,10 +150,10 @@ class AdvUuid128List(AdvDataField):
         :param class clazz: Class that will be instantiated (must inherit from AdvUuid128List)
         :param bytes ad_record: AD record to deserialize.
         """
-        nb_uuids = int(len(ad_record)/16)
+        nb_uuids = int(len(ad_record) / 16)
         uuids = []
         for i in range(nb_uuids):
-            uuids.append(UUID(ad_record[i*16:(i+1)*16]))
+            uuids.append(UUID(ad_record[i * 16 : (i + 1) * 16]))
         return clazz(*uuids)
 
 
@@ -221,8 +223,7 @@ class AdvShortenedLocalName(AdvDataField):
 
     @property
     def name(self):
-        """Return this record shortened local name
-        """
+        """Return this record shortened local name"""
         return self.__name
 
     @name.setter
@@ -245,7 +246,7 @@ class AdvShortenedLocalName(AdvDataField):
 
 class AdvCompleteLocalName(AdvDataField):
     """Device complete local name
-    
+
     This AD record (or field) contains the complete name of the device that
     sends it.
     """
@@ -256,8 +257,7 @@ class AdvCompleteLocalName(AdvDataField):
 
     @property
     def name(self):
-        """Return the complete device name
-        """
+        """Return the complete device name"""
         return self.__name
     
     @name.setter
@@ -277,11 +277,10 @@ class AdvCompleteLocalName(AdvDataField):
 
 
 class AdvTxPowerLevel(AdvDataField):
-    """Device Tx power level
-    """
+    """Device Tx power level"""
 
     def __init__(self, level):
-        super().__init__(0x0A, bytes([level&0xff]))
+        super().__init__(0x0A, bytes([level & 0xFF]))
 
     @staticmethod
     def from_bytes(ad_record):
@@ -298,8 +297,7 @@ class AdvTxPowerLevel(AdvDataField):
 
 
 class AdvManufacturerSpecificData(AdvDataField):
-    """Device Manufacturer Specific Data
-    """
+    """Device Manufacturer Specific Data"""
 
     def __init__(self, company_id, data):
         super().__init__(0xFF, pack('<H', company_id&0xffff) + bytes(data))
@@ -342,16 +340,14 @@ class AdvManufacturerSpecificData(AdvDataField):
         """
         if len(ad_record) >= 2:
             return AdvManufacturerSpecificData(
-                unpack('<H', ad_record[:2])[0],
-                ad_record[2:]
+                unpack("<H", ad_record[:2])[0], ad_record[2:]
             )
         # Parsing error
         raise AdvDataError
 
 
 class AdvIncServiceUuid16List(AdvUuid16List):
-    """Incomplete list of 16-bit Service UUIDs
-    """
+    """Incomplete list of 16-bit Service UUIDs"""
 
     def __init__(self, *args):
         super().__init__(0x02, *args)
@@ -368,8 +364,7 @@ class AdvIncServiceUuid16List(AdvUuid16List):
 
 
 class AdvCompServiceUuid16List(AdvUuid16List):
-    """Complete list of 16-bit Service UUIDs
-    """
+    """Complete list of 16-bit Service UUIDs"""
 
     def __init__(self, *args):
         super().__init__(0x03, *args)
@@ -386,8 +381,7 @@ class AdvCompServiceUuid16List(AdvUuid16List):
 
 
 class AdvIncServiceUuid128List(AdvUuid128List):
-    """Incomplete list of 128-bit Service UUIDs
-    """
+    """Incomplete list of 128-bit Service UUIDs"""
 
     def __init__(self, *args):
         super().__init__(0x06, *args)
@@ -402,13 +396,12 @@ class AdvIncServiceUuid128List(AdvUuid128List):
         """
         return AdvUuid128List.from_bytes(AdvIncServiceUuid128List, ad_record)
 
+
 class AdvCompServiceUuid128List(AdvUuid128List):
-    """Complete list of 128-bit Service UUIDs
-    """
+    """Complete list of 128-bit Service UUIDs"""
 
     def __init__(self, *args):
-        """Create a list of 128-bit UUID.
-        """
+        """Create a list of 128-bit UUID."""
         super().__init__(0x07, *args)
 
     @staticmethod
@@ -423,8 +416,7 @@ class AdvCompServiceUuid128List(AdvUuid128List):
 
 
 class AdvSlaveConnIntervalRange(AdvDataField):
-    """Advertising data Slave Connection Interval Range
-    """
+    """Advertising data Slave Connection Interval Range"""
 
     def __init__(self, min_value=0xFFFF, max_value=0xFFFF):
         """Create a Slave Connection Interval Range advertising data record.
@@ -433,7 +425,7 @@ class AdvSlaveConnIntervalRange(AdvDataField):
         :param int max_value: Max interval range (0x0006 - 0x0C80)
         """
         self.__range = [min_value, max_value]
-        super().__init__(0x12, pack('<HH', min_value, max_value))
+        super().__init__(0x12, pack("<HH", min_value, max_value))
 
     @property
     def range(self):
@@ -471,15 +463,14 @@ class AdvSlaveConnIntervalRange(AdvDataField):
         :rtype: AdvSlaveConnIntervalRange
         """
         if len(ad_record) == 4:
-            min_value, max_value = unpack('<HH', ad_record)
+            min_value, max_value = unpack("<HH", ad_record)
             return AdvSlaveConnIntervalRange(min_value, max_value)
         # Parsing error
         raise AdvDataError
 
 
 class AdvServiceSollicitationUuid16List(AdvUuid16List):
-    """List of 16-bit Service sollicitation UUIDs.
-    """
+    """List of 16-bit Service sollicitation UUIDs."""
 
     def __init__(self, *args):
         """Create a list of 16-bit UUID.
@@ -500,8 +491,7 @@ class AdvServiceSollicitationUuid16List(AdvUuid16List):
 
 
 class AdvServiceSollicitationUuid128List(AdvUuid128List):
-    """List of 128-bit Service sollicitation UUIDs.
-    """
+    """List of 128-bit Service sollicitation UUIDs."""
 
     def __init__(self, *args):
         """Create a list of 128-bit UUID.
@@ -522,8 +512,7 @@ class AdvServiceSollicitationUuid128List(AdvUuid128List):
 
 
 class AdvServiceData16(AdvDataField):
-    """Service Data with 16-bit UUID.
-    """
+    """Service Data with 16-bit UUID."""
 
     def __init__(self, uuid, data):
         self.__uuid = uuid
@@ -557,7 +546,7 @@ class AdvServiceData16(AdvDataField):
         :rtype: AdvServiceData16
         """
         if len(ad_record) >= 2:
-            uuid = UUID(unpack('<H', ad_record[:2])[0])
+            uuid = UUID(unpack("<H", ad_record[:2])[0])
             data = ad_record[2:]
             return AdvServiceData16(uuid, data)
         # Parsing error
@@ -565,15 +554,14 @@ class AdvServiceData16(AdvDataField):
 
 
 class AdvPublicTargetAddr(AdvDataField):
-    """Public target address.
-    """
+    """Public target address."""
 
     def __init__(self, *addresses):
         """Create a Public Target Address advertising data record.
 
         :param addresses: One or more :class:`BDAddress` objects.
         """
-        # Parse given addresses
+        # Parse given addresses
         self.__addresses = []
         for address in addresses:
             if isinstance(address, BDAddress):
@@ -581,7 +569,7 @@ class AdvPublicTargetAddr(AdvDataField):
             elif isinstance(address, str):
                 self.__addresses.append(BDAddress(address))
 
-        super().__init__(0x17, b''.join([addr.value for addr in self.__addresses]))
+        super().__init__(0x17, b"".join([addr.value for addr in self.__addresses]))
 
     def __len__(self):
         return len(self.__addresses)
@@ -601,27 +589,24 @@ class AdvPublicTargetAddr(AdvDataField):
         :rtype: AdvPublicTargetAddr
         """
         if len(ad_record) > 0 and ((len(ad_record) % 6) == 0):
-            nb_addr = int(len(ad_record)/6)
+            nb_addr = int(len(ad_record) / 6)
             addresses = []
             for i in range(nb_addr):
-                addresses.append(
-                    BDAddress.from_bytes(ad_record[6*i:6*(i+1)])
-                )
+                addresses.append(BDAddress.from_bytes(ad_record[6 * i : 6 * (i + 1)]))
             return AdvPublicTargetAddr(*addresses)
         # Parsing error.
         raise AdvDataError
 
 
 class AdvRandomTargetAddr(AdvDataField):
-    """Random target address.
-    """
+    """Random target address."""
 
     def __init__(self, *addresses):
         """Create a Public Target Address advertising data record.
 
         :param *addresses: One or more :class:`BDAddress` objects.
         """
-        # Parse given addresses
+        # Parse given addresses
         self.__addresses = []
         for address in addresses:
             if isinstance(address, BDAddress):
@@ -629,7 +614,7 @@ class AdvRandomTargetAddr(AdvDataField):
             elif isinstance(address, str):
                 self.__addresses.append(BDAddress(address))
 
-        super().__init__(0x18, b''.join([addr.value for addr in self.__addresses]))
+        super().__init__(0x18, b"".join([addr.value for addr in self.__addresses]))
 
     def __len__(self):
         return len(self.__addresses)
@@ -649,20 +634,17 @@ class AdvRandomTargetAddr(AdvDataField):
         :rtype: AdvRandomTargetAddr
         """
         if len(ad_record) > 0 and ((len(ad_record) % 6) == 0):
-            nb_addr = int(len(ad_record)/6)
+            nb_addr = int(len(ad_record) / 6)
             addresses = []
             for i in range(nb_addr):
-                addresses.append(
-                    BDAddress.from_bytes(ad_record[6*i:6*(i+1)])
-                )
+                addresses.append(BDAddress.from_bytes(ad_record[6 * i : 6 * (i + 1)]))
             return AdvRandomTargetAddr(*addresses)
         # Parsing error.
         raise AdvDataError
 
 
 class AdvAppearance(AdvDataField):
-    """Device appearance advertising data record.
-    """
+    """Device appearance advertising data record."""
 
     def __init__(self, appearance=0x0000):
         """Create an Device appearance advertisement record.
@@ -671,7 +653,7 @@ class AdvAppearance(AdvDataField):
         """
         if 0x0000 <= appearance <= 0xFFFF:
             self.__appearance = appearance
-            super().__init__(0x19, pack('<H', appearance))
+            super().__init__(0x19, pack("<H", appearance))
         else:
             raise AdvDataError
 
@@ -700,24 +682,23 @@ class AdvAppearance(AdvDataField):
         :return: A new AdvAppearance object that represents the device appearance.
         """
         if len(ad_record) == 2:
-            appearance = unpack('<H', ad_record)[0]
+            appearance = unpack("<H", ad_record)[0]
             return AdvAppearance(appearance)
         # Parsing error.
         raise AdvDataError
 
 
 class AdvURI(AdvDataField):
-    """Uniform Resource Identifier advertising data record.
-    """
+    """Uniform Resource Identifier advertising data record."""
 
     SUPPORTED_SCHEMES = {
-        'aaa'   : 0x0001,
-        'aaas'  : 0x0002,
-        'data'  : 0x000C,
-        'ftp'   : 0x0011,
-        'http'  : 0x0016,
-        'https' : 0x0017,
-        'mailto': 0x0026
+        "aaa": 0x0001,
+        "aaas": 0x0002,
+        "data": 0x000C,
+        "ftp": 0x0011,
+        "http": 0x0016,
+        "https": 0x0017,
+        "mailto": 0x0026,
     }
 
     def __init__(self, url):
@@ -784,8 +765,7 @@ class AdvURI(AdvDataField):
 
 
 class AdvAdvertisingInterval(AdvDataField):
-    """Advertising Interval record.
-    """
+    """Advertising Interval record."""
 
     def __init__(self, interval):
         """Create an Advertising Interval record.
@@ -794,17 +774,17 @@ class AdvAdvertisingInterval(AdvDataField):
         """
         if interval <= 0xFFFF:
             self.__interval = interval
-            self.__interval_packed = pack('<H', interval)
+            self.__interval_packed = pack("<H", interval)
         elif interval <= 0xFFFFFF:
             self.__interval = interval
             self.__interval_packed = bytes([
                 interval & 0xFF,
-                (interval & 0xFF00)>>8,
-                (interval & 0xFF0000)>>16
+                (interval & 0xFF00) >> 8,
+                (interval & 0xFF0000) >> 16,
             ])
         elif interval <= 0xFFFFFFFF:
             self.__interval = interval
-            self.__interval_packed = pack('<I', interval)
+            self.__interval_packed = pack("<I", interval)
         else:
             raise AdvDataError
 
@@ -825,7 +805,7 @@ class AdvAdvertisingInterval(AdvDataField):
         :return: An instance of AdvAdvertisingInterval
         """
         if len(ad_record) == 2:
-            interval = unpack('<H', ad_record)[0]
+            interval = unpack("<H", ad_record)[0]
             return AdvAdvertisingInterval(interval)
         if len(ad_record) == 3:
             interval = ad_record[0] | (ad_record[1]<<8) | (ad_record[2]<<16)
@@ -836,9 +816,9 @@ class AdvAdvertisingInterval(AdvDataField):
         # Parsing error
         raise AdvDataError
 
+
 class AdvBluetoothDeviceAddr(AdvDataField):
-    """Bluetooth Device Address information record.
-    """
+    """Bluetooth Device Address information record."""
 
     def __init__(self, bd_address, public=False):
         """Create a Bluetooth Device Address advertising data record
@@ -865,7 +845,7 @@ class AdvBluetoothDeviceAddr(AdvDataField):
         else:
             suffix = bytes([0x01])
 
-        super().__init__(0x1B,address.value + suffix)
+        super().__init__(0x1B, address.value + suffix)
 
     @property
     def is_public(self):
@@ -882,7 +862,6 @@ class AdvBluetoothDeviceAddr(AdvDataField):
         :return bool: True if address is random, False otherwise
         """
         return not self.__public
-
 
     @staticmethod
     def from_bytes(ad_record):
@@ -901,14 +880,12 @@ class AdvBluetoothDeviceAddr(AdvDataField):
 
 
 class AdvLeRole(AdvDataField):
-    """LE Role advertising data record.
-    """
+    """LE Role advertising data record."""
 
     ONLY_PERIPHERAL_ROLE = 0x00
     ONLY_CENTRAL_ROLE = 0x01
     PREFERRED_PERIPHERAL_ROLE = 0x02
     PREFERRED_CENTRAL_ROLE = 0x03
-
 
     def __init__(self, role):
         """Create an AdvLeRole advertising data record.
@@ -917,14 +894,13 @@ class AdvLeRole(AdvDataField):
         """
         self.__role = role
         if self.__role >= 0 and self.__role < 4:
-            super().__init__(0x1C, pack('<B', role))
+            super().__init__(0x1C, pack("<B", role))
         else:
             raise AdvDataError
 
     @property
     def role(self):
-        """Return LE role value
-        """
+        """Return LE role value"""
         return self.__role
 
     @staticmethod
@@ -943,8 +919,7 @@ class AdvLeRole(AdvDataField):
 
 
 class AdvServiceDataUuid128(AdvDataField):
-    """Service Data with 128-bit UUID.
-    """
+    """Service Data with 128-bit UUID."""
 
     def __init__(self, uuid, data):
         """Initialize a 128-bit UUID Service data
@@ -961,14 +936,12 @@ class AdvServiceDataUuid128(AdvDataField):
 
     @property
     def uuid(self):
-        """Returns service's 128-bit UUID
-        """
+        """Returns service's 128-bit UUID"""
         return self.__uuid
 
     @property
     def data(self):
-        """Returns service's data
-        """
+        """Returns service's data"""
         return self.__data
 
     @staticmethod
@@ -988,8 +961,7 @@ class AdvServiceDataUuid128(AdvDataField):
 
 
 class AdvLeSupportedFeatures(AdvDataField):
-    """LE Supported Features
-    """
+    """LE Supported Features"""
 
     def __init__(self, encryption=False, conn_param_update=False, ext_reject_ind=False,
                  slave_features_exchange=False, ping=False, data_packet_length=False,
@@ -1009,7 +981,7 @@ class AdvLeSupportedFeatures(AdvDataField):
         :param bool ext_scanner_filter_policies: True if extended scanner filtering
                                                  policies are supported, False otherwise
         """
-        # Save parameters
+        # Save parameters
         self.__encryption = encryption
         self.__conn_param_update = conn_param_update
         self.__ext_reject_ind = ext_reject_ind
@@ -1019,22 +991,22 @@ class AdvLeSupportedFeatures(AdvDataField):
         self.__privacy = privacy
         self.__ext_scanner_filter_policies = ext_scanner_filter_policies
 
-        # Generate bitmap
+        # Generate bitmap
         features = 0x00
         if self.__encryption:
             features |= 1
         if self.__conn_param_update:
-            features |= (1 << 1)
+            features |= 1 << 1
         if self.__ext_reject_ind:
-            features |= (1 << 2)
+            features |= 1 << 2
         if self.__slave_features_exchange:
-            features |= (1 << 3)
+            features |= 1 << 3
         if self.__ping:
-            features |= (1 << 4)
+            features |= 1 << 4
         if self.__data_packet_length:
-            features |= (1 << 5)
+            features |= 1 << 5
         if self.__privacy:
-            features |= (1 << 6)
+            features |= 1 << 6
         if self.__ext_scanner_filter_policies:
             features |= (1 << 7)
 
@@ -1098,7 +1070,7 @@ class AdvLeSupportedFeatures(AdvDataField):
         :rtype: AdvDataError
         """
         if len(ad_record) >= 1:
-            # Parse features set
+            # Parse features set
             features = 0x00
             for i, record in enumerate(ad_record):
                 features |= (record << (8*i))
@@ -1120,11 +1092,81 @@ class AdvLeSupportedFeatures(AdvDataField):
                 ping=ping,
                 data_packet_length=data_packet_length,
                 privacy=privacy,
-                ext_scanner_filter_policies=ext_scanner_filter_policies
+                ext_scanner_filter_policies=ext_scanner_filter_policies,
             )
 
         # Parsing error
         raise AdvDataError
+
+
+class AdvPbAdv(AdvDataField):
+    """
+    BT Mesh PB-ADV data field
+
+    Contains various PDUS/fragments of PDUS used during Mesh PB-ADV provisioning
+    """
+
+    def __init__(self, data):
+        """
+        Initialize this AdvPbAdv object
+
+        :param data: Payload
+        :type data: bytes
+        """
+        self.__data = data
+        super().__init__(0x29, data)
+
+    @property
+    def data(self):
+        """
+        Returns the data
+        """
+        return self.__data
+
+    @staticmethod
+    def from_bytes(ad_record):
+        """Deserialize an AdvPbAdv
+
+        :param bytes ad_record: Serialized AdvPbAdv AD record
+        :returns: An AdvPbAdv object
+        :rtype: AdvPbAdv
+        """
+        return AdvPbAdv(ad_record)
+
+
+class AdvMeshBeacon(AdvDataField):
+    """
+    BT Mesh Beacon data field
+
+    Transports various types of Mesh Beacons
+    """
+
+    def __init__(self, data):
+        """
+        Initialize this AdvMeshBeacon object
+
+        :param data: Payload
+        :type data: bytes
+        """
+        self.__data = data
+        super().__init__(0x2B, data)
+
+    @property
+    def data(self):
+        """
+        Returns the data
+        """
+        return self.__data
+
+    @staticmethod
+    def from_bytes(ad_record):
+        """Deserialize an AdvMeshBeacon
+
+        :param bytes ad_record: Serialized AdvMeshBeacon AD record
+        :returns: An AdvMeshBeacon object
+        :rtype: AdvMeshBeacon
+        """
+        return AdvMeshBeacon(ad_record)
 
 
 class EddystoneUrl(AdvServiceData16):
@@ -1141,8 +1183,20 @@ class EddystoneUrl(AdvServiceData16):
     ]
 
     EXTENSIONS = [
-        ".com/", ".org/", ".edu/", ".net/", ".info/", ".biz/", ".gov/",
-        ".com", ".org", ".edu", ".net", ".info", ".biz", ".gov",
+        ".com/",
+        ".org/",
+        ".edu/",
+        ".net/",
+        ".info/",
+        ".biz/",
+        ".gov/",
+        ".com",
+        ".org",
+        ".edu",
+        ".net",
+        ".info",
+        ".biz",
+        ".gov",
     ]
 
     def encode_url(self, url):
@@ -1194,15 +1248,15 @@ class AdvDataFieldList:
         0x01: AdvFlagsField,
         0x02: AdvIncServiceUuid16List,
         0x03: AdvCompServiceUuid16List,
-        #0x04: AdvIncServiceUUID32List,
-        #0x05: AdvCompServiceUUID32List,
+        # 0x04: AdvIncServiceUUID32List,
+        # 0x05: AdvCompServiceUUID32List,
         0x06: AdvIncServiceUuid128List,
         0x07: AdvCompServiceUuid128List,
         0x08: AdvShortenedLocalName,
         0x09: AdvCompleteLocalName,
         0x0A: AdvTxPowerLevel,
-        #0x0D: AdvDeviceClass,
-        #0x10: AdvDeviceId,
+        # 0x0D: AdvDeviceClass,
+        # 0x10: AdvDeviceId,
         0x12: AdvSlaveConnIntervalRange,
         0x14: AdvServiceSollicitationUuid16List,
         0x15: AdvServiceSollicitationUuid128List,
@@ -1213,25 +1267,24 @@ class AdvDataFieldList:
         0x1A: AdvAdvertisingInterval,
         0x1B: AdvBluetoothDeviceAddr,
         0x1C: AdvLeRole,
-        #0x1F: AdvServiceSollicitationUuid32List,
-        #0x20: AdvServiceDataUuid32,
+        # 0x1F: AdvServiceSollicitationUuid32List,
+        # 0x20: AdvServiceDataUuid32,
         0x21: AdvServiceDataUuid128,
         0x24: AdvURI,
-        #0x25: AdvIndoorPositioning,
-        #0x26: AdvTransportDiscData,
+        # 0x25: AdvIndoorPositioning,
+        # 0x26: AdvTransportDiscData,
         0x27: AdvLeSupportedFeatures,
-        #0x28: AdvChannelMapUpdateIndication,
-        #0x29: AdvPbAdv,
-        #0x2A: AdvMeshMessage,
-        #0x2B: AdvMeshBeacon,
-        #0x2C: AdvBigInfo,
-        #0x2D: AdvBroadcastCode,
-        #0x2F: AdvAdvertisingIntervalLong,
-        #0x30: AdvBroadcastName,
-        #0x3D: Adv3dInfoData,
-        0xFF: AdvManufacturerSpecificData
+        # 0x28: AdvChannelMapUpdateIndication,
+        0x29: AdvPbAdv,
+        # 0x2A: AdvMeshMessage,
+        0x2B: AdvMeshBeacon,
+        # 0x2C: AdvBigInfo,
+        # 0x2D: AdvBroadcastCode,
+        # 0x2F: AdvAdvertisingIntervalLong,
+        # 0x30: AdvBroadcastName,
+        # 0x3D: Adv3dInfoData,
+        0xFF: AdvManufacturerSpecificData,
     }
-
 
     def __init__(self, *args):
         self.__fields = []
@@ -1277,7 +1330,7 @@ class AdvDataFieldList:
 
         :return bytes: Serialized AD records list
         """
-        output = b''
+        output = b""
         for field in self.__fields:
             field_record = field.to_bytes()
             if len(output) + len(field_record) <= 31:
