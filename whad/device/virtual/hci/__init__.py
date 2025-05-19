@@ -727,7 +727,7 @@ class HCIDevice(VirtualDevice):
     def _update_max_acl_len(self, length: int):
         """Update device HCI MTU
         """
-        self.__max_acl_len = length
+        #self.__max_acl_len = length
 
     def get_max_acl_len(self) -> int:
         """Retrieve maximum ACL length
