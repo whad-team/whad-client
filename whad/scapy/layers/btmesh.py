@@ -652,7 +652,6 @@ class ForwardingTableEntry(Packet):
     fields_desc = [
         LittleEndianPacketLenField(
             "forwarding_table_entry_header",
-            default=ForwardingTableEntryHeader(),
             cls=ForwardingTableEntryHeader,
             length_from=lambda pkt: 2,
         ),
