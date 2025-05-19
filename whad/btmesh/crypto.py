@@ -10,7 +10,7 @@ from whad.ble.crypto import (
     xor,
 )
 from cryptography.hazmat.primitives.asymmetric.ec import derive_private_key, SECP256R1
-from random import randbytes
+from os import urandom
 
 
 def aes_ccm(key, nonce, plaintext, additional_data=b""):
@@ -384,9 +384,9 @@ class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoM
         NOT SAFE
         """
         if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
-            self.rand_provisioner = randbytes(16)
+            self.rand_provisioner = urandom(16)
         elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
-            self.rand_provisioner = randbytes(32)
+            self.rand_provisioner = urandom(32)
 
 
 class ProvisioningBearerAdvCryptoManagerProvisionee(ProvisioningBearerAdvCryptoManager):
@@ -430,9 +430,9 @@ class ProvisioningBearerAdvCryptoManagerProvisionee(ProvisioningBearerAdvCryptoM
         NOT SAFE
         """
         if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
-            self.rand_provisionee = randbytes(16)
+            self.rand_provisionee = urandom(16)
         elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
-            self.rand_provisionee = randbytes(32)
+            self.rand_provisionee = urandom(32)
 
 
 """

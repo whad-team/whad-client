@@ -99,7 +99,7 @@ class AccessLayer(Layer):
         self.state.received_message = None
         self.state.expected_class = clazz
 
-        self.state.event.wait(timeout=2)
+        self.state.event.wait(timeout=3)
         self.state.expected_class = None
         return self.state.received_message
 
