@@ -4,7 +4,7 @@ PB-ADV bearer Layer
 Mostly instanciate a generic provisioning layer. Only once for a provisionee, and one per peer for a provisioner (one per link id)
 """
 
-from random import randbytes
+from os import urandom
 from whad.common.stack import Layer, alias, instance
 from whad.btmesh.stack.utils import (
     ProvisioningCompleteData,
@@ -154,7 +154,7 @@ class PBAdvBearerLayer(Layer):
         :param peer_uuid: UUID of peer
         :type peer_uuid: str
         """
-        link_id = randbytes(4)
+        link_id = urandom(4)
         self.state.gen_prov_layer = self.instantiate_gen_prov(link_id, peer_uuid)
         self.state.current_link_id = link_id
         self.state.gen_prov_layer.get_layer("provisioning").initiate_provisioning()
