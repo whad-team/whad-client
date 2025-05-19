@@ -471,7 +471,7 @@ class LittleEndianPacketLenField(PacketLenField):
     """
 
     def __init__(self, name, default, cls_arg, length_from=None):
-        super().__init__(name=name, default=default, cls=cls_arg, length_from=length_from)
+        super().__init__(name, default, cls_arg, length_from)
 
     def i2m(self, pkt, val):
         if val is None:
