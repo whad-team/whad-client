@@ -9,15 +9,9 @@ This module provides 2 set of tests  :
 """
 
 import pytest
-from whad.scapy.layers.btmesh import (
-    BTMesh_Provisioning_Hdr,
-    BTMesh_Provisioning_Invite,
-    BTMesh_Provisioning_Capabilities,
-)
 from whad.common.stack import instance, alias
 from whad.common.stack.tests import Sandbox, LayerMessage
 from whad.btmesh.stack.provisioning import (
-    ProvisioningLayerProvisioner,
     ProvisioningLayerProvisionee,
 )
 from scapy.all import raw

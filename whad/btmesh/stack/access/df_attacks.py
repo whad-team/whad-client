@@ -74,11 +74,7 @@ class DFAttacksAccessLayer(AccessLayer):
         :param dest: Destination address
         :type dest: int
         """
-        app_key = (
-            self.state.profile.get_configuration_server_model()
-            .get_state("app_key_list")
-            .get_value(0)
-        )
+        app_key = self.state.profile.get_app_key(0)
 
         if app_key is None:
             return False
@@ -109,6 +105,7 @@ class DFAttacksAccessLayer(AccessLayer):
 
         # Wanted lanes
         ctx = copy(ctx)
+        ctx.seq_number = None
         pkt = BTMesh_Model_Directed_Forwarding_Wanted_Lanes_Set(
             net_key_index=0, wanted_lanes=1
         )
@@ -118,6 +115,7 @@ class DFAttacksAccessLayer(AccessLayer):
 
         # Echo interval
         ctx = copy(ctx)
+        ctx.seq_number = None
         pkt = BTMesh_Model_Directed_Forwarding_Path_Echo_Interval_Set(
             net_key_index=0, unicast_echo_interval=5, multicast_echo_interval=5
         )
@@ -127,6 +125,7 @@ class DFAttacksAccessLayer(AccessLayer):
 
         # Lane lifetime
         ctx = copy(ctx)
+        ctx.seq_number = None
         pkt = BTMesh_Model_Directed_Forwarding_Path_Metric_Set(
             net_key_index=0, path_lifetime=2, path_metric_type=0
         )
@@ -144,13 +143,10 @@ class DFAttacksAccessLayer(AccessLayer):
         :param dest: Destination address
         :type dest: int
         """
-        app_key = (
-            self.state.profile.get_configuration_server_model()
-            .get_state("app_key_list")
-            .get_value(0)
-        )
+        app_key = self.state.profile.get_app_key(0)
 
         if app_key is None:
+            print("no appkey")
             return
 
         # First message to get the Update Number
@@ -190,6 +186,8 @@ class DFAttacksAccessLayer(AccessLayer):
         )
         # We wait for the response to this message ...
         pkt = BTMesh_Model_Message() / pkt
+        ctx = copy(ctx)
+        ctx.seq_number = None
         self.process_new_message((pkt, ctx))
         self.wait_for_message(BTMesh_Model_Directed_Forwarding_Table_Entries_Status)
 
@@ -215,11 +213,7 @@ class DFAttacksAccessLayer(AccessLayer):
         :param pt: Path target of the path
         :type pt: int
         """
-        app_key = (
-            self.state.profile.get_configuration_server_model()
-            .get_state("app_key_list")
-            .get_value(0)
-        )
+        app_key = self.state.profile.get_app_key(0)
 
         if app_key is None:
             return
@@ -271,11 +265,7 @@ class DFAttacksAccessLayer(AccessLayer):
         return self.df_dependents(dest, po, pt)
 
     def df_reset(self, addr):
-        app_key = (
-            self.state.profile.get_configuration_server_model()
-            .get_state("app_key_list")
-            .get_value(0)
-        )
+        app_key = self.state.profile.get_app_key(0)
 
         if app_key is None:
             return False
@@ -309,11 +299,7 @@ class DFAttacksAccessLayer(AccessLayer):
         :param action: On or off
         :type action: bool
         """
-        app_key = (
-            self.state.profile.get_configuration_server_model()
-            .get_state("app_key_list")
-            .get_value(0)
-        )
+        app_key = self.state.profile.get_app_key(0)
 
         if app_key is None:
             return False
@@ -333,4 +319,4 @@ class DFAttacksAccessLayer(AccessLayer):
         ctx.aid = app_key.aid
 
         pkt = BTMesh_Model_Message() / pkt
-        self.process_new_message((pkt, ctx)) 
+        self.process_new_message((pkt, ctx))
