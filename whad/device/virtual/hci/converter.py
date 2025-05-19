@@ -127,7 +127,7 @@ class HCIConverter:
                     #return hci_packets
 
                 # No HCI packet for now.
-                logger.debug("l2cap is incomplete, more fragments needed (%s/%s).", len(self.cached_l2cap_payload) - 4), self.cached_l2cap_length)
+                logger.debug("l2cap is incomplete, more fragments needed (%s/%s).", len(self.cached_l2cap_payload) - 4, self.cached_l2cap_length)
                 return []
 
             # L2CAP packet is complete but must be split
