@@ -12,7 +12,7 @@ from scapy.fields import BitField, LEShortField
 from scapy.error import warning
 from scapy.layers.bluetooth import BluetoothUserSocket, BluetoothSocketError, BluetoothCommandError, \
     HCI_Hdr, SM_Hdr, HCI_Event_LE_Meta, HCI_Command_Hdr, HCI_Event_Command_Complete
-from scapy.fields import ByteField, ShortField
+from scapy.fields import ByteField, ShortField, StrFixedLenField
 
 class SM_Security_Request(Packet):
     name = "Security Request"
@@ -139,9 +139,14 @@ class HCI_Cmd_LE_Complete_Read_Buffer_Size(Packet):
     name = "LE Read Buffer Size response"
     fields_desc = [LEShortField("acl_pkt_len", 0),
                    ByteField("total_num_acl_pkts", 0)]
-    
+
+class HCI_Cmd_LE_Set_Event_Mask(Packet):
+    name = "LE Set Event Mask"
+    fields_desc = [StrFixedLenField("mask", b"\x1f\x00\x00\x00\x00\x00\x00\x00", 8)]
+
 class HCI_Cmd_Read_Buffer_Size(Packet):
     name = "Read Buffer Size"
+
 
 class HCI_Cmd_Complete_Read_Buffer_Size(Packet):
     name = "Read Buffer Size response"
@@ -154,5 +159,6 @@ bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Buffer_Size, opcode=0x1005)
 
 # HCI LE commands
 bind_layers(HCI_Event_LE_Meta, HCI_LE_Meta_Data_Length_Change, event=7)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Event_Mask, opcode=0x2001) # noqa: E501
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_LE_Complete_Read_Buffer_Size, opcode=0x2002)  # noqa: E501
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Buffer_Size, opcode=0x1005)  # noqa: E501
