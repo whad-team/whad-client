@@ -22,9 +22,6 @@ try:
     linkcloser.start()
     print("LINK CLOSER STARTED")
 
-    while True:
-        linkcloser.polling_rx_packets()
-        sleep(0.05)
 except ConnectionLostException as e:
     print("Connection lost", e)
 

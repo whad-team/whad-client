@@ -15,7 +15,6 @@ from whad.scapy.layers.btmesh import (
     EIR_BTMesh_Beacon,
     BTMesh_Secure_Network_Beacon,
 )
-from whad.btmesh.crypto import NetworkLayerCryptoManager
 from whad.btmesh.stack.constants import (
     VIRTUAL_ADDR_TYPE,
     UNICAST_ADDR_TYPE,
@@ -268,6 +267,24 @@ class NetworkLayer(Layer):
             # logger.warning(
             #    "Received Network PDU with wrong authentication value, dropping"
             # )
+            return
+
+        # If sniffing_only mode, we display packet and leave
+        if self.__connector.sniffing_only:
+            raw_lower_transport = plaintext[2:]
+            if network_ctl == 1:
+                lower_transport_pdu = BTMesh_Lower_Transport_Control_Message(
+                    raw_lower_transport
+                )
+            else:
+                lower_transport_pdu = BTMesh_Lower_Transport_Access_Message(
+                    raw_lower_transport
+                )
+
+            print("====================== START MESSAGE ===========================")
+            deobf_net_pdu.show()
+            lower_transport_pdu.show()
+            print("====================== END MESSAGE =============================")
             return
 
         # check address validity. Mesh Spec Section 3.4.3

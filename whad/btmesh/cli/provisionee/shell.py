@@ -31,7 +31,7 @@ class BTMeshProvisioneeShell(BTMeshBaseShell):
         self.intro = INTRO
 
         # Instanciate our Peripheral
-        self._connector = Provisionee(self._interface, profile=self._profile)
+        self._connector = Provisionee(self.interface, profile=self.profile)
 
         self.update_prompt()
 

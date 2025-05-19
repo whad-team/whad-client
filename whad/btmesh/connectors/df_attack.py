@@ -17,7 +17,6 @@ react on specific events.
 
 from whad.btmesh.connectors.provisionee import Provisionee
 
-from whad.scapy.layers.btmesh import *
 from whad.btmesh.stack.network import NetworkLayer
 
 from whad.btmesh.profile import BaseMeshProfile
@@ -43,8 +42,6 @@ class DFAttacks(Provisionee):
             profile,
         )
 
-        self.whitelist = []
-
         # Add the df_attacks for the upper_transport
         self.options = {
             "profile": self.profile,
@@ -58,6 +55,8 @@ class DFAttacks(Provisionee):
             },
         }
 
+
+        # reinstantiate NetworkLayer with the correct options
         self._main_stack = NetworkLayer(connector=self, options=self.options)
 
     def do_network_discovery(self, addr_low, addr_high, delay=3.5):
@@ -110,7 +109,7 @@ class DFAttacks(Provisionee):
         :param victim_addr: Addr of the victim
         :type victim_addr: int
         """
-        return self._main_stack.get_layer("upper_transport").a5_attack(victim_addr)
+        return self._main_stack.get_layer("upper_transport").a3_attack(victim_addr)
 
     def a4_attack(self, addr_list):
         """

@@ -150,8 +150,6 @@ class ProvisioningLayer(Layer):
         )
 
     def send_to_gen_prov(self, packet):
-        packet.show()
-        print(raw(packet))
         hdr = BTMesh_Provisioning_Hdr(
             type=PROVISIONING_TYPES[type(packet)], message=packet
         )
@@ -175,9 +173,6 @@ class ProvisioningLayer(Layer):
             packet = packet.message
 
         packet_type = type(packet)
-        if isinstance(packet, Packet):
-            packet.show()
-            print(raw(packet))
 
         if (
             packet_type not in self._handlers
@@ -508,8 +503,8 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         """
         On receiving Provisionee Complete packet
         """
-        # notify gen_prov to close the link by sending None
-        self.send("gen_prov", "CLOSE_LINK")
+        # notify gen_prov to close the link by sending None becasue prov finished
+        self.send("gen_prov", "FINISHED_PROV")
 
 
 class ProvisioningLayerProvisionee(ProvisioningLayer):

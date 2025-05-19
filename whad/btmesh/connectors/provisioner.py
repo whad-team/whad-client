@@ -154,6 +154,8 @@ class Provisioner(BTMesh):
 
         :param dev_uuid: The dev_uuid of the node we want to provision
         :type dev_uuid: UUID
+        :returns: True if success, False if fail
+        :rtype: bool
         """
         if (
             self.__unprovisioned_devices.check(dev_uuid)
@@ -172,8 +174,12 @@ class Provisioner(BTMesh):
 
             while time() - start_time < duration:
                 # Check if event timedout, we fail
-                if not self.prov_event.wait(timeout=10):
-                    return False
+                self.prov_event.wait(timeout=5)
+
+                # if distant node is provisioned, finished
+                if self.distant_node_provisioned:
+                    self.distant_node_provisioned = False
+                    return True
 
                 elif not auth_done and self.prov_auth_data is not None:
                     auth_done = True
@@ -185,7 +191,7 @@ class Provisioner(BTMesh):
                     elif self.prov_auth_data.auth_method == OUTPUT_OOB_AUTH:
                         return self.prov_auth_data
 
-            return True
+            return False
 
     def resume_provisioning_with_auth(self, value):
         """
@@ -193,10 +199,16 @@ class Provisioner(BTMesh):
 
         :param value: The value types by the user
         :type value: str
+        :returns: True if provisioning success, False if fail
+        :rtype: bool
         """
 
         self.prov_auth_data.value = value
         self._prov_stack.get_layer("pb_adv").on_auth_data(self.prov_auth_data)
         self.prov_event = Event()
         self.prov_event.wait(20)
-        return True
+        if self.distant_node_provisioned:
+            self.distant_node_provisioned = False
+            return True
+        else:
+            return False

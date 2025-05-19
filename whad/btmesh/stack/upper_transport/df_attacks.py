@@ -3,25 +3,13 @@ from whad.btmesh.stack.access.df_attacks import DFAttacksAccessLayer
 from whad.btmesh.stack.access import AccessLayer
 from whad.common.stack import alias
 from whad.scapy.layers.btmesh import (
-    BTMesh_Upper_Transport_Access_PDU,
-    BTMesh_Model_Message,
-    BTMesh_Upper_Transport_Control_Heartbeat,
     BTMesh_Upper_Transport_Control_Path_Reply,
-    BTMesh_Upper_Transport_Control_Friend_Poll,
-    BTMesh_Upper_Transport_Control_Friend_Clear,
     BTMesh_Upper_Transport_Control_Path_Request,
-    BTMesh_Upper_Transport_Control_Friend_Offer,
     BTMesh_Upper_Transport_Control_Path_Echo_Reply,
-    BTMesh_Upper_Transport_Control_Friend_Update,
     BTMesh_Upper_Transport_Control_Path_Confirmation,
-    BTMesh_Upper_Transport_Control_Friend_Request,
-    BTMesh_Upper_Transport_Control_Friend_Clear_Confirm,
     BTMesh_Upper_Transport_Control_Path_Request_Solicitation,
     BTMesh_Upper_Transport_Control_Dependent_Node_Update,
     BTMesh_Upper_Transport_Control_Path_Echo_Request,
-    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add,
-    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove,
-    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm,
     UnicastAddr,
 )
 from whad.btmesh.stack.utils import MeshMessageContext
@@ -29,7 +17,7 @@ from whad.btmesh.stack.constants import (
     DIRECTED_FORWARDING_CREDS,
     MANAGED_FLOODING_CREDS,
 )
-from threading import Thread, Timer
+from threading import Timer
 from copy import copy
 from time import sleep
 
@@ -473,7 +461,7 @@ class UpperTransportDFAttacks(UpperTransportLayer):
 
     def a3_attack(self, victim_addr):
         """
-        Launched the A5 attack.
+        Launched the A3 attack.
         Sends a Path Request to the victim. Expects a Path Reply with confirmation.
         We then send the PAth Conformation, and finally send a dependent_nodes_update message.
 

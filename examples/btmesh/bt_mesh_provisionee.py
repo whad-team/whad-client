@@ -1,4 +1,3 @@
-from whad.scapy.layers.btmesh import *
 from whad.exceptions import WhadDeviceNotFound
 
 from whad.device import WhadDevice
@@ -8,9 +7,6 @@ from whad.btmesh.connectors.provisionee import Provisionee
 from time import sleep
 from whad.btmesh.stack.utils import MeshMessageContext
 
-from whad.scapy.layers.btmesh import *
-
-from scapy.all import EIR_Hdr
 
 
 if len(sys.argv) != 2:
