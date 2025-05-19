@@ -651,7 +651,7 @@ class ForwardingTableEntry(Packet):
     name = "Bluetooth Mesh Path Forwarding Table Entry"
     fields_desc = [
         LittleEndianPacketLenField(
-            "forwarding_table_entry_header",
+            name="forwarding_table_entry_header",
             default=ForwardingTableEntryHeader(),
             cls=ForwardingTableEntryHeader,
             length_from=lambda pkt: 2,
