@@ -18,7 +18,7 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Cmd_LE_Start_Encryption_Request, HCI_Cmd_LE_Set_Advertising_Parameters, \
     HCI_Cmd_LE_Read_Buffer_Size, BluetoothUserSocket
 from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, HCI_Cmd_Read_Buffer_Size, \
-    HCI_Cmd_Complete_Read_Buffer_Size
+    HCI_Cmd_Complete_Read_Buffer_Size#, HCI_Cmd_LE_Set_Event_Mask
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -388,6 +388,11 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_Set_Event_Mask(mask=mask))
         return response is not None and response.status == 0x00
 
+    #def _le_set_event_mask(self, mask=b''):
+    #    """Configure HCI LE event mask.
+    #    """
+    #    response = self._write_command(HCI_Cmd_LE_Set_Event_Mask())
+
     def _set_connection_accept_timeout(self, timeout=32000):
         """
         Configure HCI device connection accept timeout.
@@ -399,7 +404,7 @@ class HCIDevice(VirtualDevice):
         """
         Indicates to HCI Device that the Host supports Low Energy mode.
         """
-        response = self._write_command(HCI_Cmd_LE_Host_Supported())
+        response = self._write_command(HCI_Cmd_LE_Host_Supported(simultaneous=0))
         return response is not None and response.status == 0x00
 
     def _initialize(self):
@@ -407,11 +412,12 @@ class HCIDevice(VirtualDevice):
         Initialize HCI Device and returns boolean indicating if it can be used by WHAD.
         """
         success = (
-                self._reset() and
+                #self._reset() and
                 self._le_read_buffer_size() and
                 self._set_event_filter(0) and
                 self._set_connection_accept_timeout(32000) and
                 self._set_event_mask(b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d") and
+                #self._le_set_event_mask()
                 self.indicates_le_support()
         )
 
