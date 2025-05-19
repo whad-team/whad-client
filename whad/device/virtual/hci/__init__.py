@@ -269,6 +269,7 @@ class HCIDevice(VirtualDevice):
         logger.debug("[hci] waiting for response (timeout: %s)...", self.__timeout)
         response = self._wait_response(timeout=self.__timeout)
         if response is None:
+            logger.debug("[hci][%s] timeout reached when sending packet", self.__device.interface)
             return False
 
         logger.debug("[hci] response code: 0x%04x", response.code)
@@ -276,6 +277,7 @@ class HCIDevice(VirtualDevice):
             logger.debug("[hci] waiting for response ...")
             response = self._wait_response(timeout=self.__timeout)
             if response is None:
+                logger.debug("[hci][%s] wait_response returned None !", self.__device.interface)
                 return False
             logger.debug("[hci] response code: 0x%04x", response.code)
 
