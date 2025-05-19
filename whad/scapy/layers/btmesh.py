@@ -471,7 +471,7 @@ class LittleEndianPacketLenField(PacketLenField):
     """
 
     def __init__(self, name, default, cls, length_from=None):
-        super().__init__(name, default, cls, length_from)
+        super().__init__(name=name, default=default, cls=cls, length_from=length_from)
 
     def i2m(self, pkt, val):
         if val is None:
@@ -652,6 +652,7 @@ class ForwardingTableEntry(Packet):
     fields_desc = [
         LittleEndianPacketLenField(
             "forwarding_table_entry_header",
+            default=ForwardingTableEntryHeader(),
             cls=ForwardingTableEntryHeader,
             length_from=lambda pkt: 2,
         ),
