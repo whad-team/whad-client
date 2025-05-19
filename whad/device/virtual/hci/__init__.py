@@ -18,7 +18,7 @@ from scapy.layers.bluetooth import BluetoothSocketError, \
     HCI_Cmd_LE_Start_Encryption_Request, HCI_Cmd_LE_Set_Advertising_Parameters, \
     HCI_Cmd_LE_Read_Buffer_Size, BluetoothUserSocket
 from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, HCI_Cmd_Read_Buffer_Size, \
-    HCI_Cmd_Complete_Read_Buffer_Size, HCI_Cmd_LE_Set_Event_Mask
+    HCI_Cmd_Complete_Read_Buffer_Size#, HCI_Cmd_LE_Set_Event_Mask
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -388,10 +388,10 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_Set_Event_Mask(mask=mask))
         return response is not None and response.status == 0x00
 
-    def _le_set_event_mask(self, mask=b''):
-        """Configure HCI LE event mask.
-        """
-        response = self._write_command(HCI_Cmd_LE_Set_Event_Mask())
+    #def _le_set_event_mask(self, mask=b''):
+    #    """Configure HCI LE event mask.
+    #    """
+    #    response = self._write_command(HCI_Cmd_LE_Set_Event_Mask())
 
     def _set_connection_accept_timeout(self, timeout=32000):
         """
