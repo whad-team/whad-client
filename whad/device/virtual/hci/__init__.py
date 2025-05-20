@@ -18,9 +18,13 @@ from scapy.layers.bluetooth import BluetoothSocketError, BluetoothUserSocket, \
     HCI_Cmd_LE_Enable_Encryption, HCI_Cmd_LE_Set_Advertising_Parameters, \
     HCI_Cmd_LE_Read_Buffer_Size_V1, HCI_Cmd_Read_Local_Name, HCI_Cmd_Complete_Read_Local_Name, \
     HCI_Cmd_Complete_Read_Local_Version_Information, HCI_Cmd_Read_Local_Version_Information, \
-    HCI_Cmd_Write_Connect_Accept_Timeout
+    HCI_Cmd_Write_Connect_Accept_Timeout, HCI_Cmd_LE_Read_Local_Supported_Features, \
+    HCI_Cmd_LE_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Clear_Filter_Accept_List
 from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
-    HCI_Cmd_Read_Buffer_Size, HCI_Cmd_Complete_Read_Buffer_Size
+    HCI_Cmd_Read_Buffer_Size, HCI_Cmd_Complete_Read_Buffer_Size, HCI_Cmd_LE_Set_Event_Mask, \
+    HCI_Cmd_Read_Local_Supported_Commands, HCI_Cmd_Complete_Supported_Commands, \
+    HCI_Cmd_Read_Local_Supported_Features, HCI_Cmd_Complete_Supported_Features, \
+    HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Complete_Supported_Features
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -77,7 +81,6 @@ def get_hci(index):
         logger.debug("WHAD device hci%d cannot be accessed.", index)
         raise WhadDeviceAccessDenied(f"hci{index}") from perm_err
 
-
 class HCIDevice(VirtualDevice):
     """Host/controller interface virtual device implementation.
     """
@@ -118,9 +121,19 @@ class HCIDevice(VirtualDevice):
         self._cached_scan_response_data = None
         self.__timeout = 1.0
         self._connected = False
+        self.__closing = False
+        self.__local_supp_cmds = None
+
+        # ACL properties
         self.__max_acl_len = 27
         self._active_handles = []
-        self.__closing = False
+
+        # LE Features
+        self.__le_features = None
+
+        # LE Filter Accept
+        self.__fa_size = 0
+        self.__fa_entries = []
 
     @property
     def identifier(self):
@@ -206,6 +219,7 @@ class HCIDevice(VirtualDevice):
                     if messages is not None:
                         for message in messages:
                             self._send_whad_message(message)
+
                     # If the connection is stopped and peripheral mode is started,
                     # automatically re-enable advertising based on cached data
                     if HCI_Event_Disconnection_Complete in event:
@@ -332,6 +346,19 @@ class HCIDevice(VirtualDevice):
         }
         return capabilities
 
+    def is_le_cmd_supported(self, cmd: str) -> bool:
+        """Determine if a specific LE command is supported by the HCI interface.
+
+        :param cmd: Command to test
+        :type cmd: str
+        :return: True if command is supported, False otherwise
+        :rtype: bool
+        """
+        self.__local_supp_cmds.show()
+        if cmd in self.__local_supp_cmds.supported_commands.names:
+            return getattr(self.__local_supp_cmds.supported_commands, cmd)
+        return False
+
     def _reset(self):
         """
         Reset HCI device.
@@ -358,6 +385,7 @@ class HCIDevice(VirtualDevice):
         """Read HCI device LE buffer size and update max ACL length.
         """
         response = self._write_command(HCI_Cmd_LE_Read_Buffer_Size_V1())
+        response.show()
         if response is not None and response.status == 0x0:
             if HCI_Cmd_LE_Complete_Read_Buffer_Size in response:
                 if response.acl_pkt_len > 0:
@@ -370,7 +398,36 @@ class HCIDevice(VirtualDevice):
                     return self._read_buffer_size()
             
         return False
-        
+    
+    def read_local_supported_commands(self):
+        """Read local adapter supported commands.
+        """
+        response = self._write_command(HCI_Cmd_Read_Local_Supported_Commands())
+        response.show()
+        if response is not None and response.status == 0x0:
+            if HCI_Cmd_Complete_Supported_Commands in response:
+                self.__local_supp_cmds = response[HCI_Cmd_Complete_Supported_Commands]
+                return True
+        return False
+
+    def read_local_supported_features(self):
+        """Read local supported features
+        """
+        response = self._write_command(HCI_Cmd_Read_Local_Supported_Features())
+        response.show()
+        if response is not None and response.status == 0x0:
+            if HCI_Cmd_Complete_Supported_Features in response:
+                return True
+        return False      
+
+    def read_local_le_supported_features(self):
+        """Read local LE supported features
+        """
+        response = self._write_command(HCI_Cmd_LE_Read_Local_Supported_Features())
+        if response is not None and HCI_Cmd_LE_Complete_Supported_Features in response:
+            self.__le_features = response[HCI_Cmd_LE_Complete_Supported_Features].le_features
+            return True
+        return False
 
     def _set_event_filter(self, filter_type=0):
         """
@@ -412,15 +469,51 @@ class HCIDevice(VirtualDevice):
         """
         success = (
                 self._reset() and
-                self._le_read_buffer_size() and
-                self._set_event_filter(0) and
-                self._set_connection_accept_timeout(32000) and
+                self.read_local_supported_commands() and 
+                self.read_local_supported_features() and 
                 self._set_event_mask(b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d") and
                 self._le_set_event_mask() and
-                self.indicates_le_support()
+                self._le_read_buffer_size() and
+                self.read_local_le_supported_features() and 
+                self._read_bd_address() and 
+                self.indicates_le_support() and
+                self.__read_filter_accept_list_size() and
+                self.clear_filter_list()
         )
 
         return success
+    
+    def clear_filter_list(self):
+        """Clear LE filter list.
+        """
+        response = self._write_command(HCI_Cmd_LE_Clear_Filter_Accept_List())
+        return response is not None and response.status == 0x00
+
+    def __read_filter_accept_list_size(self) -> bool:
+        """Retrieve LE Filter accept list size from local adapter.
+        """
+        if self.is_le_cmd_supported("le_read_filter_accept_list_size"):
+            print("we can read filter access list size")
+        else:
+            print("command not supported")
+        response = self._write_command(HCI_Cmd_LE_Read_Filter_Accept_List_Size())
+        response.show()
+        if response is not None and response.status == 0x00:
+            r = response[HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size]
+            self.__fa_size = r.list_size
+            return True
+        return False
+    
+    def get_whitelist_size(self) -> int:
+        """Retrieve the LE Device Whitelist size for the current HCI
+        interface.
+
+        :return: Number of slots in current LE Whitelist (Filter Accept List)
+        :rtype: int
+        """
+        # Read Filter Accept List size
+        self.__read_filter_accept_list_size()
+        return self.__fa_size
 
     def _read_bd_address(self):
         """
@@ -656,18 +749,42 @@ class HCIDevice(VirtualDevice):
         # Return result
         return result
 
+    def set_advertising_parameters(self, interval_min: int = 0x0020, interval_max: int = 0x0020,
+                                   adv_type="ADV_IND", oatype: int = 0, datype: int = 0,
+                                   daddr:str = "00:00:00:00:00:00", channel_map: int = 0x7,
+                                   filter_policy: str = "all:all", wait_response: bool = True) -> bool:
+        """Configure the HCI LE advertising parameters.
+        """
+        # Wait for a response and update result accordingly.
+        response = self._write_command(HCI_Cmd_LE_Set_Advertising_Parameters(
+            interval_min = 0x0020,
+            interval_max = 0x0020,
+            adv_type="ADV_IND",
+            oatype=0 if self._bd_address_type == AddressType.PUBLIC else 1,
+            datype=0,
+            daddr="00:00:00:00:00:00",
+            channel_map=0x7,
+            filter_policy="all:all"
+        ), wait_response=wait_response)
+
+        # Process response if required
+        if wait_response:
+            return response.status == 0x00
+        return True
 
     def _set_advertising_mode(self, enable=True, wait_response=True):
         """
         Enable or disable advertising mode for HCI device.
         """
+        # Already enable, nothing to do
         if self._advertising and enable:
             return True
-        else:
+
+        # Not advertising and enabling, we need to configure our advertising
+        # parameters.
+        if not self._advertising and enable:
             logger.debug("Set advertising parameters")
-            if wait_response:
-                # Wait for a response and update result accordingly.
-                response = self._write_command(HCI_Cmd_LE_Set_Advertising_Parameters(
+            result = self.set_advertising_parameters(
                     interval_min = 0x0020,
                     interval_max = 0x0020,
                     adv_type="ADV_IND",
@@ -675,37 +792,37 @@ class HCIDevice(VirtualDevice):
                     datype=0,
                     daddr="00:00:00:00:00:00",
                     channel_map=0x7,
-                    filter_policy="all:all"
-                ))
-                result = response.status == 0x00
-            else:
-                # Don't wait, simply send command and consider it OK.
-                self._write_command(HCI_Cmd_LE_Set_Advertising_Parameters(
-                    interval_min = 0x0020,
-                    interval_max = 0x0020,
-                    adv_type="ADV_IND",
-                    oatype=0 if self._bd_address_type == AddressType.PUBLIC else 1,
-                    datype="public",
-                    daddr="00:00:00:00:00:00",
-                    channel_map=0x07,
-                    filter_policy="all:all"
-                ), wait_response=False)
+                    filter_policy="all:all",
+                    wait_response=wait_response
+                )
 
-            logger.debug("Enable advertising: %s", enable)
-            if wait_response:
-                # Wait for a response and update result accordingly.
-                response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))
-                result = response.status == 0x00
-            else:
-                # Don't wait, simply send command and consider it OK.
-                self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(
-                    enable=int(enable)
-                ), wait_response=False)
-                result = True
+            if result:
+                logger.debug("Enable advertising: %s", enable)
+                if wait_response:
+                    # Wait for a response and update result accordingly.
+                    response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))
+                    result = response.status == 0x00
+                else:
+                    # Don't wait, simply send command and consider it OK.
+                    self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(
+                        enable=int(enable)
+                    ), wait_response=False)
+                    result = True
 
             # On success, advertising has been enabled.
-            if result:
-                self._advertising = enable
+            self._advertising = result
+        else:
+            # Disabling advertising
+            if wait_response:
+                response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=0))
+                result = response.status == 0x00
+                if result:
+                    self._advertising = False
+            else:
+                response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=0),
+                                               wait_response=False)
+                self._advertising = False
+                result = True
 
         # Return result
         return result
@@ -744,7 +861,7 @@ class HCIDevice(VirtualDevice):
         return self.__max_acl_len
 
 
-    def _on_whad_ble_encryption(self, message):
+    def _1le_encryption(self, message):
         success = self._enable_encryption(
             message.enabled,
             message.conn_handle,
@@ -841,7 +958,7 @@ class HCIDevice(VirtualDevice):
             self._send_whad_command_result(CommandResult.SUCCESS)
         elif self.__internal_state == HCIInternalState.PERIPHERAL:
             # We are not advertising anymore
-            self._advertising = False
+            self._set_advertising_mode(False)
             self._send_whad_command_result(CommandResult.SUCCESS)
         else:
             self._send_whad_command_result(CommandResult.ERROR)
