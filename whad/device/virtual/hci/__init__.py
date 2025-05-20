@@ -197,8 +197,7 @@ class HCIDevice(VirtualDevice):
         if not self.__opened:
             raise WhadDeviceNotReady()
         try:
-            #if self.__socket is not None and self.__socket.readable(0.1):
-            if 1:
+            if self.__socket is not None and self.__socket.readable(0.1):
                 event = self.__socket.recv()
                 if event.type == 0x4 and event.code in (0xe, 0xf, 0x13):
                     self.__hci_responses.put(event)
