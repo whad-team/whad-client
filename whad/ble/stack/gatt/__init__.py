@@ -46,6 +46,9 @@ def proclock(f):
         except AttError as err:
             self.procedure_stop()
             raise err
+        except GattTimeoutException as err:
+            self.procedure_stop()
+            raise err
         
         # Release GATT procedure lock
         self.procedure_stop()
