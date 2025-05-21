@@ -730,7 +730,7 @@ class HCIDevice(VirtualDevice):
                 self.clear_filter_list()
         )
         try:
-            result = result and self.configure_data_length()
+            success = success and self.configure_data_length()
         except HCIUnsupportedCommand as cmderr:
             logger.debug("[%s] Configuring data length cannot be done, command %s is not supported.",
                          self.interface, cmderr.command)
