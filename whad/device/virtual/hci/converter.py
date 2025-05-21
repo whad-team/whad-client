@@ -392,8 +392,8 @@ class HCIConverter:
                 initiator_address_type = (
                     BleAddrType.PUBLIC if event.patype == 0 else BleAddrType.RANDOM
                 )
-                responder_address = bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
-                responder_address_type = self.__device._bd_address_type
+                responder_address = self.__device._bd_address.value#bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
+                responder_address_type = self.__device._bd_address.type#self.__device._bd_address_type
 
             msg = self.__device.hub.ble.create_connected(
                 BDAddress(initiator_address, addr_type=initiator_address_type),
