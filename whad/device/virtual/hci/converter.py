@@ -380,8 +380,8 @@ class HCIConverter:
             handle = event.handle
             if event.role == 0: # master role
                 self.role = HCIRole.CENTRAL
-                initiator_address = bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
-                initiator_address_type = self.__device._bd_address_type
+                initiator_address = self.__device._bd_address.value#bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
+                initiator_address_type = self.__device._bd_address.type#self.__device._bd_address_type
                 responder_address = bytes.fromhex(event.paddr.replace(":",""))[::-1]
                 responder_address_type = (
                     BleAddrType.PUBLIC if event.patype == 0 else BleAddrType.RANDOM
