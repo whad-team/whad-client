@@ -20,11 +20,14 @@ from scapy.layers.bluetooth import BluetoothSocketError, BluetoothUserSocket, \
     HCI_Cmd_Complete_Read_Local_Version_Information, HCI_Cmd_Read_Local_Version_Information, \
     HCI_Cmd_Write_Connect_Accept_Timeout, HCI_Cmd_LE_Read_Local_Supported_Features, \
     HCI_Cmd_LE_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Clear_Filter_Accept_List
+
 from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
     HCI_Cmd_Read_Buffer_Size, HCI_Cmd_Complete_Read_Buffer_Size, HCI_Cmd_LE_Set_Event_Mask, \
     HCI_Cmd_Read_Local_Supported_Commands, HCI_Cmd_Complete_Supported_Commands, \
     HCI_Cmd_Read_Local_Supported_Features, HCI_Cmd_Complete_Supported_Features, \
-    HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Complete_Supported_Features
+    HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Complete_Supported_Features, \
+    HCI_Cmd_LE_Write_Suggested_Default_Data_Length, HCI_Cmd_LE_Read_Suggested_Default_Data_Length, \
+    HCI_Cmd_LE_Complete_Suggested_Default_Data_Length
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -35,7 +38,7 @@ from whad.device import VirtualDevice
 from whad.hub.discovery import Domain
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.discovery import Capability
-from whad.hub.ble import Direction as BleDirection, Commands, AddressType
+from whad.hub.ble import Direction as BleDirection, Commands, AddressType, BDAddress
 
 # Whad custom layers
 from whad.scapy.layers.hci import HCI_VERSIONS, BT_MANUFACTURERS, \
@@ -81,11 +84,135 @@ def get_hci(index):
         logger.debug("WHAD device hci%d cannot be accessed.", index)
         raise WhadDeviceAccessDenied(f"hci{index}") from perm_err
 
+def compute_max_time(length: int, datarate: int) -> int:
+    """Compute the maximum transmission time for a given PDU length and
+    datarate.
+
+    Prefix is 80 bits (header + CRC), suffix is some kind of security margin.
+    """
+    return int(((80 + length*8 + 32)/datarate)*1000000.0)
+
+class HCIUnsupportedCommand(Exception):
+    """Raised when an HCI command requirement is not met by hardware.
+    """
+    def __init__(self, command):
+        super().__init__()
+        self.__command = command
+
+    def __repr__(self):
+        return f"HCIUnsupportedCommand(cmd='{self.__command}')"
+
+class HCIUnsupportedFeature(Exception):
+    """Raised when an HCI feature requirement is not met by hardware.
+    """
+    def __init__(self, feature):
+        super().__init__()
+        self.__feature = feature
+
+    def __repr__(self):
+        return f"HCIUnsupportedFeature(feature='{self.__feature}')"
+
+class HCIUnsupportedLEFeature(Exception):
+    """Raised when an HCI LE feature requirement is not met by hardware.
+    """
+    def __init__(self, feature):
+        super().__init__()
+        self.__feature = feature
+
+    def __repr__(self):
+        return f"HCIUnsupportedLEFeature(feature='{self.__feature}')"
+
+class req_cmd:
+    """HCI Decorator to handle command requirements.
+
+    Normally, we query an HCI interface to retrieve the list of its supported
+    commands, following the recommended initialization procedure
+    (Vol6, part D, section 1).
+
+    We need to check that all the required commands are supported by the target
+    hardware before starting a specific procedure, and this decorator provides
+    a way to declare one or more required commands for a decorated method of
+    HCIDevice, and blocks its execution if at least one of them is not provided
+    by the target hardware.
+    """
+
+    def __init__(self, *args):
+        """Save any string argument as a required HCI command.
+        """
+        self.__requires = []
+        for arg in args:
+            if isinstance(arg, str):
+                self.__requires.append(arg)
+
+    def __call__(self, method):
+        """Called to decorate the actual method.
+        """
+        requirements = self.__requires
+        def _wrap(self, *args, **kwargs):
+            # check our requirements are met
+            for command in requirements:
+                if not self.is_cmd_supported(command):
+                    raise HCIUnsupportedCommand(command)
+
+            # If all requirements are met, forward
+            return method(self, *args, **kwargs)
+        return _wrap
+
+class req_feature:
+    """HCI decorator to handle command feature requirement.
+    """
+    def __init__(self, *args):
+        self.__requires = []
+        for arg in args:
+            if isinstance(arg, str):
+                self.__requires.append(arg)
+    
+    def __call__(self, method):
+        """Called to decorate the actual method.
+        """
+        requirements = self.__requires
+        def _wrap(self, *args, **kwargs):
+            # check our requirements are met
+            for feature in requirements:
+                if not self.is_feature_supported(feature):
+                    raise HCIUnsupportedFeature(feature)
+
+            # If all requirements are met, forward
+            return method(self, *args, **kwargs)
+        return _wrap   
+
+class le_only(req_feature):
+    """Requires a LE-enabled controller
+    """
+    def __init__(self, *args):
+        super().__init__("le_supported_controller")
+        self.__requires = []
+        for arg in args:
+            if isinstance(arg, str):
+                self.__requires.append(arg)
+
+    def __call__(self, method):
+        requirements = self.__requires
+        def _wrap(self, *args, **kwargs):
+            # check our requirements are met
+            for feature in requirements:
+                if not self.is_le_feature_supported(feature):
+                    raise HCIUnsupportedLEFeature(feature)
+
+            # If all requirements are met, forward
+            return method(self, *args, **kwargs)
+        
+        # Wrap with LE-enabled controller check (tested first)
+        return super().__init__(_wrap)
+
 class HCIDevice(VirtualDevice):
     """Host/controller interface virtual device implementation.
     """
 
     INTERFACE_NAME = "hci"
+
+    PHY_1M = 1000000
+    PHY_2M = 2000000
 
     @classmethod
     def list(cls):
@@ -124,9 +251,22 @@ class HCIDevice(VirtualDevice):
         self.__closing = False
         self.__local_supp_cmds = None
 
-        # ACL properties
-        self.__max_acl_len = 27
+        # Data PDU Length management
+        self.__datarate = HCIDevice.PHY_1M
+        self.__conn_max_tx_octets = 27
+        self.__conn_max_tx_time = 0x148
+        self.__conn_max_tx_time_uncoded = 328
+        self.__conn_max_tx_time_coded = 2704
+        self.__conn_max_rx_octets = 27
+        self.__conn_max_rx_time = 0x148
+        self.__supported_max_tx_octets = 27
+        self.__supported_max_tx_time = 0x148
+        self.__supported_max_rx_octets = 27
+        self.__supported_max_rx_time = 0x148
         self._active_handles = []
+
+        # Classic Features
+        self.__features = None
 
         # LE Features
         self.__le_features = None
@@ -306,13 +446,23 @@ class HCIDevice(VirtualDevice):
             response = self._wait_response()
             while response.opcode != hci_command[HCI_Command_Hdr].opcode:
                 response = self._wait_response()
+            
+            if response is not None:
+                logger.debug("[%s] HCI write command returned status %d",
+                            self.interface, response.status)
         else:
+            logger.debug("[%s] HCI write command returned (non-blocking)", self.interface)
             response = None
+        
         return response
 
     def reset(self):
+        """
         self._bd_address = self._read_bd_address()
         self._local_name = self._read_local_name()
+        """
+        self._initialize()
+        self._read_local_name()
         self._fw_version, self._manufacturer = self._read_local_version_information()
         self._fw_author = self._manufacturer
         self._dev_id = self._generate_dev_id()
@@ -320,7 +470,7 @@ class HCIDevice(VirtualDevice):
         self._dev_capabilities = self._get_capabilities()
 
     def _generate_dev_id(self):
-        devid = (bytes.fromhex(self._bd_address.replace(":","")) + self._local_name)[:16]
+        devid = (self._bd_address.value + self._local_name)[:16]
         if len(devid) < 16:
             devid += b"\x00" * (16 - len(devid))
         return devid
@@ -346,7 +496,7 @@ class HCIDevice(VirtualDevice):
         }
         return capabilities
 
-    def is_le_cmd_supported(self, cmd: str) -> bool:
+    def is_cmd_supported(self, cmd: str) -> bool:
         """Determine if a specific LE command is supported by the HCI interface.
 
         :param cmd: Command to test
@@ -354,123 +504,222 @@ class HCIDevice(VirtualDevice):
         :return: True if command is supported, False otherwise
         :rtype: bool
         """
-        self.__local_supp_cmds.show()
         if cmd in self.__local_supp_cmds.supported_commands.names:
             return getattr(self.__local_supp_cmds.supported_commands, cmd)
+        return False
+
+    def is_feature_supported(self, feature: str) -> bool:
+        """Determine if a specific feature is supported by the HCI interface.
+
+        :param feature: Feature to test
+        :type feature: str
+        :return: True if feature is supported, False otherwise
+        :rtype: bool
+        """
+        if feature in self.__features.lmp_features.names:
+            return getattr(self.__features.lmp_features, feature)
+        return False
+    
+    def is_le_feature_supported(self, feature: str) -> bool:
+        """Determine if a specific feature is supported by the HCI interface.
+
+        :param feature: Feature to test
+        :type feature: str
+        :return: True if feature is supported, False otherwise
+        :rtype: bool
+        """
+        if feature in self.__le_features.le_features.names:
+            return getattr(self.__le_features.le_features, feature)
         return False
 
     def _reset(self):
         """
         Reset HCI device.
         """
+        logger.debug("[%s] Resetting interface ...", self.interface)
         response = self._write_command(HCI_Cmd_Reset())
         return response is not None and response.status == 0x0
 
+    @req_cmd("read_buffer_size")
     def _read_buffer_size(self):
         """Read HCI device default buffer size and update max ACL length.
         """
+        logger.debug("[%s] Reading HCI ACL buffer size ...", self.interface)
         response = self._write_command(HCI_Cmd_Read_Buffer_Size())
 
         if response is not None and response.status == 0x0:
             if HCI_Cmd_Complete_Read_Buffer_Size in response:
                 if response.acl_pkt_len > 0:
                     # Update HCI MTU
-                    logger.debug("[hci][%s] ACL buffer length: %d", self.interface, response.acl_pkt_len)
-                    self.__max_acl_len = response.acl_pkt_len
+                    logger.debug("[%s] ACL buffer length: %d", self.interface, response.acl_pkt_len)
+                    self.__conn_max_tx_octets = response.acl_pkt_len
                     return True
 
+        logger.debug("[%s] Failed reading ACL buffer size !", self.interface)
         return False
 
+    @req_cmd("le_read_buffer_size_v1")
     def _le_read_buffer_size(self):
         """Read HCI device LE buffer size and update max ACL length.
         """
+        logger.debug("[%s] Reading HCI LE ACL buffer size v1 ...", self.interface)
         response = self._write_command(HCI_Cmd_LE_Read_Buffer_Size_V1())
-        response.show()
         if response is not None and response.status == 0x0:
             if HCI_Cmd_LE_Complete_Read_Buffer_Size in response:
                 if response.acl_pkt_len > 0:
                     # Update HCI MTU
-                    logger.debug("[hci][%s] LE ACL buffer length: %d", self.interface, response.acl_pkt_len)
-                    self.__max_acl_len = response.acl_pkt_len
+                    logger.debug("[%s] LE ACL buffer length: %d", self.interface,
+                                 response.acl_pkt_len)
+                    self.__conn_max_tx_octets = response.acl_pkt_len
                     return True
                 else:
-                    logger.debug("[hci][%s] LE ACL buffer read failed, read ACL buffer size")
+                    logger.debug("[%s] LE ACL buffer is 0, fallback to default ACL buffer")
                     return self._read_buffer_size()
-            
+        
+        logger.debug("[%s] Failed reading LE ACL buffer size v1 !", self.interface)
         return False
     
     def read_local_supported_commands(self):
         """Read local adapter supported commands.
         """
+        logger.debug("[%s] Reading HCI local supported commands ...", self.interface)
         response = self._write_command(HCI_Cmd_Read_Local_Supported_Commands())
-        response.show()
         if response is not None and response.status == 0x0:
             if HCI_Cmd_Complete_Supported_Commands in response:
+                logger.debug("[%s] Local supported commands cached.", self.interface)
                 self.__local_supp_cmds = response[HCI_Cmd_Complete_Supported_Commands]
                 return True
+            
+        logger.debug("[%s] Failed reading supported commands !", self.interface)
+        return False   
+
+    @req_cmd("read_local_supported_features")
+    def read_local_supported_features(self):
+        """Query the HCI interface to retrieve its supported features.
+        """
+        logger.debug("[%s] Reading HCI local supported features ...", self.interface)
+        response = self._write_command(HCI_Cmd_Read_Local_Supported_Features())
+        if response is not None and HCI_Cmd_Complete_Supported_Features in response:
+            logger.debug("[%s] Local supported features cached.", self.interface)
+            self.__features = response[HCI_Cmd_Complete_Supported_Features]
+            return True
+        
+        logger.debug("[%s] Failed reading supported features !", self.interface)
         return False
 
-    def read_local_supported_features(self):
-        """Read local supported features
-        """
-        response = self._write_command(HCI_Cmd_Read_Local_Supported_Features())
-        response.show()
-        if response is not None and response.status == 0x0:
-            if HCI_Cmd_Complete_Supported_Features in response:
-                return True
-        return False      
-
+    @req_cmd("le_read_local_supported_features")
     def read_local_le_supported_features(self):
         """Read local LE supported features
         """
+        logger.debug("[%s] Reading HCI LE local supported features ...", self.interface)
         response = self._write_command(HCI_Cmd_LE_Read_Local_Supported_Features())
         if response is not None and HCI_Cmd_LE_Complete_Supported_Features in response:
-            self.__le_features = response[HCI_Cmd_LE_Complete_Supported_Features].le_features
+            logger.debug("[%s] Local LE supported features cached.", self.interface)
+            self.__le_features = response[HCI_Cmd_LE_Complete_Supported_Features]
             return True
+        
+        logger.debug("[%s] Failed reading LE supported features !", self.interface)
         return False
 
+    @req_cmd("set_event_filter")
     def _set_event_filter(self, filter_type=0):
         """
         Configure HCI device event filter.
         """
+        logger.debug("[%s] Setting HCI Event Filter to type %d", self.interface, filter_type)
         response = self._write_command(HCI_Cmd_Set_Event_Filter(type=filter_type))
         return response is not None and response.status == 0x00
 
+    @req_cmd("set_event_mask")
     def _set_event_mask(self, mask=b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d"):
         """
         Configure HCI device event mask.
         """
+        logger.debug("[%s] Setting HCI Event Mask to %s", self.interface, mask.hex())
         response = self._write_command(HCI_Cmd_Set_Event_Mask(mask=mask))
         return response is not None and response.status == 0x00
 
-    def _le_set_event_mask(self, mask=b''):
+    @req_cmd("le_set_event_mask")
+    def _le_set_event_mask(self, mask=b"\x1f\x00\x00\x00\x00\x00\x00\x00"):
         """Configure HCI LE event mask.
         """
+        logger.debug("[%s] Setting HCI LE Event Mask to %s", self.interface, mask.hex())
         response = self._write_command(HCI_Cmd_LE_Set_Event_Mask())
         return response is not None and response.status == 0x00
 
+    @req_cmd("write_connection_accept_timeout")
     def _set_connection_accept_timeout(self, timeout=32000):
         """
         Configure HCI device connection accept timeout.
         """
+        logger.debug("[%s] Setting connection timeout to %d", self.interface, timeout)
         response = self._write_command(HCI_Cmd_Write_Connect_Accept_Timeout(timeout=timeout))
         return response is not None and response.status == 0x00
 
+    @req_cmd("write_le_host_support")
     def indicates_le_support(self):
         """
         Indicates to HCI Device that the Host supports Low Energy mode.
         """
+        logger.debug("[%s] Write LE Host support (simulatenous mode not supported)", self.interface)
         response = self._write_command(HCI_Cmd_Write_LE_Host_Support(supported=1))
         return response is not None and response.status == 0x00
+
+    @req_cmd("le_write_suggested_default_data_length",
+             "le_read_suggested_default_data_length")
+    def configure_data_length(self):
+        """Negociate ACL data length.
+        """
+        # If our controller supports LE Data Length Update, suggest an intermediate
+        # size and compute time
+        if self.is_le_feature_supported("data_packet_length_extension"):
+            suggested_max_tx_octets = 64
+            suggested_max_tx_time = compute_max_time(suggested_max_tx_octets, self.__datarate)
+        else:
+            suggested_max_tx_octets = 27
+            suggested_max_tx_time = 0x148
+
+        # Send suggested default data length first
+        logger.debug("[%s] HCI Write Suggested Default Data Length (max TX octets:%d, max Tx time: %d)",
+                     self.interface, self.__conn_max_tx_octets, self.__conn_max_tx_time)
+        response = self._write_command(HCI_Cmd_LE_Write_Suggested_Default_Data_Length(
+            max_tx_octets=suggested_max_tx_octets,
+            max_tx_time=suggested_max_tx_time
+        ))
+        if response is not None and response.status == 0x00:
+            logger.debug("[%s] Suggested Default Data Length successfully sent.", self.interface)
+        else:
+            logger.debug("[%s] Failed sending Suggested Default Data Length !", self.interface)
+
+        # Read suggested default data length from controller
+        logger.debug("[%s] Reading local Suggested Default Data Length ...", self.interface)
+        response = self._write_command(HCI_Cmd_LE_Read_Suggested_Default_Data_Length())
+        if response is not None and HCI_Cmd_LE_Complete_Suggested_Default_Data_Length in response:
+            # Check if reported data length is greater than 27, if so we need to
+            # ensure the controller supports the Data Length Extension and follow
+            # this procedure.
+            answer = response[HCI_Cmd_LE_Complete_Suggested_Default_Data_Length]
+            logger.debug(
+                "[%s] Suggested Default Data Length read (max_tx_octets:%d, max_tx_time: %d)",
+                self.interface, answer.max_tx_octets, answer.max_tx_time
+            )
+            return True
+
+        logger.debug("[%s] Failed reading Suggested Default Data Length !", self.interface)
+        return False
+
+
+
 
     def _initialize(self):
         """
         Initialize HCI Device and returns boolean indicating if it can be used by WHAD.
         """
+        logger.debug("[%s] Starting initialization process ...", self.interface)
         success = (
                 self._reset() and
                 self.read_local_supported_commands() and 
-                self.read_local_supported_features() and 
+                self.read_local_le_supported_features() and 
                 self._set_event_mask(b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d") and
                 self._le_set_event_mask() and
                 self._le_read_buffer_size() and
@@ -478,29 +727,32 @@ class HCIDevice(VirtualDevice):
                 self._read_bd_address() and 
                 self.indicates_le_support() and
                 self.__read_filter_accept_list_size() and
-                self.clear_filter_list()
+                self.clear_filter_list() and 
+                self.configure_data_length()
         )
-
+        logger.debug("[%s] Initialization process result: %s", self.interface,
+                     "Success" if success else "Failed")
         return success
-    
+
+    @req_cmd("le_clear_filter_accept_list")
     def clear_filter_list(self):
         """Clear LE filter list.
         """
+        logger.debug("[%s] Clearing LE filter accept list ...", self.interface)
         response = self._write_command(HCI_Cmd_LE_Clear_Filter_Accept_List())
         return response is not None and response.status == 0x00
 
+    @req_cmd("le_read_filter_accept_list_size")
     def __read_filter_accept_list_size(self) -> bool:
         """Retrieve LE Filter accept list size from local adapter.
         """
-        if self.is_le_cmd_supported("le_read_filter_accept_list_size"):
-            print("we can read filter access list size")
-        else:
-            print("command not supported")
+        logger.debug("[%s] Reading LE filter accept list size ...", self.interface)
         response = self._write_command(HCI_Cmd_LE_Read_Filter_Accept_List_Size())
-        response.show()
         if response is not None and response.status == 0x00:
             r = response[HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size]
             self.__fa_size = r.list_size
+            logger.debug("[%s] LE filter accept list size: %d slots", self.interface,
+                         self.__fa_size)
             return True
         return False
     
@@ -515,13 +767,17 @@ class HCIDevice(VirtualDevice):
         self.__read_filter_accept_list_size()
         return self.__fa_size
 
+    @req_cmd("read_bd_addr")
     def _read_bd_address(self):
         """
         Read BD Address used by the HCI device.
         """
+        logger.debug("[%s] Reading HCI interface BD address ...", self.interface)
         response = self._write_command(HCI_Cmd_Read_BD_Addr())
         if response.status == 0x00 and HCI_Cmd_Complete_Read_BD_Addr in response:
-            return response.addr
+            self._bd_address = BDAddress(response.addr)
+            logger.debug("[%s] BD address: %s", self.interface, self._bd_address)
+            return True
 
         # Cannot read BD address, device is non-responsive.
         # logger.error("[%s] cannot read BD address", self.interface)
@@ -529,39 +785,53 @@ class HCIDevice(VirtualDevice):
         logger.debug("raising WhadDeviceNotReady exception")
         raise WhadDeviceNotReady(f"cannot read BD address of interface {self.interface}")
 
+    @req_cmd("read_local_name")
     def _read_local_name(self):
         """
         Read local name used by the HCI device.
         """
+        logger.debug("[%s] Reading local name ...", self.interface)
         response = self._write_command(HCI_Cmd_Read_Local_Name())
         if response.status == 0x00 and HCI_Cmd_Complete_Read_Local_Name in response:
-            return response.local_name
+            self._local_name = response.local_name
+            return True
         
         # Cannot read local name.
-        logger.debug("cannot read local name of interface %s", self.interface)
-        logger.debug("raising WhadDeviceNotReady exception")
+        logger.debug("[%s] Failed reading local name !", self.interface)
+        logger.debug("[%s] Device not supported.")
         raise WhadDeviceNotReady()
 
+    @req_cmd("read_local_version_information")
     def _read_local_version_information(self):
         """
         Read local version information used by the HCI device.
         """
+        logger.debug("[%s] Reading local version info ...", self.interface)
         response = self._write_command(HCI_Cmd_Read_Local_Version_Information())
         if response.status == 0x00 and HCI_Cmd_Complete_Read_Local_Version_Information in response:
             version = [int(v) for v in HCI_VERSIONS[response.hci_version].split(".")]
             version += [response.hci_subversion]
-            manufacturer = BT_MANUFACTURERS[response.company_identifier].encode("utf-8")
+            try:
+                manufacturer = BT_MANUFACTURERS[response.company_identifier].encode("utf-8")
+            except IndexError:
+                logger.debug("[%s] Unsupported manufacturer ID 0x%04x", self.interface,
+                             response.company_identifier)
+                manufacturer = f"unknown<0x{response.company_identifier:04x}>".encode("utf-8")
+            logger.debug("[%s] Version: %s", self.interface, version)
+            logger.debug("[%s] Manufacturer: %s", self.interface, manufacturer)
             return version, manufacturer
         
         # Cannot read local version information.
-        logger.debug("cannot read local version of interface %s", self.interface)
-        logger.debug("raising WhadDeviceNotReady exception")
+        logger.debug("[%s] Failed reading local version info !", self.interface)
+        logger.debug("[%s] Unsupported HCI interface.")
         raise WhadDeviceNotReady()
 
+    @req_cmd("le_read_supported_states")
     def _read_le_supported_states(self):
         """
         Returns the list of Bluetooth Low Energy states supported by the HCI device.
         """
+        logger.debug("[%s] Reading LE supported states ...", self.interface)
         response = self._write_command(HCI_Cmd_LE_Read_Supported_States())
         if response.status == 0x00 and HCI_Cmd_Complete_LE_Read_Supported_States in response:
             states = []
@@ -571,16 +841,21 @@ class HCIDevice(VirtualDevice):
             return states
 
         # Cannot read supported LE states.
-        logger.debug("cannot read supported LE states for interface %s", self.interface)
-        logger.debug("raising WhadDeviceNotReady exception")
+        logger.debug("[%s] Failed reading LE supported states !", self.interface)
+        logger.debug("[%s] Unsupported HCI interface.")
         raise WhadDeviceNotReady()
 
+    @req_cmd("le_set_random_address")
     def _set_bd_address(self, bd_address: bytes = b"\x00\x11\x22\x33\x44\x55",
                         bd_address_type: int = AddressType.PUBLIC) -> bool:
         """
         Modify the BD address (if supported by the HCI device).
         """
-        if bd_address_type == AddressType.PUBLIC:
+        logger.debug("[%s] Setting HCI adapter random address to %s ...", self.interface, 
+                     BDAddress(bd_address))
+        
+        # Disabled for now
+        if False and bd_address_type == AddressType.PUBLIC:
             _, self._manufacturer = self._read_local_version_information()
             if self._manufacturer in ADDRESS_MODIFICATION_VENDORS:
                 logger.info("[i] Address modification supported !")
@@ -643,27 +918,42 @@ class HCIDevice(VirtualDevice):
             self._bd_address_type = bd_address_type
             return False
 
-        self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
-        self._bd_address = self._read_bd_address()
-        self._bd_address_type = AddressType.RANDOM
+        response = self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
+        if response is not None and response.status == 0x00:
+            logger.debug("[%s] Random address successfully set to %s", self.interface, 
+                     BDAddress(bd_address))
+            # Read BD address
+            self._read_bd_address()
+            self._bd_address_type = AddressType.RANDOM
+        else:
+            logger.debug("[%s] Failed setting random address, continue anyway", self.interface)
+        
+        # Success
         return True
 
+    @req_cmd("le_set_scan_parameters")
     def _set_scan_parameters(self, active=True):
         """
         Configure Scan parameters for HCI device.
         """
+        logger.debug("[%s] Setting LE Scan Parameters (active:%s) ...", self.interface, 
+                     active)
         response = self._write_command(HCI_Cmd_LE_Set_Scan_Parameters(type=int(active)))
         return response is not None and response.status == 0x00
 
+    @req_cmd("le_set_scan_enable")
     def _set_scan_mode(self, enable=True):
         """
         Enable or disable scan mode for HCI device.
         """
+        logger.debug("[%s] Enabling LE Scan Mode (enable:%s, no duplicates) ...",
+                     self.interface, enable)
         response = self._write_command(HCI_Cmd_LE_Set_Scan_Enable(
             enable=int(enable),filter_dups=False
         ))
         return response is not None and response.status == 0x00
 
+    @req_cmd("le_set_host_channel_classification", "le_create_connection")
     def _connect(self, bd_address, bd_address_type=AddressType.PUBLIC, hop_interval=96,
                  channel_map=None):
         """
@@ -674,15 +964,20 @@ class HCIDevice(VirtualDevice):
         patype = 0 if bd_address_type == AddressType.PUBLIC else 1
         if channel_map is not None:
             formatted_channel_map = unpack("<Q",channel_map+ b"\x00\x00\x00")[0]
+            logger.debug("[%s] Setting Channel Map to  0x%x...",
+                self.interface, formatted_channel_map)
             response = self._write_command(HCI_Cmd_LE_Set_Host_Channel_Classification(
                 chM=formatted_channel_map
             ))
             if response.status != 0x00:
-                logger.debug("[hci] HCI SetHostChannelClassification command failed with response %d", response.status)
+                logger.debug("[%s] Failed setting Channel Map !", self.interface,
+                             response.status)
+                logger.debug("[%s] Connection aborted.", self.interface)
                 return False
 
         # Connect
-        logger.debug("[hci] sending HCI_LE_Create_Connection command")
+        logger.debug("[%s] Creating LE connection to %s ...", self.interface,
+                     BDAddress(bd_address, random=bd_address_type==BDAddress.RANDOM))
         response = self._write_command(
             HCI_Cmd_LE_Create_Connection(
                 paddr=bd_address,
@@ -692,17 +987,19 @@ class HCIDevice(VirtualDevice):
             )
         )
         if response.status != 0x00:
-            logger.debug("[hci] HCI_LE_Create_Connection command failed with response %d", response.status)
+            logger.debug("[%s] HCI_LE_Create_Connection command failed with response %d", response.status)
         return response is not None and response.status == 0x00
 
+    @req_cmd("disconnect")
     def _disconnect(self, handle):
         """
         Establish a disconnection using HCI device.
         """
-        logger.debug("[hci] sending HCI disconnect command ...")
+        logger.debug("[%s] sending HCI disconnect command ...")
         response = self._write_command(HCI_Cmd_Disconnect(handle=handle))
         return response is not None and response.status == 0x00
 
+    @req_cmd("le_set_advertising_data")
     def _set_advertising_data(self, data, wait_response: bool = True) -> bool:
         """
         Configure advertising data to use by HCI device.
@@ -715,17 +1012,20 @@ class HCIDevice(VirtualDevice):
         result = True
         if wait_response:
             # Wait for response.
+            logger.debug("[%s] Setting HCI LE advertising data ...", self.interface)
             response = self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data))
 
             # Check response and update result.
             result = response is not None and response.status == 0x0
         else:
             # Otherwise send command without waiting a response.
+            logger.debug("[%s] Setting HCI LE advertising data (non-blocking) ...", self.interface)
             self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data), wait_response=False)
 
         # Return result
         return result
 
+    @req_cmd("le_set_scan_response_data")
     def _set_scan_response_data(self, data, wait_response=True) -> bool:
         """
         Configure scan response data to use by HCI device.
@@ -733,6 +1033,8 @@ class HCIDevice(VirtualDevice):
         result = True
         if wait_response:
             # Wait response and update result accordingly.
+            logger.debug("[%s] Setting HCI LE Scan Response Data to %s ...", self.interface,
+                         data.hex())
             response = self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(
                     data=data + (31 - len(data)) * b"\x00", len=len(data)
                 )
@@ -740,6 +1042,8 @@ class HCIDevice(VirtualDevice):
             result = response is not None and response.status == 0x0
         else:
             # Don't wait for a response.
+            logger.debug("[%s] Setting HCI LE Scan Response Data to %s (non-blocking) ...", self.interface,
+                         data.hex())
             self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(
                     data=data + (31 - len(data)) * b"\x00", len=len(data)
                 ),
@@ -749,6 +1053,7 @@ class HCIDevice(VirtualDevice):
         # Return result
         return result
 
+    @req_cmd("le_set_advertising_parameters")
     def set_advertising_parameters(self, interval_min: int = 0x0020, interval_max: int = 0x0020,
                                    adv_type="ADV_IND", oatype: int = 0, datype: int = 0,
                                    daddr:str = "00:00:00:00:00:00", channel_map: int = 0x7,
@@ -756,6 +1061,8 @@ class HCIDevice(VirtualDevice):
         """Configure the HCI LE advertising parameters.
         """
         # Wait for a response and update result accordingly.
+        logger.debug("[%s] Setting HCI LE Advertising Parameters (blocking:%s) ...",
+                    self.interface, wait_response)
         response = self._write_command(HCI_Cmd_LE_Set_Advertising_Parameters(
             interval_min = 0x0020,
             interval_max = 0x0020,
@@ -772,18 +1079,20 @@ class HCIDevice(VirtualDevice):
             return response.status == 0x00
         return True
 
+    @req_cmd("le_set_advertising_enable")
     def _set_advertising_mode(self, enable=True, wait_response=True):
         """
         Enable or disable advertising mode for HCI device.
         """
         # Already enable, nothing to do
         if self._advertising and enable:
+            logger.debug("[%s] Advertising is already enabled, nothing to do ...",
+                    self.interface)
             return True
 
         # Not advertising and enabling, we need to configure our advertising
         # parameters.
         if not self._advertising and enable:
-            logger.debug("Set advertising parameters")
             result = self.set_advertising_parameters(
                     interval_min = 0x0020,
                     interval_max = 0x0020,
@@ -797,7 +1106,8 @@ class HCIDevice(VirtualDevice):
                 )
 
             if result:
-                logger.debug("Enable advertising: %s", enable)
+                logger.debug("[%s] Sending HCI LE Set Advertise Enable (enable:%s, blocking:%s)",
+                             self.interface, enable, wait_response)
                 if wait_response:
                     # Wait for a response and update result accordingly.
                     response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))
@@ -812,6 +1122,8 @@ class HCIDevice(VirtualDevice):
             # On success, advertising has been enabled.
             self._advertising = result
         else:
+            logger.debug("[%s] Sending HCI LE Set Advertise Enable (enable:0, blocking:%s)",
+                            self.interface, wait_response)
             # Disabling advertising
             if wait_response:
                 response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=0))
@@ -827,8 +1139,10 @@ class HCIDevice(VirtualDevice):
         # Return result
         return result
 
+    @req_cmd("le_long_term_key_request_reply", "le_enable_encryption")
     def _enable_encryption(self, enable=True, handle=None,  key=None, rand=None, ediv=None):
         if self.__converter.pending_key_request:
+            logger.debug("[%s] Sending HCI LE Long Term Key request", self.interface)
             response = self._write_command(
                 HCI_Cmd_LE_Long_Term_Key_Request_Reply(
                     handle=handle,
@@ -837,6 +1151,7 @@ class HCIDevice(VirtualDevice):
             )
             self.__converter.pending_key_request = False
         else:
+            logger.debug("[%s] Sending HCI LE Enable Encryption", self.interface)
             response = self._write_command(
                 HCI_Cmd_LE_Enable_Encryption(
                     handle=handle,
@@ -850,7 +1165,7 @@ class HCIDevice(VirtualDevice):
     def _update_max_acl_len(self, length: int):
         """Update device HCI MTU
         """
-        self.__max_acl_len = length
+        self.__conn_max_tx_octets = length
 
     def get_max_acl_len(self) -> int:
         """Retrieve maximum ACL length
@@ -858,7 +1173,7 @@ class HCIDevice(VirtualDevice):
         :return: Current HCI maximum TX size
         :rtype: int
         """
-        return self.__max_acl_len
+        return self.__conn_max_tx_octets
 
 
     def _1le_encryption(self, message):

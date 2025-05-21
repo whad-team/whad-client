@@ -622,6 +622,24 @@ class HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size(Packet):
         ByteField("list_size", 0)
     ]
 
+class HCI_Cmd_LE_Write_Suggested_Default_Data_Length(Packet):
+    name = "HCI_LE_Write_Suggested_Default_Data_Length"
+    fields_desc = [
+        LEShortField("max_tx_octets", 0x1B),
+        LEShortField("max_tx_time", 0x148),
+    ]
+
+class HCI_Cmd_LE_Read_Suggested_Default_Data_Length(Packet):
+    name = "HCI_LE_Read_Suggested_Default_Data_Length"
+
+class HCI_Cmd_LE_Complete_Suggested_Default_Data_Length(Packet):
+    name = "Suggested Default Length"
+    fields_desc = [
+        LEShortField("max_tx_octets", 0x1B),
+        LEShortField("max_tx_time", 0x148)
+    ]
+
+
 def unbind_layer(cls, pkt_cls):
     # Unbind bottom/up
     item = None
@@ -652,12 +670,16 @@ bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Event_Mask, ogf=0x08, ocf=0x0001) # 
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Supported_Commands, ogf=0x04, ocf=0x0002) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Supported_Features, ogf=0x04, ocf=0x0003) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Local_Supported_Features, ogf=0x08, ocf=0x0003) # noqa: E501
+bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Suggested_Default_Data_Length, ogf=0x08, ocf=0x0023) # noqa: E501
+bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Write_Suggested_Default_Data_Length, ogf=0x08, ocf=0x0024) # noqa: E501
 
 # HCI Event Command Complete dispatch
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_LE_Complete_Read_Buffer_Size, opcode=0x2002)  # noqa: E501
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_LE_Complete_Supported_Features, opcode=0x2003)  # noqa: E501
 unbind_layer(HCI_Event_Command_Complete, HCI_Cmd_Complete_LE_Read_White_List_Size)
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size, opcode=0x200F)  # noqa: E501
+bind_layers(HCI_Event_Command_Complete, HCI_Cmd_LE_Complete_Suggested_Default_Data_Length, opcode=0x2023)  # noqa: E501
+
 
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Supported_Commands, opcode=0x1002)  # noqa: E501
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Supported_Features, opcode=0x1003)  # noqa: E501
