@@ -442,7 +442,8 @@ class HCIDevice(VirtualDevice):
         """
         hci_command = HCI_Hdr()/HCI_Command_Hdr()/command
         self.__socket.send(hci_command)
-        if wait_response:
+        #if wait_response:
+        if 1:
             response = self._wait_response()
             while response.opcode != hci_command[HCI_Command_Hdr].opcode:
                 response = self._wait_response()
