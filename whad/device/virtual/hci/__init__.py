@@ -721,7 +721,7 @@ class HCIDevice(VirtualDevice):
                 self.read_local_supported_commands() and 
                 self.read_local_le_supported_features() and 
                 self._set_event_mask(b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d") and
-                self._le_set_event_mask() and
+                self._le_set_event_mask(mask=b'\xff\xff\xff\xff\x03') and
                 self._le_read_buffer_size() and
                 self.read_local_le_supported_features() and 
                 self._read_bd_address() and 
@@ -779,7 +779,7 @@ class HCIDevice(VirtualDevice):
         logger.debug("[%s] Reading HCI interface BD address ...", self.interface)
         response = self._write_command(HCI_Cmd_Read_BD_Addr())
         if response.status == 0x00 and HCI_Cmd_Complete_Read_BD_Addr in response:
-            self._bd_address = BDAddress(response.addr)
+            self._bd_address = BDAddress(response.addr, random=False)
             logger.debug("[%s] BD address: %s", self.interface, self._bd_address)
             return True
 
