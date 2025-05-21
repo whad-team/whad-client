@@ -97,10 +97,10 @@ class HCIUnsupportedCommand(Exception):
     """
     def __init__(self, command):
         super().__init__()
-        self.__command = command
+        self.command = command
 
     def __repr__(self):
-        return f"HCIUnsupportedCommand(cmd='{self.__command}')"
+        return f"HCIUnsupportedCommand(cmd='{self.command}')"
 
 class HCIUnsupportedFeature(Exception):
     """Raised when an HCI feature requirement is not met by hardware.
@@ -727,9 +727,13 @@ class HCIDevice(VirtualDevice):
                 self._read_bd_address() and 
                 self.indicates_le_support() and
                 self.__read_filter_accept_list_size() and
-                self.clear_filter_list() and 
-                self.configure_data_length()
+                self.clear_filter_list()
         )
+        try:
+            result = result and self.configure_data_length()
+        except HCIUnsupportedCommand as cmderr:
+            logger.debug("[%s] Configuring data length cannot be done, command %s is not supported.",
+                         self.interface, cmderr.command)
         logger.debug("[%s] Initialization process result: %s", self.interface,
                      "Success" if success else "Failed")
         return success
