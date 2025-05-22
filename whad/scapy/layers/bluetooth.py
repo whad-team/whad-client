@@ -639,6 +639,13 @@ class HCI_Cmd_LE_Complete_Suggested_Default_Data_Length(Packet):
         LEShortField("max_tx_time", 0x148)
     ]
 
+class HCI_Cmd_Write_Simple_Pairing_Mode(Packet):
+    name = "Write Simple Pairing Mode"
+    fields_desc = [ ByteField("enable", 0), ]
+
+class HCI_Cmd_Write_Default_Link_Policy_Settings(Packet):
+    name = "Write Default Link Policy Settings"
+    fields_desc = [ LEShortField("policy", 7),] 
 
 def unbind_layer(cls, pkt_cls):
     # Unbind bottom/up
@@ -672,6 +679,8 @@ bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Supported_Features, ogf=0x04, oc
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Local_Supported_Features, ogf=0x08, ocf=0x0003) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Suggested_Default_Data_Length, ogf=0x08, ocf=0x0023) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Write_Suggested_Default_Data_Length, ogf=0x08, ocf=0x0024) # noqa: E501
+bind_layers(HCI_Command_Hdr, HCI_Cmd_Write_Simple_Pairing_Mode, ogf=0x03, ocf=0x0056) # noqa: E501
+bind_layers(HCI_Command_Hdr, HCI_Cmd_Write_Default_Link_Policy_Settings, ogf=0x02, ocf=0x000f) # noqa: E501
 
 # HCI Event Command Complete dispatch
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_LE_Complete_Read_Buffer_Size, opcode=0x2002)  # noqa: E501
