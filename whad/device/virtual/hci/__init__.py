@@ -19,7 +19,8 @@ from scapy.layers.bluetooth import BluetoothSocketError, BluetoothUserSocket, \
     HCI_Cmd_LE_Read_Buffer_Size_V1, HCI_Cmd_Read_Local_Name, HCI_Cmd_Complete_Read_Local_Name, \
     HCI_Cmd_Complete_Read_Local_Version_Information, HCI_Cmd_Read_Local_Version_Information, \
     HCI_Cmd_Write_Connect_Accept_Timeout, HCI_Cmd_LE_Read_Local_Supported_Features, \
-    HCI_Cmd_LE_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Clear_Filter_Accept_List
+    HCI_Cmd_LE_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Clear_Filter_Accept_List, \
+    EIR_Hdr
 
 from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
     HCI_Cmd_Read_Buffer_Size, HCI_Cmd_Complete_Read_Buffer_Size, HCI_Cmd_LE_Set_Event_Mask, \
@@ -27,7 +28,8 @@ from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
     HCI_Cmd_Read_Local_Supported_Features, HCI_Cmd_Complete_Supported_Features, \
     HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Complete_Supported_Features, \
     HCI_Cmd_LE_Write_Suggested_Default_Data_Length, HCI_Cmd_LE_Read_Suggested_Default_Data_Length, \
-    HCI_Cmd_LE_Complete_Suggested_Default_Data_Length
+    HCI_Cmd_LE_Complete_Suggested_Default_Data_Length, HCI_Cmd_Write_Simple_Pairing_Mode, \
+    HCI_Cmd_Write_Default_Link_Policy_Settings
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -709,7 +711,20 @@ class HCIDevice(VirtualDevice):
         logger.debug("[%s] Failed reading Suggested Default Data Length !", self.interface)
         return False
 
+    def write_simple_pairing_mode(self, enable: bool = True) -> bool:
+        """Configure HCI interface to support Simple Pairing mode (or not)"""
+        response = self._write_command(HCI_Cmd_Write_Simple_Pairing_Mode(enable=enable))
+        return response is not None and response.status == 0x00
 
+    def write_connect_accept_timeout(self, timeout: int = 32000) -> bool:
+        """Configure the HCI interface connection timeout for LE and BR/EDR controller"""
+        response = self._write_command(HCI_Cmd_Write_Connect_Accept_Timeout(timeout=timeout))
+        return response is not None and response.status == 0x00
+
+    def write_default_link_policy_settings(self, policy: int = 0x0f) -> bool:
+        """Configure the HCI interface default link policy settings for LE and BR/EDR controller"""
+        response = self._write_command(HCI_Cmd_Write_Default_Link_Policy_Settings(policy=policy))
+        return response is not None and response.status == 0x00
 
 
     def _initialize(self):
@@ -721,7 +736,10 @@ class HCIDevice(VirtualDevice):
                 self._reset() and
                 self.read_local_supported_commands() and 
                 self.read_local_le_supported_features() and 
+                self.write_simple_pairing_mode() and
+                self.write_connect_accept_timeout() and
                 self._set_event_mask(b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d") and
+                self.write_default_link_policy_settings() and
                 self._le_set_event_mask(mask=b'\xff\xff\xff\xff\x03') and
                 self._le_read_buffer_size() and
                 self.read_local_le_supported_features() and 
@@ -1010,22 +1028,22 @@ class HCIDevice(VirtualDevice):
         Configure advertising data to use by HCI device.
         """
         # pad data if less than 31 bytes
-        if len(data) < 31:
-            data += b'\x00'*(31 - len(data))
+        #if len(data) < 31:
+        #    data += b'\x00'*(31 - len(data))
 
         # Send command and wait for response if required.
         result = True
         if wait_response:
             # Wait for response.
             logger.debug("[%s] Setting HCI LE advertising data ...", self.interface)
-            response = self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data))
+            response = self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=EIR_Hdr(data)))
 
             # Check response and update result.
             result = response is not None and response.status == 0x0
         else:
             # Otherwise send command without waiting a response.
             logger.debug("[%s] Setting HCI LE advertising data (non-blocking) ...", self.interface)
-            self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=data), wait_response=False)
+            self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=EIR_Hdr(data)), wait_response=False)
 
         # Return result
         return result
