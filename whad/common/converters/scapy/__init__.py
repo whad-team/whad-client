@@ -22,8 +22,10 @@ class ScapyConverter:
             # Here we iterate over fields of the selected metadata class and populates a sub dictionary linked to "metadata" key
             for field in fields(Metadata) + fields(pkt.metadata.__class__):
                 if hasattr(pkt.metadata, field.name) and getattr(pkt.metadata,field.name) is not None:
-                    pkt_dict["metadata"][field.name] = getattr(pkt.metadata, field.name)
-
+                    if isinstance(getattr(pkt.metadata, field.name), int) or isinstance(getattr(pkt.metadata, field.name), float):
+                        pkt_dict["metadata"][field.name] = getattr(pkt.metadata, field.name)
+                    else:
+                        pkt_dict["metadata"][field.name] = str(getattr(pkt.metadata, field.name))
         # Iterate of each layer of the scapy packet
         for layer in pkt.layers():
             current_layer = {}
