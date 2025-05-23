@@ -130,7 +130,6 @@ class UserTransformApp(CommandLineApp):
                 if self.is_stdout_piped():
                     unix_server = UnixConnector(UnixSocketServerDevice(parameters=parameters))
 
-
                     while not unix_server.device.opened:
                         if unix_server.device.timedout:
                             return
@@ -147,6 +146,9 @@ class UserTransformApp(CommandLineApp):
 
                 else:
                     connector.on_packet = self.on_rx_packet
+
+                # Once configured, unlock connector to enable packet processing
+                connector.unlock()
 
                 # Keep running while interface is active
                 while interface.opened:
