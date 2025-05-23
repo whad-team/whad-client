@@ -95,6 +95,24 @@ class WhadFilterApp(CommandLineApp):
             nargs='?'
         )
 
+        # Metada can be disabled here
+        self.add_argument(
+            '--no-metadata',
+            dest='metadata',
+            action="store_false",
+            help='Hide packets metadata'
+        )
+
+        # Format can be overriden here
+        self.add_argument(
+            '--format',
+            dest='format',
+            action="store",
+            default='repr',
+            choices=['repr', 'show', 'raw', 'hexdump', 'tshark'],
+            help='Indicate format to display packet'
+        )
+
         self.add_argument(
             '--down',
             dest='down',
@@ -339,11 +357,11 @@ class WhadFilterApp(CommandLineApp):
                 if not self.args.nocolor:
                     conf.color_theme = BrightTheme()
 
+                # Load parameters from input tool
                 parameters = self.args.__dict__
                 connector = UnixConnector(interface)
                 connector.domain = self.args.domain
                 hub = ProtocolHub(2)
-                connector.format = hub.get(self.args.domain).format
 
                 if self.is_stdout_piped():
                     unix_server = UnixConnector(UnixSocketServerDevice(parameters=parameters))
@@ -362,6 +380,11 @@ class WhadFilterApp(CommandLineApp):
                 else:
                     # Unlock Unix connector
                     connector.unlock()
+
+                    # Take format and metadata settings from input tool,
+                    # if provided.
+                    if "format" in parameters and parameters["format"] in ('repr', 'show', 'raw', 'hexdump', 'tshark'):
+                        self.args.format = parameters["format"]
 
                     # Overwrite its packet rx method
                     connector.on_packet = self.on_rx_packet
