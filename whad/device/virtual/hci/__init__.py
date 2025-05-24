@@ -437,10 +437,10 @@ class HCIDevice(VirtualDevice):
             logger.debug("[hci] waiting for response ...")
             response = self._wait_response(timeout=self.__timeout)
             if response is None:
-                logger.debug("[hci][%s] wait_response returned None !", self.__device.interface)
+                logger.debug("[hci][%s] wait_response returned None !", self.interface)
                 return False
             logger.debug("[hci] response code: 0x%04x", response.code)
-        return response.num_handles == 1
+        return response.num_handles == 1 and response.num_completed_packets_list[0] == 1
 
     def _write_command(self, command, wait_response=True):
         """
