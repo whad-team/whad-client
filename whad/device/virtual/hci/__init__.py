@@ -299,6 +299,7 @@ class HCIDevice(VirtualDevice):
                 raise WhadDeviceNotReady()
 
             # Flush HCI interface
+            logger.debug("[%s] Flushing HCI interface ...", self.interface)
             self.__socket.flush()
 
             # Mark as opened
