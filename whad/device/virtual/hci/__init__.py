@@ -477,7 +477,8 @@ class HCIDevice(VirtualDevice):
             while not (event.type == 0x4 and event.code == 0xe):
                 if event.type == 0x4 and event.code in (0xf, 0x13):
                     self.__hci_responses.put(event)
-                response = self.__socket.recv()
+                event = self.__socket.recv()
+            response = event
 
         return response
 
