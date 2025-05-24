@@ -669,7 +669,7 @@ class HCIDevice(VirtualDevice):
         Indicates to HCI Device that the Host supports Low Energy mode.
         """
         logger.debug("[%s] Write LE Host support (simulatenous mode not supported)", self.interface)
-        response = self._write_command(HCI_Cmd_Write_LE_Host_Support(supported=1))
+        response = self._write_command(HCI_Cmd_Write_LE_Host_Support(supported=1, unused=0))
         return response is not None and response.status == 0x00
 
     @req_cmd("le_write_suggested_default_data_length",
