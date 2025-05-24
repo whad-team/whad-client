@@ -29,7 +29,8 @@ from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
     HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Complete_Supported_Features, \
     HCI_Cmd_LE_Write_Suggested_Default_Data_Length, HCI_Cmd_LE_Read_Suggested_Default_Data_Length, \
     HCI_Cmd_LE_Complete_Suggested_Default_Data_Length, HCI_Cmd_Write_Simple_Pairing_Mode, \
-    HCI_Cmd_Write_Default_Link_Policy_Settings
+    HCI_Cmd_Write_Default_Link_Policy_Settings, HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power, \
+    HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -373,12 +374,15 @@ class HCIDevice(VirtualDevice):
                         if not self._advertising:
                             return
 
+                        if not self._read_advertising_physical_channel_tx_power():
+                            self.error("[%s] Cannot read advertising physical channel Tx power", self.interface)
+
                         # if data are cached, configure them
                         if self._cached_scan_data is not None:
                             # We can't wait for response because we are in the
                             # reception loop context
                             success = self._set_advertising_data(self._cached_scan_data,
-                                                                 wait_response=False)
+                                                                 wait_response=True)
 
                             # Raise an error if we cannot set the advertising data.
                             if not success:
@@ -387,7 +391,7 @@ class HCIDevice(VirtualDevice):
 
                         if self._cached_scan_response_data is not None:
                             success = self._set_scan_response_data(
-                                self._cached_scan_response_data, wait_response=False
+                                self._cached_scan_response_data, wait_response=True
                             )
 
                             # Raise an error if we cannot set the scan response data.
@@ -398,7 +402,7 @@ class HCIDevice(VirtualDevice):
                         # We need to artificially disable advertising indicator
                         # to prevent cached operation
                         self._advertising = False
-                        self._set_advertising_mode(True, wait_response=False)
+                        self._set_advertising_mode(True, wait_response=True)
 
 
         except (BrokenPipeError, OSError) as err:
@@ -993,8 +997,7 @@ class HCIDevice(VirtualDevice):
                 chM=formatted_channel_map
             ))
             if response.status != 0x00:
-                logger.debug("[%s] Failed setting Channel Map !", self.interface,
-                             response.status)
+                logger.debug("[%s] Failed setting Channel Map !", self.interface)
                 logger.debug("[%s] Connection aborted.", self.interface)
                 return False
 
@@ -1010,7 +1013,8 @@ class HCIDevice(VirtualDevice):
             )
         )
         if response.status != 0x00:
-            logger.debug("[%s] HCI_LE_Create_Connection command failed with response %d", response.status)
+            logger.debug("[%s] HCI_LE_Create_Connection command failed with response %d", self.interface,
+                         response.status)
         return response is not None and response.status == 0x00
 
     @req_cmd("disconnect")
@@ -1047,6 +1051,17 @@ class HCIDevice(VirtualDevice):
 
         # Return result
         return result
+    
+    @req_cmd("le_read_advertising_physical_channel_tx_power")
+    def _read_advertising_physical_channel_tx_power(self) -> bool:
+        """Read Advertising Physical Channel Tx Power level
+        """
+        response = self._write_command(HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power())
+        logger.debug("Read Advertising Physical Channel Tx Power")
+        response.show()
+        if response is not None and response.status == 0x00:
+            power_level = response[HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level].tx_power_level
+            logger.debug("[%s] Advertising Tx Power level: %d", self.interface, power_level)
 
     @req_cmd("le_set_scan_response_data")
     def _set_scan_response_data(self, data, wait_response=True) -> bool:
@@ -1216,7 +1231,7 @@ class HCIDevice(VirtualDevice):
     def _on_whad_ble_periph_mode(self, message):
         logger.debug("whad ble periph mode message")
         if Commands.PeripheralMode in self._dev_capabilities[Domain.BtLE][1]:
-            success = True
+            success = self._read_advertising_physical_channel_tx_power()
             if len(message.scan_data) > 0:
                 success = success and self._set_advertising_data(message.scan_data)
                 self._cached_scan_data = message.scan_data
