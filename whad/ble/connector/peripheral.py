@@ -447,7 +447,7 @@ class Peripheral(BLE):
         :type   connection_data:    :class:`whad.protocol.ble_pb2.Disconnected`
         """
 
-        logger.info("a device has just connected (connection handle: %d)",
+        logger.info("a device has just disconnected (connection handle: %d)",
                     disconnection_data.conn_handle)
         self.__stack.on_disconnection(
             disconnection_data.conn_handle,
