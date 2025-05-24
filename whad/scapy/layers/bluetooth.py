@@ -647,6 +647,14 @@ class HCI_Cmd_Write_Default_Link_Policy_Settings(Packet):
     name = "Write Default Link Policy Settings"
     fields_desc = [ LEShortField("policy", 7),] 
 
+class HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power(Packet):
+    name = "HCI_LE_Read_Advertising_Physical_Channel_Tx_Power"
+    fields_desc = []
+
+class HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level(Packet):
+    name = "Advertising Tx Power Level"
+    fields_desc = [ ByteField("tx_power_level", 0), ]
+
 def unbind_layer(cls, pkt_cls):
     # Unbind bottom/up
     item = None
@@ -677,10 +685,12 @@ bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Event_Mask, ogf=0x08, ocf=0x0001) # 
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Supported_Commands, ogf=0x04, ocf=0x0002) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Supported_Features, ogf=0x04, ocf=0x0003) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Local_Supported_Features, ogf=0x08, ocf=0x0003) # noqa: E501
+bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power, ogf=0x08, ocf=0x0007) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Suggested_Default_Data_Length, ogf=0x08, ocf=0x0023) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Write_Suggested_Default_Data_Length, ogf=0x08, ocf=0x0024) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Write_Simple_Pairing_Mode, ogf=0x03, ocf=0x0056) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Write_Default_Link_Policy_Settings, ogf=0x02, ocf=0x000f) # noqa: E501
+
 
 # HCI Event Command Complete dispatch
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_LE_Complete_Read_Buffer_Size, opcode=0x2002)  # noqa: E501
@@ -688,6 +698,7 @@ bind_layers(HCI_Event_Command_Complete, HCI_Cmd_LE_Complete_Supported_Features, 
 unbind_layer(HCI_Event_Command_Complete, HCI_Cmd_Complete_LE_Read_White_List_Size)
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size, opcode=0x200F)  # noqa: E501
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_LE_Complete_Suggested_Default_Data_Length, opcode=0x2023)  # noqa: E501
+bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level, opcode=0x2007) # noaq: E501
 
 
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Supported_Commands, opcode=0x1002)  # noqa: E501
