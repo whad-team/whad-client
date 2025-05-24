@@ -460,7 +460,7 @@ class HCIDevice(VirtualDevice):
         Writes an HCI command and returns the response.
         """
         hci_command = HCI_Hdr()/HCI_Command_Hdr()/command
-        logger.debug("[%s][write_command] Sending HCI command to user socket ...", , self.interface)
+        logger.debug("[%s][write_command] Sending HCI command to user socket ...", self.interface)
         self.__socket.send(hci_command)
         logger.debug("[%s][write_command] Command sent.", self.interface)
         #if wait_response:
@@ -470,7 +470,7 @@ class HCIDevice(VirtualDevice):
             while response.opcode != hci_command[HCI_Command_Hdr].opcode:
                 logger.debug("[%s][write_command] Received response with opcode %d", self.interface, response.opcode)
                 response = self._wait_response()
-            logger.debug("[%s][write_command] Response received.", , self.interface)
+            logger.debug("[%s][write_command] Response received.", self.interface)
             
             if response is not None:
                 logger.debug("[%s] HCI write command returned status %d",
