@@ -460,12 +460,17 @@ class HCIDevice(VirtualDevice):
         Writes an HCI command and returns the response.
         """
         hci_command = HCI_Hdr()/HCI_Command_Hdr()/command
+        logger.debug("[%s][write_command] Sending HCI command to user socket ...", , self.interface)
         self.__socket.send(hci_command)
+        logger.debug("[%s][write_command] Command sent.", self.interface)
         #if wait_response:
         if 1:
+            logger.debug("[%s][write_command] Waiting for response ...", self.interface)
             response = self._wait_response()
             while response.opcode != hci_command[HCI_Command_Hdr].opcode:
+                logger.debug("[%s][write_command] Received response with opcode %d", self.interface, response.opcode)
                 response = self._wait_response()
+            logger.debug("[%s][write_command] Response received.", , self.interface)
             
             if response is not None:
                 logger.debug("[%s] HCI write command returned status %d",
@@ -1070,8 +1075,8 @@ class HCIDevice(VirtualDevice):
     def _read_advertising_physical_channel_tx_power(self) -> bool:
         """Read Advertising Physical Channel Tx Power level
         """
+        logger.debug("Read Advertising Physical Channel Tx Power ...")
         response = self._write_command(HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power())
-        logger.debug("Read Advertising Physical Channel Tx Power")
         response.show()
         if response is not None and response.status == 0x00:
             power_level = response[HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level].tx_power_level
@@ -1259,6 +1264,8 @@ class HCIDevice(VirtualDevice):
                 self.__internal_state = HCIInternalState.PERIPHERAL
                 self._send_whad_command_result(CommandResult.SUCCESS)
                 return
+        else:
+            logger.debug("[%s] HCI interface does not allow peripheral mode.")
         self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_disconnect(self, message):
