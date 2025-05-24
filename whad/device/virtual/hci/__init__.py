@@ -291,14 +291,23 @@ class HCIDevice(VirtualDevice):
         Open device.
         """
         if not self.__opened:
+            # Open a Bluetooth user socket
             self.__socket = get_hci(self.__index)
             if self.__socket is None:
+                # An error occured, raising error
                 logger.error("Whad device is not ready.")
                 raise WhadDeviceNotReady()
+
+            # Flush HCI interface
+            self.__socket.flush()
+
+            # Mark as opened
             self.__opened = True
 
             # Ask parent class to run a background I/O thread
             super().open()
+
+            # Initialize this HCI interface
             if not self._initialize():
                 raise WhadDeviceNotReady()
 
@@ -363,8 +372,12 @@ class HCIDevice(VirtualDevice):
                         for message in messages:
                             self._send_whad_message(message)
 
+                    # Wrong ! HCI interface is still back to advertising once a
+                    # connection closed.
+                    #
                     # If the connection is stopped and peripheral mode is started,
                     # automatically re-enable advertising based on cached data
+                    '''
                     if HCI_Event_Disconnection_Complete in event:
                         logger.debug("[hci] Disconnection complete")
                     if HCI_Event_Disconnection_Complete in event and \
@@ -403,6 +416,7 @@ class HCIDevice(VirtualDevice):
                         # to prevent cached operation
                         self._advertising = False
                         self._set_advertising_mode(True, wait_response=True)
+                    '''
 
 
         except (BrokenPipeError, OSError) as err:
