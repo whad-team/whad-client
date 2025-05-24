@@ -373,9 +373,6 @@ class HCIDevice(VirtualDevice):
                         for message in messages:
                             self._send_whad_message(message)
 
-                    # Wrong ! HCI interface is still back to advertising once a
-                    # connection closed.
-                    #
                     # If the connection is stopped and peripheral mode is started,
                     # automatically re-enable advertising based on cached data
                     if HCI_Event_Disconnection_Complete in event:
@@ -387,7 +384,7 @@ class HCIDevice(VirtualDevice):
                         if not self._advertising:
                             return
 
-                        if not self._read_advertising_physical_channel_tx_power():
+                        if not self._read_advertising_physical_channel_tx_power(wait_response=False):
                             logger.error("[%s] Cannot read advertising physical channel Tx power", self.interface)
 
                         # if data are cached, configure them
@@ -463,8 +460,7 @@ class HCIDevice(VirtualDevice):
         logger.debug("[%s][write_command] Sending HCI command to user socket ...", self.interface)
         self.__socket.send(hci_command)
         logger.debug("[%s][write_command] Command sent.", self.interface)
-        #if wait_response:
-        if 1:
+        if wait_response:
             logger.debug("[%s][write_command] Waiting for response ...", self.interface)
             response = self._wait_response()
             while response.opcode != hci_command[HCI_Command_Hdr].opcode:
@@ -476,6 +472,12 @@ class HCIDevice(VirtualDevice):
                 logger.debug("[%s] HCI write command returned status %d",
                             self.interface, response.status)
         else:
+            # We must read directly from our socket
+            event = self.__socket.recv()
+            while not (event.type == 0x4 and event.code == 0xe):
+                if event.type == 0x4 and event.code in (0xf, 0x13):
+                    self.__hci_responses.put(event)
+                response = self.__socket.recv()
             logger.debug("[%s] HCI write command returned (non-blocking)", self.interface)
             response = None
         
@@ -1072,11 +1074,12 @@ class HCIDevice(VirtualDevice):
         return result
     
     @req_cmd("le_read_advertising_physical_channel_tx_power")
-    def _read_advertising_physical_channel_tx_power(self) -> bool:
+    def _read_advertising_physical_channel_tx_power(self, wait_response: bool = True) -> bool:
         """Read Advertising Physical Channel Tx Power level
         """
         logger.debug("Read Advertising Physical Channel Tx Power ...")
-        response = self._write_command(HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power())
+        response = self._write_command(HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power(),
+                                       wait_response=wait_response)
         response.show()
         if response is not None and response.status == 0x00:
             power_level = response[HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level].tx_power_level
