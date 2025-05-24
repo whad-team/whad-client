@@ -241,7 +241,7 @@ class HCIDevice(VirtualDevice):
         self._local_name = None
         self._advertising = False
         self._bd_address = None
-        self._bd_address_type = AddressType.PUBLIC
+        self._bd_address_type = AddressType.RANDOM
         self._fw_version = None
         self._fw_url = None
         self._fw_author = None
