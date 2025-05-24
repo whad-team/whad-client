@@ -375,7 +375,7 @@ class HCIDevice(VirtualDevice):
                             return
 
                         if not self._read_advertising_physical_channel_tx_power():
-                            self.error("[%s] Cannot read advertising physical channel Tx power", self.interface)
+                            logger.error("[%s] Cannot read advertising physical channel Tx power", self.interface)
 
                         # if data are cached, configure them
                         if self._cached_scan_data is not None:
@@ -1062,6 +1062,8 @@ class HCIDevice(VirtualDevice):
         if response is not None and response.status == 0x00:
             power_level = response[HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level].tx_power_level
             logger.debug("[%s] Advertising Tx Power level: %d", self.interface, power_level)
+            return True
+        return False
 
     @req_cmd("le_set_scan_response_data")
     def _set_scan_response_data(self, data, wait_response=True) -> bool:
