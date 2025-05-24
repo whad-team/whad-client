@@ -392,7 +392,7 @@ class HCIDevice(VirtualDevice):
                             # We can't wait for response because we are in the
                             # reception loop context
                             success = self._set_advertising_data(self._cached_scan_data,
-                                                                 wait_response=True)
+                                                                 wait_response=False)
 
                             # Raise an error if we cannot set the advertising data.
                             if not success:
@@ -401,7 +401,7 @@ class HCIDevice(VirtualDevice):
 
                         if self._cached_scan_response_data is not None:
                             success = self._set_scan_response_data(
-                                self._cached_scan_response_data, wait_response=True
+                                self._cached_scan_response_data, wait_response=False
                             )
 
                             # Raise an error if we cannot set the scan response data.
@@ -412,7 +412,7 @@ class HCIDevice(VirtualDevice):
                         # We need to artificially disable advertising indicator
                         # to prevent cached operation
                         self._advertising = False
-                        self._set_advertising_mode(True, wait_response=True)
+                        self._set_advertising_mode(True, wait_response=False)
 
 
         except (BrokenPipeError, OSError) as err:
