@@ -377,7 +377,6 @@ class HCIDevice(VirtualDevice):
                     #
                     # If the connection is stopped and peripheral mode is started,
                     # automatically re-enable advertising based on cached data
-                    '''
                     if HCI_Event_Disconnection_Complete in event:
                         logger.debug("[hci] Disconnection complete")
                     if HCI_Event_Disconnection_Complete in event and \
@@ -416,7 +415,6 @@ class HCIDevice(VirtualDevice):
                         # to prevent cached operation
                         self._advertising = False
                         self._set_advertising_mode(True, wait_response=True)
-                    '''
 
 
         except (BrokenPipeError, OSError) as err:
