@@ -478,9 +478,7 @@ class HCIDevice(VirtualDevice):
                 if event.type == 0x4 and event.code in (0xf, 0x13):
                     self.__hci_responses.put(event)
                 response = self.__socket.recv()
-            logger.debug("[%s] HCI write command returned (non-blocking)", self.interface)
-            response = None
-        
+
         return response
 
     def reset(self):
@@ -1080,7 +1078,7 @@ class HCIDevice(VirtualDevice):
         logger.debug("Read Advertising Physical Channel Tx Power ...")
         response = self._write_command(HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power(),
                                        wait_response=wait_response)
-        response.show()
+        
         if response is not None and response.status == 0x00:
             power_level = response[HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level].tx_power_level
             logger.debug("[%s] Advertising Tx Power level: %d", self.interface, power_level)
