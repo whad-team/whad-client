@@ -750,7 +750,8 @@ class HCIDevice(VirtualDevice):
                 self._read_bd_address() and 
                 self.indicates_le_support() and
                 self.__read_filter_accept_list_size() and
-                self.clear_filter_list()
+                self.clear_filter_list() and
+                self._set_bd_address()
         )
         try:
             success = success and self.configure_data_length()
@@ -874,7 +875,7 @@ class HCIDevice(VirtualDevice):
 
     @req_cmd("le_set_random_address")
     def _set_bd_address(self, bd_address: bytes = b"\x00\x11\x22\x33\x44\x55",
-                        bd_address_type: int = AddressType.PUBLIC) -> bool:
+                        bd_address_type: int = AddressType.RANDOM) -> bool:
         """
         Modify the BD address (if supported by the HCI device).
         """
