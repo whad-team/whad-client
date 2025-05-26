@@ -5,6 +5,7 @@ import logging
 from time import sleep
 from queue import Queue, Empty
 from struct import unpack
+from threading import Lock
 
 # Scapy layers for HCI
 from scapy.layers.bluetooth import BluetoothSocketError, BluetoothUserSocket, \
@@ -233,6 +234,7 @@ class HCIDevice(VirtualDevice):
         super().__init__(index=index)
         self.__converter = HCIConverter(self)
         self.__index = index
+        self.__lock = Lock()
         self.__socket = None
         self.__internal_state = HCIInternalState.NONE
         self.__opened = False
@@ -363,8 +365,13 @@ class HCIDevice(VirtualDevice):
         if not self.__opened:
             raise WhadDeviceNotReady()
         try:
+            # We assume here that we can determine if there is something to read
+            # by calling readable without locking our socket
             if self.__socket is not None and self.__socket.readable(0.1):
+                # Lock our socket to catch the awaiting event
+                self.__lock.acquire()
                 event = self.__socket.recv()
+                self.__lock.release()
                 if event.type == 0x4 and event.code in (0xe, 0xf, 0x13):
                     self.__hci_responses.put(event)
                 else:
@@ -384,7 +391,7 @@ class HCIDevice(VirtualDevice):
                         if not self._advertising:
                             return
 
-                        if not self._read_advertising_physical_channel_tx_power(wait_response=False):
+                        if not self._read_advertising_physical_channel_tx_power(from_queue=False):
                             logger.error("[%s] Cannot read advertising physical channel Tx power", self.interface)
 
                         # if data are cached, configure them
@@ -392,7 +399,7 @@ class HCIDevice(VirtualDevice):
                             # We can't wait for response because we are in the
                             # reception loop context
                             success = self._set_advertising_data(self._cached_scan_data,
-                                                                 wait_response=False)
+                                                                 from_queue=False)
 
                             # Raise an error if we cannot set the advertising data.
                             if not success:
@@ -401,7 +408,7 @@ class HCIDevice(VirtualDevice):
 
                         if self._cached_scan_response_data is not None:
                             success = self._set_scan_response_data(
-                                self._cached_scan_response_data, wait_response=False
+                                self._cached_scan_response_data, from_queue=False
                             )
 
                             # Raise an error if we cannot set the scan response data.
@@ -412,7 +419,7 @@ class HCIDevice(VirtualDevice):
                         # We need to artificially disable advertising indicator
                         # to prevent cached operation
                         self._advertising = False
-                        self._set_advertising_mode(True, wait_response=False)
+                        self._set_advertising_mode(True, from_queue=False)
 
 
         except (BrokenPipeError, OSError) as err:
@@ -433,7 +440,16 @@ class HCIDevice(VirtualDevice):
         Writes an HCI packet.
         """
         logger.debug("[hci] sending packet ...")
+
+        # We claim access to our socket by acquiring its lock
+        self.__lock.acquire()
+
+        # And we send our HCI ACL packet
         self.__socket.send(packet)
+
+        # We will wait for a response packet in our HCI RX queue, so we
+        # can release our socket to let other threads handle it.
+        self.__lock.release()
 
         # Wait for response
         logger.debug("[hci] waiting for response (timeout: %s)...", self.__timeout)
@@ -452,15 +468,30 @@ class HCIDevice(VirtualDevice):
             logger.debug("[hci] response code: 0x%04x", response.code)
         return response.num_handles == 1 and response.num_completed_packets_list[0] == 1
 
-    def _write_command(self, command, wait_response=True):
+    def _write_command(self, command, from_queue=True):
         """
         Writes an HCI command and returns the response.
         """
+        # Prepare HCI command
         hci_command = HCI_Hdr()/HCI_Command_Hdr()/command
+
+        # Acquire lock on our socket
+        self.__lock.acquire()
+
+        # Send prepared HCI command
         logger.debug("[%s][write_command] Sending HCI command to user socket ...", self.interface)
         self.__socket.send(hci_command)
         logger.debug("[%s][write_command] Command sent.", self.interface)
-        if wait_response:
+
+        # If we are expecting to receive events from our reception queue, we
+        # need to release the socket lock and wait for our read() method to
+        # catch an answer. This is usually done when an HCI command is initiated
+        # by the user application or the protocol stack in use.
+        if from_queue:
+            # We release our socket lock
+            self.__lock.release()
+
+            # And we wait for a response to be sent to our reception queue
             logger.debug("[%s][write_command] Waiting for response ...", self.interface)
             response = self._wait_response()
             while response.opcode != hci_command[HCI_Command_Hdr].opcode:
@@ -472,12 +503,21 @@ class HCIDevice(VirtualDevice):
                 logger.debug("[%s] HCI write command returned status %d",
                             self.interface, response.status)
         else:
-            # We must read directly from our socket
+            # In the other case, _write_command() is directly called from the
+            # read() method and therefore we need to keep our socket locked
+            # in order to read from it. Any event received that is not an
+            # expected HCI_Command_Complete message is sent to the HCI RX
+            # queue.
+
             event = self.__socket.recv()
             while not (event.type == 0x4 and event.code == 0xe):
                 if event.type == 0x4 and event.code in (0xf, 0x13):
                     self.__hci_responses.put(event)
                 event = self.__socket.recv()
+            
+            # We got our response: we release our socket lock and set the
+            # captured event as the reponse to return to caller.
+            self.__lock.release()
             response = event
 
         return response
@@ -912,8 +952,8 @@ class HCIDevice(VirtualDevice):
 
                     # Write BD address and reset with vendor specific commands
                     self._write_command(HCI_Cmd_CSR_Write_BD_Address(addr=bd_address),
-                                        wait_response=False)
-                    self._write_command(HCI_Cmd_CSR_Reset(), wait_response=False)
+                                        from_queue=False)
+                    self._write_command(HCI_Cmd_CSR_Reset(), from_queue=False)
 
                     # We are forced to close the socket and reopen it here...
                     self.__socket.close()
@@ -949,7 +989,7 @@ class HCIDevice(VirtualDevice):
                         b'ST Microelectronics' : HCI_Cmd_ST_Write_BD_Address
                     }
                     command = bd_address_mod_map[self._manufacturer](addr=bd_address)
-                    self._write_command(command, wait_response=False)
+                    self._write_command(command, from_queue=False)
                     self._reset()
 
                 # Check the modification success and re-generate device ID
@@ -1047,7 +1087,7 @@ class HCIDevice(VirtualDevice):
         return response is not None and response.status == 0x00
 
     @req_cmd("le_set_advertising_data")
-    def _set_advertising_data(self, data, wait_response: bool = True) -> bool:
+    def _set_advertising_data(self, data, from_queue: bool = True) -> bool:
         """
         Configure advertising data to use by HCI device.
         """
@@ -1057,7 +1097,7 @@ class HCIDevice(VirtualDevice):
 
         # Send command and wait for response if required.
         result = True
-        if wait_response:
+        if from_queue:
             # Wait for response.
             logger.debug("[%s] Setting HCI LE advertising data ...", self.interface)
             response = self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=EIR_Hdr(data)))
@@ -1067,18 +1107,18 @@ class HCIDevice(VirtualDevice):
         else:
             # Otherwise send command without waiting a response.
             logger.debug("[%s] Setting HCI LE advertising data (non-blocking) ...", self.interface)
-            self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=EIR_Hdr(data)), wait_response=False)
+            self._write_command(HCI_Cmd_LE_Set_Advertising_Data(data=EIR_Hdr(data)), from_queue=False)
 
         # Return result
         return result
     
     @req_cmd("le_read_advertising_physical_channel_tx_power")
-    def _read_advertising_physical_channel_tx_power(self, wait_response: bool = True) -> bool:
+    def _read_advertising_physical_channel_tx_power(self, from_queue: bool = True) -> bool:
         """Read Advertising Physical Channel Tx Power level
         """
         logger.debug("Read Advertising Physical Channel Tx Power ...")
         response = self._write_command(HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power(),
-                                       wait_response=wait_response)
+                                       from_queue=from_queue)
         
         if response is not None and response.status == 0x00:
             power_level = response[HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level].tx_power_level
@@ -1087,12 +1127,12 @@ class HCIDevice(VirtualDevice):
         return False
 
     @req_cmd("le_set_scan_response_data")
-    def _set_scan_response_data(self, data, wait_response=True) -> bool:
+    def _set_scan_response_data(self, data, from_queue=True) -> bool:
         """
         Configure scan response data to use by HCI device.
         """
         result = True
-        if wait_response:
+        if from_queue:
             # Wait response and update result accordingly.
             logger.debug("[%s] Setting HCI LE Scan Response Data to %s ...", self.interface,
                          data.hex())
@@ -1108,7 +1148,7 @@ class HCIDevice(VirtualDevice):
             self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(
                     data=data + (31 - len(data)) * b"\x00", len=len(data)
                 ),
-                wait_response=False
+                from_queue=False
             )
 
         # Return result
@@ -1118,12 +1158,12 @@ class HCIDevice(VirtualDevice):
     def set_advertising_parameters(self, interval_min: int = 0x0020, interval_max: int = 0x0020,
                                    adv_type="ADV_IND", oatype: int = 0, datype: int = 0,
                                    daddr:str = "00:00:00:00:00:00", channel_map: int = 0x7,
-                                   filter_policy: str = "all:all", wait_response: bool = True) -> bool:
+                                   filter_policy: str = "all:all", from_queue: bool = True) -> bool:
         """Configure the HCI LE advertising parameters.
         """
         # Wait for a response and update result accordingly.
         logger.debug("[%s] Setting HCI LE Advertising Parameters (blocking:%s) ...",
-                    self.interface, wait_response)
+                    self.interface, from_queue)
         response = self._write_command(HCI_Cmd_LE_Set_Advertising_Parameters(
             interval_min = 0x0020,
             interval_max = 0x0020,
@@ -1133,15 +1173,15 @@ class HCIDevice(VirtualDevice):
             daddr="00:00:00:00:00:00",
             channel_map=0x7,
             filter_policy="all:all"
-        ), wait_response=wait_response)
+        ), from_queue=from_queue)
 
         # Process response if required
-        if wait_response:
+        if from_queue:
             return response.status == 0x00
         return True
 
     @req_cmd("le_set_advertising_enable")
-    def _set_advertising_mode(self, enable=True, wait_response=True):
+    def _set_advertising_mode(self, enable=True, from_queue=True):
         """
         Enable or disable advertising mode for HCI device.
         """
@@ -1163,13 +1203,13 @@ class HCIDevice(VirtualDevice):
                     daddr="00:00:00:00:00:00",
                     channel_map=0x7,
                     filter_policy="all:all",
-                    wait_response=wait_response
+                    from_queue=from_queue
                 )
 
             if result:
                 logger.debug("[%s] Sending HCI LE Set Advertise Enable (enable:%s, blocking:%s)",
-                             self.interface, enable, wait_response)
-                if wait_response:
+                             self.interface, enable, from_queue)
+                if from_queue:
                     # Wait for a response and update result accordingly.
                     response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))
                     result = response.status == 0x00
@@ -1177,23 +1217,23 @@ class HCIDevice(VirtualDevice):
                     # Don't wait, simply send command and consider it OK.
                     self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(
                         enable=int(enable)
-                    ), wait_response=False)
+                    ), from_queue=False)
                     result = True
 
             # On success, advertising has been enabled.
             self._advertising = result
         else:
             logger.debug("[%s] Sending HCI LE Set Advertise Enable (enable:0, blocking:%s)",
-                            self.interface, wait_response)
+                            self.interface, from_queue)
             # Disabling advertising
-            if wait_response:
+            if from_queue:
                 response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=0))
                 result = response.status == 0x00
                 if result:
                     self._advertising = False
             else:
                 response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=0),
-                                               wait_response=False)
+                                               from_queue=False)
                 self._advertising = False
                 result = True
 
