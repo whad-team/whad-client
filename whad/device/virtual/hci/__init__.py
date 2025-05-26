@@ -31,7 +31,7 @@ from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
     HCI_Cmd_LE_Write_Suggested_Default_Data_Length, HCI_Cmd_LE_Read_Suggested_Default_Data_Length, \
     HCI_Cmd_LE_Complete_Suggested_Default_Data_Length, HCI_Cmd_Write_Simple_Pairing_Mode, \
     HCI_Cmd_Write_Default_Link_Policy_Settings, HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power, \
-    HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level
+    HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level, HCI_Cmd_Write_Class_Of_Device
 
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
@@ -790,6 +790,16 @@ class HCIDevice(VirtualDevice):
         return response is not None and response.status == 0x00
 
 
+    def write_device_class(self, major_service_class: int = 0x360, major_device_class: int = 0x00,
+                           minor_device_class: int = 0x00) -> bool:
+        """Configure a default class of device"""
+        response = self._write_command(HCI_Cmd_Write_Class_Of_Device(
+            major_service_classes=major_service_class,
+            major_device_class=major_device_class,
+            minor_device_class=minor_device_class
+        ))
+        return response is not None and response.status == 0x00
+
     def _initialize(self):
         """
         Initialize HCI Device and returns boolean indicating if it can be used by WHAD.
@@ -801,11 +811,11 @@ class HCIDevice(VirtualDevice):
                 self.read_local_le_supported_features() and 
                 self.write_simple_pairing_mode() and
                 self.write_connect_accept_timeout() and
+                self.write_device_class() and
                 self._set_event_mask(b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d") and
                 self.write_default_link_policy_settings() and
                 self._le_set_event_mask(mask=b'\xff\xff\xff\xff\x03') and
                 self._le_read_buffer_size() and
-                self.read_local_le_supported_features() and 
                 self._read_bd_address() and 
                 self.indicates_le_support() and
                 self.__read_filter_accept_list_size() and
