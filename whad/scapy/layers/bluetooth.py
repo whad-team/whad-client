@@ -1,6 +1,6 @@
 from scapy.packet import bind_layers, Packet
 from scapy.fields import BitField, LEShortField, ByteField, StrFixedLenField, \
-    FlagsField, ByteEnumField
+    FlagsField, ByteEnumField, BitEnumField
 from scapy.layers.bluetooth import SM_Hdr, HCI_Event_LE_Meta, HCI_Command_Hdr, \
     HCI_Event_Command_Complete, _bluetooth_features, _bluetooth_error_codes, \
     HCI_Cmd_Complete_LE_Read_White_List_Size
@@ -655,6 +655,39 @@ class HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level(Packet):
     name = "Advertising Tx Power Level"
     fields_desc = [ ByteField("tx_power_level", 0), ]
 
+class HCI_Cmd_Write_Class_Of_Device(Packet):
+    name = "Set Class of Device"
+    fields_desc = [
+        FlagsField('major_service_classes', 0, 11, [
+            'limited_discoverable_mode',
+            'le_audio',
+            'reserved',
+            'positioning',
+            'networking',
+            'rendering',
+            'capturing',
+            'object_transfer',
+            'audio',
+            'telephony',
+            'information'
+        ], tot_size=-3),
+        BitEnumField('major_device_class', 0, 5, {
+            0x00: 'miscellaneous',
+            0x01: 'computer',
+            0x02: 'phone',
+            0x03: 'lan',
+            0x04: 'audio_video',
+            0x05: 'peripheral',
+            0x06: 'imaging',
+            0x07: 'wearable',
+            0x08: 'toy',
+            0x09: 'health',
+            0x1f: 'uncategorized'
+        }),
+        BitField('minor_device_class', 0, 6),
+        BitField('fixed', 0, 2, end_tot_size=-3)
+    ]
+
 def unbind_layer(cls, pkt_cls):
     # Unbind bottom/up
     item = None
@@ -684,6 +717,7 @@ bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Event_Mask, ogf=0x08, ocf=0x0001) # 
 # HCI Commands
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Supported_Commands, ogf=0x04, ocf=0x0002) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Supported_Features, ogf=0x04, ocf=0x0003) # noqa: E501
+bind_layers(HCI_Command_Hdr, HCI_Cmd_Write_Class_Of_Device, ogf=0x03, ocf=0x0024) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Local_Supported_Features, ogf=0x08, ocf=0x0003) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power, ogf=0x08, ocf=0x0007) # noqa: E501
 bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Suggested_Default_Data_Length, ogf=0x08, ocf=0x0023) # noqa: E501
