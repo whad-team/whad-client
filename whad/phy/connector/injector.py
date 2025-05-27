@@ -6,6 +6,7 @@ from whad.phy import Endianness
 from whad.hub.phy import Modulation as PhyModulation, Endianness as PhyEndianness
 from whad.phy.injecting import InjectionConfiguration
 from whad.phy.exceptions import NoModulation
+from whad.scapy.layers.phy import Phy_Packet
 from whad.exceptions import UnsupportedCapability
 
 # TODO: every sniffer is broken (sniff() method does not catch packets, we
@@ -82,7 +83,8 @@ class Injector(Phy):
         self.start()
 
     def inject(self, packet):
-
+        """Send packet through hardware.
+        """
         if not self._metadata_check:
             if hasattr(packet, "metadata") and hasattr(packet.metadata, "modulation") and packet.metadata.modulation is not None:
                 deviation = packet.metadata.deviation
@@ -135,4 +137,5 @@ class Injector(Phy):
                 self.start()
                 self._metadata_check = True
 
-        super().send(packet)
+        # Send packet payload
+        super().send(packet[Phy_Packet])
