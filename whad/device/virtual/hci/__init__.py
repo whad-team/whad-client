@@ -816,11 +816,10 @@ class HCIDevice(VirtualDevice):
                 self.write_default_link_policy_settings() and
                 self._le_set_event_mask(mask=b'\xff\xff\xff\xff\x03') and
                 self._le_read_buffer_size() and
-                self._read_bd_address() and 
+                self._read_bd_address() and
                 self.indicates_le_support() and
                 self.__read_filter_accept_list_size() and
-                self.clear_filter_list() and
-                self._set_bd_address()
+                self.clear_filter_list()
         )
         try:
             success = success and self.configure_data_length()
@@ -943,7 +942,7 @@ class HCIDevice(VirtualDevice):
         raise WhadDeviceNotReady()
 
     @req_cmd("le_set_random_address")
-    def _set_bd_address(self, bd_address: bytes = b"\x00\x11\x22\x33\x44\x55",
+    def _set_bd_address(self, bd_address: bytes = b"\x55\x44\x33\x22\x11\x00",
                         bd_address_type: int = AddressType.RANDOM) -> bool:
         """
         Modify the BD address (if supported by the HCI device).
@@ -1024,7 +1023,7 @@ class HCIDevice(VirtualDevice):
             self._bd_address_type = AddressType.RANDOM
         else:
             logger.debug("[%s] Failed setting random address, continue anyway", self.interface)
-        
+
         # Success
         return True
 
