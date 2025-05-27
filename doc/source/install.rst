@@ -43,8 +43,8 @@ Installing WHAD is straightforward with ``pip``:
 
     You can also use `pipx <https://pipx.pypa.io/stable/>`_ instead of *pip*, as it manages its own virtual environments.
 
-Installing WHAD from Github repository
---------------------------------------
+Installing WHAD from our Github repository
+------------------------------------------
 
 Another solution is to get the source from github directly and install the framework
 with the classic Python tools.
@@ -53,7 +53,7 @@ Then clone the repository, create a virtual environment and install it:
 
 .. code-block:: text
 
-    $ git clone https://github.com/whad-team/whad-client.git
+    $ git clone --recurse-submodules --remote-submodules https://github.com/whad-team/whad-client.git
     $ cd whad-client
     $ python3 -m venv venv
     $ . ./venv/bin/activate
@@ -174,6 +174,7 @@ Once correctly flashed, you should be able to see the available devices using ``
       Index: 0
       Identifier: /dev/ttyUSB0
 
+
 Installing WHAD in a virtual machine
 ------------------------------------
 
@@ -194,17 +195,38 @@ OSes used to run them, as well as the recommended guest OSes for each of them.
 Using VMWare virtualization software (1)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Our tests with the recommended guest OS Ubuntu 22.04 showed that the *Bluetooth*
-service must be stopped or disabled in the Ubuntu guest to avoid conflicts with
-Bluetooth USB dongles:
+Our tests with the recommended guest OS Ubuntu 22.04 showed that the USB core
+driver has its *autosuspend* feature enabled by default, causing issues with
+any USB bluetooth dongle plugged into the virtual machine.
+
+This behavior can be disabled by setting the `autosuspend` option to `-1` in
+the system boot command-line, by running the following commands in a terminal
+in the target VM:
+
 
 .. code-block:: shell
 
-    $ sudo service bluetooth stop
+    sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="[a-z ]*/& usbcore.autosuspend=-1/' /etc/default/grub
+    sudo update-grub2
+
+
+The VM then needs to be restarted for this modification to take effect.
+Once restarted, the system should automatically stop suspending
+any USB device plugged into the virtual machine.
 
 .. note::
-    
-    On Linux hosts, the *Bluetooth* service does not need to be stopped or1
-    disabled in guest OS.
+
+    On native Linux systems, the USB core *autosuspend* feature works as expected and
+    should not be disabled.
+
+.. important::
+
+    Unlike stated in a previous version of this documentation, The *Bluetooth* service
+    running by default in Ubuntu VMs does not need to be stopped, WHAD solely relies on
+    HCI user sockets to control bluetooth-enabled adapters and therefore takes ownership,
+    avoiding the *Bluetooth* service to interact with them while in use by WHAD.
+
+    This also means `bluetoothctl` and WHAD will both work out of the box, no modification
+    required.
 
 
