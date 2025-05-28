@@ -96,14 +96,18 @@ class HCIConverter:
                 self.cached_l2cap_length = ll_packet[L2CAP_Hdr:].len
 
                 # No HCI packet to send for now (data queued)
-                logger.debug("l2cap is incomplete (%s/%s)", len(self.cached_l2cap_payload)-4, self.cached_l2cap_length)
+                logger.debug("l2cap is incomplete (%s/%s)",
+                             len(self.cached_l2cap_payload)-4,
+                             self.cached_l2cap_length)
                 return []
 
             if self.waiting_l2cap_fragments:
                 self.cached_l2cap_payload += raw(ll_packet[BTLE_DATA:][1:])
                 if self.cached_l2cap_length <= (len(self.cached_l2cap_payload) - 4):
                     if self.cached_l2cap_length < len(self.cached_l2cap_payload) - 4:
-                        logger.debug("[hci device][%s] too much data (got %d, expected %d)", self.__device.interface, len(self.cached_l2cap_payload) - 4, self.cached_l2cap_length)
+                        logger.debug("[hci device][%s] too much data (got %d, expected %d)",
+                                     self.__device.interface, len(self.cached_l2cap_payload) - 4,
+                                     self.cached_l2cap_length)
                     self.waiting_l2cap_fragments = False
                     logger.debug("[hci device] reassembled l2cap data !")
 
@@ -113,19 +117,6 @@ class HCIConverter:
                         bytes(L2CAP_Hdr(self.cached_l2cap_payload)),
                         message.conn_handle
                     )
-
-                    #l2cap_data = bytes(L2CAP_Hdr(self.cached_l2cap_payload))
-                    #max_acl_len = self.__device.get_max_acl_len()
-                    #nb_hci_packets = len(l2cap_data)//max_acl_len
-                    #if len(l2cap_data)%max_acl_len > 0:
-                    #    nb_hci_packets += 1
-                    #hci_packets = []
-                    #for i in range(nb_hci_packets):
-                    #    pkt = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle, PB=1 if i>0 else 0)
-                    #    pkt = pkt / l2cap_data[i*max_acl_len:(i+1)*max_acl_len]
-                    #    hci_packets.append(pkt)
-                    #logger.debug("[hci converter] split ACL data into %d chunks (total: %d, acl_len: %d)", nb_hci_packets, len(l2cap_data), max_acl_len)
-                    #return hci_packets
 
                 # No HCI packet for now.
                 logger.debug("l2cap is incomplete, more fragments needed (%s/%s).", len(self.cached_l2cap_payload) - 4, self.cached_l2cap_length)
