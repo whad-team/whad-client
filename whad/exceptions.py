@@ -127,6 +127,10 @@ class WhadDeviceError(Exception):
 
     def __str__(self):
         return f"WhadDeviceError({self.__message})"
+    
+    @property
+    def message(self) -> str:
+        return self.__message
 
 # External tools exceptions
 
