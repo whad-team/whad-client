@@ -14,7 +14,7 @@ from whad.cli.app import run_app
 from whad.common.pcap import extract_pcap_metadata
 
 from whad.device import WhadDevice
-from whad.exceptions import WhadDeviceNotFound
+from whad.exceptions import WhadDeviceNotFound, WhadDeviceError
 from whad.tools.utils import list_implemented_sniffers
 from whad.tools.wsniff import WhadSniffApp
 
@@ -99,6 +99,9 @@ class WhadPlayApp(WhadSniffApp):
             super().run()
         except WhadDeviceNotFound:
             self.error("PCAP file not found")
+        except WhadDeviceError as err:
+            # Generally raised when PCAP file is not supported
+            self.error(err.message)
 
 def wplay_main():
     """Launcher for wplay.
