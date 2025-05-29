@@ -171,6 +171,7 @@ class Peripheral(BLE):
         self.connection = None
         self.__connected = False
         self.__conn_handle = None
+        self.__access_address = None
 
         # Initialize event listener
         self.__evt_listener = None
@@ -298,6 +299,10 @@ class Peripheral(BLE):
         :return:                PDU transmission result.
         :rtype: bool
         """
+        # TODO: access address is not really required in parameters, only conn_handle
+        # We patch access address if it was set in the connection event
+        if self.__access_address is not None:
+            access_address = self.__access_address
         return super().send_data_pdu(data, conn_handle=conn_handle, direction=direction,
                                      access_address=access_address, encrypt=encrypt)
 
@@ -320,6 +325,10 @@ class Peripheral(BLE):
         :return:                PDU transmission result.
         :rtype: bool
         """
+        # TODO: access address is not really required in parameters, only conn_handle
+        # We patch access address if it was set in the connection event
+        if self.__access_address is not None:
+            access_address = self.__access_address
         return super().send_ctrl_pdu(pdu, conn_handle=conn_handle, direction=direction,
                                      access_address=access_address, encrypt=encrypt)
 
@@ -422,15 +431,23 @@ class Peripheral(BLE):
             connection_data.initiator,
             connection_data.init_addr_type
         )
+
+        # GATT server is now connected
+        self.__connected = True
+        self.__conn_handle = connection_data.conn_handle
+
+        # Save access address if specified
+        if connection_data.access_address != 0:
+            self.__access_address = connection_data.access_address
+        else:
+            self.__access_address = None
+
+        # Notify our stack that a connection has been created
         self.__stack.on_connection(
             connection_data.conn_handle,
             self.__local_peer,
             self.__remote_peer
         )
-
-        # GATT server is now connected
-        self.__connected = True
-        self.__conn_handle = connection_data.conn_handle
 
         # Notify event listener, if any
         self.notify_event(PeripheralEventConnected(

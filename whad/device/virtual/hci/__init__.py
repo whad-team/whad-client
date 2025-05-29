@@ -784,11 +784,10 @@ class HCIDevice(VirtualDevice):
         response = self._write_command(HCI_Cmd_Write_Connect_Accept_Timeout(timeout=timeout))
         return response is not None and response.status == 0x00
 
-    def write_default_link_policy_settings(self, policy: int = 0x0f) -> bool:
+    def write_default_link_policy_settings(self, policy: int = 0x07) -> bool:
         """Configure the HCI interface default link policy settings for LE and BR/EDR controller"""
         response = self._write_command(HCI_Cmd_Write_Default_Link_Policy_Settings(policy=policy))
         return response is not None and response.status == 0x00
-
 
     def write_device_class(self, major_service_class: int = 0x360, major_device_class: int = 0x00,
                            minor_device_class: int = 0x00) -> bool:
