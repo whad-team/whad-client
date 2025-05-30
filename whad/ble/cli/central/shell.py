@@ -25,7 +25,7 @@ from whad.ble import Scanner, Central
 from whad.ble.profile.device import PeripheralCharacteristic, PeripheralDevice
 from whad.ble.profile.characteristic import CharacteristicProperties
 from whad.ble.profile.advdata import AdvDataFieldList
-from whad.ble.profile.attribute import UUID
+from whad.ble.profile.attribute import UUID, InvalidUUIDException
 from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
     InsufficientAuthenticationError, InsufficientAuthorizationError, \
     InsufficientEncryptionKeySize, ReadNotPermittedError, \
@@ -706,6 +706,9 @@ class BleCentralShell(InteractiveShell):
                 except ValueError:
                     try:
                         handle = UUID(args[0])
+                    except InvalidUUIDException:
+                        self.error(f"Wrong UUID: {args[0]}")
+                        return
                     except ValueError:
                         self.error(f"Wrong UUID: {args[0]}")
                         return
@@ -787,6 +790,9 @@ class BleCentralShell(InteractiveShell):
             except ValueError:
                 try:
                     handle = UUID(args[0])
+                except InvalidUUIDException:
+                    self.error(f"Wrong UUID: {args[0]}")
+                    return
                 except ValueError:
                     self.error(f"Wrong UUID: {args[0]}")
                     return
@@ -1061,6 +1067,9 @@ class BleCentralShell(InteractiveShell):
                 except ValueError:
                     try:
                         handle = UUID(args[0])
+                    except InvalidUUIDException:
+                        self.error(f"Wrong UUID: {args[0]}")
+                        return
                     except Exception:
                         self.error(f"Wrong UUID: {args[0]}")
                         return
@@ -1169,6 +1178,9 @@ class BleCentralShell(InteractiveShell):
                 except ValueError:
                     try:
                         handle = UUID(args[0])
+                    except InvalidUUIDException:
+                        self.error(f"Wrong UUID: {args[0]}")
+                        return
                     except Exception:
                         self.error(f"Wrong handle: {args[0]}")
                         return
