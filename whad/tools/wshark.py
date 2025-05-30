@@ -87,12 +87,6 @@ class WhadWiresharkApp(CommandLineApp):
                         sleep(.1)
 
                 else:
-                    # Attack a wireshark monitor
-                    logger.info("wshark: register monitors")
-                    self.monitor = WiresharkMonitor()
-                    self.monitor.attach(connector)
-                    self.monitor.start()
-
                     connector.unlock()
 
                     # Wait for the user to CTL-C or close Wireshark
