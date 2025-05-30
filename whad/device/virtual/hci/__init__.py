@@ -243,7 +243,7 @@ class HCIDevice(VirtualDevice):
         self._local_name = None
         self._advertising = False
         self._bd_address = None
-        self._bd_address_type = AddressType.RANDOM
+        self._bd_address_type = AddressType.PUBLIC
         self._fw_version = None
         self._fw_url = None
         self._fw_author = None
@@ -1013,15 +1013,18 @@ class HCIDevice(VirtualDevice):
             self._bd_address_type = bd_address_type
             return False
 
-        response = self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
-        if response is not None and response.status == 0x00:
-            logger.debug("[%s] Random address successfully set to %s", self.interface, 
-                     BDAddress(bd_address))
-            # Read BD address
-            self._read_bd_address()
-            self._bd_address_type = AddressType.RANDOM
-        else:
-            logger.debug("[%s] Failed setting random address, continue anyway", self.interface)
+        if bd_address_type == BDAddress.RANDOM:
+            response = self._write_command(HCI_Cmd_LE_Set_Random_Address(address=bd_address))
+            if response is not None and response.status == 0x00:
+                logger.debug("[%s] Random address successfully set to %s", self.interface, 
+                        BDAddress(bd_address))
+                # Read BD address
+                self._read_bd_address()
+                logger.debug("[%s] BD address set to %s (random)", self.interface,
+                             BDAddress(bd_address))
+                self._bd_address_type = AddressType.RANDOM
+            else:
+                logger.debug("[%s] Failed setting random address, continue anyway", self.interface)
 
         # Success
         return True
@@ -1151,8 +1154,8 @@ class HCIDevice(VirtualDevice):
             result = response is not None and response.status == 0x0
         else:
             # Don't wait for a response.
-            logger.debug("[%s] Setting HCI LE Scan Response Data to %s (non-blocking) ...", self.interface,
-                         data.hex())
+            logger.debug("[%s] Setting HCI LE Scan Response Data to %s (non-blocking) ...",
+                         self.interface, data.hex())
             self._write_command(HCI_Cmd_LE_Set_Scan_Response_Data(
                     data=data + (31 - len(data)) * b"\x00", len=len(data)
                 ),
