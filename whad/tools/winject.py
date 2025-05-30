@@ -110,8 +110,6 @@ class WhadInjectApp(CommandLineApp):
         """
         Generate the subparsers argument according to the environment.
         """
-        # List every domain implementing an injector
-        self.environment = list_implemented_injectors()
 
         # Iterate over domain, and get the associated sniffer parameters
         for domain_name, domain in self.environment.items():
@@ -254,7 +252,14 @@ class WhadInjectApp(CommandLineApp):
         error_func = self.error
         if self.subparsers is None:
             self.error  = lambda m : None
+
+        # Load implemented injectors *before* calling super().__init__()
+        # drastically improves performances.
+        self.environment = list_implemented_injectors()      
+
+        # Call CLI app pre-run: it will initialize our source interface
         super().pre_run()
+
         try:
             domain = self.args.domain
         except AttributeError:
@@ -290,6 +295,7 @@ class WhadInjectApp(CommandLineApp):
 
         self.generate_packets()
 
+
     def is_input_alive(self) -> bool:
         """Determine if the input interface is providing packets to inject.
 
@@ -310,7 +316,7 @@ class WhadInjectApp(CommandLineApp):
         injector = None
         # Launch pre-run tasks
         self.pre_run()
-
+        
         try:
             # We need to have an interface specified
             if self.interface is not None:
@@ -324,7 +330,6 @@ class WhadInjectApp(CommandLineApp):
 
 
                     if self.is_piped_interface():
-
                         connector = UnixConnector(self.input_interface)
 
                         connector.domain = self.args.domain
