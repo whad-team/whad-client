@@ -59,10 +59,16 @@ class Scanner(BLE):
             # Does our device accept sniffing mode and is able of sniffing advertising reports ?
             if not self.can_sniff_advertisements():
                 raise UnsupportedCapability('Scan')
+            # Stop current mode
             self.stop()
+
+            # Set advertisement sniffing
             self.sniff_advertisements()
         else:
+            # Stop current mode
             self.stop()
+
+            # Enable active scanning
             self.enable_scan_mode(True)
 
     def start(self):
@@ -79,9 +85,12 @@ class Scanner(BLE):
 
         Stop scanning for devices, disable scan mode if used.
         """
+        # Stop scanning
+        super().stop()
+
+        # Disable active scan mode (passive mode by default)
         if self.can_scan():
             self.enable_scan_mode(False)
-        super().stop()
 
     def discover_devices(self, minimal_rssi = None, filter_address = None,
                          timeout: float = None) -> Iterator[AdvertisingDevice]:
