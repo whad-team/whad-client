@@ -324,7 +324,7 @@ class WhadInjectApp(CommandLineApp):
         injector = None
         # Launch pre-run tasks
         self.pre_run()
-        
+
         try:
             # We need to have an interface specified
             if self.interface is not None:
