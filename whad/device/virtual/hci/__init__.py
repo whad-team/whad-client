@@ -326,9 +326,18 @@ class HCIDevice(VirtualDevice):
         # Marking device as in closing process
         self.__closing = True
 
-        # Disconnect if necessary
-        for handle in self._active_handles:
-            self._disconnect(handle)
+        if self.__conn_state == HCIConnectionState.ESTABLISHED:
+            # Disconnect if necessary
+            for handle in self._active_handles:
+                self._disconnect(handle)
+        elif self.__conn_state == HCIConnectionState.INITIATING:
+            # Cancel current connection if still trying to connect
+            self.cancel_connection()
+
+        # Stop advertising if enabled
+        if self._advertising:
+            self._set_advertising_mode(False)
+
         # Ask parent class to stop I/O thread
         logger.debug("Stopping background IO threads ...")
         super().close()
@@ -1347,20 +1356,31 @@ class HCIDevice(VirtualDevice):
     def on_connection_created(self, handle: int = 0):
         """Callback method to handle a new connection
         """
-        # HCI interface now connected
-        if self.__conn_state == HCIConnectionState.INITIATING:
-            # Connection is now established
+        # Central mode ?
+        if self.__internal_state == HCIInternalState.CENTRAL:
+            # HCI interface now connected
+            if self.__conn_state == HCIConnectionState.INITIATING:
+                # Connection is now established
+                self.__conn_state = HCIConnectionState.ESTABLISHED
+                self._connected = True
+                if handle not in self._active_handles:
+                    self._active_handles.append(handle)
+                else:
+                    logger.warning("[%s] Connection event received with existing handle %d",
+                                self.interface, handle)
+            else:
+                logger.debug("[%s] Unexpected connection event (handle:%d, current state:%d)",
+                            self.interface, handle, self.__conn_state)
+                logger.warning("[%s] Received an unexpected connection event", self.interface)
+        elif self.__internal_state == HCIInternalState.PERIPHERAL:
+            # HCI interface now connected
             self.__conn_state = HCIConnectionState.ESTABLISHED
             self._connected = True
             if handle not in self._active_handles:
                 self._active_handles.append(handle)
             else:
                 logger.warning("[%s] Connection event received with existing handle %d",
-                               self.interface, handle)
-        else:
-            logger.debug("[%s] Unexpected connection event (handle:%d, current state:%d)",
-                         self.interface, handle, self.__conn_state)
-            logger.warning("[%s] Received an expected connection event", self.interface)
+                            self.interface, handle)
 
     def on_connection_terminated(self, handle: int = 0):
         """Callback method to handle connection termination
