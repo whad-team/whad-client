@@ -182,12 +182,19 @@ class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
     @property
     def name(self):
         """Descriptor name
+
+        Clean description as it may contain null chars.
         """
-        return f"{super().name}, '{self.text}'"
+        desc = self.__description[:self.__description.index('\x00')]
+        return f"{super().name}, '{desc}'"
 
     @staticmethod
     def from_value(characteristic, handle, value):
-        return CharacteristicUserDescriptionDescriptor(characteristic, handle, description=value.decode('utf-8'))
+        """Create CUD descriptor from value
+        """
+        return CharacteristicUserDescriptionDescriptor(
+            characteristic, handle, description=value.decode('utf-8')
+        )
 
 class CharacteristicValue(Attribute):
     """Characteristic value attribute.

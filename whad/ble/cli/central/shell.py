@@ -1,6 +1,8 @@
 """BLE GATT Central tool interactive shell.
 """
 import re
+import html
+
 from typing import List
 from binascii import unhexlify, Error as BinasciiError
 
@@ -58,7 +60,6 @@ def show_adv_record(offset, raw_record):
     for line in range(0, nlines):
         line_str = " ".join([f"{c:02x}" for c in raw_record[line*16:(line+1)*16]])
         print("  " + line_str)
-
 
 class BleCentralShell(InteractiveShell):
     """Bluetooth Low Energy interactive shell
@@ -361,7 +362,6 @@ class BleCentralShell(InteractiveShell):
                 target_bd_addr = target['info'].address
                 target_random_address_type = target['info'].address_type == 1
             except IndexError:
-                print("Device not in cache")
                 # If target not in cache, we are expecting a BD address
                 if re.match(BDADDR_REGEXP, args[0]):
                     target_bd_addr = args[0]
@@ -428,6 +428,9 @@ class BleCentralShell(InteractiveShell):
             except PeripheralNotFound:
                 print(f"Unable to connect to device {target_bd_addr}")
                 self.__target_bd = None
+            except KeyboardInterrupt:
+                # Connection interrupted by user, stop current mode
+                self.__connector.stop()
         except IndexError:
             print(f"Device {args[0]} not found")
         except PermissionError:
@@ -564,9 +567,9 @@ class BleCentralShell(InteractiveShell):
 
                     for desc in charac.descriptors():
                         print_formatted_text(HTML((
-                            f"  | <ansiblue><b>Descriptor type {desc.name}</b></ansiblue> "
-                            f"handle: <b>{desc.handle:d}</b>"
-                        )))
+                            "  | <ansiblue><b>Descriptor type {name}</b></ansiblue> "
+                            "handle: <b>{handle}</b>"
+                        )).format(name=desc.name, handle=desc.handle))
                 print('')
 
 

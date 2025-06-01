@@ -364,15 +364,14 @@ class HCIConverter:
         if event.status == 0x00:
 
             # Mark device as connected and register handle.
-            self.__device._connected = True
-            self.__device._active_handles.append(event.handle)
+            self.__device.on_connection_created(event.handle)
 
             # Send BLE connected message to consumer.
             handle = event.handle
             if event.role == 0: # master role
                 self.role = HCIRole.CENTRAL
-                initiator_address = self.__device._bd_address.value#bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
-                initiator_address_type = self.__device._bd_address.type#self.__device._bd_address_type
+                initiator_address = self.__device._bd_address.value
+                initiator_address_type = self.__device._bd_address.type
                 responder_address = bytes.fromhex(event.paddr.replace(":",""))[::-1]
                 responder_address_type = (
                     BleAddrType.PUBLIC if event.patype == 0 else BleAddrType.RANDOM
@@ -383,8 +382,8 @@ class HCIConverter:
                 initiator_address_type = (
                     BleAddrType.PUBLIC if event.patype == 0 else BleAddrType.RANDOM
                 )
-                responder_address = self.__device._bd_address.value#bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
-                responder_address_type = self.__device._bd_address.type#self.__device._bd_address_type
+                responder_address = self.__device._bd_address.value
+                responder_address_type = self.__device._bd_address.type
 
             msg = self.__device.hub.ble.create_connected(
                 BDAddress(initiator_address, addr_type=initiator_address_type),
@@ -394,7 +393,9 @@ class HCIConverter:
             )
 
             return [msg]
-        
+        else:
+            logger.debug("[%s] Connection complete event with status 0x%x", self.__device.interface,
+                         event.status)
         # Nothing to convert
         return []
 
@@ -403,8 +404,9 @@ class HCIConverter:
         """
         if event.status == 0x00:
             # Mark device as disconnected and remove handle
-            self.__device._connected = False
-            self.__device._active_handles.remove(event.handle)
+            #self.__device._connected = False
+            #self.__device._active_handles.remove(event.handle)
+            self.__device.on_connection_terminated(event.handle)
 
             # Send disconnection message to consumer.
             logger.debug("[hci] sending Disconnected message to host")
