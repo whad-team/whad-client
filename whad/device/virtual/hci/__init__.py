@@ -21,7 +21,7 @@ from scapy.layers.bluetooth import BluetoothSocketError, BluetoothUserSocket, \
     HCI_Cmd_Complete_Read_Local_Version_Information, HCI_Cmd_Read_Local_Version_Information, \
     HCI_Cmd_Write_Connect_Accept_Timeout, HCI_Cmd_LE_Read_Local_Supported_Features, \
     HCI_Cmd_LE_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Clear_Filter_Accept_List, \
-    EIR_Hdr
+    EIR_Hdr, HCI_Cmd_LE_Create_Connection_Cancel
 
 from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
     HCI_Cmd_Read_Buffer_Size, HCI_Cmd_Complete_Read_Buffer_Size, HCI_Cmd_LE_Set_Event_Mask, \
@@ -55,7 +55,7 @@ from whad.scapy.layers.hci import HCI_VERSIONS, BT_MANUFACTURERS, \
 from whad.device.virtual.hci.converter import HCIConverter
 from whad.device.virtual.hci.hciconfig import HCIConfig
 from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, \
-    HCIInternalState
+    HCIInternalState, HCIConnectionState
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +170,7 @@ class req_feature:
         for arg in args:
             if isinstance(arg, str):
                 self.__requires.append(arg)
-    
+
     def __call__(self, method):
         """Called to decorate the actual method.
         """
@@ -205,7 +205,7 @@ class le_only(req_feature):
 
             # If all requirements are met, forward
             return method(self, *args, **kwargs)
-        
+
         # Wrap with LE-enabled controller check (tested first)
         return super().__init__(_wrap)
 
@@ -237,6 +237,7 @@ class HCIDevice(VirtualDevice):
         self.__lock = Lock()
         self.__socket = None
         self.__internal_state = HCIInternalState.NONE
+        self.__conn_state = HCIConnectionState.DISCONNECTED
         self.__opened = False
         self.__hci_responses = Queue()
         self._dev_capabilities = None
@@ -1057,6 +1058,10 @@ class HCIDevice(VirtualDevice):
         """
         Establish a connection using HCI device.
         """
+        # Cancel connection if we were trying to connect to a remote peripheral
+        if self.__conn_state in (HCIConnectionState.INITIATING, HCIConnectionState.ESTABLISHED):
+            self.terminate_connection()
+
         logger.debug("bd_address: %s (%d)", bd_address, bd_address_type)
         logger.debug("[hci] _connect() called")
         patype = 0 if bd_address_type == AddressType.PUBLIC else 1
@@ -1084,9 +1089,26 @@ class HCIDevice(VirtualDevice):
             )
         )
         if response.status != 0x00:
+            # Not connected
+            self.__conn_state = HCIConnectionState.DISCONNECTED
             logger.debug("[%s] HCI_LE_Create_Connection command failed with response %d", self.interface,
                          response.status)
+        else:
+            # Connection is initiating
+            self.__conn_state = HCIConnectionState.INITIATING
         return response is not None and response.status == 0x00
+
+    @req_cmd("le_create_connection_cancel")
+    def cancel_connection(self) -> bool:
+        """When iniating mode, cancel connection creationg
+        """
+        logger.debug("[%s] sending HCI cancel connection command ...")
+        response = self._write_command(HCI_Cmd_LE_Create_Connection_Cancel())
+        if response is not None and response.status == 0x00:
+            self.__conn_state = HCIConnectionState.DISCONNECTED
+            self._connected = False
+            return True
+        return False
 
     @req_cmd("disconnect")
     def _disconnect(self, handle):
@@ -1095,7 +1117,28 @@ class HCIDevice(VirtualDevice):
         """
         logger.debug("[%s] sending HCI disconnect command ...")
         response = self._write_command(HCI_Cmd_Disconnect(handle=handle))
-        return response is not None and response.status == 0x00
+        if response is not None and response.status == 0x00:
+            self.__conn_state = HCIConnectionState.DISCONNECTED
+            self._connected = False
+            return True
+        return False
+
+    def terminate_connection(self):
+        """Terminate an active connection or connection attempt.
+        """
+        if self.__conn_state == HCIConnectionState.INITIATING:
+            logger.debug("[%s] HCI interface in connection initiation mode, canceling ...",
+                         self.interface)
+            if self.cancel_connection():
+                logger.debug("[%s] connection initiation successfully canceled.", self.interface)
+            else:
+                logger.warning("[%s] Cannot cancel pending connection !", self.interface)
+        elif self.__conn_state == HCIConnectionState.ESTABLISHED:
+            logger.debug("[%s] HCI interface is connected, disconnecting ...")
+            if self._disconnect():
+                logger.debug("[%s] Successfully disconnected.")
+            else:
+                logger.warning("[%s] Error while disconnecting !")
 
     @req_cmd("le_set_advertising_data")
     def _set_advertising_data(self, data, from_queue: bool = True) -> bool:
@@ -1301,6 +1344,41 @@ class HCIDevice(VirtualDevice):
             return
         self._send_whad_command_result(CommandResult.ERROR)
 
+    def on_connection_created(self, handle: int = 0):
+        """Callback method to handle a new connection
+        """
+        # HCI interface now connected
+        if self.__conn_state == HCIConnectionState.INITIATING:
+            # Connection is now established
+            self.__conn_state = HCIConnectionState.ESTABLISHED
+            self._connected = True
+            if handle not in self._active_handles:
+                self._active_handles.append(handle)
+            else:
+                logger.warning("[%s] Connection event received with existing handle %d",
+                               self.interface, handle)
+        else:
+            logger.debug("[%s] Unexpected connection event (handle:%d, current state:%d)",
+                         self.interface, handle, self.__conn_state)
+            logger.warning("[%s] Received an expected connection event", self.interface)
+
+    def on_connection_terminated(self, handle: int = 0):
+        """Callback method to handle connection termination
+
+        :param handle: Connection handle
+        :type handle: int
+        """
+        if self.__conn_state == HCIConnectionState.ESTABLISHED:
+            # Connection is now terminated
+            self.__conn_state = HCIConnectionState.DISCONNECTED
+            self._connected = False
+
+            # Remove handle from active handles
+            if handle in self._active_handles:
+                self._active_handles.remove(handle)
+            else:
+                logger.warning("[%s] Disconnect event received for unknown handle %d",
+                               self.interface, handle)
 
     def _on_whad_ble_periph_mode(self, message):
         logger.debug("whad ble periph mode message")
@@ -1357,7 +1435,11 @@ class HCIDevice(VirtualDevice):
                 return
         self._send_whad_command_result(CommandResult.ERROR)
 
-    def _on_whad_ble_start(self, message):
+    def _on_whad_ble_start(self, _):
+        """Enable the current active mode.
+
+        Configure the HCI interface based on selected mode.
+        """
         logger.info("whad internal state: %d", self.__internal_state)
         if self.__internal_state == HCIInternalState.SCANNING:
             self._set_scan_mode(True)
@@ -1378,11 +1460,17 @@ class HCIDevice(VirtualDevice):
             self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_stop(self, message):
+
+        # Stop any connection attempt, terminate established connection
+        self.terminate_connection()
+
+        # Process with requested mode
         if self.__internal_state == HCIInternalState.SCANNING:
             self._set_scan_mode(False)
             self.__internal_state = HCIInternalState.NONE
             self._send_whad_command_result(CommandResult.SUCCESS)
         elif self.__internal_state == HCIInternalState.CENTRAL:
+            # Update mode and return success
             self.__internal_state = HCIInternalState.NONE
             self._send_whad_command_result(CommandResult.SUCCESS)
         elif self.__internal_state == HCIInternalState.PERIPHERAL:
@@ -1393,38 +1481,46 @@ class HCIDevice(VirtualDevice):
             self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_send_pdu(self, message):
-        logger.debug("[%s] Received WHAD BLE send_pdu message", self.interface)
-        if ((self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE) or
-           (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
-            try:
-                hci_packets = self.__converter.process_message(message)
+        """Send a given PDU into the active connection
+        """
+        # Make sure we have an active connection
+        if self.__conn_state == HCIConnectionState.ESTABLISHED:
+            logger.debug("[%s] Received WHAD BLE send_pdu message", self.interface)
+            if ((self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE) or
+            (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
+                try:
+                    hci_packets = self.__converter.process_message(message)
 
-                if hci_packets is not None:
-                    logger.debug("[%s] sending HCI packets ...", self.interface)
+                    if hci_packets is not None:
+                        logger.debug("[%s] sending HCI packets ...", self.interface)
 
-                    self.__converter.lock()
-                    success = True
-                    for hci_packet in hci_packets:
-                        success = success and self._write_packet(hci_packet)
-                    self.__converter.unlock()
-                    logger.debug("[%s] HCI packet sending result: %s", self.interface, success)
-                    if success:
-                        logger.debug("[%s] send_pdu command succeeded.", self.interface)
-                        self._send_whad_command_result(CommandResult.SUCCESS)
-                    else:
-                        logger.debug("[%s] send_pdu command failed.", self.interface)
-                        self._send_whad_command_result(CommandResult.ERROR)
+                        self.__converter.lock()
+                        success = True
+                        for hci_packet in hci_packets:
+                            success = success and self._write_packet(hci_packet)
+                        self.__converter.unlock()
+                        logger.debug("[%s] HCI packet sending result: %s", self.interface, success)
+                        if success:
+                            logger.debug("[%s] send_pdu command succeeded.", self.interface)
+                            self._send_whad_command_result(CommandResult.SUCCESS)
+                        else:
+                            logger.debug("[%s] send_pdu command failed.", self.interface)
+                            self._send_whad_command_result(CommandResult.ERROR)
 
-                pending_messages = self.__converter.get_pending_messages()
-                for pending_message in pending_messages:
-                    self._send_whad_message(pending_message)
+                    pending_messages = self.__converter.get_pending_messages()
+                    for pending_message in pending_messages:
+                        self._send_whad_message(pending_message)
 
-            except WhadDeviceUnsupportedOperation:
-                logger.debug("Parameter error")
-                self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
+                except WhadDeviceUnsupportedOperation:
+                    logger.debug("Parameter error")
+                    self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
+            else:
+                # Wrong state, cannot send PDU
+                logger.debug("wrong state or packet direction.")
+                self._send_whad_command_result(CommandResult.ERROR)
         else:
-            # Wrong state, cannot send PDU
-            logger.debug("wrong state or packet direction.")
+            # Not connected
+            logger.debug("[%s] Cannot send PDU: no connection.", self.interface)
             self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_set_bd_addr(self, message):

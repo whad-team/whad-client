@@ -15,6 +15,13 @@ class HCIInternalState(IntEnum):
     CENTRAL = 2
     PERIPHERAL = 3
 
+class HCIConnectionState(IntEnum):
+    """Host/controller interface connection state
+    """
+    DISCONNECTED = 0
+    INITIATING = 1
+    ESTABLISHED = 2
+
 LE_STATES = {
     0 : ("Non-connectable Advertising State", 0 ,
          [Commands.Start, Commands.Stop, Commands.AdvMode, Commands.SetAdvData]
