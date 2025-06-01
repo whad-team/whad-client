@@ -185,7 +185,12 @@ class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
 
         Clean description as it may contain null chars.
         """
-        desc = self.__description[:self.__description.index('\x00')]
+        # End string at the first null char encountered
+        if '\x00' in self.__description:
+            desc = self.__description[:self.__description.index('\x00')]
+        else:
+            desc = self.__description
+
         return f"{super().name}, '{desc}'"
 
     @staticmethod
