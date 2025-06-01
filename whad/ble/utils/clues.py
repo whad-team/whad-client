@@ -2,7 +2,12 @@
 """
 import json
 import os.path
-from importlib import resources
+
+try:
+    # For python < 3.9
+    import importlib_resources as resources
+except ImportError:
+    from importlib import resources
 
 from whad.ble.profile.attribute import UUID
 
