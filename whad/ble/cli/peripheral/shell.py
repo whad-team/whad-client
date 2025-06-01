@@ -1026,7 +1026,7 @@ class BlePeriphShell(InteractiveShell):
             try:
                 handle = int(args[0].lower(), 16)
             except ValueError:
-                self.error("Wrong handle: {args[0]}")
+                self.error(f"Wrong handle: {args[0]}")
                 return
         else:
             try:
@@ -1035,7 +1035,7 @@ class BlePeriphShell(InteractiveShell):
                 try:
                     handle = UUID(args[0].replace("-",''))
                 except Exception:
-                    self.error("Wrong UUID: {args[0]}")
+                    self.error(f"Wrong UUID: {args[0]}")
                     return
 
         # Do we have hex data ?
