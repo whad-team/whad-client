@@ -121,7 +121,7 @@ class PacketReceived(PbMessageWrapper):
         if packet.metadata.rssi is not None:
             msg.rssi = packet.metadata.rssi
         if packet.metadata.timestamp is not None:
-            msg.timstamp = packet.metadata.timestamp
+            msg.timestamp = packet.metadata.timestamp
 
         return msg
 
