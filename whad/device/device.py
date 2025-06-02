@@ -795,6 +795,14 @@ class WhadDevice:
             self.__messages.put(message, block=True)
             logger.info("message added to default message queue")
 
+    def has_pending_messages(self) -> bool:
+        """Determine if the device has sent some messages.
+
+        :return: True if there are some messages awaiting for processing, False otherwise
+        :rtype: bool
+        """
+        return not self.__messages.empty()
+
     def process_messages(self, timeout=1.0) -> bool:
         """Process pending messages
         """
