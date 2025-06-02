@@ -73,6 +73,7 @@ class UnixSocketDevice(WhadDevice):
         self.__fileno = None
         self.__socket = None
         self.__opened = False
+        self.__stalled = False
 
     @property
     def identifier(self):
@@ -154,6 +155,7 @@ class UnixSocketDevice(WhadDevice):
         and message parsing and dispatch.
         """
         try:
+            # If not opened, device is not ready
             if not self.__opened:
                 raise WhadDeviceNotReady()
 
@@ -174,8 +176,19 @@ class UnixSocketDevice(WhadDevice):
                 if len(data) > 0:
                     self.on_data_received(data)
                 else:
-                    logger.debug('No data received from device')
-                    raise WhadDeviceDisconnected()
+                    # Unix socket client is stalled if we have pending messages
+                    if not self.has_pending_messages():
+                        # If no pending message then consider the socket disconnected
+                        logger.debug("[%s] Socket closed by remote peer.",
+                                     self.interface)
+                        raise WhadDeviceDisconnected()
+                    elif not self.__stalled:
+                        logger.debug((
+                            "[%s] There are pending messages awaiting "
+                            "for processing, consider unix socket stalled."),
+                            self.interface)
+                        self.__stalled = True
+
             elif len(errors) > 0:
                 raise WhadDeviceDisconnected()
         except ConnectionResetError:
@@ -428,8 +441,18 @@ class UnixConnector(WhadDeviceConnector):
             #Create a dummy connector.
             super().__init__(device)
 
-        # Open device
-        device.open()
+        # Open device if not already opened
+        if not device.opened:
+            # Unix socket server has already sent some messages but is now
+            # closed, the previous tool must have finished earlier. We don't
+            # need to open the socket again (it would fail) but simply consider
+            # it open in order to process messages.
+            if device.has_pending_messages():
+                logger.debug("[%s] Unix socket has sent messages and closed.",
+                             device.interface)
+            else:
+                # Open socket if no pending message
+                device.open()
 
     def on_discovery_msg(self, message):
         pass
