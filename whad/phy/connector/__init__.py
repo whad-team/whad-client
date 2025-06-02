@@ -1,3 +1,7 @@
+from typing import Union, Tuple
+
+from scapy.packet import Packet
+
 from whad.hub.discovery import Domain, Capability
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter
@@ -49,12 +53,11 @@ class Phy(WhadDeviceConnector):
         self.__physical_layer = None
 
         # Configurations
-        self.__configured_datarate = False
-        self.__configured_endianness = False
-        self.__configured_frequency = False
-        self.__configured_syncword = False
-        self.__configured_packetsize = False
-        self.__configured_modulation = False
+        self.__datarate = None
+        self.__endianness = None
+        self.__frequency = None
+        self.__syncword = None
+        self.__modulation = None
 
         # Open device and make sure it is compatible
         self.device.open()
@@ -70,13 +73,21 @@ class Phy(WhadDeviceConnector):
             self.__ready = True
 
 
-    def format(self, packet):
+    def format(self, packet: Union[Packet, bytes]) -> Tuple[Packet, int]:
         """
         Format a packet for PCAP export.
         """
+        # Convert bytes into packet, if required
         if isinstance(packet, bytes):
             packet = Phy_Packet(packet)
-        packet.metadata = PhyMetadata(syncword=b"")
+        
+            # Save current parameters as metadata
+            packet.metadata = PhyMetadata(
+                syncword=self.__syncword, frequency=self.__frequency, 
+                endianness=self.__endianness, datarate=self.__datarate, 
+                modulation=self.__modulation)
+            
+        # Process packet through WHAD's hub PHY formatter
         return self.hub.phy.format(packet)
 
     def close(self):
@@ -372,7 +383,7 @@ class Phy(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
         if success:
-            self.__configured_datarate = True
+            self.__datarate = rate
         return success
 
     def can_set_endianness(self):
@@ -395,7 +406,7 @@ class Phy(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
         if success:
-            self.__configured_endianness = True
+            self.__endianness = endianness
         return success
 
     def can_send(self):
@@ -448,10 +459,7 @@ class Phy(WhadDeviceConnector):
         msg = self.hub.phy.create_set_packet_size(size)
 
         resp = self.send_command(msg, message_filter(CommandResult))
-        success = isinstance(resp, Success)
-        if success:
-            self.__configured_packetsize = True
-        return success
+        return isinstance(resp, Success)
 
     def can_set_sync_word(self):
         """
@@ -474,7 +482,7 @@ class Phy(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter(CommandResult))
         success = isinstance(resp, Success)
         if success:
-            self.__configured_syncword = True
+            self.__syncword = sync_word
         return success
 
     def can_sniff(self):
