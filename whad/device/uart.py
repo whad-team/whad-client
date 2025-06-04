@@ -263,7 +263,6 @@ class Uart(Interface):
 
             # Feed our IO thread with received data
             return data
-
         # Nothing to read
         return None
 
