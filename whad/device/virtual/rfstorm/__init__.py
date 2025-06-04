@@ -602,9 +602,14 @@ class RFStormDevice(VirtualDevice):
                 sync = bytes([swap_bits(i) for i in self.__phy_sync])[::-1]
             else:
                 sync = self.__phy_sync
+
+            # Set channel
+            success_chan = self._rfstorm_set_channel(self.__channel)
+
+            # Enable promiscuous mode
             success = self._rfstorm_generic_promiscuous_mode(prefix=sync, rate=self.__phy_rate,
                                                              payload_length=self.__phy_size)
-            if success:
+            if success and success_chan:
                 self.__opened_stream = True
                 self._send_whad_command_result(CommandResult.SUCCESS)
             else:
