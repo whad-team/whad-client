@@ -1,6 +1,6 @@
 """WHAD protocol message abstraction
 """
-from typing import Any
+from typing import Any, Callable
 from whad.protocol.whad_pb2 import Message
 from whad.hub.registry import Registry
 
@@ -82,12 +82,49 @@ class HubMessage(object):
     """
 
     def __init__(self,  message: Message = None):
+        # Allocate a new Protobuf message structure if required
         if message is None:
             self.__msg = Message()
         else:
             self.__msg = message
+        
+        # Optional callback method to call when message has been sent
+        self.__callback = None
 
-    def serialize(self):
+    def callback(self, cb: Callable["HubMessage", int]):
+        """Attach a callback to be notified when message is sent, or if an error
+        occured.
+
+        :param handler: Callback function to call when message is sent or if an error
+                        occured.
+        :type handler: callable
+        """
+        self.__callback = cb
+
+    def has_callback(self) -> bool:
+        """Determine if message has a callback set.
+        """
+        return self.__callback is not None
+
+    def sent(self):
+        """Notify a successful message transmission.
+        """
+        if self.__callback is not None:
+            self.__callback(self, 0)
+
+    def error(self, error: int):
+        """Notify an error while sending message.
+
+        :param error: Error code
+        :type error: int
+        """
+        assert error > 0
+        if self.__callback is not None:
+            self.__callback(self, error)
+
+    def serialize(self) -> bytes:
+        """Serialize hub message.
+        """
         return self.__msg.SerializeToString()
 
     def set_field_value(self, field: PbField, value):
@@ -135,6 +172,8 @@ class HubMessage(object):
 
     @property
     def message(self):
+        """Underlying protobuf message
+        """
         return self.__msg
 
 
