@@ -2,7 +2,8 @@
 """
 import struct
 import logging
-from typing import Any, Optional
+
+from typing import Any, Callable
 from abc import abstractmethod
 
 from scapy.packet import Packet
@@ -142,16 +143,48 @@ class HubMessage(object):
     """
 
     def __init__(self,  message: Message = None):
+        # Allocate a new Protobuf message structure if required
         if message is None:
             self.__msg = Message()
         else:
             self.__msg = message
+        
+        # Optional callback method to call when message has been sent
+        self.__callback = None
+
+    def callback(self, cb: Callable["HubMessage", int]):
+        """Attach a callback to be notified when message is sent, or if an error
+        occured.
+
+        :param handler: Callback function to call when message is sent or if an error
+                        occured.
+        :type handler: callable
+        """
+        self.__callback = cb
+
+    def has_callback(self) -> bool:
+        """Determine if message has a callback set.
+        """
+        return self.__callback is not None
+
+    def sent(self):
+        """Notify a successful message transmission.
+        """
+        if self.__callback is not None:
+            self.__callback(self, 0)
+
+    def error(self, error: int):
+        """Notify an error while sending message.
+
+        :param error: Error code
+        :type error: int
+        """
+        assert error > 0
+        if self.__callback is not None:
+            self.__callback(self, error)
 
     def serialize(self) -> bytes:
         """Serialize hub message.
-
-        :return: Serialized message
-        :rtype: bytes
         """
         return self.__msg.SerializeToString()
 
@@ -200,6 +233,8 @@ class HubMessage(object):
 
     @property
     def message(self):
+        """Underlying protobuf message
+        """
         return self.__msg
 
 
