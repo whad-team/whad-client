@@ -4,13 +4,14 @@ This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
 import logging
+
 from prompt_toolkit import print_formatted_text, HTML
 
 from whad.cli.app import CommandLineApp, run_app
 from whad.device.tcp import TCPSocketConnector
+from whad.device.websocket import WebSocketConnector
 
 logger = logging.getLogger(__name__)
-
 
 class WhadServerApp(CommandLineApp):
     """Main wserver CLI application class.
@@ -23,6 +24,26 @@ class WhadServerApp(CommandLineApp):
             description="WHAD server tool",
             interface=True,
             commands=False
+        )
+
+        self.add_argument(
+            '--websocket',
+            '--ws',
+            '-w',
+            action='store_true',
+            dest='websocket',
+            default=False,
+            help="Enable websocket mode."
+        )
+
+
+        self.add_argument(
+            '-j',
+            '--json',
+            action='store_true',
+            dest='json',
+            default=False,
+            help="Export as JSON (websocket mode only)"
         )
 
         self.add_argument(
@@ -48,7 +69,7 @@ class WhadServerApp(CommandLineApp):
         self.port = None
         self.server = None
 
-    def run(self):
+    def run(self, pre: bool = True, post: bool = True):
         """CLI application main routine.
         """
         try:
@@ -87,9 +108,16 @@ class WhadServerApp(CommandLineApp):
             f"<ansicyan>[i] Device proxy running on {self.address}:{self.port} </ansicyan>"
         ))
 
-        # Setup a TCP server and await connections.
-        self.server = TCPSocketConnector(device, self.address, self.port)
-        self.server.serve()
+        if self.args.websocket:
+            logger.debug("[wserver] Uses websocket mode")
+            self.server = WebSocketConnector(device, self.address, self.port,
+                                             json_mode = self.args.json)
+            self.server.serve()
+        else:
+            logger.debug("[wserver] Uses default TCP mode")
+            # Setup a TCP server and await connections.
+            self.server = TCPSocketConnector(device, self.address, self.port)
+            self.server.serve()
 
 def wserver_main():
     """Launcher for wserver.
