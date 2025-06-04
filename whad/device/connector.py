@@ -5,14 +5,18 @@ This module provides a default connector class `WhadDeviceConnector` that
 implements all the basic features of a device connector.
 """
 import logging
+import contextlib
 from queue import Queue, Empty
-from threading import Lock
+from threading import Thread, Lock
+from typing import Generator, Any, Callable, Union, List
 
 from whad.helpers import message_filter
 from whad.hub import ProtocolHub
+from whad.hub.message import AbstractPacket, AbstractEvent
 from whad.hub.generic.cmdresult import CommandResult, Success
 from whad.exceptions import WhadDeviceError, WhadDeviceDisconnected, \
-    RequiredImplementation
+    RequiredImplementation, UnsupportedDomain
+from whad.device.iface import Interface, IfaceEvt, Disconnected, MessageReceived
 
 logger = logging.getLogger(__name__)
 
@@ -475,3 +479,176 @@ class LockedConnector(WhadDeviceConnector):
         # and could be later retrieved when connector is unlocked.
         self.set_device(device)
         device.set_connector(self)
+
+
+class ConnIoThread(Thread):
+    """Connector's background thread processing events from interface
+    """
+    def __init__(self, connector):
+        super().__init__()
+        self.__connector = connector
+        self.__canceled = False
+        self.daemon = True
+
+    def cancel(self):
+        """Cancel IO thread"""
+        self.__canceled = True
+
+    def run(self):
+        """Main task.
+        """
+        while not self.__canceled:
+            try:
+                # Retrieve pending event
+                with self.__connector.get_event(timeout=1.0) as evt:
+                    # If event is a disconnection event, notify connector
+                    if isinstance(evt, Disconnected):
+                        self.__connector.on_disconnection()
+                    # If event is a notification of a message
+                    elif isinstance(evt, MessageReceived):
+                        # Let connector process this message
+                        self.__connector.dispatch_message(evt.message)
+            except Empty:
+                pass
+
+class Event:
+    """Generic connector event class.
+    """
+
+class Connector(WhadDeviceConnector):
+    """New implementation that differs a bit from the previous one, using
+    message queues.
+    """
+
+    def __init__(self, iface: Interface):
+        """Initialization
+        """
+        super().__init__(iface)
+
+        # Queue holding events coming from our interface
+        self.__events = Queue()
+
+        # Create a background thread for message processing
+        self.__io_thread = ConnIoThread(self)
+        self.__io_thread.start()
+
+        # Event listeners
+        self.__listeners = []
+
+    def send_event(self, event):
+        """Send an event into the connector event queue.
+        """
+        self.__events.put(event)
+
+    def add_listener(self, listener: Callable[..., None],event_cls: Union[List[Event],
+                                                                    Event] = None):
+        """Add a connector event listener with optional event filter.
+
+        :param listener: callable to handle events
+        :type listener: callable
+        :param event_cls: List of event classes or single event class to match
+        :type event_cls: list, ConnectorEvent, optional
+        """
+        if event_cls is not None:
+            events = event_cls if isinstance(event_cls, list) else [event_cls]
+        else:
+            events = None
+        self.__listeners.append((listener, events))
+
+    def remove_listener(self, listener: Callable[..., None]) -> bool:
+        """Remove listener from registered listeners.
+        """
+        # Find one or more entries related to the given listener
+        items = set(filter(lambda x: x[0] == listener, self.__listeners))
+
+        # Nothing found, return False
+        if len(items) == 0:
+            return False
+
+        # Remove found entries.
+        for item in items:
+            self.__listeners.remove(item)
+
+        # Success
+        return True
+    
+    def clear_listeners(self):
+        """Clear listeners.
+        """
+        self.__listeners = []
+
+    def notify(self, event: Event):
+        """Notify listeners of a specific event.
+        """
+        for listener, events in self.__listeners:
+            if events is None:
+                listener(event)
+            elif event.__class__ in events:
+                listener(event)
+
+    @contextlib.contextmanager
+    def get_event(self, timeout: float = None) -> Generator[IfaceEvt, None, None]:
+        """Retrieve event from connector's event queue.
+        """
+        try:
+            yield self.__events.get(timeout=timeout)
+        except Empty as err:
+            raise err
+        else:
+            self.__events.task_done()
+
+    def dispatch_message(self, message):
+        """Dispatch message to the connector's handlers.
+
+        This method may trigger specific message processing in inherited
+        connector's classes as well as attached protocol stacks. Since it
+        is only called by the connector's I/O thread, that's pretty safe.
+        """
+        # Forward message to our any message handler
+        self.on_any_msg(message)
+
+        # If message is of type "discovery", forward to our discovery
+        # handler
+        if message.message_type == "discovery":
+            logger.info("message is about device discovery, forwarding to discovery handler")
+            self.on_discovery_msg(message)
+        elif message.message_type == "generic":
+            # Handle generic result message
+            if isinstance(message, CommandResult):
+                if message.result_code == CommandResult.UNSUPPORTED_DOMAIN:
+                    logger.error("domain not supported by this device")
+                    raise UnsupportedDomain("")
+
+            # Forward to generic message handler
+            logger.info("message is generic, forwarding to default handler")
+            self.on_generic_msg(message)
+        else:
+            domain = message.message_type
+            if domain is not None:
+                # Check if message is a received packet
+                if issubclass(message, AbstractPacket):
+                    # If connector is locked, save message into locked pdus
+                    if self.is_locked():
+                        self.add_locked_pdu(message)
+                    else:
+                        # Convert message into packet
+                        packet = message.to_packet()
+                        if packet is not None:
+                            self.monitor_packet_rx(packet)
+                            if self.is_synchronous():
+                                self.add_pending_packet(message)
+                            else:
+                                self.on_packet(packet)
+                # Check if message is a received event
+                elif issubclass(message, AbstractEvent):
+                    # Convert message into event
+                    event = message.to_event()
+                    if event is not None:
+                        # Forward to our connector
+                        self.on_event(event)
+
+                # Other messages go to on_domain_msg
+                else:
+                    logger.info("message concerns domain `%s`, forward to domain-specific handler",
+                                domain)
+                    self.on_domain_msg(domain, message)
