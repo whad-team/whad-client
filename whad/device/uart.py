@@ -1,4 +1,4 @@
-"""This module provides a UartDevice class that can be used with a WhadDeviceConnector
+"""This module provides a UartIface class that can be used with a WhadDeviceConnector
 to interact with a WHAD-enable firmware device that uses UART as its transport layer.
 
 This class handles device connection, disconnection and read/write operations. All the
@@ -14,7 +14,7 @@ from queue import Empty
 from serial import Serial
 from serial.tools.list_ports import comports
 
-from whad.device import WhadDevice
+from whad.device.iface import Interface
 from whad.exceptions import WhadDeviceNotReady, WhadDeviceError
 from whad.helpers import message_filter
 from whad.exceptions import WhadDeviceNotFound
@@ -59,9 +59,9 @@ def is_device_supported(vid, pid, manufacturer, product):
     # Device is not supported.
     return False
 
-class UartDevice(WhadDevice):
+class UartIface(Interface):
     """
-    UartDevice device class.
+    UartIface device class.
     """
     INTERFACE_NAME = "uart"
 
@@ -78,7 +78,7 @@ class UartDevice(WhadDevice):
         for uart_dev in comports():
             if is_device_supported(uart_dev.vid, uart_dev.pid, uart_dev.manufacturer,
                                    uart_dev.product):
-                dev = UartDevice(uart_dev.device, baudrate=115200)
+                dev = UartIface(uart_dev.device, baudrate=115200)
                 devices.append(dev)
         return devices
 
@@ -170,7 +170,7 @@ class UartDevice(WhadDevice):
                     1.0,
                     message_filter(DeviceReady)
                 )
-                self.dispatch_message(msg)
+                self.put_message(msg)
             except Empty:
                 # Use the classic way to reset device (RTS-based reset failed)
                 msg = self.hub.discovery.create_reset_query()
@@ -201,12 +201,12 @@ class UartDevice(WhadDevice):
         self.__fileno = None
         self.__opened = False
 
-    def write(self, data):
-        """Writes data to the device. It relies on select() in order to make sure
+    def write(self, payload):
+        """Writes payload to the device. It relies on select() in order to make sure
         we are allowed to write to the device and wait without eating too much CPU
         if the device is not ready to be written to.
 
-        :param bytes data: Data to write
+        :param bytes payload: Data to write
         :returns: number of bytes written to the device
         """
         try:
@@ -223,7 +223,7 @@ class UartDevice(WhadDevice):
             )
 
             if len(writers) > 0:
-                nb_bytes_written = os.write(self.__fileno, data)
+                nb_bytes_written = os.write(self.__fileno, payload)
             return nb_bytes_written
         except OSError as os_error:
             raise WhadDeviceError("Sending data to WHAD device failed.") from os_error
@@ -262,7 +262,10 @@ class UartDevice(WhadDevice):
                 raise WhadDeviceNotReady()
 
             # Feed our IO thread with received data
-            self.on_data_received(data)
+            return data
+        
+        # Nothing to read
+        return None
 
     def change_transport_speed(self, speed):
         """Set UART speed for true serial devices. CDC ACM devices will ignore
