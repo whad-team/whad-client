@@ -26,6 +26,15 @@ class WhadServerApp(CommandLineApp):
             commands=False
         )
 
+        self.add_argument(
+            '--websocket',
+            '--ws',
+            '-w',
+            action='store_true',
+            dest='websocket',
+            default=False,
+            help="Enable websocket mode."
+        )
 
 
         self.add_argument(
@@ -34,7 +43,7 @@ class WhadServerApp(CommandLineApp):
             action='store_true',
             dest='json',
             default=False,
-            help="Save as JSON"
+            help="Export as JSON (websocket mode only)"
         )
 
         self.add_argument(
@@ -99,11 +108,13 @@ class WhadServerApp(CommandLineApp):
             f"<ansicyan>[i] Device proxy running on {self.address}:{self.port} </ansicyan>"
         ))
 
-        if self.args.json:
+        if self.args.websocket:
+            logger.debug("[wserver] Uses websocket mode")
             self.server = WebSocketConnector(device, self.address, self.port,
                                              json_mode = self.args.json)
             self.server.serve()
         else:
+            logger.debug("[wserver] Uses default TCP mode")
             # Setup a TCP server and await connections.
             self.server = TCPSocketConnector(device, self.address, self.port)
             self.server.serve()
