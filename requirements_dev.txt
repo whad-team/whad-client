@@ -8,4 +8,4 @@ pytest-cov==2.12.1
 pycryptodomex==3.11.0
 pyusb==1.2.1
 cryptography==36.0.0
-websockets==11.0.3
+websockets>=11.0.3
