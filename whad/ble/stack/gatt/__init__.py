@@ -187,7 +187,7 @@ class GattLayer(Layer):
                 logger.debug('Connection lost')
                 raise ConnectionLostException(None)
             try:
-                msg = self.__queue.get(block=False,timeout=0.5)
+                msg = self.__queue.get(block=True,timeout=timeout/10.0)
                 if isinstance(msg, message_clazz) or isinstance(msg, GattErrorResponse):
                     return msg
             except Empty:
