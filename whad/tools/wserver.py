@@ -4,18 +4,14 @@ This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
 import logging
+
 from prompt_toolkit import print_formatted_text, HTML
 
 from whad.cli.app import CommandLineApp, run_app
 from whad.device.tcp import TCPSocketConnector
-from whad.common.converters.scapy import ScapyConverter
-from pprint import pprint 
-
-logger = logging.getLogger(__name__)
-
 from whad.device.websocket import WebSocketConnector
 
-
+logger = logging.getLogger(__name__)
 
 class WhadServerApp(CommandLineApp):
     """Main wserver CLI application class.
@@ -64,7 +60,7 @@ class WhadServerApp(CommandLineApp):
         self.port = None
         self.server = None
 
-    def run(self):
+    def run(self, pre: bool = True, post: bool = True):
         """CLI application main routine.
         """
         try:
@@ -104,9 +100,9 @@ class WhadServerApp(CommandLineApp):
         ))
 
         if self.args.json:
-            self.server = WebSocketConnector(device, self.address, self.port, json_mode = self.args.json)
+            self.server = WebSocketConnector(device, self.address, self.port,
+                                             json_mode = self.args.json)
             self.server.serve()
-            
         else:
             # Setup a TCP server and await connections.
             self.server = TCPSocketConnector(device, self.address, self.port)
