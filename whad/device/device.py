@@ -5,6 +5,7 @@ This module provides multiple classes to handle WHAD device communication,
 including background threads.
 """
 import logging
+import struct
 from binascii import hexlify
 from time import time, sleep
 from queue import Queue, Empty
@@ -1083,20 +1084,23 @@ class WhadDevice:
         """Process packet message
         """
         # Convert message into packet
-        packet = message.to_packet()
-        if packet is not None:
+        try:
+            packet = message.to_packet()
+            if packet is not None:
 
-            # Report packet to monitors
-            self.__connector.monitor_packet_rx(packet)
+                # Report packet to monitors
+                self.__connector.monitor_packet_rx(packet)
 
-            # Forward to our connector
-            if self.__connector.is_synchronous():
-                # If we are in synchronous mode, add packet as pending
-                self.__connector.add_pending_packet(packet)
-            else:
-                #logger.debug("[WhadDevice] on_domain_msg() for device %s: %s",
-                #             self.interface, message)
-                self.__connector.on_packet(packet)
+                # Forward to our connector
+                if self.__connector.is_synchronous():
+                    # If we are in synchronous mode, add packet as pending
+                    self.__connector.add_pending_packet(packet)
+                else:
+                    #logger.debug("[WhadDevice] on_domain_msg() for device %s: %s",
+                    #             self.interface, message)
+                    self.__connector.on_packet(packet)
+        except struct.error:
+            logger.debug("received malformed packet !")
 
 class VirtualDevice(WhadDevice):
     """
