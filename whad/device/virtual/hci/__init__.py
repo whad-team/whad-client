@@ -822,7 +822,6 @@ class HCIDevice(VirtualDevice):
                 self.write_connect_accept_timeout() and
                 self.write_device_class() and
                 self._set_event_mask(b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d") and
-                self.write_default_link_policy_settings() and
                 self._le_set_event_mask(mask=b'\xff\xff\xff\xff\x03') and
                 self._le_read_buffer_size() and
                 self._read_bd_address() and
