@@ -76,7 +76,8 @@ class Scanner(ESB):
             message = self.wait_for_message(filter=message_filter(message_type))
             if issubclass(message, AbstractPacket):
                 packet = message.to_packet()
-                yield packet
+                if packet is not None:
+                    yield packet
 
 
     def discover_devices(self, minimal_rssi = None, filter_address = None) -> Iterator[CommunicatingDevice]:

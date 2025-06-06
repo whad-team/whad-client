@@ -44,11 +44,12 @@ class WhadAnalyzePipe(Bridge):
         """
         if hasattr(message, "to_packet"):
             pkt = message.to_packet()
-            pkts = self.processing_function(pkt, piped=True)
-            if pkts is not None:
-                for forwarded in pkts:
-                    msg = message.from_packet(forwarded)
-                    super().on_outbound(msg)
+            if pkt is not None:
+                pkts = self.processing_function(pkt, piped=True)
+                if pkts is not None:
+                    for forwarded in pkts:
+                        msg = message.from_packet(forwarded)
+                        super().on_outbound(msg)
         else:
             logger.debug("[wfilter][input-pipe] forward default outbound message %s", message)
             # Forward other messages

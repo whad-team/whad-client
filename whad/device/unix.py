@@ -751,10 +751,10 @@ class UnixSocketCallbacksConnector(UnixSocketConnector):
 
             if isinstance(message, AbstractPacket):
                 pkt = message.to_packet()
-                pkt = on_rx_packet(pkt)
                 if pkt is None:
                     msg = None
                 else:
+                    pkt = on_rx_packet(pkt)
                     msg = msg.from_packet(pkt)
 
         if msg is not None:

@@ -94,8 +94,9 @@ class Sniffer(Dot15d4, EventsManager):
                 message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
                 if message is not None:
                     packet = message.to_packet()
-                    self.monitor_packet_rx(packet)
-                    yield packet
+                    if packet is not None:
+                        self.monitor_packet_rx(packet)
+                        yield packet
 
                 # Check if timeout has been reached (if provided)
                 if timeout is not None:

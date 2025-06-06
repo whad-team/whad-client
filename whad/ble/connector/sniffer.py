@@ -351,8 +351,9 @@ class Sniffer(BLE, EventsManager):
                                                             timeout=0.1)
                             if message is not None:
                                 packet = message.to_packet()
-                                self.monitor_packet_rx(packet)
-                                yield packet
+                                if packet is not None:
+                                    self.monitor_packet_rx(packet)
+                                    yield packet
 
                 else:
                     if self.support_raw_pdu():
@@ -366,9 +367,10 @@ class Sniffer(BLE, EventsManager):
                                                     timeout=0.1)
                     if message is not None:
                         packet = message.to_packet()
-                        packet = self.process_packet(packet)
-                        self.monitor_packet_rx(packet)
-                        yield packet
+                        if packet is not None:
+                            packet = self.process_packet(packet)
+                            self.monitor_packet_rx(packet)
+                            yield packet
 
                 # Check if timeout has been reached
                 if timeout is not None:

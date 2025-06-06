@@ -134,12 +134,13 @@ class Scanner(BLE):
             if message is not None:
                 # Convert message from rebuilt PDU
                 packet = message.to_packet()
-                self.monitor_packet_rx(packet)
-                # Force TxAdd value to propagate the address type
-                if isinstance(message, BleAdvPduReceived):
-                    if message.addr_type > 0:
-                        packet.getlayer(BTLE_ADV).TxAdd = 1
-                yield packet
+                if packet is not None:
+                    self.monitor_packet_rx(packet)
+                    # Force TxAdd value to propagate the address type
+                    if isinstance(message, BleAdvPduReceived):
+                        if message.addr_type > 0:
+                            packet.getlayer(BTLE_ADV).TxAdd = 1
+                    yield packet
 
             if timeout is not None and time() - start_time > timeout:
                 break
