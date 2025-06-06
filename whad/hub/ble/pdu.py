@@ -8,7 +8,7 @@ from whad.hub.message import AbstractPacket
 from whad.hub.ble import Direction, AdvType, AddressType, BDAddress, BLEMetadata
 
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
-    PbFieldBool
+    PbFieldBool, dissect_failsafe
 from whad.hub.ble import BleDomain, AdvType
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
     BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
@@ -30,7 +30,7 @@ def packet_to_bytes(packet):
     """
     try:
         return raw(packet)
-    except TypeError as type_err:
+    except TypeError:
         return bytes(packet.__bytes__())
 
 # correlation table
@@ -69,6 +69,7 @@ class SendBleRawPdu(PbMessageWrapper):
     crc = PbFieldInt("ble.send_raw_pdu.crc")
     encrypt = PbFieldBool("ble.send_raw_pdu.encrypt")
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message to the corresponding Scapy packet
         """
@@ -119,6 +120,7 @@ class SendBlePdu(PbMessageWrapper):
     pdu = PbFieldBytes("ble.send_pdu.pdu")
     encrypt = PbFieldBool("ble.send_pdu.encrypt")
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message to the corresponding Scapy packet
         """
@@ -170,7 +172,7 @@ class BleAdvPduReceived(PbMessageWrapper):
     adv_data = PbFieldBytes("ble.adv_pdu.adv_data")
     addr_type = PbFieldInt("ble.adv_pdu.addr_type")
 
-
+    @dissect_failsafe
     def to_packet(self):
         """Convert message into its corresponding Scapy packet
         """
@@ -228,6 +230,7 @@ class BlePduReceived(PbMessageWrapper):
     processed = PbFieldBool("ble.pdu.processed")
     decrypted = PbFieldBool("ble.pdu.decrypted")
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message into its corresponding Scapy packet
         """
@@ -270,6 +273,7 @@ class BleRawPduReceived(PbMessageWrapper):
     processed = PbFieldBool("ble.raw_pdu.processed")
     decrypted = PbFieldBool("ble.raw_pdu.decrypted")
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message into its corresponding Scapy packet
         """

@@ -1,8 +1,68 @@
 """WHAD protocol message abstraction
 """
-from typing import Any
+import struct
+import logging
+from typing import Any, Optional
+from abc import abstractmethod
+
+from scapy.packet import Packet
+
 from whad.protocol.whad_pb2 import Message
 from whad.hub.registry import Registry
+
+def dissect_failsafe(f):
+    """Failsafe decorator for WHAD's Hub message classes that implement the
+    AbstractPacket class.
+    """
+    def _fail_wrapper(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except struct.error:
+            logger = logging.getLogger(f.__qualname__)
+            logger.debug("Parsing error while converting message %s to packet !", args[0])
+            return None
+    return _fail_wrapper
+
+class AbstractPacketMeta(type):
+    """Hub packet metaclass"""
+    def __instancecheck__(cls, instance):
+        return cls.__subclasscheck__(type(instance))
+
+    def __subclasscheck__(cls, subclass):
+        return (hasattr(subclass, 'to_packet') and
+                callable(subclass.to_packet) and
+                hasattr(subclass, 'from_packet') and
+                callable(subclass.from_packet))
+
+class AbstractPacket(metaclass=AbstractPacketMeta):
+    """Abstract packet class
+    """
+
+    @abstractmethod
+    def to_packet(self) -> Packet:
+        """Convert message to its corresponding packet representation.
+
+        :return: Corresponding Scapy representation
+        :rtype: Packets
+        """
+        return None
+
+class AbstractEventMeta(type):
+    """Hub event metaclass
+    """
+    def __instancecheck__(cls, instance: Any) -> bool:
+        return cls.__instancecheck__(type(instance))
+
+    def __subclasscheck__(cls, subclass):
+        return (hasattr(subclass, 'to_event') and
+                callable(subclass.to_event) and
+                hasattr(subclass, 'from_event') and
+                callable(subclass.from_event))
+
+class AbstractEvent(metaclass=AbstractEventMeta):
+    """Abstract event class.
+    """
+
 
 class PbField(object):
     """Protocol Buffers field model
@@ -87,7 +147,12 @@ class HubMessage(object):
         else:
             self.__msg = message
 
-    def serialize(self):
+    def serialize(self) -> bytes:
+        """Serialize hub message.
+
+        :return: Serialized message
+        :rtype: bytes
+        """
         return self.__msg.SerializeToString()
 
     def set_field_value(self, field: PbField, value):
@@ -234,32 +299,3 @@ class PbMessageWrapper(HubMessage):
         """Parse a generic protobuf message message.
         """
         return parent_class(message=message)
-
-class AbstractPacketMeta(type):
-    """Hub packet metaclass"""
-    def __instancecheck__(cls, instance):
-        return cls.__subclasscheck__(type(instance))
-
-    def __subclasscheck__(cls, subclass):
-        return (hasattr(subclass, 'to_packet') and
-                callable(subclass.to_packet) and
-                hasattr(subclass, 'from_packet') and
-                callable(subclass.from_packet))
-
-class AbstractPacket(metaclass=AbstractPacketMeta):
-    pass
-
-class AbstractEventMeta(type):
-    """Hub event metaclass
-    """
-    def __instancecheck__(cls, instance: Any) -> bool:
-        return cls.__instancecheck__(type(instance))
-
-    def __subclasscheck__(cls, subclass):
-        return (hasattr(subclass, 'to_event') and
-                callable(subclass.to_event) and
-                hasattr(subclass, 'from_event') and
-                callable(subclass.from_event))
-
-class AbstractEvent(metaclass=AbstractEventMeta):
-    pass
