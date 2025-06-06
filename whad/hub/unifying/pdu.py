@@ -2,7 +2,8 @@
 """
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
-from ..message import pb_bind, PbFieldBytes, PbFieldBool, PbFieldInt, PbMessageWrapper
+from ..message import pb_bind, PbFieldBytes, PbFieldBool, PbFieldInt, PbMessageWrapper, \
+    dissect_failsafe
 from whad.hub.message import AbstractPacket
 from . import UnifyingDomain, UnifyingMetadata
 
@@ -16,6 +17,7 @@ class SendPdu(PbMessageWrapper):
     pdu = PbFieldBytes('unifying.send.pdu')
     retr_count = PbFieldInt('unifying.send.retransmission_count')
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert SendPdu message to its scapy equivalent
         """
@@ -40,6 +42,7 @@ class SendRawPdu(PbMessageWrapper):
     pdu = PbFieldBytes('unifying.send_raw.pdu')
     retr_count = PbFieldInt('unifying.send_raw.retransmission_count')
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert SendPdu message to its scapy equivalent
         """
@@ -70,6 +73,7 @@ class PduReceived(PbMessageWrapper):
     crc_validity = PbFieldBool('unifying.pdu.crc_validity', optional=True)
     address = PbFieldBytes('unifying.pdu.address', optional=True)
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message to the corresponding scapy packet
         """
@@ -124,6 +128,7 @@ class RawPduReceived(PbMessageWrapper):
     crc_validity = PbFieldBool('unifying.raw_pdu.crc_validity', optional=True)
     address = PbFieldBytes('unifying.raw_pdu.address', optional=True)
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message to the corresponding scapy packet
         """

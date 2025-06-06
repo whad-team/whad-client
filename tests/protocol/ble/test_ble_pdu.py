@@ -3,6 +3,7 @@
 import pytest
 
 from whad.protocol.whad_pb2 import Message
+from whad.hub.message import AbstractPacket
 from whad.hub.ble import SendBleRawPdu, Direction, SendBlePdu, BleAdvPduReceived, \
     AdvType, AddressType, BlePduReceived, BleRawPduReceived, SetAdvData
 
@@ -137,9 +138,40 @@ def ble_adv_pdu():
     msg.ble.adv_pdu.addr_type = AddressType.PUBLIC
     return msg
 
+@pytest.fixture
+def ble_bad_adv_pdu():
+    """Create a bad ble_adv_pdu protocol buffer message
+
+    No BDADDRESS set, no advertising data.
+    """
+    msg = Message()
+    msg.ble.adv_pdu.adv_type = AdvType.ADV_IND
+    msg.ble.adv_pdu.rssi = -50
+    msg.ble.adv_pdu.addr_type = AddressType.PUBLIC
+    return msg
+
+
 class TestAdvPduReceived(object):
     """Test BleAdvPduReceived message parsing/crafting
     """
+
+    def test_adv_to_packet(self):
+        msg = Message()
+        msg.ble.adv_pdu.adv_type = AdvType.ADV_IND
+        msg.ble.adv_pdu.rssi = -50
+        msg.ble.adv_pdu.bd_address = b"FOO"
+        msg.ble.adv_pdu.adv_data = b""
+        msg.ble.adv_pdu.addr_type = AddressType.PUBLIC
+        parsed_obj = BleAdvPduReceived.parse(1, msg)
+        assert issubclass(parsed_obj, AbstractPacket)
+        pkt = parsed_obj.to_packet()
+        assert pkt is None
+
+    def test_parsing_error(self, ble_bad_adv_pdu):
+        """Check bad BleAdvPduReceived parsing
+        """
+        parsed_obj = BleAdvPduReceived.parse(1, ble_bad_adv_pdu)
+        assert parsed_obj
 
     def test_parsing(self, ble_adv_pdu):
         """Check BleAdvPduReceived parsing
@@ -181,10 +213,28 @@ def ble_pdu():
     msg.ble.pdu.decrypted = False
     return msg
 
+@pytest.fixture
+def bad_ble_pdu():
+    """Create a ble_pdu protocol buffer message
+    """
+    msg = Message()
+    msg.ble.pdu.direction = Direction.MASTER_TO_SLAVE
+    msg.ble.pdu.conn_handle = 1
+    msg.ble.pdu.pdu = b'\x03'
+    msg.ble.pdu.processed = False
+    msg.ble.pdu.decrypted = False
+    return msg
+
 class TestPduReceived(object):
     """Test PduReceived message parsing/crafting
     """
-    
+    def test_convert_to_packet_fail(self, bad_ble_pdu):
+        """Check bad BLE message conversion to packet
+        """
+        msg = BlePduReceived.parse(1, bad_ble_pdu)
+        assert issubclass(msg, AbstractPacket)
+        assert msg.to_packet() is None
+
     def test_parsing(self, ble_pdu):
         """Check BlePduReceived parsing
         """
