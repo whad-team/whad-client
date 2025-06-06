@@ -167,8 +167,9 @@ class Bridge:
             # Monitor packet if required
             if issubclass(message, AbstractPacket):
                 packet = message.to_packet()
-                self.__in.monitor_packet_rx(packet)
-                self.__out.monitor_packet_tx(packet)
+                if packet is not None:
+                    self.__in.monitor_packet_rx(packet)
+                    self.__out.monitor_packet_tx(packet)
 
             # Forward message
             self.__in.send_message(message)
@@ -186,8 +187,9 @@ class Bridge:
             # Monitor packet if required
             if issubclass(message, AbstractPacket):
                 packet = message.to_packet()
-                self.__out.monitor_packet_tx(packet)
-                self.__in.monitor_packet_rx(packet)
+                if packet is not None:
+                    self.__out.monitor_packet_tx(packet)
+                    self.__in.monitor_packet_rx(packet)
 
             self.__out.send_message(message)
 
@@ -203,13 +205,17 @@ class Bridge:
     def dispatch_pending_output(self, message):
         """Forward pending output messages to input.
         """
-        self.output.monitor_packet_rx(message.to_packet())
-        self.input.monitor_packet_tx(message.to_packet())
+        packet = message.to_packet()
+        if packet is not None:
+            self.output.monitor_packet_rx(packet)
+            self.input.monitor_packet_tx(packet)
         self.input.send_message(message)
 
     def dispatch_pending_input(self, message):
         """Forward pending input messages to output.
         """
-        self.output.monitor_packet_tx(message.to_packet())
-        self.input.monitor_packet_rx(message.to_packet())
+        packet = message.to_packet()
+        if packet is not None:
+            self.output.monitor_packet_tx(packet)
+            self.input.monitor_packet_rx(packet)
         self.output.send_message(message)

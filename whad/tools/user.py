@@ -30,10 +30,11 @@ class UserTransformPipe(Bridge):
         """
         if hasattr(message, "to_packet"):
             pkt = message.to_packet()
-            pkt = self.on_rx_packet(pkt)
             if pkt is not None:
-                msg = message.from_packet(pkt)
-                super().on_outbound(msg)
+                pkt = self.on_rx_packet(pkt)
+                if pkt is not None:
+                    msg = message.from_packet(pkt)
+                    super().on_outbound(msg)
         else:
             logger.debug(
                 '[user-transform][input-pipe] forward default outbound message %s',
@@ -51,10 +52,11 @@ class UserTransformPipe(Bridge):
         """
         if hasattr(message, "to_packet"):
             pkt = message.to_packet()
-            pkt = self.on_tx_packet(pkt)
             if pkt is not None:
-                msg = message.from_packet(pkt)
-                super().on_inbound(msg)
+                pkt = self.on_tx_packet(pkt)
+                if pkt is not None:
+                    msg = message.from_packet(pkt)
+                    super().on_inbound(msg)
         else:
             logger.debug(
                 '[user-transform][input-pipe] forward default inbound message %s',

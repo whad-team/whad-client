@@ -152,8 +152,9 @@ class Sniffer(ESB, EventsManager):
 
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
-                    self.monitor_packet_rx(packet)
-                    yield packet
+                    if packet is not None:
+                        self.monitor_packet_rx(packet)
+                        yield packet
 
         # Handle device disconnection
         except WhadDeviceDisconnected:
