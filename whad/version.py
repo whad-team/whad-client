@@ -6,7 +6,7 @@ ATTENTION: This version number must match the one in pyproject.toml !
 # Current version number
 VERSION_MAJOR = 1
 VERSION_MINOR = 2
-VERSION_REVISION = 7
+VERSION_REVISION = 8
 
 def get_version() -> str:
     """Return the current version of this package (WHAD).
