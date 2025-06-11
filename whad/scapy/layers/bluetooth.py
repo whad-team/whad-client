@@ -2,76 +2,9 @@ from scapy.packet import bind_layers, Packet
 from scapy.fields import BitField, LEShortField, ByteField, StrFixedLenField, \
     FlagsField, ByteEnumField, BitEnumField
 from scapy.layers.bluetooth import SM_Hdr, HCI_Event_LE_Meta, HCI_Command_Hdr, \
-    HCI_Event_Command_Complete, _bluetooth_error_codes, \
+    HCI_Event_Command_Complete, _bluetooth_features, _bluetooth_error_codes, \
     HCI_Cmd_Complete_LE_Read_White_List_Size
 
-
-_bluetooth_features = [
-    '3_slot_packets',
-    '5_slot_packets',
-    'encryption',
-    'slot_offset',
-    'timing_accuracy',
-    'role_switch',
-    'hold_mode',
-    'sniff_mode',
-    'park_mode',
-    'power_control_requests',
-    'channel_quality_driven_data_rate',
-    'sco_link',
-    'hv2_packets',
-    'hv3_packets',
-    'u_law_log_synchronous_data',
-    'a_law_log_synchronous_data',
-    'cvsd_synchronous_data',
-    'paging_parameter_negotiation',
-    'power_control',
-    'transparent_synchronous_data',
-    'flow_control_lag_4_bit0',
-    'flow_control_lag_4_bit1',
-    'flow_control_lag_4_bit2',
-    'broadband_encryption',
-    'cvsd_synchronous_data',
-    'edr_acl_2_mbps_mode',
-    'edr_acl_3_mbps_mode',
-    'enhanced_inquiry_scan',
-    'interlaced_inquiry_scan',
-    'interlaced_page_scan',
-    'rssi_with_inquiry_results',
-    'ev3_packets',
-    'ev4_packets',
-    'ev5_packets',
-    'reserved',
-    'afh_capable_slave',
-    'afh_classification_slave',
-    'br_edr_not_supported',
-    'le_supported_controller',
-    '3_slot_edr_acl_packets',
-    '5_slot_edr_acl_packets',
-    'sniff_subrating',
-    'pause_encryption',
-    'afh_capable_master',
-    'afh_classification_master',
-    'edr_esco_2_mbps_mode',
-    'edr_esco_3_mbps_mode',
-    '3_slot_edr_esco_packets',
-    'extended_inquiry_response',
-    'simultaneous_le_and_br_edr_to_same_device_capable_controller',
-    'reserved2',
-    'secure_simple_pairing',
-    'encapsulated_pdu',
-    'erroneous_data_reporting',
-    'non_flushable_packet_boundary_flag',
-    'reserved3',
-    'link_supervision_timeout_changed_event',
-    'inquiry_tx_power_level',
-    'enhanced_power_control',
-    'reserved4_bit0',
-    'reserved4_bit1',
-    'reserved4_bit2',
-    'reserved4_bit3',
-    'extended_features',
-]
 _bluetooth_supported_commands = [
     # Byte 0
     "inquiry",
@@ -725,7 +658,7 @@ class HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level(Packet):
 class HCI_Cmd_Write_Class_Of_Device(Packet):
     name = "Set Class of Device"
     fields_desc = [
-        FlagsField('major_service_classes', 0, -3, [
+        FlagsField('major_service_classes', 0, 11, [
             'limited_discoverable_mode',
             'le_audio',
             'reserved',
@@ -737,7 +670,7 @@ class HCI_Cmd_Write_Class_Of_Device(Packet):
             'audio',
             'telephony',
             'information'
-        ]),
+        ], tot_size=-3),
         BitEnumField('major_device_class', 0, 5, {
             0x00: 'miscellaneous',
             0x01: 'computer',

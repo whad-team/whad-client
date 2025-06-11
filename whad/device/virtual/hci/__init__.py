@@ -10,13 +10,13 @@ from threading import Lock
 # Scapy layers for HCI
 from scapy.layers.bluetooth import BluetoothSocketError, BluetoothUserSocket, \
     HCI_Hdr, HCI_Command_Hdr, HCI_Cmd_Reset, HCI_Cmd_Set_Event_Filter, \
-    HCI_Cmd_Set_Event_Mask, HCI_Cmd_LE_Host_Supported, \
+    HCI_Cmd_Set_Event_Mask, HCI_Cmd_Write_LE_Host_Support, \
     HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
     HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect, \
     HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, \
     HCI_Event_Disconnection_Complete, HCI_Cmd_LE_Set_Scan_Response_Data, \
     HCI_Cmd_LE_Set_Random_Address, HCI_Cmd_LE_Long_Term_Key_Request_Reply, \
-    HCI_Cmd_LE_Start_Encryption_Request, HCI_Cmd_LE_Set_Advertising_Parameters, \
+    HCI_Cmd_LE_Enable_Encryption, HCI_Cmd_LE_Set_Advertising_Parameters, \
     HCI_Cmd_LE_Read_Buffer_Size_V1, HCI_Cmd_Read_Local_Name, HCI_Cmd_Complete_Read_Local_Name, \
     HCI_Cmd_Complete_Read_Local_Version_Information, HCI_Cmd_Read_Local_Version_Information, \
     HCI_Cmd_Write_Connect_Accept_Timeout, HCI_Cmd_LE_Read_Local_Supported_Features, \
@@ -738,7 +738,7 @@ class HCIDevice(VirtualDevice):
         Indicates to HCI Device that the Host supports Low Energy mode.
         """
         logger.debug("[%s] Write LE Host support (simulatenous mode not supported)", self.interface)
-        response = self._write_command(HCI_Cmd_LE_Host_Supported(supported=1, simulatenous=0))
+        response = self._write_command(HCI_Cmd_Write_LE_Host_Support(supported=1, unused=0))
         return response is not None and response.status == 0x00
 
     @req_cmd("le_write_suggested_default_data_length",
@@ -1314,9 +1314,9 @@ class HCIDevice(VirtualDevice):
             )
             self.__converter.pending_key_request = False
         else:
-            logger.debug("[%s] Sending HCI LE Start Encryption Request", self.interface)
+            logger.debug("[%s] Sending HCI LE Enable Encryption", self.interface)
             response = self._write_command(
-                HCI_Cmd_LE_Start_Encryption_Request(
+                HCI_Cmd_LE_Enable_Encryption(
                     handle=handle,
                     ltk=key[::-1],
                     rand=rand,
