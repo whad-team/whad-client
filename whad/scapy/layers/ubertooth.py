@@ -1,6 +1,6 @@
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteEnumField, ByteField, LEIntField, LEShortField, \
-    XLE3BytesField, ShortField, SignedByteField, XByteField, XLEIntField
+    LEX3BytesField, ShortField, SignedByteField, XByteField, XLEIntField
 from scapy.layers.bluetooth4LE import BTLE
 from whad.ble.utils.phy import FieldsSize
 from struct import unpack
@@ -52,7 +52,7 @@ class BTLE_Promiscuous_Access_Address(Packet):
 
 class BTLE_Promiscuous_CRCInit(Packet):
     name = "BTLE Promiscuous CRCInit"
-    fields_desc = [XLE3BytesField("crc_init",None)]
+    fields_desc = [LEX3BytesField("crc_init",None)]
 
 class BTLE_Promiscuous_Hop_Interval(Packet):
     name = "BTLE Promiscuous Hop Interval"
