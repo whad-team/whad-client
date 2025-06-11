@@ -1,5 +1,5 @@
 protobuf==3.20.*
-scapy==2.5.0rc3
+scapy==2.6.1
 elementpath==2.4.0
 pyserial==3.5.0
 tox==3.9.0
