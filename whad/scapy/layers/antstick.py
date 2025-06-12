@@ -1,5 +1,5 @@
 from scapy.fields import ByteField, LenField, ByteEnumField, StrField, \
-    BitField, BitEnumField, LEIntField
+    BitField, BitEnumField, LEIntField, LEX3BytesField, LEShortField
 from scapy.packet import Packet, bind_layers
 
 antstick_message_ids = {
@@ -69,6 +69,41 @@ antstick_message_ids = {
     0x5F : "legacy_extended_burst_data",
 }
 
+antstick_message_codes = {
+    0 : "response_no_error", 
+    1 : "event_rx_search_timeout", 
+    2 : "event_rx_fail", 
+    3 : "event_tx", 
+    4 : "event_transfer_rx_failed", 
+    5 : "event_transfer_tx_completed", 
+    6 : "event_transfer_tx_failed", 
+    7 : "event_channel_closed", 
+    8 : "event_rx_fail_to_go_to_search", 
+    9 : "event_channel_collision", 
+    10: "event_transfer_tx_start", 
+    17: "event_transfer_next_data_block", 
+    21: "channel_in_wrong_state", 
+    22: "channel_not_opened", 
+    24: "channel_id_not_set", 
+    25: "close_all_channels", 
+    31: "transfer_in_progress", 
+    32: "transfer_sequence_number_error", 
+    33: "transfer_in_error", 
+    39: "message_size_exceeds_limit", 
+    40: "invalid_message", 
+    41: "invalid_network_number", 
+    48: "invalid_list_id", 
+    49: "invalid_scan_tx_channel", 
+    51: "invalid_parameter_provided", 
+    52: "invalid_serial_que_overflow", 
+    53: "event_que_overflow", 
+    56: "encrypt_negotiation_success", 
+    57: "encrypt_negotiation_fail", 
+    64: "nvm_full_error", 
+    65: "nvm_write_error", 
+    112: "usb_string_write_fail", 
+    174: "msg_serial_error_id"
+}
 
 class ANTStick_Message(Packet):
     name = "ANTStick Message"
@@ -142,7 +177,7 @@ class ANTStick_Requested_Message_Capabilities(Packet):
         BitField("cap_no_receive_messages", 0, 1), 
         BitField("cap_no_transmit_channels", 0, 1), 
         BitField("cap_no_receive_channels", 0, 1),
-
+        
         # Advanced options
         BitField("cap_search_list_enabled", 0, 1), 
         BitField("cap_script_enabled", 0, 1), 
@@ -152,36 +187,85 @@ class ANTStick_Requested_Message_Capabilities(Packet):
         BitField("reserved_2", 0, 1), 
         BitField("cap_network_enabled", 0, 1), 
         BitField("reserved_3", 0, 1), 
-
+        
         # Advanced options (2)
         BitField("cap_fit1_enabled", 0, 1), 
         BitField("cap_fs_antfs_enabled", 0, 1), 
         BitField("cap_ext_assign_enabled", 0, 1), 
         BitField("cap_prox_search_enabled", 0, 1), 
-        BitField("reserved4", 0, 1), 
+        BitField("reserved_4", 0, 1), 
         BitField("cap_scan_mode_enabled", 0, 1), 
         BitField("cap_ext_msg_enabled", 0, 1), 
         BitField("cap_led_enabled", 0, 1), 
 
         ByteField("max_sensrcore_channels", None), 
     
+
+        # For some weird reason, it does not match the spec
         # Advanced options (3)
-        BitField("cap_encrypted_channel_enabled", 0, 1), 
-        BitField("cap_selective_data_updates_enabled", 0, 1), 
-        BitField("reserved5", 0, 1), 
-        BitField("cap_search_sharing_enabled", 0, 1), 
-        BitField("cap_high_duty_search", 0, 1), 
-        BitField("cap_event_filtering_enabled", 0, 1), 
-        BitField("cap_event_buffering_enabled", 0, 1), 
-        BitField("cap_advanced_burst_enabled", 0, 1),     
+        # BitField("cap_encrypted_channel_enabled", 0, 1), 
+        # BitField("cap_selective_data_updates_enabled", 0, 1), 
+        # BitField("reserved_5", 0, 1), 
+        # BitField("cap_search_sharing_enabled", 0, 1), 
+        # BitField("cap_high_duty_search", 0, 1), 
+        # BitField("cap_event_filtering_enabled", 0, 1), 
+        # BitField("cap_event_buffering_enabled", 0, 1), 
+        # BitField("cap_advanced_burst_enabled", 0, 1),     
 
         # Advanced options (4)
-        BitField("reserved6", 0, 7),
-        BitField("cap_rfactive_notification_enabled", 0, 1), 
-
+        # BitField("reserved6", 0, 7),
+        # BitField("cap_rfactive_notification_enabled", 0, 1), 
+        
     ]
+
+class ANTStick_Requested_Message_Advanced_Burst(Packet):
+    name = "ANTStick Requested Message (Advanced Burst header)"
+    fields_desc = [
+        ByteEnumField("message_type", None, {0: "capabilities", 1:"configuration"})
+    ]
+
+
+class ANTStick_Requested_Message_Advanced_Burst_Capabilities(Packet):
+    name = "ANTStick Requested Message (Advanced Burst Capabilities)"
+    fields_desc = [
+        ByteField("supported_max_packet_length", None), 
+        BitField("reserved", 0, 23), 
+        BitField("cap_adv_burst_frequency_hop_enabled", 0, 1)
+    ]
+
+
+class ANTStick_Requested_Message_Advanced_Burst_Configuration(Packet):
+    name = "ANTStick Requested Message (Advanced Burst Configuration)"
+    fields_desc = [
+        ByteEnumField("enabled", None, {0:"disabled", 1:"enabled"}), 
+        ByteEnumField("max_packet_length", None, {0x01 : "8 bytes", 0x02: "16 bytes", 0x03 : "24 bytes"}),
+        LEX3BytesField("required_features", None), 
+        LEX3BytesField("optional_features", None),         
+    ]
+
+class ANTStick_Requested_Message_Advanced_Burst_Configuration_Stall_Extension(Packet):
+    name = "ANTStick Requested Message (Advanced Burst Configuration - Stall extension)"
+    fields_desc = [
+        LEShortField("stall_count", None), 
+        ByteField("retry_count_extension", None)
+    ]
+   
+class ANTStick_Channel_Response_Or_Event(Packet):
+    name = "ANTStick Channel Response or Event"
+    fields_desc = [
+        ByteField("channel_number", None), 
+        ByteEnumField("message_id", None, antstick_message_ids), 
+        ByteEnumField("message_code", None, antstick_message_codes)
+    ]
+    
+bind_layers(ANTStick_Requested_Message_Advanced_Burst, ANTStick_Requested_Message_Advanced_Burst_Capabilities, message_type=0)
+bind_layers(ANTStick_Requested_Message_Advanced_Burst, ANTStick_Requested_Message_Advanced_Burst_Configuration, message_type=1)
+bind_layers(ANTStick_Requested_Message_Advanced_Burst_Configuration, ANTStick_Requested_Message_Advanced_Burst_Configuration_Stall_Extension)
+
 
 bind_layers(ANTStick_Message, ANTStick_Command_Request_Message, id=0x4D)
 bind_layers(ANTStick_Message, ANTStick_Requested_Message_Serial_Number, id=0x61)
 bind_layers(ANTStick_Message, ANTStick_Requested_Message_ANT_Version, id=0x3E)
 bind_layers(ANTStick_Message, ANTStick_Requested_Message_Capabilities, id=0x54)
+bind_layers(ANTStick_Message, ANTStick_Requested_Message_Advanced_Burst, id=0x78)
+bind_layers(ANTStick_Message, ANTStick_Channel_Response_Or_Event, id=0x40)

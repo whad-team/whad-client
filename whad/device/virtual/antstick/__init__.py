@@ -4,16 +4,22 @@ ANT Stick adaptation layer for WHAD.
 import logging
 from threading import  Lock
 from time import sleep, time
+from struct import pack
 
 from usb.util import find_descriptor, endpoint_direction, ENDPOINT_IN, ENDPOINT_OUT
 from usb.core import find, USBError, USBTimeoutError
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.device import VirtualDevice
-from whad.hub.ant import Commands as AntCommands
+
+from whad.hub.ant import Commands
+from whad.hub.discovery import Domain, Capability
 
 from whad.scapy.layers.antstick import ANTStick_Message, ANTStick_Command_Request_Message, \
-    ANTStick_Requested_Message_Serial_Number, ANTStick_Requested_Message_ANT_Version
+    ANTStick_Requested_Message_Serial_Number, ANTStick_Requested_Message_ANT_Version, \
+    ANTStick_Requested_Message_Advanced_Burst, ANTStick_Requested_Message_Capabilities, \
+    ANTStick_Channel_Response_Or_Event
 from whad.device.virtual.antstick.constants import AntStickIds
+
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +95,7 @@ class ANTStickDevice(VirtualDevice):
         if device is None:
             raise WhadDeviceNotFound
         _, self.__antstick = device
+        self.__antstick_capabilities = None
         self.__lock = Lock()
         super().__init__()
 
@@ -130,15 +137,126 @@ class ANTStickDevice(VirtualDevice):
         self.__antstick.reset()
         self._configure_endpoints()
 
-        print("serial: ", self._get_serial_number())
 
-        print("ant_ver: ",self._get_ant_version())
+        serial_number = self._get_serial_number()
+        if serial_number is not None:
+            self._dev_id = self._get_ant_version()[:12] + pack("<I", serial_number)
+            self._dev_id = b"\x00" * (16 - len(self._dev_id)) + self._dev_id
+        self._fw_author = self._get_manufacturer()
+        self._fw_url = self._get_url()
+        self._fw_version = self._get_firmware_version()
+        self._dev_capabilities = self._get_capabilities()
 
-        self._dev_id = None
-        #self._fw_author = self._get_manufacturer()
-        #self._fw_url = self._get_url()
-        #self._fw_version = self._get_firmware_version()
-        #self._dev_capabilities = self._get_capabilities()
+    def _get_manufacturer(self):
+        return self.__antstick.manufacturer.encode('utf-8').replace(b"\x00", b"")
+
+    def _get_firmware_version(self):
+        return (1, 0, 0)
+
+    def _get_url(self):
+        return "https://thisisant.com".encode('utf-8')
+
+
+
+    def _get_capabilities(self):
+        response = self._antstick_send_command(ANTStick_Command_Request_Message(message_id_req=0x54))
+        # Provide ant stick capabilities
+        if ANTStick_Requested_Message_Capabilities in response:
+            self.__antstick_capabilities = response
+            
+            capabilities = Capability.NoRawData # no support of raw PDU here
+            commands = []
+
+            if (
+                self.__antstick_capabilities.cap_no_receive_messages == 0 and 
+                self.__antstick_capabilities.cap_no_receive_channels == 0 
+            ): 
+                capabilities |= Capability.Sniff
+                commands += [
+                        Commands.Sniff, 
+                        Commands.SetDeviceNumber, 
+                        Commands.SetDeviceType, 
+                        Commands.SetTransmissionType, 
+                        Commands.SetFrequency, 
+                        Commands.Start, 
+                        Commands.Stop
+                    ]
+            if (
+                self.__antstick_capabilities.cap_no_transmit_messages == 0 and 
+                self.__antstick_capabilities.cap_no_transmit_channels == 0 
+            ): 
+                capabilities |= Capability.Inject
+                commands += [
+                    Commands.Send, 
+                    Commands.SetFrequency, 
+                    Commands.Start, 
+                    Commands.Stop
+                ]
+            if (
+                self.__antstick_capabilities.cap_no_ackd_messages == 0 and
+                self.__antstick_capabilities.cap_no_burst_messages == 0 and
+                self.__antstick_capabilities.cap_no_transmit_channels == 0 
+            ):
+                capabilities |= Capability.SimulateRole
+                commands += [
+                    Commands.SlaveMode,
+                    Commands.SetDeviceNumber, 
+                    Commands.SetDeviceType, 
+                    Commands.SetTransmissionType,
+                    Commands.SetChannelPeriod, 
+                    Commands.SetNetworkKey,
+                    Commands.SetFrequency, 
+                    Commands.AssignChannel, 
+                    Commands.UnassignChannel, 
+                    Commands.OpenChannel, 
+                    Commands.CloseChannel, 
+                    Commands.Start, 
+                    Commands.Stop
+                ]
+            if (
+                self.__antstick_capabilities.cap_no_receive_channels == 0
+            ):
+                capabilities |= Capability.SimulateRole
+                commands += [
+                    Commands.MasterMode,
+                    Commands.SetDeviceNumber, 
+                    Commands.SetDeviceType, 
+                    Commands.SetTransmissionType,
+                    Commands.SetChannelPeriod, 
+                    Commands.SetNetworkKey,
+                    Commands.SetFrequency, 
+                    Commands.AssignChannel, 
+                    Commands.UnassignChannel, 
+                    Commands.OpenChannel, 
+                    Commands.CloseChannel, 
+                    Commands.Start, 
+                    Commands.Stop
+                ]
+
+            if (
+                self.__antstick_capabilities.cap_scan_mode_enabled == 1
+            ):
+                capabilities |= Capability.Scan
+                commands += [
+                    Commands.Sniff, 
+                    Commands.SetFrequency, 
+                    Commands.SetDeviceNumber, 
+                    Commands.SetDeviceType, 
+                    Commands.SetTransmissionType,
+                    Commands.SetChannelPeriod, 
+                    Commands.SetNetworkKey,
+                    Commands.Start, 
+                    Commands.Stop
+                ]
+
+            return {
+                Domain.ANT : (
+                                capabilities, 
+                                list(set(commands))
+                )
+            }       
+
+        return None        
 
     def _get_serial_number(self):
         response = self._antstick_send_command(ANTStick_Command_Request_Message(message_id_req=0x61))
@@ -160,22 +278,20 @@ class ANTStickDevice(VirtualDevice):
                 self.__antstick.write(self.__out_endpoint,
                                      data, timeout=timeout)
             except USBTimeoutError:
-                return False
+                return None
+
             response = self._antstick_read_response()
+            if ANTStick_Channel_Response_Or_Event in response and response.message_code == 40: # invalid message 
+                return None
 
-        # If we have a response, return it
-        if not no_response:
             return response
-
-        # Success
-        return True
 
     def _antstick_read_response(self, timeout=200):
         try:
             msg = bytes(self.__antstick.read(self.__in_endpoint,
                                              64, timeout=timeout))
-            print("< ", msg.hex())
-            ANTStick_Message(msg).show()
+            #print("< ", msg.hex())
+            #ANTStick_Message(msg).show()
             return ANTStick_Message(msg)
         except USBTimeoutError:
             return None
