@@ -11,6 +11,7 @@ from .apimote import APIMoteDevice
 from .hci import HCIDevice
 from .rfstorm import RFStormDevice
 from .yard import YardStickOneDevice
+from .antstick import ANTStickDevice
 from .pcap import PCAPDevice
 
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
     "HCIDevice",
     "RFStormDevice",
     "YardStickOneDevice",
+    "ANTStickDevice",
     "PCAPDevice"
 ]
