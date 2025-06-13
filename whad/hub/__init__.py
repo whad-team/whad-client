@@ -60,6 +60,10 @@ class ProtocolHub(Registry):
         return self.get('esb')
 
     @property
+    def ant(self):
+        return self.get('ant')
+
+    @property
     def unifying(self):
         return self.get('unifying')
 
@@ -102,6 +106,9 @@ class ProtocolHub(Registry):
         elif self.esb.is_packet_compat(packet):
             logger.debug('[hub] convert_packet(): packet is ESB')
             msg = self.esb.convert_packet(packet)
+        elif self.ant.is_packet_compat(packet):
+            logger.debug('[hub] convert_packet(): packet is ANT')
+            msg = self.ant.convert_packet(packet)
         elif self.phy.is_packet_compat(packet):
             logger.debug('[hub] convert_packet(): packet is PHY')
             msg = self.phy.convert_packet(packet)
@@ -122,3 +129,4 @@ from .dot15d4 import Dot15d4Domain
 from .phy import PhyDomain
 from .esb import EsbDomain
 from .unifying import UnifyingDomain
+from .ant import AntDomain
