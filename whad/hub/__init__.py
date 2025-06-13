@@ -26,7 +26,7 @@ class ProtocolHub(Registry):
     NAME = 'hub'
     VERSIONS = {}
 
-    def __init__(self, proto_version: int):
+    def __init__(self, proto_version: int = 2):
         """Instantiate a WHAD protocol hub for a specific version.
         """
         self.__version = proto_version
