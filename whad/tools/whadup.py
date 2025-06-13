@@ -11,7 +11,7 @@ from prompt_toolkit import print_formatted_text, HTML
 
 # Whad device
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
-from whad.device import WhadDevice
+from whad.device.iface import Interface
 
 # Whad hub
 from whad.hub.ble import Commands as BleCommands
@@ -234,7 +234,8 @@ def main():
         # Connect to target device and performs discovery
 
         try:
-            dev = WhadDevice.create(interface)
+            print("dev", interface)
+            dev = Interface.create(interface)
 
             info("Connecting to device ...")
             dev.open()
@@ -301,7 +302,7 @@ def main():
             error("Cannot access the requested device (permission error).")
     else:
         info("Available devices")
-        for device in WhadDevice.list(): #print("Usage: %s [device]" % sys.argv[0])
+        for device in Interface.list(): #print("Usage: %s [device]" % sys.argv[0])
             print_formatted_text(HTML(f"- <b>{device.interface}</b>"))
             print_formatted_text(HTML(f"  <b>Type</b>: {device.type}"))
             print_formatted_text(HTML(f"  <b>Index</b>: {device.index}"))
