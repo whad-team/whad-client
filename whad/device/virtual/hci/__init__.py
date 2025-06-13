@@ -36,7 +36,7 @@ from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceUnsupportedOperation, WhadDeviceError
-from whad.device import VirtualDevice
+from whad.device.iface import VirtualInterface
 
 # Whad hub
 from whad.hub.discovery import Domain
@@ -216,7 +216,7 @@ class le_only(req_feature):
         # Wrap with LE-enabled controller check (tested first)
         return super().__init__(_wrap)
 
-class HCIDevice(VirtualDevice):
+class HCIDevice(VirtualInterface):
     """Host/controller interface virtual device implementation.
     """
 
@@ -361,7 +361,7 @@ class HCIDevice(VirtualDevice):
         self.__closing = False
 
 
-    def write(self, data):
+    def write(self, payload):
         """
         Writes data to the device. It relies on select() in order to make sure
         we are allowed to write to the device and wait without eating too much CPU
@@ -372,7 +372,7 @@ class HCIDevice(VirtualDevice):
         """
         if not self.__opened:
             raise WhadDeviceNotReady()
-        self.__socket.send(data)
+        self.__socket.send(payload)
 
     def read(self):
         """
