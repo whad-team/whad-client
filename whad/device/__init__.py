@@ -17,7 +17,7 @@ from whad.device.bridge import Bridge
 from whad.device.device import WhadDevice, VirtualDevice
 
 # Import derived classes
-from whad.device.uart import UartDevice
+from whad.device.uart2 import UartDevice
 from whad.device.tcp import TCPSocketDevice
 from whad.device.unix import UnixSocketDevice
 from whad.device.virtual import HCIDevice, APIMoteDevice, RFStormDevice, RZUSBStickDevice, \
