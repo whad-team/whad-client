@@ -81,7 +81,7 @@ def generate_ant_metadata(message):
     return metadata
 
 
-@pb_bind(ProtocolHub, name="ant", version=1)
+@pb_bind(ProtocolHub, name="ant", version=3)
 class AntDomain(Registry):
     """WHAD ANT domain messages parser/factory.
     """
