@@ -478,9 +478,9 @@ class AntDomain(Registry):
         return AntDomain.bound('pdu', self.proto_version)(
             channel_number = channel_number, 
             pdu = pdu, 
-            rssi = rssi, 
-            timestamp = timestamp, 
-            crc_validity = crc_validity
+            #rssi = rssi, 
+            #timestamp = timestamp, 
+            #crc_validity = crc_validity
         )
 
     def create_raw_pdu_received(

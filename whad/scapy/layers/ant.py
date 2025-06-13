@@ -1,5 +1,7 @@
 from scapy.packet import Packet, bind_layers
-from scapy.fields import StrFixedLenField, ByteField, ByteEnumField, BitField, BitEnumField, LEShortField, LEIntField
+from scapy.fields import StrFixedLenField, ByteField, ByteEnumField, \
+ 	BitField, BitEnumField,LEX3BytesField, LEShortField, LEIntField, \
+	SignedByteField, ShortField, LEShortEnumField
 
 ANT_MANUFACTURERS_ID = {
 	"Garmin": 1,
@@ -228,25 +230,343 @@ class AntAddressField(StrFixedLenField):
 		return x
 
 class ANT_Hdr(Packet):
-	name = "ANT Packet"
+	name = "ANT packet"
 	fields_desc = [
-		AntAddressField("address",None),
-		]
-class ANT_Header_Hdr(Packet):
-	name = "ANT Header"
+		LEShortField("preamble", None),
+		LEShortField("device_number", None),
+		ByteField("device_type", None),
+		ByteField("transmission_type",None),
+		BitEnumField("broadcast",None,1, {0:"broadcast", 1:"ack/burst"}),
+		BitEnumField("ack", None, 1, {0:False, 1: True}),
+		BitEnumField("end",None, 1, {0:False, 1:True}),
+		BitField("count",None, 1),
+		BitEnumField("slot", None, 1, {0:False, 1:True}),
+		BitField("unknown", None, 3),
+	]
+
+class  ANT_Plus_Header_Hdr(Packet):
+	name = "ANT+ Header"
 	fields_desc = [
-			ByteField("transmission_type",None),
-			ByteField("unknown",None), # ?
-			ByteEnumField("packet_type",None,{0x43:"Beacon", 0x44:"Command / Response"})
-	]	
-	
-class ANT_Beacon_Packet(Packet):
-	name = "ANT Beacon Packet"
+	]
+
+
+	def guess_payload_class(self, payload):
+		"""Guess payload content based on payload size and content.
+		"""
+		if self.underlayer is not None and len(payload) > 0 and self.underlayer.device_type in ANT_PLUS_PROFILES.keys():
+			return ANT_PLUS_PROFILES[self.underlayer.device_type]
+		else:
+			return Packet.guess_payload_class(self, payload)
+
+class ANT_Plus_HR_Header_Hdr(Packet):
+	name = "ANT Heart Rate Header"
 	fields_desc = [
-			BitField("reserved",None, 2), 
+		BitField("toggle_bit", None, 1),
+		BitField("data_page_number", None, 7),
+	]
+
+
+class ANT_HR_Default_Data_Page(Packet):
+	name = "ANT Heart Rate Default Data Page"
+	fields_desc = [
+		LEX3BytesField("reserved",0xFFFFFF)
+	]
+
+class ANT_HR_Cumulative_Operating_Time_Data_Page(Packet):
+	name = "ANT Heart Rate Cumulative Operating Time Data Page"
+	fields_desc = [
+		LEX3BytesField("cumulative_operating_time",None)
+	]
+
+class ANT_HR_Manufacturer_Information_Data_Page(Packet):
+	name = "ANT Heart Rate Manufacturer Information Data Page"
+	fields_desc = [
+		ByteEnumField("manufacturer_id",None,ANT_MANUFACTURERS_ID),
+		LEShortField("serial_number", None)
+	]
+
+class ANT_HR_Product_Information_Data_Page(Packet):
+	name = "ANT Heart Rate Product Information Data Page"
+	fields_desc = [
+		ByteField("hardware_version",None),
+		ByteField("software_version",None),
+		ByteField("model_number", None)
+	]
+
+
+class ANT_HR_Previous_Heart_Beat_Data_Page(Packet):
+	name = "ANT Heart Rate Previous Heart Beat Data Page"
+	fields_desc = [
+		ByteField("manufacturer", None),
+		LEShortField("previous_heart_beat",None)
+	]
+
+class ANT_HR_Swim_Interval_Summary_Data_Page(Packet):
+	name = "ANT Heart Rate Swim Interval Summary Data Page"
+	fields_desc = [
+		ByteField("interval_average_heart_rate",None),
+		ByteField("interval_maximum_heart_rate",None),
+		ByteField("session_average_heart_rate", None)
+	]
+
+
+class ANT_HR_Capabilities_Data_Page(Packet):
+	name = "ANT Heart Rate Capabilities Data Page"
+	fields_desc = [
+		ByteField("reserved_2",None),
+		BitEnumField("manufacturer_specific_features_supported",None, 2, {1:"supported", 0:"non supported"}),
+		BitField("reserved_3",0, 3),
+		BitEnumField("extended_swimming_features_supported",0, 1, {1:"supported", 0:"non supported"}),
+		BitEnumField("extended_cycling_features_supported",0, 1, {1:"supported", 0:"non supported"}),
+		BitEnumField("extended_running_features_supported",0, 1, {1:"supported", 0:"non supported"}),
+
+		BitEnumField("manufacturer_specific_features_enabled",None, 2, {1:"enabled", 0:"disabled"}),
+		BitField("reserved_4",0, 3),
+		BitEnumField("extended_swimming_features_enabled",0, 1, {1:"enabled", 0:"disabled"}),
+		BitEnumField("extended_cycling_features_enabled",0, 1, {1:"enabled", 0:"disabled"}),
+		BitEnumField("extended_running_features_enabled",0, 1, {1:"enabled", 0:"disabled"}),
+	]
+
+
+class ANT_HR_Battery_Status_Data_Page(Packet):
+	name = "ANT Heart Rate Battery Status Data Page"
+	fields_desc = [
+		ByteField("battery_level",None),
+		ByteField("fractional_battery_voltage",None),
+		ByteField("coarse_battery_voltage",None),
+
+	]
+
+class ANT_Request_Data_Page(Packet):
+	name = "ANT Request Data Page"
+	fields_desc = [
+		LEIntField("reserved", 0xFFFFFFFF),
+		BitField("requested_transmission_response_using_ack", None, 1),
+		BitField("requested_transmission_response_count", None, 7),
+		ByteField("requested_page_number", None),
+		ByteEnumField("command_type",0x01,  {0x01 : "request_data_page"})
+	]
+
+
+class ANT_Mode_Setting_Page(Packet):
+	name = "ANT Mode Setting Page"
+	fields_desc = [
+		LEIntField("reserved", 0xFFFFFFFF),
+		LEShortField("reserved2", 0xFFFF),
+		ByteEnumField("sport_mode",None,  {0x01 : "running", 0x02 : "cycling", 0x03 : "swimming"})
+	]
+
+class ANT_HR_Common_Payload(Packet):
+	name = "ANT Heart Rate Common Payload"
+	fields_desc = [
+		LEShortField("heart_beat_event_time", None),
+		ByteField("heart_beat_count", None),
+		ByteField("computed_heart_rate", None)
+	]
+
+
+
+class ANT_Plus_Ranging_Header_Hdr(Packet):
+	name = "ANT Ranging Header"
+	fields_desc = [
+		ByteField("data_page_number", None)
+	]
+
+class ANT_Ranging_Measurement_Data_Page(Packet):
+	name = "ANT Ranging Measurement Data Data Page"
+	fields_desc = [
+		LEShortField("reserved", 0x0000),
+		SignedByteField("board_temperature", None),
+		ByteField("reserved_2", 0xFF),
+		ByteField("event_count", None),
+		ShortField("distance", None)
+	]
+
+
+class ANT_Ranging_Set_Measurement_Mode_Data_Page(Packet):
+	name = "ANT Ranging Set Measurement Mode Data Page"
+	fields_desc = [
+		ByteField("sequence_number", None),
+		LEShortField("reserved", 0xFFFF),
+		ByteEnumField("measurement_mode", None, {0x00:"asynchronous_mode", 0x01 : "synchronous_mode", 0xFF: "always_on"}),
+		LEShortField("reserved_2", 0xFFFF),
+		ByteField("measurement_interval_delay", None),
+	]
+
+class ANT_Ranging_Trigger_Distance_Measurement(Packet):
+	name = "ANT Ranging Trigger Distance Measurement Data Page"
+	fields_desc = [
+		ByteField("sequence_number", None),
+		LEIntField("reserved", 0xFFFFFFFF),
+		LEShortField("reserved_2", 0xFFFF),
+	]
+
+
+class ANT_Plus_Bicycle_Speed_And_Cadence(Packet):
+	name = "ANT Bicycle Speed and Cadence"
+	fields_desc = [
+		LEShortField("bike_cadence_event_time", None),
+		LEShortField("cumulative_cadence_revolution_count", None),
+		LEShortField("bike_speed_event_time", None),
+		LEShortField("cumulative_speed_revolution_count", None),
+	]
+
+class ANT_Plus_Bicycle_Speed_Header_Hdr(Packet):
+	name = "ANT Bicycle Speed Header"
+	fields_desc = [
+	BitField("toggle_bit", None, 1),
+	BitField("data_page_number", None, 7),
+	]
+
+
+class ANT_Bicycle_Speed_Default_Data_Page(Packet):
+	name = "ANT Bicycle Speed Default Data Page"
+	fields_desc = [
+		LEX3BytesField("reserved",0xFFFFFF),
+		LEShortField("bike_speed_event_time", None),
+		LEShortField("cumulative_speed_revolution_count", None),
+	]
+
+
+class ANT_Bicycle_Speed_Cumulative_Operating_Time_Data_Page(Packet):
+	name = "ANT Bicycle Speed Cumulative Operating Time Data Page"
+	fields_desc = [
+		LEX3BytesField("cumulative_operating_time",None),
+		LEShortField("bike_speed_event_time", None),
+		LEShortField("cumulative_speed_revolution_count", None),
+	]
+
+
+class ANT_Bicycle_Speed_Manufacturer_Information_Data_Page(Packet):
+	name = "ANT Bicycle Speed Manufacturer Information Data Page"
+	fields_desc = [
+		ByteEnumField("manufacturer_id",None,ANT_MANUFACTURERS_ID),
+		LEShortField("serial_number", None),
+		LEShortField("bike_speed_event_time", None),
+		LEShortField("cumulative_speed_revolution_count", None),
+	]
+
+class ANT_Bicycle_Speed_Product_Information_Data_Page(Packet):
+	name = "ANT Bicycle Speed Product Information Data Page"
+	fields_desc = [
+		ByteField("hardware_version",None),
+		ByteField("software_version",None),
+		ByteField("model_number",None),
+		LEShortField("bike_speed_event_time", None),
+		LEShortField("cumulative_speed_revolution_count", None),
+	]
+
+class ANT_Bicycle_Speed_Battery_Status_Data_Page(Packet):
+	name = "ANT Bicycle Speed Battery Status Data Page"
+	fields_desc = [
+		ByteField("reserved",0xFF),
+		ByteField("fractional_battery_voltage",None),
+		BitField("reserved_2", None, 1),
+		BitEnumField("battery_status", None, 3,  {0x00 : "reserved", 0x01 : "new", 0x02: "good", 0x03 : "ok", 0x04: "low", 0x05 : "critical", 0x06 : "reserved", 0x07: "invalid"}),
+		BitField("coarse_battery_voltage", None, 4),
+		LEShortField("bike_speed_event_time", None),
+		LEShortField("cumulative_speed_revolution_count", None),
+
+	]
+
+
+class ANT_Bicycle_Speed_Motion_And_Cadence_Data_Page(Packet):
+	name = "ANT Bicycle Speed Motion and Cadence Data Page"
+	fields_desc = [
+		ByteField("flags",None),
+		LEShortField("reserved", 0xFFFF),
+		LEShortField("bike_speed_event_time", None),
+		LEShortField("cumulative_speed_revolution_count", None),
+	]
+
+class ANT_Plus_Bicycle_Cadence_Header_Hdr(Packet):
+	name = "ANT Bicycle Cadence Header"
+	fields_desc = [
+	BitField("toggle_bit", None, 1),
+	BitField("data_page_number", None, 7),
+	]
+
+class ANT_Bicycle_Cadence_Default_Data_Page(Packet):
+	name = "ANT Bicycle Cadence Default Data Page"
+	fields_desc = [
+		LEX3BytesField("reserved",0xFFFFFF),
+		LEShortField("bike_cadence_event_time", None),
+		LEShortField("cumulative_cadence_revolution_count", None),
+
+	]
+
+class ANT_Bicycle_Cadence_Cumulative_Operating_Time_Data_Page(Packet):
+	name = "ANT Bicycle Cadence Cumulative Operating Time Data Page"
+	fields_desc = [
+		LEX3BytesField("cumulative_operating_time",None),
+		LEShortField("bike_cadence_event_time", None),
+		LEShortField("cumulative_cadence_revolution_count", None),
+	]
+
+class ANT_Bicycle_Cadence_Manufacturer_Information_Data_Page(Packet):
+	name = "ANT Bicycle Cadence Manufacturer Information Data Page"
+	fields_desc = [
+		ByteEnumField("manufacturer_id",None,ANT_MANUFACTURERS_ID),
+		LEShortField("serial_number", None),
+		LEShortField("bike_cadence_event_time", None),
+		LEShortField("cumulative_cadence_revolution_count", None),
+
+	]
+
+class ANT_Bicycle_Cadence_Product_Information_Data_Page(Packet):
+	name = "ANT Bicycle Cadence Product Information Data Page"
+	fields_desc = [
+		ByteField("hardware_version",None),
+		ByteField("software_version",None),
+		ByteField("model_number",None),
+		LEShortField("bike_cadence_event_time", None),
+		LEShortField("cumulative_cadence_revolution_count", None),
+
+	]
+
+class ANT_Bicycle_Cadence_Battery_Status_Data_Page(Packet):
+	name = "ANT Bicycle Cadence Battery Status Data Page"
+	fields_desc = [
+		ByteField("reserved",0xFF),
+		ByteField("fractional_battery_voltage",None),
+		BitField("reserved_2", None, 1),
+		BitEnumField("battery_status", None, 3,  {0x00 : "reserved", 0x01 : "new", 0x02: "good", 0x03 : "ok", 0x04: "low", 0x05 : "critical", 0x06 : "reserved", 0x07: "invalid"}),
+		BitField("coarse_battery_voltage", None, 4),
+		LEShortField("bike_cadence_event_time", None),
+		LEShortField("cumulative_cadence_revolution_count", None),
+
+	]
+
+
+class ANT_Bicycle_Cadence_Motion_And_Cadence_Data_Page(Packet):
+	name = "ANT Bicycle Cadence Motion and Cadence Data Page"
+	fields_desc = [
+		ByteField("flags",None),
+		LEShortField("reserved", 0xFFFF),
+		LEShortField("bike_cadence_event_time", None),
+		LEShortField("cumulative_cadence_revolution_count", None),
+
+	]
+
+
+class  ANT_FS_Header_Hdr(Packet):
+	name = "ANT FS Header"
+	fields_desc = [
+	]
+
+class ANT_FS_Type_Hdr(Packet):
+	name = "ANT FS Type"
+	fields_desc = [
+		ByteEnumField("packet_type",None,{0x43:"Beacon", 0x44:"Command / Response"})
+	]
+
+class ANT_FS_Beacon_Packet(Packet):
+	name = "ANT FS Beacon Packet"
+	fields_desc = [
+			BitField("reserved",None, 2),
 			BitEnumField("data",None, 1, {0:False,1:True}),
-			BitEnumField("upload",None, 1, {0:False,1:True}),			
-			BitEnumField("pairing",None, 1, {0:False,1:True}),			
+			BitEnumField("upload",None, 1, {0:False,1:True}),
+			BitEnumField("pairing",None, 1, {0:False,1:True}),
 			BitEnumField("period",None, 3, {
 											0: "0.5 Hz (65535)",
 											1: "1 Hz (32768)",
@@ -259,39 +579,40 @@ class ANT_Beacon_Packet(Packet):
 											0: "link",
 											1: "auth",
 											2: "transport",
-											3: "busy",											
-										}),	
+											3: "busy",
+										}),
 			ByteEnumField("auth_type",None, {
 											0: "pass-through",
 											1: "n/a",
 											2: "pairing",
 											3: "passkey & pairing",
-										}),											
+										}),
 	]
-	
-class ANT_Beacon_Link_Packet(Packet):
-	name = "ANT Beacon Link Packet"
-	fields_desc = [
-		LEShortField("device_type",None),
-		LEShortField("manufacturer",None)
-	]
-	
 
-class ANT_Beacon_Auth_Packet(Packet):
-	name = "ANT Beacon Auth Packet"
+
+class ANT_FS_Beacon_Link_Packet(Packet):
+	name = "ANT FS Beacon Link Packet"
+	fields_desc = [
+		LEShortField("dev_type",None),
+		LEShortEnumField("manufacturer_id",None, ANT_MANUFACTURERS_ID)
+	]
+
+
+class ANT_FS_Beacon_Auth_Packet(Packet):
+	name = "ANT FS Beacon Auth Packet"
 	fields_desc = [
 		LEIntField("host_serial",None)
 	]
-	
 
-class ANT_Beacon_Transport_Packet(Packet):
-	name = "ANT Beacon Transport Packet"
+
+class ANT_FS_Beacon_Transport_Packet(Packet):
+	name = "ANT FS Beacon Transport Packet"
 	fields_desc = [
 		LEIntField("host_serial",None)
 	]
-	
-class ANT_Command_Or_Response_Packet(Packet):
-	name = "ANT Command or Response Packet"
+
+class ANT_FS_Command_Or_Response_Packet(Packet):
+	name = "ANT FS Command or Response Packet"
 	fields_desc = [
 		ByteEnumField("cmd_or_resp_type", None, {
 												# ANTFS Commands
@@ -308,36 +629,37 @@ class ANT_Command_Or_Response_Packet(Packet):
 												0x89: "download_req_resp",
 												0x8a: "upload_req_resp",
 												0x8b: "erase_resp",
-												0x8c: "upload_data_resp",													
+												0x8c: "upload_data_resp",
 		})
 	]
-		
-class ANT_Link_Command_Packet(Packet):
-	name = "ANT Link Command Packet"
+
+
+class ANT_FS_Link_Command_Packet(Packet):
+	name = "ANT FS Link Command Packet"
 	fields_desc = [
-		ByteField("frequency", None), 
+		ByteField("frequency", None),
 		ByteEnumField("period", None, {
 										0: "0.5 Hz (65535)",
 										1: "1 Hz (32768)",
 										2: "2 Hz (16384)",
 										3: "4 Hz (8192)",
 										4: "8 Hz (4096)",
-										7: "match established",		
+										7: "match established",
 		}),
 		LEIntField("host_serial",None)
 	]
 
-class ANT_Disconnect_Command_Packet(Packet):
-	name = "ANT Disconnect Command Packet"
+class ANT_FS_Disconnect_Command_Packet(Packet):
+	name = "ANT FS Disconnect Command Packet"
 	fields_desc = [
 		ByteEnumField("disconnect_type", None, {0 : "return to link", 1 : "return to broadcast"}),
-		ByteField("time_duration", None), 
+		ByteField("time_duration", None),
 		ByteField("application_duration", None)
 	]
-	
 
-class ANT_Auth_Command_Packet(Packet):
-	name = "ANT Auth Command Packet"
+
+class ANT_FS_Auth_Command_Packet(Packet):
+	name = "ANT FS Auth Command Packet"
 	fields_desc = [
 		ByteEnumField("auth_type", None, {
 												0: "pass-through",
@@ -345,61 +667,61 @@ class ANT_Auth_Command_Packet(Packet):
 												2: "request pairing",
 												3: "request passkey",
 		}),
-		ByteField("auth_string_length", None), 
+		ByteField("auth_string_length", None),
 		LEIntField("host_serial",None)
 	]
-	
 
-class ANT_Ping_Command_Packet(Packet):
-	name = "ANT Ping Command Packet"
+
+class ANT_FS_Ping_Command_Packet(Packet):
+	name = "ANT FS Ping Command Packet"
 	fields_desc = []
-	
 
 
-class ANT_Download_Request_Command_Packet(Packet):
-	name = "ANT Download Request Command Packet"
+
+class ANT_FS_Download_Request_Command_Packet(Packet):
+	name = "ANT FS Download Request Command Packet"
 	fields_desc = [
-		LEShortField("index", None), 
+		LEShortField("index", None),
 		LEIntField("offset", None)
 	]
-	
 
-class ANT_Upload_Request_Command_Packet(Packet):
-	name = "ANT Upload Request Command Packet"
+
+class ANT_FS_Upload_Request_Command_Packet(Packet):
+	name = "ANT FS Upload Request Command Packet"
 	fields_desc = [
-		LEShortField("index", None), 
+		LEShortField("index", None),
 		LEIntField("max_size", None)
 	]
-	
 
-class ANT_Upload_Data_Command_Packet(Packet):
-	name = "ANT Upload Data Command Packet"
+
+class ANT_FS_Upload_Data_Command_Packet(Packet):
+	name = "ANT FS Upload Data Command Packet"
 	fields_desc = [
-		LEShortField("crc_seed", None), 
+		LEShortField("crc_seed", None),
 		LEIntField("offset", None)
 	]
-			
-class ANT_Erase_Command_Packet(Packet):
-	name = "ANT Erase Request Command Packet"
+
+class ANT_FS_Erase_Command_Packet(Packet):
+	name = "ANT FS Erase Request Command Packet"
 	fields_desc = [
 		LEShortField("index", None)
-	]	
-	
+	]
 
-class ANT_Auth_Response_Packet(Packet):
-	name = "ANT Auth Response Packet"
+
+class ANT_FS_Auth_Response_Packet(Packet):
+	name = "ANT FS Auth Response Packet"
 	fields_desc = [
 		ByteEnumField("response", None, {
 											0: "response to serial req.",
 											1: "accept",
 											2: "reject",
 		}),
-		ByteField("auth_string_length", None), 
+		ByteField("auth_string_length", None),
 		LEIntField("client_serial",None)
 	]
 
-class ANT_Download_Request_Response_Packet(Packet):
-	name = "ANT Download Request Response Packet"
+class ANT_FS_Download_Request_Response_Packet(Packet):
+	name = "ANT FS Download Request Response Packet"
 	fields_desc = [
 		ByteEnumField("response", None, {
 											0: "ANTFS_OK",
@@ -408,12 +730,12 @@ class ANT_Download_Request_Response_Packet(Packet):
 											3: "ANTFS_ENOTREADY",
 											4: "ANTFS_EINVAL",
 											5: "ANTFS_ECRC",
-		}), 
+		}),
 		LEIntField("remaining", None)
 	]
 
-class ANT_Upload_Request_Response_Packet(Packet):
-	name = "ANT Upload Request Response Packet"
+class ANT_FS_Upload_Request_Response_Packet(Packet):
+	name = "ANT FS Upload Request Response Packet"
 	fields_desc = [
 		ByteEnumField("response", None, {
 											0: "ANTFS_OK",
@@ -422,20 +744,20 @@ class ANT_Upload_Request_Response_Packet(Packet):
 											3: "ANTFS_ENOSPC",
 											4: "ANTFS_EINVAL",
 											5: "ANTFS_ENOTREADY",
-		}), 
+		}),
 		LEIntField("last_offset", None)
 	]
-		
 
-class ANT_Upload_Data_Response_Packet(Packet):
-	name = "ANT Upload Data Response Packet"
+
+class ANT_FS_Upload_Data_Response_Packet(Packet):
+	name = "ANT FS Upload Data Response Packet"
 	fields_desc = [
 		# ???
 	]
-		
 
-class ANT_Erase_Response_Packet(Packet):
-	name = "ANT Erase Response Packet"
+
+class ANT_FS_Erase_Response_Packet(Packet):
+	name = "ANT FS Erase Response Packet"
 	fields_desc = [
 		ByteEnumField("response", None, {
 											0: "OK",
@@ -443,27 +765,79 @@ class ANT_Erase_Response_Packet(Packet):
 											2: "ENOTREADY",
 		})
 	]
-		
+
+ANT_PLUS_PROFILES = {
+	120 : ANT_Plus_HR_Header_Hdr, 
+	121 : ANT_Plus_Bicycle_Speed_And_Cadence, 
+	122 : ANT_Plus_Bicycle_Cadence_Header_Hdr, 
+	123 : ANT_Plus_Bicycle_Speed_Header_Hdr, 
+	16  : ANT_Plus_Ranging_Header_Hdr 
+}
+bind_layers(ANT_Hdr, ANT_Plus_Header_Hdr, preamble=0xc5a6)
+bind_layers(ANT_Hdr, ANT_FS_Header_Hdr, preamble=0xa33b)
+bind_layers(ANT_FS_Header_Hdr, ANT_FS_Type_Hdr)
+
+bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_HR_Header_Hdr, device_type=120)
+bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_Bicycle_Speed_And_Cadence, device_type=121)
+bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_Bicycle_Cadence_Header_Hdr, device_type=122)
+bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_Bicycle_Speed_Header_Hdr, device_type=123)
+bind_layers(ANT_Plus_Header_Hdr,ANT_Plus_Ranging_Header_Hdr, device_type=16)
+
+bind_layers(ANT_Plus_HR_Header_Hdr, ANT_HR_Default_Data_Page,data_page_number=0)
+bind_layers(ANT_Plus_HR_Header_Hdr, ANT_HR_Cumulative_Operating_Time_Data_Page,data_page_number=1)
+bind_layers(ANT_Plus_HR_Header_Hdr, ANT_HR_Manufacturer_Information_Data_Page,data_page_number=2)
+bind_layers(ANT_Plus_HR_Header_Hdr, ANT_HR_Product_Information_Data_Page,data_page_number=3)
+bind_layers(ANT_Plus_HR_Header_Hdr, ANT_HR_Previous_Heart_Beat_Data_Page,data_page_number=4)
+bind_layers(ANT_Plus_HR_Header_Hdr, ANT_HR_Swim_Interval_Summary_Data_Page, data_page_number=5)
+bind_layers(ANT_Plus_HR_Header_Hdr, ANT_HR_Capabilities_Data_Page, data_page_number=6)
+bind_layers(ANT_Plus_HR_Header_Hdr, ANT_HR_Battery_Status_Data_Page, data_page_number=7)
+
+bind_layers(ANT_Plus_HR_Header_Hdr, ANT_Request_Data_Page, data_page_number=0x46)
+bind_layers(ANT_Plus_HR_Header_Hdr, ANT_Mode_Setting_Page, data_page_number=0x4C)
+
+bind_layers(ANT_HR_Default_Data_Page, ANT_HR_Common_Payload)
+bind_layers(ANT_HR_Cumulative_Operating_Time_Data_Page, ANT_HR_Common_Payload)
+bind_layers(ANT_HR_Previous_Heart_Beat_Data_Page, ANT_HR_Common_Payload)
+bind_layers(ANT_HR_Manufacturer_Information_Data_Page, ANT_HR_Common_Payload)
+bind_layers(ANT_HR_Product_Information_Data_Page, ANT_HR_Common_Payload)
+bind_layers(ANT_HR_Capabilities_Data_Page, ANT_HR_Common_Payload)
+bind_layers(ANT_HR_Battery_Status_Data_Page, ANT_HR_Common_Payload)
 
 
-bind_layers(ANT_Hdr,ANT_Header_Hdr)
-bind_layers(ANT_Header_Hdr,ANT_Beacon_Packet, 				packet_type=0x43)
-bind_layers(ANT_Header_Hdr,ANT_Command_Or_Response_Packet,	packet_type=0x44)
+bind_layers(ANT_Plus_Ranging_Header_Hdr,ANT_Ranging_Measurement_Data_Page, data_page_number=0x10)
+bind_layers(ANT_Plus_Ranging_Header_Hdr,ANT_Ranging_Set_Measurement_Mode_Data_Page, data_page_number=0x30)
 
-bind_layers(ANT_Beacon_Packet,ANT_Beacon_Link_Packet, 		state=0x00)
-bind_layers(ANT_Beacon_Packet,ANT_Beacon_Auth_Packet, 		state=0x01)
-bind_layers(ANT_Beacon_Packet,ANT_Beacon_Transport_Packet, 	state=0x02)
 
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Link_Command_Packet, cmd_or_resp_type=0x02)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Disconnect_Command_Packet, cmd_or_resp_type=0x03)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Auth_Command_Packet, cmd_or_resp_type=0x04)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Ping_Command_Packet, cmd_or_resp_type=0x05)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Download_Request_Command_Packet, cmd_or_resp_type=0x09)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Upload_Request_Command_Packet, cmd_or_resp_type=0x0a)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Erase_Command_Packet, cmd_or_resp_type=0x0b)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Upload_Data_Command_Packet, cmd_or_resp_type=0x0c)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Auth_Response_Packet, cmd_or_resp_type=0x84)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Download_Request_Response_Packet, cmd_or_resp_type=0x89)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Upload_Request_Response_Packet, cmd_or_resp_type=0x8a)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Erase_Response_Packet, cmd_or_resp_type=0x8b)
-bind_layers(ANT_Command_Or_Response_Packet,ANT_Upload_Data_Response_Packet, cmd_or_resp_type=0x8c)
+bind_layers(ANT_Plus_Bicycle_Cadence_Header_Hdr,ANT_Bicycle_Cadence_Default_Data_Page,data_page_number=0)
+bind_layers(ANT_Plus_Bicycle_Cadence_Header_Hdr,ANT_Bicycle_Cadence_Cumulative_Operating_Time_Data_Page,data_page_number=1)
+bind_layers(ANT_Plus_Bicycle_Cadence_Header_Hdr,ANT_Bicycle_Cadence_Manufacturer_Information_Data_Page,data_page_number=2)
+bind_layers(ANT_Plus_Bicycle_Cadence_Header_Hdr,ANT_Bicycle_Cadence_Product_Information_Data_Page,data_page_number=3)
+bind_layers(ANT_Plus_Bicycle_Cadence_Header_Hdr,ANT_Bicycle_Cadence_Battery_Status_Data_Page, data_page_number=4)
+bind_layers(ANT_Plus_Bicycle_Cadence_Header_Hdr,ANT_Bicycle_Cadence_Motion_And_Cadence_Data_Page,data_page_number=5)
+
+bind_layers(ANT_Plus_Bicycle_Speed_Header_Hdr,ANT_Bicycle_Speed_Default_Data_Page,data_page_number=0)
+bind_layers(ANT_Plus_Bicycle_Speed_Header_Hdr,ANT_Bicycle_Speed_Cumulative_Operating_Time_Data_Page,data_page_number=1)
+bind_layers(ANT_Plus_Bicycle_Speed_Header_Hdr,ANT_Bicycle_Speed_Manufacturer_Information_Data_Page,data_page_number=2)
+bind_layers(ANT_Plus_Bicycle_Speed_Header_Hdr,ANT_Bicycle_Speed_Product_Information_Data_Page,data_page_number=3)
+bind_layers(ANT_Plus_Bicycle_Speed_Header_Hdr,ANT_Bicycle_Speed_Battery_Status_Data_Page, data_page_number=4)
+bind_layers(ANT_Plus_Bicycle_Speed_Header_Hdr,ANT_Bicycle_Speed_Motion_And_Cadence_Data_Page,data_page_number=5)
+
+bind_layers(ANT_FS_Type_Hdr,ANT_FS_Beacon_Packet, packet_type=0x43)
+bind_layers(ANT_FS_Beacon_Packet,ANT_FS_Beacon_Link_Packet, state=0x00)
+bind_layers(ANT_FS_Beacon_Packet,ANT_FS_Beacon_Auth_Packet, state=0x01)
+bind_layers(ANT_FS_Beacon_Packet,ANT_FS_Beacon_Transport_Packet, state=0x02)
+
+bind_layers(ANT_FS_Type_Hdr,ANT_FS_Command_Or_Response_Packet, packet_type=0x44)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Link_Command_Packet, cmd_or_resp_type=0x02)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Disconnect_Command_Packet, cmd_or_resp_type=0x03)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Auth_Command_Packet, cmd_or_resp_type=0x04)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Ping_Command_Packet, cmd_or_resp_type=0x05)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Download_Request_Command_Packet, cmd_or_resp_type=0x09)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Upload_Request_Command_Packet, cmd_or_resp_type=0x0a)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Erase_Command_Packet, cmd_or_resp_type=0x0b)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Upload_Data_Command_Packet, cmd_or_resp_type=0x0c)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Auth_Response_Packet, cmd_or_resp_type=0x84)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Download_Request_Response_Packet, cmd_or_resp_type=0x89)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Upload_Request_Response_Packet, cmd_or_resp_type=0x8a)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Erase_Response_Packet, cmd_or_resp_type=0x8b)
+bind_layers(ANT_FS_Command_Or_Response_Packet,ANT_FS_Upload_Data_Response_Packet, cmd_or_resp_type=0x8c)
