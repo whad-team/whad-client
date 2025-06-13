@@ -11,9 +11,13 @@ from whad.scapy.layers.ant import ANT_Hdr
 from whad.device import WhadDeviceConnector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
+
+# WHAD Protocol hub
+from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.discovery import Domain, Capability
 from whad.hub.ant import Commands
 
+# ANT-specific imports
 from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
 
 logger = logging.getLogger(__name__)
@@ -169,6 +173,7 @@ class ANT(WhadDeviceConnector):
         """
         Normal PDU processing (???).
         """
+        packet.show()
         # Enqueue PDU if in synchronous mode
         if self.is_synchronous():
             self.add_pending_packet(packet)

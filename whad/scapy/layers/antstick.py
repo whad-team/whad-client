@@ -1,5 +1,6 @@
 from scapy.fields import ByteField, LenField, ByteEnumField, StrField, \
-    BitField, BitEnumField, LEIntField, LEX3BytesField, LEShortField
+    BitField, BitEnumField, LEIntField, LEX3BytesField, LEShortField, \
+    StrFixedLenField
 from scapy.packet import Packet, bind_layers
 
 antstick_message_ids = {
@@ -257,15 +258,121 @@ class ANTStick_Channel_Response_Or_Event(Packet):
         ByteEnumField("message_id", None, antstick_message_ids), 
         ByteEnumField("message_code", None, antstick_message_codes)
     ]
-    
+
+class ANTStick_Command_Assign_Channel(Packet):
+    name = "ANTStick Assign Channel Command"
+    fields_desc = [
+        ByteField("channel_number", None), 
+        ByteEnumField("channel_type", None, {
+            0x00 : "receive_bidirectional_channel", 
+            0x10 : "transmit_bidirectional_channel", 
+            0x50 : "transmit_unidirectional_channel", 
+            0x40 : "receive_unidirectional_channel", 
+            0x20 : "shared_bidirectional_receive_channel", 
+            0x30 : "shared_bidirectional_transmit_channel"
+        }), 
+        ByteField("network_number", 0)
+    ]
+
+class ANTStick_Command_Set_Network_Key(Packet):
+    name = "ANTStick Set Network Key command"
+    fields_desc = [
+        ByteField("network_number", None), 
+        StrFixedLenField("network_key", b"\x00\x00\x00\x00\x00\x00\x00\x00", length=8)
+    ]
+
+class ANTStick_Command_Set_Channel_ID(Packet):
+    name = "ANTStick Set Channel ID command"
+    fields_desc = [
+        ByteField("channel_number", None),
+        LEShortField("device_number", 0), 
+        ByteField("device_type", None), # MSB = 1 for pairing request  
+        ByteField("transmission_type", 0)
+    ]
+
+class ANTStick_Command_Set_Channel_RF_Frequency(Packet):
+    name = "ANTStick Set Channel RF Frequency command"
+    fields_desc = [
+        ByteField("channel_number", None),
+        ByteField("channel_rf_frequency", None)
+    ]
+
+class ANTStick_Command_Enable_Extended_Messages(Packet):
+    name = "ANTStick Enable Extended Messages command"
+    fields_desc = [
+        ByteField("filler", 0x00),
+        ByteEnumField("enable", None, {0 : "disable", 1 : "enable"})
+    ]
+
+class ANTStick_Extended_Assignment_Extension(Packet):
+        name = "ANTStick Extended ASsignment extension for Assign Channel"
+        fields_desc = [
+            ByteEnumField("extended_assignment", None, {
+                0x01 : "background_scanning",
+                0x04 : "frequency_agility", 
+                0x10 : "fast_channel_initiation", 
+                0x20 : "asynchronous_transmission_enable"
+            })
+        ]
+
+class ANTStick_Command_Open_RX_Scan_Mode(Packet):
+    name = "ANTStick Open RX Scan Mode command"
+    fields_desc = [
+        ByteField("filler", 0x00),
+        ByteEnumField("sync_channel_packets_only", 0x00, {0 : "disable", 1 : "enable"})
+    ]
+
+class ANTStick_Command_Open_Channel(Packet):
+    name = "ANTStick Open Channel command"
+    fields_desc = [
+        ByteField("channel_number", None),
+    ]
+
+class ANTStick_Command_Close_Channel(Packet):
+    name = "ANTStick Close Channel command"
+    fields_desc = [
+        ByteField("channel_number", None),
+    ]
+
+class ANTStick_Data_Broadcast_Data(Packet):
+    name = "ANTStick Data Broadcast Data"
+    fields_desc = [
+        ByteField("channel_number", None), 
+        StrFixedLenField("pdu", None, length=8)
+    ]
+
+class ANTStick_Data_Extension(Packet):
+    name = "ANTStick Data Extension"
+    fields_desc = [
+        ByteField("flag", 0x80), 
+        LEShortField("device_number" , None), 
+        ByteField("device_type", None), 
+        ByteField("transmission_type", None), 
+        #ByteField("checksum", None)
+    ]
+
+bind_layers(ANTStick_Message, ANTStick_Data_Broadcast_Data, id=0x4E)
+bind_layers(ANTStick_Data_Broadcast_Data, ANTStick_Data_Extension)
+
+bind_layers(ANTStick_Command_Assign_Channel, ANTStick_Extended_Assignment_Extension)
 bind_layers(ANTStick_Requested_Message_Advanced_Burst, ANTStick_Requested_Message_Advanced_Burst_Capabilities, message_type=0)
 bind_layers(ANTStick_Requested_Message_Advanced_Burst, ANTStick_Requested_Message_Advanced_Burst_Configuration, message_type=1)
 bind_layers(ANTStick_Requested_Message_Advanced_Burst_Configuration, ANTStick_Requested_Message_Advanced_Burst_Configuration_Stall_Extension)
 
 
-bind_layers(ANTStick_Message, ANTStick_Command_Request_Message, id=0x4D)
-bind_layers(ANTStick_Message, ANTStick_Requested_Message_Serial_Number, id=0x61)
 bind_layers(ANTStick_Message, ANTStick_Requested_Message_ANT_Version, id=0x3E)
-bind_layers(ANTStick_Message, ANTStick_Requested_Message_Capabilities, id=0x54)
-bind_layers(ANTStick_Message, ANTStick_Requested_Message_Advanced_Burst, id=0x78)
 bind_layers(ANTStick_Message, ANTStick_Channel_Response_Or_Event, id=0x40)
+
+
+bind_layers(ANTStick_Message, ANTStick_Command_Assign_Channel, id=0x42)
+bind_layers(ANTStick_Message, ANTStick_Command_Set_Channel_RF_Frequency, id=0x45)
+bind_layers(ANTStick_Message, ANTStick_Command_Set_Network_Key, id=0x46)
+bind_layers(ANTStick_Message, ANTStick_Command_Open_Channel, id=0x4B)
+bind_layers(ANTStick_Message, ANTStick_Command_Close_Channel, id=0x4C)
+bind_layers(ANTStick_Message, ANTStick_Command_Request_Message, id=0x4D)
+bind_layers(ANTStick_Message, ANTStick_Command_Set_Channel_ID, id=0x51)
+bind_layers(ANTStick_Message, ANTStick_Requested_Message_Capabilities, id=0x54)
+bind_layers(ANTStick_Message, ANTStick_Command_Open_RX_Scan_Mode, id=0x5B)
+bind_layers(ANTStick_Message, ANTStick_Requested_Message_Serial_Number, id=0x61)
+bind_layers(ANTStick_Message, ANTStick_Command_Enable_Extended_Messages, id=0x66)
+bind_layers(ANTStick_Message, ANTStick_Requested_Message_Advanced_Burst, id=0x78)

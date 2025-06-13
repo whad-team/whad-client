@@ -13,11 +13,22 @@ from whad.device import VirtualDevice
 
 from whad.hub.ant import Commands
 from whad.hub.discovery import Domain, Capability
+from whad.hub.generic.cmdresult import CommandResult
 
+
+from whad.ant.crypto import is_valid_network_key, generate_sync_from_network_key, ANT_PLUS_NETWORK_KEY
+
+from whad.scapy.layers.ant import ANT_Hdr, ANT_Plus_Header_Hdr
 from whad.scapy.layers.antstick import ANTStick_Message, ANTStick_Command_Request_Message, \
     ANTStick_Requested_Message_Serial_Number, ANTStick_Requested_Message_ANT_Version, \
     ANTStick_Requested_Message_Advanced_Burst, ANTStick_Requested_Message_Capabilities, \
-    ANTStick_Channel_Response_Or_Event
+    ANTStick_Command_Enable_Extended_Messages, ANTStick_Command_Open_RX_Scan_Mode, \
+    ANTStick_Command_Set_Channel_ID, ANTStick_Command_Set_Channel_RF_Frequency, \
+    ANTStick_Channel_Response_Or_Event, ANTStick_Command_Set_Network_Key, \
+    ANTStick_Command_Assign_Channel, ANTStick_Command_Close_Channel, \
+    ANTStick_Command_Open_Channel, ANTStick_Extended_Assignment_Extension, \
+    ANTStick_Data_Broadcast_Data
+
 from whad.device.virtual.antstick.constants import AntStickIds
 
 
@@ -96,7 +107,12 @@ class ANTStickDevice(VirtualDevice):
             raise WhadDeviceNotFound
         _, self.__antstick = device
         self.__antstick_capabilities = None
+        self.__opened = False
+        self.__opened_stream = False
         self.__lock = Lock()
+
+        self.__sync = generate_sync_from_network_key(ANT_PLUS_NETWORK_KEY)
+        self.__frequency = 2457
         super().__init__()
 
     def reset(self):
@@ -146,6 +162,64 @@ class ANTStickDevice(VirtualDevice):
         self._fw_url = self._get_url()
         self._fw_version = self._get_firmware_version()
         self._dev_capabilities = self._get_capabilities()
+
+        self.__opened = True
+        # Ask parent class to run a background I/O thread
+        super().open()
+
+    def read(self):
+        """Read incoming data
+        """
+
+        if not self.__opened:
+            raise WhadDeviceNotReady()
+
+        if self.__opened_stream:
+            try:
+                data = self._antstick_read_message()
+                if data is not None and ANTStick_Data_Broadcast_Data in data:
+                    pkt = bytes(
+                            ANT_Hdr(
+                                preamble = self.__sync, 
+                                device_number = data.device_number, 
+                                device_type = data.device_type,
+                                transmission_type=data.transmission_type, 
+                                broadcast = 0, 
+                                ack = False, 
+                                end = False, 
+                                count = 0, 
+                                slot = False, 
+                                unknown = 0
+                        ) / data.pdu
+                    )
+                    pkt = ANT_Hdr(pkt)
+                    print(repr(pkt))
+                    self._send_whad_ant_pdu(
+                        pdu=bytes(pkt)
+                    )
+                else:
+                    sleep(0.5)
+                    print("waiting...")
+            except USBTimeoutError:
+                data = b""
+                # self._send_whad_pdu(data[5:], data[:5], int(self.__last_packet_timestamp))
+        else:
+            sleep(0.1)
+
+
+    def _send_whad_ant_pdu(self, pdu, channel_number=0, timestamp=None):
+        msg = self.hub.ant.create_pdu_received(
+            pdu=pdu, 
+            channel_number=channel_number
+        )
+
+        # Set timestamp if provided
+        if timestamp is not None:
+            msg.timestamp = timestamp
+
+        # Send message
+        self._send_whad_message(msg)
+
 
     def _get_manufacturer(self):
         return self.__antstick.manufacturer.encode('utf-8').replace(b"\x00", b"")
@@ -269,10 +343,89 @@ class ANTStickDevice(VirtualDevice):
         response = self._antstick_send_command(ANTStick_Command_Request_Message(message_id_req=0x3E))
         if ANTStick_Requested_Message_ANT_Version in response:
             return response.version
-        return None     
+        return None
+
+
+    def _set_network_key(self, network_key, network_number=0):
+        if not is_valid_network_key(network_key):
+            return False
+
+        response = self._antstick_send_command(ANTStick_Command_Set_Network_Key(
+            network_number=network_number, 
+            network_key=network_key[::-1]
+            )
+        )
+
+        self.__sync = generate_sync_from_network_key(network_key)
+        return True
+
+
+    def _assign_channel(self, channel_number=0, channel_type=0, network_number=0, background_scanning = False):
+        response = self._antstick_send_command(ANTStick_Command_Assign_Channel(
+                channel_number=channel_number, 
+                network_number=network_number, 
+                channel_type=channel_type
+            ) / 
+            ANTStick_Extended_Assignment_Extension(
+                extended_assignment = (0x01 if background_scanning else 0x00)
+            )
+        )
+        return True
+
+    def _set_channel_id(self, channel_number=0, device_number=0, device_type=0, transmission_type=0):
+        response = self._antstick_send_command(ANTStick_Command_Set_Channel_ID(
+                channel_number=channel_number, 
+                device_number=device_number, 
+                device_type=device_type, 
+                transmission_type=transmission_type
+            )
+        )
+        return True
+
+
+    def _set_channel_rf_frequency(self, channel_number=0, frequency=2457):
+        self.__frequency = frequency
+        response = self._antstick_send_command(ANTStick_Command_Set_Channel_RF_Frequency(
+                channel_number=channel_number, 
+                channel_rf_frequency=frequency - 2400
+            )
+        )
+        return True
+
+    def _open_rx_scan_mode(self, sync_channel_packets_only=False):
+        response = self._antstick_send_command(ANTStick_Command_Open_RX_Scan_Mode(
+                sync_channel_packets_only=(1 if sync_channel_packets_only else 0)
+            )
+        )
+        return True
+
+    def _configure_extension_mode(self, enable=True):
+        response = self._antstick_send_command(ANTStick_Command_Enable_Extended_Messages(
+                enable=(1 if enable else 0)
+            )
+        )
+        return True
+
+    def _open_channel(self, channel_number=0):
+        response = self._antstick_send_command(ANTStick_Command_Open_Channel(
+                channel_number=channel_number
+            )
+        )
+        return True
+
+
+    def _close_channel(self, channel_number=0):
+        response = self._antstick_send_command(ANTStick_Command_Close_Channel(
+                channel_number=channel_number
+            )
+        )
+        return True
 
     def _antstick_send_command(self, command, timeout=200, no_response=False):
         data = bytes(ANTStick_Message() / command)
+        print(">", bytes(data))
+        ANTStick_Message(data).show()
+            
         with self.__lock:
             try:
                 self.__antstick.write(self.__out_endpoint,
@@ -280,21 +433,50 @@ class ANTStickDevice(VirtualDevice):
             except USBTimeoutError:
                 return None
 
-            response = self._antstick_read_response()
+            response = self._antstick_read_message()
             if ANTStick_Channel_Response_Or_Event in response and response.message_code == 40: # invalid message 
                 return None
 
             return response
 
-    def _antstick_read_response(self, timeout=200):
+    def _antstick_read_message(self, timeout=200):
         try:
             msg = bytes(self.__antstick.read(self.__in_endpoint,
                                              64, timeout=timeout))
-            #print("< ", msg.hex())
+            print("<", bytes(msg), bytes(msg).hex())
             #ANTStick_Message(msg).show()
+
             return ANTStick_Message(msg)
         except USBTimeoutError:
             return None
+
+
+    # WHAD command handlers
+    def _on_whad_ant_sniff(self, message):
+        print("ANT sniff cmd", message)
+        self._close_channel(channel_number=0)
+        self._set_network_key(network_number = 0, network_key = message.network_key)
+        self._assign_channel(
+            channel_number = 0, 
+            network_number = 0, 
+            channel_type = 0x40, 
+            background_scanning = True
+        )
+        self._set_channel_id(
+            channel_number = 0,
+            device_number = message.device_number, 
+            device_type = message.device_type, 
+            transmission_type = message.transmission_type
+        )
+        self._set_channel_rf_frequency(
+            channel_number = 0, 
+            frequency = 2457
+        )
+        self._configure_extension_mode(enable=True)
+        self._open_rx_scan_mode()
+        # self._open_channel(channel_number=0)
+        self.__opened_stream = True
+        self._send_whad_command_result(CommandResult.SUCCESS)
 
 if __name__ == '__main__':
     print(ANTStickDevice.list())

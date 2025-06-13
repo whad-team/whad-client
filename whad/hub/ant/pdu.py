@@ -3,7 +3,7 @@
 import logging
 
 from struct import pack, unpack, error as StructError
-from whad.scapy.layers.ant import ANT_Hdr, ANT_Header_Hdr
+from whad.scapy.layers.ant import ANT_Hdr
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool, dissect_failsafe
 from whad.hub.ant import AntDomain, ANTMetadata
@@ -21,14 +21,14 @@ class SendPdu(PbMessageWrapper):
     def to_packet(self):
         """Convert message to the corresponding scapy packet
         """
-        return ANT_Header_Hdr(self.pdu)
+        return ANT_Hdr(self.pdu)
 
     @staticmethod
     def from_packet(packet, frequency: int = 2457):
         """Convert a scapy packet to a SendPdu message
         """
-        if ANT_Hdr in packet or ANT_Header_Hdr in packet:
-            pdu = bytes(packet[ANT_Header_Hdr])
+        if ANT_Hdr in packet:
+            pdu = bytes(packet[ANT_Hdr])
         else:
             return None
 
@@ -58,8 +58,6 @@ class SendRawPdu(PbMessageWrapper):
         """
         if ANT_Hdr in packet:
             pdu = bytes(packet[ANT_Hdr])
-        elif ANT_Header_Hdr in packet:
-            pdu = bytes(ANT_Hdr(address="00:00:00:00:00") / pdu)
         else:
             return None
 
@@ -86,7 +84,7 @@ class PduReceived(PbMessageWrapper):
         """Convert message to its scapy packet representation
         """
         # Create packet
-        packet = ANT_Header_Hdr(bytes(self.pdu))
+        packet = ANT_Hdr(bytes(self.pdu))
 
         # Set packet metadata
         packet.metadata = ANTMetadata()
@@ -97,7 +95,7 @@ class PduReceived(PbMessageWrapper):
             packet.metadata.rssi = self.rssi
         if self.timestamp is not None:
             packet.metadata.timestamp = self.timestamp
-        if self.fcs_validity is not None:
+        if self.crc_validity is not None:
             packet.metadata.is_crc_valid = self.crc_validity
 
         # Return packet
@@ -110,7 +108,7 @@ class PduReceived(PbMessageWrapper):
         # Create a PduReceived message
         msg = PduReceived(
             channel_number=packet.metadata.channel,
-            pdu=bytes(packet.getlayer(ANT_Header_Hdr)),
+            pdu=bytes(packet.getlayer(ANT_Hdr)),
         )
         # Add optional metadata
         if packet.metadata.rssi is not None:
@@ -151,7 +149,7 @@ class RawPduReceived(PbMessageWrapper):
             packet.metadata.rssi = self.rssi
         if self.timestamp is not None:
             packet.metadata.timestamp = self.timestamp
-        if self.fcs_validity is not None:
+        if self.crc_validity is not None:
             packet.metadata.is_crc_valid = self.crc_validity
 
         # Return packet
