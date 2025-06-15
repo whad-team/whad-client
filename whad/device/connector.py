@@ -299,9 +299,7 @@ class WhadDeviceConnector:
                     # Call the provided dispatch callback
                     dispatch_callback(message)
         except Empty:
-            logger.info("Error while unlocking")
-            # Processing done, continue.
-            pass
+            logger.debug("Processed all messages")
 
         # Mark connector as unlocked
         self.__locked = False
@@ -323,7 +321,7 @@ class WhadDeviceConnector:
         self.__locked_pdus.put(pdu)
 
     # Device interaction
-    def send_message(self, message, filter=None):
+    def send_message(self, message, msg_filter=None):
         """Sends a message to the underlying device without waiting for an answer.
 
         :param Message message: WHAD message to send to the device.
@@ -331,7 +329,7 @@ class WhadDeviceConnector:
         """
         try:
             logger.debug("sending WHAD message to device: %s", message)
-            self.__device.send_message(message, filter)
+            self.__device.send_message(message, msg_filter)
         except WhadDeviceError as device_error:
             logger.debug("an error occured while communicating with the WHAD device !")
             self.on_error(device_error)
@@ -390,14 +388,15 @@ class WhadDeviceConnector:
         return False
 
 
-    def wait_for_message(self, timeout=None, filter=None, command=False):
+    def wait_for_message(self, timeout=None, msg_filter=None, command=False):
         """Waits for a specific message to be received.
 
         This method reads the message queue and return the first message that matches the
         provided filter. A timeout can be specified and will cause this method to return
         None if this timeout is reached.
         """
-        return self.__device.wait_for_message(timeout=timeout, filter=filter, command=command)
+        return self.__device.wait_for_message(timeout=timeout, msg_filter=msg_filter,
+                                              command=command)
 
     # Message callbacks
     def on_any_msg(self, message): # pylint: disable=W0613
@@ -535,8 +534,11 @@ class Connector(WhadDeviceConnector):
         # Event listeners
         self.__listeners = []
 
-    def send_event(self, event):
+    def send_event(self, event: IfaceEvt):
         """Send an event into the connector event queue.
+
+        :param event: Event to add to the connector's event queue
+        :type event: IfaceEvt
         """
         self.__events.put(event)
 
@@ -571,7 +573,7 @@ class Connector(WhadDeviceConnector):
 
         # Success
         return True
-    
+
     def clear_listeners(self):
         """Clear listeners.
         """
@@ -589,6 +591,9 @@ class Connector(WhadDeviceConnector):
     @contextlib.contextmanager
     def get_event(self, timeout: float = None) -> Generator[IfaceEvt, None, None]:
         """Retrieve event from connector's event queue.
+
+        :param timeout: Timeout in seconds
+        :type timeout: float
         """
         try:
             yield self.__events.get(timeout=timeout)
