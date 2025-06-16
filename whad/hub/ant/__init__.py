@@ -26,7 +26,7 @@ class Commands:
     UnassignChannel           = 0x06
     OpenChannel               = 0x07
     CloseChannel              = 0x08
-    SetFrequency              = 0x09
+    SetRFChannel              = 0x09
     Sniff                     = 0x0a
     Jam                       = 0x0b
     Send                      = 0x0c
@@ -35,7 +35,8 @@ class Commands:
     SlaveMode                 = 0x0f
     Start                     = 0x10
     Stop                      = 0x11
-
+    ListChannels              = 0x12
+    ListNetworks              = 0x13
 
 
 
@@ -47,14 +48,14 @@ class ChannelType:
     SHARED_BIDIRECTIONAL_RECEIVE_CHANNEL = AntChannelType.SHARED_BIDIRECTIONAL_RECEIVE_CHANNEL
     SHARED_BIDIRECTIONAL_TRANSMIT_CHANNEL = AntChannelType.SHARED_BIDIRECTIONAL_TRANSMIT_CHANNEL
     RECEIVE_ONLY_CHANNEL = AntChannelType.RECEIVE_ONLY_CHANNEL
-    TRANSMIT_ONLY_CHANNEL = AntChannelType.TRANSMIT_ONLY_CHANNEL
-
+    TRANSMIT_ONLY_CHANNEL = AntChannelType.TRANSMIT_ONLY_CHANNEL    
 
 @dataclass(repr=False)
 class ANTMetadata(Metadata):
     is_crc_valid : bool = None
     timestamp : int = None
-    channel : int = None
+    rf_channel : int = None
+    channel_number : int = None
 
     def convert_to_header(self):
         return None, self.timestamp
@@ -64,15 +65,18 @@ class ANTMetadata(Metadata):
         metadata = ANTMetadata()
         metadata.is_crc_valid = True # TODO: update this field when we got a way
         metadata.timestamp = int(100000 * pkt.time)
-        metadata.channel = 0
+        metadata.rf_channel = 0
+        metadata.channel_number = 0
         return metadata
 
 def generate_ant_metadata(message):
     metadata = ANTMetadata()
 
+    metadata.channel_number = message.channel_number
+    metadata.rf_channel = message.rf_channel
+
     if message.rssi is not None:
         metadata.rssi = message.rssi
-    metadata.channel = message.channel
     if message.timestamp is not None:
         metadata.timestamp = message.timestamp
     if message.crc_validity is not None:
@@ -211,7 +215,7 @@ class AntDomain(Registry):
         :return: instance of `SetNetworkKey`
         """
         return AntDomain.bound('set_network_key', self.proto_version)(
-            channel_number=channel_number, 
+            network_number=network_number, 
             network_key=network_key
         )
         
@@ -295,24 +299,24 @@ class AntDomain(Registry):
         )
 
 
-    def create_set_frequency(self, channel_number : int, frequency : int) -> HubMessage:
-        """Create a SetFrequency message
+    def create_set_rf_channel(self, channel_number : int, rf_channel : int) -> HubMessage:
+        """Create a SetRFChannel message
 
         :param channel_number: Channel to configure
         :type channel_number: int
-        :param frequency: Frequency used to configure the channel (in MHz)
-        :type frequency: int
-        :return: instance of `SetFrequency`
+        :param rf_channel: RF Channel to use (between 0 & 125)
+        :type rf_channel: int
+        :return: instance of `SetRFChannel`
         """
-        return AntDomain.bound('set_frequency', self.proto_version)(
+        return AntDomain.bound('set_rf_channel', self.proto_version)(
             channel_number = channel_number, 
-            frequency = frequency
+            rf_channel = rf_channel
         )
         
 
     def create_sniff(
                         self,
-                        frequency : int,
+                        rf_channel : int,
                         network_key : bytes, 
                         device_number : int, 
                         device_type : int, 
@@ -320,8 +324,8 @@ class AntDomain(Registry):
     ) -> HubMessage:
         """Create a Sniff message
 
-        :param frequency: Frequency to monitor (in MHz)
-        :type frequency: int
+        :param rf_channel: RF Channel to monitor
+        :type rf_channel: int
         :param network_key: Network key to use to decrypt traffic
         :type network_key: bytes
         :param device_number: device number to sniff
@@ -333,7 +337,7 @@ class AntDomain(Registry):
         :return: instance of `Sniff`
         """
         return AntDomain.bound('sniff', self.proto_version)(
-            frequency = frequency, 
+            rf_channel = rf_channel, 
             network_key = network_key, 
             device_number = device_number, 
             device_type = device_type, 
@@ -343,53 +347,61 @@ class AntDomain(Registry):
 
     def create_jam(
                         self,
-                        frequency : int
+                        rf_channel : int
     ) -> HubMessage:
         """Create a Jam message
 
-        :param frequency: Frequency to jam (in MHz)
-        :type frequency: int
+        :param rf_channel: RF Channel to jam
+        :type rf_channel: int
         :return: instance of `Jam`
         """
         return AntDomain.bound('jam', self.proto_version)(
-            frequency = frequency 
+            rf_channel = rf_channel 
         )
         
 
     def create_send(
                         self,
-                        frequency : int, 
-                        pdu : bytes
+                        pdu : bytes, 
+                        channel_number : int = 0, 
+                        rf_channel : int = None
     ) -> HubMessage:
         """Create a Send message
 
-        :param frequency: Frequency to use (in MHz)
-        :type frequency: int
         :param pdu: PDU to send
         :type pdu: bytes
+        :param channel: Logical channel to use (if no RF channel directly selected)
+        :type channel: int
+        :param rf_channel: RF Channel to use (for direct transmission)
+        :type rf_channel: int
         :return: instance of `Send`
         """
         return AntDomain.bound('send', self.proto_version)(
-            frequency = frequency, 
+            rf_channel = rf_channel, 
+            channel_number = channel_number, 
             pdu = pdu
         )
 
 
     def create_send_raw(
                         self,
-                        frequency : int, 
-                        pdu : bytes
+                        pdu : bytes, 
+                        channel_number : int = 0, 
+                        rf_channel : int = None
     ) -> HubMessage:
         """Create a SendRaw message
 
-        :param frequency: Frequency to use (in MHz)
-        :type frequency: int
-        :param pdu: Raw PDU to send
+        :param pdu: PDU to send
         :type pdu: bytes
+        :param channel: Logical channel to use (if no RF channel directly selected)
+        :type channel: int
+        :param rf_channel: RF Channel to use (for direct transmission)
+        :type rf_channel: int
         :return: instance of `SendRaw`
         """
         return AntDomain.bound('send_raw', self.proto_version)(
-            frequency = frequency, 
+            rf_channel = rf_channel, 
+            channel_number = channel_number, 
             pdu = pdu
         )
 
@@ -441,6 +453,43 @@ class AntDomain(Registry):
         return AntDomain.bound('stop', self.proto_version)()
         
 
+    def create_list_channels(self) -> HubMessage:
+        """Create a List Channels message
+        
+        :return: instance of `List Channels`
+        """
+        return AntDomain.bound('list_channels', self.proto_version)()
+
+
+    def create_list_networks(self) -> HubMessage:
+        """Create a List Networks message
+        
+        :return: instance of `ListNetworks`
+        """
+        return AntDomain.bound('list_networks', self.proto_version)()
+        
+    def create_available_channels(self, number_of_channels : int) -> HubMessage:
+        """Create an available channels notification
+
+        :param number_of_channels: Maximum number of channels of available channels notification
+        :type number_of_channels: int
+        :return: instance of `AvailableChannels`
+        """
+        return AntDomain.bound('available_channels', self.proto_version)(
+            number_of_channels = number_of_channels  
+        )
+
+
+    def create_available_networks(self, number_of_networks : int) -> HubMessage:
+        """Create an available networks notification
+
+        :param number_of_networks: Maximum number of networks of available networks notification
+        :type number_of_networks: int
+        :return: instance of `AvailableChannels`
+        """
+        return AntDomain.bound('available_networks', self.proto_version)(
+            number_of_networks = number_of_networks  
+        )
 
     def create_jammed(self, timestamp : int = None) -> HubMessage:
         """Create a Jammed notification
@@ -456,6 +505,7 @@ class AntDomain(Registry):
     def create_pdu_received(
                         self,
                         channel_number : int, 
+                        rf_channel : int, 
                         pdu : bytes, 
                         rssi : int = None, 
                         timestamp : int = None, 
@@ -463,8 +513,10 @@ class AntDomain(Registry):
     ) -> HubMessage:
         """Create a PduReceived notification
 
-        :param channel_number: Channel to use
+        :param channel_number: Channel in use
         :type channel_number: int
+        :param rf_channel: RF Channel selected
+        :type rf_channel: int
         :param pdu: Received PDU
         :type pdu: bytes
         :param rssi: RSSI of the received packet in dBm (optional)
@@ -476,7 +528,8 @@ class AntDomain(Registry):
         :return: instance of `PduReceived`
         """
         return AntDomain.bound('pdu', self.proto_version)(
-            channel_number = channel_number, 
+            channel_number = channel_number,
+            rf_channel = rf_channel,  
             pdu = pdu, 
             #rssi = rssi, 
             #timestamp = timestamp, 
@@ -486,6 +539,7 @@ class AntDomain(Registry):
     def create_raw_pdu_received(
                         self,
                         channel_number : int, 
+                        rf_channel : int, 
                         pdu : bytes, 
                         crc : int, 
                         rssi : int = None, 
@@ -494,8 +548,10 @@ class AntDomain(Registry):
     ) -> HubMessage:
         """Create a RawPduReceived notification
 
-        :param channel_number: Channel to use
+        :param channel_number: Channel in use
         :type channel_number: int
+        :param rf_channel: RF Channel selected
+        :type rf_channel: int
         :param pdu: Received PDU
         :type pdu: bytes
         :param crc: Received PDU's CRC value (2-bytes integer format)
@@ -510,6 +566,7 @@ class AntDomain(Registry):
         """
         return AntDomain.bound('raw_pdu', self.proto_version)(
             channel_number = channel_number, 
+            rf_channel = rf_channel, 
             pdu = pdu, 
             crc = crc,
             rssi = rssi, 
@@ -519,7 +576,8 @@ class AntDomain(Registry):
 
 
 from .channel import SetDeviceNumber, SetDeviceType, SetTransmissionType, SetChannelPeriod, \
-SetNetworkKey, AssignChannel, UnassignChannel, OpenChannel, CloseChannel, SetFrequency
+    SetNetworkKey, AssignChannel, UnassignChannel, OpenChannel, CloseChannel, SetRFChannel, \
+    ListChannels, ListNetworks, AvailableChannels, AvailableNetworks
 from .mode import SniffMode, JamMode, MasterMode, SlaveMode, Start, Stop, Jammed
 from .pdu import SendPdu, SendRawPdu, PduReceived, RawPduReceived
 
@@ -533,13 +591,17 @@ __all__ = [
     'UnassignChannel',
     'OpenChannel',
     'CloseChannel',
-    'SetFrequency',
+    'SetRFChannel',
     'SniffMode',
     'JamMode',
     'MasterMode',
     'SlaveMode',
     'Start',
     'Stop',
+    'ListChannels',
+    'ListNetworks',
+    'AvailableChannels',
+    'AvailableNetworks',
     'Jammed',
     'SendPdu',
     'SendRawPdu',

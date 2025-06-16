@@ -9,7 +9,7 @@ from . import AntDomain
 class SniffMode(PbMessageWrapper):
     """ANT sniffing mode
     """
-    frequency = PbFieldInt('ant.sniff.frequency')
+    rf_channel = PbFieldInt('ant.sniff.rf_channel')
     network_key = PbFieldBytes('ant.sniff.network_key')
     device_number = PbFieldInt('ant.sniff.device_number', optional=True)
     device_type = PbFieldInt('ant.sniff.device_type', optional=True)
@@ -21,7 +21,7 @@ class SniffMode(PbMessageWrapper):
 class JamMode(PbMessageWrapper):
     """ANT jamming mode
     """
-    frequency = PbFieldInt('ant.jam.frequency')
+    rf_channel = PbFieldInt('ant.jam.rf_channel')
 
 
 @pb_bind(AntDomain, 'master_mode', 3)

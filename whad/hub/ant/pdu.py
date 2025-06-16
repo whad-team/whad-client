@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 class SendPdu(PbMessageWrapper):
     """Send ANT PDU message class
     """
-    frequency = PbFieldInt('ant.send.frequency')
+    channel_number = PbFieldInt('ant.send.channel_number')
+    rf_channel = PbFieldInt('ant.send.rf_channel')
     pdu = PbFieldBytes('ant.send.pdu')
 
     @dissect_failsafe
@@ -24,7 +25,7 @@ class SendPdu(PbMessageWrapper):
         return ANT_Hdr(self.pdu)
 
     @staticmethod
-    def from_packet(packet, frequency: int = 2457):
+    def from_packet(packet, channel_number : int = 0, rf_channel: int = 57):
         """Convert a scapy packet to a SendPdu message
         """
         if ANT_Hdr in packet:
@@ -33,7 +34,8 @@ class SendPdu(PbMessageWrapper):
             return None
 
         msg = SendPdu(
-            frequency=frequency,
+            channel_number=channel_number, 
+            rf_channel=rf_channel,
             pdu=pdu
         )
         return msg
@@ -43,7 +45,8 @@ class SendPdu(PbMessageWrapper):
 class SendRawPdu(PbMessageWrapper):
     """Send Raw ANT PDU message class
     """
-    frequency = PbFieldInt('ant.send_raw.frequency')
+    channel_number = PbFieldInt('ant.send_raw.channel_number')
+    rf_channel = PbFieldInt('ant.send_raw.rf_channel')
     pdu = PbFieldBytes('ant.send_raw.pdu')
 
     @dissect_failsafe
@@ -53,7 +56,7 @@ class SendRawPdu(PbMessageWrapper):
         return ANT_Hdr(self.pdu)
 
     @staticmethod
-    def from_packet(packet, frequency: int = 2457):
+    def from_packet(packet, channel_number : int = 0, rf_channel: int = 57):
         """Convert a scapy packet to a SendPdu message
         """
         if ANT_Hdr in packet:
@@ -62,7 +65,8 @@ class SendRawPdu(PbMessageWrapper):
             return None
 
         msg = SendRawPdu(
-            frequency=frequency,
+            channel_number=channel_number, 
+            rf_channel=rf_channel,
             pdu=pdu
         )
         return msg
@@ -74,6 +78,7 @@ class PduReceived(PbMessageWrapper):
     """ANT PDU received message class
     """
     channel_number = PbFieldInt('ant.pdu.channel_number')
+    rf_channel = PbFieldInt('ant.pdu.rf_channel')
     pdu = PbFieldBytes('ant.pdu.pdu')
     rssi = PbFieldInt('ant.pdu.rssi', optional=True)
     timestamp = PbFieldInt('ant.pdu.timestamp', optional=True)
@@ -88,7 +93,9 @@ class PduReceived(PbMessageWrapper):
 
         # Set packet metadata
         packet.metadata = ANTMetadata()
-        packet.metadata.channel = self.channel_number
+        packet.metadata.channel_number = self.channel_number
+        packet.metadata.rf_channel = self.rf_channel
+
         packet.metadata.decrypted = False
 
         if self.rssi is not None:
@@ -107,7 +114,8 @@ class PduReceived(PbMessageWrapper):
         """
         # Create a PduReceived message
         msg = PduReceived(
-            channel_number=packet.metadata.channel,
+            channel_number=packet.metadata.channel_number,
+            rf_channel=packet.metadata.rf_channel,
             pdu=bytes(packet.getlayer(ANT_Hdr)),
         )
         # Add optional metadata
@@ -127,6 +135,7 @@ class RawPduReceived(PbMessageWrapper):
     """ANT PDU received message class
     """
     channel_number = PbFieldInt('ant.raw_pdu.channel_number')
+    rf_channel = PbFieldInt('ant.raw_pdu.rf_channel')
     pdu = PbFieldBytes('ant.raw_pdu.pdu')
     crc = PbFieldInt('ant.raw_pdu.crc')
     rssi = PbFieldInt('ant.raw_pdu.rssi', optional=True)
@@ -142,7 +151,8 @@ class RawPduReceived(PbMessageWrapper):
 
         # Set packet metadata
         packet.metadata = ANTMetadata()
-        packet.metadata.channel = self.channel_number
+        packet.metadata.channel_number = self.channel_number
+        packet.metadata.rf_channel = self.rf_channel
         packet.metadata.decrypted = False
 
         if self.rssi is not None:
@@ -161,7 +171,8 @@ class RawPduReceived(PbMessageWrapper):
         """
         # Create a PduReceived message
         msg = RawPduReceived(
-            channel_number=packet.metadata.channel,
+            channel_number=packet.metadata.channel_number,
+            rf_channel=packet.metadata.rf_channel,
             pdu=bytes(packet.getlayer(ANT_Hdr))[:-2],
             crc=unpack('<H', bytes(packet.getlayer(ANT_Hdr))[-2:])[0]
         )

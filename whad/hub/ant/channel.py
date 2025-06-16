@@ -1,4 +1,5 @@
 from whad.protocol.whad_pb2 import Message
+from whad.protocol.ant.ant_pb2 import ListChannelsCmd, ListNetworksCmd 
 from ..message import pb_bind, PbFieldInt, PbFieldBytes, PbFieldBool, PbMessageWrapper
 from . import AntDomain
 
@@ -16,8 +17,8 @@ class SetDeviceNumber(PbMessageWrapper):
 class SetDeviceType(PbMessageWrapper):
     """ANT Set Device Type channel configuration message
     """
-    channel_number = PbFieldInt('ant.set_device_number.channel_number')
-    device_type = PbFieldInt('ant.set_device_number.device_type')
+    channel_number = PbFieldInt('ant.set_device_type.channel_number')
+    device_type = PbFieldInt('ant.set_device_type.device_type')
     
 
 
@@ -84,10 +85,47 @@ class CloseChannel(PbMessageWrapper):
     channel_number = PbFieldInt('ant.close_channel.channel_number')
 
 
-@pb_bind(AntDomain, 'set_frequency', 3)
-class SetFrequency(PbMessageWrapper):
-    """ANT Set Frequency channel configuration message
+@pb_bind(AntDomain, 'set_rf_channel', 3)
+class SetRFChannel(PbMessageWrapper):
+    """ANT Set RF Channel channel configuration message
     """
-    channel_number = PbFieldInt('ant.set_frequency.channel_number')
-    frequency = PbFieldInt('ant.set_frequency.frequency')
-    
+    channel_number = PbFieldInt('ant.set_rf_channel.channel_number')
+    rf_channel = PbFieldInt('ant.set_rf_channel.rf_channel')
+
+
+@pb_bind(AntDomain, 'list_channels', 3)
+class ListChannels(PbMessageWrapper):
+    """ANT list channels message
+    """
+
+    def __init__(self, message: Message = None):
+        super().__init__(message=message)
+        self.message.ant.list_channels.CopyFrom(ListChannelsCmd())
+
+
+@pb_bind(AntDomain, 'list_networks', 3)
+class ListNetworks(PbMessageWrapper):
+    """ANT list channels message
+    """
+
+    def __init__(self, message: Message = None):
+        super().__init__(message=message)
+        self.message.ant.list_networks.CopyFrom(ListNetworksCmd())
+
+
+
+@pb_bind(AntDomain, 'available_channels', 3)
+class AvailableChannels(PbMessageWrapper):
+    """ANT available channels notification
+    """
+
+    number_of_channels = PbFieldInt('ant.available_channels.number_of_channels')
+
+
+
+@pb_bind(AntDomain, 'available_networks', 3)
+class AvailableNetworks(PbMessageWrapper):
+    """ANT available networks notification
+    """
+
+    number_of_networks = PbFieldInt('ant.available_networks.number_of_networks')

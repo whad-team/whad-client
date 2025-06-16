@@ -106,10 +106,12 @@ antstick_message_codes = {
     174: "msg_serial_error_id"
 }
 
+ANTSTICK_SYNC = 0xA4
+
 class ANTStick_Message(Packet):
     name = "ANTStick Message"
     fields_desc = [
-        ByteField("sync", 0xA4), 
+        ByteField("sync", ANTSTICK_SYNC), 
         ByteField("length", None), 
         ByteEnumField("id", None, antstick_message_ids), 
         ByteField("checksum", None)
@@ -258,6 +260,12 @@ class ANTStick_Channel_Response_Or_Event(Packet):
         ByteEnumField("message_id", None, antstick_message_ids), 
         ByteEnumField("message_code", None, antstick_message_codes)
     ]
+   
+class ANTStick_Command_Unassign_Channel(Packet):
+    name = "ANTStick Unassign Channel Command"
+    fields_desc = [
+        ByteField("channel_number", None)
+    ]
 
 class ANTStick_Command_Assign_Channel(Packet):
     name = "ANTStick Assign Channel Command"
@@ -351,6 +359,30 @@ class ANTStick_Data_Extension(Packet):
         #ByteField("checksum", None)
     ]
 
+
+class ANTStick_Command_Reset(Packet):
+    name = "ANTStick Reset command"
+    fields_desc = [
+        ByteField("filler", 0x00),
+    ]
+
+
+class ANTStick_Requested_Message_Startup(Packet):
+    name = "ANTStick Requested Message Startup"
+    fields_desc = [
+        ByteField("error_code", None),
+    ]
+
+
+class ANTStick_Command_Set_Channel_Period(Packet):
+    name = "ANTStick Set Channel Period command"
+    fields_desc = [
+        ByteField("channel_number", None),
+        LEShortField("period", None),
+    ]
+
+
+
 bind_layers(ANTStick_Message, ANTStick_Data_Broadcast_Data, id=0x4E)
 bind_layers(ANTStick_Data_Broadcast_Data, ANTStick_Data_Extension)
 
@@ -363,10 +395,12 @@ bind_layers(ANTStick_Requested_Message_Advanced_Burst_Configuration, ANTStick_Re
 bind_layers(ANTStick_Message, ANTStick_Requested_Message_ANT_Version, id=0x3E)
 bind_layers(ANTStick_Message, ANTStick_Channel_Response_Or_Event, id=0x40)
 
-
+bind_layers(ANTStick_Message, ANTStick_Command_Set_Channel_Period, id=0x43)
+bind_layers(ANTStick_Message, ANTStick_Command_Unassign_Channel, id=0x41)
 bind_layers(ANTStick_Message, ANTStick_Command_Assign_Channel, id=0x42)
 bind_layers(ANTStick_Message, ANTStick_Command_Set_Channel_RF_Frequency, id=0x45)
 bind_layers(ANTStick_Message, ANTStick_Command_Set_Network_Key, id=0x46)
+bind_layers(ANTStick_Message, ANTStick_Command_Reset, id=0x4A)
 bind_layers(ANTStick_Message, ANTStick_Command_Open_Channel, id=0x4B)
 bind_layers(ANTStick_Message, ANTStick_Command_Close_Channel, id=0x4C)
 bind_layers(ANTStick_Message, ANTStick_Command_Request_Message, id=0x4D)
@@ -375,4 +409,5 @@ bind_layers(ANTStick_Message, ANTStick_Requested_Message_Capabilities, id=0x54)
 bind_layers(ANTStick_Message, ANTStick_Command_Open_RX_Scan_Mode, id=0x5B)
 bind_layers(ANTStick_Message, ANTStick_Requested_Message_Serial_Number, id=0x61)
 bind_layers(ANTStick_Message, ANTStick_Command_Enable_Extended_Messages, id=0x66)
+bind_layers(ANTStick_Message, ANTStick_Requested_Message_Startup,id=0x6F)
 bind_layers(ANTStick_Message, ANTStick_Requested_Message_Advanced_Burst, id=0x78)
