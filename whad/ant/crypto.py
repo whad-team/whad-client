@@ -64,6 +64,3 @@ def generate_sync_from_network_key(network_key) -> int:
 
     high_sync = tmp
     return low_sync | (high_sync << 8)
-
-print(is_valid_network_key(ANT_PLUS_NETWORK_KEY), hex(generate_sync_from_network_key(ANT_PLUS_NETWORK_KEY)))
-print(is_valid_network_key(ANT_FS_NETWORK_KEY))

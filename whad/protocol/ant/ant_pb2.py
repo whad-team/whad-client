@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bwhad/protocol/ant/ant.proto\x12\x03\x61nt\"C\n\x12SetDeviceNumberCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x15\n\rdevice_number\x18\x02 \x01(\r\"?\n\x10SetDeviceTypeCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x13\n\x0b\x64\x65vice_type\x18\x02 \x01(\r\"K\n\x16SetTransmissionTypeCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x19\n\x11transmission_type\x18\x02 \x01(\r\"E\n\x13SetChannelPeriodCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x16\n\x0e\x63hannel_period\x18\x02 \x01(\r\"?\n\x10SetNetworkKeyCmd\x12\x16\n\x0enetwork_number\x18\x01 \x01(\r\x12\x13\n\x0bnetwork_key\x18\x02 \x01(\x0c\"\xe5\x02\n\x10\x41ssignChannelCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x16\n\x0enetwork_number\x18\x02 \x01(\r\x12)\n\x0c\x63hannel_type\x18\x03 \x01(\x0e\x32\x13.ant.AntChannelType\x12 \n\x13\x62\x61\x63kground_scanning\x18\x04 \x01(\x08H\x00\x88\x01\x01\x12\x1e\n\x11\x66requency_agility\x18\x05 \x01(\x08H\x01\x88\x01\x01\x12$\n\x17\x66\x61st_channel_initiation\x18\x06 \x01(\x08H\x02\x88\x01\x01\x12&\n\x19\x61synchronous_transmission\x18\x07 \x01(\x08H\x03\x88\x01\x01\x42\x16\n\x14_background_scanningB\x14\n\x12_frequency_agilityB\x1a\n\x18_fast_channel_initiationB\x1c\n\x1a_asynchronous_transmission\",\n\x12UnassignChannelCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\"(\n\x0eOpenChannelCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\")\n\x0f\x43loseChannelCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\"<\n\x0fSetFrequencyCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x11\n\tfrequency\x18\x02 \x01(\r\"\xc0\x01\n\x08SniffCmd\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x13\n\x0bnetwork_key\x18\x02 \x01(\x0c\x12\x1a\n\rdevice_number\x18\x03 \x01(\rH\x00\x88\x01\x01\x12\x18\n\x0b\x64\x65vice_type\x18\x04 \x01(\rH\x01\x88\x01\x01\x12\x1e\n\x11transmission_type\x18\x05 \x01(\rH\x02\x88\x01\x01\x42\x10\n\x0e_device_numberB\x0e\n\x0c_device_typeB\x14\n\x12_transmission_type\"\x1b\n\x06JamCmd\x12\x11\n\tfrequency\x18\x01 \x01(\r\")\n\x07SendCmd\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x0b\n\x03pdu\x18\x02 \x01(\x0c\",\n\nSendRawCmd\x12\x11\n\tfrequency\x18\x01 \x01(\r\x12\x0b\n\x03pdu\x18\x02 \x01(\x0c\"\'\n\rMasterModeCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\"&\n\x0cSlaveModeCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\"\n\n\x08StartCmd\"\t\n\x07StopCmd\"\x1b\n\x06Jammed\x12\x11\n\ttimestamp\x18\x01 \x01(\r\"\xb0\x01\n\x0eRawPduReceived\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x19\n\x0c\x63rc_validity\x18\x04 \x01(\x08H\x02\x88\x01\x01\x12\x0b\n\x03pdu\x18\x05 \x01(\x0c\x12\x0b\n\x03\x63rc\x18\x06 \x01(\rB\x07\n\x05_rssiB\x0c\n\n_timestampB\x0f\n\r_crc_validity\"\xa0\x01\n\x0bPduReceived\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x19\n\x0c\x63rc_validity\x18\x04 \x01(\x08H\x02\x88\x01\x01\x12\x0b\n\x03pdu\x18\x05 \x01(\x0c\x42\x07\n\x05_rssiB\x0c\n\n_timestampB\x0f\n\r_crc_validity\"\x8a\x07\n\x07Message\x12\x34\n\x11set_device_number\x18\x01 \x01(\x0b\x32\x17.ant.SetDeviceNumberCmdH\x00\x12\x30\n\x0fset_device_type\x18\x02 \x01(\x0b\x32\x15.ant.SetDeviceTypeCmdH\x00\x12<\n\x15set_transmission_type\x18\x03 \x01(\x0b\x32\x1b.ant.SetTransmissionTypeCmdH\x00\x12\x36\n\x12set_channel_period\x18\x04 \x01(\x0b\x32\x18.ant.SetChannelPeriodCmdH\x00\x12\x30\n\x0fset_network_key\x18\x05 \x01(\x0b\x32\x15.ant.SetNetworkKeyCmdH\x00\x12/\n\x0e\x61ssign_channel\x18\x06 \x01(\x0b\x32\x15.ant.AssignChannelCmdH\x00\x12\x33\n\x10unassign_channel\x18\x07 \x01(\x0b\x32\x17.ant.UnassignChannelCmdH\x00\x12+\n\x0copen_channel\x18\x08 \x01(\x0b\x32\x13.ant.OpenChannelCmdH\x00\x12-\n\rclose_channel\x18\t \x01(\x0b\x32\x14.ant.CloseChannelCmdH\x00\x12-\n\rset_frequency\x18\n \x01(\x0b\x32\x14.ant.SetFrequencyCmdH\x00\x12\x1e\n\x05sniff\x18\x0b \x01(\x0b\x32\r.ant.SniffCmdH\x00\x12\x1a\n\x03jam\x18\x0c \x01(\x0b\x32\x0b.ant.JamCmdH\x00\x12\x1c\n\x04send\x18\r \x01(\x0b\x32\x0c.ant.SendCmdH\x00\x12#\n\x08send_raw\x18\x0e \x01(\x0b\x32\x0f.ant.SendRawCmdH\x00\x12)\n\x0bmaster_mode\x18\x0f \x01(\x0b\x32\x12.ant.MasterModeCmdH\x00\x12\'\n\nslave_mode\x18\x10 \x01(\x0b\x32\x11.ant.SlaveModeCmdH\x00\x12\x1e\n\x05start\x18\x11 \x01(\x0b\x32\r.ant.StartCmdH\x00\x12\x1c\n\x04stop\x18\x12 \x01(\x0b\x32\x0c.ant.StopCmdH\x00\x12\x1d\n\x06jammed\x18\x13 \x01(\x0b\x32\x0b.ant.JammedH\x00\x12&\n\x07raw_pdu\x18\x14 \x01(\x0b\x32\x13.ant.RawPduReceivedH\x00\x12\x1f\n\x03pdu\x18\x15 \x01(\x0b\x32\x10.ant.PduReceivedH\x00\x42\x05\n\x03msg*\xb2\x02\n\nANTCommand\x12\x13\n\x0fSetDeviceNumber\x10\x00\x12\x11\n\rSetDeviceType\x10\x01\x12\x17\n\x13SetTransmissionType\x10\x02\x12\x14\n\x10SetChannelPeriod\x10\x03\x12\x11\n\rSetNetworkKey\x10\x04\x12\x11\n\rAssignChannel\x10\x05\x12\x13\n\x0fUnassignChannel\x10\x06\x12\x0f\n\x0bOpenChannel\x10\x07\x12\x10\n\x0c\x43loseChannel\x10\x08\x12\x10\n\x0cSetFrequency\x10\t\x12\t\n\x05Sniff\x10\n\x12\x07\n\x03Jam\x10\x0b\x12\x08\n\x04Send\x10\x0c\x12\x0b\n\x07SendRaw\x10\r\x12\x0e\n\nMasterMode\x10\x0e\x12\r\n\tSlaveMode\x10\x0f\x12\t\n\x05Start\x10\x10\x12\x08\n\x04Stop\x10\x11*\xe1\x01\n\x0e\x41ntChannelType\x12!\n\x1d\x42IDIRECTIONAL_RECEIVE_CHANNEL\x10\x00\x12\"\n\x1e\x42IDIRECTIONAL_TRANSMIT_CHANNEL\x10\x01\x12(\n$SHARED_BIDIRECTIONAL_RECEIVE_CHANNEL\x10\x02\x12)\n%SHARED_BIDIRECTIONAL_TRANSMIT_CHANNEL\x10\x03\x12\x18\n\x14RECEIVE_ONLY_CHANNEL\x10\x04\x12\x19\n\x15TRANSMIT_ONLY_CHANNEL\x10\x05\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bwhad/protocol/ant/ant.proto\x12\x03\x61nt\"C\n\x12SetDeviceNumberCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x15\n\rdevice_number\x18\x02 \x01(\r\"?\n\x10SetDeviceTypeCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x13\n\x0b\x64\x65vice_type\x18\x02 \x01(\r\"K\n\x16SetTransmissionTypeCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x19\n\x11transmission_type\x18\x02 \x01(\r\"E\n\x13SetChannelPeriodCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x16\n\x0e\x63hannel_period\x18\x02 \x01(\r\"?\n\x10SetNetworkKeyCmd\x12\x16\n\x0enetwork_number\x18\x01 \x01(\r\x12\x13\n\x0bnetwork_key\x18\x02 \x01(\x0c\"\xe5\x02\n\x10\x41ssignChannelCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x16\n\x0enetwork_number\x18\x02 \x01(\r\x12)\n\x0c\x63hannel_type\x18\x03 \x01(\x0e\x32\x13.ant.AntChannelType\x12 \n\x13\x62\x61\x63kground_scanning\x18\x04 \x01(\x08H\x00\x88\x01\x01\x12\x1e\n\x11\x66requency_agility\x18\x05 \x01(\x08H\x01\x88\x01\x01\x12$\n\x17\x66\x61st_channel_initiation\x18\x06 \x01(\x08H\x02\x88\x01\x01\x12&\n\x19\x61synchronous_transmission\x18\x07 \x01(\x08H\x03\x88\x01\x01\x42\x16\n\x14_background_scanningB\x14\n\x12_frequency_agilityB\x1a\n\x18_fast_channel_initiationB\x1c\n\x1a_asynchronous_transmission\",\n\x12UnassignChannelCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\"(\n\x0eOpenChannelCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\")\n\x0f\x43loseChannelCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\"=\n\x0fSetRFChannelCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x12\n\nrf_channel\x18\x02 \x01(\r\"\xc1\x01\n\x08SniffCmd\x12\x12\n\nrf_channel\x18\x01 \x01(\r\x12\x13\n\x0bnetwork_key\x18\x02 \x01(\x0c\x12\x1a\n\rdevice_number\x18\x03 \x01(\rH\x00\x88\x01\x01\x12\x18\n\x0b\x64\x65vice_type\x18\x04 \x01(\rH\x01\x88\x01\x01\x12\x1e\n\x11transmission_type\x18\x05 \x01(\rH\x02\x88\x01\x01\x42\x10\n\x0e_device_numberB\x0e\n\x0c_device_typeB\x14\n\x12_transmission_type\"\x1c\n\x06JamCmd\x12\x12\n\nrf_channel\x18\x01 \x01(\r\"V\n\x07SendCmd\x12\x17\n\nrf_channel\x18\x01 \x01(\rH\x00\x88\x01\x01\x12\x16\n\x0e\x63hannel_number\x18\x02 \x01(\r\x12\x0b\n\x03pdu\x18\x03 \x01(\x0c\x42\r\n\x0b_rf_channel\"Y\n\nSendRawCmd\x12\x17\n\nrf_channel\x18\x01 \x01(\rH\x00\x88\x01\x01\x12\x16\n\x0e\x63hannel_number\x18\x02 \x01(\r\x12\x0b\n\x03pdu\x18\x03 \x01(\x0c\x42\r\n\x0b_rf_channel\"\'\n\rMasterModeCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\"&\n\x0cSlaveModeCmd\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\"\n\n\x08StartCmd\"\t\n\x07StopCmd\"\x11\n\x0fListChannelsCmd\"\x11\n\x0fListNetworksCmd\"\x1b\n\x06Jammed\x12\x11\n\ttimestamp\x18\x01 \x01(\r\"/\n\x11\x41vailableChannels\x12\x1a\n\x12number_of_channels\x18\x01 \x01(\r\"/\n\x11\x41vailableNetworks\x12\x1a\n\x12number_of_networks\x18\x01 \x01(\r\"\xc4\x01\n\x0eRawPduReceived\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x19\n\x0c\x63rc_validity\x18\x04 \x01(\x08H\x02\x88\x01\x01\x12\x0b\n\x03pdu\x18\x05 \x01(\x0c\x12\x0b\n\x03\x63rc\x18\x06 \x01(\r\x12\x12\n\nrf_channel\x18\x07 \x01(\rB\x07\n\x05_rssiB\x0c\n\n_timestampB\x0f\n\r_crc_validity\"\xb4\x01\n\x0bPduReceived\x12\x16\n\x0e\x63hannel_number\x18\x01 \x01(\r\x12\x11\n\x04rssi\x18\x02 \x01(\x05H\x00\x88\x01\x01\x12\x16\n\ttimestamp\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x19\n\x0c\x63rc_validity\x18\x04 \x01(\x08H\x02\x88\x01\x01\x12\x0b\n\x03pdu\x18\x05 \x01(\x0c\x12\x12\n\nrf_channel\x18\x06 \x01(\rB\x07\n\x05_rssiB\x0c\n\n_timestampB\x0f\n\r_crc_validity\"\xd5\x08\n\x07Message\x12\x34\n\x11set_device_number\x18\x01 \x01(\x0b\x32\x17.ant.SetDeviceNumberCmdH\x00\x12\x30\n\x0fset_device_type\x18\x02 \x01(\x0b\x32\x15.ant.SetDeviceTypeCmdH\x00\x12<\n\x15set_transmission_type\x18\x03 \x01(\x0b\x32\x1b.ant.SetTransmissionTypeCmdH\x00\x12\x36\n\x12set_channel_period\x18\x04 \x01(\x0b\x32\x18.ant.SetChannelPeriodCmdH\x00\x12\x30\n\x0fset_network_key\x18\x05 \x01(\x0b\x32\x15.ant.SetNetworkKeyCmdH\x00\x12/\n\x0e\x61ssign_channel\x18\x06 \x01(\x0b\x32\x15.ant.AssignChannelCmdH\x00\x12\x33\n\x10unassign_channel\x18\x07 \x01(\x0b\x32\x17.ant.UnassignChannelCmdH\x00\x12+\n\x0copen_channel\x18\x08 \x01(\x0b\x32\x13.ant.OpenChannelCmdH\x00\x12-\n\rclose_channel\x18\t \x01(\x0b\x32\x14.ant.CloseChannelCmdH\x00\x12.\n\x0eset_rf_channel\x18\n \x01(\x0b\x32\x14.ant.SetRFChannelCmdH\x00\x12\x1e\n\x05sniff\x18\x0b \x01(\x0b\x32\r.ant.SniffCmdH\x00\x12\x1a\n\x03jam\x18\x0c \x01(\x0b\x32\x0b.ant.JamCmdH\x00\x12\x1c\n\x04send\x18\r \x01(\x0b\x32\x0c.ant.SendCmdH\x00\x12#\n\x08send_raw\x18\x0e \x01(\x0b\x32\x0f.ant.SendRawCmdH\x00\x12)\n\x0bmaster_mode\x18\x0f \x01(\x0b\x32\x12.ant.MasterModeCmdH\x00\x12\'\n\nslave_mode\x18\x10 \x01(\x0b\x32\x11.ant.SlaveModeCmdH\x00\x12\x1e\n\x05start\x18\x11 \x01(\x0b\x32\r.ant.StartCmdH\x00\x12\x1c\n\x04stop\x18\x12 \x01(\x0b\x32\x0c.ant.StopCmdH\x00\x12\x1d\n\x06jammed\x18\x13 \x01(\x0b\x32\x0b.ant.JammedH\x00\x12&\n\x07raw_pdu\x18\x14 \x01(\x0b\x32\x13.ant.RawPduReceivedH\x00\x12\x1f\n\x03pdu\x18\x15 \x01(\x0b\x32\x10.ant.PduReceivedH\x00\x12-\n\rlist_channels\x18\x16 \x01(\x0b\x32\x14.ant.ListChannelsCmdH\x00\x12-\n\rlist_networks\x18\x17 \x01(\x0b\x32\x14.ant.ListNetworksCmdH\x00\x12\x34\n\x12\x61vailable_channels\x18\x18 \x01(\x0b\x32\x16.ant.AvailableChannelsH\x00\x12\x34\n\x12\x61vailable_networks\x18\x19 \x01(\x0b\x32\x16.ant.AvailableNetworksH\x00\x42\x05\n\x03msg*\xd6\x02\n\nANTCommand\x12\x13\n\x0fSetDeviceNumber\x10\x00\x12\x11\n\rSetDeviceType\x10\x01\x12\x17\n\x13SetTransmissionType\x10\x02\x12\x14\n\x10SetChannelPeriod\x10\x03\x12\x11\n\rSetNetworkKey\x10\x04\x12\x11\n\rAssignChannel\x10\x05\x12\x13\n\x0fUnassignChannel\x10\x06\x12\x0f\n\x0bOpenChannel\x10\x07\x12\x10\n\x0c\x43loseChannel\x10\x08\x12\x10\n\x0cSetRFChannel\x10\t\x12\t\n\x05Sniff\x10\n\x12\x07\n\x03Jam\x10\x0b\x12\x08\n\x04Send\x10\x0c\x12\x0b\n\x07SendRaw\x10\r\x12\x0e\n\nMasterMode\x10\x0e\x12\r\n\tSlaveMode\x10\x0f\x12\t\n\x05Start\x10\x10\x12\x08\n\x04Stop\x10\x11\x12\x10\n\x0cListChannels\x10\x12\x12\x10\n\x0cListNetworks\x10\x13*\xe1\x01\n\x0e\x41ntChannelType\x12!\n\x1d\x42IDIRECTIONAL_RECEIVE_CHANNEL\x10\x00\x12\"\n\x1e\x42IDIRECTIONAL_TRANSMIT_CHANNEL\x10\x01\x12(\n$SHARED_BIDIRECTIONAL_RECEIVE_CHANNEL\x10\x02\x12)\n%SHARED_BIDIRECTIONAL_TRANSMIT_CHANNEL\x10\x03\x12\x18\n\x14RECEIVE_ONLY_CHANNEL\x10\x04\x12\x19\n\x15TRANSMIT_ONLY_CHANNEL\x10\x05\x62\x06proto3')
 
 _ANTCOMMAND = DESCRIPTOR.enum_types_by_name['ANTCommand']
 ANTCommand = enum_type_wrapper.EnumTypeWrapper(_ANTCOMMAND)
@@ -30,7 +30,7 @@ AssignChannel = 5
 UnassignChannel = 6
 OpenChannel = 7
 CloseChannel = 8
-SetFrequency = 9
+SetRFChannel = 9
 Sniff = 10
 Jam = 11
 Send = 12
@@ -39,6 +39,8 @@ MasterMode = 14
 SlaveMode = 15
 Start = 16
 Stop = 17
+ListChannels = 18
+ListNetworks = 19
 BIDIRECTIONAL_RECEIVE_CHANNEL = 0
 BIDIRECTIONAL_TRANSMIT_CHANNEL = 1
 SHARED_BIDIRECTIONAL_RECEIVE_CHANNEL = 2
@@ -56,7 +58,7 @@ _ASSIGNCHANNELCMD = DESCRIPTOR.message_types_by_name['AssignChannelCmd']
 _UNASSIGNCHANNELCMD = DESCRIPTOR.message_types_by_name['UnassignChannelCmd']
 _OPENCHANNELCMD = DESCRIPTOR.message_types_by_name['OpenChannelCmd']
 _CLOSECHANNELCMD = DESCRIPTOR.message_types_by_name['CloseChannelCmd']
-_SETFREQUENCYCMD = DESCRIPTOR.message_types_by_name['SetFrequencyCmd']
+_SETRFCHANNELCMD = DESCRIPTOR.message_types_by_name['SetRFChannelCmd']
 _SNIFFCMD = DESCRIPTOR.message_types_by_name['SniffCmd']
 _JAMCMD = DESCRIPTOR.message_types_by_name['JamCmd']
 _SENDCMD = DESCRIPTOR.message_types_by_name['SendCmd']
@@ -65,7 +67,11 @@ _MASTERMODECMD = DESCRIPTOR.message_types_by_name['MasterModeCmd']
 _SLAVEMODECMD = DESCRIPTOR.message_types_by_name['SlaveModeCmd']
 _STARTCMD = DESCRIPTOR.message_types_by_name['StartCmd']
 _STOPCMD = DESCRIPTOR.message_types_by_name['StopCmd']
+_LISTCHANNELSCMD = DESCRIPTOR.message_types_by_name['ListChannelsCmd']
+_LISTNETWORKSCMD = DESCRIPTOR.message_types_by_name['ListNetworksCmd']
 _JAMMED = DESCRIPTOR.message_types_by_name['Jammed']
+_AVAILABLECHANNELS = DESCRIPTOR.message_types_by_name['AvailableChannels']
+_AVAILABLENETWORKS = DESCRIPTOR.message_types_by_name['AvailableNetworks']
 _RAWPDURECEIVED = DESCRIPTOR.message_types_by_name['RawPduReceived']
 _PDURECEIVED = DESCRIPTOR.message_types_by_name['PduReceived']
 _MESSAGE = DESCRIPTOR.message_types_by_name['Message']
@@ -132,12 +138,12 @@ CloseChannelCmd = _reflection.GeneratedProtocolMessageType('CloseChannelCmd', (_
   })
 _sym_db.RegisterMessage(CloseChannelCmd)
 
-SetFrequencyCmd = _reflection.GeneratedProtocolMessageType('SetFrequencyCmd', (_message.Message,), {
-  'DESCRIPTOR' : _SETFREQUENCYCMD,
+SetRFChannelCmd = _reflection.GeneratedProtocolMessageType('SetRFChannelCmd', (_message.Message,), {
+  'DESCRIPTOR' : _SETRFCHANNELCMD,
   '__module__' : 'whad.protocol.ant.ant_pb2'
-  # @@protoc_insertion_point(class_scope:ant.SetFrequencyCmd)
+  # @@protoc_insertion_point(class_scope:ant.SetRFChannelCmd)
   })
-_sym_db.RegisterMessage(SetFrequencyCmd)
+_sym_db.RegisterMessage(SetRFChannelCmd)
 
 SniffCmd = _reflection.GeneratedProtocolMessageType('SniffCmd', (_message.Message,), {
   'DESCRIPTOR' : _SNIFFCMD,
@@ -195,12 +201,40 @@ StopCmd = _reflection.GeneratedProtocolMessageType('StopCmd', (_message.Message,
   })
 _sym_db.RegisterMessage(StopCmd)
 
+ListChannelsCmd = _reflection.GeneratedProtocolMessageType('ListChannelsCmd', (_message.Message,), {
+  'DESCRIPTOR' : _LISTCHANNELSCMD,
+  '__module__' : 'whad.protocol.ant.ant_pb2'
+  # @@protoc_insertion_point(class_scope:ant.ListChannelsCmd)
+  })
+_sym_db.RegisterMessage(ListChannelsCmd)
+
+ListNetworksCmd = _reflection.GeneratedProtocolMessageType('ListNetworksCmd', (_message.Message,), {
+  'DESCRIPTOR' : _LISTNETWORKSCMD,
+  '__module__' : 'whad.protocol.ant.ant_pb2'
+  # @@protoc_insertion_point(class_scope:ant.ListNetworksCmd)
+  })
+_sym_db.RegisterMessage(ListNetworksCmd)
+
 Jammed = _reflection.GeneratedProtocolMessageType('Jammed', (_message.Message,), {
   'DESCRIPTOR' : _JAMMED,
   '__module__' : 'whad.protocol.ant.ant_pb2'
   # @@protoc_insertion_point(class_scope:ant.Jammed)
   })
 _sym_db.RegisterMessage(Jammed)
+
+AvailableChannels = _reflection.GeneratedProtocolMessageType('AvailableChannels', (_message.Message,), {
+  'DESCRIPTOR' : _AVAILABLECHANNELS,
+  '__module__' : 'whad.protocol.ant.ant_pb2'
+  # @@protoc_insertion_point(class_scope:ant.AvailableChannels)
+  })
+_sym_db.RegisterMessage(AvailableChannels)
+
+AvailableNetworks = _reflection.GeneratedProtocolMessageType('AvailableNetworks', (_message.Message,), {
+  'DESCRIPTOR' : _AVAILABLENETWORKS,
+  '__module__' : 'whad.protocol.ant.ant_pb2'
+  # @@protoc_insertion_point(class_scope:ant.AvailableNetworks)
+  })
+_sym_db.RegisterMessage(AvailableNetworks)
 
 RawPduReceived = _reflection.GeneratedProtocolMessageType('RawPduReceived', (_message.Message,), {
   'DESCRIPTOR' : _RAWPDURECEIVED,
@@ -226,10 +260,10 @@ _sym_db.RegisterMessage(Message)
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _ANTCOMMAND._serialized_start=2634
-  _ANTCOMMAND._serialized_end=2940
-  _ANTCHANNELTYPE._serialized_start=2943
-  _ANTCHANNELTYPE._serialized_end=3168
+  _ANTCOMMAND._serialized_start=3106
+  _ANTCOMMAND._serialized_end=3448
+  _ANTCHANNELTYPE._serialized_start=3451
+  _ANTCHANNELTYPE._serialized_end=3676
   _SETDEVICENUMBERCMD._serialized_start=36
   _SETDEVICENUMBERCMD._serialized_end=103
   _SETDEVICETYPECMD._serialized_start=105
@@ -248,30 +282,38 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _OPENCHANNELCMD._serialized_end=829
   _CLOSECHANNELCMD._serialized_start=831
   _CLOSECHANNELCMD._serialized_end=872
-  _SETFREQUENCYCMD._serialized_start=874
-  _SETFREQUENCYCMD._serialized_end=934
-  _SNIFFCMD._serialized_start=937
-  _SNIFFCMD._serialized_end=1129
-  _JAMCMD._serialized_start=1131
-  _JAMCMD._serialized_end=1158
-  _SENDCMD._serialized_start=1160
-  _SENDCMD._serialized_end=1201
-  _SENDRAWCMD._serialized_start=1203
-  _SENDRAWCMD._serialized_end=1247
-  _MASTERMODECMD._serialized_start=1249
-  _MASTERMODECMD._serialized_end=1288
-  _SLAVEMODECMD._serialized_start=1290
-  _SLAVEMODECMD._serialized_end=1328
-  _STARTCMD._serialized_start=1330
-  _STARTCMD._serialized_end=1340
-  _STOPCMD._serialized_start=1342
-  _STOPCMD._serialized_end=1351
-  _JAMMED._serialized_start=1353
-  _JAMMED._serialized_end=1380
-  _RAWPDURECEIVED._serialized_start=1383
-  _RAWPDURECEIVED._serialized_end=1559
-  _PDURECEIVED._serialized_start=1562
-  _PDURECEIVED._serialized_end=1722
-  _MESSAGE._serialized_start=1725
-  _MESSAGE._serialized_end=2631
+  _SETRFCHANNELCMD._serialized_start=874
+  _SETRFCHANNELCMD._serialized_end=935
+  _SNIFFCMD._serialized_start=938
+  _SNIFFCMD._serialized_end=1131
+  _JAMCMD._serialized_start=1133
+  _JAMCMD._serialized_end=1161
+  _SENDCMD._serialized_start=1163
+  _SENDCMD._serialized_end=1249
+  _SENDRAWCMD._serialized_start=1251
+  _SENDRAWCMD._serialized_end=1340
+  _MASTERMODECMD._serialized_start=1342
+  _MASTERMODECMD._serialized_end=1381
+  _SLAVEMODECMD._serialized_start=1383
+  _SLAVEMODECMD._serialized_end=1421
+  _STARTCMD._serialized_start=1423
+  _STARTCMD._serialized_end=1433
+  _STOPCMD._serialized_start=1435
+  _STOPCMD._serialized_end=1444
+  _LISTCHANNELSCMD._serialized_start=1446
+  _LISTCHANNELSCMD._serialized_end=1463
+  _LISTNETWORKSCMD._serialized_start=1465
+  _LISTNETWORKSCMD._serialized_end=1482
+  _JAMMED._serialized_start=1484
+  _JAMMED._serialized_end=1511
+  _AVAILABLECHANNELS._serialized_start=1513
+  _AVAILABLECHANNELS._serialized_end=1560
+  _AVAILABLENETWORKS._serialized_start=1562
+  _AVAILABLENETWORKS._serialized_end=1609
+  _RAWPDURECEIVED._serialized_start=1612
+  _RAWPDURECEIVED._serialized_end=1808
+  _PDURECEIVED._serialized_start=1811
+  _PDURECEIVED._serialized_end=1991
+  _MESSAGE._serialized_start=1994
+  _MESSAGE._serialized_end=3103
 # @@protoc_insertion_point(module_scope)
