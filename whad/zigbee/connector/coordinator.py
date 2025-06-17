@@ -15,14 +15,15 @@ from whad.zigbee.stack.apl.application import ApplicationObject
 from whad.zigbee.stack.apl.constants import LogicalDeviceType
 from whad.zigbee.stack.nwk.network import ZigbeeNetwork
 from whad.exceptions import UnsupportedCapability
-from whad.device import WhadDevice
+
+from whad.hw import Interface
 
 class Coordinator(Zigbee):
     """
     Zigbee Coordinator interface for compatible WHAD device.
     """
 
-    def __init__(self, device: WhadDevice, applications: List[ApplicationObject] = None):
+    def __init__(self, device: Interface, applications: List[ApplicationObject] = None):
         """ZigBee coordinator initialization.
 
         :param device: WHAD device to use as coordinator

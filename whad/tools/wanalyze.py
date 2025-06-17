@@ -296,11 +296,11 @@ class WhadAnalyzeApp(CommandLineApp):
                 if not self.args.nocolor:
                     conf.color_theme = BrightTheme()
 
-                parameters = self.args.__dict__
 
-                connector = UnixSocketConnector(interface)
-                for parameter_name, parameter_value in parameters.items():
-                    connector.add_parameter(parameter_name, parameter_value)
+                #parameters = self.args.__dict__
+                connector = UnixConnector(interface)
+                #for parameter_name, parameter_value in parameters.items():
+                #    connector.add_parameter(parameter_name, parameter_value)
 
                 self.provided_analyzers, self.provided_parameters = self.get_provided_analyzers()
                 self.selected_analyzers = {}
@@ -329,13 +329,14 @@ class WhadAnalyzeApp(CommandLineApp):
 
                     # Create our packet bridge
                     logger.info("[wanalyze] Starting our output pipe")
-                    _ = WhadAnalyzePipe(connector, unix_server, self.on_packet)
+                    WhadAnalyzePipe(connector, unix_server, self.on_packet).wait()
                 else:
                     connector.on_packet = self.on_packet
+                    # Unlock connector
                     connector.unlock()
 
-                while interface.opened:
-                    sleep(.1)
+                    # Wait for the associated interface to disconnect
+                    connector.join()
 
         except KeyboardInterrupt:
             # Launch post-run tasks
