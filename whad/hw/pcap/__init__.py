@@ -18,8 +18,9 @@ from scapy.utils import PcapReader
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceDisconnected, WhadDeviceError
 
-from whad.hw import VirtualInterface
-from whad.device.virtual.pcap.capabilities import CAPABILITIES
+from ..iface import VirtualInterface
+from .capabilities import CAPABILITIES
+
 from whad.hub.generic.cmdresult import CommandResult
 from whad.scapy.layers.phy import Phy_Packet
 from whad.hub.dot15d4 import Dot15d4Metadata
@@ -32,7 +33,7 @@ from whad.ble.utils.phy import FieldsSize
 
 logger = logging.getLogger(__name__)
 
-class PCAPDevice(VirtualInterface):
+class PcapIface(VirtualInterface):
     """PCAP replay virtual device implementation.
     """
 

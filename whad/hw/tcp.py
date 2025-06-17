@@ -41,7 +41,7 @@ def is_valid_hostname(hostname: str) -> bool:
     allowed = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
     return all(allowed.match(label) for label in labels)
 
-class TCPSocketDevice(Interface):
+class TcpSocket(Interface):
     """
     UnixSocketDevice device class.
     """
