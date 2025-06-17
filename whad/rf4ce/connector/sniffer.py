@@ -141,25 +141,18 @@ class Sniffer(RF4CE, EventsManager):
                         forever if set to `None`.
         :type timeout: float
         """
-        start = time()
-        try:
-            while True:
-                if self.support_raw_pdu():
-                    message_type = RawPduReceived
-                else:
-                    message_type = PduReceived
+        if self.support_raw_pdu():
+            message_type = RawPduReceived
+        else:
+            message_type = PduReceived
 
-                message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
+        try:
+            for message in super().sniff(messages=(message_type), timeout=timeout):
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
                     if packet is not None:
                         packet = self.process_packet(packet)
                         self.monitor_packet_rx(packet)
                         yield packet
-
-                # Check if timeout has been reached
-                if timeout is not None:
-                    if time() - start >= timeout:
-                        break
         except WhadDeviceDisconnected:
             return
