@@ -3,7 +3,7 @@ from typing import Union, Tuple
 from scapy.packet import Packet
 
 from whad.hub.discovery import Domain, Capability
-from whad.device import WhadDeviceConnector
+from whad.hw import Connector
 from whad.helpers import message_filter
 from whad.phy.utils.definitions import OOKModulationScheme, ASKModulationScheme, \
     QPSKModulationScheme, BPSKModulationScheme, \
@@ -19,7 +19,7 @@ from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.phy import Commands, TxPower, Endianness, SupportedFreqRanges, \
     SchedulePacketResponse, PhyMetadata
 
-class Phy(WhadDeviceConnector):
+class Phy(Connector):
     """
     Physical layer connector.
 

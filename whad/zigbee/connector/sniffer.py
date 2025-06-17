@@ -13,7 +13,8 @@ from whad.common.sniffing import EventsManager
 from whad.hub.dot15d4 import RawPduReceived, PduReceived
 from whad.hub.message import AbstractPacket
 from whad.exceptions import WhadDeviceDisconnected
-from whad.device import WhadDevice
+
+from whad.hw import Interface
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class Sniffer(Zigbee, EventsManager):
     Zigbee Sniffer interface for compatible WHAD device.
     """
 
-    def __init__(self, device: WhadDevice):
+    def __init__(self, device: Interface):
         """Sniffer initialization.
 
         :param device: Device to use for sniffing
@@ -155,7 +156,7 @@ class Sniffer(Zigbee, EventsManager):
                 else:
                     message_type = PduReceived
 
-                message = self.wait_for_message(filter=message_filter(message_type), timeout=0.1)
+                message = self.wait_for_message(msg_filter=message_filter(message_type), timeout=0.1)
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
                     if packet is not None:

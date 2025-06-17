@@ -33,6 +33,14 @@ from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
     HCI_Cmd_Write_Default_Link_Policy_Settings, HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power, \
     HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level, HCI_Cmd_Write_Class_Of_Device
 
+# Whad custom layers
+from whad.scapy.layers.hci import HCI_VERSIONS, BT_MANUFACTURERS, \
+    HCI_Cmd_LE_Read_Supported_States, \
+    HCI_Cmd_Complete_LE_Read_Supported_States, HCI_Cmd_CSR_Write_BD_Address, HCI_Cmd_CSR_Reset, \
+    HCI_Cmd_TI_Write_BD_Address, HCI_Cmd_BCM_Write_BD_Address, HCI_Cmd_Zeevo_Write_BD_Address, \
+    HCI_Cmd_Ericsson_Write_BD_Address, HCI_Cmd_ST_Write_BD_Address, \
+    HCI_Cmd_LE_Set_Host_Channel_Classification
+
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceUnsupportedOperation, WhadDeviceError
@@ -44,18 +52,10 @@ from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.discovery import Capability
 from whad.hub.ble import Direction as BleDirection, Commands, AddressType, BDAddress
 
-# Whad custom layers
-from whad.scapy.layers.hci import HCI_VERSIONS, BT_MANUFACTURERS, \
-    HCI_Cmd_LE_Read_Supported_States, \
-    HCI_Cmd_Complete_LE_Read_Supported_States, HCI_Cmd_CSR_Write_BD_Address, HCI_Cmd_CSR_Reset, \
-    HCI_Cmd_TI_Write_BD_Address, HCI_Cmd_BCM_Write_BD_Address, HCI_Cmd_Zeevo_Write_BD_Address, \
-    HCI_Cmd_Ericsson_Write_BD_Address, HCI_Cmd_ST_Write_BD_Address, \
-    HCI_Cmd_LE_Set_Host_Channel_Classification
-
-from whad.device.virtual.hci.converter import HCIConverter
-from whad.device.virtual.hci.hciconfig import HCIConfig
-from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, \
-    HCIInternalState, HCIConnectionState
+from .converter import HCIConverter
+from .hciconfig import HCIConfig
+from .constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState, \
+    HCIConnectionState
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +63,6 @@ def get_hci(index):
     '''
     Returns an HCI socket based on adapter index.
     '''
-    # Make sure Python installation is built with Bluetooth support
-    try:
-        from socket import AF_BLUETOOTH
-    except ImportError as e:
-        logger.error("Python interpreter is built without Bluetooth support, cannot use HCI devices")
-        return None
-
     try:
         logger.debug("Creating bluetooth socket ...")
         socket = BluetoothUserSocket(index)
@@ -143,7 +136,7 @@ class req_cmd:
     We need to check that all the required commands are supported by the target
     hardware before starting a specific procedure, and this decorator provides
     a way to declare one or more required commands for a decorated method of
-    HCIDevice, and blocks its execution if at least one of them is not provided
+    HciIface, and blocks its execution if at least one of them is not provided
     by the target hardware.
     """
 
@@ -216,7 +209,7 @@ class le_only(req_feature):
         # Wrap with LE-enabled controller check (tested first)
         return super().__init__(_wrap)
 
-class HCIDevice(VirtualInterface):
+class HciIface(VirtualInterface):
     """Host/controller interface virtual device implementation.
     """
 
@@ -233,7 +226,7 @@ class HCIDevice(VirtualInterface):
         available_devices = {}
         devices_ids = HCIConfig.list()
         for device_id in devices_ids:
-            available_devices[device_id] = HCIDevice(index=device_id)
+            available_devices[device_id] = HciIface(index=device_id)
 
         return available_devices
 
@@ -265,7 +258,7 @@ class HCIDevice(VirtualInterface):
         self.__local_supp_cmds = None
 
         # Data PDU Length management
-        self.__datarate = HCIDevice.PHY_1M
+        self.__datarate = HciIface.PHY_1M
         self.__conn_max_tx_octets = 27
         self.__conn_max_tx_time = 0x148
         self.__conn_max_tx_time_uncoded = 328

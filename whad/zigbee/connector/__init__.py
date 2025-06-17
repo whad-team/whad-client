@@ -1,4 +1,3 @@
-from whad.device import WhadDeviceConnector
 from whad.dot15d4.connector import Dot15d4
 
 class Zigbee(Dot15d4):

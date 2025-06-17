@@ -17,7 +17,7 @@ from typing import Generator
 
 from scapy.packet import Packet
 
-from whad.device import WhadDevice
+from whad.device.device import WhadDevice
 from whad.exceptions import WhadDeviceDisconnected
 from whad.esb.connector.base import ESB
 from whad.esb.sniffing import SnifferConfiguration

@@ -122,9 +122,10 @@ class WhadDumpApp(CommandLineApp):
 
                         # Create our packet bridge
                         logger.info("[wdump] Starting our output pipe")
-                        _ = Bridge(connector, unix_server)
-                        while interface.opened:
-                            sleep(.1)
+                        bridge = Bridge(connector, unix_server)
+                        #while interface.opened:
+                        #    sleep(.1)
+                        bridge.wait()
                     else:
                         # Unlock Unix connector first
                         connector.unlock()

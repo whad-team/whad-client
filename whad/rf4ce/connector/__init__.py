@@ -1,4 +1,3 @@
-from whad.device import WhadDeviceConnector
 from whad.dot15d4.connector import Dot15d4
 from whad.scapy.layers.rf4ce import RF4CE_Hdr
 

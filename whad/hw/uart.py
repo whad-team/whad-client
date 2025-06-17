@@ -14,13 +14,14 @@ from queue import Empty
 from serial import Serial
 from serial.tools.list_ports import comports
 
-from whad.hw import Interface
 from whad.exceptions import WhadDeviceNotReady, WhadDeviceError
 from whad.helpers import message_filter
 from whad.exceptions import WhadDeviceNotFound
 
 from whad.hub.generic.cmdresult import CommandResult, Success
 from whad.hub.discovery import DeviceReady
+
+from .iface import Interface
 
 SUPPORTED_UART_DEVICES = (
     (0xc0ff, 0xeeee, "WHAD", "ButteRFly dongle"), # Butterfly Dongle

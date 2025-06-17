@@ -1169,3 +1169,4 @@ class VirtualDevice(WhadDevice):
     def _send_whad_command_result(self, code):
         msg = self.hub.generic.create_command_result(code)
         self._send_whad_message(msg)
+

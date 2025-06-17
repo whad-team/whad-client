@@ -16,12 +16,15 @@ import re
 import logging
 from threading import Thread
 from random import randint
+from binascii import hexlify
 
 from scapy.config import conf
 
-from whad.hw import Interface, Connector
 from whad.exceptions import WhadDeviceNotReady, WhadDeviceDisconnected
 from whad.hub.message import AbstractPacket
+
+from .iface import Interface
+from .connector import Connector
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +133,7 @@ class UnixSocketDevice(Interface):
         :param bytes data: Data to write
         :returns: number of bytes written to the device
         """
-        logger.debug("sending data to unix socket: %s", data.hex())
+        logger.debug("sending data to unix socket: %s", hexlify(payload))
         if not self.__opened:
             raise WhadDeviceNotReady()
 
@@ -189,7 +192,7 @@ class UnixSocketDevice(Interface):
                         logger.debug((
                             "[%s] There are pending messages awaiting "
                             "for processing, consider unix socket stalled."),
-                                     self.interface)
+                            self.interface)
                         self.__stalled = True
 
             elif len(errors) > 0:
@@ -381,7 +384,7 @@ class UnixSocketServerDevice(Interface):
         :param bytes payload: Data to write
         :returns: number of bytes written to the device
         """
-        logger.debug("sending data to unix server client socket: %s", data.hex())
+        logger.debug("sending data to unix server client socket: %s", hexlify(payload))
         if not self.__opened:
             raise WhadDeviceNotReady()
 
@@ -557,7 +560,7 @@ class UnixSocketConnector(Connector):
     def on_data_received(self, data):
         """Handle received data from the unix socket.
         """
-        logger.debug("received raw data from socket: %s", data.hex())
+        logger.debug("received raw data from socket: %s", hexlify(data))
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
             # Is the magic correct ?

@@ -17,7 +17,7 @@ from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
 from whad.device.unix import UnixSocketServerDevice, UnixConnector
 from whad.tools.utils import list_implemented_sniffers, get_sniffer_parameters, \
     build_configuration_from_args, gen_option_name
-from whad.device import Bridge
+from whad.hw import Bridge
 from whad.phy.exceptions import UnsupportedFrequency
 
 logger = logging.getLogger(__name__)
@@ -47,8 +47,6 @@ class WhadSniffOutputPipe(Bridge):
             logger.debug('[wsniff][input-pipe] forward default outbound message %s', message)
             # Forward other messages
             super().on_outbound(message)
-
-
 
 class WhadDomainSubParser(ArgumentParser):
     """
@@ -158,7 +156,6 @@ class WhadSniffApp(CommandLineApp):
 
                     # Generate a sniffer based on the selected domain
                     sniffer = self.environment[self.args.domain]["sniffer_class"](self.interface)
-
                     # Add an event listener to display incoming events
                     # sniffer.add_event_listener(display_event)
 
@@ -202,15 +199,14 @@ class WhadSniffApp(CommandLineApp):
 
                         # Create our packet bridge
                         logger.info("[wsniff] Starting our output pipe")
-                        _ = WhadSniffOutputPipe(sniffer, unix_server)
+                        bridge = WhadSniffOutputPipe(sniffer, unix_server)
+                        
                         # Start the sniffer
                         sniffer.start()
 
                         # Loop until the user hits CTL-C or interface disconnects
-                        while self.interface.opened:
-                            sleep(.1)
+                        bridge.wait()
 
-                        # Stop unix server
                         logger.debug('wsniff: closing device')
                         unix_server.device.close()
 
@@ -224,8 +220,6 @@ class WhadSniffApp(CommandLineApp):
                                 show_metadata = self.args.metadata,
                                 format = self.args.format
                             )
-
-
                 else:
                     self.error("You need to specify a domain.")
             else:
