@@ -13,7 +13,7 @@ from scapy.themes import BrightTheme
 from whad.cli.app import run_app
 from whad.common.pcap import extract_pcap_metadata
 
-from whad.device import WhadDevice
+from whad.hw import Interface
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceError
 from whad.tools.utils import list_implemented_sniffers
 from whad.tools.wsniff import WhadSniffApp
@@ -89,7 +89,7 @@ class WhadPlayApp(WhadSniffApp):
             conf.color_theme = BrightTheme()
 
         if self.args.pcap is not None:
-            self.interface = WhadDevice.create(self.build_device_path())
+            self.interface = Interface.create(self.build_device_path())
 
     def run(self):
         """Wrapper for our wplay utility, since we use a PCAP file rather than

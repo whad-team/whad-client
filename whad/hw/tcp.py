@@ -11,6 +11,7 @@ import logging
 import socket
 import select
 import re
+from binascii import hexlify
 from ipaddress import ip_address
 
 from whad.device import Interface, Connector
@@ -40,7 +41,7 @@ def is_valid_hostname(hostname: str) -> bool:
     allowed = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
     return all(allowed.match(label) for label in labels)
 
-class TCPSocketDevice(Interface):
+class TcpSocket(Interface):
     """
     UnixSocketDevice device class.
     """
@@ -169,7 +170,7 @@ class TCPSocketDevice(Interface):
         :param bytes payload: Data to write
         :returns: number of bytes written to the device
         """
-        logger.debug("sending data to TCP socket: %s", data.hex())
+        logger.debug("sending data to TCP socket: %s", hexlify(payload))
         if not self.__opened:
             raise WhadDeviceNotReady()
 
@@ -266,7 +267,7 @@ class TCPSocketConnector(Connector):
         :param data: Incoming data
         :type data: bytes
         """
-        logger.debug("received raw data from socket: %s", data.hex())
+        logger.debug("received raw data from socket: %s", hexlify(data))
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
             # Is the magic correct ?

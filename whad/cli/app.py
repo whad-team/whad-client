@@ -68,7 +68,8 @@ from prompt_toolkit.output import create_output
 from prompt_toolkit.application.current import get_app_session
 
 from whad.version import get_version
-from whad.device import WhadDevice, UnixSocketDevice
+from whad.device import UnixSocketDevice
+from whad.device.iface import Interface
 from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound, \
     WhadDeviceNotReady, WhadDeviceTimeout, UnsupportedDomain
 
@@ -455,7 +456,7 @@ class CommandLineApp(ArgumentParser):
             if self.__args.interface is not None:
                 try:
                     # Create WHAD interface
-                    self.__interface = WhadDevice.create(self.__args.interface)
+                    self.__interface = Interface.create(self.__args.interface)
                 except WhadDeviceNotFound as dev_404:
                     raise ApplicationError(
                         f"Whad adapter '{self.__args.interface}' not found."
