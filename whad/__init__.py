@@ -4,8 +4,8 @@ WHAD - Wireless HAcking Devices
 This is the main WHAD client module.
 """
 import logging
-# Import device related classes
-from whad.device import UartDevice, VirtualDevice
+
+from whad.device import WhadDevice
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, \
     UnsupportedCapability, WhadDeviceNotReady, WhadDeviceNotFound, \
     WhadDeviceAccessDenied
@@ -17,6 +17,7 @@ logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 __all__ = [
     'UartDevice',
     'VirtualDevice',
+    'WhadDevice',
     'RequiredImplementation',
     'UnsupportedDomain',
     'UnsupportedCapability',

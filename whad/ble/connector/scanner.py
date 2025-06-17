@@ -123,15 +123,15 @@ class Scanner(BLE):
         """
         Listen and yield incoming advertising PDUs.
         """
-        start_time = time()
-        while True:
-            if self.support_raw_pdu():
-                message_type = BleRawPduReceived
-            else:
-                message_type = BleAdvPduReceived
+        if self.support_raw_pdu():
+            message_type = BleRawPduReceived
+        else:
+            message_type = BleAdvPduReceived
 
-            message = self.wait_for_message(filter=message_filter(message_type), timeout=timeout)
-            if message is not None:
+        # Loop until timeout reached or stopped
+        while True:
+            # Switch to sniffing mode
+            for message in super().sniff(messages=(message_type), timeout=timeout):
                 # Convert message from rebuilt PDU
                 packet = message.to_packet()
                 if packet is not None:
@@ -141,9 +141,6 @@ class Scanner(BLE):
                         if message.addr_type > 0:
                             packet.getlayer(BTLE_ADV).TxAdd = 1
                     yield packet
-
-            if timeout is not None and time() - start_time > timeout:
-                break
 
     def clear(self):
         """

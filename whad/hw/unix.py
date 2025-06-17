@@ -20,9 +20,11 @@ from binascii import hexlify
 
 from scapy.config import conf
 
-from whad.hw import Interface, Connector
 from whad.exceptions import WhadDeviceNotReady, WhadDeviceDisconnected
 from whad.hub.message import AbstractPacket
+
+from .iface import Interface
+from .connector import Connector
 
 logger = logging.getLogger(__name__)
 

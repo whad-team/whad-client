@@ -11,7 +11,7 @@ from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_CONNECT_REQ, BTLE_DAT
 from scapy.compat import raw
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.device import VirtualDevice
+from whad.hw import VirtualInterface
 from whad.hub.discovery import Domain, Capability
 from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc,\
     FieldsSize, is_access_address_valid
@@ -47,7 +47,7 @@ def get_ubertooth(index: int = 0, serial: str = None):
     except IndexError:
         return None
 
-class UbertoothDevice(VirtualDevice):
+class UbertoothDevice(VirtualInterface):
     """Ubertooth virtual device implementation.
     """
 
