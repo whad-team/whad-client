@@ -334,7 +334,7 @@ class Sniffer(BLE, EventsManager):
                         yield self.__access_addresses[aa]
 
             elif self.__configuration.active_connection is not None:
-                message = self.wait_for_message(msg_filter=message_filter(Synchronized),
+                message = self.wait_for_message(keep=message_filter(Synchronized),
                                                 timeout=0.1)
 
                 if message is not None:

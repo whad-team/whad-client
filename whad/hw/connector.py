@@ -708,18 +708,18 @@ class Connector:
                 # Notify queue we are done with this message
                 self.__sniff_queue.task_done()
 
-                # If timeout is provided, compute remaining time and
-                # exit loop when reached.
-                if timeout is not None:
-                    timeout = timeout - (time() - start_mark)
-                    if timeout < 0:
-                        break
-
             except Empty:
                 # We receive this exception when timeout has been reached when calling
                 # our queue's get() method with a given timeout.
                 logger.debug("[sniffer][%s] Sniffing timeout reached (%s seconds) !",
                              self.device.interface, initial_to)
+                
+            # If timeout is provided, compute remaining time and
+            # exit loop when reached.
+            if timeout is not None:
+                timeout = timeout - (time() - start_mark)
+                if timeout < 0:
+                    break
 
         # Sniffing done, disable sniffing mode and return to normal operation
         self.__sniff_mode = False

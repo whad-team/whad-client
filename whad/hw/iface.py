@@ -144,8 +144,10 @@ class IfaceOutThread(Thread):
     """
     def __init__(self, iface = None):
         super().__init__()
+        self.daemon = True
         self.__iface = iface
         self.__canceled = False
+
 
         # Data processing
         self.__data = bytearray()
@@ -997,5 +999,57 @@ class VirtualInterface(Interface):
 class WhadDevice(Interface):
     """Deprecated implementation"""
 
+    @classmethod
+    def _get_sub_classes(cls):
+        """Get subclasses of Interface instead of WhadDevice.
+        """
+        return Interface._get_sub_classes()
+
+    @classmethod
+    def create_inst(cls, interface_string):
+        """Create an instance of interface from its name, using Interface."""
+        return Interface.create_inst(interface_string)
+
+    @classmethod
+    def create(cls, interface_string):
+        """Create an instance of interface from its name, using Interface."""
+        return Interface.create(interface_string)        
+
+    @classmethod
+    def list(cls) -> Union[list,dict]:
+        """List available interfaces as returned by Interface."""
+        return Interface.list()
+
+    @classmethod
+    def check_interface(cls, interface):
+        """Check if Interface supports the requested interface."""
+        return Interface.check_interface(interface)
+
 class WhadVirtualDevice(VirtualInterface):
     """Deprecated implementation"""
+
+    @classmethod
+    def _get_sub_classes(cls):
+        """Get subclasses of VirtualInterface instead of WhadDevice.
+        """
+        return VirtualInterface._get_sub_classes()
+
+    @classmethod
+    def create_inst(cls, interface_string):
+        """Create an instance of interface from its name, using VirtualInterface."""
+        return VirtualInterface.create_inst(interface_string)
+
+    @classmethod
+    def create(cls, interface_string):
+        """Create an instance of interface from its name, using VirtualInterface."""
+        return VirtualInterface.create(interface_string)        
+
+    @classmethod
+    def list(cls) -> Union[list,dict]:
+        """List available interfaces as returned by VirtualInterface."""
+        return VirtualInterface.list()
+
+    @classmethod
+    def check_interface(cls, interface):
+        """Check if VirtualInterface supports the requested interface."""
+        return VirtualInterface.check_interface(interface)
