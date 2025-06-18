@@ -68,8 +68,7 @@ from prompt_toolkit.output import create_output
 from prompt_toolkit.application.current import get_app_session
 
 from whad.version import get_version
-from whad.device import UnixSocketDevice
-from whad.device.iface import Interface
+from whad.hw import Interface, UnixSocketDevice
 from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound, \
     WhadDeviceNotReady, WhadDeviceTimeout, UnsupportedDomain
 
