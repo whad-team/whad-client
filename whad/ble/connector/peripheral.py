@@ -11,17 +11,18 @@ from time import sleep
 from queue import Queue, Empty
 from threading import Thread
 
-from whad.ble.connector.base import BLE
 from whad.hub.ble.bdaddr import BDAddress
-from whad.ble.stack import BleStack, Layer
-from whad.ble.stack.gatt import GattServer, GattClientServer
-from whad.ble.stack.att import ATTLayer
-from whad.ble.stack.smp import CryptographicDatabase, Pairing
-from whad.ble.profile import GenericProfile
-from whad.ble.profile.device import PeripheralDevice
-from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField
 from whad.hub.ble import Direction as BleDirection
 from whad.exceptions import UnsupportedCapability
+
+from .base import BLE
+from ..stack import BleStack, Layer
+from ..stack.gatt import GattServer, GattClientServer
+from ..stack.att import ATTLayer
+from ..stack.smp import CryptographicDatabase, Pairing
+from ..profile import GenericProfile
+from ..profile.device import PeripheralDevice
+from ..profile.advdata import AdvDataFieldList, AdvFlagsField
 
 # Logging
 logger = logging.getLogger(__name__)

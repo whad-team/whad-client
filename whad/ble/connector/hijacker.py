@@ -91,7 +91,7 @@ class Hijacker(BLE):
                 self.__hijack_slave = slave
                 self.hijack_slave(self.__connection.access_address)
 
-            message = self.wait_for_message(filter=message_filter(Hijacked))
+            message = self.wait_for_message(keep=message_filter(Hijacked))
             self.__status = message.success
             return message.success
 
