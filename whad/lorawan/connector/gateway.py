@@ -1,3 +1,6 @@
+"""LoRaWAN single-channel Gateway implementation.
+"""
+import logging
 from binascii import hexlify
 
 from whad.device import WhadDevice
@@ -7,7 +10,6 @@ from whad.lorawan.channel import ChannelPlan
 from whad.lorawan.connector import LoRaWAN
 from whad.lorawan.app import LWApplication
 
-import logging
 logger = logging.getLogger(__name__)
 
 class LWGateway(LoRaWAN):
