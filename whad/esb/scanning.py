@@ -8,9 +8,11 @@ are handled in :class:`whad.ble.scanning.CommunicatingDevice`.
 """
 from typing import List
 
-from whad.esb.stack.llm.constants import ESBRole
-from whad.esb.esbaddr import ESBAddress
 from whad.scapy.layers.esb import ESB_Payload_Hdr, ESB_Ack_Response
+
+from .stack.llm.constants import ESBRole
+from .esbaddr import ESBAddress
+
 
 UNIFYING_COMMAND_BYTES = (0x51,0xC2,0x40,0x4F,0xD3,0xC1, 0xC3,0x5F,0x1F,0x0F,0x0E,0x10)
 

@@ -22,7 +22,6 @@ from whad.scapy.layers.apimote import GoodFET_Command_Hdr, GoodFET_Reply_Hdr, Go
     GoodFET_Read_RF_Packet_Command, GoodFET_Read_RF_Packet_Reply, GoodFET_Send_RF_Packet_Command, \
     GoodFET_Send_RF_Packet_Reply, CC_VERSIONS
 
-from whad.hw import VirtualInterface
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.hub.discovery import Domain, Capability
 from whad.hub.generic.cmdresult import CommandResult
@@ -31,12 +30,12 @@ from whad.hub.dot15d4 import Commands
 from whad.zigbee.utils.phy import channel_to_frequency, frequency_to_channel
 from whad.device.uart import get_port_info
 
-
+from ..device import VirtualDevice
 from .constants import APIMoteId, APIMoteRegisters, \
     APIMoteRegistersMasks, APIMoteInternalStates
 
 
-class Apimote(VirtualInterface):
+class Apimote(VirtualDevice):
     """Apimote virtual device implementation.
     """
 

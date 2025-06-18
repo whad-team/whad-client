@@ -7,23 +7,24 @@ to join it (if permitted) and act as an End Device in this network.
 """
 from typing import List, Union
 from scapy.packet import Packet
-from whad.zigbee.connector import Zigbee
+
+from whad.device import Device
 from whad.dot15d4.stack import Dot15d4Stack
 from whad.dot15d4.stack.mac import MACManager
-from whad.zigbee.stack.nwk import NWKManager
-from whad.zigbee.stack.apl.constants import LogicalDeviceType
-from whad.zigbee.stack.apl.application import ApplicationObject
-from whad.zigbee.stack.nwk.network import ZigbeeNetwork
 from whad.exceptions import UnsupportedCapability
 
-from whad.hw import Interface
+from .base import Zigbee
+from ..stack.nwk import NWKManager
+from ..stack.apl.constants import LogicalDeviceType
+from ..stack.apl.application import ApplicationObject
+from ..stack.nwk.network import ZigbeeNetwork
 
 class EndDevice(Zigbee):
     """
     Zigbee End Device interface for compatible WHAD device.
     """
 
-    def __init__(self, device: Interface, applications: List[ApplicationObject] = None):
+    def __init__(self, device: Device, applications: List[ApplicationObject] = None):
         """ZigBee End Device connector initialization.
 
         :param device: WHAD device
