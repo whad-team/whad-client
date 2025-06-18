@@ -13,14 +13,15 @@ considered deprecated in a future release.
 # Load interface base classes
 from .iface import Interface, VirtualInterface, IfaceEvt, Disconnected, MessageReceived, \
     WhadDevice, WhadVirtualDevice
-from .connector import Connector, WhadDeviceConnector, Event, LockedConnector, WhadDeviceConnector
+from .connector import Connector, Event, LockedConnector, WhadDeviceConnector
 from .bridge import Bridge
 
 # Load supported hardware interfaces
 from .unix import UnixSocketDevice
-from .pcap import PcapIface
+from .pcap import Pcap
 from .uart import Uart
-from .hci import HciIface
+from .hci import Hci
+from .tcp import TcpSocket
 
 __all__ = [
     "Interface",
@@ -31,12 +32,14 @@ __all__ = [
     "IfaceEvt",
     "Disconnected",
     "MessageReceived",
-    "HciIface",
-    "PcapIface",
+    "Hci",
+    "Pcap",
+    "TcpSocket",
     "UnixSocketDevice",
     "WhadDevice",
     "WhadVirtualDevice",
     "WhadDeviceConnector",
     "LockedConnector",
-    "Event"
+    "Event",
+    "Uart"
 ]

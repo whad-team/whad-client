@@ -33,7 +33,7 @@ from whad.ble.utils.phy import FieldsSize
 
 logger = logging.getLogger(__name__)
 
-class PcapIface(VirtualInterface):
+class Pcap(VirtualInterface):
     """PCAP replay virtual device implementation.
     """
 
