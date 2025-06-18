@@ -133,23 +133,8 @@ class Sniffer(ESB, EventsManager):
         else:
             message_type = PduReceived
 
-        # Sniff packets
-        start = time()
-
         try:
-            while True:
-
-                # Exit if timeout is set and reached
-                if timeout is not None and (time() - start >= timeout):
-                    break
-
-                if self.support_raw_pdu():
-                    message_type = RawPduReceived
-                else:
-                    message_type = PduReceived
-
-                message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
-
+            for message in super().sniff(message=(message_type), timeout=timeout):
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
                     if packet is not None:
