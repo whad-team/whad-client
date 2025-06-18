@@ -1,12 +1,14 @@
 """
 Pythonic LoRaWAN 1.0 stack
 """
+import logging
+
 from whad.scapy.layers.lorawan import PHYPayload
-from whad.lorawan.stack.llm import LWGwLinkLayer
-from whad.lorawan.helpers import EUI
 from whad.common.stack import LayerState, Layer, alias, source, state
 
-import logging
+from ..stack.llm import LWGwLinkLayer
+from ..helpers import EUI
+
 logger = logging.getLogger(__name__)
 
 class LWGatewayState(LayerState):

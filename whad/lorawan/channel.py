@@ -59,7 +59,7 @@ the downlink channel to use.
 """
 from random import choice
 
-from whad.lorawan.exceptions import ChannelNotFound, InvalidDataRate
+from .exceptions import ChannelNotFound, InvalidDataRate
 
 class Channel(object):
     """This class represents a LoRaWAN channel that is used in
