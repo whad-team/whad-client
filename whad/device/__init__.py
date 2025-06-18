@@ -12,31 +12,27 @@ from cryptography.utils import CryptographyDeprecationWarning
 
 # Whad device-related classes
 from .info import WhadDeviceInfo
-from .device import WhadDevice
+from .device import WhadDevice, WhadVirtualDevice
 from .connector import WhadDeviceConnector
 from .bridge import Bridge
 
-from whad.hw.unix import UnixSocketDevice
+# Import virtual devices
+from .virtual import PCAPDevice, HCIDevice, UARTDevice, \
+    TCPSocketDevice, UnixSocketDevice, APIMoteDevice, RFStormDevice, \
+    RZUSBStickDevice, UbertoothDevice, YardStickOneDevice
 
-# Import derived classes
-#from whad.device.uart import Uart
-#from whad.device.tcp import TCPSocketDevice
-#from whad.device.unix import UnixSocketDevice
-#from whad.device.virtual import HCIDevice, APIMoteDevice, RFStormDevice, RZUSBStickDevice, \
-#    UbertoothDevice, YardStickOneDevice, PCAPDevice
 
 # Remove scapy deprecation warnings
 warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
 
 __all__ = [
-    "Bridge",
-    "Connector",
-    "WhadDevice",
     "WhadDeviceInfo",
+    "WhadDevice",
+    "WhadVirtualDevice",
     "WhadDeviceConnector",
-    "Interface",
-    "Uart",
-    "VirtualInterface",
+    "Bridge",
+    "HCIDevice",
+    "UartDevice",
     "TCPSocketDevice",
     "UnixSocketDevice",
     "HCIDevice",
