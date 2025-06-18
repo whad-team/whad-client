@@ -382,6 +382,10 @@ class Interface:
         self.__opened = False
         self.__discovered = False
 
+        # Make sure index is an int
+        if not isinstance(index, int):
+            raise WhadDeviceNotFound()
+
         # Generate device index if not provided
         if index is None:
             self.inc_dev_index()
@@ -1000,12 +1004,6 @@ class WhadDevice(Interface):
     """Deprecated implementation"""
 
     @classmethod
-    def _get_sub_classes(cls):
-        """Get subclasses of Interface instead of WhadDevice.
-        """
-        return Interface._get_sub_classes()
-
-    @classmethod
     def create_inst(cls, interface_string):
         """Create an instance of interface from its name, using Interface."""
         return Interface.create_inst(interface_string)
@@ -1016,23 +1014,12 @@ class WhadDevice(Interface):
         return Interface.create(interface_string)        
 
     @classmethod
-    def list(cls) -> Union[list,dict]:
-        """List available interfaces as returned by Interface."""
-        return Interface.list()
-
-    @classmethod
     def check_interface(cls, interface):
         """Check if Interface supports the requested interface."""
         return Interface.check_interface(interface)
 
 class WhadVirtualDevice(VirtualInterface):
     """Deprecated implementation"""
-
-    @classmethod
-    def _get_sub_classes(cls):
-        """Get subclasses of VirtualInterface instead of WhadDevice.
-        """
-        return VirtualInterface._get_sub_classes()
 
     @classmethod
     def create_inst(cls, interface_string):
@@ -1043,11 +1030,6 @@ class WhadVirtualDevice(VirtualInterface):
     def create(cls, interface_string):
         """Create an instance of interface from its name, using VirtualInterface."""
         return VirtualInterface.create(interface_string)        
-
-    @classmethod
-    def list(cls) -> Union[list,dict]:
-        """List available interfaces as returned by VirtualInterface."""
-        return VirtualInterface.list()
 
     @classmethod
     def check_interface(cls, interface):
