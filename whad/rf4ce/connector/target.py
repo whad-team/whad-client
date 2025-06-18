@@ -1,11 +1,14 @@
-from whad.rf4ce.connector import RF4CE
+"""RF4CE Target connector
+"""
+import logging
+
 from whad.exceptions import UnsupportedCapability
 from whad.dot15d4.stack import Dot15d4Stack
 from whad.dot15d4.stack.mac import MACManager
 from whad.dot15d4.address import Dot15d4Address
-from whad.rf4ce.stack.nwk import NWKManager
 
-import logging
+from .base import RF4CE
+from ..stack.nwk import NWKManager
 
 logger = logging.getLogger(__name__)
 

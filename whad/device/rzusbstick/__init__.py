@@ -7,7 +7,7 @@ from struct import unpack, pack
 from usb.core import find, USBError, USBTimeoutError
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.hw import VirtualInterface
+from whad.device import VirtualDevice
 from whad.hub.discovery import Domain, Capability
 
 from whad.hub.generic.cmdresult import CommandResult
@@ -40,7 +40,7 @@ def get_rzusbstick(index=0,bus=None, address=None):
     except IndexError:
         return None
 
-class RzUsbStick(VirtualInterface):
+class RzUsbStick(VirtualDevice):
     """ATMEL RZAVRUSB stick virtual device.
     """
 

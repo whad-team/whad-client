@@ -1,11 +1,8 @@
-from queue import Queue
-
-from whad.exceptions import WhadDeviceDisconnected
+"""PHY Injector connector
+"""
 from whad.phy.connector import Phy
-from whad.phy import Endianness
 from whad.hub.phy import Modulation as PhyModulation, Endianness as PhyEndianness
 from whad.phy.injecting import InjectionConfiguration
-from whad.phy.exceptions import NoModulation
 from whad.scapy.layers.phy import Phy_Packet
 from whad.exceptions import UnsupportedCapability
 

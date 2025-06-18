@@ -4,9 +4,6 @@ from typing import Generator
 
 from scapy.packet import Packet
 from scapy.layers.zigbee import ZigbeeSecurityHeader
-from whad.zigbee.connector import Zigbee
-from whad.zigbee.sniffing import SnifferConfiguration, KeyExtractedEvent
-from whad.zigbee.crypto import ZigbeeDecryptor, TouchlinkKeyManager, TransportKeyDistribution
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter
 from whad.common.sniffing import EventsManager
@@ -14,7 +11,11 @@ from whad.hub.dot15d4 import RawPduReceived, PduReceived
 from whad.hub.message import AbstractPacket
 from whad.exceptions import WhadDeviceDisconnected
 
-from whad.hw import Interface
+from whad.device import Device
+from ..connector import Zigbee
+from ..sniffing import SnifferConfiguration, KeyExtractedEvent
+from ..crypto import ZigbeeDecryptor, TouchlinkKeyManager, TransportKeyDistribution
+
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class Sniffer(Zigbee, EventsManager):
     Zigbee Sniffer interface for compatible WHAD device.
     """
 
-    def __init__(self, device: Interface):
+    def __init__(self, device: Device):
         """Sniffer initialization.
 
         :param device: Device to use for sniffing

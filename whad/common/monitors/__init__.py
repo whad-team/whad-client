@@ -1,6 +1,5 @@
 import logging
-from whad.device import WhadDeviceConnector
-from whad.hw import Connector
+from whad.device import WhadDeviceConnector, Connector
 
 logger = logging.getLogger(__name__)
 

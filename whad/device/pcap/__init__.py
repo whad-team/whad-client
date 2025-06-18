@@ -28,12 +28,12 @@ from whad.hub.unifying import UnifyingMetadata
 from whad.hub.discovery import Domain
 from whad.ble.utils.phy import FieldsSize
 
-from ..iface import VirtualInterface
+from ..device import VirtualDevice
 from .capabilities import CAPABILITIES
 
 logger = logging.getLogger(__name__)
 
-class Pcap(VirtualInterface):
+class Pcap(VirtualDevice):
     """PCAP replay virtual device implementation.
     """
 
