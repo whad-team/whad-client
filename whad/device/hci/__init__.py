@@ -44,7 +44,6 @@ from whad.scapy.layers.hci import HCI_VERSIONS, BT_MANUFACTURERS, \
 # Whad
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceUnsupportedOperation, WhadDeviceError
-from whad.hw import VirtualInterface
 
 # Whad hub
 from whad.hub.discovery import Domain
@@ -52,6 +51,7 @@ from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.discovery import Capability
 from whad.hub.ble import Direction as BleDirection, Commands, AddressType, BDAddress
 
+from ..device import VirtualDevice
 from .converter import HCIConverter
 from .hciconfig import HCIConfig
 from .constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState, \
@@ -209,7 +209,7 @@ class le_only(req_feature):
         # Wrap with LE-enabled controller check (tested first)
         return super().__init__(_wrap)
 
-class Hci(VirtualInterface):
+class Hci(VirtualDevice):
     """Host/controller interface virtual device implementation.
     """
 

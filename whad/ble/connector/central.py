@@ -12,19 +12,20 @@ import logging
 from time import sleep
 from threading import Event
 
-from whad.ble.connector.base import BLE
 from whad.device.connector import Event as CentralEvent
-from whad.hub.ble import Direction
-from whad.hub.ble.bdaddr import BDAddress
-from whad.ble.stack import BleStack
-from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
-from whad.ble.stack.gatt import GattClient
-from whad.ble.stack.att import ATTLayer
-from whad.ble.stack.smp import CryptographicDatabase
-from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
-from whad.ble.profile.device import PeripheralDevice
 from whad.common.stack import Layer
 from whad.exceptions import UnsupportedCapability
+from whad.hub.ble import Direction
+from whad.hub.ble.bdaddr import BDAddress
+
+from .base import BLE
+from ..exceptions import ConnectionLostException, PeripheralNotFound
+from ..profile.device import PeripheralDevice
+from ..stack import BleStack
+from ..stack.constants import BT_MANUFACTURERS, BT_VERSIONS
+from ..stack.gatt import GattClient
+from ..stack.att import ATTLayer
+from ..stack.smp import CryptographicDatabase
 
 logger = logging.getLogger(__name__)
 

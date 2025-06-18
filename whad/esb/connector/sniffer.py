@@ -17,22 +17,24 @@ from typing import Generator
 
 from scapy.packet import Packet
 
-from whad.device.device import WhadDevice
-from whad.exceptions import WhadDeviceDisconnected
-from whad.esb.connector.base import ESB
-from whad.esb.sniffing import SnifferConfiguration
-from whad.exceptions import UnsupportedCapability
+from whad.device import Device
 from whad.helpers import message_filter
+from whad.exceptions import WhadDeviceDisconnected, UnsupportedCapability
 from whad.common.sniffing import EventsManager
+
 from whad.hub.esb import PduReceived, RawPduReceived
 from whad.hub.message import AbstractPacket
+
+from .base import ESB
+from ..sniffing import SnifferConfiguration
+
 
 class Sniffer(ESB, EventsManager):
     """
     Enhanced ShockBurst Sniffer interface for compatible WHAD device.
     """
 
-    def __init__(self, device: WhadDevice):
+    def __init__(self, device: Device):
         ESB.__init__(self, device)
         EventsManager.__init__(self)
 

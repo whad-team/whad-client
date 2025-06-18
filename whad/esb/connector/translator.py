@@ -5,6 +5,7 @@ import logging
 from scapy.packet import Packet
 
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
+
 from whad.hub.esb import generate_esb_metadata
 from whad.hub import ProtocolHub
 from whad.hub.message import HubMessage

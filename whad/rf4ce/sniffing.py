@@ -26,10 +26,13 @@ class SnifferConfiguration:
 class KeyExtractedEvent(SniffingEvent):
     """Event indicating that a key has been extracted from pairing
     """
+
     def __init__(self, key):
+        """Constructor."""
         super().__init__("Key extracted")
         self.key = key
 
     @property
-    def message(self):
+    def message(self) -> str:
+        """Show message."""
         return "key={}".format(self.key.hex())

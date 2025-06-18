@@ -7,20 +7,21 @@ from time import sleep, time
 from scapy.packet import Packet
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE
 
-from whad.ble.connector.base import BLE
-from whad.ble.connector.injector import Injector
-from whad.ble.connector.hijacker import Hijacker
-from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress, \
-    SynchronizationEvent, DesynchronizationEvent, KeyExtractedEvent
-from whad.ble.crypto import EncryptedSessionInitialization, LinkLayerDecryptor, \
-    LegacyPairingCracking
 from whad.hub.ble import AccessAddressDiscovered, Synchronized, BleRawPduReceived, \
     BlePduReceived, BleAdvPduReceived
-from whad.ble.exceptions import MissingCryptographicMaterial
-from whad.exceptions import WhadDeviceDisconnected
-from whad.exceptions import UnsupportedCapability
+
+from whad.exceptions import WhadDeviceDisconnected, UnsupportedCapability
 from whad.helpers import message_filter
 from whad.common.sniffing import EventsManager
+
+from .base import BLE
+from .injector import Injector
+from .hijacker import Hijacker
+from ..exceptions import MissingCryptographicMaterial
+from ..sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress, \
+    SynchronizationEvent, DesynchronizationEvent, KeyExtractedEvent
+from ..crypto import EncryptedSessionInitialization, LinkLayerDecryptor, \
+    LegacyPairingCracking
 
 logger = logging.getLogger(__name__)
 

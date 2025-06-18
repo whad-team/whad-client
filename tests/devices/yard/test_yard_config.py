@@ -2,7 +2,7 @@
 """
 import pytest
 
-from whad.hw.yard.constants import YardRadioStructure
+from whad.device.yard.constants import YardRadioStructure
 
 @pytest.fixture
 def rcs():

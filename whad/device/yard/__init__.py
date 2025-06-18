@@ -9,7 +9,7 @@ from usb.core import find, USBError, USBTimeoutError
 from usb.util import get_string
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.hw import VirtualInterface
+from whad.device import VirtualDevice
 from whad.hub.discovery import Domain, Capability
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.phy import Commands, TxPower, Endianness as PhyEndianness, Modulation as PhyModulation
@@ -45,7 +45,7 @@ def get_yardstickone(index=0,bus=None, address=None):
     except IndexError:
         return None
 
-class YardStickOne(VirtualInterface):
+class YardStickOne(VirtualDevice):
     """Yard Stick One virtual device.
     """
 

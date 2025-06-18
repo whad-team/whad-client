@@ -12,9 +12,11 @@ to handle acknowledgements and pings automatically.
 """
 from typing import Generator
 from scapy.packet import Packet
-from whad.esb.connector.base import ESB
-from whad.esb.stack import ESBStack
+
 from whad.exceptions import UnsupportedCapability
+
+from ..connector.base import ESB
+from ..stack import ESBStack
 
 
 class PRX(ESB):

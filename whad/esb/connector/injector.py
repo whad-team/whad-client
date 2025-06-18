@@ -7,8 +7,8 @@ existing ESB connection, or simply send ESB packets in the air.
 """
 from scapy.packet import Packet
 
-from whad.esb.connector import PTX
-from whad.esb.injecting import InjectionConfiguration
+from .base import PTX
+from ..injecting import InjectionConfiguration
 
 class Injector(PTX):
     """

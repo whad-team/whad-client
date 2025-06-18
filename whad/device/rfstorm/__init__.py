@@ -8,7 +8,6 @@ from time import sleep, time
 from usb.core import find, USBError, USBTimeoutError
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.hw import VirtualInterface
 
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.esb import Commands as EsbCommands
@@ -19,6 +18,7 @@ from whad.hub.discovery import Capability, Domain
 from whad.phy import Endianness
 from whad.helpers import swap_bits
 
+from ..device import VirtualDevice
 from .constants import RFStormId, RFStormCommands, \
     RFStormDataRate, RFStormEndPoints, RFStormInternalStates, RFStormDomains
 
@@ -44,7 +44,7 @@ def get_rfstorm(index=0,bus=None, address=None):
         return None
 
 
-class RfStorm(VirtualInterface):
+class RfStorm(VirtualDevice):
     """RFStorm virtual device implementation.
     """
 

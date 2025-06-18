@@ -23,12 +23,15 @@ an :class:`UnsupportedCapability` exception.
 """
 from typing import Iterator
 from scapy.packet import Packet
-from whad.esb.connector.base import ESB
+
 from whad.helpers import message_filter
 from whad.exceptions import UnsupportedCapability
-from whad.esb.scanning import CommunicatingDevicesDB, CommunicatingDevice
+
 from whad.hub.esb import PduReceived, RawPduReceived
 from whad.hub.message import AbstractPacket
+
+from .base import ESB
+from ..scanning import CommunicatingDevicesDB, CommunicatingDevice
 
 class Scanner(ESB):
     """
