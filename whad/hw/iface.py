@@ -382,8 +382,6 @@ class Interface:
         self.__opened = False
         self.__discovered = False
 
-        print(index)
-
         # Generate device index if not provided
         if index is None:
             self.inc_dev_index()
