@@ -13,7 +13,7 @@ from whad.hub.discovery import Domain, Capability
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.dot15d4 import Commands
 
-from whad.device.virtual.rzusbstick.constants import RZUSBStickInternalStates, \
+from .constants import RZUSBStickInternalStates, \
     RZUSBStickId, RZUSBStickModes, RZUSBStickEndPoints, RZUSBStickCommands, \
     RZUSBStickResponses
 
@@ -40,7 +40,7 @@ def get_rzusbstick(index=0,bus=None, address=None):
     except IndexError:
         return None
 
-class RZUSBStickDevice(VirtualInterface):
+class RzUsbStick(VirtualInterface):
     """ATMEL RZAVRUSB stick virtual device.
     """
 
@@ -56,7 +56,7 @@ class RZUSBStickDevice(VirtualInterface):
             for rzusbstick in find(idVendor=RZUSBStickId.RZUSBSTICK_ID_VENDOR,
                                    idProduct=RZUSBStickId.RZUSBSTICK_ID_PRODUCT,
                                    find_all=True):
-                available_devices.append(RZUSBStickDevice(bus=rzusbstick.bus,
+                available_devices.append(RzUsbStick(bus=rzusbstick.bus,
                                                           address=rzusbstick.address))
         except ValueError:
             logger.warning("Cannot access RZUSBStick, root privileges may be required.")

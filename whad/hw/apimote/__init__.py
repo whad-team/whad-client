@@ -25,9 +25,10 @@ from whad.scapy.layers.apimote import GoodFET_Command_Hdr, GoodFET_Reply_Hdr, Go
 from whad.hw import VirtualInterface
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
 from whad.hub.discovery import Domain, Capability
-from whad.zigbee.utils.phy import channel_to_frequency, frequency_to_channel
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.dot15d4 import Commands
+
+from whad.zigbee.utils.phy import channel_to_frequency, frequency_to_channel
 from whad.device.uart import get_port_info
 
 
@@ -35,8 +36,8 @@ from .constants import APIMoteId, APIMoteRegisters, \
     APIMoteRegistersMasks, APIMoteInternalStates
 
 
-class APIMoteDevice(VirtualInterface):
-    """APIMote virtual device implementation.
+class Apimote(VirtualInterface):
+    """Apimote virtual device implementation.
     """
 
     INTERFACE_NAME = "apimote"
@@ -54,7 +55,7 @@ class APIMoteDevice(VirtualInterface):
                             uart_dev.pid == APIMoteId.APIMOTE_ID_PRODUCT
                             )
                         ]:
-            available_devices.append(APIMoteDevice(apimote.device))
+            available_devices.append(Apimote(apimote.device))
         return available_devices
 
     @property
