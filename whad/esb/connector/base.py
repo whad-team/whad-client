@@ -6,18 +6,18 @@ ShockBurst compatible devices.
 """
 from scapy.packet import Packet
 
-from whad.hw.connector import Connector
+from whad.device import Connector
+from whad.helpers import message_filter
+from whad.exceptions import UnsupportedDomain, UnsupportedCapability
+
+from whad.scapy.layers.esb import ESB_Hdr,ESB_Payload_Hdr,ESB_Ack_Response
 
 from whad.hub.discovery import Domain, Capability
-from whad.esb.esbaddr import ESBAddress
-from whad.hub.esb import ESBMetadata
-from whad.scapy.layers.esb import ESB_Hdr,ESB_Payload_Hdr,ESB_Ack_Response
-from whad.helpers import message_filter
+from whad.hub.esb import ESBMetadata, EsbNodeAddress, Commands
 from whad.hub.generic.cmdresult import Success, CommandResult
-from whad.exceptions import UnsupportedDomain, UnsupportedCapability
-from whad.hub.esb import EsbNodeAddress, Commands
 from whad.hub.events import JammedEvt
 
+from whad.esb.esbaddr import ESBAddress
 
 class ESB(Connector):
     """

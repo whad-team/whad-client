@@ -20,13 +20,15 @@ from binascii import hexlify
 
 from scapy.config import conf
 
-from whad.hw import Interface, Connector
 from whad.exceptions import WhadDeviceNotReady, WhadDeviceDisconnected
 from whad.hub.message import AbstractPacket
 
+from .device import Device
+from .connector import Connector
+
 logger = logging.getLogger(__name__)
 
-class UnixSocketDevice(Interface):
+class UnixSocketDevice(Device):
     """
     UnixSocketDevice device class.
     """
@@ -205,7 +207,7 @@ class UnixSocketDevice(Interface):
         """Not supported by Unix socket devices.
         """
 
-class UnixSocketServerDevice(Interface):
+class UnixSocketServerDevice(Device):
     """Unix socket server device
     """
 

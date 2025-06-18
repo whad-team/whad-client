@@ -6,7 +6,8 @@ an Enhanced ShockBurst device address.
 """
 import re
 from binascii import hexlify, unhexlify
-from whad.esb.exceptions import InvalidESBAddressException
+
+from .exceptions import InvalidESBAddressException
 
 class ESBAddress:
     """This class represents an Enhanced ShockBurst address.

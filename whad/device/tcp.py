@@ -11,11 +11,16 @@ import logging
 import socket
 import select
 import re
+
 from binascii import hexlify
 from ipaddress import ip_address
 
-from whad.device import Interface, Connector
 from whad.exceptions import WhadDeviceNotReady, WhadDeviceDisconnected, WhadDeviceNotFound
+from whad.hub.message import HubMessage
+
+from .device import Device
+from .connector import Connector
+
 logger = logging.getLogger(__name__)
 
 def is_valid_hostname(hostname: str) -> bool:
@@ -41,9 +46,9 @@ def is_valid_hostname(hostname: str) -> bool:
     allowed = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
     return all(allowed.match(label) for label in labels)
 
-class TCPSocketDevice(Interface):
+class TcpSocket(Device):
     """
-    UnixSocketDevice device class.
+    TCP client class.
     """
 
     INTERFACE_NAME = "tcp"
@@ -260,7 +265,6 @@ class TCPSocketConnector(Connector):
         logger.debug("TCP socket address and port: %s (%s)", str(self.__address),
                      str(self.__port))
 
-
     def on_data_received(self, data: bytes):
         """Handle incoming data and parse it.
 
@@ -277,10 +281,6 @@ class TCPSocketConnector(Connector):
                     msg_size = self.__inpipe[2] | (self.__inpipe[3] << 8)
                     if len(self.__inpipe) >= (msg_size+4):
                         raw_message = self.__inpipe[4:4+msg_size]
-
-                        # Old parsing code
-                        #_msg = Message()
-                        #_msg.ParseFromString(bytes(raw_message))
 
                         # Parse our message with our Protocol Hub
                         _msg = self.hub.parse(bytes(raw_message))
@@ -344,7 +344,7 @@ class TCPSocketConnector(Connector):
                             # Is socket closed ?
                             if len(data) == 0:
                                 # Exit serve loop
-                                break
+                                raise WhadDeviceDisconnected()
 
                             # Process received data
                             self.on_data_received(data)
@@ -361,8 +361,7 @@ class TCPSocketConnector(Connector):
         except BrokenPipeError:
             logger.error('Broken pipe.')
             self.__client = None
-        except Exception:
-            pass
+
 
     # Message callbacks
     def on_any_msg(self, message):
@@ -404,7 +403,7 @@ class TCPSocketConnector(Connector):
         """Called when a message has successfully been sent.
         """
 
-    def on_generic_msg(self, message):
+    def on_generic_msg(self, message: HubMessage):
         """Callback function to process incoming generic messages.
 
         This method MUST be overriden by inherited classes.
@@ -413,14 +412,14 @@ class TCPSocketConnector(Connector):
         :type message: HubMessage
         """
 
-    def on_discovery_msg(self, message):
+    def on_discovery_msg(self, message: HubMessage):
         """Callback method to process incoming discovery messages.
 
         :param message: Discovery message
         :type message: HubMessage
         """
 
-    def on_domain_msg(self, domain, message):
+    def on_domain_msg(self, domain, message: HubMessage):
         """Callback function to process incoming domain-related messages.
 
         This method MUST be overriden by inherited classes.

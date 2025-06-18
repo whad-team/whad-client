@@ -1,45 +1,58 @@
+"""WHAD hardware module
+
+This module provides various classes to interact with WHAD-enabled hardware:
+
+- :py:class:`whad.hw.Interface`
+- :py:class:`whad.hw.VirtInterface`
+
+This module replaces the previous `whad.device` module and its ambiguous class
+names and features. The `whad.device` module is still available but will be
+considered deprecated in a future release.
 """
-WHAD Device module
 
-This module provides a set of classes used to interact with devices
-running compatible firmwares, as well as the default connector class used
-to handle messages coming from or sent to the device.
-"""
-# Logging
-import warnings
-
-from cryptography.utils import CryptographyDeprecationWarning
-
-# Whad device-related classes
-from .info import WhadDeviceInfo
-from .device import WhadDevice, WhadVirtualDevice
-from .connector import WhadDeviceConnector
+# Load interface base classes
+from .device import Device, VirtualDevice, DeviceEvt, Disconnected, MessageReceived, \
+    WhadDevice, WhadVirtualDevice
+from .connector import Connector, Event, LockedConnector, WhadDeviceConnector
 from .bridge import Bridge
 
-# Import virtual devices
-from .virtual import PCAPDevice, HCIDevice, UARTDevice, \
-    TCPSocketDevice, UnixSocketDevice, APIMoteDevice, RFStormDevice, \
-    RZUSBStickDevice, UbertoothDevice, YardStickOneDevice
+# Load supported hardware interfaces
+from .unix import UnixSocketDevice
+from .uart import Uart
+from .tcp import TcpSocket
 
-
-# Remove scapy deprecation warnings
-warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
+# Load supported virtual interfaces
+from .hci import Hci
+from .pcap import Pcap
+from .apimote import Apimote
+from .rfstorm import RfStorm
+from .rzusbstick import RzUsbStick
+from .ubertooth import Ubertooth
+from .yard import YardStickOne
 
 __all__ = [
-    "WhadDeviceInfo",
+    "Device",
+    "VirtualDevice",
+    "Connector",
+    "WhadDeviceConnector",
+    "Bridge",
+    "DeviceEvt",
+    "Disconnected",
+    "MessageReceived",
     "WhadDevice",
     "WhadVirtualDevice",
     "WhadDeviceConnector",
-    "Bridge",
-    "HCIDevice",
-    "UartDevice",
-    "TCPSocketDevice",
+    "LockedConnector",
+    "Event",
+
+    "Hci",
+    "Pcap",
+    "Uart",
+    "TcpSocket",
     "UnixSocketDevice",
-    "HCIDevice",
-    "APIMoteDevice",
-    "RFStormDevice",
-    "RZUSBStickDevice",
-    "UbertoothDevice",
-    "YardStickOneDevice",
-    "PCAPDevice"
+    "Apimote",
+    "RfStorm",
+    "RzUsbStick",
+    "Ubertooth",
+    "YardStickOne",
 ]

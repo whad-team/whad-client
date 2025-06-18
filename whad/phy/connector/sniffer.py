@@ -46,11 +46,12 @@ from typing import Generator
 from scapy.packet import Packet
 
 from whad.exceptions import WhadDeviceDisconnected
-from whad.phy.connector import Phy
-from whad.phy import Endianness
-from whad.phy.sniffing import SnifferConfiguration
+from whad.hub.phy import Endianness
 from whad.common.sniffing import EventsManager
 from whad.exceptions import UnsupportedCapability
+
+from .base import Phy
+from ..sniffing import SnifferConfiguration
 
 class Sniffer(Phy, EventsManager):
     """

@@ -13,7 +13,7 @@ from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
 from scapy.packet import Packet
 
 # Device interface
-from whad.device.connector import Connector
+from whad.device import Connector
 from whad.hub.discovery import Domain, Capability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
