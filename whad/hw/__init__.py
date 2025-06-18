@@ -18,10 +18,17 @@ from .bridge import Bridge
 
 # Load supported hardware interfaces
 from .unix import UnixSocketDevice
-from .pcap import Pcap
 from .uart import Uart
-from .hci import Hci
 from .tcp import TcpSocket
+
+# Load supported virtual interfaces
+from .hci import Hci
+from .pcap import Pcap
+from .apimote import Apimote
+from .rfstorm import RfStorm
+from .rzusbstick import RzUsbStick
+from .ubertooth import Ubertooth
+from .yard import YardStickOne
 
 __all__ = [
     "Interface",
@@ -32,14 +39,20 @@ __all__ = [
     "IfaceEvt",
     "Disconnected",
     "MessageReceived",
-    "Hci",
-    "Pcap",
-    "TcpSocket",
-    "UnixSocketDevice",
     "WhadDevice",
     "WhadVirtualDevice",
     "WhadDeviceConnector",
     "LockedConnector",
     "Event",
-    "Uart"
+
+    "Hci",
+    "Pcap",
+    "Uart",
+    "TcpSocket",
+    "UnixSocketDevice",
+    "Apimote",
+    "RfStorm",
+    "RzUsbStick",
+    "Ubertooth",
+    "YardStickOne",
 ]
