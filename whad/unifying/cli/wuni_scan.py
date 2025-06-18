@@ -160,10 +160,9 @@ class UniScanApp(CommandLineDeviceSink):
         else:
             print("Scanning for Unifying devices on channels 0-100 ...")
 
-        while True:
-            for packet in sniffer.sniff():
-                if Logitech_Unifying_Hdr in packet:
-                    self.show_packet(packet)
+        for packet in sniffer.sniff():
+            if Logitech_Unifying_Hdr in packet:
+                self.show_packet(packet)
 
     def show_packet(self, packet: Packet):
         """Display a Logitech Unifying packet with a short analysis.
