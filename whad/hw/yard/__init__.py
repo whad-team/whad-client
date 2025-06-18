@@ -10,17 +10,18 @@ from usb.util import get_string
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
 from whad.hw import VirtualInterface
-from whad.device.virtual.yard.constants import YardStickOneId, YardStickOneEndPoints, \
-    YardApplications, YardSystemCommands, YardRadioStructure, YardRFStates, \
-    YardMemoryRegisters, YardMARCStates, YardCCA, YardFrequencyTransitionPoints, \
-    YardNICCommands, YardVCOType, YardRegistersMasks, YardModulations, YardEncodings, \
-    POSSIBLE_CHANNEL_BANDWIDTHS, NUM_PREAMBLE_LOOKUP_TABLE, YardUSBProperties, \
-    YardInternalStates
 from whad.hub.discovery import Domain, Capability
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.phy import Commands, TxPower, Endianness as PhyEndianness, Modulation as PhyModulation
 from whad.phy import Endianness
 from whad.helpers import swap_bits
+
+from .constants import YardStickOneId, YardStickOneEndPoints, \
+    YardApplications, YardSystemCommands, YardRadioStructure, YardRFStates, \
+    YardMemoryRegisters, YardMARCStates, YardCCA, YardFrequencyTransitionPoints, \
+    YardNICCommands, YardVCOType, YardRegistersMasks, YardModulations, YardEncodings, \
+    POSSIBLE_CHANNEL_BANDWIDTHS, NUM_PREAMBLE_LOOKUP_TABLE, YardUSBProperties, \
+    YardInternalStates
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ def get_yardstickone(index=0,bus=None, address=None):
     except IndexError:
         return None
 
-class YardStickOneDevice(VirtualInterface):
+class YardStickOne(VirtualInterface):
     """Yard Stick One virtual device.
     """
 
@@ -60,7 +61,7 @@ class YardStickOneDevice(VirtualInterface):
             for yard in find(idVendor=YardStickOneId.YARD_ID_VENDOR,
                              idProduct=YardStickOneId.YARD_ID_PRODUCT,
                              find_all=True):
-                available_devices.append(YardStickOneDevice(bus=yard.bus, address=yard.address))
+                available_devices.append(YardStickOne(bus=yard.bus, address=yard.address))
         except ValueError:
             logger.warning("Cannot access YardStickOne, root privileges may be required.")
 
