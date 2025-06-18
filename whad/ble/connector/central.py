@@ -10,6 +10,7 @@ weird reasons).
 """
 import logging
 from time import sleep
+from threading import Event
 
 from whad.ble.connector.base import BLE
 from whad.device.connector import Event as CentralEvent
