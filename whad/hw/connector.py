@@ -11,12 +11,15 @@ from queue import Queue, Empty
 from threading import Thread, Lock, Event as ThreadEvent
 from typing import Generator, Callable, Union, List
 
+from scapy.packet import Packet
+
 from whad.helpers import message_filter
 from whad.hub import ProtocolHub
 from whad.hub.message import AbstractPacket, AbstractEvent, HubMessage
 from whad.hub.generic.cmdresult import CommandResult, Success
 from whad.exceptions import WhadDeviceError, WhadDeviceDisconnected, \
     RequiredImplementation, UnsupportedDomain
+
 from .iface import Interface, IfaceEvt, Disconnected, MessageReceived
 
 logger = logging.getLogger(__name__)
@@ -24,6 +27,12 @@ logger = logging.getLogger(__name__)
 class Event:
     """Generic connector event class.
     """
+
+    def __str__(self):
+        return "Event()"
+
+    def __repr__(self):
+        return "Event()"
 
 class ConnIoThread(Thread):
     """Connector's background thread processing events from interface.
@@ -143,7 +152,7 @@ class Connector:
 
 
     def attach_callback(self, callback, on_reception=True, on_transmission=True,
-                        filter=lambda pkt:True):
+                        packet: Callable[[Packet], bool]=lambda pkt:True):
         """
         Attach a new packet callback to current connector.
 
@@ -159,7 +168,7 @@ class Connector:
                 ([self.__transmission_callbacks] if on_transmission else [])
             )
             for callback_dict in callbacks_dicts:
-                callback_dict[callback] = filter
+                callback_dict[callback] = packet
 
         return len(callbacks_dicts) > 0
 
@@ -194,14 +203,14 @@ class Connector:
             for cb, cb_filter in self.__reception_callbacks.items():
                 connector.attach_callback(
                     cb,
-                    filter=cb_filter,
+                    packet=cb_filter,
                     on_reception=True
                 )
             self.__reception_callbacks = {}
 
             for cb, cb_filter in self.__transmission_callbacks.items():
                 connector.attach_callback(
-                    cb, filter=cb_filter, on_transmission=True
+                    cb, packet=cb_filter, on_transmission=True
                 )
             self.__transmission_callbacks = {}
 
@@ -214,19 +223,14 @@ class Connector:
                              reception are detached.
         :param on_transmission: Boolean indicating if the callbacks monitoring
                                 transmission are detached.
-        :returns: Boolean indicating if callbacks have been successfully detached.
         """
 
-        # Enter critical section
+        # Remove all callbacks
         with self.__callbacks_lock:
-            callbacks_dicts = (
-                ([self.__reception_callbacks] if reception else []) +
-                ([self.__transmission_callbacks] if transmission else [])
-            )
-            for callback_dict in callbacks_dicts:
-                callback_dict = {}
-
-        return len(callbacks_dicts) > 0
+            if reception:
+                self.__reception_callbacks = {}
+            if transmission:
+                self.__transmission_callbacks = {}
 
 
     def monitor_packet_tx(self, packet):
@@ -270,6 +274,12 @@ class Connector:
 
 
     def is_stalled(self) -> bool:
+        """Determine if the interface associated with this connector is stalled,
+        i.e. has messages awaiting processing even if closed.
+        
+        :return: True if interface is stalled, False otherwise.
+        :rtype: bool
+        """
         return self.__stalled
 
     @property
@@ -362,7 +372,8 @@ class Connector:
             while True:
                 # Retrieve PDU
                 message = self.__locked_pdus.get(block=True, timeout=0.2)
-                logger.debug("[connector][%s] Unlocked message for processing: %s", self.device.interface, message)
+                logger.debug("[connector][%s] Unlocked message for processing: %s",
+                             self.device.interface, message)
                 if dispatch_callback is None:
                     self.process_message(message)
                 else:
@@ -593,8 +604,8 @@ class Connector:
             yield self.__events.get(timeout=timeout)
         except Empty as err:
             raise err
-        else:
-            self.__events.task_done()
+
+        self.__events.task_done()
 
     def busy(self) -> bool:
         """Determine if this connector is busy.
@@ -603,11 +614,11 @@ class Connector:
         # process. If sniffing queue is empty, it is not busy anymore.
         if self.__sniff_mode:
             return not self.__sniff_queue.empty()
-        else:
-            # If not sniffing, connector is busy if it still has events to
-            # process (incoming messages) or if the associated interface has
-            # messages to send
-            return not self.__events.empty() or self.device.busy()
+
+        # If not sniffing, connector is busy if it still has events to
+        # process (incoming messages) or if the associated interface has
+        # messages to send
+        return not self.__events.empty() or self.device.busy()
 
     def on_disconnection(self):
         """Device has disconnected or been closed.
@@ -632,7 +643,8 @@ class Connector:
         else:
             # Did we receive a disconnection event ?
             if isinstance(message, Disconnected):
-                logger.debug("[%s] received a disconnection message, processing ...", self.device.interface)
+                logger.debug("[%s] received a disconnection message, processing ...",
+                             self.device.interface)
                 # Notify disconnection if we are not locked
                 if self.is_locked():
                     logger.debug("[%s] locked, mark connector as stalled", self.device.interface)
@@ -646,6 +658,7 @@ class Connector:
                 # Process hub message
                 self.process_message(message.message)
 
+    # pylint: disable=C0301
     def sniff(self, messages: List = None, timeout: float = None) -> Generator[HubMessage, None, None]:
         """Enable sniffing mode and report any received messages, optionally
         filtered by their type/classes if `messages` is provided.
@@ -675,7 +688,7 @@ class Connector:
                                     self.device.interface)
                     return
 
-                elif isinstance(event, MessageReceived):
+                if isinstance(event, MessageReceived):
                     logger.debug("[sniffer][%s] received message, processing",
                                      self.device.interface)
                     # Retrieve message
@@ -683,8 +696,10 @@ class Connector:
 
                     # Do we need to filter messages by type ?
                     if messages is not None:
-                        logger.debug("[sniffer][%s] checking message type (%s) against filtered types (%s)",
-                                     self.device.interface, type(message), messages)
+                        logger.debug(
+                            "[sniffer][%s] checking message type (%s) against filtered types (%s)",
+                            self.device.interface, type(message), messages
+                        )
                         if isinstance(message, messages):
                             yield message
                     else:

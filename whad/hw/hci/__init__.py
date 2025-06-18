@@ -209,7 +209,7 @@ class le_only(req_feature):
         # Wrap with LE-enabled controller check (tested first)
         return super().__init__(_wrap)
 
-class HciIface(VirtualInterface):
+class Hci(VirtualInterface):
     """Host/controller interface virtual device implementation.
     """
 
@@ -226,7 +226,7 @@ class HciIface(VirtualInterface):
         available_devices = {}
         devices_ids = HCIConfig.list()
         for device_id in devices_ids:
-            available_devices[device_id] = HciIface(index=device_id)
+            available_devices[device_id] = Hci(index=device_id)
 
         return available_devices
 
@@ -258,7 +258,7 @@ class HciIface(VirtualInterface):
         self.__local_supp_cmds = None
 
         # Data PDU Length management
-        self.__datarate = HciIface.PHY_1M
+        self.__datarate = Hci.PHY_1M
         self.__conn_max_tx_octets = 27
         self.__conn_max_tx_time = 0x148
         self.__conn_max_tx_time_uncoded = 328

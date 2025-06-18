@@ -96,7 +96,7 @@ class BleCentralShell(InteractiveShell):
                 self.on_disconnect,
                 on_transmission=False,
                 on_reception=True,
-                filter=lambda pkt: pkt.haslayer(LL_TERMINATE_IND)
+                packet=lambda pkt: pkt.haslayer(LL_TERMINATE_IND)
             )
 
             # Create our cached device if non-existing
@@ -407,7 +407,7 @@ class BleCentralShell(InteractiveShell):
                         self.on_disconnect,
                         on_transmission=False,
                         on_reception=True,
-                        filter=lambda pkt: pkt.haslayer(LL_TERMINATE_IND)
+                        packet=lambda pkt: pkt.haslayer(LL_TERMINATE_IND)
                     )
 
                     # Create our cached device if non-existing
