@@ -1,7 +1,8 @@
 from scapy.packet import Packet, bind_layers
 from scapy.fields import StrFixedLenField, ByteField, ByteEnumField, \
  	BitField, BitEnumField,LEX3BytesField, LEShortField, LEIntField, \
-	SignedByteField, ShortField, LEShortEnumField
+	SignedByteField, ShortField, LEShortEnumField, XLEShortField, ConditionalField
+from struct import pack
 
 ANT_MANUFACTURERS_ID = {
 	"Garmin": 1,
@@ -214,6 +215,41 @@ ANT_MANUFACTURERS_ID = {
 # address [3:5] seems static: 0x0001
  
 
+def crc_update(crc, value, bits):
+    """Update CRC with the provided bits.
+
+    Implementation taken from Bastille's nRF Research firmware
+    (https://github.com/BastilleResearch/nrf-research-firmware/)
+    """
+    crc = crc ^ (value << 8)
+    while bits>0:
+        bits -= 1
+        if (crc & 0x8000) == 0x8000:
+            crc = (crc << 1) ^ 0x1021
+        else:
+            crc = crc << 1
+    crc = crc & 0xFFFF
+    return crc
+
+
+def compute_crc(packet) -> bytes:
+    """Compute ANT packet CRC bytes (16-bit)
+
+    :param packet: ESB packet with an extra null byte
+    :type packet: :class:`whad.scapy.layers.esb.ESB_Hdr`
+    :return: CRC encoded as a byte array
+    :rtype: bytes
+    """
+    # CRC initial value is 0xFFFF
+    crc = 0xFFFF
+
+    # Loop on all packet bytes except the last one
+    for x in packet:
+        crc = crc_update(crc, x, 8)
+
+    # Return the encoded CRC (big-endian)
+    return crc
+
 class AntAddressField(StrFixedLenField):
 	def __init__(self, name, default):
 		StrFixedLenField.__init__(self, name, default,length=5)
@@ -242,8 +278,49 @@ class ANT_Hdr(Packet):
 		BitField("count",None, 1),
 		BitEnumField("slot", None, 1, {0:False, 1:True}),
 		BitField("unknown", None, 3),
+		ByteEnumField("crc_present", None, {0 : "no", 1 : "yes"}), 
+		 
+        ConditionalField(
+            XLEShortField("crc", None),
+            lambda pkt: pkt.crc_present  == 1
+        ),
 	]
 
+	@classmethod
+	def compute_crc(cls, p):
+		"""Process and compute CRC of an ANT packet.
+		"""
+		return compute_crc(bytes(p))
+
+	def post_build(self, p, pay):
+		"""Effectively build the ANTStick message and re-arrange it.
+		"""
+		if self.crc_present == 1 and self.crc is None:
+			print(p)
+			self.crc = compute_crc(p[:-3] + pay)
+			print("crc", hex(self.crc))
+
+		# Build the final frame
+		if self.crc_present == 1:
+			return p[:7] + p[9:] +pay  + pack("<H", self.crc)
+		else:
+			print(p, pay)
+			return p[:7] + p[8:] + pay
+
+	def post_dissect(self, s):
+		"""Override layer post_dissect() function to reset raw packet cache.
+		"""
+		self.raw_packet_cache = None  # Reset packet to allow post_build
+		return s
+
+	def pre_dissect(self,s):
+		"""Pre-dissect an ANTStick message to re-arrange fields.
+		"""
+		if len(s) == 17:
+			return s[:7] + bytes([1]) + s[-2:] + s[7:-2]
+		else:
+			return s[:7] + bytes([0]) + s[7:]
+		
 class  ANT_Plus_Header_Hdr(Packet):
 	name = "ANT+ Header"
 	fields_desc = [

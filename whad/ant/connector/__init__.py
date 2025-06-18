@@ -15,7 +15,8 @@ from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 # WHAD Protocol hub
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.discovery import Domain, Capability
-from whad.hub.ant import Commands, AvailableChannels, AvailableNetworks, ChannelType
+from whad.hub.ant import Commands, AvailableChannels, AvailableNetworks, \
+    ChannelType, ANTMetadata
 
 # ANT-specific imports
 from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
@@ -121,6 +122,24 @@ class ANT(WhadDeviceConnector):
             (commands & (1 << Commands.ListNetworks)) > 0
         )
 
+    def can_send(self) -> bool:
+        """
+        Determine if the device can transmit packets.
+        """
+        if self.__can_send is None:
+            commands = self.device.get_domain_commands(Domain.ANT)
+            self.__can_send = ((commands & (1 << Commands.Send)) > 0 or (commands & (1 << Commands.SendRaw)) > 0)
+        return self.__can_send
+
+
+    def support_raw_pdu(self) -> bool:
+        """
+        Determine if the device supports raw PDU.
+        """
+        if self.__can_send_raw is None:
+            capabilities = self.device.get_domain_capability(Domain.ANT)
+            self.__can_send_raw = not (capabilities & Capability.NoRawData)
+        return self.__can_send_raw
 
     def start(self) -> bool:
         """
@@ -320,6 +339,22 @@ class ANT(WhadDeviceConnector):
         return isinstance(resp, Success)
 
 
+    def set_channel_period(self, channel_number : int, period : int) -> bool:
+        """
+        Configure an ANT channel with a given channel period.
+        """
+        if not self.can_manage_channels():
+            raise UnsupportedCapability("ChannelManagement")
+
+        # Create a SniffMode message
+        msg = self.hub.ant.create_set_channel_period(
+            channel_number = channel_number, 
+            channel_period = period
+        )
+
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+
 
     def unassign_channel(self, channel_number : int) -> bool:
         """
@@ -379,6 +414,57 @@ class ANT(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
+
+    def send(self, pdu: bytes, channel_number: int = 0, rf_channel: int = None, add_crc : bool = False):
+        """
+        Send ANT packets (on a single channel).
+
+        :param pdu: ANT packet to send
+        :type pdu: bytes
+        :param channel_number: (Logical) channel on which the packet has to be sent
+        :type channel_number: int
+        :param rf_channel: Send the packet on a specific RF channel (priority over the logical channel)
+        :type rf_channel: int
+        :return: `True` if packet has been correctly sent, `False` otherwise.
+        :rtype: bool
+        """
+        if self.can_send():
+            # If raw mode is supported by the hardware, handle FCS value
+            if self.support_raw_pdu():
+                # Enable raw mode
+                raw_mode = True
+
+                # Add CRC if required
+                if add_crc:
+                    packet = ANT_Hdr(bytes(pdu))
+                    packet.crc_present = 1
+                    packet.crc = None
+                else:
+                    packet = ANT_Hdr(bytes(pdu))
+            else:
+                # Disable raw mode
+                raw_mode = False
+
+                # Cannot add/remove FCS, let hardware generate it
+                logger.debug((
+                    "[ant::send()] cannot add or remove CRC because HW"
+                    "does not support raw packets, rollback to classic ANT"
+                    "frames with valid CRC."
+                ))
+                packet = ANT_Hdr(bytes(pdu))
+
+            # Add Dot15d4 metadata
+            packet.metadata = ANTMetadata()
+            packet.metadata.raw = raw_mode
+            packet.metadata.channel_number = channel_number
+            if rf_channel is not None:
+                packet.metadata.rf_channel = rf_channel
+
+            # Send packet
+            return super().send_packet(packet)
+
+        # Failed at sending packet.
+        return False
 
     def on_generic_msg(self, message):
         """

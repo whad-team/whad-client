@@ -30,7 +30,11 @@ from whad.scapy.layers.antstick import ANTStick_Message, ANTStick_Command_Reques
     ANTStick_Command_Assign_Channel, ANTStick_Command_Close_Channel, \
     ANTStick_Command_Open_Channel, ANTStick_Extended_Assignment_Extension, \
     ANTStick_Data_Broadcast_Data, ANTSTICK_SYNC, ANTStick_Command_Reset, \
-    ANTStick_Command_Unassign_Channel, ANTStick_Command_Set_Channel_Period
+    ANTStick_Command_Unassign_Channel, ANTStick_Command_Set_Channel_Period, \
+    ANTStick_Command_Search_Timeout, ANTStick_Command_Low_Priority_Search_Timeout, \
+    ANTStick_Data_Acknowledged_Data, ANTStick_Command_Lib_Config, \
+    ANTStick_RSSI_Data_Extension, ANTStick_Timestamp_Data_Extension, \
+    ANTStick_Data_Burst_Data, ANTStick_Data_Extension
 
 from whad.device.virtual.antstick.constants import AntStickIds
 from whad.device.virtual.antstick.channel import ChannelStatus, ChannelType, Channel
@@ -116,8 +120,11 @@ class ANTStickDevice(VirtualDevice):
         self.__lock = Lock()
 
         self.__in_buffer = b""
+        self.__event_queue = Queue()
         self.__pdu_queue = Queue()
         self.__response_queue = Queue()
+        self.__ack_queue = Queue()
+
         self.__last_timestamp = int(time() * 1000)
         self.__sync = generate_sync_from_network_key(ANT_PLUS_NETWORK_KEY)
         self.__rf_channel = 57
@@ -125,6 +132,7 @@ class ANTStickDevice(VirtualDevice):
         self.__number_of_networks = 0
         self.__channels = {}
         self.__networks = {}
+        self.__reload_channel = None
         super().__init__()
 
     def reset(self):
@@ -181,6 +189,8 @@ class ANTStickDevice(VirtualDevice):
         self._initialize_channels()
         self._initialize_networks()
         self._configure_extension_mode(enable=True)
+        self._configure_lib(rssi=True, channel_id=True, timestamp=True)
+
         self.__opened = True
         super().open()
 
@@ -217,6 +227,26 @@ class ANTStickDevice(VirtualDevice):
             )
 
 
+    def _reload_channel(self, channel_number):
+        self.__channels[channel_number].opened = False
+        self._set_channel_id(
+            channel_number = channel_number, 
+            device_number = self.__channels[channel_number].device_number, 
+            device_type = self.__channels[channel_number].device_type, 
+            transmission_type = self.__channels[channel_number].transmission_type
+        )
+        self._set_channel_rf_channel(
+            channel_number = channel_number, 
+            rf_channel = self.__channels[channel_number].rf_channel, 
+        )
+
+        self._set_channel_period(
+            channel_number = channel_number, 
+            period = self.__channels[channel_number].period, 
+        )
+        self._open_channel(channel_number)
+
+
     def read(self):
         """Read incoming data
         """
@@ -224,20 +254,33 @@ class ANTStickDevice(VirtualDevice):
         if not self.__opened:
             raise WhadDeviceNotReady()
         else:
+            if self.__reload_channel is not None:
+                self.__opened = False
+                self._reload_channel(self.__reload_channel)
+                self.__reload_channel = None
+                self.__opened = True
             self._antstick_read_message()
 
             if self.__opened_stream:
+                while not self.__event_queue.empty():
+                    event = ANTStick_Message(self.__event_queue.get())
+                    print("Event:", repr(event))
+                    if event.message_code == 7 and self.__channels[event.channel_number].opened: # event_channel_closed
+                        self.__reload_channel = event.channel_number
+                    elif event.message_code in (5,6) + (4,10,17):
+                        self.__ack_queue.put(bytes(event))
+                    # acked: event_transfer_tx_completed or event_transfer_tx_failed  
                 while not self.__pdu_queue.empty():
                     data = ANTStick_Message(self.__pdu_queue.get())
-                    print(data)
+                    print(repr(data))
                     if data is not None:# and ANTStick_Data_Broadcast_Data in data:
                         pkt = bytes(
                                 ANT_Hdr(
                                     preamble = self.__sync, 
-                                    device_number = data.device_number, 
-                                    device_type = data.device_type,
-                                    transmission_type=data.transmission_type, 
-                                    broadcast = 0, 
+                                    device_number = data.device_number if ANTStick_Data_Extension in data else self.__channels[data.channel_number].device_number, 
+                                    device_type = data.device_type if ANTStick_Data_Extension in data else self.__channels[data.channel_number].device_type,
+                                    transmission_type=data.transmission_type if ANTStick_Data_Extension in data else self.__channels[data.channel_number].transmission_type, 
+                                    broadcast = (0 if ANTStick_Data_Broadcast_Data in data else 1), 
                                     ack = False, 
                                     end = False, 
                                     count = 0, 
@@ -246,12 +289,20 @@ class ANTStickDevice(VirtualDevice):
                             ) / data.pdu
                         )
                         pkt = ANT_Hdr(pkt)
-                        print(repr(pkt))
-                        now = int(time() * 1000)
+                        rssi = None
+                        if ANTStick_RSSI_Data_Extension in data:
+                            rssi = data.rssi
+                        if ANTStick_Timestamp_Data_Extension in data:
+                            timestamp = data.timestamp
+                        else:
+                            now = int(time() * 1000)
+                            timestamp = now - self.__last_timestamp
+                            
                         self._send_whad_ant_pdu(
                             pdu=bytes(pkt), 
                             rf_channel=self.__rf_channel, 
-                            timestamp=now - self.__last_timestamp
+                            timestamp=timestamp, 
+                            rssi = rssi
                         )
                     else:
                         sleep(0.0001)
@@ -260,7 +311,7 @@ class ANTStickDevice(VirtualDevice):
                 sleep(0.0001)
 
 
-    def _send_whad_ant_pdu(self, pdu, channel_number=0, rf_channel=0, timestamp=None):
+    def _send_whad_ant_pdu(self, pdu, channel_number=0, rf_channel=0, timestamp=None, rssi=None):
         msg = self.hub.ant.create_pdu_received(
             pdu=pdu, 
             channel_number=channel_number, 
@@ -271,6 +322,8 @@ class ANTStickDevice(VirtualDevice):
         if timestamp is not None:
             msg.timestamp = timestamp
 
+        if rssi is not None:
+            msg.rssi = rssi
         # Send message
         self._send_whad_message(msg)
 
@@ -466,15 +519,15 @@ class ANTStickDevice(VirtualDevice):
                 channel_type=channel_type
             ) / 
             ANTStick_Extended_Assignment_Extension(
-                extended_assignment = (0x01 if background_scanning else 0x00)
-            )
+                extended_assignment = 0x20 # | (0x01 if background_scanning else 0x00)
+            ) # for some reason transmission doesn't work without async mode so let's hardcode it
         )
         self.__channels[channel_number].status = ChannelStatus.ASSIGNED
         self.__channels[channel_number].assigned_network = network_number 
         self.__channels[channel_number].type = ChannelType(channel_type)
         return True
 
-    def _set_channel_id(self, channel_number=0, device_number=None, device_type=None, transmission_type=None):
+    def _set_channel_id(self, channel_number=0, device_number=None, device_type=None, transmission_type=None, force=False):
 
         if channel_number not in self.__channels:
             return False
@@ -556,6 +609,17 @@ class ANTStickDevice(VirtualDevice):
         self.__channels[0].opened = True
         return True
 
+
+    def _configure_lib(self, rssi=False, channel_id=False, timestamp=False):
+        response = self._antstick_send_command(ANTStick_Command_Lib_Config(
+                channel_id_output_enabled=(1 if channel_id else 0), 
+                rssi_output_enabled=(1 if rssi else 0), 
+                rx_timestamp_enabled=(1 if timestamp else 0)
+            )
+        )
+        return True
+
+
     def _configure_extension_mode(self, enable=True):
         response = self._antstick_send_command(ANTStick_Command_Enable_Extended_Messages(
                 enable=(1 if enable else 0)
@@ -570,7 +634,10 @@ class ANTStickDevice(VirtualDevice):
         if self.__channels[channel_number].opened:
             return True
 
-        self._set_channel_period(channel_number, 8070)
+            # Configure an infinite search timeout, because who wants a 
+            # channel to be arbitrarily closed after a few seconds ? WTF Garmin !
+            self._configure_search_timeout(channel_number, 0xFF)
+            self._configure_low_priority_search_timeout(channel_number, 0)
 
         response = self._antstick_send_command(ANTStick_Command_Open_Channel(
                 channel_number=channel_number
@@ -579,7 +646,33 @@ class ANTStickDevice(VirtualDevice):
         self.__channels[channel_number].opened = True
         return True
 
+    def _configure_search_timeout(self, channel_number=0, timeout=0):
+        if channel_number not in self.__channels:
+            return False
 
+        if self.__channels[channel_number].opened:
+            self._close_channel(channel_number)
+
+        response = self._antstick_send_command(ANTStick_Command_Search_Timeout(
+                channel_number=channel_number, 
+                timeout=timeout
+            )
+        )
+        return True
+
+    def _configure_low_priority_search_timeout(self, channel_number=0, timeout=0):
+        if channel_number not in self.__channels:
+            return False
+
+        if self.__channels[channel_number].opened:
+            self._close_channel(channel_number)
+
+        response = self._antstick_send_command(ANTStick_Command_Low_Priority_Search_Timeout(
+                channel_number=channel_number, 
+                timeout=timeout
+            )
+        )
+        return True
     def _close_channel(self, channel_number=0):
         if channel_number not in self.__channels:
             return False
@@ -673,7 +766,10 @@ class ANTStickDevice(VirtualDevice):
 
             if msg[2] in (0x4E, 0x4F, 0x50, 0x72):
                 self.__pdu_queue.put(msg)
+            elif msg[2] == 0x40 and ANTStick_Message(msg).message_code >= 1 and ANTStick_Message(msg).message_code <= 17: # event range
+                self.__event_queue.put(msg)
             else:
+                print("Adding response: ", repr(ANTStick_Message(msg))) 
                 self.__response_queue.put(msg)
     
 
@@ -801,7 +897,7 @@ class ANTStickDevice(VirtualDevice):
         self._send_whad_command_result(CommandResult.SUCCESS)
 
     def _on_whad_ant_set_rf_channel(self, message):
-        if message.channel_number not in self.__networks:
+        if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
         if message.rf_channel < 0 or message.rf_channel > 125:
@@ -817,7 +913,7 @@ class ANTStickDevice(VirtualDevice):
 
 
     def _on_whad_ant_set_device_number(self, message):
-        if message.channel_number not in self.__networks:
+        if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
         if message.device_number < 0 or message.device_number > 0xFFFF:
@@ -833,7 +929,7 @@ class ANTStickDevice(VirtualDevice):
 
 
     def _on_whad_ant_set_device_type(self, message):
-        if message.channel_number not in self.__networks:
+        if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
         if message.device_type < 0 or message.device_type > 0xFF:
@@ -849,7 +945,7 @@ class ANTStickDevice(VirtualDevice):
 
 
     def _on_whad_ant_set_transmission_type(self, message):
-        if message.channel_number not in self.__networks:
+        if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
         if message.transmission_type < 0 or message.transmission_type > 0xFF:
@@ -862,6 +958,70 @@ class ANTStickDevice(VirtualDevice):
             self._send_whad_command_result(CommandResult.ERROR)
 
         self._send_whad_command_result(CommandResult.SUCCESS)
+
+
+
+    def _on_whad_ant_set_channel_period(self, message):
+        if message.channel_number not in self.__channels:
+            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
+
+        if message.channel_period < 0 or message.channel_period > 0xFFFF:
+            self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
+
+        if self._set_channel_period(
+            channel_number = message.channel_number, 
+            period = message.channel_period
+        ):
+            self._send_whad_command_result(CommandResult.ERROR)
+
+        self._send_whad_command_result(CommandResult.SUCCESS)
+
+    def _on_whad_ant_send(self, message):
+        packet = ANT_Hdr(message.pdu)
+        print("transmitting: ", repr(packet))
+        if packet.broadcast == 1:
+            for count in range(2):
+                seq_num = (((((count-1) % 3) + 1) if count != 0 else 0)  | ((0 if count != 9 else 1) << 2))
+                self._antstick_send_command(
+                    ANTStick_Data_Burst_Data(
+                        sequence_number = seq_num, 
+                        channel_number = message.channel_number, 
+                        pdu = bytes(message.pdu[-8:])
+                    ), no_response = True
+                )
+                if count == 1:
+                    while self.__ack_queue.empty():
+                        sleep(0.001)
+                    ack_event = ANTStick_Message(self.__ack_queue.get())
+                    print("ackevent", repr(ack_event))
+                    if ack_event.message_code != 10:
+                        break
+
+            '''
+            self._antstick_send_command(
+                ANTStick_Data_Acknowledged_Data(
+                    channel_number = message.channel_number, 
+                    pdu = bytes(message.pdu[-8:])
+                ), no_response = True
+            )'''
+            while self.__ack_queue.empty():
+                sleep(0.001)
+            ack_event = ANTStick_Message(self.__ack_queue.get())
+            if ack_event.message_code == 6:
+                self._send_whad_command_result(CommandResult.ERROR)
+            else:
+               self._send_whad_command_result(CommandResult.SUCCESS)
+
+        else:
+            self._antstick_send_command(
+                ANTStick_Data_Broadcast_Data(
+                    channel_number = message.channel_number, 
+                    pdu = bytes(message.pdu[-8:])
+                ), no_response = True
+            )
+            self._send_whad_command_result(CommandResult.SUCCESS)
+            
+
 
 if __name__ == '__main__':
     print(ANTStickDevice.list())

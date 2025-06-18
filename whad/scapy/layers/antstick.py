@@ -1,6 +1,6 @@
 from scapy.fields import ByteField, LenField, ByteEnumField, StrField, \
     BitField, BitEnumField, LEIntField, LEX3BytesField, LEShortField, \
-    StrFixedLenField
+    StrFixedLenField, SignedByteField
 from scapy.packet import Packet, bind_layers
 
 antstick_message_ids = {
@@ -120,6 +120,9 @@ class ANTStick_Message(Packet):
     def post_build(self, p, pay):
         """Effectively build the ANTStick message and re-arrange it.
         """
+        if self.sync is None:
+            self.sync = ANTSTICK_SYNC
+
         if self.length is None:
             self.length = len(pay)
 
@@ -342,13 +345,6 @@ class ANTStick_Command_Close_Channel(Packet):
         ByteField("channel_number", None),
     ]
 
-class ANTStick_Data_Broadcast_Data(Packet):
-    name = "ANTStick Data Broadcast Data"
-    fields_desc = [
-        ByteField("channel_number", None), 
-        StrFixedLenField("pdu", None, length=8)
-    ]
-
 class ANTStick_Data_Extension(Packet):
     name = "ANTStick Data Extension"
     fields_desc = [
@@ -382,9 +378,81 @@ class ANTStick_Command_Set_Channel_Period(Packet):
     ]
 
 
+class ANTStick_Command_Search_Timeout(Packet):
+    name = "ANTStick Search Timeout command"
+    fields_desc = [
+        ByteField("channel_number", None),
+        ByteField("timeout", None),
+    ]
 
+
+class ANTStick_Command_Low_Priority_Search_Timeout(Packet):
+    name = "ANTStick Low Priority Search Timeout command"
+    fields_desc = [
+        ByteField("channel_number", None),
+        ByteField("timeout", None),
+    ]
+
+class ANTStick_Data_Broadcast_Data(Packet):
+    name = "ANTStick Data Broadcast Data"
+    fields_desc = [
+        ByteField("channel_number", None), 
+        StrFixedLenField("pdu", None, length=8)
+    ]
+
+class ANTStick_Data_Acknowledged_Data(Packet):
+    name = "ANTStick Data Acknowledged Data"
+    fields_desc = [
+        ByteField("channel_number", None), 
+        StrFixedLenField("pdu", None, length=8)
+    ]
+
+
+class ANTStick_Data_Burst_Data(Packet):
+    name = "ANTStick Data Burst Data"
+    fields_desc = [
+        BitField("sequence_number", 0, 3),
+        BitField("channel_number", 0, 5), 
+        StrFixedLenField("pdu", None, length=8)
+    ]
+
+class ANTStick_Command_Lib_Config(Packet):
+    name = "ANTStick Lib Config command"
+    fields_desc = [
+        ByteField("filler", 0x00),
+        BitField("channel_id_output_enabled", 0,1),
+        BitField("rssi_output_enabled", 0,1),
+        BitField("rx_timestamp_enabled", 0,1),
+        BitField("reserved1", 0,5)
+    ]
+
+class ANTStick_RSSI_Data_Extension(Packet):
+    name = "ANTStick RSSI Data Extension"
+    fields_desc = [
+        ByteEnumField("type", None, {0x20 : "dBm"}),
+        SignedByteField("rssi", None), 
+        SignedByteField("threshold", None)
+    ]
+
+
+class ANTStick_Timestamp_Data_Extension(Packet):
+    name = "ANTStick Timestamp Data Extension"
+    fields_desc = [
+        LEIntField("timestamp", None)
+    ]
+    
 bind_layers(ANTStick_Message, ANTStick_Data_Broadcast_Data, id=0x4E)
 bind_layers(ANTStick_Data_Broadcast_Data, ANTStick_Data_Extension)
+bind_layers(ANTStick_Data_Extension, ANTStick_RSSI_Data_Extension)
+bind_layers(ANTStick_RSSI_Data_Extension, ANTStick_Timestamp_Data_Extension)
+
+
+bind_layers(ANTStick_Message, ANTStick_Data_Acknowledged_Data, id=0x4F)
+bind_layers(ANTStick_Data_Acknowledged_Data, ANTStick_Data_Extension)
+
+bind_layers(ANTStick_Message, ANTStick_Data_Burst_Data, id=0x50)
+bind_layers(ANTStick_Data_Burst_Data, ANTStick_Data_Extension)
+
 
 bind_layers(ANTStick_Command_Assign_Channel, ANTStick_Extended_Assignment_Extension)
 bind_layers(ANTStick_Requested_Message_Advanced_Burst, ANTStick_Requested_Message_Advanced_Burst_Capabilities, message_type=0)
@@ -398,6 +466,7 @@ bind_layers(ANTStick_Message, ANTStick_Channel_Response_Or_Event, id=0x40)
 bind_layers(ANTStick_Message, ANTStick_Command_Set_Channel_Period, id=0x43)
 bind_layers(ANTStick_Message, ANTStick_Command_Unassign_Channel, id=0x41)
 bind_layers(ANTStick_Message, ANTStick_Command_Assign_Channel, id=0x42)
+bind_layers(ANTStick_Message, ANTStick_Command_Search_Timeout, id=0x44)
 bind_layers(ANTStick_Message, ANTStick_Command_Set_Channel_RF_Frequency, id=0x45)
 bind_layers(ANTStick_Message, ANTStick_Command_Set_Network_Key, id=0x46)
 bind_layers(ANTStick_Message, ANTStick_Command_Reset, id=0x4A)
@@ -408,6 +477,9 @@ bind_layers(ANTStick_Message, ANTStick_Command_Set_Channel_ID, id=0x51)
 bind_layers(ANTStick_Message, ANTStick_Requested_Message_Capabilities, id=0x54)
 bind_layers(ANTStick_Message, ANTStick_Command_Open_RX_Scan_Mode, id=0x5B)
 bind_layers(ANTStick_Message, ANTStick_Requested_Message_Serial_Number, id=0x61)
+bind_layers(ANTStick_Message, ANTStick_Command_Low_Priority_Search_Timeout, id=0x63)
 bind_layers(ANTStick_Message, ANTStick_Command_Enable_Extended_Messages, id=0x66)
+bind_layers(ANTStick_Message, ANTStick_Command_Lib_Config, id=0x6E)
 bind_layers(ANTStick_Message, ANTStick_Requested_Message_Startup,id=0x6F)
 bind_layers(ANTStick_Message, ANTStick_Requested_Message_Advanced_Burst, id=0x78)
+
