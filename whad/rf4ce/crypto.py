@@ -1,14 +1,19 @@
-from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
-from whad.scapy.layers.rf4ce import RF4CE_Hdr, \
-    RF4CE_Cmd_Pair_Request, RF4CE_Cmd_Key_Seed
-from whad.rf4ce.exceptions import MissingRF4CEHeader, \
-    MissingCryptographicMaterial, MissingRF4CESecurityFlag
-from whad.common.analyzer import TrafficAnalyzer
+"""RF4CE Crypto manager
+"""
+from struct import pack
+from scapy.config import conf
+
 from Cryptodome.Cipher import AES
 from Cryptodome.Random import get_random_bytes
 
-from struct import pack
-from scapy.config import conf
+from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
+
+from whad.common.analyzer import TrafficAnalyzer
+from whad.scapy.layers.rf4ce import RF4CE_Hdr, \
+    RF4CE_Cmd_Pair_Request, RF4CE_Cmd_Key_Seed
+
+from .exceptions import MissingRF4CEHeader, \
+    MissingCryptographicMaterial, MissingRF4CESecurityFlag
 
 conf.dot15d4_protocol = "rf4ce"
 

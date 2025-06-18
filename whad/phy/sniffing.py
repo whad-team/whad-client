@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from whad.phy import Endianness
+from whad.hub.phy import Endianness
 
 @dataclass
 class FSKConfiguration:
