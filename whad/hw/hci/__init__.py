@@ -1131,7 +1131,7 @@ class Hci(VirtualInterface):
             return True
         return False
 
-    def terminate_connection(self):
+    def terminate_connection(self, handle: int):
         """Terminate an active connection or connection attempt.
         """
         if self.__conn_state == HCIConnectionState.INITIATING:
@@ -1143,7 +1143,7 @@ class Hci(VirtualInterface):
                 logger.warning("[%s] Cannot cancel pending connection !", self.interface)
         elif self.__conn_state == HCIConnectionState.ESTABLISHED:
             logger.debug("[%s] HCI interface is connected, disconnecting ...")
-            if self._disconnect():
+            if self._disconnect(handle):
                 logger.debug("[%s] Successfully disconnected.")
             else:
                 logger.warning("[%s] Error while disconnecting !")
@@ -1480,8 +1480,9 @@ class Hci(VirtualInterface):
 
     def _on_whad_ble_stop(self, message):
 
-        # Stop any connection attempt, terminate established connection
-        self.terminate_connection()
+        # Stop any connection attempt, terminate established connections
+        for handle in self._active_handles:
+            self.terminate_connection(handle)
 
         # Process with requested mode
         if self.__internal_state == HCIInternalState.SCANNING:

@@ -1,11 +1,10 @@
+import sys
 from whad.ble import Peripheral
 from whad.common.monitors import WiresharkMonitor
 from whad.ble.profile.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
-from whad.device.uart import WhadDevice
-from time import sleep
-import sys
+from whad.device import WhadDevice
 
 # Define your custom profile
 class MyPeripheral(GenericProfile):
