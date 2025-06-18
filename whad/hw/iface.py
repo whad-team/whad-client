@@ -292,7 +292,7 @@ class Interface:
         if interfaces is not None and iface_id in interfaces:
             return interfaces[iface_id]
 
-        if interfaces is not None and 0 in interfaces:
+        if interfaces is not None and iface_id is None and 0 in interfaces:
             return interfaces[0]
 
         # Return interface or raise an exception
