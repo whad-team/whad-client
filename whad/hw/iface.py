@@ -382,17 +382,17 @@ class Interface:
         self.__opened = False
         self.__discovered = False
 
-        # Make sure index is an int
-        if not isinstance(index, int):
-            raise WhadDeviceNotFound()
+        print(index)
 
         # Generate device index if not provided
         if index is None:
             self.inc_dev_index()
             self.__index = self.__class__.CURRENT_DEVICE_INDEX
-        else:
+        elif isinstance(index, int):
             # Used by HCI devices to force index to match system names
             self.__index = index
+        else:
+            raise WhadDeviceNotFound()
 
         # IO Threads
         self.__iface_in = None
@@ -411,7 +411,6 @@ class Interface:
 
         # Interface lock
         self.__lock = Lock()
-
         # Connector lock
         self.__msg_filter: Callable[..., bool] = None
 
