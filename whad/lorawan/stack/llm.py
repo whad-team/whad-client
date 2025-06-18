@@ -1,15 +1,18 @@
 """
 LoRaWAN Gateway stack link-layer manager
 """
+import logging
+
 from time import sleep, time
 from random import randint
-from whad.lorawan.stack.mac import LWMacLayer
+
 from whad.common.stack import LayerState, Layer, alias, source, state,instance
 from whad.scapy.layers.lorawan import MACPayloadUplink, PHYPayload, JoinAccept, JoinRequest, MACPayloadDownlink
-from whad.lorawan.crypto import MIC, derive_appskey, derive_nwkskey, encrypt_packet, decrypt_packet
-from whad.lorawan.helpers import EUI
 
-import logging
+from .mac import LWMacLayer
+from ..crypto import MIC, derive_appskey, derive_nwkskey, encrypt_packet, decrypt_packet
+from ..helpers import EUI
+
 logger = logging.getLogger(__name__)
 
 class LWGwLinkLayerState(LayerState):

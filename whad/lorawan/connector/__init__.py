@@ -1,5 +1,7 @@
 """This module provides a connector to use LoRaWAN capable hardware.
 """
+import logging
+
 from time import sleep
 from queue import Queue, Empty
 from struct import unpack
@@ -9,18 +11,32 @@ from scapy.contrib.loraphy2wan import PHYPayload, Join_Request, Join_Accept
 
 from whad.device import WhadDevice
 from whad.phy.connector.lora import LoRa
-from whad.lorawan.channel import EU868, ChannelModParams, ChannelPlan
-from whad.lorawan.exceptions import NotStartedException
 
-import logging
+from ..channel import EU868, ChannelModParams, ChannelPlan
+from ..exceptions import NotStartedException
+
 logger = logging.getLogger(__name__)
 
-def eui_to_bytes(eui):
+def eui_to_bytes(eui) -> bytes:
+    """Convert EUI to bytes.
+
+    :param eui: LoRaWAN EUI in the form of comma-separated hex values
+    :type eui: str
+    """
     values = eui.lower().split(':')[::-1]
     assert len(values) == 8
     return bytes([int(v, 16) for v in values])
 
-def compute_mic(appkey, buffer):
+def compute_mic(appkey, buffer) -> bytes:
+    """Compute a message MIC given an APP key.
+    
+    :param appkey: APP key
+    :type appkey: bytes
+    :param buffer: Message
+    :type buffer: bytes
+    :return: Computed MIC (4 bytes)
+    :rtype: bytes
+    """
     c = CMAC.new(appkey, ciphermod=AES)
     c.update(buffer)
     return c.digest()[:4]
