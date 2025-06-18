@@ -18,9 +18,6 @@ from scapy.utils import PcapReader
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceDisconnected, WhadDeviceError
 
-from ..iface import VirtualInterface
-from .capabilities import CAPABILITIES
-
 from whad.hub.generic.cmdresult import CommandResult
 from whad.scapy.layers.phy import Phy_Packet
 from whad.hub.dot15d4 import Dot15d4Metadata
@@ -30,6 +27,9 @@ from whad.hub.phy import PhyMetadata, Modulation, Endianness
 from whad.hub.unifying import UnifyingMetadata
 from whad.hub.discovery import Domain
 from whad.ble.utils.phy import FieldsSize
+
+from ..iface import VirtualInterface
+from .capabilities import CAPABILITIES
 
 logger = logging.getLogger(__name__)
 
