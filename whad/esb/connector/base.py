@@ -6,8 +6,9 @@ ShockBurst compatible devices.
 """
 from scapy.packet import Packet
 
+from whad.hw.connector import Connector
+
 from whad.hub.discovery import Domain, Capability
-from whad.device import WhadDeviceConnector
 from whad.esb.esbaddr import ESBAddress
 from whad.hub.esb import ESBMetadata
 from whad.scapy.layers.esb import ESB_Hdr,ESB_Payload_Hdr,ESB_Ack_Response
@@ -18,7 +19,7 @@ from whad.hub.esb import EsbNodeAddress, Commands
 from whad.hub.events import JammedEvt
 
 
-class ESB(WhadDeviceConnector):
+class ESB(Connector):
     """
     Enhanced ShockBurst protocol connector.
 
