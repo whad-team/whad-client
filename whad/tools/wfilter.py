@@ -17,7 +17,7 @@ from scapy.themes import BrightTheme
 from scapy.config import conf
 
 from whad.cli.app import CommandLineApp, run_app
-from whad.device.unix import UnixSocketServerDevice, UnixConnector
+from whad.device.unix import UnixSocketServer, UnixConnector
 from whad.device import Bridge
 from whad.hub import ProtocolHub
 from whad.cli.ui import display_packet, error
@@ -366,7 +366,7 @@ class WhadFilterApp(CommandLineApp):
                 hub = ProtocolHub()
 
                 if self.is_stdout_piped():
-                    unix_server = UnixConnector(UnixSocketServerDevice(parameters=parameters))
+                    unix_server = UnixConnector(UnixSocketServer(parameters=parameters))
 
 
                     while not unix_server.device.opened:
@@ -380,6 +380,7 @@ class WhadFilterApp(CommandLineApp):
                                    self.on_tx_packet).wait()
 
                 else:
+                    print("unlock")
                     # Unlock Unix connector
                     connector.unlock()
 
