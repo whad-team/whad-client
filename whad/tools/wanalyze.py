@@ -15,7 +15,7 @@ from scapy.config import conf
 from scapy.themes import BrightTheme
 
 from whad.cli.app import CommandLineApp, run_app
-from whad.device.unix import  UnixSocketConnector, UnixConnector, UnixSocketServerDevice
+from whad.device.unix import UnixConnector, UnixSocketServer
 from whad.device import Bridge
 from whad.hub import ProtocolHub
 from whad.cli.ui import error, success, info, display_packet, format_analyzer_output
@@ -315,7 +315,7 @@ class WhadAnalyzeApp(CommandLineApp):
 
 
                 if self.is_stdout_piped() and self.args.packets:
-                    unix_server = UnixConnector(UnixSocketServerDevice(parameters={
+                    unix_server = UnixConnector(UnixSocketServer(parameters={
                         'domain': self.args.domain,
                         'format': self.args.format,
                         'metadata' : self.args.metadata
