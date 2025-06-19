@@ -33,11 +33,6 @@ class DeviceInfo:
         )
         return DeviceInfo(msg)
 
-    def create_info_resp(self, type: int, device_id: bytes, proto_min_ver: int,
-                              max_speed: int, fw_author: bytes, fw_url: bytes,
-                              fw_version_major: int, fw_version_minor: int,
-                              fw_version_rev: int, capabilities: List[int])
-
     def __init__(self, info_resp):
         """Populate device information object from WHAD's InfoQueryResp message.
         
