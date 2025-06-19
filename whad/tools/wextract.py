@@ -14,7 +14,7 @@ from scapy.config import conf
 from scapy.themes import BrightTheme
 
 from whad.cli.app import CommandLineApp, run_app
-from whad.device.unix import  UnixSocketConnector
+from whad.device.unix import  UnixConnector
 from whad.hub import ProtocolHub
 
 logger = logging.getLogger(__name__)
@@ -138,12 +138,8 @@ class WhadExtractApp(CommandLineApp):
                 if not self.args.nocolor:
                     conf.color_theme = BrightTheme()
 
-                parameters = self.args.__dict__
-
                 # Create a Unix socket connector
-                connector = UnixSocketConnector(interface)
-                for parameter_name, parameter_value in parameters.items():
-                    connector.add_parameter(parameter_name, parameter_value)
+                connector = UnixConnector(interface)
 
                 # Set the connector domain
                 connector.domain = self.args.domain
@@ -154,8 +150,7 @@ class WhadExtractApp(CommandLineApp):
                 # Unlock to start processing incoming messages
                 connector.unlock()
 
-                while interface.opened:
-                    time.sleep(.1)
+                connector.join()
 
         except KeyboardInterrupt:
             # Launch post-run tasks
