@@ -225,7 +225,7 @@ class Device:
     @classmethod
     def _get_sub_classes(cls):
         """
-        Helper allowing to get every subclass of WhadDevice.
+        Helper allowing to get every subclass of Device.
         """
         # List every available device class
         device_classes = set()
@@ -247,7 +247,7 @@ class Device:
             - a class method list, returning the available devices
             - a property identifier, allowing to identify the device in a unique way
 
-        This method should NOT be used outside of this class. Use WhadDevice.create instead.
+        This method should NOT be used outside of this class. Use Device.create instead.
         """
         if cls.INTERFACE_NAME is None:
             raise WhadDeviceNotFound()
@@ -998,38 +998,38 @@ class VirtualDevice(Device):
 
 
 class WhadDevice(Device):
-    """Deprecated implementation"""
+    """Renamed to `Device` for clarity, will be deprecated later."""
 
     @classmethod
     def create_inst(cls, interface_string):
-        """Create an instance of interface from its name, using Interface."""
+        """Create an instance of interface from its name, using Device."""
         return Device.create_inst(interface_string)
 
     @classmethod
     def create(cls, interface_string):
-        """Create an instance of interface from its name, using Interface."""
+        """Create an instance of interface from its name, using Device."""
         return Device.create(interface_string)        
 
     @classmethod
     def check_interface(cls, interface):
-        """Check if Interface supports the requested interface."""
+        """Check if Device supports the requested interface."""
         return Device.check_interface(interface)
 
 class WhadVirtualDevice(VirtualDevice):
-    """Deprecated implementation"""
+    """Renamed to `VirtualDevice` for clarity, will be deprecated later."""
 
     @classmethod
     def create_inst(cls, interface_string):
-        """Create an instance of interface from its name, using VirtualInterface."""
+        """Create an instance of interface from its name, using VirtualDevice."""
         return VirtualDevice.create_inst(interface_string)
 
     @classmethod
     def create(cls, interface_string):
-        """Create an instance of interface from its name, using VirtualInterface."""
+        """Create an instance of interface from its name, using VirtualDevice."""
         return VirtualDevice.create(interface_string)        
 
     @classmethod
     def check_interface(cls, interface):
-        """Check if VirtualInterface supports the requested interface."""
+        """Check if VirtualDevice supports the requested interface."""
         return VirtualDevice.check_interface(interface)
 
