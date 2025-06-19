@@ -7,7 +7,7 @@ two connectors.
 import logging
 from threading import Event
 
-from whad.hub.message import AbstractPacket
+from whad.hub.message import AbstractPacket, HubMessage
 
 from .connector import Connector
 
@@ -172,7 +172,7 @@ class Bridge:
             # We are done processing packets, bridge stops.
             self.__stopped.set()
 
-    def on_disconnect(self, wrapper):
+    def on_disconnect(self, wrapper: BridgeIfaceWrapper):
         """When a wrapper disconnects, stop bridge.
         """
         if wrapper == self.__in_wrapper:
@@ -200,7 +200,7 @@ class Bridge:
                 self.__stopped.set()
 
 
-    def on_any_msg(self, wrapper, message):
+    def on_any_msg(self, wrapper, message: HubMessage):
         """Callback method for any message.
 
         :param wrapper: Calling wrapper object
@@ -216,7 +216,7 @@ class Bridge:
         else:
             logger.error("on_any_msg() called by an unknown wrapper (%s)", wrapper)
 
-    def on_inbound(self, message):
+    def on_inbound(self, message: HubMessage):
         """Inbound message hook
 
         This hook is called whenever a message is received on the input
@@ -237,7 +237,7 @@ class Bridge:
             message.callback(self.on_message_sent)
             self.__in.send_message(message)
 
-    def on_outbound(self, message):
+    def on_outbound(self, message: HubMessage):
         """Outbound message hook.
 
         This hook is called whenever a message is received on the output
@@ -258,7 +258,7 @@ class Bridge:
             self.__out.send_message(message)
 
     def unlock(self):
-        """Unlock bridge interfaces.
+        """Unlock bridge's interfaces.
         """
         # Unlock connector, causing packets to be sent to the output connector
         if self.__in.is_locked():
@@ -268,7 +268,7 @@ class Bridge:
             logger.debug("[bridge] %s is locked, unlocking it", self.__out.device.interface)
             self.__out.unlock(dispatch_callback=self.dispatch_pending_output)
 
-    def dispatch_pending_output(self, message):
+    def dispatch_pending_output(self, message: HubMessage):
         """Forward pending output messages to input.
         """
         packet = message.to_packet()
@@ -277,7 +277,7 @@ class Bridge:
             self.input.monitor_packet_tx(packet)
         self.input.send_message(message)
 
-    def dispatch_pending_input(self, message):
+    def dispatch_pending_input(self, message: HubMessage):
         """Forward pending input messages to output.
         """
         packet = message.to_packet()
@@ -286,5 +286,9 @@ class Bridge:
             self.input.monitor_packet_rx(packet)
         self.output.send_message(message)
 
-    def wait(self, timeout: float = None):
-        return self.__stopped.wait(timeout=timeout)
+    def join(self):
+        """Wait for bridge termination. Bridge termination is triggered when
+        at least one of the bridge's interface is disconnected and every pending
+        messages forwarded.
+        """
+        return self.__stopped.wait()
