@@ -14,10 +14,10 @@ from whad.cli.app import CommandLineApp, run_app
 from whad.cli.ui import error, warning, display_packet
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.common.monitors import WiresharkMonitor, PcapWriterMonitor
-from whad.device.unix import UnixSocketServerDevice, UnixConnector
+from whad.device.unix import UnixSocketServer, UnixConnector
 from whad.tools.utils import list_implemented_sniffers, get_sniffer_parameters, \
     build_configuration_from_args, gen_option_name
-from whad.hw import Bridge
+from whad.device import Bridge
 from whad.phy.exceptions import UnsupportedFrequency
 
 logger = logging.getLogger(__name__)
@@ -185,7 +185,7 @@ class WhadSniffApp(CommandLineApp):
                         #proxy = UnixSocketProxy(self.interface, params={"domain":self.args.domain})
 
                         # Create our unix socket server
-                        unix_server = UnixConnector(UnixSocketServerDevice(parameters={
+                        unix_server = UnixConnector(UnixSocketServer(parameters={
                             'format': self.args.format,
                             'metadata':self.args.metadata,
                             'domain': self.args.domain
@@ -205,7 +205,7 @@ class WhadSniffApp(CommandLineApp):
                         sniffer.start()
 
                         # Loop until the user hits CTL-C or interface disconnects
-                        bridge.wait()
+                        bridge.join()
 
                         logger.debug('wsniff: closing device')
                         unix_server.device.close()
