@@ -17,7 +17,7 @@ from .connector import Connector, Event, LockedConnector, WhadDeviceConnector
 from .bridge import Bridge
 
 # Load supported hardware interfaces
-from .unix import UnixSocketDevice
+from .unix import UnixSocket
 from .uart import Uart
 from .tcp import TcpSocket
 
@@ -31,6 +31,7 @@ from .ubertooth import Ubertooth
 from .yard import YardStickOne
 
 __all__ = [
+    # Base classes
     "Device",
     "VirtualDevice",
     "Connector",
@@ -39,17 +40,20 @@ __all__ = [
     "DeviceEvt",
     "Disconnected",
     "MessageReceived",
+    "Event",
+
+    # Kept for compatibility
     "WhadDevice",
     "WhadVirtualDevice",
     "WhadDeviceConnector",
     "LockedConnector",
-    "Event",
-
+    
+    # Virtual devices
     "Hci",
     "Pcap",
     "Uart",
     "TcpSocket",
-    "UnixSocketDevice",
+    "UnixSocket",
     "Apimote",
     "RfStorm",
     "RzUsbStick",
