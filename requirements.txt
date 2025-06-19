@@ -1,5 +1,4 @@
 protobuf==6.30.2
-orom whad.common.converters.scapy import ScapyConverter
 scapy==2.6.1
 elementpath==5.0.0
 pyserial==3.5.0
