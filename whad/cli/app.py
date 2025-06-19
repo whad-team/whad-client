@@ -68,7 +68,7 @@ from prompt_toolkit.output import create_output
 from prompt_toolkit.application.current import get_app_session
 
 from whad.version import get_version
-from whad.device import Device, UnixSocketDevice
+from whad.device import Device, UnixSocket
 from whad.exceptions import WhadDeviceAccessDenied, WhadDeviceNotFound, \
     WhadDeviceNotReady, WhadDeviceTimeout, UnsupportedDomain
 
@@ -523,7 +523,7 @@ class CommandLineApp(ArgumentParser):
 
                                 # Create a Unix socket device and connect it to the
                                 # given Unix socket path
-                                self.__input_iface = UnixSocketDevice(url_info.path)
+                                self.__input_iface = UnixSocket(url_info.path)
                                 self.__input_iface.open()
 
                                 # Copy parameters into our app parameters
@@ -558,7 +558,7 @@ class CommandLineApp(ArgumentParser):
         """
         if self.__output_type == CommandLineApp.OUTPUT_WHAD:
             # If stdout is piped, forward socket info to next tool
-            if isinstance(self.__input_iface, UnixSocketDevice) and self.is_stdout_piped():
+            if isinstance(self.__input_iface, UnixSocket) and self.is_stdout_piped():
                 sys.stdout.write(f"{self.__interface_path}\n")
                 sys.stdout.flush()
         elif self.__input_type == CommandLineApp.INPUT_WHAD and self.__input_iface is not None:
