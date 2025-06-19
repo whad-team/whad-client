@@ -76,7 +76,7 @@ class Scanner(ESB):
             else:
                 message_type = PduReceived
 
-            message = self.wait_for_message(filter=message_filter(message_type))
+            message = self.wait_for_message(keep=message_filter(message_type))
             if issubclass(message, AbstractPacket):
                 packet = message.to_packet()
                 if packet is not None:
