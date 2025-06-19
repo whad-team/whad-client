@@ -176,11 +176,11 @@ class UnixSocket(Device):
             #print(readers, errors)
             if len(readers) > 0:
                 data = self.__socket.recv(1024)
-                logger.info("[%s] Unix socket returned %s", self.interface, data)
+                logger.info("[%s] Read data from socket: %s", self.interface, data)
                 if len(data) > 0:
                     return data
                 else:
-                    logger.info("[%s] Unix socket returned %s", self.interface, data)
+                    logger.info("[%s] Read data, received empty buffer", self.interface)
                     # Unix socket client is stalled if we have pending messages
                     if not self.busy():
                         # If no pending message then consider the socket disconnected
