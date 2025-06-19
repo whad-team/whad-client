@@ -1,4 +1,4 @@
-"""This module provides a UnixSocketDevice class that can be used with a WhadDeviceConnector
+"""This module provides a UnixSocket class that can be used with a WhadDeviceConnector
 to interact with a unix socket connected to a Whad-enable device. This class implements
 a Unix socket client that connects to a remote device through a Unix socket.
 
@@ -28,9 +28,9 @@ from .connector import Connector
 
 logger = logging.getLogger(__name__)
 
-class UnixSocketDevice(Device):
+class UnixSocket(Device):
     """
-    UnixSocketDevice device class.
+    UnixSocket device class.
     """
 
     INTERFACE_NAME = "unix"
@@ -57,7 +57,7 @@ class UnixSocketDevice(Device):
                 for socket_ in p.findall(proc_net_unix):
                     _, filename = os.path.split(socket_)
                     if re.match('whad_[0-9a-f]+\\.sock', filename):
-                        dev = UnixSocketDevice(socket_)
+                        dev = UnixSocket(socket_)
                         devices.append(dev)
             return devices
         except IOError:
@@ -111,7 +111,7 @@ class UnixSocketDevice(Device):
         """
         Close current device.
         """
-        logger.debug('[UnixSocketDevice] closing unix socket ...')
+        logger.debug('[UnixSocket] closing unix socket ...')
         # Close underlying device.
         if self.__socket is not None:
             self.__socket.close()
@@ -121,7 +121,7 @@ class UnixSocketDevice(Device):
         self.__opened = False
 
         # Ask parent class to stop I/O thread
-        logger.debug('[UnixSocketDevice] stopping I/O thread')
+        logger.debug('[UnixSocket] stopping I/O thread')
         super().close()
 
 
@@ -207,7 +207,7 @@ class UnixSocketDevice(Device):
         """Not supported by Unix socket devices.
         """
 
-class UnixSocketServerDevice(Device):
+class UnixSocketServer(Device):
     """Unix socket server device
     """
 
