@@ -8,7 +8,7 @@ import logging
 from time import sleep
 
 # WHAD device classes
-from whad.device.unix import UnixConnector, UnixSocketServerDevice
+from whad.device.unix import UnixConnector, UnixSocketServer
 from whad.device import Bridge
 
 # WHAD BLE interfaces
@@ -387,7 +387,7 @@ class BleConnectApp(CommandLineDevicePipe):
                 logger.info("local_peer: %s", central.local_peer)
 
                 # Insanciate our output pipe
-                proxy = UnixConnector(UnixSocketServerDevice(parameters={
+                proxy = UnixConnector(UnixSocketServer(parameters={
                     'domain':'ble',
                     'conn_handle':periph.conn_handle,
                     'initiator_bdaddr':str(central.local_peer),
