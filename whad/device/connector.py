@@ -102,6 +102,7 @@ class Connector:
         # Connector lock mode
         self.__locked = False
         self.__locked_pdus = Queue()
+        self.__lock = Lock()
 
         # Synchronous mode (not enabled by default)
         self.__synchronous = False
@@ -112,7 +113,6 @@ class Connector:
 
         # Create a background thread for message processing
         self.__io_thread = ConnIoThread(self)
-        self.__io_thread.start()
 
         # Event listeners
         self.__listeners = []
@@ -123,6 +123,9 @@ class Connector:
 
         # Interface disconnection
         self.__disconnected = ThreadEvent()
+
+        # Start background thread (start processing messages)
+        self.__io_thread.start()
 
 
     def attach_error_callback(self, callback, context=None):
@@ -366,21 +369,27 @@ class Connector:
                                    internal dispatch routine
         :type   dispatch_callback: callable
         """
-        logger.info("[connector][%s] unlock()", self.device.interface)
-        # Dispatch PDUs
-        try:
-            while True:
-                # Retrieve PDU
-                message = self.__locked_pdus.get(block=True, timeout=0.2)
-                logger.debug("[connector][%s] Unlocked message for processing: %s",
-                             self.device.interface, message)
-                if dispatch_callback is None:
-                    self.process_message(message)
-                else:
-                    # Call the provided dispatch callback
-                    dispatch_callback(message)
-        except Empty:
-            logger.debug("[connector][%s] Processed all messages", self.device.interface)
+        with self.__lock:
+            logger.info("[connector][%s] unlock()", self.device.interface)
+            # Dispatch PDUs
+            try:
+                # Loop until locked PDUs queue is empty
+                while not self.__locked_pdus.empty():
+                    # Retrieve PDU
+                    message = self.__locked_pdus.get(block=True, timeout=0.2)
+                    logger.debug("[connector][%s] Unlocked message for processing: %s",
+                                self.device.interface, message)
+                    if dispatch_callback is None:
+                        logger.debug("[connector][%s] forward to __process_pkt_message()")
+                        self.__process_pkt_message(message)
+                    else:
+                        # Call the provided dispatch callback
+                        dispatch_callback(message)
+                    
+                    # Mark locked PDU as processed
+                    self.__locked_pdus.task_done()
+            except Empty:
+                logger.debug("[connector][%s] Processed all messages", self.device.interface)
 
         # Mark connector as unlocked
         self.__locked = False
@@ -399,8 +408,11 @@ class Connector:
         :param  Packet pdu:  Packet to add to locked packets queue
         :type   pdu: scapy.packet.Packet
         """
-        logger.info("[connector][%s] Add locked pdu: %s", self.device.interface, pdu)
-        self.__locked_pdus.put(pdu)
+        # We use the same lock used when unlocking to prevent adding more locked PDUs into
+        # our locked PDUs queue, until it becomes full and connector is unlocked.
+        with self.__lock:
+            logger.info("[connector][%s] Add locked pdu: %s", self.device.interface, pdu)
+            self.__locked_pdus.put(pdu)
 
     # Device interaction
     def send_message(self, message, keep=None):
@@ -727,6 +739,8 @@ class Connector:
     def process_message(self, message: HubMessage):
         """Process received message.
         """
+        logger.debug("[connector][%s] process_message() called for message %s", self.device.interface,
+                     message)
         # Forward message to the on_any_msg() handler
         self.on_any_msg(message)
 
@@ -754,14 +768,7 @@ class Connector:
                     if self.is_locked():
                         self.add_locked_pdu(message)
                     else:
-                        # Convert message into packet
-                        packet = message.to_packet()
-                        if packet is not None:
-                            self.monitor_packet_rx(packet)
-                            if self.is_synchronous():
-                                self.add_pending_packet(message)
-                            else:
-                                self.on_packet(packet)
+                        self.__process_pkt_message(message)
                 # Check if message is a received event
                 elif issubclass(message, AbstractEvent):
                     # Convert message into event
@@ -775,6 +782,21 @@ class Connector:
                     logger.info("message concerns domain `%s`, forward to domain-specific handler",
                                 domain)
                     self.on_domain_msg(domain, message)
+
+    def __process_pkt_message(self, message: HubMessage):
+        """Process a Hub message containing a packet.
+
+        :param message: Message supporting the AbstractPacket interface
+        :type message: HubMessage
+        """
+        # Convert message into packet
+        packet = message.to_packet()
+        if packet is not None:
+            self.monitor_packet_rx(packet)
+            if self.is_synchronous():
+                self.add_pending_packet(message)
+            else:
+                self.on_packet(packet)
 
     def join(self):
         """Wait for the interface to disconnect and messages to be processed.
