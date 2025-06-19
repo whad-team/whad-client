@@ -11,7 +11,7 @@ from prompt_toolkit import print_formatted_text, HTML
 
 # Whad device
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
-from whad.hw import Interface
+from whad.device import Device
 
 # Whad hub
 from whad.hub.ble import Commands as BleCommands
@@ -234,7 +234,7 @@ def main():
         # Connect to target device and performs discovery
 
         try:
-            dev = Interface.create(interface)
+            dev = Device.create(interface)
 
             info("Connecting to device ...")
             dev.open()
