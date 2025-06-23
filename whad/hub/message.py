@@ -74,6 +74,10 @@ class PbField(object):
         self.__type = field_type
         self.__optional = optional
 
+    def __repr__(self):
+        """String representation."""
+        return f"PbField(path='{self.__path}', type='{self.__type.__name__}')"
+
     @property
     def path(self):
         return self.__path
