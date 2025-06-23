@@ -79,7 +79,7 @@ class Discovery(Registry):
         return Discovery.bound('info_resp', self.proto_version)(
             type=type, device_id=device_id, proto_min_ver=proto_min_ver,
             max_speed=max_speed, fw_author=fw_author, fw_url=fw_url,
-            fw_version_major=fw_version_major, fw_version_min=fw_version_minor,
+            fw_version_major=fw_version_major, fw_version_minor=fw_version_minor,
             fw_version_rev=fw_version_rev, capabilities=capabilities
         )
 
