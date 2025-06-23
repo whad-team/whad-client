@@ -670,7 +670,8 @@ class Device:
         # (This specific condition is met when a Unix client socket has closed
         # following a connection to a server, after the server sent a set of
         # messages that are still to process by the client).
-        if not self.__opened and self.__out_messages.empty():
+        if not self.opened and self.__out_messages.empty():
+            logger.debug("[%s] wait_for_message() cannot succeed because device is closed.")
             raise WhadDeviceDisconnected()
 
         if keep is not None:
@@ -711,7 +712,7 @@ class Device:
         :param Message message: Message to send
         :param keep: Message queue filter function
         """
-        if not self.__opened and self.__out_messages.empty():
+        if not self.opened and self.__out_messages.empty():
             logger.debug("[%s] Cannot send message: device closed.", self.interface)
             raise WhadDeviceDisconnected()
 
