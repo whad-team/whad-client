@@ -1,4 +1,4 @@
-"""WHAD Bluetooth Low Energt base connector
+"""WHAD Bluetooth Low Energy base connector
 
 This module provides the :class:`whad.ble.connector.BLE` class that implements
 basic BLE-related methods for the attached interface.
