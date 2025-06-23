@@ -28,8 +28,8 @@ class DeviceInfo:
         msg = ProtocolHub().discovery.create_info_resp(
             type=dev_type, device_id=dev_id, proto_min_ver=proto_ver, max_speed=max_speed,
             fw_author=author.encode('utf-8'), fw_url=url.encode('utf-8'),
-            fw_version_major=ver.major, fw_version_minor=ver.minor, fw_version_rev=ver.release,
-            capabilities=capabilities  
+            fw_version_major=ver.major, fw_version_minor=ver.minor, fw_version_rev=ver.micro,
+            capabilities=capabilities
         )
         return DeviceInfo(msg)
 
@@ -169,4 +169,4 @@ class DeviceInfo:
     def domains(self):
         """Return the list of supported domains.
         """
-        return self.__domains.keys()
+        return list(self.__domains.keys())
