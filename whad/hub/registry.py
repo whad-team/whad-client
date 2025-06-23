@@ -24,20 +24,20 @@ class Registry(object):
         parent_class.VERSIONS[version][name] = clazz
 
     @classmethod
-    def bound(parent_class, name: str = None, version: int = 1):
+    def bound(cls, name: str = None, version: int = 1):
         """Retrieve the given node class `name` for version `version`.
 
         If there is no defined class for version N, look for a corresponding
         class in version N-1, N-2 until 0.
         """
         # Look for node class from given name and version
-        if version in parent_class.VERSIONS:
-            if name in parent_class.VERSIONS[version]:
-                return parent_class.VERSIONS[version][name]
+        if version in cls.VERSIONS:
+            if name in cls.VERSIONS[version]:
+                return cls.VERSIONS[version][name]
 
         if version > 1:
             # If not found for version N, look for node class in version N-1
-            return parent_class.bound(name, version - 1)
+            return cls.bound(name, version - 1)
 
         # If not found, raise exception
         raise UnsupportedVersionException(name, version)
