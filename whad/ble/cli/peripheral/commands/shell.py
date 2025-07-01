@@ -1,6 +1,8 @@
 """BLE peripheral emulation interactive shell
 """
+import json
 from binascii import unhexlify, Error as BinasciiError
+
 from whad.cli.app import command
 from whad.ble.cli.peripheral.shell import BlePeriphShell
 
@@ -56,6 +58,14 @@ def interactive_handler(app, _):
             # Read profile
             with open(app.args.profile,'rb') as f:
                 profile_json = f.read()
+            try:
+                if not check_profile(json.loads(profile_json)):
+                    app.error("Invalid JSON file (does not contain a valid GATT profile).")
+                    profile_json = None
+            except json.decoder.JSONDecodeError as parsing_err:
+                app.error((f"Invalid JSON file, parsing error line {parsing_err.lineno}: "
+                          f"{parsing_err.msg}"))
+                app.exit()
         else:
             profile_json = None
 
