@@ -8,72 +8,19 @@ import logging
 from time import sleep
 from random import randint, choice
 
-from typing import List, Tuple
+from typing import List
 from whad.device.mock import MockDevice
 from whad.hub import ProtocolHub
 from whad.hub.discovery import DeviceType, Domain, Capability
 from whad.hub.generic.cmdresult import Success, WrongMode, Error
-from whad.hub.ble import BDAddress, AddressType, Commands
+from whad.hub.ble import BDAddress, Commands
 from whad.hub.ble.mode import ScanMode, BleStart, BleStop
 from whad.hub.ble.pdu import BleAdvPduReceived, AdvType
 from whad.hub.ble.sniffing import SniffAdv
 
+from .device import EmulatedDevice
+
 logger = logging.getLogger(__name__)
-
-class EmulatedDevice:
-    """Properties holder for a BLE device emulated by the BleScanMock.
-    """
-    def __init__(self, address: BDAddress, adv_data: bytes = b'',
-                 scan_data: bytes = None):
-        """Create an emulated device and its associated state.
-
-        :param address: Device BD address
-        :type address: BDAddress
-        :param addr_type: Address type
-        :type addr_type: AddressType
-        :param adv_data: Advertising data
-        :type adv_data: bytes
-        :param scan_data: Scan response data
-        :type scan_data: bytes
-        """
-        self.__address = address
-        if len(adv_data) > 31:
-            raise ValueError()
-        self.__adv_data = adv_data
-        if scan_data is not None and len(scan_data) > 31:
-            raise ValueError()
-        self.__scan_data = scan_data
-        self.__next = "adv"
-
-    @property
-    def address(self) -> BDAddress:
-        """Device BD address"""
-        return self.__address
-
-    @property
-    def addr_type(self) -> AddressType:
-        """Device address type"""
-        return AddressType.PUBLIC if self.__address.is_public() else AddressType.RANDOM
-
-    @property
-    def adv_data(self) -> bytes:
-        """Advertising data"""
-        return self.__adv_data
-
-    @property
-    def scan_data(self) -> bytes:
-        """Scan response data"""
-        return self.__scan_data
-
-    def get_adv_data(self) -> Tuple[int, bytes]:
-        """Return the next advertising data type and bytes.
-        """
-        if self.__next == "adv":
-            self.__next = "scan"
-            return (AdvType.ADV_IND, self.__adv_data)
-        elif self.__next == "scan":
-            self.__next = "adv"
-            return (AdvType.ADV_SCAN_RSP, self.__scan_data)
 
 class DeviceScan(MockDevice):
     """BLE scanning mock device
