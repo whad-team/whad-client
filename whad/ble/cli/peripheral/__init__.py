@@ -1,10 +1,11 @@
 """Bluetooth Low Energy peripheral utility for WHAD
 """
+import json
 
 from whad.cli.app import CommandLineApp, run_app
 from whad.ble.cli.peripheral.shell import BlePeriphShell
 
-from .commands.shell import interactive_handler
+from .commands.shell import interactive_handler, check_profile
 
 class BlePeriphApp(CommandLineApp):
     """Bluetooth Low Energy Peripheral emulation app
@@ -51,8 +52,24 @@ class BlePeriphApp(CommandLineApp):
         self.pre_run()
 
         if self.args.script is not None:
+            # If a profile has been provided, load it
+            if self.args.profile is not None:
+                # Read profile
+                with open(self.args.profile,'rb') as f:
+                    profile_json = f.read()
+                try:
+                    if not check_profile(json.loads(profile_json)):
+                        self.error("Invalid JSON file (does not contain a valid GATT profile).")
+                        profile_json = None
+                except json.decoder.JSONDecodeError as parsing_err:
+                    self.error((f"Invalid JSON file, parsing error line {parsing_err.lineno}: "
+                            f"{parsing_err.msg}"))
+                    self.exit()
+            else:
+                profile_json = None
+
             # Launch an interactive shell (well, driven by our script)
-            myshell = BlePeriphShell(self.interface)
+            myshell = BlePeriphShell(self.interface, profile_json)
             myshell.run_script(self.args.script)
         else:
             # Run the application through WHAD's main app routine
