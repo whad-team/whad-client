@@ -29,7 +29,7 @@ Command-line options
 * ``--bdaddr`` (``-b``): specifies a Bluetooth Device address to use for the GATT server in the form *XX:XX:XX:XX:XX:XX*
 * ``--file`` (``-f``): provides a script to execute
 * ``--no-color``: disables colors in output
-* ``--profile`` (``-p``): specifies a device profile file (JSON) that will be used to populate GATT services, characteristics and advertisement info
+* ``--profile`` (``-p``): specifies a device profile file (JSON, :download:`see example <../../../../examples/ble/example_profile.json>`) that will be used to populate GATT services, characteristics and advertisement info
 
 .. include:: ../generic/debug-options.rst
 
@@ -101,7 +101,7 @@ Importing an existing profile
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Instead of creating services and characteristics by hand, we can import a dumped
-json profile that will populate all the services and characteristics by using the
+JSON profile (such as :download:`this example <../../../../examples/ble/example_profile.json>` based on a smartwatch) that will populate all the services and characteristics by using the
 `-p` option:
 
 .. code-block:: text

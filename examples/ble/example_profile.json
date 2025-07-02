@@ -1,0 +1,213 @@
+{
+    "services": [
+        {
+            "uuid": "1800",
+            "type_uuid": "2800",
+            "start_handle": 1,
+            "end_handle": 7,
+            "characteristics": [
+                {
+                    "handle": 2,
+                    "uuid": "2803",
+                    "properties": 10,
+                    "security": 0,
+                    "value": {
+                        "handle": 3,
+                        "uuid": "2A00",
+                        "data": "4578616d706c65446576"
+                    },
+                    "descriptors": []
+                },
+                {
+                    "handle": 4,
+                    "uuid": "2803",
+                    "properties": 2,
+                    "security": 0,
+                    "value": {
+                        "handle": 5,
+                        "uuid": "2A01",
+                        "data": "0000"
+                    },
+                    "descriptors": []
+                },
+                {
+                    "handle": 6,
+                    "uuid": "2803",
+                    "properties": 2,
+                    "security": 0,
+                    "value": {
+                        "handle": 7,
+                        "uuid": "2A04",
+                        "data": "7800a00000009001"
+                    },
+                    "descriptors": []
+                }
+            ]
+        },
+        {
+            "uuid": "1801",
+            "type_uuid": "2800",
+            "start_handle": 8,
+            "end_handle": 8,
+            "characteristics": []
+        },
+        {
+            "uuid": "0001",
+            "type_uuid": "2800",
+            "start_handle": 9,
+            "end_handle": 14,
+            "characteristics": [
+                {
+                    "handle": 10,
+                    "uuid": "2803",
+                    "properties": 16,
+                    "security": 0,
+                    "value": {
+                        "handle": 11,
+                        "uuid": "0003",
+                        "data": ""
+                    },
+                    "descriptors": [
+                        {
+                            "handle": 12,
+                            "uuid": "2902",
+                            "value": "0000"
+                        }
+                    ]
+                },
+                {
+                    "handle": 13,
+                    "uuid": "2803",
+                    "properties": 12,
+                    "security": 0,
+                    "value": {
+                        "handle": 14,
+                        "uuid": "0002",
+                        "data": ""
+                    },
+                    "descriptors": []
+                }
+            ]
+        },
+        {
+            "uuid": "3E01",
+            "type_uuid": "2800",
+            "start_handle": 15,
+            "end_handle": 20,
+            "characteristics": [
+                {
+                    "handle": 16,
+                    "uuid": "2803",
+                    "properties": 16,
+                    "security": 0,
+                    "value": {
+                        "handle": 17,
+                        "uuid": "3E03",
+                        "data": ""
+                    },
+                    "descriptors": [
+                        {
+                            "handle": 18,
+                            "uuid": "2902",
+                            "value": "0000"
+                        }
+                    ]
+                },
+                {
+                    "handle": 19,
+                    "uuid": "2803",
+                    "properties": 12,
+                    "security": 0,
+                    "value": {
+                        "handle": 20,
+                        "uuid": "3E02",
+                        "data": ""
+                    },
+                    "descriptors": []
+                }
+            ]
+        },
+        {
+            "uuid": "2C01",
+            "type_uuid": "2800",
+            "start_handle": 21,
+            "end_handle": 26,
+            "characteristics": [
+                {
+                    "handle": 22,
+                    "uuid": "2803",
+                    "properties": 16,
+                    "security": 0,
+                    "value": {
+                        "handle": 23,
+                        "uuid": "2C03",
+                        "data": ""
+                    },
+                    "descriptors": [
+                        {
+                            "handle": 24,
+                            "uuid": "2902",
+                            "value": "0000"
+                        }
+                    ]
+                },
+                {
+                    "handle": 25,
+                    "uuid": "2803",
+                    "properties": 12,
+                    "security": 0,
+                    "value": {
+                        "handle": 26,
+                        "uuid": "2C02",
+                        "data": ""
+                    },
+                    "descriptors": []
+                }
+            ]
+        },
+        {
+            "uuid": "FEE7",
+            "type_uuid": "2800",
+            "start_handle": 27,
+            "end_handle": 32,
+            "characteristics": [
+                {
+                    "handle": 28,
+                    "uuid": "2803",
+                    "properties": 18,
+                    "security": 0,
+                    "value": {
+                        "handle": 29,
+                        "uuid": "FEA1",
+                        "data": "01e60600"
+                    },
+                    "descriptors": [
+                        {
+                            "handle": 30,
+                            "uuid": "2902",
+                            "value": "0000"
+                        }
+                    ]
+                },
+                {
+                    "handle": 31,
+                    "uuid": "2803",
+                    "properties": 2,
+                    "security": 0,
+                    "value": {
+                        "handle": 32,
+                        "uuid": "FEC9",
+                        "data": "e66a8bc4c636"
+                    },
+                    "descriptors": []
+                }
+            ]
+        }
+    ],
+    "devinfo": {
+        "adv_data": "0319000002010509ff00c7e66a8bc4c6360d094578616d706c65446576",
+        "bd_addr": "a4:f9:33:42:42:42",
+        "addr_type": 0,
+        "scan_rsp": "05030100e7fe"
+    }
+}
