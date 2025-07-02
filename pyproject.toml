@@ -32,7 +32,7 @@ classifiers = [
   "Operating System :: POSIX :: Linux",
 ]
 dependencies = [
-    "protobuf>=6.30;python_version>'3.8'",
+    "protobuf>=6.30",
     "scapy~=2.6.1",
     "pyserial~=3.5.0",
     "pycryptodomex>=3.11.0",
@@ -42,8 +42,8 @@ dependencies = [
     "hexdump~=3.3",
     "pynput~=1.8.1",
     "Sphinx~=8.2.3;python_version>='3.11'",
-    "sphinx-rtd-theme~=3.0.2;python_version>='3.8'",
-    "sphinxcontrib-mermaid~=1.0.0;python_version>='3.8'",
+    "sphinx-rtd-theme~=3.0.2",
+    "sphinxcontrib-mermaid~=1.0.0",
     "requests>=2.28.0",
     "distro~=1.9",
     "pytest~=8.3.5",
@@ -54,19 +54,6 @@ dependencies = [
 
     # Python 3.9
     "Sphinx~=7.4.7;python_version=='3.9'",
-
-    # Python 3.8
-    "Sphinx~=7.1.2;python_version=='3.8'",
-    "importlib-resources==3.0.0;python_version<'3.9'",
-    "protobuf==5.29.5;python_version=='3.8'",
-    "elementpath==4.8.0;python_version=='3.8'",
-
-    # Python 3.7
-    "sphinx-rtd-theme==2.1.0rc2;python_version<'3.8'",
-    "sphinxcontrib-mermaid==0.9.2;python_version<'3.8'",
-    "pytest==7.4.4;python_version<'3.8'",
-    "protobuf==4.24.4;python_version<'3.8'",
-    "elementpath==4.1.5;python_version<'3.8'"
 ]
 
 [project.scripts]

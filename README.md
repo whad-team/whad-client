@@ -30,5 +30,5 @@ You can run unit tests for every supported python version using:
 tox
 ```
 
-(Obviously, you need to install python interpreter from 3.6 to 3.10 included to run tox).
+(You need to install Python interpreters from 3.9 to 3.13 included to run tox).
 The tests are automatically run by github actions when something is pushed to main branch or when a pull request is merged.
