@@ -3,6 +3,11 @@ WHAD default device connector module.
 
 This module provides a default connector class `WhadDeviceConnector` that
 implements all the basic features of a device connector.
+
+TODO: sniffing mode is really close from the synchronous mode, maybe merge the two ?
+
+- Offer the possibility to capture only packet or everything in enable_synchronous()
+- Based on the selected mode, capture packets or events+packets.
 """
 import logging
 import contextlib
@@ -538,6 +543,7 @@ class Connector:
         logger.error("method `on_packet` must be implemented in inherited classes")
         raise RequiredImplementation()
 
+    # TODO: event for device and connector event ?
     def on_event(self, event): # pylint: disable=W0613
         """Callback function to process incoming events.
 
@@ -698,6 +704,8 @@ class Connector:
                     # Interface has disconnected, log this error and exit the function
                     logger.debug("[sniffer][%s] Interface has disconnected !",
                                     self.device.interface)
+                    # Maybe raise an exception instead of simply exiting the sniff() method ?
+                    # Calling code cannot tell if sniffing is just done or if an error occurred.
                     return
 
                 if isinstance(event, MessageReceived):
