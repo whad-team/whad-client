@@ -1,9 +1,0 @@
-protobuf==6.30.2
-scapy==2.6.1
-elementpath==5.0.0
-pyserial==3.5.0
-pycryptodomex==3.11.0
-pyusb==1.2.1
-cryptography==38.0.0
-packaging==24.0
-websockets>=11.0.3
