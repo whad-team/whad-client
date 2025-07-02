@@ -6,8 +6,11 @@ System dependencies
 
 First, you may need some specific system dependencies:
 
-- Python3 development libraries (`apt install python3-dev` on Debian or Ubuntu)
+- Python 3 interpreter
+- Python 3 development libraries (`apt install python3-dev` on Debian or Ubuntu)
 - a working compiler as it is required to build some dependencies
+
+To use HCI devices, your Python interpreter must be built with Bluetooth support enabled (by default on Debian or Ubuntu).
 
 On a Debian/Ubuntu *x86/x64* system:
 
