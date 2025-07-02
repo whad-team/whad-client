@@ -37,6 +37,7 @@ class BridgeIfaceWrapper(Connector):
         if status == 0:
             self.__processor.on_message_sent(self, message)
         else:
+            # TODO: implement or remove on_message_error()
             self.__processor.on_message_error(self, message, status)
 
 
