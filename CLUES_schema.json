@@ -1,0 +1,256 @@
+{
+  "$id": "https://darkmentor.com/CLUES_Schema/CLUES_base.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Licensed 'CC BY-SA 4.0' with an attribution condition of 'From the CLUES project - https://github.com/darkmentorllc/CLUES_Schema'",
+  "description": "Custom Lightweight UUID Exchange Schema (CLUES!)",
+  "version": "0.1.0",
+  "type": "array",
+  "items": {
+    "anyOf": [
+      {
+        "$ref": "#/definitions/CustomUUID"
+      }
+    ]
+  },
+  "definitions": {
+    "CustomUUID": {
+      "description": "The core information which must be in every element of the base array",
+      "type": "object",
+      "required": [
+        "UUID",
+        "company",
+        "UUID_purpose",
+        "UUID_usage_array",
+        "evidence_array"
+      ],
+      "properties": {
+        "UUID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "company": {
+          "description": "Name of company associated with this UUID.",
+          "type": "string"
+        },
+        "UUID_name": {
+          "description": "This should be the name of the UUID without including the company name, or the words 'Service' or 'Characteristic', unless the name explicitly includes those designators as indicated by abbreviations. E.g. in 'Nordic Status Message Service (NSMS)' it would be acceptable to include both the company name and the word Service. If the name is unknown, use 'Unknown' with that capitalization.",
+          "type": "string"
+        },
+        "UUID_purpose": {
+          "description": "Freeform description of what the high level purpose of this UUID is used for by the given company. E.g. \"('Legacy'/insecure) DFU: Control Point\" or \"UART: Receive (RX)\". Leave out the company name so that it is not duplicative if a user of the JSON file interpolates with the \"company\" string before this string. But include model information if the UUID is known to be model-specific. E.g. if the entry was describing UUID adab6552-6e7d-4601-bda2-bﬀaa68956ba it should be mentioned that this is used for Fitbit One devices (per https://darkmentor.com/bt.html#It%20Was%20Harder%20to%20Sniff%20Bluetooth%20Through%20My%20Mask%20During%20the%20Pandemic...)",
+          "type": "string"
+        },
+        "UUID_usage_array": {
+          "description": "How is this UUID used? E.g. GATT Service/Characteristic? Beacons? SDP? (More types can be added if they are found to be needed for being more descriptive of other protocols and profiles.)",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UUID_usage_array_item"
+          }
+        },
+        "evidence_array": {
+          "description": "Evidence for the UUID's company/usage, which can be one or more of URL, description, and/or submitter.",
+          "items": {
+            "$ref": "#/definitions/evidence_array_item"
+          }
+        },
+        "parent_UUID": {
+          "description": "This optional field is just for GATT type UUIDs, to nest Characteristic UUIDs under parent Service UUIDs, to make it easier to keep files sorted, so that they're more human-readable by having associated UUIDs in close proximity to each other.",
+          "$ref": "#/definitions/UUID"
+        },
+        "adv_channel_pdu_array": {
+          "description": "Where, if anywhere, this UUID appears in advertisement channel traffice (ADV\\_IND, ADV\\_NONCONN\\_IND, SCAN\\_RSP, etc.) E.g. a GATT Service UUID may or may not appear in advertisements. If it does not, this field should not be present.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/adv_channel_pdu_array_item"
+          }
+        },
+        "adv_data_type_array": {
+          "$comment": "Numeric order corresponds to string ordering in adv_data_type_str",
+          "description": "What type of AdvData field this UUID appeared in, if any. E.g. 0x02 = \"Incomplete List of 16-bit Service or Service Class UUIDs\", 0x14 = \"List of 16-bit Service Solicitation UUIDs\", etc. Note: numeric order corresponds to string ordering in adv_data_type_str.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/adv_data_type_array_item"
+          }
+        },
+        "adv_data_type_str_array": {
+          "description": "What type of AdvData field this UUID appeared in, if any. E.g. 0x07 for 16-bit UUIDs, 0x16 for 128-bit UUIDs, etc.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/adv_data_type_str_array_item"
+          }
+        },
+        "regex": {
+          "description": "This UUID is stored in a format where the character 'X' is a wildcard for the regular expression '[a-fA-F0-9]'. This allows the regex to still conform to the length sanity checks required for UUID16/32/128s in this schema. Users of an entry where this is true must replace the 'X' character with with '[a-fA-F0-9]' before using the UUID as a regex within their application. E.g. the common UUID pattern used by many Fitbit devices (described in https://darkmentor.com/bt.html#It%20Was%20Harder%20to%20Sniff%20Bluetooth%20Through%20My%20Mask%20During%20the%20Pandemic...) could be given as adabXXXX-6e7d-4601-bda2-bﬀaa68956ba, if one wanted to find new probably-Fitbit devices, even if the exact model was not known.",
+          "type": "boolean",
+          "default": true,
+          "enum": [true]
+        },
+        "android_info_array": {
+          "description": "Information about Android packages where this UUID has been observed.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/android_info_item"
+          }
+        }
+      }
+    },
+    "android_info_item": {
+      "description": "Information about an Android package where this UUID has been found. This can help indicate which company, product, or product type this UUID is associated with.",
+      "type": "object",
+      "required": [
+        "package_id",
+        "version_code",
+        "version_name"
+      ],
+      "properties": {
+        "package_id": {
+          "description": "Unique identifier for the Android package (like \"com.firewalla.chancellor\")",
+          "type": "string"
+        },
+        "version_code": {
+          "description": "Version code of the Android package (like \"1540\").",
+          "type": "integer"
+        },
+        "version_name": {
+          "description": "Version name of the Android package (like \"1.56.81\").",
+          "type": "string"
+        },
+        "package_path": {
+          "description": "Optional path to the Android package. (Useful for local repository lookup.)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Optional description of the Android package. (Useful for describing data that wasn't extracted automatically, or possibly automatically extracting android app description from store listing.)",
+          "type": "string"
+        }
+      }
+    },
+    "evidence_array_item": {
+      "description": "Evidence for the UUID's company/usage, which can be one or more of URL, description, and/or submitter.",
+      "type": "object",
+      "properties": {
+        "URL": {
+          "description": "URL for site or document that provides evidence of the UUID's use by that company. Try to capture as an archive.org URL to avoid future link breakage. If no URL is available, use the placeholder \"None\".",
+          "type": "string"
+        },
+        "description": {
+          "description": "Supplementary description of evidence for why this UUID corresponds to the given company, usage, etc. (E.g. if it's based on a specific person's experience, that person should include also a evidence_submitter field, so that any comments like \"I have seen this in FOO\" are clear about who the \"I\" is.)",
+          "type": "string"
+        },
+        "submitter": {
+          "description": "Freeform name or pseudonym of person who provided evidence for this UUID, or automated system name.",
+          "type": "string"
+        }
+      },
+      "anyOf": [
+        { "required": ["URL"] },
+        { "required": ["description"] },
+        { "required": ["submitter"] }
+      ]
+    },
+    "UUID": {
+      "description": "Must include UUID in either of the following formats",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/UUID16_hex_str"
+        },
+        {
+          "$ref": "#/definitions/UUID32_hex_str"
+        },
+        {
+          "$ref": "#/definitions/UUID128_hex_str"
+        }
+      ]
+    },
+    "UUID16_hex_str": {
+      "description": "UUID16 as hex_str.",
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 4
+    },
+    "UUID32_hex_str": {
+      "description": "UUID32 as hex_str.",
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 8
+    },
+    "UUID128_hex_str": {
+      "description": "UUID128 as big-endian hex_str. Can be encoded with dashes or without, but it must be exactly 32 (without dashes) or 36 (with dashes) hexadecimal characters long.",
+      "type": "string",
+      "anyOf": [
+        {
+          "description": "UUID128 as big-endian hex_str without dashes.",
+          "minLength": 32,
+          "maxLength": 32
+        },
+        {
+          "description": "UUID128 as big-endian hex_str with dashes.",
+          "minLength": 36,
+          "maxLength": 36
+        }
+      ]
+    },
+    "UUID_usage_array_item": {
+      "description": "How is this UUID used? E.g. GATT Service/Characteristic? Beacons? SDP? (More types can be added if they are found to be needed for being more descriptive of other protocols and profiles.)",
+      "type": "string",
+      "enum": [
+        "GATT Service",
+        "GATT Characteristic",
+        "iBeacon",
+        "Eddystone",
+        "SDP Service",
+        "Advertisement"
+      ]
+    },
+    "adv_channel_pdu_array_item": {
+      "description": "Where, if anywhere, this UUID appears in advertisement channel traffice (ADV\\_IND, ADV\\_NONCONN\\_IND, SCAN\\_RSP, etc.) E.g. a GATT Service UUID may or may not appear in advertisements. If it does not, this field should not be present.",
+      "type": "string",
+      "enum": [
+        "EIR",
+        "ADV_IND",
+        "ADV_DIRECT_IND",
+        "ADV_SCAN_IND",
+        "ADV_NONCONN_IND",
+        "SCAN_RSP",
+        "AUX_ADV_IND",
+        "AUX_SCAN_RSP"
+      ]
+    },
+    "adv_data_type_array_item": {
+      "$comment": "Numeric order corresponds to string ordering in adv_data_type_str",
+      "description": "What type of AdvData field this UUID appeared in, if any. E.g. 0x02 = \"Incomplete List of 16-bit Service or Service Class UUIDs\", 0x14 = \"List of 16-bit Service Solicitation UUIDs\", etc. Note: numeric order corresponds to string ordering in adv_data_type_str.",
+      "type": "integer",
+      "enum": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        20,
+        31,
+        21,
+        22,
+        32,
+        33
+      ]
+    },
+    "adv_data_type_str_array_item": {
+      "description": "What type of AdvData field this UUID appeared in, if any. E.g. 0x07 for 16-bit UUIDs, 0x16 for 128-bit UUIDs, etc.",
+      "type": "string",
+      "enum": [
+        "Incomplete List of 16-bit Service or Service Class UUIDs",
+        "Complete List of 16-bit Service or Service Class UUIDs",
+        "Incomplete List of 32-bit Service or Service Class UUIDs",
+        "Complete List of 32-bit Service or Service Class UUIDs",
+        "Incomplete List of 128-bit Service or Service Class UUIDs",
+        "Complete List of 128-bit Service or Service Class UUIDs",
+        "List of 16-bit Service Solicitation UUIDs",
+        "List of 32-bit Service Solicitation UUIDs",
+        "List of 128-bit Service Solicitation UUIDs",
+        "Service Data - 16-bit UUID",
+        "Service Data - 32-bit UUID",
+        "Service Data - 128-bit UUID"
+      ]
+    }
+  }
+}
