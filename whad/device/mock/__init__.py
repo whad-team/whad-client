@@ -8,8 +8,10 @@ for WHAD:
 
 from .base import MockDevice
 from .replay import ReplayMock
+from .connector import MockConnector
 
 __all__ = [
+    "MockConnector",
     "MockDevice",
     "ReplayMock",
 ]
