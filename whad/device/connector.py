@@ -69,7 +69,7 @@ class ConnIoThread(Thread):
                 # Retrieve pending event
                 with self.__connector.get_event() as evt:
                     # Let connector process this message
-                    self.__connector.on_iface_event(evt)
+                    self.__connector.on_device_event(evt)
             except Empty:
                 pass
 
@@ -79,6 +79,11 @@ class Connector:
 
     A connector creates a link between a device and a protocol controller.
     """
+
+    # Synchronous modes
+    SYNC_MODE_OFF = 0
+    SYNC_MODE_PKT = 1
+    SYNC_MODE_ALL = 2
 
     def __init__(self, device: Device =None):
         """
@@ -110,8 +115,10 @@ class Connector:
         self.__lock = Lock()
 
         # Synchronous mode (not enabled by default)
-        self.__synchronous = False
-        self.__pending_pdus = Queue()
+        self.__sync_mode = Connector.SYNC_MODE_OFF
+
+        # Synchronous events (device event + messages)
+        self.__sync_events = Queue()
 
         # Queue holding events coming from our interface
         self.__events = Queue()
@@ -305,7 +312,7 @@ class Connector:
         """
         return self.__device.hub
 
-    def enable_synchronous(self, enabled : bool):
+    def enable_synchronous(self, enabled : bool, events: bool = False):
         """Enable or disable synchronous mode
 
         Synchronous mode is a mode in which the connector expects sone third-party code to
@@ -315,41 +322,60 @@ class Connector:
 
         :param enabled: If set to `True`, enable synchronous mode. Otherwise disable it.
         :type enabled: bool
+        :param events: If set to `True`, synchronous mode will also capture events
+                       sent by the associate device
+        :type events: bool, optional
         """
         # Clear pending packets if we are disabling this feature.
-        if not enabled:
-            self.__pending_pdus.queue.clear()
+        if not enabled and self.__sync_mode != Connector.SYNC_MODE_OFF:
+            self.__sync_mode = Connector.SYNC_MODE_OFF
+        elif enabled:
+            if events:
+                self.__sync_mode = Connector.SYNC_MODE_ALL
+            else:
+                self.__sync_mode = Connector.SYNC_MODE_PKT
 
-        # Update state
-        self.__synchronous = enabled
-
+        # Clear events queue
+        self.__sync_events.queue.clear()
+        
     def is_synchronous(self):
         """Determine if the conncetor is in synchronous mode.
 
         :return: `True` if synchronous mode is enabled, `False` otherwise.
         """
-        return self.__synchronous
+        return self.__sync_mode != Connector.SYNC_MODE_OFF
 
-    def add_pending_packet(self, pdu):
-        """Add a pending protocol data unit (PDU) if in synchronous mode.
+    def add_sync_event(self, event: DeviceEvt):
+        """Add an event to the synchronous event queue when synchronous mode is
+        enabled.
 
-        :param pdu: Pending PDU to add to our queue of pending PDUs
-        :type pdu: scapy.packet.Packet
+        :param event: Device event to add to our queue of received events
+        :type event: whad.device.DeviceEvt
         """
-        if self.__synchronous:
-            self.__pending_pdus.put(pdu)
+        # Insert device events in synchronous event queue only if SYNC_MODE_ALL
+        if isinstance(event, DeviceEvt) and self.__sync_mode == Connector.SYNC_MODE_ALL:
+            self.__sync_events.put(event)
+        elif isinstance(event, MessageReceived) and self.__sync_mode >= Connector.SYNC_MODE_PKT:
+            # If SYNC_MODE_PKT is enabled, add MessageReceived event into our 
+            # synchronous events queue
+            self.__sync_events.put(event)
 
     def wait_packet(self, timeout:float = None):
-        '''Wait for a packet when in synchronous mode.
+        '''Wait for a packet when in synchronous mode. This method should be only used
+        with SYNC_MODE_PKT to avoid discarding any device event.
 
         :param timeout: If specified, defines a timeout when querying the PDU queue
         :type timeout: float, optional
-        :return: Received packet if any, None otherwise
+        :return: Received packet if any, None if empty or when timeout is reached
         :rtype: scapy.packet.Packet
         '''
-        if self.__synchronous:
+        if self.__sync_mode >= Connector.SYNC_MODE_PKT:
             try:
-                return self.__pending_pdus.get(block=True, timeout=timeout)
+                event = self.__sync_events.get(block=True, timeout=timeout)
+                if isinstance(event, MessageReceived):
+                    pkt = event.message.to_packet()
+                    if pkt is not None:
+                        return pkt
             except Empty:
                 return None
         else:
@@ -646,21 +672,24 @@ class Connector:
         # Mark connector as disconnected
         self.__disconnected.set()
 
-    def on_iface_event(self, message):
+    def on_device_event(self, event: DeviceEvt):
         """Dispatch message to the connector's handlers.
 
         This method may trigger specific message processing in inherited
         connector's classes as well as attached protocol stacks. Since it
         is only called by the connector's I/O thread, that's pretty safe.
+
+        :param event: Device event to process
+        :type event: whad.device.DeviceEvt
         """
-        # If sniffing mode is enabled, we simply forward any message into our
-        # sniffing queue.
-        if self.__sniff_mode:
-            logger.debug("[sniffer] received message %s and save into sniffing queue", message)
-            self.__sniff_queue.put(message)
+        # If synchronous mode is enabled and capturing all events, we simply
+        # add these events to the synchronous mode event queue.
+        if self.__sync_mode == Connector.SYNC_MODE_ALL:
+            logger.debug("[synchronous] received event %s and save into sniffing queue", event)
+            self.add_sync_event(event)
         else:
             # Did we receive a disconnection event ?
-            if isinstance(message, Disconnected):
+            if isinstance(event, Disconnected):
                 logger.debug("[%s] received a disconnection message, processing ...",
                              self.device.interface)
                 # Notify disconnection if we are not locked
@@ -672,9 +701,15 @@ class Connector:
                     self.on_disconnection()
 
             # Or a hub emssage ?
-            elif isinstance(message, MessageReceived):
-                # Process hub message
-                self.process_message(message.message)
+            elif isinstance(event, MessageReceived):
+                # If synchronous mode is enabled, add events into our synchronous
+                # event queue. At this point in code, we are certain to be in
+                # SYNC_MODE_PKT mode.
+                if self.__sync_mode == Connector.SYNC_MODE_PKT:
+                    self.add_sync_event(event)
+                else:
+                    # Process hub message if not in synchronous mode
+                    self.process_message(event.message)
 
     # pylint: disable=C0301
     def sniff(self, messages: List = None, timeout: float = None) -> Generator[HubMessage, None, None]:
@@ -687,7 +722,7 @@ class Connector:
         :type timeout: float, optional
         """
         # Enable sniffing mode (and disable message processing)
-        self.__sniff_mode = True
+        self.enable_synchronous(True, events=True)
 
         # Listen for messages
         initial_to = timeout
@@ -695,7 +730,7 @@ class Connector:
         while True:
             try:
                 # Wait for an event
-                event = self.__sniff_queue.get(block=True, timeout=timeout)
+                event = self.__sync_events.get(block=True, timeout=timeout)
                 logger.debug("[sniffer][%s] received event %s",
                                      self.device.interface, event)
 
@@ -726,14 +761,14 @@ class Connector:
                         yield message
 
                 # Notify queue we are done with this message
-                self.__sniff_queue.task_done()
+                self.__sync_events.task_done()
 
             except Empty:
                 # We receive this exception when timeout has been reached when calling
                 # our queue's get() method with a given timeout.
                 logger.debug("[sniffer][%s] Sniffing timeout reached (%s seconds) !",
                              self.device.interface, initial_to)
-                
+
             # If timeout is provided, compute remaining time and
             # exit loop when reached.
             if timeout is not None:
@@ -742,7 +777,7 @@ class Connector:
                     break
 
         # Sniffing done, disable sniffing mode and return to normal operation
-        self.__sniff_mode = False
+        self.enable_synchronous(False)
 
     def process_message(self, message: HubMessage):
         """Process received message.
@@ -801,10 +836,7 @@ class Connector:
         packet = message.to_packet()
         if packet is not None:
             self.monitor_packet_rx(packet)
-            if self.is_synchronous():
-                self.add_pending_packet(message)
-            else:
-                self.on_packet(packet)
+            self.on_packet(packet)
 
     def join(self):
         """Wait for the interface to disconnect and messages to be processed.
