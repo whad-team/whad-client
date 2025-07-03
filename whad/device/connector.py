@@ -2,12 +2,15 @@
 WHAD default device connector module.
 
 This module provides a default connector class `WhadDeviceConnector` that
-implements all the basic features of a device connector.
+implements all the basic features of a device connector:
 
-TODO: sniffing mode is really close from the synchronous mode, maybe merge the two ?
+- Sending and receiving messages
+- A synchronous mode used for message sniffing and processing
+- A locked mode (enabled by default) to temporarily save messages while the connector
+  is initializing (no more message lost)
+- A dedicated notification manager and basic notification class to allow external objects
+  to subscribe for specific notifications.
 
-- Offer the possibility to capture only packet or everything in enable_synchronous()
-- Based on the selected mode, capture packets or events+packets.
 """
 import logging
 import contextlib
@@ -38,6 +41,18 @@ class Event:
 
     def __repr__(self):
         return "Event()"
+
+class Notification:
+    """Generic connector notification class."""
+
+    def __str__(self) -> str:
+        """String representation for notification."""
+        return "Notification()"
+
+    def __repr__(self) -> str:
+        """Python representation."""
+        return str(self)
+
 
 class ConnIoThread(Thread):
     """Connector's background thread processing events from interface.
@@ -291,7 +306,7 @@ class Connector:
     def is_stalled(self) -> bool:
         """Determine if the interface associated with this connector is stalled,
         i.e. has messages awaiting processing even if closed.
-        
+
         :return: True if interface is stalled, False otherwise.
         :rtype: bool
         """
@@ -337,7 +352,7 @@ class Connector:
 
         # Clear events queue
         self.__sync_events.queue.clear()
-        
+
     def is_synchronous(self):
         """Determine if the conncetor is in synchronous mode.
 
@@ -416,7 +431,7 @@ class Connector:
                     else:
                         # Call the provided dispatch callback
                         dispatch_callback(message)
-                    
+
                     # Mark locked PDU as processed
                     self.__locked_pdus.task_done()
             except Empty:
@@ -593,7 +608,7 @@ class Connector:
 
     def add_listener(self, listener: Callable[..., None],event_cls: Union[List[Event],
                                                                     Event] = None):
-        """Add a connector event listener with optional event filter.
+        """Add a connector notification listener with optional event filter.
 
         :param listener: callable to handle events
         :type listener: callable
@@ -654,12 +669,13 @@ class Connector:
     def busy(self) -> bool:
         """Determine if this connector is busy.
         """
-        # In sniff mode, a busy connector has remaining sniffed messages to
-        # process. If sniffing queue is empty, it is not busy anymore.
-        if self.__sniff_mode:
-            return not self.__sniff_queue.empty()
+        # In synchronous mode, a busy connector has unprocessed events to
+        # left in its events queue. If this events queue is empty, it is not considered
+        # busy anymore.
+        if self.__sync_mode != Connector.SYNC_MODE_OFF:
+            return not self.__sync_events.empty()
 
-        # If not sniffing, connector is busy if it still has events to
+        # If not in synchronous mode, connector is busy if it still has events to
         # process (incoming messages) or if the associated interface has
         # messages to send
         return not self.__events.empty() or self.device.busy()
@@ -715,7 +731,7 @@ class Connector:
     def sniff(self, messages: List = None, timeout: float = None) -> Generator[HubMessage, None, None]:
         """Enable sniffing mode and report any received messages, optionally
         filtered by their type/classes if `messages` is provided.
-        
+
         :param messages: If specified, sniff only messages that match the given types.
         :param messages: List, optional
         :param timeout: If specified, set a sniffing timeout in seconds
