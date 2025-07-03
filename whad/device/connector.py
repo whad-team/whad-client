@@ -144,10 +144,6 @@ class Connector:
         # Event listeners
         self.__listeners = []
 
-        # Sniffing mode
-        self.__sniff_mode = False
-        self.__sniff_queue = Queue()
-
         # Interface disconnection
         self.__disconnected = ThreadEvent()
 
@@ -460,6 +456,14 @@ class Connector:
             logger.info("[connector][%s] Add locked pdu: %s", self.device.interface, pdu)
             self.__locked_pdus.put(pdu)
 
+    def has_locked_pdus(self) -> bool:
+        """Determine if connector has locked PDUs.
+
+        :return: `True` if connector has locked PDUs, `False` otherwise.
+        :rtype: bool
+        """
+        return not self.__locked_pdus.empty()
+
     # Device interaction
     def send_message(self, message, keep=None):
         """Sends a message to the underlying device without waiting for an answer.
@@ -674,6 +678,10 @@ class Connector:
         # busy anymore.
         if self.__sync_mode != Connector.SYNC_MODE_OFF:
             return not self.__sync_events.empty()
+
+        # If connector is locked or has unprocessed locked PDUs, it is considered busy.
+        if not self.__locked_pdus.empty():
+            return True
 
         # If not in synchronous mode, connector is busy if it still has events to
         # process (incoming messages) or if the associated interface has
