@@ -301,7 +301,7 @@ def main():
             error("Cannot access the requested device (permission error).")
     else:
         info("Available devices")
-        for device in Interface.list(): #print("Usage: %s [device]" % sys.argv[0])
+        for device in Device.list(): #print("Usage: %s [device]" % sys.argv[0])
             print_formatted_text(HTML(f"- <b>{device.interface}</b>"))
             print_formatted_text(HTML(f"  <b>Type</b>: {device.type}"))
             print_formatted_text(HTML(f"  <b>Index</b>: {device.index}"))
