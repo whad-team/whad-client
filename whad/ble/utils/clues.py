@@ -40,9 +40,11 @@ class CluesDb:
     loaded = False
 
     @staticmethod
-    def load_data():
+    def load_data() -> bool:
         """Load data from CLUES_data.json file
         """
+        result = False
+
         if not CluesDb.loaded:
             # Load data from CLUES_data.json into cache
             clues_data_path = os.path.join(resources.files("whad"),
@@ -53,12 +55,21 @@ class CluesDb:
                 try:
                     with open(clues_data_path, 'r', encoding="utf-8") as clues_json:
                         CluesDb.CLUES_CACHE = json.load(clues_json)
+
+                    # Success
+                    result = True
                 except IOError:
-                    logger.error("[!] Cannot read CLUES database, please check permissions.")
+                    logger.debug("[cluesdb] input/output error while trying to open file %s", clues_data_path)
+                    logger.error("CLUES database could not be loaded (read error)")
             else:
-                logger.error("[!] CLUES database not found, did you clone WHAD's repository with --recurse-submodules ?")
+                logger.debug("[cluesdb] missing database file CLUES_data.json, expected path: %s", clues_data_path)
+                logger.error("CLUES database could not be be found (missing file)")
+
         # Mark DB as loaded, even if it failed (avoiding multiple error messages).
         CluesDb.loaded = True
+
+        # Return operation result
+        return result
 
     @staticmethod
     def get_uuid_alias(uuid: UUID) -> str:
