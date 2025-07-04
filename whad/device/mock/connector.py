@@ -49,7 +49,7 @@ class MockConnector(Connector):
         """
         self.__packets.append(packet)
 
-    def on_packet(self, event):
+    def on_event(self, event):
         """Default handler for received event.
 
         :param packet: Received event
