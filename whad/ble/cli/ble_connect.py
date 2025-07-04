@@ -338,7 +338,7 @@ class BleConnectApp(CommandLineDevicePipe):
                 print("Connected: %d" % periph.conn_handle)
 
                 # Create our bridge: it will drive the connection process
-                output_pipe = BleConnectInputPipe(
+                BleConnectInputPipe(
                     LockedConnector(self.input_interface),
                     central,
                     periph.conn_handle,
