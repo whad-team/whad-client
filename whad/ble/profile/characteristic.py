@@ -380,7 +380,6 @@ class Characteristic(Attribute):
         if alias is not None:
             return f"{alias} (0x{self.__charac_uuid})"
 
-        
         # Search in collaborative CLUES database
         alias = CluesDb.get_uuid_alias(self.__charac_uuid)
         if alias is not None:
