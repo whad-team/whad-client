@@ -53,7 +53,8 @@ class BlePeriphApp(CommandLineApp):
         self.pre_run()
 
         # Preload CluesDb
-        CluesDb.load_data()
+        if not CluesDb.load_data():
+            self.error("CLUES database could not be loaded, did you use `--recurse-submodules` when cloning the repository ?")
 
         if self.args.script is not None:
             # If a profile has been provided, load it

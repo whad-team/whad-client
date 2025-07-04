@@ -93,7 +93,8 @@ class BleCentralApp(CommandLineApp):
         self.pre_run()
 
         # Pre-load CluesDb
-        CluesDb.load_data()
+        if not CluesDb.load_data():
+            self.error("CLUES database could not be loaded, did you use `--recurse-submodules` when cloning the repository ?")
 
         logger.debug("Executing main code")
         if self.args.script is not None:
