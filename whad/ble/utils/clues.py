@@ -37,12 +37,13 @@ class CluesDb:
     """DarkMentorLLC Clues collaborative database.
     """
     CLUES_CACHE = []
+    loaded = False
 
     @staticmethod
     def load_data():
         """Load data from CLUES_data.json file
         """
-        if len(CluesDb.CLUES_CACHE) == 0:
+        if not CluesDb.loaded:
             # Load data from CLUES_data.json into cache
             clues_data_path = os.path.join(resources.files("whad"),
                                            "resources/clues/CLUES_data.json")
@@ -56,7 +57,8 @@ class CluesDb:
                     logger.error("[!] Cannot read CLUES database, please check permissions.")
             else:
                 logger.error("[!] CLUES database not found, did you clone WHAD's repository with --recurse-submodules ?")
-
+        # Mark DB as loaded, even if it failed (avoiding multiple error messages).
+        CluesDb.loaded = True
 
     @staticmethod
     def get_uuid_alias(uuid: UUID) -> str:
