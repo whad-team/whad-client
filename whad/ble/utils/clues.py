@@ -2,10 +2,13 @@
 """
 import json
 import os.path
+import logging
 
 from importlib import resources
 
 from whad.ble.profile.attribute import UUID
+
+logger = logging.getLogger(__name__)
 
 def uuid_match(uuid: UUID, pattern: str) -> bool:
     """Determine if the provided UUID matches the pattern.
@@ -43,8 +46,17 @@ class CluesDb:
             # Load data from CLUES_data.json into cache
             clues_data_path = os.path.join(resources.files("whad"),
                                            "resources/clues/CLUES_data.json")
-            with open(clues_data_path, 'r', encoding="utf-8") as clues_json:
-                CluesDb.CLUES_CACHE = json.load(clues_json)
+
+            # Ensure the database file is present
+            if os.path.exists(clues_data_path):
+                try:
+                    with open(clues_data_path, 'r', encoding="utf-8") as clues_json:
+                        CluesDb.CLUES_CACHE = json.load(clues_json)
+                except IOError:
+                    logger.error("[!] Cannot read CLUES database, please check permissions.")
+            else:
+                logger.error("[!] CLUES database not found, did you clone WHAD's repository with --recurse-submodules ?")
+
 
     @staticmethod
     def get_uuid_alias(uuid: UUID) -> str:
