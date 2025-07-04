@@ -135,9 +135,6 @@ class UnifyingApplicativeLayer(Layer):
         self.__packets_queue.put(message)
         return True
 
-    def __del__(self):
-        self.unlock_channel()
-
     @property
     def role(self):
         return self.state.role
