@@ -40,15 +40,6 @@ class ReplayMock(MockDevice):
         """Mock interface alias for debugging."""
         return f"mock-replay{self.index}"
 
-    def open(self):
-        """Open PCAP file and load packets.
-        """
-        # Load packets from PCAP
-        self.__packets = rdpcap(self.__pcap)
-
-        # Consider this mock device opened and start background threads
-        super().__init__()
-
     def on_interface_message(self):
         """Each time this method is called, we wait `ifs` seconds and report
         a packet. If no more packet is available, we report this device as
