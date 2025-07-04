@@ -73,7 +73,7 @@ class BleConnectInputPipe(Bridge):
         command = self.convert_packet_message(message, self.__out_handle)
         self.output.send_command(command)
 
-    def dispatch_pending_output_pdu(self, pdu):
+    def dispatch_pending_output_pdu(self, message):
         """Dispatch pending out PDUs (received)
         """
         logger.info("Dispatching output pdu %s" % message)
