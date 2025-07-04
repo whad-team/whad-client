@@ -4,6 +4,7 @@ import json
 
 from whad.cli.app import CommandLineApp, run_app
 from whad.ble.cli.peripheral.shell import BlePeriphShell
+from whad.ble.utils.clues import CluesDb
 
 from .commands.shell import interactive_handler, check_profile
 
@@ -50,6 +51,9 @@ class BlePeriphApp(CommandLineApp):
         """
         # Launch pre-run tasks
         self.pre_run()
+
+        # Preload CluesDb
+        CluesDb.load_data()
 
         if self.args.script is not None:
             # If a profile has been provided, load it

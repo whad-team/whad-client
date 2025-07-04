@@ -19,6 +19,8 @@ $ wble-central sniff <bd address> -> capture connections to this device and save
 import logging
 from whad.cli.app import CommandLineApp, run_app
 
+from whad.ble.utils.clues import CluesDb
+
 from .shell import BleCentralShell
 from .commands import *
 
@@ -89,6 +91,9 @@ class BleCentralApp(CommandLineApp):
         # Launch pre-run tasks
         logger.debug("Executing pre-run hook")
         self.pre_run()
+
+        # Pre-load CluesDb
+        CluesDb.load_data()
 
         logger.debug("Executing main code")
         if self.args.script is not None:
