@@ -317,7 +317,7 @@ class MACManagementService(MACService):
             # if beaconOrder < 15, we start a beacon-enabled network
             if beacon_order < 15:
                 self.database.set("macBattLifeExt", battery_life_extension)
-                if pan_coordinator == False:
+                if not pan_coordinator:
                     # Start beaconing after start time
                     self._start_beaconing(start_time)
                 else:
