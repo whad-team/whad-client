@@ -142,16 +142,6 @@ class Unifying(WhadDeviceConnector):
             self.__can_send_raw = not (capabilities & Capability.NoRawData)
         return self.__can_send_raw
 
-
-    def can_set_node_address(self):
-        """
-        Determine if the device can configure a Node address.
-        """
-        commands = self.device.get_domain_commands(Domain.LogitechUnifying)
-        return (
-            (commands & (1 << Commands.SetNodeAddress)) > 0
-        )
-
     def sniff(self, channel=None, address="FF:FF:FF:FF:FF", show_acknowledgements=False):
         """
         Sniff Logitech Unifying packets.
