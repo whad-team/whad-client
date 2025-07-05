@@ -306,7 +306,6 @@ class AdvRecordsManager:
         """Update a specific record.
         """
         # Remove record and add it again
-        old_record = self.get_record(record.__class__)
         self.remove_record(record.__class__)
         self.add_record(record)
         

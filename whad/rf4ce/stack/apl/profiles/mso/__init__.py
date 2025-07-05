@@ -6,7 +6,7 @@ from whad.scapy.layers.rf4ce import RC_COMMAND_CODES, RF4CE_Vendor_MSO_Hdr, \
     RF4CE_Vendor_MSO_User_Control_Pressed, RF4CE_Vendor_MSO_User_Control_Released, \
     RF4CE_Vendor_MSO_User_Control_Repeated, RF4CE_Vendor_MSO_Get_Attribute_Request, \
     RF4CE_Vendor_MSO_Get_Attribute_Response, RF4CE_Vendor_MSO_Check_Validation_Request, \
-    RF4CE_Vendor_MSO_Check_Validation_Response, RF4CE_Vendor_MSO_Check_Validation_Request
+    RF4CE_Vendor_MSO_Check_Validation_Response
 
 from whad.rf4ce.stack.apl.exceptions import APLTimeoutException
 from whad.rf4ce.stack.apl.profiles.mso.database import InformationBase

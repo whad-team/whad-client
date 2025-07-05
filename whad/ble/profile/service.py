@@ -284,7 +284,7 @@ class IncludeService(Attribute):
             return f"Included service {alias} (0x{self.__service_uuid})"
         
         # Search in collaborative CLUES database
-        alias = Clues.get_uuid_alias(self.__service_uuid)
+        alias = CluesDb.get_uuid_alias(self.__service_uuid)
         if alias is not None:
             if self.__service_uuid.type == UUID.TYPE_16:
                 return f"Included service {alias} (0x{self.__service_uuid})"

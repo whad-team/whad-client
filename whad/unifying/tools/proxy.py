@@ -8,6 +8,7 @@ packets transmitted to the dongle.
 """
 from whad.unifying.connector import Unifying, Mouse, Dongle
 from whad.esb.stack import ESBStack
+from whad.exceptions import WhadDeviceNotFound
 from whad.unifying.stack import UnifyingApplicativeLayer, UnifyingRole
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr
 from whad.scapy.layers.unifying import Logitech_Unifying_Hdr, Logitech_Keepalive_Payload, \

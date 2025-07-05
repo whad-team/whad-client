@@ -3,16 +3,11 @@
 import struct
 from scapy.compat import raw
 from scapy.layers.bluetooth4LE import BTLE, BTLE_DATA, BTLE_CTRL, BTLE_ADV, BTLE_ADV_IND, \
-    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP
-from whad.hub.message import AbstractPacket
-from whad.hub.ble import Direction, AdvType, AddressType, BDAddress, BLEMetadata
-
-from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
+    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, BTLE_RF
+from whad.hub.message import AbstractPacket, pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool, dissect_failsafe
-from whad.hub.ble import BleDomain, AdvType
-from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
-    BTLE_ADV_NONCONN_IND, BTLE_ADV_DIRECT_IND, BTLE_ADV_SCAN_IND, BTLE_SCAN_RSP, \
-    BTLE_RF, BTLE_CTRL
+from whad.hub.ble import Direction, AdvType, AddressType, BDAddress, BleDomain, BLEMetadata
+
 from struct import pack
 
 # correlation table

@@ -1,7 +1,7 @@
 from scapy.packet import Packet, bind_layers, split_layers
 from scapy.fields import ByteEnumField, StrLenField, LEIntField, XShortField, LEShortField, \
     FieldLenField, StrFixedLenField, ConditionalField, PacketField, XLongField, XIntField,  XLEIntField, \
-    XLEShortField, BitEnumField, BitField, ByteField, FieldListField, StrField, XByteField, LEShortField
+    XLEShortField, BitEnumField, BitField, ByteField, FieldListField, StrField, XByteField
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS, Dot15d4Data
 from scapy.config import conf
 

@@ -1309,7 +1309,6 @@ class GattServer(GattLayer):
             for i in range(max_nb_items):
                 if i < len(matching_attrs):
                     handle, end_handle = matching_attrs[i]
-                    attr_obj = attrs[handle]
                     handles_list.append(
                         ATT_Handle(
                             handle=handle,
@@ -1399,25 +1398,25 @@ class GattServer(GattLayer):
                         self.att.read_response(
                             value
                         )
-                    except HookReturnAuthentRequired as authent_error:
+                    except HookReturnAuthentRequired:
                         self.error(
                             BleAttOpcode.READ_REQUEST,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHENT
                         )
-                    except HookReturnAuthorRequired as author_error:
+                    except HookReturnAuthorRequired:
                         self.error(
                             BleAttOpcode.READ_REQUEST,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHOR
                         )
-                    except HookReturnAccessDenied as access_denied:
+                    except HookReturnAccessDenied:
                         self.error(
                             BleAttOpcode.READ_REQUEST,
                             request.handle,
                             BleAttErrorCode.READ_NOT_PERMITTED
                         )
-                    except HookReturnNotFound as not_found:
+                    except HookReturnNotFound:
                         self.error(
                             BleAttOpcode.READ_REQUEST,
                             request.handle,
@@ -1452,7 +1451,7 @@ class GattServer(GattLayer):
                     attr.value[:local_mtu - 1]
                 )
 
-        except IndexError as e:
+        except IndexError:
             self.error(
                 BleAttOpcode.READ_REQUEST,
                 request.handle,
@@ -1536,25 +1535,25 @@ class GattServer(GattLayer):
                         self.att.read_blob_response(
                             value
                         )
-                    except HookReturnAuthentRequired as authent_error:
+                    except HookReturnAuthentRequired:
                         self.error(
                             BleAttOpcode.READ_BLOB_REQUEST,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHENT
                         )
-                    except HookReturnAuthorRequired as author_error:
+                    except HookReturnAuthorRequired:
                         self.error(
                             BleAttOpcode.READ_REQUEST,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHOR
                         )
-                    except HookReturnAccessDenied as access_denied:
+                    except HookReturnAccessDenied:
                         self.error(
                             BleAttOpcode.READ_BLOB_REQUEST,
                             request.handle,
                             BleAttErrorCode.READ_NOT_PERMITTED
                         )
-                    except HookReturnNotFound as not_found:
+                    except HookReturnNotFound:
                         self.error(
                             BleAttOpcode.READ_BLOB_REQUEST,
                             request.handle,
@@ -1581,7 +1580,7 @@ class GattServer(GattLayer):
                     request.handle,
                     BleAttErrorCode.INVALID_OFFSET
                 )
-        except IndexError as e:
+        except IndexError:
             # Attribute not found
             self.error(
                 BleAttOpcode.READ_BLOB_REQUEST,
@@ -1647,7 +1646,7 @@ class GattServer(GattLayer):
                         self.att.write_response()
 
                         # Trigger our written hook (after charac has been written)
-                        value =  self.server_model.on_characteristic_written(
+                        self.server_model.on_characteristic_written(
                             service,
                             charac,
                             0,
@@ -1661,7 +1660,7 @@ class GattServer(GattLayer):
                         self.att.write_response()
 
                         # Trigger our written hook (after charac has been written)
-                        value =  self.server_model.on_characteristic_written(
+                        self.server_model.on_characteristic_written(
                             service,
                             charac,
                             0,
@@ -1669,25 +1668,25 @@ class GattServer(GattLayer):
                             True
                         )
 
-                    except HookReturnAuthentRequired as authent_error:
+                    except HookReturnAuthentRequired:
                         self.error(
                             BleAttOpcode.WRITE_REQUEST,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHENT
                         )
-                    except HookReturnAuthorRequired as author_error:
+                    except HookReturnAuthorRequired:
                         self.error(
                             BleAttOpcode.READ_REQUEST,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHOR
                         )
-                    except HookReturnAccessDenied as access_denied:
+                    except HookReturnAccessDenied:
                         self.error(
                             BleAttOpcode.WRITE_REQUEST,
                             request.handle,
                             BleAttErrorCode.READ_NOT_PERMITTED
                         )
-                    except HookReturnNotFound as not_found:
+                    except HookReturnNotFound:
                         self.error(
                             BleAttOpcode.WRITE_REQUEST,
                             request.handle,
@@ -1811,7 +1810,7 @@ class GattServer(GattLayer):
 
                     try:
                         # Trigger our write hook
-                        value =  self.server_model.on_characteristic_write(
+                        self.server_model.on_characteristic_write(
                             service,
                             charac,
                             0,
@@ -1823,7 +1822,7 @@ class GattServer(GattLayer):
                         attr.value = request.value
 
                         # Trigger our written hook (after charac has been written)
-                        value =  self.server_model.on_characteristic_written(
+                        self.server_model.on_characteristic_written(
                             service,
                             charac,
                             0,
@@ -1836,7 +1835,7 @@ class GattServer(GattLayer):
                         attr.value = force_value.value
 
                         # Trigger our written hook (after charac has been written)
-                        value =  self.server_model.on_characteristic_written(
+                        self.server_model.on_characteristic_written(
                             service,
                             charac,
                             0,
@@ -1844,25 +1843,25 @@ class GattServer(GattLayer):
                             True
                         )
 
-                    except HookReturnAuthentRequired as authent_error:
+                    except HookReturnAuthentRequired:
                         self.error(
                             BleAttOpcode.WRITE_COMMAND,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHENT
                         )
-                    except HookReturnAuthorRequired as author_error:
+                    except HookReturnAuthorRequired:
                         self.error(
                             BleAttOpcode.READ_REQUEST,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHOR
                         )
-                    except HookReturnAccessDenied as access_denied:
+                    except HookReturnAccessDenied:
                         self.error(
                             BleAttOpcode.WRITE_COMMAND,
                             request.handle,
                             BleAttErrorCode.READ_NOT_PERMITTED
                         )
-                    except HookReturnNotFound as not_found:
+                    except HookReturnNotFound:
                         self.error(
                             BleAttOpcode.WRITE_COMMAND,
                             request.handle,
