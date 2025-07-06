@@ -2,7 +2,6 @@
 Bluetooth LE Stack Link-layer Manager
 """
 import logging
-from binascii import hexlify
 from struct import pack
 from random import randint
 from threading import Lock
@@ -717,9 +716,10 @@ class LinkLayer(Layer):
             skdm, ivm = self.state.get_skd_and_iv(conn_handle)
             rand, ediv = self.state.get_rand_and_ediv(conn_handle)
 
-            logger.info("[llm] Received LL_ENC_RSP: skds=%s ivs=%s",
-                hexlify(pack('<Q', enc_rsp.skds)),
-                hexlify(pack('<I', enc_rsp.ivs))
+            logger.info(
+                "[llm] Received LL_ENC_RSP: skds=%s ivs=%s",
+                pack('<Q', enc_rsp.skds).hex(),
+                pack('<I', enc_rsp.ivs).hex(),
             )
 
             logger.info('[llm] Initiate connection LinkLayerCryptoManager')
@@ -748,14 +748,14 @@ class LinkLayer(Layer):
             # Generate session key
             session_key = e(encryption_key, skd)
 
-            logger.info("[llm] master  skd: %s", hexlify(master_skd))
-            logger.info("[llm] master   iv: %s", hexlify(master_iv))
-            logger.info("[llm] slave   skd: %s", hexlify(slave_skd))
-            logger.info("[llm] slave    iv: %s", hexlify(slave_iv))
-            logger.info("[llm] Session  TK: %s", hexlify(encryption_key))
-            logger.info("[llm] Session  iv: %s", hexlify(iv))
-            logger.info("[llm] Exp. Ses iv: %s", hexlify(self.__llcm.iv))
-            logger.info("[llm] Session key: %s", hexlify(session_key))
+            logger.info("[llm] master  skd: %s", master_skd.hex())
+            logger.info("[llm] master   iv: %s", master_iv.hex())
+            logger.info("[llm] slave   skd: %s", slave_skd.hex())
+            logger.info("[llm] slave    iv: %s", slave_iv.hex())
+            logger.info("[llm] Session  TK: %s", encryption_key.hex())
+            logger.info("[llm] Session  iv: %s", iv.hex())
+            logger.info("[llm] Exp. Ses iv: %s", self.__llcm.iv.hex())
+            logger.info("[llm] Session key: %s", session_key.hex())
 
 
             # Notify encryption enabled
@@ -803,11 +803,12 @@ class LinkLayer(Layer):
             iv = randint(0, 0x100000000)
             self.state.register_skd_and_iv(conn_handle, skd, iv)
 
-            logger.info("[llm] Received LL_ENC_REQ: rand=%s ediv=%s skd=%s iv=%s",
-                hexlify(pack('<Q', enc_req.rand)),
-                hexlify(pack('<H', enc_req.ediv)),
-                hexlify(pack('<Q', enc_req.skdm)),
-                hexlify(pack('<I', enc_req.ivm)),
+            logger.info(
+                "[llm] Received LL_ENC_REQ: rand=%s ediv=%s skd=%s iv=%s",
+                pack('<Q', enc_req.rand).hex(),
+                pack('<H', enc_req.ediv).hex(),
+                pack('<Q', enc_req.skdm).hex(),
+                pack('<I', enc_req.ivm).hex(),
             )
 
             logger.info("[llm] Initiate connection LinkLayerCryptoManager")
@@ -839,18 +840,19 @@ class LinkLayer(Layer):
             # Generate session key
             session_key = e(encryption_key, skd)
 
-            logger.info("[llm] master  skd: %s", hexlify(master_skd))
-            logger.info("[llm] master   iv: %s", hexlify(master_iv))
-            logger.info("[llm] slave   skd: %s", hexlify(slave_skd))
-            logger.info("[llm] slave    iv: %s", hexlify(slave_iv))
-            logger.info("[llm] Session  TK: %s", hexlify(encryption_key))
-            logger.info("[llm] Session  iv: %s", hexlify(iv))
-            logger.info("[llm] Exp. Ses iv: %s", hexlify(self.__llcm.iv))
-            logger.info("[llm] Session key: %s", hexlify(session_key))
+            logger.info("[llm] master  skd: %s", master_skd.hex())
+            logger.info("[llm] master   iv: %s", master_iv.hex())
+            logger.info("[llm] slave   skd: %s", slave_skd.hex())
+            logger.info("[llm] slave    iv: %s", slave_iv.hex())
+            logger.info("[llm] Session  TK: %s", encryption_key.hex())
+            logger.info("[llm] Session  iv: %s", iv.hex())
+            logger.info("[llm] Exp. Ses iv: %s", self.__llcm.iv.hex())
+            logger.info("[llm] Session key: %s", session_key.hex())
             skdm, ivm = self.state.get_skd_and_iv(conn_handle)
-            logger.info("[llm] Send LL_ENC_RSP: skd=%s iv=%s",
-                hexlify(pack('<Q', skdm)),
-                hexlify(pack('<I', ivm))
+            logger.info(
+                "[llm] Send LL_ENC_RSP: skd=%s iv=%s",
+                pack('<Q', skdm).hex(),
+                pack('<I', ivm).hex(),
             )
 
             # Send back our parameters

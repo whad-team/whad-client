@@ -13,7 +13,6 @@ BleSMP provides these different pairing strategies:
 # refactoring, maybe some states can be merged
 
 from struct import pack, unpack
-from binascii import hexlify
 from random import randint
 from time import sleep
 
@@ -616,10 +615,7 @@ class SM_Peer(object):
         """
         # Rand
         self.__rand = generate_random_value(128)
-        logger.info('(%s) Generated RAND value: %s' % (
-            self.__address,
-            hexlify(self.__rand)
-        ))
+        logger.info("(%s) Generated RAND value: %s", self.__address, self.__rand.hex())
 
     @property
     def rand(self):
@@ -631,10 +627,7 @@ class SM_Peer(object):
         """
         if isinstance(value, bytes) and len(value) == 16:
             self.__rand = value
-            logger.debug('(%s) Set RAND value: %s' % (
-                self.__address,
-                hexlify(value)
-            ))
+            logger.debug("(%s) Set RAND value: %s", self.__address, value.hex())
         else:
             raise SMInvalidParameterFormat()
 
@@ -648,24 +641,15 @@ class SM_Peer(object):
         """
         if isinstance(value, bytes) and len(value) == 16:
             self.__confirm = value
-            logger.debug('(%s) Set confirm value: %s' % (
-                self.__address,
-                hexlify(value)
-            ))
+            logger.debug("(%s) Set confirm value: %s", self.__address, value.hex())
         else:
             raise SMInvalidParameterFormat()
 
     def check_peer_confirm(self, tk, preq, pres, peer, initiator=True):
         """Check peer confirm value
         """
-        logger.debug('(%s) RAND value: %s' % (
-            self.__address,
-            hexlify(self.__rand)
-        ))
-        logger.debug('(%s) CONFIRM value: %s' % (
-            self.__address,
-            hexlify(self.__confirm)
-        ))
+        logger.debug("(%s) RAND value: %s", self.__address, self.__rand.hex())
+        logger.debug("(%s) CONFIRM value: %s", self.__address, self.__confirm.hex())
         # First, compute confirm based on rand
         if initiator:
             _confirm = self.get_custom_function("compute_legacy_confirm_value")(
@@ -703,14 +687,8 @@ class SM_Peer(object):
             pack('<B', resp_addr_type),
             resp_addr[::-1]
         )
-        logger.info('(%s) Using RAND to compute confirm: %s' % (
-            self.__address,
-            hexlify(self.__rand)
-        ))
-        logger.info('(%s) Computed CONFIRM: %s' % (
-            self.__address,
-            hexlify(_confirm)
-        ))
+        logger.info("(%s) Using RAND to compute confirm: %s", self.__address, self.__rand.hex())
+        logger.info("(%s) Computed CONFIRM: %s", self.__address, _confirm.hex())
         return _confirm
 
 
@@ -928,7 +906,7 @@ class SMPLayer(Layer):
         :param SM_Peer initiator: Pairing initiator
         :param SM_Peer responder: Pairing responder
         """
-        logger.debug('[check_initiator_legacy_confirm] RAND=%s' % hexlify(self.state.initiator.rand))
+        logger.debug("[check_initiator_legacy_confirm] RAND=%s", self.state.initiator.rand.hex())
         # Compute expected confirm value
         expected_confirm = self.compute_legacy_confirm_value(
             tk,
@@ -938,8 +916,8 @@ class SMPLayer(Layer):
             self.state.initiator,
             self.state.responder
         )
-        logger.debug('[check_initiator_legacy_confirm] Computed CONFIRM=%s' % hexlify(expected_confirm))
-        logger.debug('[check_initiator_legacy_confirm] Expected CONFIRM=%s' % hexlify(self.state.initiator.confirm))
+        logger.debug("[check_initiator_legacy_confirm] Computed CONFIRM=%s", expected_confirm.hex())
+        logger.debug("[check_initiator_legacy_confirm] Expected CONFIRM=%s", self.state.initiator.confirm.hex())
 
         # Compare with confirm value
         return (expected_confirm == self.state.initiator.confirm)
@@ -954,7 +932,7 @@ class SMPLayer(Layer):
         :param SM_Peer initiator: Pairing initiator
         :param SM_Peer responder: Pairing responder
         """
-        logger.debug('[check_responder_legacy_confirm] RAND=%s' % hexlify(self.state.initiator.rand))
+        logger.debug("[check_responder_legacy_confirm] RAND=%s", self.state.initiator.rand.hex())
 
         # Compute expected confirm value
         expected_confirm = self.compute_legacy_confirm_value(
@@ -966,8 +944,8 @@ class SMPLayer(Layer):
             self.state.responder
         )
 
-        logger.debug('[check_initiator_legacy_confirm] Computed CONFIRM=%s' % hexlify(expected_confirm))
-        logger.debug('[check_initiator_legacy_confirm] Expected CONFIRM=%s' % hexlify(self.state.responder.confirm))
+        logger.debug("[check_initiator_legacy_confirm] Computed CONFIRM=%s", expected_confirm.hex())
+        logger.debug("[check_initiator_legacy_confirm] Expected CONFIRM=%s", self.state.responder.confirm.hex())
 
         # Compare with confirm value
         return (expected_confirm == self.state.responder.confirm)
@@ -1027,9 +1005,7 @@ class SMPLayer(Layer):
             random_number,
             r
         )
-        logger.info('Computed LESC CONFIRM: %s' % (
-            hexlify(_confirm)
-        ))
+        logger.info("Computed LESC CONFIRM: %s", _confirm.hex())
         return _confirm
 
     def compute_legacy_confirm_value(self, tk, rand, preq, pres, initiator, responder):
@@ -1048,16 +1024,17 @@ class SMPLayer(Layer):
         :return: Confirm value
         :rtype: bytes
         """
-        logger.debug('TK=%s RAND=%s, PRES=%s PREQ=%s INITA_TYPE=%02x INITA=%s RESPA_TYPE=%02x RESPA=%s' % (
-            hexlify(tk),
-            hexlify(rand),
-            hexlify(bytes(SM_Hdr()/pres)[::-1]),
-            hexlify(bytes(SM_Hdr()/preq)[::-1]),
+        logger.debug(
+            "TK=%s RAND=%s, PRES=%s PREQ=%s INITA_TYPE=%02x INITA=%s RESPA_TYPE=%02x RESPA=%s",
+            tk.hex(),
+            rand.hex(),
+            bytes(SM_Hdr()/pres)[::-1].hex(),
+            bytes(SM_Hdr()/preq)[::-1].hex(),
             initiator.address_type,
-            hexlify(initiator.address[::-1]),
+            initiator.address[::-1].hex(),
             responder.address_type,
-            hexlify(responder.address[::-1])
-        ))
+            responder.address[::-1].hex(),
+        )
 
         # Compute the confirm value for the provided parameters
         # We need to:
@@ -1319,7 +1296,7 @@ class SMPLayer(Layer):
                     b"\x00" # r equals 0 in JustWorks and NumComp
                 )
 
-                logger.debug('[send_pairing_confirm] Computed CONFIRM=%s' % hexlify(self.state.responder.confirm))
+                logger.debug("[send_pairing_confirm] Computed CONFIRM=%s", self.state.responder.confirm.hex())
 
                 # Update current state
                 self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT
@@ -1791,7 +1768,7 @@ class SMPLayer(Layer):
                     self.state.initiator,
                     self.state.responder
                 )
-                logger.debug('[send_pairing_confirm] Computed CONFIRM=%s' % hexlify(self.state.initiator.confirm))
+                logger.debug("[send_pairing_confirm] Computed CONFIRM=%s", self.state.initiator.confirm.hex())
 
                 # Send CONFIRM value (again, we need to reverse its bytes)
                 confirm_value = SM_Confirm(
@@ -1851,7 +1828,7 @@ class SMPLayer(Layer):
                 self.state.initiator,
                 self.state.responder
             )
-            logger.debug('[on_pairing_confirm] Computed CONFIRM=%s' % hexlify(self.state.responder.confirm))
+            logger.debug("[on_pairing_confirm] Computed CONFIRM=%s", self.state.responder.confirm.hex())
 
             # Send CONFIRM value (again, we need to reverse its bytes)
             confirm_value = SM_Confirm(
@@ -2113,7 +2090,7 @@ class SMPLayer(Layer):
                     self.state.initiator.rand
                 )
 
-                logger.debug('[on_pairing_random] STK=%s' % hexlify(self.state.stk))
+                logger.debug("[on_pairing_random] STK=%s", self.state.stk.hex())
 
                 # Notify connection that we successfully negociated STK and that
                 # the corresponding material is available.
@@ -2126,9 +2103,10 @@ class SMPLayer(Layer):
                 #self.__l2cap.connection.set_stk(self.state.stk)
 
             else:
-                logger.info('Invalid Initiator CONFIRM value (expected %s)' % (
-                    hexlify(self.state.initiator.confirm),
-                ))
+                logger.info(
+                    "Invalid Initiator CONFIRM value (expected %s)",
+                    self.state.initiator.confirm.hex(),
+                )
 
                 # Send error
                 error = SM_Failed(
@@ -2213,10 +2191,10 @@ class SMPLayer(Layer):
                     )
 
             else:
-
-                logger.info('Invalid responder CONFIRM value (expected %s)' % (
-                    hexlify(self.state.responder.confirm),
-                ))
+                logger.info(
+                    "Invalid responder CONFIRM value (expected %s)",
+                    self.state.responder.confirm.hex(),
+                )
 
                 # Send error
                 error = SM_Failed(
@@ -2256,10 +2234,10 @@ class SMPLayer(Layer):
                     )
                 )
             else:
-
-                logger.info('Invalid Initiator CONFIRM value (expected %s)' % (
-                    hexlify(self.state.initiator.confirm),
-                ))
+                logger.info(
+                    "Invalid Initiator CONFIRM value (expected %s)",
+                    self.state.initiator.confirm.hex(),
+                )
 
                 # Send error
                 error = SM_Failed(
@@ -2296,7 +2274,7 @@ class SMPLayer(Layer):
                 )
 
 
-                logger.debug('[on_pairing_random] STK=%s' % hexlify(self.state.stk))
+                logger.debug("[on_pairing_random] STK=%s", self.state.stk.hex())
 
                 # Next state
                 self.state.state = SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_RECVD
@@ -2311,9 +2289,10 @@ class SMPLayer(Layer):
                 self.get_layer('ll').start_encryption(conn_handle, 0, 0)
 
             else:
-                logger.info('Invalid Responder CONFIRM value (expected %s)' % (
-                    hexlify(self.state.responder.confirm),
-                ))
+                logger.info(
+                    "Invalid Responder CONFIRM value (expected %s)",
+                    self.state.responder.confirm.hex(),
+                )
 
                 # Send error
                 error = SM_Failed(

@@ -16,7 +16,6 @@ import re
 import logging
 from threading import Thread
 from random import randint
-from binascii import hexlify
 
 from scapy.config import conf
 
@@ -131,7 +130,7 @@ class UnixSocketDevice(WhadDevice):
         :param bytes data: Data to write
         :returns: number of bytes written to the device
         """
-        logger.debug("sending data to unix socket: %s", hexlify(data))
+        logger.debug("sending data to unix socket: %s", data.hex())
         if not self.__opened:
             raise WhadDeviceNotReady()
 
@@ -377,7 +376,7 @@ class UnixSocketServerDevice(WhadDevice):
         :param bytes data: Data to write
         :returns: number of bytes written to the device
         """
-        logger.debug("sending data to unix server client socket: %s", hexlify(data))
+        logger.debug("sending data to unix server client socket: %s", data.hex())
         if not self.__opened:
             raise WhadDeviceNotReady()
 
@@ -551,7 +550,7 @@ class UnixSocketConnector(WhadDeviceConnector):
     def on_data_received(self, data):
         """Handle received data from the unix socket.
         """
-        logger.debug("received raw data from socket: %s", hexlify(data))
+        logger.debug("received raw data from socket: %s", data.hex())
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
             # Is the magic correct ?

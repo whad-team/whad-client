@@ -4,7 +4,6 @@ import re
 import html
 
 from typing import List
-from binascii import unhexlify, Error as BinasciiError
 
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
@@ -805,8 +804,8 @@ class BleCentralShell(InteractiveShell):
             # Decode hex data
             hex_data = ''.join(args[2:])
             try:
-                char_value = unhexlify(hex_data.replace('\t',''))
-            except BinasciiError:
+                char_value = bytes.fromhex(hex_data.replace("\t", ""))
+            except ValueError:
                 self.error("Provided hex value contains non-hex characters.")
                 return
         else:
@@ -923,7 +922,7 @@ class BleCentralShell(InteractiveShell):
             try:
                 if len(args) >= 1:
                     hex_value = ''.join(args)
-                    raw_pdu = unhexlify(hex_value.replace(' ',''))
+                    raw_pdu = bytes.fromhex(hex_value.replace(" ", ""))
                     res = self.__connector.send_pdu(
                         BTLE_DATA(raw_pdu),
                         conn_handle=self.__target.conn_handle
@@ -932,7 +931,7 @@ class BleCentralShell(InteractiveShell):
                         self.error("An error occured while sending PDU.")
                 else:
                     self.error('Invalid hex value.')
-            except BinasciiError:
+            except ValueError:
                 self.error("Invalid hex value.")
             except ConnectionLostException:
                 self.error("Sending PDU failed (peripheral disconnected)")

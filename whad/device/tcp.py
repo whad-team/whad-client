@@ -11,7 +11,6 @@ import logging
 import socket
 import select
 import re
-from binascii import hexlify
 from ipaddress import ip_address
 
 from whad.device import WhadDevice, WhadDeviceConnector
@@ -170,7 +169,7 @@ class TCPSocketDevice(WhadDevice):
         :param bytes data: Data to write
         :returns: number of bytes written to the device
         """
-        logger.debug("sending data to TCP socket: %s", hexlify(data))
+        logger.debug("sending data to TCP socket: %s", data.hex())
         if not self.__opened:
             raise WhadDeviceNotReady()
 
@@ -267,7 +266,7 @@ class TCPSocketConnector(WhadDeviceConnector):
         :param data: Incoming data
         :type data: bytes
         """
-        logger.debug("received raw data from socket: %s", hexlify(data))
+        logger.debug("received raw data from socket: %s", data.hex())
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
             # Is the magic correct ?

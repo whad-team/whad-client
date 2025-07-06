@@ -1,7 +1,6 @@
 """BLE profile command handler
 """
 from json import loads, dumps
-from binascii import hexlify
 from argparse import Namespace
 
 from prompt_toolkit import print_formatted_text, HTML
@@ -155,15 +154,13 @@ def profile_handler(app, command_args):
 
         # Generate device advertising information
         device_metadata = {
-            'adv_data': hexlify(device.adv_records.to_bytes()).decode('utf-8'),
-            'bd_addr': str(device.address),
-            'addr_type': device.address_type,
-            'scan_rsp': None
+            "adv_data": device.adv_records.to_bytes().hex(),
+            "bd_addr": str(device.address),
+            "addr_type": device.address_type,
+            "scan_rsp": None
         }
         if device.scan_rsp_records is not None:
-            device_metadata['scan_rsp'] = (
-                hexlify(device.scan_rsp_records.to_bytes()).decode('utf-8')
-            )
+            device_metadata["scan_rsp"] = device.scan_rsp_records.to_bytes().hex()
 
         scanner.stop()
 
