@@ -1,5 +1,5 @@
 from typing import Union
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, fields
 
 
 def channel_to_frequency(channel):
