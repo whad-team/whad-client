@@ -1,7 +1,6 @@
 """BLE Attribute
 """
 from struct import pack, unpack
-from binascii import unhexlify, hexlify
 
 from whad.ble.exceptions import InvalidHandleValueException, InvalidUUIDException
 
@@ -542,14 +541,14 @@ class UUID:
 
         elif len(uuid) == 4:
             self.uuid = uuid
-            self.packed = unhexlify(uuid)[::-1]
+            self.packed = bytes.fromhex(uuid)[::-1]
             self.type = UUID.TYPE_16
         elif len(uuid) == 36:
             temp = uuid.replace('-','')
 
             if len(temp) == 32:
                 self.uuid = uuid
-                self.packed = unhexlify(temp)[::-1]
+                self.packed = bytes.fromhex(temp)[::-1]
                 self.type = UUID.TYPE_128
         elif len(uuid) == 32 and "-" not in uuid:
             self.uuid = b'-'.join((uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20],
@@ -564,9 +563,8 @@ class UUID:
             self.type = UUID.TYPE_16
         elif len(uuid) == 16:
             r = uuid[::-1]
-            self.uuid = b'-'.join(map(lambda x: hexlify(x),
-                                      (r[0:4], r[4:6], r[6:8],r[8:10],
-                                       r[10:]))).decode('latin-1')
+            self.uuid = "-".join(map(lambda x: x.hex(),
+                                     (r[0:4], r[4:6], r[6:8],r[8:10], r[10:])))
             self.packed = uuid
             self.type = UUID.TYPE_128
 

@@ -2,9 +2,6 @@
 """
 import re
 import argparse
-from typing import Tuple
-
-from binascii import unhexlify
 
 from whad.ble.profile.attribute import UUID, InvalidUUIDException as AttrInvalidUUIDException
 
@@ -250,7 +247,7 @@ def validate_int_att_handle(handle: int) -> int:
     return handle
 
 
-def validate_att_security_mode(mode: int, level: int) -> Tuple[int, int]:
+def validate_att_security_mode(mode: int, level: int) -> tuple[int, int]:
     """Validate ATT security mode.
 
     :param mode: Security mode to validate
@@ -313,8 +310,8 @@ def validate_ltk(ltk: str) -> str:
     """
     ltk = ltk.lower()
     try:
-        unhexlify(ltk)
-    except TypeError as err_type:
+        bytes.fromhex(ltk)
+    except ValueError as err_type:
         raise InvalidSMLTK(ltk) from err_type
     return ltk
 
@@ -332,8 +329,8 @@ def validate_irk(irk: str) -> str:
         irk = "00" * 16
     irk = irk.lower()
     try:
-        unhexlify(irk)
-    except TypeError as err_type:
+        bytes.fromhex(irk)
+    except ValueError as err_type:
         raise InvalidSMIRK(irk) from err_type
     return irk
 
@@ -351,8 +348,8 @@ def validate_csrk(csrk: str) -> str:
         csrk = "00" * 16
     csrk = csrk.lower()
     try:
-        unhexlify(csrk)
-    except TypeError as err_type:
+        bytes.fromhex(csrk)
+    except ValueError as err_type:
         raise InvalidSMCSRK(csrk) from err_type
     return csrk
 
@@ -368,7 +365,7 @@ def validate_rand(rand):
     """
     rand = rand.lower()
     try:
-        unhexlify(rand)
-    except TypeError as err_type:
+        bytes.fromhex(rand)
+    except ValueError as err_type:
         raise InvalidSMRandom(rand) from err_type
     return rand

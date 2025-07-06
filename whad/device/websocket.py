@@ -12,7 +12,6 @@ from whad.common.converters.scapy import ScapyConverter
 from websockets.sync.server import serve
 from websockets.exceptions import ConnectionClosedOK
 from time import sleep
-from binascii import hexlify
 
 import threading
 import logging
@@ -65,7 +64,7 @@ class WebSocketConnector(WhadDeviceConnector):
         :param data: Incoming data
         :type data: bytes
         """
-        logger.debug("received raw data from socket: %s", hexlify(data))
+        logger.debug("received raw data from socket: %s", data)
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
             # Is the magic correct ?

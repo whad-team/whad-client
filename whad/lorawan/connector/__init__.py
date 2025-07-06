@@ -1,9 +1,8 @@
 """This module provides a connector to use LoRaWAN capable hardware.
 """
 from time import sleep
-from binascii import hexlify, unhexlify
 from queue import Queue, Empty
-from struct import pack, unpack
+from struct import unpack
 from Cryptodome.Cipher import AES
 from Cryptodome.Hash import CMAC
 from scapy.contrib.loraphy2wan import PHYPayload, Join_Request, Join_Accept
@@ -162,12 +161,12 @@ class LoRaWAN(LoRa):
 
         # Send LoRaWAN frame
         if timestamp is not None:
-            logger.debug('Programming packet %s at %f' % (hexlify(bytes(packet)), timestamp))
+            logger.debug("Programming packet %s at %f", bytes(packet).hex(), timestamp)
             pkt_id = super().schedule_send(packet, timestamp)
-            logger.debug('packet id is %d' % pkt_id)
+            logger.debug("packet id is %d", pkt_id)
             return pkt_id
         else:
-            logger.debug('Sending packet %s' % hexlify(bytes(packet)))
+            logger.debug("Sending packet %s", bytes(packet).hex())
             super().send(packet)
 
 
@@ -177,7 +176,7 @@ class LoRaWAN(LoRa):
         :param packet: Received packet
         :type packet: :class:`whad.scapy.layers.lorawan.PHYPayload`
         """
-        logger.debug('Received LoRaWAN payload: %s' % hexlify(bytes(packet)))
+        logger.debug(f'Received LoRaWAN payload: {bytes(packet).hex()}')
 
         # Add packet to our packet queue
         pkt = PHYPayload(bytes(packet))
@@ -200,7 +199,7 @@ class LoRaWAN(LoRa):
             packet = self.__pkt_queue.get(block=True, timeout=timeout)           
             logger.debug('Packet received !')
             return packet
-        except Empty as empty:
+        except Empty:
             return None
 
     def __process_join_accept(self, app_key, packet):
@@ -216,9 +215,9 @@ class LoRaWAN(LoRa):
             ja_dec, mic = ja_dec[:-4], ja_dec[-4:]
             resp = Join_Accept(ja_dec)
 
-            logger.debug('Decrypted JoinAccept: %s' % hexlify(ja_dec))
-            logger.debug('JoinAccept MIC: %s' % hexlify(mic))
-                            
+            logger.debug("Decrypted JoinAccept: %s", ja_dec.hex())
+            logger.debug("JoinAccept MIC: %s", mic.hex())
+
             # Check MIC
             buf = b'\x20' + ja_dec
             exp_mic = compute_mic(app_key, buf)
@@ -261,9 +260,9 @@ class LoRaWAN(LoRa):
         phy_jr.Join_Request_Field = join_req
         mic = compute_mic(app_key, bytes(phy_jr)[:-4])
         phy_jr.MIC = unpack('>I', mic)[0]
-        logging.debug('PHY[JoinRequest]: %s' % hexlify(bytes(phy_jr)))
-        logging.debug(' - MIC: %s' % hexlify(mic))
-        
+        logging.debug("PHY[JoinRequest]: %s", bytes(phy_jr).hex())
+        logging.debug(" - MIC: %s", mic.hex())
+
         # Send join request
         self.send(bytes(phy_jr))
 

@@ -12,7 +12,6 @@ This tool is meant to be completely PHY agnostic and will work with any hardware
 Guessed configuration can be saved for later use, in a dedicated configuration file.
 """
 from time import sleep
-from binascii import hexlify
 from queue import Queue, Empty
 from whad.cli.app import CommandLineApp, ApplicationError
 from whad.phy.connector import Phy
@@ -42,7 +41,7 @@ class PhyCorrelator(Phy):
         into our RX queue and wait for the queue to be read later.
         """
         if packet.metadata.rssi > self.__rssi:
-            print(hexlify(bytes(packet)))
+            print(bytes(packet).hex())
             if self.__callback is not None:
                 self.__callback(packet)
             else:

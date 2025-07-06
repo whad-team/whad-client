@@ -1,7 +1,5 @@
 """BLE characteristic write command handler
 """
-from binascii import unhexlify, Error as BinasciiError
-
 from whad.cli.app import command
 from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.profile.attribute import UUID, InvalidUUIDException
@@ -223,8 +221,8 @@ def perform_write(app, device, args, without_response=False, profile_loaded=Fals
         # Decode hex data
         hex_data = ''.join(args[2:])
         try:
-            char_value = unhexlify(hex_data.replace('\t',''))
-        except BinasciiError:
+            char_value = bytes.fromhex(hex_data.replace("\t", ""))
+        except ValueError:
             app.error("Provided hex value contains non-hex characters.")
             return
     else:

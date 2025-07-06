@@ -2,7 +2,6 @@
 LoRaWAN Gateway stack link-layer manager
 """
 from time import sleep, time
-from binascii import hexlify
 from random import randint
 from whad.lorawan.stack.mac import LWMacLayer
 from whad.common.stack import LayerState, Layer, alias, source, state,instance
@@ -235,8 +234,8 @@ class LWGwLinkLayer(Layer):
         else:
             logger.debug(
                 'JoinRequest MIC is wrong (got %s instead of %s)' % (
-                hexlify(bytes(frame)[-4:]),
-                hexlify(exp_mic)
+                bytes(frame)[-4:].hex(),
+                exp_mic.hex()
             ))
 
     def add_provisioned_device(self, dev_addr : int, dev_eui : str, appskey : bytes,

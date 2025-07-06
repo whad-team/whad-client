@@ -5,7 +5,6 @@ This module provides the `ESBAddress` class that represents
 an Enhanced ShockBurst device address.
 """
 import re
-from binascii import hexlify, unhexlify
 from whad.esb.exceptions import InvalidESBAddressException
 
 class ESBAddress:
@@ -17,9 +16,9 @@ class ESBAddress:
         """
         if isinstance(address, str):
             if re.match(r'^([0-9a-fA-F]{2}\:){4}[0-9a-fA-F]{2}$', address) is not None:
-                self.__value = unhexlify(address.replace(':',''))
+                self.__value = bytes.fromhex(address.replace(":",""))
             elif re.match('[0-9a-fA-F]{10}$', address) is not None:
-                self.__value = unhexlify(address)
+                self.__value = bytes.fromhex(address)
             else:
                 raise InvalidESBAddressException
         elif isinstance(address, bytes) and len(address) > 1 and len(address) <= 5:
@@ -72,9 +71,9 @@ class ESBAddress:
         :return: An instance of ESBAddress representing the corresponding ESB address.
         """
         if len(esb_addr_bytes) == 5:
-            hex_address = hexlify(esb_addr_bytes)
-            address = b":".join([hex_address[i*2:(i+1)*2] for i in range(int(len(hex_address)/2))])
-            return ESBAddress(address.decode("utf-8"))
+            hex_address = esb_addr_bytes.hex()
+            address = ":".join([hex_address[i*2:(i+1)*2] for i in range(int(len(hex_address)/2))])
+            return ESBAddress(address)
 
         # Raise an error (invalid address size)
         raise InvalidESBAddressException

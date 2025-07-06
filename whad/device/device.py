@@ -6,7 +6,6 @@ including background threads.
 """
 import logging
 import struct
-from binascii import hexlify
 from time import time, sleep
 from queue import Queue, Empty
 from threading import Thread, Lock
@@ -709,8 +708,7 @@ class WhadDevice:
         :param bytes data: Data received from the device.
         """
         #logger.info("[WhadDevice] entering on_data_received()")
-        logger.debug("[WhadDevice] received raw data from device <%s>: %s",
-                     self.interface, hexlify(data))
+        logger.debug("[WhadDevice] received raw data from device <%s>: %s", self.interface, data.hex())
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
             # Is the magic correct ?
