@@ -1,7 +1,6 @@
 from scapy.layers.zigbee import ZigbeeDeviceProfile
 from scapy.fields import BitField, XLEShortField, ByteEnumField, \
-    XLEShortField, ByteField, ConditionalField, FieldListField, \
-    FieldLenField
+    ByteField, ConditionalField, FieldListField, FieldLenField
 from scapy.layers.dot15d4 import dot15d4AddressField
 from scapy.packet import Packet
 
