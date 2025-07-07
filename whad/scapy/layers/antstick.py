@@ -411,6 +411,13 @@ class ANTStick_Data_Acknowledged_Data(Packet):
 class ANTStick_Data_Burst_Data(Packet):
     name = "ANTStick Data Burst Data"
     fields_desc = [
+        ByteField("channel_number", None), 
+        StrFixedLenField("pdu", None, length=8)
+    ]
+
+class ANTStick_Advanced_Data_Burst_Data(Packet):
+    name = "ANTStick Advanced Data Burst Data"
+    fields_desc = [
         BitField("sequence_number", 0, 3),
         BitField("channel_number", 0, 5), 
         StrFixedLenField("pdu", None, length=8)
@@ -452,6 +459,9 @@ bind_layers(ANTStick_Data_Acknowledged_Data, ANTStick_Data_Extension)
 
 bind_layers(ANTStick_Message, ANTStick_Data_Burst_Data, id=0x50)
 bind_layers(ANTStick_Data_Burst_Data, ANTStick_Data_Extension)
+
+bind_layers(ANTStick_Message, ANTStick_Advanced_Data_Burst_Data, id=0x72)
+bind_layers(ANTStick_Advanced_Data_Burst_Data, ANTStick_Data_Extension)
 
 
 bind_layers(ANTStick_Command_Assign_Channel, ANTStick_Extended_Assignment_Extension)

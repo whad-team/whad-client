@@ -34,7 +34,7 @@ from whad.scapy.layers.antstick import ANTStick_Message, ANTStick_Command_Reques
     ANTStick_Command_Search_Timeout, ANTStick_Command_Low_Priority_Search_Timeout, \
     ANTStick_Data_Acknowledged_Data, ANTStick_Command_Lib_Config, \
     ANTStick_RSSI_Data_Extension, ANTStick_Timestamp_Data_Extension, \
-    ANTStick_Data_Burst_Data, ANTStick_Data_Extension
+    ANTStick_Data_Burst_Data, ANTStick_Data_Extension, ANTStick_Advanced_Data_Burst_Data
 
 from whad.device.virtual.antstick.constants import AntStickIds
 from whad.device.virtual.antstick.channel import ChannelStatus, ChannelType, Channel
@@ -274,12 +274,13 @@ class ANTStickDevice(VirtualDevice):
                     data = ANTStick_Message(self.__pdu_queue.get())
                     print(repr(data))
                     if data is not None:# and ANTStick_Data_Broadcast_Data in data:
+                        cn = data.channel_number & 0b11111
                         pkt = bytes(
                                 ANT_Hdr(
                                     preamble = self.__sync, 
-                                    device_number = data.device_number if ANTStick_Data_Extension in data else self.__channels[data.channel_number].device_number, 
-                                    device_type = data.device_type if ANTStick_Data_Extension in data else self.__channels[data.channel_number].device_type,
-                                    transmission_type=data.transmission_type if ANTStick_Data_Extension in data else self.__channels[data.channel_number].transmission_type, 
+                                    device_number = data.device_number if ANTStick_Data_Extension in data else self.__channels[cn].device_number, 
+                                    device_type = data.device_type if ANTStick_Data_Extension in data else self.__channels[cn].device_type,
+                                    transmission_type=data.transmission_type if ANTStick_Data_Extension in data else self.__channels[cn].transmission_type, 
                                     broadcast = (0 if ANTStick_Data_Broadcast_Data in data else 1), 
                                     ack = False, 
                                     end = False, 
@@ -980,23 +981,35 @@ class ANTStickDevice(VirtualDevice):
         packet = ANT_Hdr(message.pdu)
         print("transmitting: ", repr(packet))
         if packet.broadcast == 1:
-            for count in range(2):
-                seq_num = (((((count-1) % 3) + 1) if count != 0 else 0)  | ((0 if count != 9 else 1) << 2))
+            print()
+            data = bytes(message.pdu)[7:]
+            packets = len(data) // 8
+            for i in range(packets):
+                sequence = ((i - 1) % 3) + 1
+                if i == 0:
+                    sequence = 0
+                elif i == packets - 1:
+                    sequence = sequence | 0b100
+
+                channel_seq = message.channel_number | sequence << 5
+                packet_data = data[i * 8 : i * 8 + 8]
+                
                 self._antstick_send_command(
                     ANTStick_Data_Burst_Data(
-                        sequence_number = seq_num, 
-                        channel_number = message.channel_number, 
-                        pdu = bytes(message.pdu[-8:])
+                        channel_number = channel_seq, 
+                        pdu = packet_data
                     ), no_response = True
                 )
-                if count == 1:
-                    while self.__ack_queue.empty():
-                        sleep(0.001)
-                    ack_event = ANTStick_Message(self.__ack_queue.get())
-                    print("ackevent", repr(ack_event))
-                    if ack_event.message_code != 10:
-                        break
-
+                
+                
+                '''
+                while self.__ack_queue.empty():
+                    sleep(0.001)
+                ack_event = ANTStick_Message(self.__ack_queue.get())
+                print("ackevent", repr(ack_event))
+                if ack_event.message_code != 10:
+                    break
+                '''
             '''
             self._antstick_send_command(
                 ANTStick_Data_Acknowledged_Data(
