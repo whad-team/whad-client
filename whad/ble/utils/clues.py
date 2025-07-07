@@ -2,10 +2,13 @@
 """
 import json
 import os.path
+import logging
 
 from importlib import resources
 
 from whad.ble.profile.attribute import UUID
+
+logger = logging.getLogger(__name__)
 
 def uuid_match(uuid: UUID, pattern: str) -> bool:
     """Determine if the provided UUID matches the pattern.
@@ -34,17 +37,39 @@ class CluesDb:
     """DarkMentorLLC Clues collaborative database.
     """
     CLUES_CACHE = []
+    loaded = False
 
     @staticmethod
-    def load_data():
+    def load_data() -> bool:
         """Load data from CLUES_data.json file
         """
-        if len(CluesDb.CLUES_CACHE) == 0:
+        result = False
+
+        if not CluesDb.loaded:
             # Load data from CLUES_data.json into cache
             clues_data_path = os.path.join(resources.files("whad"),
                                            "resources/clues/CLUES_data.json")
-            with open(clues_data_path, 'r', encoding="utf-8") as clues_json:
-                CluesDb.CLUES_CACHE = json.load(clues_json)
+
+            # Ensure the database file is present
+            if os.path.exists(clues_data_path):
+                try:
+                    with open(clues_data_path, 'r', encoding="utf-8") as clues_json:
+                        CluesDb.CLUES_CACHE = json.load(clues_json)
+
+                    # Success
+                    result = True
+                except IOError:
+                    logger.debug("[cluesdb] input/output error while trying to open file %s", clues_data_path)
+                    logger.error("CLUES database could not be loaded (read error)")
+            else:
+                logger.debug("[cluesdb] missing database file CLUES_data.json, expected path: %s", clues_data_path)
+                logger.error("CLUES database could not be be found (missing file)")
+
+        # Mark DB as loaded, even if it failed (avoiding multiple error messages).
+        CluesDb.loaded = True
+
+        # Return operation result
+        return result
 
     @staticmethod
     def get_uuid_alias(uuid: UUID) -> str:
