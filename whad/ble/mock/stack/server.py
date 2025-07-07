@@ -12,20 +12,23 @@ GATT server profile:
   - TX characteristic (6d02b601-1b51-4ef9-b753-1399e05debfd): writecmd
   - RX characteristic (6d02b602-1b51-4ef9-b753-1399e05debfd): read/notify permissions
 """
+from typing import Optional
+from struct import pack
+
+from scapy.packet import Packet
+from scapy.layers.bluetooth import ATT_Error_Response
+
 from whad.hub.ble import UUID
 
-from .attribute import PrimaryService, Characteristic, CharacteristicValue, \
+from .attribute import Attribute, PrimaryService, Characteristic, CharacteristicValue, \
     ClientCharacteristicConfigurationDescriptor
 from .read import ReadProcedure
 
 class GattServer:
     """Tiny GATT server"""
 
-    def __init__(self, l2cap):
+    def __init__(self):
         """Initialize a GATT server."""
-        # Save underlying L2CAP layer
-        self.__l2cap = l2cap
-
         ###
         # Initialize GATT attributes
         ###
@@ -99,3 +102,4 @@ class GattServer:
         else:
             # Return an unlikely error
             return ATT_Error_Response(request.opcode, request.gatt_handle, 0x0E)
+
