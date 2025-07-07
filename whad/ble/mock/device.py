@@ -2,47 +2,15 @@
 """
 import logging
 from queue import Queue, Empty
-from typing import Tuple, List
+from typing import List, Optional
 
 from scapy.packet import Packet
 from scapy.layers.bluetooth4LE import BTLE_DATA
-from scapy.layers.bluetooth import ATT_Read_By_Group_Type_Request, ATT_Read_By_Group_Type_Response
 
 from whad.hub.ble import BDAddress, AddressType
-from whad.ble.profile import GenericProfile
 from whad.hub.ble.pdu import AdvType
 
 logger = logging.getLogger(__name__)
-
-class BasicBle4Stack:
-    """Small Bluetooth Low Energy stack emulating a real device behavior for
-    testing.
-    """
-
-    def __init__(self, device:'EmulatedDevice', gatt_profile: GenericProfile):
-        """Initialize our stack with the provided profile.
-        """
-        self.__device = device
-        self.__profile = gatt_profile
-        self.__procedure = None
-
-    def in_procedure(self, procedure: str = None) -> bool:
-        """Determine if stack has a ongoing procedure."""
-        return self.__procedure == procedure
-
-    def on_packet(self, packet: Packet):
-        """Process incoming packet.
-        """
-        if ATT_Read_By_Group_Type_Request in packet:
-            self.on_read_by_group_type(packet[ATT_Read_By_Group_Type_Request])
-
-    def on_read_by_group_type(self, request: ATT_Read_By_Group_Type_Request):
-        """Process a read by group type request.
-
-        :param request: ATT ReadByGroupType request
-        :type request: ATT_Read_By_Group_Type_Request
-        """
-        
 
 class EmulatedDevice:
     """Properties holder for a BLE device emulated by the BleScanMock.
@@ -51,8 +19,7 @@ class EmulatedDevice:
     STATE_ADVERTISING = 0
     STATE_CONNECTED = 1
 
-    def __init__(self, address: BDAddress, adv_data: bytes = b'',
-                 scan_data: bytes = None, profile : GenericProfile = None):
+    def __init__(self, address: BDAddress, adv_data: bytes = b'', scan_data: Optional[bytes] = None):
         """Create an emulated device and its associated state.
 
         :param address: Device BD address
@@ -132,7 +99,7 @@ class EmulatedDevice:
         """Scan response data"""
         return self.__scan_data
 
-    def get_adv_data(self) -> Tuple[int, bytes]:
+    def get_adv_data(self) -> Optional[tuple[int, bytes]]:
         """Return the next advertising data type and bytes.
         """
         if self.__next_adv_type == "adv":
@@ -149,9 +116,12 @@ class EmulatedDevice:
     def on_pdu(self, pdu: bytes):
         """Process incoming PDU.
         """
+        # Convert bytes back to packet
         print("[central_mock] received PDU %s" % pdu.hex())
         packet = BTLE_DATA(pdu)
         packet.show()
+
+        # Forward packet to device stack
 
     def get_pending_pdus(self) -> List[bytes]:
         """Pending PDUs
