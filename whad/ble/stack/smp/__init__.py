@@ -1230,16 +1230,6 @@ class SMPLayer(Layer):
                             BDAddress.RANDOM
             )
 
-            remote_peer_addr = local_conn['remote_peer_addr']
-            remote_peer_addr_type = local_conn['remote_peer_addr_type']
-
-            remote_addr_object = BDAddress.from_bytes(
-                remote_peer_addr,
-                addr_type = BDAddress.PUBLIC if
-                            remote_peer_addr_type == 0 else
-                            BDAddress.RANDOM
-            )
-
             # We are the initiator
             self.state.enc_initiator = True
 
@@ -1646,10 +1636,9 @@ class SMPLayer(Layer):
                 # Get the current connection handle
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
-                # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk[::-1])
-            # otherwise, fail.
-            else:
+                self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk[::-1])
+
+            else:  # otherwise, fail.
                 logger.info('Invalid exchange value received, report error and return to idle.')
 
                 # Notify error
@@ -1692,9 +1681,8 @@ class SMPLayer(Layer):
                 # Get the current connection handle
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
-                # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk[::-1])
                 # Start encryption
+                self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk[::-1])
                 self.get_layer('ll').start_encryption(conn_handle, 0, 0)
 
                 self.state.state = SecurityManagerState.STATE_LESC_DHK_CHECK_RECVD
@@ -2011,7 +1999,6 @@ class SMPLayer(Layer):
                     self.state.responder.indicate_ltk_distribution(self.state.ltk)
                     self.state.responder.indicate_rand_ediv_distribution(self.state.rand, self.state.ediv)
 
-                    rb = 0
                     # Let's compute EA
                     ea = self.get_custom_function("compute_exchange_value")(
                         self.state.mackey,
@@ -2134,8 +2121,7 @@ class SMPLayer(Layer):
                 # Get the current connection handle
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
-                # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.stk)
+                self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.stk)
 
                 #self.__l2cap.connection.set_stk(self.state.stk)
 
@@ -2321,9 +2307,7 @@ class SMPLayer(Layer):
                 # Get the current connection handle
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
-                # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.stk)
-
+                self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.stk)
                 self.get_layer('ll').start_encryption(conn_handle, 0, 0)
 
             else:
