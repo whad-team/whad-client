@@ -76,7 +76,7 @@ class CentralMock(MockDevice):
         # Default commands
         commands = [
             Commands.CentralMode,
-            Commands.Start, Commands.Stop, 
+            Commands.Start, Commands.Stop,
             Commands.ConnectTo,
             Commands.SendPDU,
         ]
