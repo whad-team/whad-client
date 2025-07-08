@@ -16,18 +16,13 @@ from whad.ble.stack.l2cap import L2CAPLayer
 from whad.ble.stack.att import ATTLayer
 from whad.ble.stack.gatt import GattLayer
 
-# Remove ATT and GATT layer to avoid them being instantiated
-# when L2CAPLayer is instantiated.
-L2CAPLayer.remove(ATTLayer)
-L2CAPLayer.remove(GattLayer)
-
 
 @alias('ll')
 class LinkLayerMock(Sandbox):
 
     def __init__(self, parent=None, layer_name=None, options={}):
         super().__init__(parent=parent, layer_name=layer_name, options=options)
-        
+
         # Instantiate a L2CAP layer and configure target
         self.__l2cap = self.instantiate(L2CAPLayer)
         self.target = self.__l2cap.name
@@ -36,7 +31,7 @@ class LinkLayerMock(Sandbox):
     def l2cap(self):
         return self.__l2cap
 LinkLayerMock.add(L2CAPLayer)
-    
+
 class L2CAPTest(object):
 
     @pytest.fixture
@@ -45,16 +40,27 @@ class L2CAPTest(object):
 
 class TestL2CAPLayer(L2CAPTest):
 
+    @classmethod
+    def setup_class(cls):
+        # Remove ATT and GATT layer to avoid them being instantiated
+        # when L2CAPLayer is instantiated.
+        L2CAPLayer.remove(ATTLayer)
+
+    @classmethod
+    def teardown_class(cls):
+        """Restore L2CAPLayer configuration."""
+        L2CAPLayer.add(ATTLayer)
+
     def test_non_fragmented_data(self, ll_instance):
         # Send an encapsulated L2CAP packet
         packet = L2CAP_Hdr() / ATT_Hdr() / b'Payload'
-        
+
         # We need to serialize/deserialize to force scapy to fill all the fields
         expected_result = ATT_Hdr(bytes(packet[ATT_Hdr]))
 
         # Send packet
         ll_instance.send(ll_instance.target, bytes(packet), fragment=False)
-        
+
         # Check L2CAP sent data to ATT
         assert ll_instance.expect(LayerMessage(
             ll_instance.target,
