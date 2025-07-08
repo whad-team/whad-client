@@ -12,13 +12,13 @@ GATT server profile:
   - TX characteristic (6d02b601-1b51-4ef9-b753-1399e05debfd): writecmd
   - RX characteristic (6d02b602-1b51-4ef9-b753-1399e05debfd): read/notify permissions
 """
-from typing import Optional
+from typing import Optional, List
 from struct import pack
 
 from scapy.packet import Packet
-from scapy.layers.bluetooth import ATT_Error_Response
+from scapy.layers.bluetooth import ATT_Hdr, ATT_Error_Response
 
-from whad.hub.ble import UUID
+from whad.ble.profile.attribute import UUID
 
 from .attribute import Attribute, PrimaryService, Characteristic, CharacteristicValue, \
     ClientCharacteristicConfigurationDescriptor
@@ -84,7 +84,7 @@ class GattServer:
         """Server Attributes."""
         return self.__attributes
 
-    def process_request(self, request) -> Optional[Packet]:
+    def on_pdu(self, request: Packet) -> List[Packet]:
         """Process incoming request."""
         # Find a suitable procedure if none in progress
         if self.__cur_procedure is None:
@@ -101,5 +101,5 @@ class GattServer:
             return resp
         else:
             # Return an unlikely error
-            return ATT_Error_Response(request.opcode, request.gatt_handle, 0x0E)
+            return ATT_Hdr()/ATT_Error_Response(request.opcode, request.gatt_handle, 0x0E)
 

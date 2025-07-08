@@ -7,16 +7,19 @@ emulating a set of devices with associated GATT servers.
 import logging
 from time import time
 from random import randint, choice
+from queue import Queue, Empty
+from typing import Union, Optional
 
-from typing import List
-
+from whad.exceptions import WhadDeviceDisconnected, WhadDeviceNotReady
 from whad.hub import ProtocolHub
 from whad.device.mock import MockDevice
+
 from whad.hub.generic.cmdresult import Success, WrongMode, Error
+from whad.hub.message import HubMessage
 from whad.hub.ble.mode import CentralMode, BleStart, BleStop
-from whad.hub.ble.pdu import SendBlePdu
+from whad.hub.ble.pdu import BlePduReceived, SendBlePdu
 from whad.hub.ble.connect import ConnectTo, Connected
-from whad.hub.ble import BDAddress, Commands
+from whad.hub.ble import BDAddress, Commands, Direction
 from whad.hub.discovery import Capability, Domain, DeviceType
 
 from .device import EmulatedDevice
@@ -30,10 +33,18 @@ class CentralMock(MockDevice):
     hardware interface.
     """
 
-    def __init__(self, devices: List[EmulatedDevice] = None, nowait: bool = False,
-                 address: BDAddress = None):
+    def __init__(self, devices: Optional[list[EmulatedDevice]] = None, nowait: bool = False,
+                 address: Optional[BDAddress] = None):
         """Initialize a mock BLE hardware interface that only allow device
         scanning / advertisement sniffing.
+
+        :param devices: List of devices to emulate.
+        :type devices: list[EmulatedDevice], optional
+        :param nowait: Set to `True` to disable latency emulation
+        :type nowait: bool, optional
+        :param address: Bluetooth Device address associated with the emulated Central device. Default to 'aa:bb:cc:dd:ee:ff'
+                        if not specified.
+        :type address: whad.hub.ble.address.BDAddress, optional
         """
         if devices is None:
             logger.warning("No devices passed to scanner")
@@ -52,8 +63,13 @@ class CentralMock(MockDevice):
         self.__conn_evt_ts = 0
 
         # Connections
+        self.__target = None
+        self.__conn_handle = -1
         self.__handles = [1, 17, 22, 34, 56]
         self.__connections = {}
+
+        # Pending messages
+        self.__messages = Queue()
 
         # Initialize our mock
         super().__init__(
@@ -90,29 +106,30 @@ class CentralMock(MockDevice):
             )
         }
 
-    def on_interface_message_(self):
+    def on_interface_message(self):
         """Handle pending connection events.
         """
         # Handle pending connection event
-        if self.__conn_evt is not None and self.__conn_evt_ts < time():
+        if self.__conn_evt is not None and self.__conn_evt_ts < time() and self.__target is not None:
             if self.__running:
                 # Save connection event in connections
                 self.__connections[self.__conn_evt.conn_handle] = self.__target
 
                 # Set target device as connected
-                self.__target.set_connected(self.__conn_evt.conn_handle)
+                self.__target.set_connected(self.__conn_handle)
 
                 # Send notification
                 self.put_message(self.__conn_evt)
                 self.__conn_evt = None
                 self.__conn_evt_ts = 0
+                self.__conn_handle = -1
+                self.__target = None
 
-        # For each connection, query the corresponding device stack to check if
-        # some messages need to be sent to the connector.
-        for _, device in self.__connections.items():
-            pdu_messages = device.get_pending_pdus()
-            for pdu in pdu_messages:
-                self.put_message(pdu)
+        try:
+            msg = self.__messages.get(timeout=.5)
+            return msg
+        except Empty:
+            return None
 
     @MockDevice.route(CentralMode)
     def on_central_mode(self, _: CentralMode):
@@ -172,7 +189,7 @@ class CentralMock(MockDevice):
         # Device found ? "Connect" to this device and send a notification.
         if target is not None:
             connection_evt = Connected(
-                access_addres=0,
+                access_address=0,
                 initiator=self.__address.value,
                 advertiser=target.address.value,
                 conn_handle=conn_handle,
@@ -191,6 +208,8 @@ class CentralMock(MockDevice):
                 return [Success(), connection_evt]
             else:
                 # Will generate a connection event later
+                self.__target = target
+                self.__conn_handle = conn_handle
                 self.__conn_evt = connection_evt
                 self.__conn_evt_ts = time()+randint(5, 20)/10.0
                 return Success()
@@ -201,13 +220,35 @@ class CentralMock(MockDevice):
         return Success()
 
     @MockDevice.route(SendBlePdu)
-    def on_send_pdu(self, send_pdu: SendBlePdu):
+    def on_send_pdu(self, send_pdu: SendBlePdu) -> Union[HubMessage, list[HubMessage]]:
         """Handle SendPdu command from connector.
 
         This callback forwards the given PDU to an existing connection.
         """
         if send_pdu.conn_handle in self.__connections:
-            self.__connections[send_pdu.conn_handle].on_pdu(send_pdu.pdu)
-            return Success()
+            try:
+                # Convert message to BLE_DATA object and send to our emulated device.
+                answers = self.__connections[send_pdu.conn_handle].on_pdu(
+                    send_pdu.to_packet()
+                )
+
+                result: list[HubMessage] = [Success()]
+
+                # Convert response PDUs into BlePduReceived messages and add them
+                # to the messages sent back to the connector
+                for answer in answers:
+                    result.append(BlePduReceived(
+                        conn_handle=send_pdu.conn_handle,
+                        direction=Direction.SLAVE_TO_MASTER,
+                        pdu=bytes(answer),
+                        processed=False,
+                        decrypted=False
+                    ))
+
+                # Send messages to connector
+                return result
+            except (WhadDeviceDisconnected, WhadDeviceNotReady):
+                return Error()
         else:
             return Error()
+

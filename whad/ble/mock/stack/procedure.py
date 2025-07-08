@@ -1,5 +1,8 @@
 """Bluetooth Low Energy GATT procedure"""
-from .att import Error
+import logging
+from scapy.packet import Packet
+
+logger = logging.getLogger(__name__)
 
 class Procedure:
     """Generic procedure state machine."""
@@ -23,7 +26,13 @@ class Procedure:
     @classmethod
     def trigger(cls, request) -> bool:
         """Trigger or not the procedure."""
+        logger.warning("[ble::stack::mock::Procedure] trigger method must be overriden")
+        logger.debug("[ble::stack::mock::Procedure] trigger() called with packet %s", bytes(request).hex())
         return False
+
+    @property
+    def attributes(self):
+        return self.__attributes
 
     def set_state(self, state: int):
         """Set procedure state."""
@@ -37,7 +46,7 @@ class Procedure:
         """Determine if procedure is done."""
         return self.__state == Procedure.STATE_DONE
 
-    def process_request(self, request):
+    def process_request(self, request: Packet) -> list[Packet]:
         """Process an ATT request."""
-        raise "MustImplement"
+        raise Exception(request)
 
