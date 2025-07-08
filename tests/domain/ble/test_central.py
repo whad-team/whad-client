@@ -41,13 +41,11 @@ def test_central_send_pdu(central_mock):
     """Connect to a device and send a PDU.
     """
     # Connect to emulate device
-    print("Connect to device...")
     central = Central(central_mock)
     target = central.connect("00:11:22:33:44:55")
-    print("Connected !")
     assert target is not None
     assert target.conn_handle != 0
 
     # Send PDU
-    target.read(1)
-    assert True
+    value = target.read(2)
+    assert value == b"EmulatedDevice"
