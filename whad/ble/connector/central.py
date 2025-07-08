@@ -43,13 +43,13 @@ class CentralConnected(CentralEvent):
         """Connection handle
         """
         return self.__handle
-    
+
     @property
     def local_peer(self) -> BDAddress:
         """Central BD address
         """
         return self.__local
-    
+
     @property
     def remote_peer(self) -> BDAddress:
         """Remote device BD address
@@ -135,7 +135,7 @@ class Central(BLE):
             self.__gatt_layer = gatt_layer
         if phy_layer is not None:
             self.__phy_layer = phy_layer
-            
+
             # Configure BLE stack to use our PHY class
             self.__stack = phy_layer(self)
 
@@ -260,7 +260,7 @@ class Central(BLE):
             self.__connected_evt.wait(timeout=timeout)
             if self.__peripheral is None:
                 raise PeripheralNotFound()
-            
+
             # Return peripheral
             return self.peripheral()
 
@@ -326,14 +326,12 @@ class Central(BLE):
             connection_data.advertiser,
             connection_data.adv_addr_type
         )
-
         self.__stack.on_connection(
             connection_data.conn_handle,
             self.__local,
             self.__target
         )
         self.__conn_handle = connection_data.conn_handle
-        
         # Notify event handlers
         self.notify(CentralConnected(
             connection_data.conn_handle, self.__local,self.__target)
