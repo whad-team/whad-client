@@ -17,7 +17,7 @@ import contextlib
 from time import time
 from queue import Queue, Empty
 from threading import Thread, Lock, Event as ThreadEvent
-from typing import Generator, Callable, Union, List
+from typing import Generator, Callable, Union, List, Optional
 
 from scapy.packet import Packet
 
@@ -100,7 +100,7 @@ class Connector:
     SYNC_MODE_PKT = 1
     SYNC_MODE_ALL = 2
 
-    def __init__(self, device: Device =None):
+    def __init__(self, device: Optional[Device] = None):
         """
         Constructor.
 
@@ -534,8 +534,8 @@ class Connector:
         provided filter. A timeout can be specified and will cause this method to return
         None if this timeout is reached.
         """
-        return self.__device.wait_for_message(timeout=timeout, keep=keep,
-                                              command=command)
+        if self.__device is not None:
+            return self.__device.wait_for_message(keep=keep, timeout=timeout, command=command)
 
     # Message callbacks
     def on_any_msg(self, message): # pylint: disable=W0613
@@ -657,7 +657,7 @@ class Connector:
                 listener(event)
 
     @contextlib.contextmanager
-    def get_event(self, timeout: float = None) -> Generator[DeviceEvt, None, None]:
+    def get_event(self, timeout: Optional[float] = None) -> Generator[DeviceEvt, None, None]:
         """Retrieve event from connector's event queue.
 
         :param timeout: Timeout in seconds

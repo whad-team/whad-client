@@ -5,11 +5,12 @@ messages parsing.
 """
 from .exceptions import UnsupportedVersionException
 
-class Registry(object):
+class Registry:
     """Protocol message versions registry.
     """
 
     VERSIONS = {}
+    NAME = None
 
     @classmethod
     def add_node_version(parent_class, version: int, name: str, clazz):

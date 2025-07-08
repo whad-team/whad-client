@@ -8,6 +8,8 @@ import logging
 from threading import Thread, Event
 from queue import Empty
 
+from typing import Optional
+
 from whad.hub import ProtocolHub
 from whad.hub.message import HubMessage
 from whad.hub.discovery import DeviceType
@@ -22,7 +24,7 @@ class MockInThread(Thread):
     hardware interface.
     """
 
-    def __init__(self, device = None):
+    def __init__(self, device: Device):
         super().__init__()
         self.daemon = True
         self.__iface = device
@@ -37,32 +39,37 @@ class MockInThread(Thread):
         """Out thread main task.
         """
         while not self.__canceled:
-            # Read data from device (may block)
+            # Wait for a message to send to interface (blocking)
+            logger.debug("[%s][in_thread] waiting for message to send", self.__iface.interface)
             try:
-                # Wait for a message to send to interface (blocking)
-                logger.debug("[%s][in_thread] waiting for message to send", self.__iface.interface)
                 with self.__iface.get_pending_message(timeout=1.0) as message:
-                    logger.debug("[%s][in_thread] sending message %s",
-                                 self.__iface.interface, message)
+                    # Read data from device (may block)
+                    try:
+                        logger.debug("[%s][in_thread] sending message %s",
+                                     self.__iface.interface, message)
 
-                    # Notify the device that we received a specific message from
-                    # our connector:
-                    self.__iface.on_connector_message(message)
+                        # Notify the device that we received a specific message from
+                        # our connector:
+                        self.__iface.on_connector_message(message)
 
-                    # Notify message has correctly been sent, from a dedicated
-                    # thread.
-                    if message.has_callback():
-                        Thread(target=message.sent).start()
+                        # Notify message has correctly been sent, from a dedicated
+                        # thread.
+                        if message.has_callback():
+                            Thread(target=message.sent).start()
+                    except WhadDeviceNotReady:
+                        if message.has_callback():
+                            Thread(target=message.error, args=[1]).start()
+
+                        # Exit processing loop
+                        return
+                    except WhadDeviceDisconnected:
+                        if message.has_callback():
+                            Thread(target=message.error, args=[2]).start()
+
+                        # Exit processing loop
+                        return
             except Empty:
                 pass
-            except WhadDeviceNotReady:
-                if message.has_callback():
-                    Thread(target=message.error, args=[1]).start()
-                break
-            except WhadDeviceDisconnected:
-                if message.has_callback():
-                    Thread(target=message.error, args=[2]).start()
-                break
 
 class MockOutThread(Thread):
     """Internal thread processing data sent by the hardware interface
@@ -293,7 +300,7 @@ class MockDevice(Device):
 
 
 
-    def on_interface_message(self) -> HubMessage:
+    def on_interface_message(self) -> Optional[HubMessage]:
         """Called to check if the hardware interface needs to report something.
         This callback is mostly blocking by default, most of the processing
         using directly the device's `put_message` method to enqueue a message
