@@ -3,7 +3,7 @@
 import struct
 import logging
 
-from typing import Any, Callable
+from typing import Any, Callable, Type
 from abc import abstractmethod
 
 from scapy.packet import Packet
@@ -152,7 +152,7 @@ class HubMessage(object):
             self.__msg = Message()
         else:
             self.__msg = message
-        
+
         # Optional callback method to call when message has been sent
         self.__callback = None
 
@@ -246,7 +246,7 @@ class pb_bind(object):
     """Decorator to add a versioned subclass to a registry.
     """
 
-    def __init__(self, registry: Registry, name: str, version: int):
+    def __init__(self, registry: Type[Registry], name: str, version: int):
         self.__registry = registry
         self.__name = name
         self.__version = version
