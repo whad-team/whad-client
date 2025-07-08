@@ -1,7 +1,9 @@
 """
 Bluetooth Low Energy Tiny Stack - Attributes
 """
-from whad.hub.ble import UUID
+from struct import pack
+
+from whad.ble.profile.attribute import UUID
 
 class Attribute:
     """Default attribute"""
@@ -27,7 +29,7 @@ class Attribute:
         """Attribute value"""
         return self.__value
 
-    @property.setter
+    @value.setter
     def value(self, new_value: bytes):
         """Update attribute value"""
         self.__value = new_value
@@ -58,7 +60,7 @@ class IncludeService(Attribute):
     def __init__(self, handle: int, service_handle: int, end_handle: int, uuid: UUID):
         """Initialize included service."""
         service_value = pack("<HH", service_handle, end_handle)
-        if uuid.type == UUID.TYPE_16
+        if uuid.type == UUID.TYPE_16:
             service_value += uuid.packed
         super().__init__(handle, UUID(0x2802), service_value)
 
