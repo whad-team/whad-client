@@ -5,10 +5,14 @@ from queue import Queue, Empty
 from typing import List, Optional
 
 from scapy.packet import Packet
+from scapy.layers.bluetooth import L2CAP_Hdr
 from scapy.layers.bluetooth4LE import BTLE_DATA
 
 from whad.hub.ble import BDAddress, AddressType
-from whad.hub.ble.pdu import AdvType
+from whad.hub.ble.pdu import BlePduReceived
+from whad.hub.ble.pdu import AdvType, Direction
+
+from .stack.l2cap import Llcap
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +54,9 @@ class EmulatedDevice:
         # Set default state as advertising
         self.__state = EmulatedDevice.STATE_ADVERTISING
 
+        # L2CAP layer
+        self.__l2cap = None
+
     ##
     # Device address getters
     ##
@@ -74,10 +81,14 @@ class EmulatedDevice:
         self.__handle = conn_handle
         self.__state = EmulatedDevice.STATE_CONNECTED
 
+        # Create an instance of L2CAP
+        self.__l2cap = Llcap(self.__handle)
+
     def set_disconnected(self):
         """Switch back to advertising mode.
         """
         self.__handle = None
+        self.__l2cap = None
         self.__state = EmulatedDevice.STATE_ADVERTISING
 
     def set_advertising(self):
@@ -95,7 +106,7 @@ class EmulatedDevice:
         return self.__adv_data
 
     @property
-    def scan_data(self) -> bytes:
+    def scan_data(self) -> Optional[bytes]:
         """Scan response data"""
         return self.__scan_data
 
@@ -105,7 +116,7 @@ class EmulatedDevice:
         if self.__next_adv_type == "adv":
             self.__next_adv_type = "scan"
             return (AdvType.ADV_IND, self.__adv_data)
-        elif self.__next_adv_type == "scan":
+        elif self.__next_adv_type == "scan" and self.__scan_data is not None:
             self.__next_adv_type = "adv"
             return (AdvType.ADV_SCAN_RSP, self.__scan_data)
 
@@ -113,24 +124,14 @@ class EmulatedDevice:
     # Connected mode
     ##
 
-    def on_pdu(self, pdu: bytes):
+    def on_pdu(self, packet: Packet) -> list[Packet]:
         """Process incoming PDU.
         """
-        # Convert bytes back to packet
-        print("[central_mock] received PDU %s" % pdu.hex())
-        packet = BTLE_DATA(pdu)
-        packet.show()
+        if self.__state == EmulatedDevice.STATE_CONNECTED:
+            # Forward L2CAP data to device stack
+            if self.__l2cap is not None:
+                return self.__l2cap.on_pdu(packet[L2CAP_Hdr], fragment=packet.LLID == 0x01)
 
-        # Forward packet to device stack
+        # Nothing to do
+        return []
 
-    def get_pending_pdus(self) -> List[bytes]:
-        """Pending PDUs
-        """
-        try:
-            pdu = self.__tx_pdus.get(timeout=0.5)
-            if pdu is not None:
-                return [pdu]
-            else:
-                return []
-        except Empty:
-            return []
