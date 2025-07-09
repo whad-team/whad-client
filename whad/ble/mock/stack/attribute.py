@@ -1,6 +1,7 @@
 """
 Bluetooth Low Energy Tiny Stack - Attributes
 """
+from re import I
 from struct import pack
 from typing import Optional
 
@@ -9,12 +10,16 @@ from whad.ble.profile.attribute import UUID
 class Attribute:
     """Default attribute"""
 
-    def __init__(self, handle: int, uuid: UUID, value: bytes, end_handle : Optional[int] = None):
+    def __init__(self, handle: int, uuid: UUID, value: bytes, end_handle : Optional[int] = None,
+                 read: bool = True, write: bool = False
+                ):
         """Attribute initialization."""
         self.__handle = handle
         self.__end_handle = end_handle or handle
         self.__uuid = uuid
         self.__value = value
+        self.__read = read
+        self.__write = write
 
     @property
     def handle(self) -> int:
@@ -35,11 +40,18 @@ class Attribute:
     def value(self) -> bytes:
         """Attribute value"""
         return self.__value
-
     @value.setter
     def value(self, new_value: bytes):
         """Update attribute value"""
         self.__value = new_value
+
+    def readable(self) -> bool:
+        """Check if attribute has the read permission."""
+        return self.__read
+
+    def writeable(self) -> bool:
+        """Check if attribute can be written."""
+        return self.__write
 
     def pack(self) -> bytes:
         return pack("<H", self.handle) + self.value
@@ -95,14 +107,17 @@ class CharacteristicValue(Attribute):
 
     def __init__(self, handle: int, uuid: UUID, value: bytes):
         """Characteristic value initialization."""
-        super().__init__(handle, uuid, value)
+        # Use `write=True` because characteristic value can be written.
+        super().__init__(handle, uuid, value, write=True)
 
 class ClientCharacteristicConfigurationDescriptor(Attribute):
     """GATT CCCD attribute."""
 
     def __init__(self, handle: int):
         """Initialize a CCCD. """
-        super().__init__(handle, UUID(0x2902), pack("<H", 0))
+        # Descriptor value can be modified.
+        super().__init__(handle, UUID(0x2902), pack("<H", 0),
+                         write=True)
 
 
 def find_attr_by_handle(attributes: list, handle: int) -> Attribute:
