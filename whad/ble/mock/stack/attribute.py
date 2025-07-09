@@ -97,17 +97,24 @@ class Characteristic(Attribute):
 
     def __init__(self, handle: int, uuid: UUID, value_handle: int, properties: int):
         """Characteristic initizalization."""
+        self.properties = properties
         charac_def = pack("<BH", properties, value_handle) + uuid.packed
         super().__init__(handle, UUID(0x2803), charac_def)
-
 
 class CharacteristicValue(Attribute):
     """GATT Characteristic value."""
 
-    def __init__(self, handle: int, uuid: UUID, value: bytes):
+    def __init__(self, handle: int, uuid: UUID, value: bytes, write: bool = True, read: bool = True, 
+                 write_without_resp: bool = False):
         """Characteristic value initialization."""
+        self.__without_resp = write_without_resp
         # Use `write=True` because characteristic value can be written.
-        super().__init__(handle, uuid, value, write=True)
+        super().__init__(handle, uuid, value, read=read, write=write or write_without_resp)
+
+    def writeable_without_resp(self) -> bool:
+        """Determine if the caracteristic is writeable through a WriteCommand."""
+        return self.__without_resp
+
 
 class ClientCharacteristicConfigurationDescriptor(Attribute):
     """GATT CCCD attribute."""
