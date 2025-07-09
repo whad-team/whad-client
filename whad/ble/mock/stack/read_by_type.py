@@ -5,45 +5,69 @@ The ReadByType procedure is initiated by a ReadByType request, and
 based on the required attribute start/end and type returns a
 ReadByType response or an error.
 """
-
 from struct import pack
 
 from scapy.packet import Packet
-from scapy.layers.bluetooth import ATT_Read_By_Type_Request, ATT_Error_Response,\
-    ATT_Read_By_Type_Response, ATT_Hdr
+from scapy.layers.bluetooth import ATT_Read_By_Type_Request, ATT_Read_By_Type_Response
 
 from whad.ble.profile.attribute import UUID
 
 from .attribute import find_attr_by_type
-from .procedure import Procedure
+from .procedure import Procedure, UnexpectedProcError
 
 class ReadByTypeProcedure(Procedure):
     """ATT ReadByType procedure."""
 
+    OPCODE = 0x08
+
     def __init__(self, attributes: list, mtu: int):
-        """Initialize our ReadByType procedure."""
+        """Initialize our ReadByType procedure.
+
+        :param attributes: List of GATT attributes
+        :type attributes: list
+        :param mtu: ATT MTU
+        :type mtu: int
+        """
         super().__init__(attributes, mtu)
 
     @classmethod
-    def trigger(cls, request) -> bool:
-        """Determine if the procedure should be triggered."""
+    def trigger(cls, request: Packet) -> bool:
+        """Determine if the procedure should be triggered.
+
+        :param request: Packet to check
+        :type request: scapy.packet.Packet
+        :rtype: bool
+        :return: `True` if this procedure must be triggered, `False` otherwise.
+        """
         return ATT_Read_By_Type_Request in request
 
     def process_request(self, request: Packet) -> list[Packet]:
-        """React only on a ReadByType request."""
-        request = request.getlayer(ATT_Read_By_Type_Request)
+        """React only on a ReadByType request.
+
+        :param request: Request packet to process
+        :type request: scapy.packet.Packet
+        :rtype: scapy.packet.Packet, list
+        :return: a single packet or a list of packets
+        """
+        if ATT_Read_By_Type_Request not in request:
+            self.set_state(Procedure.STATE_ERROR)
+            raise UnexpectedProcError()
+
+        # Extract ReadByType request
+        request = request[ATT_Read_By_Type_Request]
 
         try:
             if request.start > request.end:
                 self.set_state(Procedure.STATE_DONE)
-                return [ATT_Hdr()/ATT_Error_Response(request=0x08,handle=request.handle,ecode=0x01)]
+                return self.att_error_response(request.handle, Procedure.ERR_INVALID_HANDLE)
 
             # List attributes by type
-            attrs = find_attr_by_type(self.attributes, UUID(request.uuid), start_handle=request.start, end_handle=request.end)
+            attrs = find_attr_by_type(self.attributes, UUID(request.uuid),
+                                      start_handle=request.start, end_handle=request.end)
 
             if len(attrs) == 0:
                 self.set_state(Procedure.STATE_DONE)
-                return [ATT_Hdr()/ATT_Error_Response(request=0x08, handle=request.start, ecode=0x0A)]
+                return self.att_error_response(request.start, Procedure.ERR_ATTR_NOT_FOUND)
 
             # Build response value
             resp = b""
@@ -65,21 +89,14 @@ class ReadByTypeProcedure(Procedure):
                 else:
                     break
 
-            # Return attribute list
-            result = ATT_Read_By_Type_Response(
-                    len=attr_data_size,
-                    handles=resp
-                )
-
             # Mark procedure as done
             self.set_state(Procedure.STATE_DONE)
-            return [ATT_Hdr()/result]
+
+            # Return attribute list
+            return [ ATT_Read_By_Type_Response(len=attr_data_size, handles=resp) ]
+
 
         except IndexError:
-            return [
-                ATT_Hdr()/ATT_Error_Response(
-                    request=0x08,
-                    handle=request.start,
-                    ecode=0x01
-                )
-            ]
+            # Attribute cannot be found
+            self.set_state(Procedure.STATE_DONE)
+            return self.att_error_response(request.start, Procedure.ERR_ATTR_NOT_FOUND)

@@ -1,7 +1,6 @@
 """
 Bluetooth Low Energy Tiny Stack - Attributes
 """
-from re import I
 from struct import pack
 from typing import Optional
 

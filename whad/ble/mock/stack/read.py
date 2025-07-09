@@ -4,17 +4,17 @@
 The Read procedure is initiated by a Read request, and based on the required
 attribute handle returns the attribute value (success) or an error (failure).
 """
-from typing import List
-
 from scapy.packet import Packet
-from scapy.layers.bluetooth import ATT_Hdr, ATT_Read_Request, ATT_Read_Response,\
-    ATT_Error_Response
+from scapy.layers.bluetooth import ATT_Read_Request, ATT_Read_Response
 
 from .attribute import find_attr_by_handle
-from .procedure import Procedure
+from .procedure import Procedure, UnexpectedProcError
 
 class ReadProcedure(Procedure):
     """ATT Read procedure."""
+
+    # Read operation code
+    OPCODE = 0x0A
 
     def __init__(self, attributes: list, mtu: int):
         """Initialize our Read procedure."""
@@ -25,12 +25,13 @@ class ReadProcedure(Procedure):
         """Determine if the procedure is triggered."""
         return ATT_Read_Request in request
 
-    def process_request(self, request) -> List[Packet]:
+    def process_request(self, request) -> list[Packet]:
         """React only on ReadRequest."""
 
+        # Sanity check
         if ATT_Read_Request not in request:
             self.set_state(Procedure.STATE_ERROR)
-            return []
+            raise UnexpectedProcError()
 
         # Extract Read request
         request = request[ATT_Read_Request]
@@ -45,14 +46,12 @@ class ReadProcedure(Procedure):
                 # Attribute is found, return a ReadResponse and mark procedure
                 # as done.
                 self.set_state(Procedure.STATE_DONE)
-                return [ATT_Hdr()/ATT_Read_Response(value=attrib.value[:self.mtu])]
+                return [ ATT_Read_Response(value=attrib.value[:self.mtu]) ]
             else:
                 # Read not allowed
                 self.set_state(Procedure.STATE_DONE)
-                return [ATT_Hdr()/ATT_Error_Response(
-                    request=0x0A, handle=request.gatt_handle, ecode=0x02
-                )]
+                return self.att_error_response(request.gatt_handle, Procedure.ERR_READ_NOT_PERMITTED)
         except IndexError:
             self.set_state(Procedure.STATE_DONE)
-            return [ATT_Hdr()/ATT_Error_Response(request=0x0A, handle=request.gatt_handle, ecode=0x0A)]
+            return self.att_error_response(request.gatt_handle, Procedure.ERR_ATTR_NOT_FOUND)
 
