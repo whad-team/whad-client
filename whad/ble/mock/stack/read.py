@@ -7,7 +7,8 @@ attribute handle returns the attribute value (success) or an error (failure).
 from typing import List
 
 from scapy.packet import Packet
-from scapy.layers.bluetooth import ATT_Hdr, ATT_Read_Request, ATT_Read_Response
+from scapy.layers.bluetooth import ATT_Hdr, ATT_Read_Request, ATT_Read_Response,\
+    ATT_Error_Response
 
 from .attribute import find_attr_by_handle
 from .procedure import Procedure
@@ -15,12 +16,12 @@ from .procedure import Procedure
 class ReadProcedure(Procedure):
     """ATT Read procedure."""
 
-    def __init__(self, attributes: list):
+    def __init__(self, attributes: list, mtu: int):
         """Initialize our Read procedure."""
-        super().__init__(attributes)
+        super().__init__(attributes, mtu)
 
     @classmethod
-    def trigger(cls, request):
+    def trigger(cls, request) -> bool:
         """Determine if the procedure is triggered."""
         return ATT_Read_Request in request
 
@@ -34,10 +35,10 @@ class ReadProcedure(Procedure):
             attrib = find_attr_by_handle(self.attributes, request.gatt_handle)
 
             # Attribute is found, return a ReadResponse and mark procedure
-            # as done
+            # as done.
             self.set_state(Procedure.STATE_DONE)
-            return [ATT_Hdr()/ATT_Read_Response(attrib.value)]
+            return [ATT_Hdr()/ATT_Read_Response(value=attrib.value[:self.mtu])]
         except IndexError:
             self.set_state(Procedure.STATE_DONE)
-            return [ATT_Hdr()/ATT_Error_Response(0x0A, request.handle, 0x01)]
+            return [ATT_Hdr()/ATT_Error_Response(request=0x0A, handle=request.gatt_handle, ecode=0x01)]
 
