@@ -28,6 +28,7 @@ from .read import ReadProcedure
 from .read_by_group_type import ReadByGroupTypeProcedure
 from .read_by_type import ReadByTypeProcedure
 from .find_info import FindInformationProcedure
+from .write import WriteProcedure
 
 class GattServer:
     """Tiny GATT server"""
@@ -85,6 +86,7 @@ class GattServer:
         # Register procedures
         self.__procedures = [
             ReadProcedure,
+            WriteProcedure,
             ReadByGroupTypeProcedure,
             ReadByTypeProcedure,
             FindInformationProcedure,

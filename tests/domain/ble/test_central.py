@@ -6,7 +6,7 @@ from whad.ble.mock import CentralMock, EmulatedDevice
 from whad.ble import BDAddress, Central
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile.device import PeripheralDevice
-from whad.ble.stack.att.exceptions import InvalidHandleValueError
+from whad.ble.stack.att.exceptions import AttributeNotFoundError, WriteNotPermittedError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 
 @pytest.fixture
@@ -62,9 +62,46 @@ def test_read_attribute_error(central_mock):
     assert target.conn_handle != 0
 
     # Read attribute with invalid handle, must raise InvalidHandleValueError.
-    with pytest.raises(InvalidHandleValueError):
+    with pytest.raises(AttributeNotFoundError):
         value = target.read(100)
         assert value == None
+
+def test_write_attribute(central_mock):
+    """Try to write to an attribute. """
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    # Read attribute with invalid handle, must raise InvalidHandleValueError.
+    target.write(3, b"Pwn3d")
+    assert target.read(3) == b"Pwn3d"
+    target.write(3, b"EmulatedDevice")
+
+def test_write_attribute_bad_perm(central_mock):
+    """Try to write to an attribute. """
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    # Write read-only attribute, must raise
+    with pytest.raises(WriteNotPermittedError):
+        target.write(2, b"Foobar")
+
+def test_write_attribute_invalid_handle(central_mock):
+    """Try to write to an attribute. """
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    # Write non-existing attribute, must raise InvalidHandleValueError.
+    with pytest.raises(AttributeNotFoundError):
+        target.write(100, b"Pwn3d")
 
 def test_discover(central_mock):
     """Try to read an attribute with an invalid handle."""
@@ -82,9 +119,10 @@ def test_discover(central_mock):
         assert target.get_service(UUID("6d02b600-1b51-4ef9-b753-1399e05debfd"))
         assert target.get_characteristic(UUID(0x1800), UUID(0x2a00)) is not None
         assert target.get_characteristic(UUID(0x180f), UUID(0x2a19)) is not None
-        assert target.get_characteristic(UUID("6d02b600-1b51-4ef9-b753-1399e05debfd"), 
+        assert target.get_characteristic(UUID("6d02b600-1b51-4ef9-b753-1399e05debfd"),
                                          UUID("6d02b601-1b51-4ef9-b753-1399e05debfd")) is not None
         assert target.get_characteristic(UUID("6d02b600-1b51-4ef9-b753-1399e05debfd"),
                                          UUID("6d02b602-1b51-4ef9-b753-1399e05debfd")) is not None
     except GattTimeoutException:
         assert False
+
