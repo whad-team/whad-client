@@ -12,11 +12,12 @@ GATT server profile:
   - TX characteristic (6d02b601-1b51-4ef9-b753-1399e05debfd): writecmd
   - RX characteristic (6d02b602-1b51-4ef9-b753-1399e05debfd): read/notify permissions
 """
-from typing import List
+import logging
+from typing import Union
 from struct import pack
 
 from scapy.packet import Packet
-from scapy.layers.bluetooth import ATT_Hdr, ATT_Error_Response
+from scapy.layers.bluetooth import ATT_Hdr
 
 from whad.ble.profile.attribute import UUID
 
@@ -24,11 +25,14 @@ from .attribute import Attribute, PrimaryService, Characteristic, Characteristic
     ClientCharacteristicConfigurationDescriptor
 
 # ATT Procedures
+from .procedure import UnexpectedProcError
 from .read import ReadProcedure
 from .read_by_group_type import ReadByGroupTypeProcedure
 from .read_by_type import ReadByTypeProcedure
 from .find_info import FindInformationProcedure
 from .write import WriteProcedure
+
+logger = logging.getLogger(__name__)
 
 class GattServer:
     """Tiny GATT server"""
@@ -97,7 +101,7 @@ class GattServer:
         """Server Attributes."""
         return self.__attributes
 
-    def on_pdu(self, request: Packet) -> List[Packet]:
+    def on_pdu(self, request: Packet) -> list[Packet]:
         """Process incoming request."""
         # Find a suitable procedure if none in progress
         if self.__cur_procedure is None:
@@ -106,13 +110,21 @@ class GattServer:
                 if proc.trigger(request):
                     self.__cur_procedure = proc(self.attributes, self.__mtu)
 
+        # If a suitable procedure has been found or is in progress, forward request.
         if self.__cur_procedure is not None:
             # Forward to current procedure
-            resp = self.__cur_procedure.process_request(request)
+            answers: list[Packet] = self.__cur_procedure.process_request(request)
+
+            # Unset current procedure if finished
             if self.__cur_procedure.done():
                 self.__cur_procedure = None
-            return resp
-        else:
-            # Return an unlikely error
-            return [ATT_Hdr()/ATT_Error_Response(opcode=request.opcode, handle=request.gatt_handle, ecode=0x0E)]
 
+            # Automatically add ATT_Hdr()
+            if isinstance(answers, list):
+                return [ ATT_Hdr()/ans for ans in answers ]
+            else:
+                # Should not happen so raise an exception
+                raise UnexpectedProcError()
+        else:
+            logger.warning("[ble::mock::stack::gatt_server] No procedure to handle packet ! (%s)", request)
+            return []

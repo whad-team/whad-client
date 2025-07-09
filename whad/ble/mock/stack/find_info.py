@@ -5,20 +5,20 @@ The ReadByType procedure is initiated by a ReadByType request, and
 based on the required attribute start/end and type returns a
 ReadByType response or an error.
 """
-
 from struct import pack
 
 from scapy.packet import Packet
-from scapy.layers.bluetooth import ATT_Find_Information_Request, ATT_Error_Response,\
-    ATT_Find_Information_Response, ATT_Hdr
+from scapy.layers.bluetooth import ATT_Find_Information_Request, ATT_Find_Information_Response
 
 from whad.ble.profile.attribute import UUID
 
 from .attribute import find_attr_by_range
-from .procedure import Procedure
+from .procedure import Procedure, UnexpectedProcError
 
 class FindInformationProcedure(Procedure):
     """ATT FindInformation procedure."""
+
+    OPCODE = 0x04
 
     def __init__(self, attributes: list, mtu: int):
         """Initialize our FindInformation procedure."""
@@ -31,13 +31,18 @@ class FindInformationProcedure(Procedure):
 
     def process_request(self, request: Packet) -> list[Packet]:
         """React only on a ReadByType request."""
-        request = request.getlayer(ATT_Find_Information_Request)
+        if ATT_Find_Information_Request not in request:
+            self.set_state(Procedure.STATE_ERROR)
+            raise UnexpectedProcError()
+
+        # Extract request
+        request = request[ATT_Find_Information_Request]
 
         # List attributes with handles between start and end handles
         attrs = find_attr_by_range(self.attributes, start_handle=request.start, end_handle=request.end)
         if len(attrs) == 0:
             self.set_state(Procedure.STATE_DONE)
-            return [ATT_Hdr()/ATT_Error_Response(request=0x04, handle=request.start,ecode=0x01)]
+            return self.att_error_response(request.start, Procedure.ERR_ATTR_NOT_FOUND)
 
         # Build response
         resp = b""
@@ -57,8 +62,9 @@ class FindInformationProcedure(Procedure):
         # Send response
         self.set_state(Procedure.STATE_DONE)
         return [
-            ATT_Hdr()/ATT_Find_Information_Response(
+            ATT_Find_Information_Response(
                 format=1 if attr_uuid_type == UUID.TYPE_16 else 2,
                 handles=resp
             )
         ]
+

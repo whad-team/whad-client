@@ -8,16 +8,18 @@ ReadByGroupType response or an error.
 from struct import pack
 
 from scapy.packet import Packet
-from scapy.layers.bluetooth import ATT_Read_By_Group_Type_Request, ATT_Error_Response,\
-    ATT_Read_By_Group_Type_Response, ATT_Hdr
+from scapy.layers.bluetooth import ATT_Read_By_Group_Type_Request, ATT_Read_By_Group_Type_Response
 
 from whad.ble.profile.attribute import UUID
 
 from .attribute import find_attr_by_type
-from .procedure import Procedure
+from .procedure import Procedure, UnexpectedProcError
 
 class ReadByGroupTypeProcedure(Procedure):
     """ATT ReadByGroupType procedure."""
+
+    # Procedure operation code
+    OPCODE = 0x10
 
     def __init__(self, attributes: list, mtu: int):
         """Initialize our ReadByGroupType procedure."""
@@ -33,7 +35,7 @@ class ReadByGroupTypeProcedure(Procedure):
         # We should not be called when request does not contain a ReadByGroupType request.
         if ATT_Read_By_Group_Type_Request not in request:
             self.set_state(Procedure.STATE_ERROR)
-            return []
+            raise UnexpectedProcError()
 
         # Extract ReadByGroupType request
         request = request[ATT_Read_By_Group_Type_Request]
@@ -42,7 +44,7 @@ class ReadByGroupTypeProcedure(Procedure):
             # Make sure start handle is valid
             if request.start > request.end:
                 self.set_state(Procedure.STATE_DONE)
-                return [ATT_Error_Response(request=0x10, handle=request.start, ecode=0x01)]
+                return self.att_error_response(handle=request.start, ecode=Procedure.ERR_INVALID_HANDLE)
 
             # List attributes corresponding to the provided group type, return an error
             # if no attribute is found.
@@ -50,7 +52,7 @@ class ReadByGroupTypeProcedure(Procedure):
                                       start_handle=request.start, end_handle=request.end)
             if len(attrs) == 0:
                 self.set_state(Procedure.STATE_DONE)
-                return [ATT_Hdr()/ATT_Error_Response(request=0x10, handle=request.start, ecode=0x0A)]
+                return self.att_error_response(request.start, Procedure.ERR_ATTR_NOT_FOUND)
 
             # Build response value
             resp = b""
@@ -72,19 +74,17 @@ class ReadByGroupTypeProcedure(Procedure):
                 else:
                     break
 
+            # Mark procedure as done
+            self.set_state(Procedure.STATE_DONE)
+
             # Return attribute list
-            result = ATT_Read_By_Group_Type_Response(
+            return [ ATT_Read_By_Group_Type_Response(
                     length=attr_data_size,
                     data=resp
                 )
-
-            # Mark procedure as done
-            self.set_state(Procedure.STATE_DONE)
-            return [ATT_Hdr()/result]
+            ]
 
         except IndexError:
             self.set_state(Procedure.STATE_DONE)
-            return [
-                ATT_Hdr()/ATT_Error_Response(request=0x10, handle=request.start, ecode=0x01)
-            ]
+            return self.att_error_response(request.start, Procedure.ERR_ATTR_NOT_FOUND)
 
