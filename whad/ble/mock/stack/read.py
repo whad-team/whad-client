@@ -27,18 +27,32 @@ class ReadProcedure(Procedure):
 
     def process_request(self, request) -> List[Packet]:
         """React only on ReadRequest."""
-        request = request.getlayer(ATT_Read_Request)
+
+        if ATT_Read_Request not in request:
+            self.set_state(Procedure.STATE_ERROR)
+            return []
+
+        # Extract Read request
+        request = request[ATT_Read_Request]
 
         # We have a read request, look for the requested attribute
         try:
             # Query attributes
             attrib = find_attr_by_handle(self.attributes, request.gatt_handle)
 
-            # Attribute is found, return a ReadResponse and mark procedure
-            # as done.
-            self.set_state(Procedure.STATE_DONE)
-            return [ATT_Hdr()/ATT_Read_Response(value=attrib.value[:self.mtu])]
+            # Make sure attribute can be read
+            if attrib.readable():
+                # Attribute is found, return a ReadResponse and mark procedure
+                # as done.
+                self.set_state(Procedure.STATE_DONE)
+                return [ATT_Hdr()/ATT_Read_Response(value=attrib.value[:self.mtu])]
+            else:
+                # Read not allowed
+                self.set_state(Procedure.STATE_DONE)
+                return [ATT_Hdr()/ATT_Error_Response(
+                    request=0x0A, handle=request.gatt_handle, ecode=0x02
+                )]
         except IndexError:
             self.set_state(Procedure.STATE_DONE)
-            return [ATT_Hdr()/ATT_Error_Response(request=0x0A, handle=request.gatt_handle, ecode=0x01)]
+            return [ATT_Hdr()/ATT_Error_Response(request=0x0A, handle=request.gatt_handle, ecode=0x0A)]
 
