@@ -30,7 +30,13 @@ class ReadByGroupTypeProcedure(Procedure):
 
     def process_request(self, request: Packet) -> list[Packet]:
         """React only on a ReadByGroupType request."""
-        request = request.getlayer(ATT_Read_By_Group_Type_Request)
+        # We should not be called when request does not contain a ReadByGroupType request.
+        if ATT_Read_By_Group_Type_Request not in request:
+            self.set_state(Procedure.STATE_ERROR)
+            return []
+
+        # Extract ReadByGroupType request
+        request = request[ATT_Read_By_Group_Type_Request]
 
         try:
             # Make sure start handle is valid
