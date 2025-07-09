@@ -6,7 +6,7 @@ from whad.ble.mock import CentralMock, EmulatedDevice
 from whad.ble import BDAddress, Central
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile.device import PeripheralDevice
-from whad.ble.stack.att.exceptions import AttributeNotFoundError, WriteNotPermittedError
+from whad.ble.stack.att.exceptions import AttributeNotFoundError, InvalidOffsetError, WriteNotPermittedError
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 
 @pytest.fixture
@@ -102,6 +102,41 @@ def test_write_attribute_invalid_handle(central_mock):
     # Write non-existing attribute, must raise InvalidHandleValueError.
     with pytest.raises(AttributeNotFoundError):
         target.write(100, b"Pwn3d")
+
+def test_write_command(central_mock):
+    """Write data into a write without response characteristic."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    # Write non-existing attribute, must raise InvalidHandleValueError.
+    target.write_command(10, b"P0wn3d")
+
+def test_read_blob(central_mock):
+    """Read data blob from characteristic."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    # Read DeviceName characteristic value starting at offset 1.
+    assert target.read(3, offset=1) == b"mulatedDevice"
+
+def test_read_blob_bad_offset(central_mock):
+    """Read data blob from characteristic."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    # Read DeviceName characteristic value starting at offset 24 (invalid),
+    # InvalidOffsetValueError is expected to be raised
+    with pytest.raises(InvalidOffsetError):
+        assert target.read(3, offset=24) == b"mulatedDevice"
 
 def test_discover(central_mock):
     """Try to read an attribute with an invalid handle."""
