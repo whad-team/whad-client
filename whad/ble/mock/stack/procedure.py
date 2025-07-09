@@ -2,6 +2,8 @@
 import logging
 from scapy.packet import Packet
 
+from .attribute import Attribute
+
 logger = logging.getLogger(__name__)
 
 class Procedure:
@@ -15,13 +17,16 @@ class Procedure:
     # User states
     STATE_USER = 3
 
-    def __init__(self, attributes: list):
+    def __init__(self, attributes: list, mtu: int):
         """Initialization."""
         # Initialize state to STATE_INITIAL
         self.__state = Procedure.STATE_INITIAL
 
         # Save attribute list
         self.__attributes = attributes
+
+        # Save ATT MTU
+        self.__mtu = mtu
 
     @classmethod
     def trigger(cls, request) -> bool:
@@ -31,8 +36,14 @@ class Procedure:
         return False
 
     @property
-    def attributes(self):
+    def attributes(self) -> list[Attribute]:
+        """GATT attributes dictionary."""
         return self.__attributes
+
+    @property
+    def mtu(self) -> int:
+        """ATT MTU."""
+        return self.__mtu
 
     def set_state(self, state: int):
         """Set procedure state."""

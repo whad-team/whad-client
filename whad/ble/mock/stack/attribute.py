@@ -2,15 +2,17 @@
 Bluetooth Low Energy Tiny Stack - Attributes
 """
 from struct import pack
+from typing import Optional
 
 from whad.ble.profile.attribute import UUID
 
 class Attribute:
     """Default attribute"""
 
-    def __init__(self, handle: int, uuid: UUID, value: bytes):
+    def __init__(self, handle: int, uuid: UUID, value: bytes, end_handle : Optional[int] = None):
         """Attribute initialization."""
         self.__handle = handle
+        self.__end_handle = end_handle or handle
         self.__uuid = uuid
         self.__value = value
 
@@ -18,6 +20,11 @@ class Attribute:
     def handle(self) -> int:
         """Attribute handle"""
         return self.__handle
+
+    @property
+    def end_handle(self) -> int:
+        """Attribute end handle (grouping)."""
+        return self.__end_handle
 
     @property
     def uuid(self) -> UUID:
@@ -41,17 +48,17 @@ class Attribute:
 class PrimaryService(Attribute):
     """GATT Primary Service"""
 
-    def __init__(self, handle: int, uuid: UUID):
+    def __init__(self, handle: int, end_handle: int, uuid: UUID):
         """Initialize service."""
-        super().__init__(handle, UUID(0x2800), uuid.packed)
+        super().__init__(handle, UUID(0x2800), uuid.packed, end_handle=end_handle)
 
 
 class SecondaryService(Attribute):
     """GATT Secondary Service."""
 
-    def __init__(self, handle: int, uuid: UUID):
+    def __init__(self, handle: int, end_handle: int, uuid: UUID):
         """Initialize secondary service."""
-        super().__init__(handle, UUID(0x2801), uuid.packed)
+        super().__init__(handle, UUID(0x2801), uuid.packed, end_handle=end_handle)
 
 
 class IncludeService(Attribute):
@@ -62,7 +69,7 @@ class IncludeService(Attribute):
         service_value = pack("<HH", service_handle, end_handle)
         if uuid.type == UUID.TYPE_16:
             service_value += uuid.packed
-        super().__init__(handle, UUID(0x2802), service_value)
+        super().__init__(handle, UUID(0x2802), service_value, end_handle=end_handle)
 
 
 class Characteristic(Attribute):
@@ -104,3 +111,19 @@ def find_attr_by_handle(attributes: list, handle: int) -> Attribute:
         if attribute.handle == handle:
             return attribute
     raise IndexError()
+
+def find_attr_by_range(attributes: list, start_handle: int, end_handle: int) -> list[Attribute]:
+    attrs = []
+    for attribute in attributes:
+        if attribute.handle >= start_handle and attribute.handle <= end_handle:
+            attrs.append(attribute)
+    return attrs
+
+def find_attr_by_type(attributes: list[Attribute], attr_type: UUID, start_handle: int = 0, end_handle: int = 0xFFFF) -> list[Attribute]:
+    """Find attribute from list by attribute type."""
+    attrs = []
+    for attribute in attributes:
+        if attribute.handle >= start_handle and attribute.handle <= end_handle:
+            if attribute.uuid == attr_type:
+                attrs.append(attribute)
+    return attrs
