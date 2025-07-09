@@ -1,5 +1,6 @@
 """BLE Attribute
 """
+from typing import Optional
 from struct import pack, unpack
 
 from whad.ble.exceptions import InvalidHandleValueException, InvalidUUIDException
@@ -516,7 +517,7 @@ class UUID:
     TYPE_128 = 2
 
     uuid = None
-    packed = None
+    packed: Optional[bytes] = None
     type = None
 
     def __init__(self, uuid):
