@@ -12,7 +12,7 @@ GATT server profile:
   - TX characteristic (6d02b601-1b51-4ef9-b753-1399e05debfd): writecmd
   - RX characteristic (6d02b602-1b51-4ef9-b753-1399e05debfd): read/notify permissions
 """
-from typing import Optional, List
+from typing import List
 from struct import pack
 
 from scapy.packet import Packet
@@ -22,7 +22,12 @@ from whad.ble.profile.attribute import UUID
 
 from .attribute import Attribute, PrimaryService, Characteristic, CharacteristicValue, \
     ClientCharacteristicConfigurationDescriptor
+
+# ATT Procedures
 from .read import ReadProcedure
+from .read_by_group_type import ReadByGroupTypeProcedure
+from .read_by_type import ReadByTypeProcedure
+from .find_info import FindInformationProcedure
 
 class GattServer:
     """Tiny GATT server"""
@@ -34,41 +39,44 @@ class GattServer:
         ###
 
         self.__attributes = [
-            # Primary Service, Generic Access Service (0x1800), handle 0-2
-            PrimaryService(0, UUID(0x1800)),
-            Characteristic(1, UUID(0x2A00), value_handle=2, properties=(
+            # Primary Service, Generic Access Service (0x1800), handle 1-3
+            PrimaryService(1, 3,UUID(0x1800)),
+            Characteristic(2, UUID(0x2A00), value_handle=3, properties=(
                 Characteristic.PROP_READ | Characteristic.PROP_WRITE
             )),
-            CharacteristicValue(2, UUID(0x2A00), b"EmulatedDevice"),
+            CharacteristicValue(3, UUID(0x2A00), b"EmulatedDevice"),
 
-            # Primary Service, Battery Level Service (0x180F), handle 3-6
-            PrimaryService(3, UUID(0x180F)),
-            Characteristic(4, UUID(0x2A19), value_handle=5, properties=(
+            # Primary Service, Battery Level Service (0x180F), handle 4-7
+            PrimaryService(4, 7, UUID(0x180F)),
+            Characteristic(5, UUID(0x2A19), value_handle=6, properties=(
                 Characteristic.PROP_READ | Characteristic.PROP_NOTIFY | Characteristic.PROP_INDICATE
             )),
-            CharacteristicValue(5, UUID(0x2A19), pack("<H", 0)),
-            ClientCharacteristicConfigurationDescriptor(6),
+            CharacteristicValue(6, UUID(0x2A19), pack("<H", 0)),
+            ClientCharacteristicConfigurationDescriptor(7),
 
             # Primary Service, custom service (6d02b602-1b51-4ef9-b753-1399e05debfd), handle 7-10
-            PrimaryService(7, UUID("6d02b600-1b51-4ef9-b753-1399e05debfd")),
+            PrimaryService(8, 13, UUID("6d02b600-1b51-4ef9-b753-1399e05debfd")),
 
             # TX Characteristic
-            Characteristic(8, UUID("6d02b601-1b51-4ef9-b753-1399e05debfd"), value_handle=9, properties=(
+            Characteristic(9, UUID("6d02b601-1b51-4ef9-b753-1399e05debfd"), value_handle=10, properties=(
                 Characteristic.PROP_WRITE_WITHOUT_RESP
             )),
-            CharacteristicValue(9, UUID("6d02b601-1b51-4ef9-b753-1399e05debfd"), b"\x00\x00\x00\x00"),
+            CharacteristicValue(10, UUID("6d02b601-1b51-4ef9-b753-1399e05debfd"), b"\x00\x00\x00\x00"),
 
             # RX Characteristic
-            Characteristic(10, UUID("6d02b602-1b51-4ef9-b753-1399e05debfd"), value_handle=11, properties=(
+            Characteristic(11, UUID("6d02b602-1b51-4ef9-b753-1399e05debfd"), value_handle=12, properties=(
                 Characteristic.PROP_READ | Characteristic.PROP_NOTIFY
             )),
-            CharacteristicValue(11, UUID("6d02b602-1b51-4ef9-b753-1399e05debfd"), b"\x00\x00\x00\x00"),
-            ClientCharacteristicConfigurationDescriptor(12),
+            CharacteristicValue(12, UUID("6d02b602-1b51-4ef9-b753-1399e05debfd"), b"\x00\x00\x00\x00"),
+            ClientCharacteristicConfigurationDescriptor(13),
         ]
 
         ###
         # Initialize GATT state
         ###
+
+        # ATT MTU
+        self.__mtu = 23
 
         # No current procedure
         self.__cur_procedure = None
@@ -77,6 +85,9 @@ class GattServer:
         # Register procedures
         self.__procedures = [
             ReadProcedure,
+            ReadByGroupTypeProcedure,
+            ReadByTypeProcedure,
+            FindInformationProcedure,
         ]
 
     @property
@@ -91,7 +102,7 @@ class GattServer:
             # Find a procedure triggered by our request
             for proc in self.__procedures:
                 if proc.trigger(request):
-                    self.__cur_procedure = proc(self.attributes)
+                    self.__cur_procedure = proc(self.attributes, self.__mtu)
 
         if self.__cur_procedure is not None:
             # Forward to current procedure
@@ -101,5 +112,5 @@ class GattServer:
             return resp
         else:
             # Return an unlikely error
-            return ATT_Hdr()/ATT_Error_Response(request.opcode, request.gatt_handle, 0x0E)
+            return [ATT_Hdr()/ATT_Error_Response(opcode=request.opcode, handle=request.gatt_handle, ecode=0x0E)]
 
