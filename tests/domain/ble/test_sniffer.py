@@ -2,7 +2,7 @@
 """
 import pytest
 
-from scapy.layers.bluetooth4LE import BTLE_ADV_IND
+from scapy.layers.bluetooth4LE import BTLE_ADV_IND, BTLE_SCAN_RSP
 
 from whad.ble.mock import DeviceScan, EmulatedDevice
 from whad.ble import BDAddress
@@ -96,7 +96,13 @@ def test_sniffer_address_filter_match(sniff_mock):
 
     # We must have a single packet with BD address matching our filtered address
     assert len(packets) >= 1
-    assert packets[0][BTLE_ADV_IND].AdvA == "00:11:22:33:44:55"
+    packet = packets[0]
+    if BTLE_ADV_IND in packet:
+        assert packet[BTLE_ADV_IND].AdvA == "00:11:22:33:44:55"
+    elif BTLE_SCAN_RSP in packet:
+        assert packet[BTLE_SCAN_RSP].AdvA == "00:11:22:33:44:55"
+    else:
+        assert False
 
 def test_sniffer_address_filter_nomatch(sniff_mock):
     """Test sniffing advertisements sent by a specific device
