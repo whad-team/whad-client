@@ -13,7 +13,6 @@ GATT server profile:
   - RX characteristic (6d02b602-1b51-4ef9-b753-1399e05debfd): read/notify permissions
 """
 import logging
-from typing import Union
 from struct import pack
 
 from scapy.packet import Packet
@@ -27,10 +26,12 @@ from .attribute import Attribute, PrimaryService, Characteristic, Characteristic
 # ATT Procedures
 from .procedure import UnexpectedProcError
 from .read import ReadProcedure
+from .readblob import ReadBlobProcedure
 from .read_by_group_type import ReadByGroupTypeProcedure
 from .read_by_type import ReadByTypeProcedure
 from .find_info import FindInformationProcedure
 from .write import WriteProcedure
+from .writecmd import WriteCommandProcedure
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,8 @@ class GattServer:
             Characteristic(9, UUID("6d02b601-1b51-4ef9-b753-1399e05debfd"), value_handle=10, properties=(
                 Characteristic.PROP_WRITE_WITHOUT_RESP
             )),
-            CharacteristicValue(10, UUID("6d02b601-1b51-4ef9-b753-1399e05debfd"), b"\x00\x00\x00\x00"),
+            CharacteristicValue(10, UUID("6d02b601-1b51-4ef9-b753-1399e05debfd"), b"\x00\x00\x00\x00",
+                                write_without_resp=True),
 
             # RX Characteristic
             Characteristic(11, UUID("6d02b602-1b51-4ef9-b753-1399e05debfd"), value_handle=12, properties=(
@@ -90,7 +92,9 @@ class GattServer:
         # Register procedures
         self.__procedures = [
             ReadProcedure,
+            ReadBlobProcedure,
             WriteProcedure,
+            WriteCommandProcedure,
             ReadByGroupTypeProcedure,
             ReadByTypeProcedure,
             FindInformationProcedure,
