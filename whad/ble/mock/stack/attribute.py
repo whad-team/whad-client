@@ -97,9 +97,19 @@ class Characteristic(Attribute):
 
     def __init__(self, handle: int, uuid: UUID, value_handle: int, properties: int):
         """Characteristic initizalization."""
-        self.properties = properties
+        self.__properties = properties
+        self.__value_handle = value_handle
         charac_def = pack("<BH", properties, value_handle) + uuid.packed
         super().__init__(handle, UUID(0x2803), charac_def)
+
+    @property
+    def value_handle(self) -> int:
+        """Value handle."""
+        return self.__value_handle
+
+    def has_property(self, prop) -> bool:
+        """Check if a property is defined for this characteristic."""
+        return (prop & self.__properties) > 0
 
 class CharacteristicValue(Attribute):
     """GATT Characteristic value."""
@@ -148,3 +158,15 @@ def find_attr_by_type(attributes: list[Attribute], attr_type: UUID, start_handle
             if attribute.uuid == attr_type:
                 attrs.append(attribute)
     return attrs
+
+def find_charac_by_desc_handle(attributes: list[Attribute], handle: int) -> Optional[Characteristic]:
+    """Find the characteristic attribute that holds the given descriptor."""
+    charac = None
+    for attribute in attributes:
+        if isinstance(attribute, Characteristic):
+            charac = attribute
+        if attribute.handle == handle:
+            break
+    # Return found characteristic
+    return charac
+
