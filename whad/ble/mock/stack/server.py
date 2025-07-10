@@ -55,7 +55,7 @@ class GattServer:
             # Primary Service, Battery Level Service (0x180F), handle 4-7
             PrimaryService(4, 7, UUID(0x180F)),
             Characteristic(5, UUID(0x2A19), value_handle=6, properties=(
-                Characteristic.PROP_READ | Characteristic.PROP_NOTIFY | Characteristic.PROP_INDICATE
+                Characteristic.PROP_READ | Characteristic.PROP_NOTIFY
             )),
             CharacteristicValue(6, UUID(0x2A19), pack("<H", 0)),
             ClientCharacteristicConfigurationDescriptor(7),
@@ -72,7 +72,7 @@ class GattServer:
 
             # RX Characteristic
             Characteristic(11, UUID("6d02b602-1b51-4ef9-b753-1399e05debfd"), value_handle=12, properties=(
-                Characteristic.PROP_READ | Characteristic.PROP_NOTIFY
+                Characteristic.PROP_READ | Characteristic.PROP_NOTIFY | Characteristic.PROP_INDICATE
             )),
             CharacteristicValue(12, UUID("6d02b602-1b51-4ef9-b753-1399e05debfd"), b"\x00\x00\x00\x00"),
             ClientCharacteristicConfigurationDescriptor(13),
