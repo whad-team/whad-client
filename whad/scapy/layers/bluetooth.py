@@ -3,7 +3,7 @@ from scapy.fields import BitField, LEShortField, ByteField, StrFixedLenField, \
     FlagsField, ByteEnumField, BitEnumField
 from scapy.layers.bluetooth import SM_Hdr, HCI_Event_LE_Meta, HCI_Command_Hdr, \
     HCI_Event_Command_Complete, _bluetooth_features, _bluetooth_error_codes, \
-    HCI_Cmd_Complete_LE_Read_White_List_Size
+    HCI_Cmd_Complete_LE_Read_White_List_Size, ATT_Hdr
 
 _bluetooth_supported_commands = [
     # Byte 0
@@ -545,6 +545,12 @@ _bluetooth_le_features = [
     "rfu",                                    # Bit 63
 ]
 
+# Add missing ATT_Handle_Value_Confirmation class
+class ATT_Handle_Value_Confirmation(Packet):
+    """ATT Handle value confirmation packet, missing from Scapy BLE definitions
+    """
+    name = "Handle Value Confirmation"
+
 class SM_Security_Request(Packet):
     name = "Security Request"
     fields_desc = [
@@ -561,7 +567,7 @@ class HCI_LE_Meta_Data_Length_Change(Packet):
                    LEShortField("max_rx_octets", 0x001B),
                    LEShortField("max_rx_time", 0x0148)
                    ]
-    
+
 class HCI_LE_Set_Data_Length(Packet):
     name = "Set Data Length"
     fields_desc = [LEShortField("handle", 0),
@@ -738,3 +744,8 @@ bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_LE_Advertising_Tx_Power
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Supported_Commands, opcode=0x1002)  # noqa: E501
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Supported_Features, opcode=0x1003)  # noqa: E501
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Buffer_Size, opcode=0x1005)  # noqa: E501
+
+
+# Bind ATT_Handle_Value_Confirmation with ATT_Hdr
+bind_layers(ATT_Hdr, ATT_Handle_Value_Confirmation, opcode=0x1e)
+
