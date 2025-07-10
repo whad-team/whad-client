@@ -111,6 +111,10 @@ class Procedure:
         """ATT MTU."""
         return self.__mtu
 
+    def get_state(self) -> int:
+        """Return current state."""
+        return self.__state
+
     def set_state(self, state: int):
         """Set procedure state."""
         self.__state = state
