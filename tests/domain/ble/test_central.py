@@ -1,9 +1,12 @@
 """Bluetooth Low Energy Central connector testing
 """
 import pytest
+from typing import Optional
+from threading import Event
 
 from whad.ble.mock import CentralMock, EmulatedDevice
 from whad.ble import BDAddress, Central
+from whad.ble.profile import Characteristic
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile.device import PeripheralDevice
 from whad.ble.stack.att.exceptions import AttributeNotFoundError, InvalidOffsetError, WriteNotPermittedError
@@ -137,6 +140,149 @@ def test_read_blob_bad_offset(central_mock):
     # InvalidOffsetValueError is expected to be raised
     with pytest.raises(InvalidOffsetError):
         assert target.read(3, offset=24) == b"mulatedDevice"
+
+def test_notification(central_mock):
+    """Register for notification and checks notifications are correctly handled."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    # Read DeviceName characteristic value starting at offset 24 (invalid),
+    # InvalidOffsetValueError is expected to be raised
+    char = target.get_characteristic(
+        UUID("6d02b600-1b51-4ef9-b753-1399e05debfd"),
+        UUID("6d02b602-1b51-4ef9-b753-1399e05debfd")
+    )
+    assert char is not None
+
+    notif_sync = Event()
+    characteristic: Optional[Characteristic] = None
+    value = None
+    indicated = False
+
+    # Defines a callback that set `notifs` to True
+    def _notif_cb(charac, char_value, indication=False):
+        nonlocal value, characteristic, indicated
+        notif_sync.set()
+        value = char_value
+        characteristic = charac
+        indicated = indication
+
+    char.subscribe(notification=True, callback=_notif_cb)
+    notif_sync.wait()
+    assert indicated == False
+    assert value == b"Notified"
+    assert characteristic is not None and characteristic.uuid == char.uuid
+
+def test_notification_error(central_mock):
+    """Register for notification on erroneous characteristic and checks
+    no notification is sent."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    # Discover services and characteristics
+    target.discover()
+
+    # Search for a specific characteristic
+    char = target.get_characteristic(
+        UUID(0x1800),
+        UUID(0x2a00)
+    )
+    assert char is not None
+
+    # Prepare an async event to detect timeouts
+    notif_sync = Event()
+    characteristic: Optional[Characteristic] = None
+    value = None
+    indicated = False
+
+    # Defines a callback that saves parameters
+    def _notif_cb(charac, char_value, indication=False):
+        nonlocal value, characteristic, indicated
+        notif_sync.set()
+        value = char_value
+        characteristic = charac
+        indicated = indication
+
+    char.subscribe(notification=True, callback=_notif_cb)
+    assert not notif_sync.wait(timeout=1.0)
+
+def test_indication(central_mock):
+    """Register for indication and checks indications are correctly handled."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    target.discover()
+    # Read DeviceName characteristic value starting at offset 24 (invalid),
+    # InvalidOffsetValueError is expected to be raised
+    char = target.get_characteristic(
+        UUID("6d02b600-1b51-4ef9-b753-1399e05debfd"),
+        UUID("6d02b602-1b51-4ef9-b753-1399e05debfd")
+    )
+    assert char is not None
+
+    indic_sync = Event()
+    characteristic: Optional[Characteristic] = None
+    value = None
+    indicated = False
+
+    def _indic_cb(charac, char_value, indication=False):
+        nonlocal value, characteristic, indicated
+        indic_sync.set()
+        value = char_value
+        characteristic = charac
+        indicated = indication
+
+    char.subscribe(indication=True, callback=_indic_cb)
+    indic_sync.wait()
+    assert indicated == True
+    assert value == b"Indicated"
+    assert characteristic is not None and characteristic.uuid == char.uuid
+
+def test_indication_error(central_mock):
+    """Register for indication and checks confirmation is correctly handled."""
+    # Connect to emulate device
+    central = Central(central_mock)
+    target = central.connect("00:11:22:33:44:55")
+    assert target is not None
+    assert target.conn_handle != 0
+
+    # Discover services and characteristics
+    target.discover()
+
+    # Search for a specific characteristic
+    char = target.get_characteristic(
+        UUID("6d02b600-1b51-4ef9-b753-1399e05debfd"),
+        UUID("6d02b601-1b51-4ef9-b753-1399e05debfd")
+    )
+    assert char is not None
+
+    # Prepare an async event to detect timeouts
+    indic_sync = Event()
+    characteristic: Optional[Characteristic] = None
+    value = None
+    indicated = False
+
+    # Defines a callback that saves parameters
+    def _indic_cb(charac, char_value, indication=False):
+        nonlocal value, characteristic, indicated
+        indic_sync.set()
+        value = char_value
+        characteristic = charac
+        indicated = indication
+
+    char.subscribe(notification=True, callback=_indic_cb)
+    assert not indic_sync.wait(timeout=1.0)
+
 
 def test_discover(central_mock):
     """Try to read an attribute with an invalid handle."""
