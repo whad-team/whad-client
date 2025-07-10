@@ -66,6 +66,7 @@ class Sniffer(Unifying, EventsManager):
         address = self.__configuration.address
 
         if self.__configuration.pairing:
+            channel = None
             self.sniff_pairing()
         else:
             super().sniff(channel=channel, show_acknowledgements=ack, address=address)
