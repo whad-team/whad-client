@@ -11,6 +11,7 @@ from whad.exceptions import RequiredImplementation
 from whad.hub import ProtocolHub
 from whad.hub.ble import Commands, Direction, AddressType
 from whad.hub.ble.connect import Disconnected as BleDisconnected
+from whad.hub.ble.pdu import BlePduReceived
 from whad.hub.discovery import Capability, Domain
 
 @pytest.fixture
@@ -57,13 +58,19 @@ def mock_replay():
         interface='dummy'
 
     hub = ProtocolHub()
-    msg = hub.ble.create_disconnected(13, 1)
+    msg = hub.ble.create_pdu_received(
+        direction=Direction.SLAVE_TO_MASTER,
+        conn_handle=12,
+        pdu=b"FOOBAR",
+        processed=False,
+        decrypted=False
+    )
 
     messages = [
         MessageReceived(DummyConnector(), msg),
         Disconnected(),
     ]
-    return ReplayMock(capabilities=caps, messages=messages)
+    return ReplayMock(capabilities=caps, messages=messages, delay=0.2)
 
 def test_create_without_device():
     """Instantiate a connector with no device."""
@@ -227,7 +234,7 @@ def test_sniffing_all(mock_replay):
     for message in conn.sniff(timeout=.5):
         messages.append(message)
     assert len(messages) == 1
-    assert isinstance(messages[0], BleDisconnected)
+    assert isinstance(messages[0], BlePduReceived)
 
 def test_sniffing_filter_nomatch(mock_replay):
     """Try sniffing specific messages from a device."""
@@ -245,7 +252,7 @@ def test_sniffing_filter_match(mock_replay):
     mock_replay.open()
     mock_replay.discover()
     messages = []
-    for message in conn.sniff(messages=(BleDisconnected), timeout=1.0):
+    for message in conn.sniff(messages=(BlePduReceived), timeout=1.0):
         messages.append(message)
     assert len(messages) == 1
 
