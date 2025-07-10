@@ -12,10 +12,12 @@ import pytest
 
 from scapy.layers.bluetooth import *
 
+from whad.scapy.layers.bluetooth import ATT_Handle_Value_Confirmation
+
 from whad.common.stack import alias
 from whad.common.stack.tests import Sandbox, LayerMessage
 
-from whad.ble.stack.att import ATTLayer, AttHandleValueConfirmation
+from whad.ble.stack.att import ATTLayer
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode
 from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.exceptions import *
@@ -428,7 +430,7 @@ class TestAttToL2CAP(GattTest):
         assert l2cap_instance.expect(LayerMessage(
             'att',
             'l2cap',
-            ATT_Hdr() / AttHandleValueConfirmation()
+            ATT_Hdr() / ATT_Handle_Value_Confirmation()
         ))
 
 
@@ -446,7 +448,7 @@ class TestAttToGatt(GattTest):
         L2capMock.add(ATTLayer)
         L2capMock.add(GattLayer)
         return L2capMock()
-    
+
     @pytest.fixture
     def att(self, l2cap_instance):
         return l2cap_instance.get_layer('att')
