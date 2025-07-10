@@ -640,6 +640,7 @@ class WhadDevice:
         """
         logger.info("sending message %s to device <%s>", message, self.interface)
 
+        print("[send] ", message)
         # if `keep` is set, configure queue filter
         if keep is not None:
             logger.debug("send_message:set_queue_filter")
@@ -726,6 +727,8 @@ class WhadDevice:
 
                         # Forward message if successfully parsed
                         if msg is not None:
+                            print("[rcvd] ", msg)
+
                             self.on_message_received(msg)
 
                         # Chomp

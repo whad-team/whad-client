@@ -521,3 +521,5 @@ class ANT(WhadDeviceConnector):
             return
 
 
+from whad.ant.connector.sniffer import Sniffer
+
