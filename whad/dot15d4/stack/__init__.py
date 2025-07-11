@@ -48,7 +48,7 @@ class Dot15d4Stack(Layer):
 
         This callback handles a PDU and forwards it to MAC layer.
         '''
-        logger.debug('received a PDU (%d bytes)' % (len(pdu)))
+        logger.debug("received a PDU (%d bytes)", len(pdu))
         self.send('mac', pdu, tag='pdu')
 
     def on_ed_sample(self, timestamp, sample):
@@ -56,7 +56,7 @@ class Dot15d4Stack(Layer):
 
         This callback handle an Energy Detection sample and forwards it to MAC layer.
         '''
-        logger.debug('received an energy detection sample (%d / timestamp=%d) ' % (sample, timestamp))
+        logger.debug("received an energy detection sample (%d / timestamp=%d) ", sample, timestamp)
 
         # Notify link layer we received a control PDU for a given `conn_handle`.
         self.send('mac', sample, tag='energy_detection', timestamp=timestamp)

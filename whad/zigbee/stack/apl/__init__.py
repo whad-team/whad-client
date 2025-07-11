@@ -232,7 +232,7 @@ class APLManager(Dot15d4Manager):
         )
         # If cluster has not been found in the corresponding application, display an error
         if not success:
-            logger.info("[apl] cluster not found (cluster_id=0x{:04x}).".format(cluster_id))
+            logger.info("[apl] cluster not found (cluster_id=0x%04x).", cluster_id)
 
     @source('aps', "APSME-JOIN")
     def on_join(

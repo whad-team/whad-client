@@ -873,7 +873,7 @@ class MACManager(Dot15d4Manager):
             elif pdu.fcf_frametype == 0x00 or Dot15d4Beacon in pdu:
                 self.get_service("management").on_beacon_pdu(pdu)
             else:
-                logger.warning("[mac_manager] Malformed PDU received: {}".format(repr(pdu)))
+                logger.warning("[mac_manager] Malformed PDU received: %s", repr(pdu))
 
     def match_filter(self, pdu):
         macPromiscuousMode = self.database.get("macPromiscuousMode")

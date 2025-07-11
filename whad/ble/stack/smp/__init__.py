@@ -305,7 +305,7 @@ class SM_Peer(object):
         By default, peers are configured to only accept Legacy JustWorks pairing.
         """
 
-        logger.info('Initiate SM_Peer object for peer %s' % address)
+        logger.info("Initiate SM_Peer object for peer %s", address)
 
         # Peer address and address type
         self.__address = address
@@ -486,7 +486,7 @@ class SM_Peer(object):
             if self.__kd_sign_key:
                 keys.append('csrk')
                 self.__dist_csrk = True
-            logger.debug('Set distribute key for peer: %s' % (','.join(keys)))
+            logger.debug("Set distribute key for peer: %s", ",".join(keys))
         elif self.__pairing_method in [PM_LESC_JUSTWORKS, PM_LESC_NUMCOMP, PM_LESC_OOB]:
             keys=[]
             if self.__kd_id_key:
@@ -498,7 +498,7 @@ class SM_Peer(object):
             if self.__kd_link_key:
                 keys.append('ltk')
                 self.__dist_ltk = True
-            logger.debug('Set distribute key for peer: %s' % (','.join(keys)))
+            logger.debug("Set distribute key for peer: %s", ",".join(keys))
 
     def get_key_distribution(self):
         """Get the key distribution byte from the peer.
@@ -599,7 +599,7 @@ class SM_Peer(object):
         :param int pairing_method: Pairing method as defined in PM_* in BleSMP.
         """
         self.__pairing_method = pairing_method
-        logger.info('Pairing method set to %d' % self.__pairing_method)
+        logger.info("Pairing method set to %d", self.__pairing_method)
 
     @property
     def pairing_method(self):
@@ -1534,7 +1534,7 @@ class SMPLayer(Layer):
     def on_pairing_failed(self, pairing_failed):
         """Method called when a pairing failed is received.
         """
-        logger.info("Pairing failed (reason=%d)" % pairing_failed.reason)
+        logger.info("Pairing failed (reason=%d)", pairing_failed.reason)
         # Return to IDLE mode
         self.reset_state()
         self.state.last_failure = pairing_failed.reason
@@ -1583,8 +1583,8 @@ class SMPLayer(Layer):
                     ]
                 )
             )
-            logger.info("Computed EA: %s" % ea.hex())
-            logger.info("Received EA: %s" % dhkey_check.dhkey_check[::-1].hex())
+            logger.info("Computed EA: %s", ea.hex())
+            logger.info("Received EA: %s", dhkey_check.dhkey_check[::-1].hex())
             # If we received a valid EA, generate EB and transmit it
             if ea == dhkey_check.dhkey_check[::-1]:
                 eb = self.get_custom_function("compute_exchange_value")(
@@ -1650,8 +1650,8 @@ class SMPLayer(Layer):
                 )
             )
             # Compare it with the received data
-            logger.info("Computed EB: %s" % eb.hex())
-            logger.info("Received EB: %s" % dhkey_check.dhkey_check[::-1].hex())
+            logger.info("Computed EB: %s", eb.hex())
+            logger.info("Received EB: %s", dhkey_check.dhkey_check[::-1].hex())
 
             if eb == dhkey_check.dhkey_check[::-1]:
 
@@ -1875,7 +1875,7 @@ class SMPLayer(Layer):
             SecurityManagerState.STATE_LESC_PUBKEY_RECVD_STAGEN,
             SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT_STAGEN
         ):
-            logger.info('Pairing Confirm value is expected, processing ... [iteration=%d]' % self.state.passkey_counter)
+            logger.info("Pairing Confirm value is expected, processing ... [iteration=%d]", self.state.passkey_counter)
 
             if self.state.passkey_counter == 1:
                 # Collect passkey entry
@@ -1903,7 +1903,7 @@ class SMPLayer(Layer):
             )
 
         elif self.state.state == SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN:
-            logger.info('Pairing Confirm value is expected, processing ... [iteration=%d]' % self.state.passkey_counter)
+            logger.info("Pairing Confirm value is expected, processing ... [iteration=%d]", self.state.passkey_counter)
 
             # Extract confirm value
             self.state.responder.confirm = confirm.confirm[::-1]
@@ -1918,7 +1918,7 @@ class SMPLayer(Layer):
             )
 
         else:
-            logger.info('Pairing Confirm dropped because current state is %d' % self.state.state)
+            logger.info("Pairing Confirm dropped because current state is %d", self.state.state)
 
             # Notify error
             error = SM_Failed(
@@ -1999,9 +1999,7 @@ class SMPLayer(Layer):
                     )
 
                 else:
-                    logger.info('Invalid Numeric comparison (expected %s)' % (
-                        str(value),
-                    ))
+                    logger.info("Invalid Numeric comparison (expected %s)", str(value))
 
                     # Send error
                     error = SM_Failed(
@@ -2051,9 +2049,7 @@ class SMPLayer(Layer):
                 logger.info("Accepted numeric comparison, continuing...")
                 self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT
             else:
-                logger.info('Invalid Numeric comparison (expected %s)' % (
-                    str(value),
-                ))
+                logger.info("Invalid Numeric comparison (expected %s)", str(value))
 
                 # Send error
                 error = SM_Failed(
@@ -2305,7 +2301,7 @@ class SMPLayer(Layer):
                 self.state.last_failure = SM_ERROR_CONFIRM_VALUE_FAILED
 
         else:
-            logger.info('Pairing Random dropped because current state is %d' % self.state.state)
+            logger.info("Pairing Random dropped because current state is %d", self.state.state)
 
             # Notify error
             error = SM_Failed(
@@ -2499,26 +2495,26 @@ class SMPLayer(Layer):
         logger.info("Pairing done.")
         if self.is_initiator():
             if self.state.ltk is not None:
-                logger.info("Distributed LTK: %s" % self.state.ltk.hex())
+                logger.info("Distributed LTK: %s", self.state.ltk.hex())
             if self.state.rand is not None:
-                logger.info("Distributed RAND: %s" % self.state.rand.hex())
+                logger.info("Distributed RAND: %s", self.state.rand.hex())
             if self.state.ediv is not None:
-                logger.info("Distributed EDIV: %s" % hex(self.state.ediv))
+                logger.info("Distributed EDIV: %s", hex(self.state.ediv))
             if self.state.irk is not None:
-                logger.info("Distributed IRK: %s" % self.state.irk.hex())
+                logger.info("Distributed IRK: %s", self.state.irk.hex())
             if self.state.csrk is not None:
-                logger.info("Distributed CSRK: %s" % self.state.csrk.hex())
+                logger.info("Distributed CSRK: %s", self.state.csrk.hex())
 
             if self.state.responder.ltk is not None:
-                logger.info("Received LTK: %s" %  self.state.responder.ltk.hex())
+                logger.info("Received LTK: %s",  self.state.responder.ltk.hex())
             if self.state.responder.random is not None:
-                logger.info("Received RAND: %s" % self.state.responder.random.hex())
+                logger.info("Received RAND: %s", self.state.responder.random.hex())
             if self.state.responder.ediv is not None:
-                logger.info("Received EDIV: %s" % hex(self.state.responder.ediv))
+                logger.info("Received EDIV: %s", hex(self.state.responder.ediv))
             if self.state.responder.irk is not None:
-                logger.info("Received IRK: %s" % self.state.responder.irk.hex())
+                logger.info("Received IRK: %s", self.state.responder.irk.hex())
             if self.state.responder.csrk is not None:
-                logger.info("Received CSRK: %s" % self.state.responder.csrk.hex())
+                logger.info("Received CSRK: %s", self.state.responder.csrk.hex())
 
             # If bonding is enabled, we register in the security DB
             # both our own and the peer cryptographic material
@@ -2577,26 +2573,26 @@ class SMPLayer(Layer):
 
         else:
             if self.state.ltk is not None:
-                logger.info("Distributed LTK: %s" % self.state.ltk.hex())
+                logger.info("Distributed LTK: %s", self.state.ltk.hex())
             if self.state.rand is not None:
-                logger.info("Distributed RAND: %s" % self.state.rand.hex())
+                logger.info("Distributed RAND: %s", self.state.rand.hex())
             if self.state.ediv is not None:
-                logger.info("Distributed EDIV: %s" % hex(self.state.ediv))
+                logger.info("Distributed EDIV: %s", hex(self.state.ediv))
             if self.state.irk is not None:
-                logger.info("Distributed IRK: %s" % self.state.irk.hex())
+                logger.info("Distributed IRK: %s", self.state.irk.hex())
             if self.state.csrk is not None:
-                logger.info("Distributed CSRK: %s" % self.state.csrk.hex())
+                logger.info("Distributed CSRK: %s", self.state.csrk.hex())
 
             if self.state.initiator.ltk is not None:
-                logger.info("Received LTK: %s" % self.state.initiator.ltk.hex())
+                logger.info("Received LTK: %s", self.state.initiator.ltk.hex())
             if self.state.initiator.random is not None:
-                logger.info("Received RAND: %s" % self.state.initiator.random.hex())
+                logger.info("Received RAND: %s", self.state.initiator.random.hex())
             if self.state.initiator.ediv is not None:
-                logger.info("Received EDIV: %s" % hex(self.state.initiator.ediv))
+                logger.info("Received EDIV: %s", hex(self.state.initiator.ediv))
             if self.state.initiator.irk is not None:
-                logger.info("Received IRK: %s" % self.state.initiator.irk.hex())
+                logger.info("Received IRK: %s", self.state.initiator.irk.hex())
             if self.state.initiator.csrk is not None:
-                logger.info("Received CSRK: %s" % self.state.initiator.csrk.hex())
+                logger.info("Received CSRK: %s", self.state.initiator.csrk.hex())
 
             # If bonding is enabled, we register in the security DB
             # both our own and the peer cryptographic material

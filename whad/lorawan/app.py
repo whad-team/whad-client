@@ -219,7 +219,7 @@ class LWNodeRegistry(object):
                 raise InvalidNodeRegistryError(path)
             except Exception:
                 # Oops, error while loading registry. Unlink file.
-                logger.error('Error while loading registry file %s, removing file.' % path)
+                logger.error("Error while loading registry file %s, removing file.", path)
                 unlink(path)
         else:
             # File does not exist, create it.
@@ -235,12 +235,10 @@ class LWNodeRegistry(object):
         :type node: LWNode
         """
         if node.dev_eui in self.__nodes:
-            logger.warning('Device %s is already present in node registry' % (
-                node.dev_eui
-            ))
+            logger.warning("Device %s is already present in node registry", node.dev_eui)
             self.__nodes[node.dev_eui] = node
         else:
-            logger.debug('adding node %s' % node)
+            logger.debug("adding node %s", node)
             self.__nodes[node.dev_eui] = node
 
     def get_node(self, eui:str = None) -> LWNode:

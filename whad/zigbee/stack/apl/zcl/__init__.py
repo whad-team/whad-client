@@ -316,12 +316,13 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
         if not found_calling_callback:
             return False
 
-        logger.info("[zcl] Cluster {} (cluster_id={}) Transmitting {} command '{}' (command_id={})".format(
+        logger.info(
+            "[zcl] Cluster %s (cluster_id=%s) Transmitting %s command '%s' (command_id=%s)",
             self.__class__.__name__,
             hex(self.cluster_id),
             "cluster specific" if cluster_specific else "profile wide",
             command_structure.name,
-            hex(command_id))
+            hex(command_id),
         )
         # Get the current configuration
         current_configuration = self.configuration
@@ -452,12 +453,13 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                     elif name in ("no_response", "disable_default_response"):
                         parameters += [asdu[base_class].disable_default_response]
 
-            logger.info("[zcl] Cluster {} (cluster_id={}) Receiving {} interpan command '{}' (command_id={})".format(
+            logger.info(
+                "[zcl] Cluster %s (cluster_id=%s) Receiving %s interpan command '%s' (command_id=%s)",
                 self.__class__.__name__,
                 hex(self.cluster_id),
                 "cluster specific" if asdu.zcl_frametype == 1 else "profile wide",
                 command.name,
-                hex(command_identifier))
+                hex(command_identifier),
             )
             # Call reception callback and update the pending response dict with the return value
             return_value = command.receive_callback(*parameters)
@@ -465,7 +467,7 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                 self.pending_responses[asdu.transaction_sequence] = return_value
 
         except ZCLCommandNotFound:
-            logger.info("[zcl] command not found (command_identifier = 0x{:02x})".format(command_identifier))
+            logger.info("[zcl] command not found (command_identifier = 0x%02x)", command_identifier)
 
 
     def on_data(self, asdu, source_address, source_address_mode, security_status, link_quality):
@@ -507,12 +509,13 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                     elif name in ("no_response", "disable_default_response"):
                         parameters += [asdu[ZigbeeClusterLibrary].disable_default_response]
 
-            logger.info("[zcl] Cluster {} (cluster_id={}) Receiving {} command '{}' (command_id={})".format(
+            logger.info(
+                "[zcl] Cluster %s (cluster_id=%s) Receiving %s command '%s' (command_id=%s)",
                 self.__class__.__name__,
                 hex(self.cluster_id),
                 "cluster specific" if asdu.zcl_frametype == 1 else "profile wide",
                 command.name,
-                hex(command_identifier))
+                hex(command_identifier),
             )
             # Call reception callback and update the pending response dict with the return value
             return_value = command.receive_callback(*parameters)
@@ -520,7 +523,7 @@ class ZCLCluster(Cluster, metaclass=ZCLClusterMetaclass):
                 self.pending_responses[asdu.transaction_sequence] = return_value
 
         except ZCLCommandNotFound:
-            logger.info("[zcl] command not found (command_identifier = 0x{:02x})".format(command_identifier))
+            logger.info("[zcl] command not found (command_identifier = 0x%02x)", command_identifier)
 
 
     # Decorators

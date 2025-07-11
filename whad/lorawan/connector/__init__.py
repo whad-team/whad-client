@@ -44,7 +44,7 @@ class LoRaWAN(LoRa):
         super().__init__(device)
 
         # Configure channel plan
-        logger.debug('Channel plan set to %s' % channel_plan.__name__)
+        logger.debug("Channel plan set to %s", channel_plan.__name__)
         self.__channel_plan = channel_plan()
         self.__pkt_queue = Queue()
         self.__cr = 45
@@ -65,7 +65,7 @@ class LoRaWAN(LoRa):
         :param invert_iq: Invert IQ if set to `True`
         :type invert_iq: bool, optional
         '''
-        logger.debug('Reconfiguring hardware for channel %s' % channel)
+        logger.debug("Reconfiguring hardware for channel %s", channel)
 
         # Reconfigure hardware (stop if necessary, then restart if we were already started)
         must_restart = self.__started
@@ -80,10 +80,10 @@ class LoRaWAN(LoRa):
         self.bw = channel.bandwidth
         self.preamble_length = 8
         self.invert_iq = invert_iq
-        logger.debug('Enabling CRC: %s' % crc)
+        logger.debug("Enabling CRC: %s", crc)
         self.enable_crc(crc)
         self.enable_explicit_mode(True)
-        logger.debug('Setting Freq: %d' % channel.frequency)
+        logger.debug("Setting Freq: %d", channel.frequency)
         self.set_frequency(channel.frequency)
         self.syncword = LoRa.SYNCWORD_LORAWAN
 
@@ -101,7 +101,7 @@ class LoRaWAN(LoRa):
         '''
         self.__current_channel = self.__channel_plan.pick_channel()
         self.reconfigure(self.__current_channel)
-        logger.debug('TX channel: %s' % self.__current_channel)
+        logger.debug("TX channel: %s", self.__current_channel)
 
     def rx1(self):
         '''Configure hardware to listen on RX1.
@@ -110,7 +110,7 @@ class LoRaWAN(LoRa):
         '''
         # Retrieve RX1 channel modulation parameters from channel plan
         rx1_channel = self.__channel_plan.get_rx1(self.__current_channel.number)
-        logger.debug('RX1 channel: %s' % rx1_channel)
+        logger.debug("RX1 channel: %s", rx1_channel)
 
         # Change hardware configuration only if needed
         if rx1_channel != self.__current_channel or self.crc_enabled:
@@ -123,7 +123,7 @@ class LoRaWAN(LoRa):
         parameters used as a backup channel for downlink communication.
         '''
         rx2_channel = self.__channel_plan.get_rx2()
-        logger.debug('RX2 channel: %s' % rx2_channel)
+        logger.debug("RX2 channel: %s", rx2_channel)
 
         # Change hardware configuration only if needed
         if rx2_channel != self.__current_channel or self.crc_enabled:
@@ -226,7 +226,7 @@ class LoRaWAN(LoRa):
                 # Return JoinAccept if MIC is OK
                 return resp
             else:
-                logger.debug('MIC does not match (expected: %s)' % exp_mic)
+                logger.debug("MIC does not match (expected: %s)", exp_mic)
                 return None
 
     def join(self, app_key : bytes, app_eui : str, dev_eui : str, dev_nonce : int):
@@ -243,11 +243,12 @@ class LoRaWAN(LoRa):
         :param dev_nonce: Device nonce
         :type dev_nonce: str
         '''
-        logger.debug('Building a join request for APPEUI %s, DEVEUI %s' % (
+        logger.debug(
+            "Building a join request for APPEUI %s, DEVEUI %s",
             app_eui,
-            dev_eui
-        ))
-        logger.debug('Using DevNonce=0x%04x' % dev_nonce)
+            dev_eui,
+        )
+        logger.debug("Using DevNonce=0x%04x", dev_nonce)
 
         join_req = Join_Request()
         join_req.AppEUI = eui_to_bytes(app_eui)

@@ -61,7 +61,7 @@ class BleStack(Layer):
         This callback handles a control PDU received from a connection
         identified by its connection handle `conn_handle`.
         '''
-        logger.debug('received a control PDU (%d bytes) for connection handle %d' % (len(pdu), conn_handle))
+        logger.debug("received a control PDU (%d bytes) for connection handle %d", len(pdu), conn_handle)
         # Notify link layer we received a control PDU for a given `conn_handle`.
         self.send('ll', pdu, tag='control', conn_handle=conn_handle)
 
@@ -72,7 +72,7 @@ class BleStack(Layer):
         This callback hanles a data PDU received from a connection identitied
         by its connection handle `conn_handle`.
         '''
-        logger.debug('received a data PDU (%d bytes) for conn_handle %d' % (len(pdu), conn_handle))
+        logger.debug("received a data PDU (%d bytes) for conn_handle %d", len(pdu), conn_handle)
         # Notify link layer we received a data PDU for a given `conn_handle`.
         self.send('ll', pdu, tag='data', conn_handle=conn_handle)
 
@@ -80,14 +80,14 @@ class BleStack(Layer):
     def send_data(self, data, conn_handle=None, encrypt=None):
         '''Send data to the underlying WHAD connector.
         '''
-        logger.debug('sending a data PDU (%d bytes) to conn_handle %d' % (len(data), conn_handle))
+        logger.debug("sending a data PDU (%d bytes) to conn_handle %d", len(data), conn_handle)
         return self.__connector.send_data_pdu(data, conn_handle=conn_handle, encrypt=encrypt)
 
     @source('ll', 'control')
     def send_control(self, pdu, conn_handle=None, encrypt=None):
         '''Send control PDU to the underlying WHAD connector.
         '''
-        logger.debug('sending a control PDU (%d bytes) to conn_handle %d' % (len(pdu), conn_handle))
+        logger.debug("sending a control PDU (%d bytes) to conn_handle %d", len(pdu), conn_handle)
         self.__connector.send_ctrl_pdu(pdu, conn_handle, encrypt=encrypt)
 
     @source('ll', tag='ATT_MTU')
@@ -99,7 +99,7 @@ class BleStack(Layer):
     def set_encryption(self, conn_handle=None, enabled=True,ll_key=None, ll_iv=None, key=None, rand=None, ediv=None):
         '''Enable or disable encryption using underlying WHAD connector.
         '''
-        logger.debug('%s encryption (key=%s, iv=%s)' % ("enabling" if enabled else "disabling", ll_key.hex(), ll_iv.hex()))
+        logger.debug("%s encryption (key=%s, iv=%s)", "enabling" if enabled else "disabling", ll_key.hex(), ll_iv.hex())
         self.__connector.set_encryption(
             conn_handle=conn_handle,
             enabled=enabled,
