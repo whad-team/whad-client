@@ -94,10 +94,11 @@ class LWGateway(LoRaWAN):
         :param nwkskey: Device network encryption session key
         :type nwkske: bytes
         """
-        logger.info('[gateway] Device %s joined network with address 0x%08x' % (
+        logger.info(
+            "[gateway] Device %s joined network with address 0x%08x",
             dev_eui,
             dev_addr,
-        ))
+        )
 
         self.__app.on_device_joined(
             dev_eui,

@@ -128,7 +128,7 @@ class GattLayer(Layer):
         if packet_type in self.__handlers:
             self.__handlers[packet_type](packet)
         else:
-            logger.error('no GATT handler for packet type %s' % packet_type.__name__)
+            logger.error("no GATT handler for packet type %s", packet_type.__name__)
 
     def procedure_start(self):
         """
@@ -242,7 +242,7 @@ class GattLayer(Layer):
 
         :param GattFindByTypeValueRequest request: Request
         """
-        logger.debug('[gatt] FindByTypeValueRequest, start: %d, type: %s' % (request.start, request.type))
+        logger.debug("[gatt] FindByTypeValueRequest, start: %d, type: %s", request.start, request.type)
         self.error(
             BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST, request.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
@@ -751,7 +751,7 @@ class GattClient(GattLayer):
                             charac.value = b""
                         
                     handle = charac.handle+2
-                    logger.debug('found characteristic %s with handle %d' % (charac_uuid, charac_value_handle))
+                    logger.debug("found characteristic %s with handle %d", charac_uuid, charac_value_handle)
                     yield charac
 
             elif isinstance(msg, GattErrorResponse):

@@ -111,7 +111,7 @@ class LWGatewayStack(Layer):
         :type timestamp: float
         """
         # Switch to RX1
-        logger.debug('[phy] sending frame of %d bytes' % len(bytes(frame)))
+        logger.debug("[phy] sending frame of %d bytes", len(bytes(frame)))
         self.__connector.rx1()
         self.__connector.send(bytes(frame), timestamp=timestamp)
         

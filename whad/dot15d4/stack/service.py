@@ -77,9 +77,9 @@ class Dot15d4Service:
             @wraps(func)
             def request_decorator(*args, **kwargs):
                 self = args[0]
-                self._logger.info("[{}] {} request ({},{})".format(args[0]._name, request_name, str(args[1:]),str(kwargs)))
+                self._logger.info("[%s] %s request (%s,%s)", args[0]._name, request_name, str(args[1:]),str(kwargs))
                 result = func(*args, **kwargs)
-                self._logger.info("[{}] {} confirm ({})".format(args[0]._name, request_name, str(result)))
+                self._logger.info("[%s] %s confirm (%s)", args[0]._name, request_name, str(result))
                 return result
             return request_decorator
         return _request
@@ -92,7 +92,7 @@ class Dot15d4Service:
             @wraps(func)
             def response_decorator(*args, **kwargs):
                 self = args[0]
-                self._logger.info("[{}] {} response ({},{})".format(args[0]._name, response_name, str(args[1:]),str(kwargs)))
+                self._logger.info("[%s] %s response (%s,%s)", args[0]._name, response_name, str(args[1:]),str(kwargs))
                 result = func(*args, **kwargs)
                 return result
             return response_decorator
@@ -109,14 +109,14 @@ class Dot15d4Service:
                 pdu, parameters = func(*args, **kwargs)
 
                 if self._manager.upper_layer is None:
-                    self._logger.warning("[{}] {} indication not transmitted, no upper layer !".format(self._name, indication_name))
+                    self._logger.warning("[%s] %s indication not transmitted, no upper layer !", self._name, indication_name)
                     return None
 
                 upper = self._manager.upper_layer.alias
                 callback_kwargs = {"tag":indication_name}
                 callback_kwargs.update(parameters)
 
-                self._logger.info("[{}] {} indication ({},{})".format(self._name, indication_name, str(pdu), str(callback_kwargs)))
+                self._logger.info("[%s] %s indication (%s,%s)", self._name, indication_name, str(pdu), str(callback_kwargs))
                 return_value = self._manager.send(upper, pdu, **callback_kwargs)
                 return return_value
 

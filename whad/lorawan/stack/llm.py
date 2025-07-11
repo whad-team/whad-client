@@ -169,10 +169,11 @@ class LWGwLinkLayer(Layer):
             if app_eui == self.app_eui and self.get_layer('phy').is_device_allowed(dev_eui):
 
                 # Device is allowed and application is known
-                logger.debug('Device with EUI %s is allowed to join with app EUI %s' % (
+                logger.debug(
+                    "Device with EUI %s is allowed to join with app EUI %s",
                     dev_eui,
-                    app_eui
-                ))
+                    app_eui,
+                )
 
                 # Add node to our list of connections
                 dev_addr = self.generate_devaddr()
@@ -216,21 +217,23 @@ class LWGwLinkLayer(Layer):
 
                 # Send response
                 ts = frame.metadata.timestamp/1000000.
-                logger.debug('JoinRequest timestamp: %f' % ts)
-                logger.debug('will send JoinAccept at %f' % (ts + self.state.join_delay1))
+                logger.debug("JoinRequest timestamp: %f", ts)
+                logger.debug("will send JoinAccept at %f", ts + self.state.join_delay1)
                 self.send('phy', enc_ja, timestamp=ts + self.state.join_delay1)
                 sleep(self.state.join_delay1 + 0.5)
             else:
                 if app_eui != self.app_eui:
-                    logger.debug('Application %s is requested, expected application EUI %s' % (
+                    logger.debug(
+                        "Application %s is requested, expected application EUI %s",
                         app_eui,
-                        self.app_eui
-                    ))
+                        self.app_eui,
+                    )
                 else:
-                    logger.debug('Device with EUI %s is not allowed to access application EUI %s' % (
+                    logger.debug(
+                        "Device with EUI %s is not allowed to access application EUI %s",
                         dev_eui,
-                        app_eui
-                    ))
+                        app_eui,
+                    )
         else:
             logger.debug(
                 'JoinRequest MIC is wrong (got %s instead of %s)' % (
@@ -251,14 +254,16 @@ class LWGwLinkLayer(Layer):
         :param dev_nwkskey: Device network encryption session key
         :type dev_nwkskey: bytes
         """
-        logger.debug('add a pre-provisioned device (address 0x%08x, eui: %s)' % (
-            dev_addr, dev_eui
-        ))
+        logger.debug(
+            "add a pre-provisioned device (address 0x%08x, eui: %s)",
+            dev_addr,
+            dev_eui,
+        )
 
         # Instantiate a node for our connection
         conn_mac = self.instantiate(LWMacLayer)
         conn_mac.set_devaddr(dev_addr)
-        logger.debug('created a LWMACLayer instance for device: %s' % conn_mac.name)
+        logger.debug("created a LWMACLayer instance for device: %s", conn_mac.name)
 
         # Set uplink/downlink frame counters
         conn_mac.set_up_counter(upcount)
@@ -313,7 +318,7 @@ class LWGwLinkLayer(Layer):
                 confirmed=False
             )
         else:
-            logger.debug('Device address 0x%08x is not known' % mac_layer.dev_addr)
+            logger.debug("Device address 0x%08x is not known", mac_layer.dev_addr)
 
     def on_confirmed_data_up(self, conf_data_up : PHYPayload):
         """Process a confirmed data up.
@@ -360,9 +365,11 @@ class LWGwLinkLayer(Layer):
         # Find node from instance name
         connection = self.state.get_connection_from_node(inst_name)
         if connection is not None:
-            logger.debug('[llm] MAC instance %s resolved to device eui %s' % (
-                inst_name, connection['dev_eui']
-            ))
+            logger.debug(
+                "[llm] MAC instance %s resolved to device eui %s",
+                inst_name,
+                connection['dev_eui'],
+            )
 
             # Craft downlink frame
             packet = PHYPayload()/frame
@@ -386,7 +393,7 @@ class LWGwLinkLayer(Layer):
             )
             sleep(self.state.rx_delay1 + 0.5)
         else:
-            logger.debug('[llm] MAC instance %s not found' % inst_name)
+            logger.debug("[llm] MAC instance %s not found", inst_name)
 
     def on_data_received(self, dev_addr : int, data : bytes, upcount : int = 0):
         """Report data reception to phy
@@ -408,5 +415,5 @@ class LWGwLinkLayer(Layer):
                 upcount
             )
         else:
-            logger.debug('[llm][on_data_received] Device address 0x%08x not found' % dev_addr)
+            logger.debug("[llm][on_data_received] Device address 0x%08x not found", dev_addr)
             return None
