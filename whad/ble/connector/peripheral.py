@@ -563,9 +563,14 @@ class Peripheral(BLE):
     def set_mtu(self, mtu: int):
         """Set connection MTU.
         """
-        if self.connection is not None:
-            # Start a MTU exchange procedure
-            self.connection.gatt.set_mtu(mtu)
+        if self.connection is not None and isinstance(mtu, int):
+            if mtu >= 23:
+                # Start a MTU exchange procedure
+                self.connection.gatt.set_mtu(mtu)
+            else:
+                logger.error("[peripheral::set_mtu] MTU value must be >= 23")
+        else:
+            logger.error("[peripheral] provided MTU is not an integer value !")
 
     def get_mtu(self) -> int:
         """Retrieve the connection MTU.

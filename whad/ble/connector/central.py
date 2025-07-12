@@ -487,9 +487,14 @@ class Central(BLE):
     def set_mtu(self, mtu: int):
         """Set connection MTU.
         """
-        if self.__gatt_client is not None:
-            # Start a MTU exchange procedure
-            self.__gatt_client.set_mtu(mtu)
+        if self.__gatt_client is not None and isinstance(mtu, int):
+            if mtu >= 23:
+                # Start a MTU exchange procedure
+                self.__gatt_client.set_mtu(mtu)
+            else:
+                logger.error("[central::set_mtu] ATT MTU value must be >= 23 !")
+        else:
+            logger.error("[central::set_mtu] ATT MTU must be an integer !")
 
     def get_mtu(self) -> int:
         """Retrieve the connection MTU.
