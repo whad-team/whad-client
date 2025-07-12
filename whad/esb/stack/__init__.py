@@ -6,6 +6,7 @@ from typing import Optional
 
 from whad.esb.stack.llm import LinkLayer
 from whad.common.stack import Layer, alias, source
+from whad.common.stack.layer import DEFAULT_FLAVOR
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class ESBStack(Layer):
     this stack (e.g., Unifying, Microsoft).
     """
 
-    def __init__(self, connector, options: Optional[dict] = None):
+    def __init__(self, connector, options: Optional[dict] = None, flavor: str = DEFAULT_FLAVOR):
         """
         Create an instance of Enhanced ShockBurst associated with a specific connector. This
         connector provides the transport layer.

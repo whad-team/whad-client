@@ -1,19 +1,22 @@
 """
 Pythonic Bluetooth LE stack
 """
+import logging
+
+from whad.common.stack import Layer, alias, source
+from whad.common.stack.layer import DEFAULT_FLAVOR
+
 from .llm import LinkLayer
 from .constants import BtVersion
 
-from whad.common.stack import Layer, alias, source
-
-import logging
 logger = logging.getLogger(__name__)
 
 @alias('phy')
 class BleStack(Layer):
 
-    def __init__(self, connector, bt_version=BtVersion(4, 0), manufacturer=0x0002, sub_version=0x0100, options={}):
-        super().__init__(options=options)
+    def __init__(self, connector, bt_version=BtVersion(4, 0), manufacturer=0x0002, sub_version=0x0100, options={},
+                 flavor: str = DEFAULT_FLAVOR):
+        super().__init__(options=options, flavor=flavor)
 
         # Save connector (used as PHY layer)
         self.__connector = connector

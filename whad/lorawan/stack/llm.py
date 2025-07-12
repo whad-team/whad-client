@@ -102,7 +102,7 @@ class LWGwLinkLayerState(LayerState):
 
         :param mac_node: MACLayer instance name
         :type mac_node: str
-        
+
         :return: Connection data or None if not found
         :rtype: dict
         """
@@ -153,7 +153,7 @@ class LWGwLinkLayer(Layer):
         :param frame: LoRaWAN frame
         :type frame: PHYPayload
         """
-        
+
         # Retrieve APPKey and APPEUI
         self.appkey = self.get_layer('phy').get_appkey()
         self.app_eui = self.get_layer('phy').get_appeui()
@@ -380,7 +380,7 @@ class LWGwLinkLayer(Layer):
                 packet.mtype = 5
             else:
                 packet.mtype = 3
-            
+
             # Encrypt message for our target device           
             enc_pkt = encrypt_packet(
                 packet,
@@ -420,3 +420,4 @@ class LWGwLinkLayer(Layer):
         else:
             logger.debug("[llm][on_data_received] Device address 0x%08x not found", dev_addr)
             return None
+

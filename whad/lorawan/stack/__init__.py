@@ -3,6 +3,7 @@ Pythonic LoRaWAN 1.0 stack
 """
 import logging
 
+from whad.common.stack.layer import DEFAULT_FLAVOR
 from whad.scapy.layers.lorawan import PHYPayload
 from whad.common.stack import LayerState, Layer, alias, source, state
 
@@ -36,7 +37,7 @@ class LWGatewayStack(Layer):
     For now, MAC commands are not processed.
     """
 
-    def __init__(self, connector, options={}):
+    def __init__(self, connector, options={}, flavor: str = DEFAULT_FLAVOR):
         """
         Create an instance of LoRaWAN associated with a specific connector. This
         connector provides the transport layer.
@@ -47,7 +48,7 @@ class LWGatewayStack(Layer):
         :type options: dict
         """
 
-        super().__init__(options=options)
+        super().__init__(options=options, flavor=flavor)
 
         # APPKey must be provided
         if 'appkey' in options:
@@ -70,7 +71,7 @@ class LWGatewayStack(Layer):
         :rtype: bytes
         """
         return self.state.appkey
-    
+
     def get_appeui(self):
         """Retrieve the current APP EUI
 
@@ -116,7 +117,7 @@ class LWGatewayStack(Layer):
         logger.debug("[phy] sending frame of %d bytes", len(bytes(frame)))
         self.__connector.rx1()
         self.__connector.send(bytes(frame), timestamp=timestamp)
-        
+
     def on_device_joined(self, dev_eui : str, dev_addr : int, appskey : bytes, nwkskey : bytes):
         """A device has just joined.
 

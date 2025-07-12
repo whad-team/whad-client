@@ -23,6 +23,7 @@ from whad.ble.profile.characteristic import Characteristic, CharacteristicDescri
 from whad.ble.profile.service import PrimaryService, SecondaryService, IncludeService
 
 from whad.common.stack import Layer, source, alias
+from whad.common.stack.layer import DEFAULT_FLAVOR
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def proclock(f):
         except GattTimeoutException as err:
             self.procedure_stop()
             raise err
-        
+
         # Release GATT procedure lock
         self.procedure_stop()
         return result
@@ -454,8 +455,8 @@ class GattLayer(Layer):
 
 class GattClient(GattLayer):
 
-    def __init__(self, parent=None, layer_name=None, options={}):
-        super().__init__(parent=parent, layer_name=layer_name, options=options)
+    def __init__(self, parent=None, layer_name=None, options={}, flavor: str = DEFAULT_FLAVOR):
+        super().__init__(parent=parent, layer_name=layer_name, options=options, flavor=flavor)
         self.__model = None
         self.__notification_callbacks = {}
 
@@ -723,7 +724,7 @@ class GattClient(GattLayer):
         Discover service characteristics
         """
         logger.debug("discover characteristics for service %s", service.uuid)
-        logger.debug("discover characteristics from handle %d to %d", 
+        logger.debug("discover characteristics from handle %d to %d",
             service.handle, service.end_handle
         )
         if isinstance(service, PrimaryService):
@@ -762,7 +763,7 @@ class GattClient(GattLayer):
                             charac.value = self.read(charac_value_handle)
                         except AttError:
                             charac.value = b""
-                        
+
                     handle = charac.handle+2
                     logger.debug("found characteristic %s with handle %d", charac_uuid, charac_value_handle)
                     yield charac
@@ -1065,7 +1066,7 @@ class GattClient(GattLayer):
                 raise error_response_to_exc(msg.reason, msg.request, msg.handle)
         else:
             return None
-        
+
     def on_mtu_changed(self, mtu):
         """MTU has changed, notify client.
         """
@@ -1087,8 +1088,8 @@ class GattServer(GattLayer):
     BLE GATT server
     """
 
-    def __init__(self, parent=None, layer_name=None, options={}):
-        super().__init__(parent=parent, layer_name=layer_name, options=options)
+    def __init__(self, parent=None, layer_name=None, options={}, flavor: str = DEFAULT_FLAVOR):
+        super().__init__(parent=parent, layer_name=layer_name, options=options, flavor=flavor)
         self.__server_model = None
 
         # Prepared write queues
@@ -2337,5 +2338,5 @@ class GattServer(GattLayer):
 
 class GattClientServer(GattServer, GattClient):
 
-    def __init__(self, parent=None, layer_name=None, options={}):
-        super().__init__(parent=parent, layer_name=layer_name, options=options)
+    def __init__(self, parent=None, layer_name=None, options={}, flavor:str = DEFAULT_FLAVOR):
+        super().__init__(parent=parent, layer_name=layer_name, options=options, flavor=flavor)
