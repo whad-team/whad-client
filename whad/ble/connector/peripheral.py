@@ -105,12 +105,12 @@ class PeripheralEventListener(Thread):
     @property
     def queue(self):
         return self.__queue
-    
+
     def notify(self, event):
         """Add event to notify
         """
         self.__queue.put(event)
-    
+
     def stop(self):
         """Stop listener
         """
@@ -252,7 +252,7 @@ class Peripheral(BLE):
             self.__gatt_layer = gatt_layer
         if phy_layer is not None:
             self.__phy_layer = phy_layer
-            
+
             # Configure BLE stack to use our PHY class
             self.__stack = phy_layer(self)
 
@@ -554,9 +554,14 @@ class Peripheral(BLE):
     def set_mtu(self, mtu: int):
         """Set connection MTU.
         """
-        if self.connection is not None:
-            # Start a MTU exchange procedure
-            self.connection.gatt.set_mtu(mtu)
+        if self.connection is not None and isinstance(mtu, int):
+            if mtu >= 23:
+                # Start a MTU exchange procedure
+                self.connection.gatt.set_mtu(mtu)
+            else:
+                logger.error("[peripheral::set_mtu] MTU value must be >= 23")
+        else:
+            logger.error("[peripheral] provided MTU is not an integer value !")
 
     def get_mtu(self) -> int:
         """Retrieve the connection MTU.
