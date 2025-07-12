@@ -146,6 +146,12 @@ a dedicated contextual layer corresponding to a specific context, and dispatch
 the incoming packets/messages to the correct contextual layer, thus performing
 the mux/demux operation.
 """
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Default flavor constant
+DEFAULT_FLAVOR = 'default'
 
 def convert_layer_structure(structure):
     """Convert a layer structure into a GV DOT cluster
@@ -296,30 +302,62 @@ class Layer(object):
         return False
 
     @classmethod
-    def find(cls, alias):
+    def find(cls, alias, flavor: str = DEFAULT_FLAVOR):
         """Find a sub-layer class based on its alias
         """
         # First look into our sub-layers
         if hasattr(cls, 'LAYERS'):
-            if alias in cls.LAYERS:
-                return cls.LAYERS[alias]
+            # Retrieve layers definition for this class and make sure
+            # it is a dict.
+            layers = getattr(cls, 'LAYERS')
+            if isinstance(layers, dict):
+                # Retrieve the flavor layers definition, fallback to default
+                # if layer class does not have a specific definition for this
+                # flavor.
+                if flavor in layers:
+                    flavor_layers = layers[flavor]
+                else:
+                    if DEFAULT_FLAVOR not in layers:
+                        logger.error("Default implementation of layer %s not found in %s",
+                                     alias, cls)
+                        return None
+                    else:
+                        flavor_layers = layers[DEFAULT_FLAVOR]
+            else:
+                logger.error("Error while loading layers definition from %s", cls)
+                return None
 
-            # If not found, propagate to our sub-layer classes
-            for layer in cls.LAYERS:
-                result = cls.LAYERS[layer].find(alias)
+            # Search for requested layer alias in this class layer definition
+            if alias in flavor_layers:
+                # If found, return the corresponding implementation (class)
+                return flavor_layers[alias]
+
+            # If not found, iterate over next layers to see if they have a match.
+            for layer in flavor_layers:
+                result = flavor_layers[layer].find(alias, flavor=flavor)
                 if result is not None:
                     return result
+
+        # Corresponding layer not found, return None
         return None
 
     @classmethod
-    def add(cls, clazz, input=False):
+    def add(cls, clazz, input=False, flavor: str = DEFAULT_FLAVOR):
         """Add a sub-layer class.
         """
         # First we inject a LAYERS attribute into the class
         layers_prop_name = 'LAYERS'
         if not hasattr(cls, layers_prop_name):
-            setattr(cls, layers_prop_name, {})
+            setattr(cls, layers_prop_name, {DEFAULT_FLAVOR: {}})
         class_layers = getattr(cls, layers_prop_name)
+
+        # Create new flavor if required.
+        if flavor in class_layers:
+            flavor_layers = class_layers[flavor]
+        else:
+            # Create specific flavor
+            class_layers[flavor] = {}
+            flavor_layers = class_layers[flavor]
 
         # Then an input boolean field
         if input:
@@ -327,28 +365,34 @@ class Layer(object):
 
         # Register a layer based on its alias
         if hasattr(clazz, 'alias'):
-            if clazz.alias in cls.LAYERS:
-                cls.LAYERS[clazz.alias] = clazz
+            if clazz.alias in flavor_layers:
+                flavor_layers[clazz.alias] = clazz
             else:
-                cls.LAYERS[clazz.alias] = clazz
+                flavor_layers[clazz.alias] = clazz
 
     @classmethod
-    def remove(cls, clazz):
+    def remove(cls, clazz, flavor: str = DEFAULT_FLAVOR):
         """Remove a sub-layer class.
         """
         layers_prop_name = 'LAYERS'
         if hasattr(cls, layers_prop_name):
             class_layers = getattr(cls, layers_prop_name)
-            if clazz.alias in class_layers:
-                del class_layers[clazz.alias]
+            if flavor in class_layers:
+                if clazz.alias in class_layers[flavor]:
+                    del class_layers[flavor][clazz.alias]
+            else:
+                if clazz.alias in class_layers[DEFAULT_FLAVOR]:
+                    del class_layers[DEFAULT_FLAVOR][clazz.alias]
 
-    def __init__(self, parent=None, layer_name=None, options={}):
+
+    def __init__(self, parent=None, layer_name=None, options={}, flavor: str = DEFAULT_FLAVOR):
         self.__parent = parent
         self.__layer_name = layer_name
         self.__state = self.state_class()
         self.__layers = {}
         self.__layer_cache = {}
         self.__options = options
+        self.__flavor = flavor
         self.__monitor_callbacks = []
 
         # Cache our message handlers
@@ -376,9 +420,9 @@ class Layer(object):
 
         # Populate all the sub-layers, if any.
         if hasattr(self, 'LAYERS'):
-            self.populate(options)
+            self.populate(options, flavor=flavor)
 
-    def populate(self, options={}):
+    def populate(self, options={}, flavor: str = DEFAULT_FLAVOR):
         """Sub-layers instanciation.
 
         We instantiate each layer and register these instances into our object.
@@ -386,9 +430,14 @@ class Layer(object):
         self.__options = options
 
         # Define layers and default context.
-        for layer in self.LAYERS.keys():
-            if not self.LAYERS[layer].instantiable():
-                layer_inst = self.create_layer(self.LAYERS[layer], layer)
+        if flavor in self.LAYERS:
+            layers = self.LAYERS[flavor]
+        else:
+            layers = self.LAYERS[DEFAULT_FLAVOR]
+
+        for layer, cls in layers.items():
+            if not cls.instantiable():
+                layer_inst = self.create_layer(cls, layer, flavor=flavor)
                 if layer in options:
                     layer_inst.configure(options[layer])
 
@@ -411,11 +460,21 @@ class Layer(object):
         else:
             return None
 
-    def create_layer(self, layer_class, inst_name):
+    def create_layer(self, layer_class, inst_name, flavor: str = DEFAULT_FLAVOR):
         """Create a layer and registers it into our list of layers.
         """
         layer_options = self.options[layer_class.alias] if layer_class.alias in self.options else {}
-        self.__layers[inst_name] = layer_class(self, inst_name, options=layer_options)
+        # Create layer for a specific flavor, fallback to previous version layer definition if a TypeError
+        # exception is caught.
+        try:
+            self.__layers[inst_name] = layer_class(self, inst_name, options=layer_options, flavor=flavor)
+        except TypeError:
+            # Previous layer creation code, did not bother with flavors.
+            logger.info("Layer %s's __init__() method does not accept a flavor, falling back to default flavor.",
+                        layer_class)
+            self.__layers[inst_name] = layer_class(self, inst_name, options=layer_options)
+
+        # Return newly created layer
         return self.__layers[inst_name]
 
     def destroy(self, layer_instance):
@@ -539,6 +598,11 @@ class Layer(object):
     @property
     def options(self):
         return self.__options
+
+    @property
+    def flavor(self) -> str:
+        """Layer flavor"""
+        return self.__flavor
 
     @classmethod
     def list_emitters(cls):
@@ -674,11 +738,20 @@ class Layer(object):
                 sublayer_class = sublayer[:idx]
 
                 # instantiate and initialize
-                sublayer_obj = self.create_layer(self.LAYERS[sublayer_class], sublayer)
+                if self.__flavor in self.LAYERS:
+                    flavor_layers = self.LAYERS[self.__flavor]
+                elif DEFAULT_FLAVOR in self.LAYERS:
+                    flavor_layers = self.LAYERS[DEFAULT_FLAVOR]
+                else:
+                    logger.error("Class %s does not provide a default layer definition !", self.__class__)
+                    return
+
+                # Create and load sublayer
+                sublayer_obj = self.create_layer(flavor_layers[sublayer_class], sublayer)
                 sublayer_obj.load(state['sublayers'][sublayer])
 
     @classmethod
-    def get_structure(cls):
+    def get_structure(cls, flavor: str = DEFAULT_FLAVOR):
         """Retrieve layer structure.
         """
 
@@ -686,9 +759,20 @@ class Layer(object):
         # Populate sublayer structure
         sublayers_structure = []
         if hasattr(cls, 'LAYERS'):
+            if flavor in cls.LAYERS:
+                sublayers = cls.LAYERS[flavor]
+            else:
+                if DEFAULT_FLAVOR in cls.LAYERS:
+                    sublayers = cls.LAYERS[DEFAULT_FLAVOR]
+                else:
+                    logger.error("Class %s has no default implementation", cls)
+                    return sublayers_structure
+
             # Loop on all sublayers
-            for sublayer in cls.LAYERS:
-                sublayers_structure.append(cls.LAYERS[sublayer].get_structure())
+            for _, impl in sublayers.items():
+                sublayers_structure.append(impl.get_structure())
+        else:
+            logger.error("Class %s has no layer definition !", cls)
 
         # Return our structure
         structure = {
@@ -696,6 +780,7 @@ class Layer(object):
             'instanciable': cls.instantiable(),
             'emitters': cls.list_emitters(),
             'sublayers':sublayers_structure,
+            'flavor': flavor if flavor in cls.LAYERS else DEFAULT_FLAVOR
         }
 
         return structure

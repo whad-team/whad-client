@@ -27,19 +27,19 @@ class LayerMessage(object):
     @property
     def source(self):
         return self.__source
-    
+
     @property
     def destination(self):
         return self.__destination
-    
+
     @property
     def data(self):
         return self.__data
-    
+
     @property
     def tag(self):
         return self.__tag
-    
+
     @property
     def args(self):
         return self.__args
@@ -57,7 +57,7 @@ class LayerMessage(object):
         if (self.source != other.source) or (self.destination != other.destination) \
             or (self.data != other.data) or (self.tag != other.tag):
             return False
-        
+
         # check arguments
         for arg in self.args:
             if arg not in other.args:
@@ -68,11 +68,11 @@ class LayerMessage(object):
                     arg, self.args[arg], other.args[arg])
                 )
                 return False
-            
+
         # Same.
         print('same')
         return True
-        
+
 
 @alias('sandbox')
 class Sandbox(Layer):
@@ -86,10 +86,10 @@ class Sandbox(Layer):
         #self.target = target.alias
         #self.target_class = target
 
-    def populate(self, options={}):
+    def populate(self, options={}, flavor: str = 'default'):
         '''Populate static layers and install a custom message monitor callback
         '''
-        super().populate(options=options)
+        super().populate(options=options, flavor=flavor)
 
         # Install a monitor callback on all sub-layers
         for layer in self.layers:
