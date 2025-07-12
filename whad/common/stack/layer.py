@@ -464,15 +464,7 @@ class Layer(object):
         """Create a layer and registers it into our list of layers.
         """
         layer_options = self.options[layer_class.alias] if layer_class.alias in self.options else {}
-        # Create layer for a specific flavor, fallback to previous version layer definition if a TypeError
-        # exception is caught.
-        try:
-            self.__layers[inst_name] = layer_class(self, inst_name, options=layer_options, flavor=flavor)
-        except TypeError:
-            # Previous layer creation code, did not bother with flavors.
-            logger.info("Layer %s's __init__() method does not accept a flavor, falling back to default flavor.",
-                        layer_class)
-            self.__layers[inst_name] = layer_class(self, inst_name, options=layer_options)
+        self.__layers[inst_name] = layer_class(self, inst_name, options=layer_options, flavor=flavor)
 
         # Return newly created layer
         return self.__layers[inst_name]
