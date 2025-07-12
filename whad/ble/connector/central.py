@@ -50,13 +50,13 @@ class CentralConnected(CentralEvent):
         """Connection handle
         """
         return self.__handle
-    
+
     @property
     def local_peer(self) -> BDAddress:
         """Central BD address
         """
         return self.__local
-    
+
     @property
     def remote_peer(self) -> BDAddress:
         """Remote device BD address
@@ -116,7 +116,7 @@ class CentralEventHandler(Thread):
             self.__listeners[callback] = event_type
             return True
         return False
-    
+
     def remove_listener(self, callback) -> bool:
         """Remove a listener.
         """
@@ -135,7 +135,7 @@ class CentralEventHandler(Thread):
         """
         logger.debug("[central event handler] enqueue event: %s", event)
         self.__queue.put(event)
-    
+
     def run(self):
         """Event handler main thread.
         """
@@ -154,7 +154,7 @@ class Central(BLE):
     """This connector provides a BLE Central role.
 
     To initiate a connection to a device, just call :meth:`Central.connect` with the target
-    BD address and it should return an instance of 
+    BD address and it should return an instance of
     :class:`whad.ble.profile.device.PeripheralDevice` in return.
     """
 
@@ -214,7 +214,7 @@ class Central(BLE):
             self.__gatt_layer = gatt_layer
         if phy_layer is not None:
             self.__phy_layer = phy_layer
-            
+
             # Configure BLE stack to use our PHY class
             self.__stack = phy_layer(self)
 
@@ -336,7 +336,7 @@ class Central(BLE):
                 if time()-start_time >= timeout:
                     raise PeripheralNotFound
                 sleep(0.1)
-            
+
             return self.peripheral()
 
         # Raise error
@@ -408,7 +408,7 @@ class Central(BLE):
             self.__target
         )
         self.__conn_handle = connection_data.conn_handle
-        
+
         # Notify event handlers
         self.__notify_event(CentralConnected(connection_data.conn_handle, self.__local,
                                          self.__target))
