@@ -10,6 +10,7 @@ from typing import Tuple
 from scapy.layers.bluetooth4LE import *
 
 from whad.common.stack import Layer, alias, source, state, LayerState, instance
+from whad.common.stack.layer import DEFAULT_FLAVOR
 from whad.ble.stack.l2cap import L2CAPLayer
 from whad.ble.crypto import LinkLayerCryptoManager, generate_random_value, e
 from whad.hub.ble import BDAddress
@@ -97,7 +98,7 @@ class BleConnection:
         """Link layer
         """
         return self.__l2cap.get_layer("ll")
-    
+
     @property
     def att(self):
         """ATT layer
@@ -380,7 +381,7 @@ class LinkLayerState(LayerState):
 
         :param conn_handle: Connection handle
         :type conn_handle: int
-        :return: Remote peer version PDU if found, `None` otherwise 
+        :return: Remote peer version PDU if found, `None` otherwise
         """
         if conn_handle in self.connections:
             return self.connections[conn_handle]['version_remote']
@@ -392,8 +393,8 @@ class LinkLayer(Layer):
     """Bluetooth Low Energy link-layer implementation.
     """
 
-    def __init__(self, parent=None, layer_name=None, options=None):
-        super().__init__(parent=parent, layer_name=layer_name, options=options)
+    def __init__(self, parent=None, layer_name=None, options=None, flavor: str = DEFAULT_FLAVOR):
+        super().__init__(parent=parent, layer_name=layer_name, options=options, flavor=flavor)
         self.__llcm = None
 
     def configure(self, options=None):

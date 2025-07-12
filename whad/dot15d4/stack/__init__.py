@@ -2,6 +2,7 @@
 Pythonic 802.15.4 stack
 """
 
+from whad.common.stack.layer import DEFAULT_FLAVOR
 from whad.protocol.dot15d4.dot15d4_pb2 import AddressType
 from whad.dot15d4.utils.phy import PHYS
 from whad.dot15d4.stack.mac import MACManager
@@ -23,8 +24,8 @@ class Dot15d4Stack(Layer):
     - 802.15.4 data (forward to upper layer, i.e. NWK)
     """
 
-    def __init__(self, connector, phy=PHYS["802.15.4-OQPSK"], options={}):
-        super().__init__(options=options)
+    def __init__(self, connector, phy=PHYS["802.15.4-OQPSK"], options={}, flavor: str = DEFAULT_FLAVOR):
+        super().__init__(options=options, flavor=flavor)
 
         # Save connector (used as PHY layer)
         self.__connector = connector
