@@ -147,14 +147,20 @@ the incoming packets/messages to the correct contextual layer, thus performing
 the mux/demux operation.
 """
 import logging
+from typing import Callable, Any, Optional
 
 logger = logging.getLogger(__name__)
 
 # Default flavor constant
 DEFAULT_FLAVOR = 'default'
 
-def convert_layer_structure(structure):
-    """Convert a layer structure into a GV DOT cluster
+def convert_layer_structure(structure: dict) -> str:
+    """Convert a layer structure into a GV DOT cluster.
+
+    :param dict: Layer structure to convert
+    :type dict: dict
+    :return: GV DOT cluster
+    :rtype: str
     """
     output = ''
 
@@ -207,16 +213,28 @@ class source(object):
     the implementer.
     """
 
-    def __init__(self, source, tag='default', contextual=False):
+    def __init__(self, source: str, tag: str = 'default', contextual: bool = False):
+        """Initialization of our decorator.
+
+        :param source: Source layer name
+        :type source: str
+        :param tag: Optional tag to match
+        :type tag: str, optional
+        :param contextual: Set to `True` if the source layer is contextualized, `False` otherwise
+        :type contextual: bool, optional
+        """
         self.__source = source
         self.__tag = tag
         self.__contextual = contextual
 
-    def __call__(self, func):
-        """Manage source matching.
+    def __call__(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Add metadata to the decorated function.
+
+        :param func: Function to decorate
+        :type func: callable
         """
-        if hasattr(func, 'match_sources'):
-            sources = getattr(func, 'match_sources')
+        if hasattr(func, "match_sources"):
+            sources = getattr(func, "match_sources")
             if isinstance(sources, dict):
                 if self.__source not in sources:
                     # Add source if not already present
@@ -224,8 +242,9 @@ class source(object):
                 elif self.__tag not in sources[self.__source]:
                     sources[self.__source].append(self.__tag)
         else:
-            func.match_sources = {self.__source: [self.__tag]}
-            func.is_contextual = self.__contextual
+            # Inject specific attributes as special function properties
+            setattr(func, "match_sources", {self.__source: [self.__tag]})
+            setattr(func, "is_contextual", self.__contextual)
         return func
 
 class instance(source):
@@ -233,6 +252,7 @@ class instance(source):
     but forces it to include the instance reference.
     """
     def __init__(self, source, tag='default'):
+        """Initialization, derives from source decorator and force contextual to `True`."""
         super().__init__(source, tag=tag, contextual=True)
 
 
@@ -240,19 +260,27 @@ class alias(object):
     """Layer class decorator to specify layer text alias.
     """
 
-    def __init__(self, name):
+    def __init__(self, name: str):
+        """ Initialization."""
         self.__name = name
 
     def __call__(self, clazz):
+        """Inject alias name into decorated class."""
         clazz.alias = self.__name
         return clazz
 
 
 class state(object):
+    """Decorator to assign a state class to the decorated layer's class.
+    """
+
     def __init__(self, state_class):
+        """Initialization, saves state class."""
         self.__state_class = state_class
 
     def __call__(self, clazz):
+        """Decorate class by setting its `state_class` property to the one
+        specified in the decorator's constructor."""
         clazz.state_class = self.__state_class
         return clazz
 
@@ -271,22 +299,45 @@ class LayerState(object):
             if not prop.startswith('_') and not callable(prop_obj):
                 self.__db[prop] = prop_obj
 
-    def __getattr__(self, property):
+    def __getattr__(self, property: str) -> Any:
+        """Map state fields as object properties.
+
+        :param property: Name of field to access
+        :type property: str
+        :return: State field object
+        :rtype: object
+        :raises: AttributeError
+        """
         if property in self.__db:
             return self.__db[property]
         else:
             raise AttributeError
 
-    def __setattr__(self, property, value):
+    def __setattr__(self, property: str, value: Any):
+        """Property value modification hook to update state's field value when the
+        corresponding mapped property is modified.
+
+        :param property: Name of object's property to modify
+        :type property: str
+        :param value: Value to write into this property object
+        :type value: object
+        """
+        # Write to state fields if property's name does not start with '_'.
         if property.startswith('_'):
             super(LayerState, self).__setattr__(property, value)
         else:
             self.__db[property] = value
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
+        """Layer state as dictionary."""
         return self.__db
 
-    def from_dict(self, values):
+    def from_dict(self, values: dict):
+        """Load layer state from dictionary.
+
+        :param values: Layer state values to load.
+        :type values: dict
+        """
         for prop in values:
             self.__db[prop] = values[prop]
 
@@ -296,14 +347,25 @@ class Layer(object):
     """
     Basic stack layer.
     """
+    # Default state class for layers.
+    state_class = LayerState
 
     @classmethod
-    def instantiable(cls):
+    def instantiable(cls) -> bool:
+        """Determine if this layer can be instantiated. By default,
+        a simple layer cannot be instantiated."""
         return False
 
     @classmethod
-    def find(cls, alias, flavor: str = DEFAULT_FLAVOR):
-        """Find a sub-layer class based on its alias
+    def find(cls, alias: str, flavor: str = DEFAULT_FLAVOR) -> Optional[type['Layer']]:
+        """Find a sub-layer class based on its alias and the current flavor.
+
+        :param alias: Layer alias
+        :type alias: str
+        :param flavor: Layer flavor if specified, default flavor otherwise.
+        :type flavor: str, optional
+        :return: Layer class if found, `None` otherwise.
+        :rtype: Layer, optional
         """
         # First look into our sub-layers
         if hasattr(cls, 'LAYERS'):
@@ -403,17 +465,20 @@ class Layer(object):
                 prop_obj = getattr(self, prop)
                 if callable(prop_obj):
                     methods.append(prop_obj)
-            except AttributeError as att_err:
+            except AttributeError:
                 pass
 
+        # Inspect methods to find those decorated with @source() and save them as handlers.
         for method in methods:
             if hasattr(method, 'match_sources') and isinstance(getattr(method, 'match_sources'), dict):
+                # For each key in the method's `match_sources` dictionary, build the corresponding
+                # handler key and associate this method to it.
                 match_sources = getattr(method, 'match_sources')
                 for source in match_sources:
                     tags = match_sources[source]
                     for tag in tags:
                         handler_key = '%s:%s'%(source,tag)
-                    self.__handlers[handler_key] = method
+                        self.__handlers[handler_key] = method
 
         # Call configure to set up options
         self.configure(options)
