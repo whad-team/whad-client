@@ -74,7 +74,7 @@ class Central(BLE):
     """This connector provides a BLE Central role.
 
     To initiate a connection to a device, just call :meth:`Central.connect` with the target
-    BD address and it should return an instance of 
+    BD address and it should return an instance of
     :class:`whad.ble.profile.device.PeripheralDevice` in return.
     """
 
@@ -332,6 +332,7 @@ class Central(BLE):
             self.__target
         )
         self.__conn_handle = connection_data.conn_handle
+
         # Notify event handlers
         self.notify(CentralConnected(
             connection_data.conn_handle, self.__local,self.__target)
