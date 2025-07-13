@@ -2340,3 +2340,4 @@ class GattClientServer(GattServer, GattClient):
 
     def __init__(self, parent=None, layer_name=None, options={}, flavor:str = DEFAULT_FLAVOR):
         super().__init__(parent=parent, layer_name=layer_name, options=options, flavor=flavor)
+

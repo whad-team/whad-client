@@ -432,7 +432,7 @@ class LinkLayer(Layer):
                         remote_peer_addr)
 
             # Instantiate a L2CAP layer (contextual) to handle the connection
-            conn_l2cap = self.instantiate(L2CAPLayer)
+            conn_l2cap = self.instantiate("l2cap")
             conn_l2cap.set_conn_handle(conn_handle)
 
             # Update state with new connection
