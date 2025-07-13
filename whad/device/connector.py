@@ -7,12 +7,16 @@ implements all the basic features of a device connector.
 import logging
 from queue import Queue, Empty
 from threading import Lock
+from typing import Optional
 
 from whad.helpers import message_filter
 from whad.hub import ProtocolHub
 from whad.hub.generic.cmdresult import CommandResult, Success
-from whad.exceptions import WhadDeviceError, WhadDeviceDisconnected, \
-    RequiredImplementation
+from whad.exceptions import (
+    WhadDeviceError, WhadDeviceDisconnected, RequiredImplementation
+)
+from whad.device.device import WhadDevice
+
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +27,7 @@ class WhadDeviceConnector:
     A connector creates a link between a device and a protocol controller.
     """
 
-    def __init__(self, device=None):
+    def __init__(self, device: Optional[WhadDevice] = None):
         """
         Constructor.
 
@@ -33,7 +37,7 @@ class WhadDeviceConnector:
         :param device: Device to be used with this connector.
         :type device: WhadDevice
         """
-        self.__device = None
+        self.__device: Optional[WhadDevice] = None
         self.set_device(device)
         if self.__device is not None:
             self.__device.set_connector(self)
@@ -191,7 +195,7 @@ class WhadDeviceConnector:
                 if packet_filter(packet):
                     callback(packet)
 
-    def set_device(self, device=None):
+    def set_device(self, device: Optional[WhadDevice] = None):
         """
         Set device linked to this connector.
 
@@ -201,19 +205,23 @@ class WhadDeviceConnector:
             self.__device = device
 
     @property
-    def device(self):
+    def device(self) -> Optional[WhadDevice]:
         """Get the connector associated device instance
         """
         return self.__device
 
     @property
-    def hub(self) -> ProtocolHub:
+    def hub(self) -> Optional[ProtocolHub]:
         """Get the connector protocol hub
 
         :return: Instance of ProtocolHub
         :rtype: ProtocolHub
         """
-        return self.__device.hub
+        if self.__device is not None:
+            return self.__device.hub
+
+        # No device configured
+        return None
 
     def enable_synchronous(self, enabled : bool):
         """Enable or disable synchronous mode
@@ -249,7 +257,7 @@ class WhadDeviceConnector:
         if self.__synchronous:
             self.__pending_pdus.put(pdu)
 
-    def wait_packet(self, timeout:float = None):
+    def wait_packet(self, timeout: Optional[float] = None):
         '''Wait for a packet when in synchronous mode.
 
         :param timeout: If specified, defines a timeout when querying the PDU queue
@@ -289,9 +297,9 @@ class WhadDeviceConnector:
                 # Retrieve PDU
                 message = self.__locked_pdus.get(block=False, timeout=0.2)
                 logger.info("Unlocked message for processing: %s", message)
-                if dispatch_callback is None:
+                if self.device is not None and dispatch_callback is None:
                     self.device.on_packet_message(message)
-                else:
+                elif dispatch_callback is not None:
                     # Call the provided dispatch callback
                     dispatch_callback(message)
         except Empty:
@@ -326,8 +334,12 @@ class WhadDeviceConnector:
         :param filter: optional filter function for incoming message queue.
         """
         try:
-            logger.debug("sending WHAD message to device: %s", message)
-            self.__device.send_message(message, filter)
+            if self.__device is not None:
+                logger.debug("sending WHAD message to device: %s", message)
+                self.__device.send_message(message, filter)
+            else:
+                logger.debug("cannot send WHAD message to non-configured device !")
+                raise WhadDeviceError(message="No device configured.")
         except WhadDeviceError as device_error:
             logger.debug("an error occured while communicating with the WHAD device !")
             self.on_error(device_error)
@@ -343,7 +355,11 @@ class WhadDeviceConnector:
         :param filter: Filtering function used to match the expected response from the device.
         """
         try:
-            return self.__device.send_command(message, filter)
+            if self.__device is not None:
+                return self.__device.send_command(message, filter)
+            else:
+                # Device is not set, return None
+                return None
         except WhadDeviceError as device_error:
             logger.debug("an error occured while communicating with the WHAD device !")
             self.on_error(device_error)
@@ -361,6 +377,15 @@ class WhadDeviceConnector:
     def send_packet(self, packet):
         """Send packet to our device.
         """
+        # Make sure we have a hub configured.
+        if self.hub is None:
+            logger.debug((
+                "[connector::send_packet] No protocol hub available, "
+                "cannot convert packet into WHAD message."
+            ))
+            # Failure
+            return False
+
         # Monitor this outgoing packet
         self.monitor_packet_tx(packet)
 
@@ -393,7 +418,9 @@ class WhadDeviceConnector:
         provided filter. A timeout can be specified and will cause this method to return
         None if this timeout is reached.
         """
-        return self.__device.wait_for_message(timeout=timeout, filter=filter, command=command)
+        if self.__device is not None:
+            return self.__device.wait_for_message(timeout=timeout, filter=filter, command=command)
+        return None
 
     # Message callbacks
     def on_any_msg(self, message): # pylint: disable=W0613
@@ -463,7 +490,7 @@ class LockedConnector(WhadDeviceConnector):
     """Provides a lockable connector.
     """
 
-    def __init__(self, device):
+    def __init__(self, device: WhadDevice):
         # We set the connector with no interface for now
         super().__init__(None)
 
@@ -475,3 +502,4 @@ class LockedConnector(WhadDeviceConnector):
         # and could be later retrieved when connector is unlocked.
         self.set_device(device)
         device.set_connector(self)
+

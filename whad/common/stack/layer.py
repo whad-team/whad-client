@@ -58,6 +58,14 @@ class PhyLayer(Layer):
     pass
 ```
 
+We use the :py:method:`whad.common.stack.layer.Layer.add` class method to bind
+a specific layer to another:
+
+``` python
+PhyLayer.add(EtherLayer)
+EtherLayer.add(IpLayer)
+```
+
 This physical layer will be our main layer for our stack, and will send each
 raw packet received to the `EthLayer` class and receive as well packets to
 send back on the physical link from the latter.
@@ -122,6 +130,10 @@ class PhyLayer(Layer):
         '''Received packet from the network'''
         # Send packet to our Ethernet layer
         self.send('eth', packet)
+
+# Link layers (PhyLayer -> EthLayer -> IpLayer)
+PhyLayer.add(EthLayer)
+EthLayer.add(IpLayer)
 ```
 
 Using the above code, when the physical layer class `PhyLayer` is sending a
@@ -145,6 +157,75 @@ be instantiated to hold its own context. The lower layer must then instantiate
 a dedicated contextual layer corresponding to a specific context, and dispatch
 the incoming packets/messages to the correct contextual layer, thus performing
 the mux/demux operation.
+
+
+Customizing an existing stack model
+-----------------------------------
+
+Any stack layer of a stack model can be replaced by a custom user-defined
+stack layer to alter the way the protocol stack works. This can be useful
+for vulnerability research for instance or simply to implement a variant
+of a standard protocol without rewriting the whole stack.
+
+In order to keep the stack model fully functional, a new *flavor* of an
+existing stack model needs to be defined: the stack model will store its
+standard (or _default_) definition but also the new flavored definition.
+Let's implement a variant of our previous protocol stack to include ICMP.
+
+First, we define a new protocol layer for ICMP, like we previously did for the
+other protocols:
+
+``` python
+@alias('icmp')
+class IcmpLayer(Layer):
+    pass
+```
+
+Then, we create a link between the IP layer implementation and this new ICMP layer,
+by calling the :py:method:`whad.common.stack.layer.Layer.add` method and specifying
+the flavor in which this link will be made:
+
+``` python
+IpLayer.add(IcmpLayer, flavor="icmp")
+```
+
+At this point, our protocol stack defined by the `PhyLayer` can be instantiated with
+two different flavors: the default flavor (no flavor specified) or the `icmp` flavor.
+If we want to use the default flavor, then the following code will create an instance
+of our `PhyLayer` with all the required sub-layers (`EtherLayer` and `IpLayer`), but
+no `IcmpLayer`:
+
+``` python
+stack = PhyLayer()
+```
+
+The default protocol stack structure will then be:
+
+.. mermaid::
+
+	flowchart LR
+        A(["PhyLayer"])
+        A <--> B(["EthLayer"])
+        B <--> C(["IpLayer"])
+
+To use our new stack flavor, we simply instantiate the layer class with the extra
+named parameter `flavor` to tell WHAD which flavor to use:
+
+``` python
+stack = PhyLayer(flavor="icmp")
+```
+
+This time the protocol stack structure will be the following:
+
+.. mermaid::
+
+	flowchart LR
+        A(["PhyLayer"])
+        A <--> B(["EthLayer"])
+        B <--> C(["IpLayer"])
+		C <--> D(["IcmpLayer"])
+
+
 """
 import logging
 from typing import Callable, Any, Optional
@@ -500,28 +581,44 @@ class Layer(object):
         else:
             layers = self.LAYERS[DEFAULT_FLAVOR]
 
+		# Loop over declared layers and create an instance of each
+		# sub-layer, if not a contextual layer.
         for layer, cls in layers.items():
             if not cls.instantiable():
                 layer_inst = self.create_layer(cls, layer, flavor=flavor)
                 if layer in options:
                     layer_inst.configure(options[layer])
 
-    def instantiate(self, contextual_clazz):
-        """Instantiate a contextual layer.
-        """
+    def instantiate(self, layer_name: Optional[str] = None):
+        """Instantiate a contextual layer based on current flavor.
+		"""
+		# Find layer in current flavor layers
+        layer_cls: Optional[Layer] = None
+        if self.__flavor in self.LAYERS:
+            if layer_name in self.LAYERS[self.__flavor]:
+                layer_cls = self.LAYERS[self.__flavor][layer_name]
+
+		# If not found, fallback to default flavor
+        if layer_cls is None:
+            if layer_name not in self.LAYERS[DEFAULT_FLAVOR]:
+				# Cannot find layer, return None
+                return None
+            else:
+                layer_cls = self.LAYERS[DEFAULT_FLAVOR][layer_name]
+
         # Make sure the class inherits from `ContextualLayer` class
-        if issubclass(contextual_clazz, ContextualLayer):
+        if issubclass(layer_cls, ContextualLayer):
             # Build instance number
-            if hasattr(contextual_clazz, 'INSTCOUNT'):
-                instcount = getattr(contextual_clazz, 'INSTCOUNT')
+            if hasattr(layer_cls, 'INSTCOUNT'):
+                instcount = getattr(layer_cls, 'INSTCOUNT')
                 instcount += 1
             else:
-                setattr(contextual_clazz, 'INSTCOUNT', 0)
+                setattr(layer_cls, 'INSTCOUNT', 0)
                 instcount = 0
-            instance_name = '%s#%d' % (contextual_clazz.alias, instcount)
+            instance_name = '%s#%d' % (layer_cls.alias, instcount)
 
-            # Create layer with this new instance name.
-            return self.create_layer(contextual_clazz, instance_name)
+            # Create layer with this new instance name and active flavor.
+            return self.create_layer(layer_cls, instance_name, flavor=self.__flavor)
         else:
             return None
 
@@ -804,7 +901,8 @@ class Layer(object):
                     return
 
                 # Create and load sublayer
-                sublayer_obj = self.create_layer(flavor_layers[sublayer_class], sublayer)
+                sublayer_obj = self.create_layer(flavor_layers[sublayer_class],
+                                                 sublayer, flavor=self.__flavor)
                 sublayer_obj.load(state['sublayers'][sublayer])
 
     @classmethod
@@ -827,9 +925,9 @@ class Layer(object):
 
             # Loop on all sublayers
             for _, impl in sublayers.items():
-                sublayers_structure.append(impl.get_structure())
+                sublayers_structure.append(impl.get_structure(flavor=flavor))
         else:
-            logger.error("Class %s has no layer definition !", cls)
+            logger.debug("Class %s has no layer definition !", cls)
 
         # Return our structure
         structure = {
@@ -837,16 +935,16 @@ class Layer(object):
             'instanciable': cls.instantiable(),
             'emitters': cls.list_emitters(),
             'sublayers':sublayers_structure,
-            'flavor': flavor if flavor in cls.LAYERS else DEFAULT_FLAVOR
+            'flavor': flavor if hasattr(cls, "LAYERS") and flavor in cls.LAYERS else DEFAULT_FLAVOR
         }
 
         return structure
 
     @classmethod
-    def export(cls, output_file=None):
+    def export(cls, output_file=None, flavor: str = DEFAULT_FLAVOR):
         """Export to graphviz file.
         """
-        structure = cls.get_structure()
+        structure = cls.get_structure(flavor=flavor)
 
         output = 'digraph T {\n'
         output += 'rankdir=LR;\n'

@@ -169,7 +169,7 @@ method `on_packet_received`:
 
         def configure(self, options={}):
             pass
-        
+ 
         def on_packet_received(self, packet: Packet):
             pass
 
@@ -200,7 +200,7 @@ method combined with the :py:meth:`whad.common.stack.Layer.send`:
 
         def configure(self, options={}):
             pass
-        
+ 
         def on_packet_received(self, packet: Packet):
             if packet.haslayer(Ether):
                 self.send('ether', packet.getlayer(Ether))
@@ -234,7 +234,7 @@ process it, and send an answer back to the `Phy` layer using the same mechanism:
 
         def configure(self, options={}):
             pass
-        
+
         def on_packet_received(self, packet: Packet):
             if packet.haslayer(Ether):
                 self.send('ether', packet.getlayer(Ether))
@@ -270,7 +270,7 @@ Let's try this small protocol stack in a nutshell:
 
         def configure(self, options={}):
             pass
-        
+ 
         def on_packet_received(self, packet: Packet):
             if packet.haslayer(Ether):
                 self.send('ether', packet.getlayer(Ether))
@@ -369,7 +369,7 @@ associate this specific class with a specific layer class thanks to the
         def add_mac_address(self, mac):
             if mac not in self.macs:
                 self.macs.append(mac)
-        
+ 
         def has_mac_address(self, mac):
             return mac in self.macs
 
@@ -433,7 +433,7 @@ shown below:
         def add_mac_address(self, mac):
             if mac not in self.macs:
                 self.macs.append(mac)
-        
+ 
         def has_mac_address(self, mac):
             return mac in self.macs
 
@@ -578,7 +578,7 @@ addresses we have to handle. This is done this way:
             '''Check if a stream is already handled by an IPLayer instance.
             '''
             return ((mac,ip) in self.streams.values())
-                
+ 
         def register_stream(self, mac, ip, layer):
             '''Register a new IPLayer instance for a specified IP/MAC
             '''
@@ -633,7 +633,7 @@ addresses we have to handle. This is done this way:
                     print('New IP address seen: %s' % packet_ip)
 
                     # Create a new IP layer
-                    ip_layer_obj = self.instantiate(IPLayer)
+                    ip_layer_obj = self.instantiate('ip')
                     print('Instantiated a new layer: %s' % ip_layer_obj.name) 
 
                     # Register our source MAC and IP address with our new layer name ('ip#0')
@@ -701,6 +701,77 @@ mux/demux layer assembles everything.
 Therefore, the number of active layers when the stack is running may vary, and the
 stack state reflects this fact.
 
+Creating different flavors of a stack model
+-------------------------------------------
+
+WHAD provides a way to create a variant of a protocol stack model in which one or more
+layers's classes will be replaced by others, called a *flavor*. A single stack model can
+contain multiple flavors, each flavor diverging from the default model while keeping
+the default stack model intact.
+
+As an example, we want to define a custom flavor of our previously defined stack able to
+process ICMP packets. To do so, we need to implement two new classes: one to handle IP
+packets and determine if a packet contains an ICMP layer to forward to a dedicated ICMP
+stack layer, and another one to implement this very ICMP stack layer.
+
+.. code-block:: python
+
+    @alias('ip')
+    class IPLayerWithICMP(ContextualLayer):
+
+        def configure(self, options={}):
+            pass
+
+        @source('ether')
+        def on_ip_packet(self, packet):
+            """Forward ICMP packet if present in the received packet."""
+            if ICMP in packet:
+                self.send('icmp', packet[ICMP])
+
+    @alias('icmp')
+    class ICMPLayer(ContextualLayer):
+
+        def configure(self, options={}):
+            pass
+
+        @source('ip')
+        def on_icmp_packet(self, packet):
+            """Show ICMP packet"""
+            print("Received an ICMP packet:")
+            packet.show()
+
+We now need to link our new ``IPLayerWithICMP`` layer to our previously defined ``EtherLayer``
+layer and our new ``ICMPLayer`` to ``IPLayerWithICMP``:
+
+.. code-block:: python
+
+    EtherLayer.add(IPLayerWithICMP, flavor="icmp")
+    IPLayerWithICMP.add(ICMPLayer, flavor="icmp")
+
+And that's it, we have successfully created a new flavor of our stack model called ``icmp``,
+in which the IP and ICMP layers differ from the standard model. This flavor can be easily
+instantiated by specifying the ``flavor`` named parameter set to ``icmp`` when creating our
+stack's root layer:
+
+.. code-block:: python
+
+    my_stack = Phy(flavor="icmp")
+
+This flavor of our stack model still uses the default ``Phy`` and ``EtherLayer`` layers as
+they do not have any replacement defined. More generally, any layer not defined in a
+new flavor will fallback to its default definition.
+
+.. mermaid::
+
+	flowchart LR
+		A(["PhyLayer"]) <--> B(["EthLayer"])
+		B <-.-> C(["IpLayer"])
+		B <--> D(["IPLayerWithICMP"])
+		D <--> E(["ICMPLayer"])
+		 C:::disabled
+		classDef disabled stroke-width:1px, stroke-dasharray: 1, stroke:#000000, fill:#d5d5d5, color:#757575
+		linkStyle 1 stroke:#757575
+
 Visualizing a stack
 -------------------
 
@@ -715,6 +786,12 @@ layers, using the :py:meth:`whad.common.stack.Layer.export` method, as shown bel
     :align: center
     :caption: Our example stack
 
+Stack flavors can also be translated to DOT files by specifying a `flavor` named
+parameter with the desired flavor name:
+
+.. code:: python
+
+    Phy.export('mystack.dot', flavor="icmp")
 
 Testing protocol layers
 -----------------------
@@ -736,7 +813,7 @@ This class must be used as a layer container as shown below:
 
     import pytest
     from whad.common.stack.tests import Sandbox, LayerMessage
-    
+ 
     # Import our previously declared protocol layer
     from . import Ether
 
@@ -756,7 +833,7 @@ We then can implement one or more unit tests using `pytest` and this sandbox:
 
     import pytest
     from whad.common.stack.tests import Sandbox, LayerMessage
-    
+ 
     # Import our previously declared protocol layer
     from . import Ether
 

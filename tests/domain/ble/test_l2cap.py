@@ -27,16 +27,16 @@ class LinkLayerMock(Sandbox):
 
     def __init__(self, parent=None, layer_name=None, options={}):
         super().__init__(parent=parent, layer_name=layer_name, options=options)
-        
+
         # Instantiate a L2CAP layer and configure target
-        self.__l2cap = self.instantiate(L2CAPLayer)
+        self.__l2cap = self.instantiate("l2cap")
         self.target = self.__l2cap.name
 
     @property
     def l2cap(self):
         return self.__l2cap
 LinkLayerMock.add(L2CAPLayer)
-    
+
 class L2CAPTest(object):
 
     @pytest.fixture
@@ -48,13 +48,13 @@ class TestL2CAPLayer(L2CAPTest):
     def test_non_fragmented_data(self, ll_instance):
         # Send an encapsulated L2CAP packet
         packet = L2CAP_Hdr() / ATT_Hdr() / b'Payload'
-        
+
         # We need to serialize/deserialize to force scapy to fill all the fields
         expected_result = ATT_Hdr(bytes(packet[ATT_Hdr]))
 
         # Send packet
         ll_instance.send(ll_instance.target, bytes(packet), fragment=False)
-        
+
         # Check L2CAP sent data to ATT
         assert ll_instance.expect(LayerMessage(
             ll_instance.target,
