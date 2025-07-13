@@ -11,6 +11,7 @@ from time import sleep
 from queue import Queue, Empty
 from threading import Thread
 
+from whad.device import WhadDevice
 from whad.ble.connector.base import BLE
 from whad.hub.ble.bdaddr import BDAddress
 from whad.ble.stack import BleStack, Layer
@@ -134,9 +135,20 @@ class Peripheral(BLE):
     defined by a specific profile.
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None,
-                 scan_data=None, bd_address=None, public=True, stack=BleStack, gatt=GattServer,
-                 pairing=Pairing(), security_database=None):
+    def __init__(
+        self,
+        device: WhadDevice,
+        existing_connection = None,
+        profile: (GenericProfile | None) = None,
+        adv_data: (AdvDataFieldList | None) = None,
+        scan_data: (AdvDataFieldList | None) = None,
+        bd_address=None,
+        public: bool = True,
+        stack: type[Layer] = BleStack,
+        pairing: Pairing = Pairing(),
+        security_database=None,
+        flavor: str = "server"
+    ):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -166,7 +178,7 @@ class Peripheral(BLE):
         self.__central = None
 
         # Initialize stack
-        self.__configure_stack(stack, gatt)
+        self.__stack = stack(self, flavor=flavor)
 
         self.connection = None
         self.__connected = False
@@ -243,23 +255,6 @@ class Peripheral(BLE):
         """Connection handle
         """
         return self.__conn_handle
-
-    def __configure_stack(self, phy_layer=None, gatt_layer=None):
-        """
-        """
-        # Save GATT and PHY layers
-        if gatt_layer is not None:
-            self.__gatt_layer = gatt_layer
-        if phy_layer is not None:
-            self.__phy_layer = phy_layer
-
-            # Configure BLE stack to use our PHY class
-            self.__stack = phy_layer(self)
-
-        # Configure ATT layer to use our GATT class
-        if self.__gatt_layer is not None:
-            if issubclass(self.__gatt_layer, Layer) and self.__gatt_layer.alias == 'gatt':
-                ATTLayer.add(self.__gatt_layer)
 
     def attach_event_listener(self, listener: PeripheralEventListener):
         """Attach an event queue to receive asynchronous notifications.
@@ -417,9 +412,6 @@ class Peripheral(BLE):
         :param  connection_data:    Connection data
         :type   connection_data:    :class:`whad.protocol.ble_pb2.Connected`
         """
-        # Make sure stack is correctly configured
-        self.__configure_stack()
-
         # Retrieve the GATT server instance and set its profile
         logger.info("a device is now connected (connection handle: %d)",
                     connection_data.conn_handle)
@@ -584,13 +576,9 @@ class PeripheralClient(Peripheral):
             scan_data=scan_data,
             bd_address=bd_address,
             public=public,
-            stack=stack
+            stack=stack,
+            flavor="both"
         )
-
-        # Change ATTLayer to use GattClientServer and reinstantiate our stack
-        ATTLayer.add(GattClientServer)
-        self.use_stack(BleStack)
-
 
     def on_new_connection(self, connection):
         super().on_new_connection(connection)

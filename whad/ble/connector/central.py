@@ -12,19 +12,17 @@ import logging
 from time import time, sleep
 from threading import Thread
 from queue import Empty, Queue
-#from multiprocessing import Queue
 
 from whad.ble.connector.base import BLE
+from whad.device.device import WhadDevice
 from whad.hub.ble import Direction
 from whad.hub.ble.bdaddr import BDAddress
+from whad.common.stack.layer import Layer
 from whad.ble.stack import BleStack
 from whad.ble.stack.constants import BT_MANUFACTURERS, BT_VERSIONS
-from whad.ble.stack.gatt import GattClient
-from whad.ble.stack.att import ATTLayer
 from whad.ble.stack.smp import CryptographicDatabase
 from whad.ble.exceptions import ConnectionLostException, PeripheralNotFound
 from whad.ble.profile.device import PeripheralDevice
-from whad.common.stack import Layer
 from whad.exceptions import UnsupportedCapability
 
 logger = logging.getLogger(__name__)
@@ -158,18 +156,41 @@ class Central(BLE):
     :class:`whad.ble.profile.device.PeripheralDevice` in return.
     """
 
-    def __init__(self, device, existing_connection = None, from_json=None, stack=BleStack,
-                 client=GattClient, security_database=None):
-        """Attach a GATT client if specified in parameter
+    def __init__(
+        self,
+        device: WhadDevice,
+        existing_connection = None,
+        from_json=None,
+        stack: type[Layer] = BleStack,
+        security_database=None,
+        flavor: str = "client"
+    ):
+        """BLE Central connector initialization
 
-        If `client` is set to None, the default GATT layer is used, which does
-        not provide any client feature at all.
+        :param  device:                 Hardware device to use
+        :type   device:                 WhadDevice
+
+        :param  existing_connection:    Connection information if this connector is
+                                        instantiated from an hijacked connection
+        :type   existing_connection:    dict, optional
+
+        :param  from_json:              If specified, provide a target BLE profile to load by default
+        :type   from_json:              str, optional
+
+        :param  stack:                  Protocol stack class to use,
+                                        :py:class:`whad.ble.stack.BleStack` by default
+        :type   stack:                  whad.common.stack.layer.Layer, optional
+
+        :param  security_database:      Security database to be used by the SMP
+        :type   security_database:      CryptographicDatabase, optional
+
+        :param  flavor:                 If specified, custom stack flavor to use.
+        :type   flavor:                 str, optional
         """
         super().__init__(device)
 
-        # Reconfigure stack layers
-        self.__configure_stack(stack, client)
-
+        # Configure stack layers
+        self.__stack = stack(self, flavor=flavor)
         self.__gatt_client = None
         self.__connected = False
         self.__peripheral = None
@@ -204,24 +225,6 @@ class Central(BLE):
         else:
             # self.stop() # ButteRFly doesn't support calling stop when spawning central
             self.enable_central_mode()
-
-
-    def __configure_stack(self, phy_layer=None, gatt_layer=None):
-        """
-        """
-        # Save GATT and PHY layers
-        if gatt_layer is not None:
-            self.__gatt_layer = gatt_layer
-        if phy_layer is not None:
-            self.__phy_layer = phy_layer
-
-            # Configure BLE stack to use our PHY class
-            self.__stack = phy_layer(self)
-
-        # Configure ATT layer to use our GATT class
-        if self.__gatt_layer is not None:
-            if issubclass(self.__gatt_layer, Layer) and self.__gatt_layer.alias == 'gatt':
-                ATTLayer.add(self.__gatt_layer)
 
     @property
     def security_database(self):
@@ -316,9 +319,6 @@ class Central(BLE):
         :return: An instance of `PeripheralDevice` on success, `None` on failure.
         :rtype: :class:`whad.ble.profile.device.PeripheralDevice`
         """
-        # Make sure our BLE stack is correctly configured
-        self.__configure_stack()
-
         if self.can_connect():
             self.connect_to(
                 bd_address,
