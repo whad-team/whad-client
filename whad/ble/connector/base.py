@@ -5,6 +5,7 @@ basic BLE-related methods for the attached interface.
 """
 import struct
 import logging
+from typing import Optional
 
 # Scapy
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
@@ -920,7 +921,7 @@ class BLENew(Connector):
             packet = BTLE(packet)
         return self.hub.ble.format(packet)
 
-    def __init__(self, device=None, synchronous=False):
+    def __init__(self, device: Optional[WhadDevice] = None, synchronous=False):
         """
         Initialize the connector, open the device (if not already opened), discover
         the services (if not already discovered).
@@ -1399,7 +1400,7 @@ class BLENew(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def enable_adv_mode(self, adv_data=None, scan_data=None):
+    def enable_adv_mode(self, adv_data: Optional[AdvDataFieldList] = None, scan_data: Optional[AdvDataFieldList] = None):
         """
         Enable BLE advertising mode (acts as a broadcaster)
         """

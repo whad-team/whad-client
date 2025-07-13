@@ -136,9 +136,20 @@ class Peripheral(BLE):
     defined by a specific profile.
     """
 
-    def __init__(self, device, existing_connection = None, profile=None, adv_data=None,
-                 scan_data=None, bd_address=None, public=True, stack=BleStack, gatt=GattServer,
-                 pairing=Pairing(), security_database=None):
+    def __init__(
+        self,
+        device: WhadDevice,
+        existing_connection = None,
+        profile: (GenericProfile | None) = None,
+        adv_data: (AdvDataFieldList | None) = None,
+        scan_data: (AdvDataFieldList | None) = None,
+        bd_address=None,
+        public: bool = True,
+        stack: type[Layer] = BleStack,
+        pairing: Pairing = Pairing(),
+        security_database=None,
+        flavor: str = "server"
+    ):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -168,7 +179,7 @@ class Peripheral(BLE):
         self.__central = None
 
         # Initialize stack
-        self.__configure_stack(stack, gatt)
+        self.__stack = stack(self, flavor=flavor)
 
         self.connection = None
         self.__connected = Event()
@@ -424,9 +435,6 @@ class Peripheral(BLE):
         :param  connection_data:    Connection data
         :type   connection_data:    :class:`whad.protocol.ble_pb2.Connected`
         """
-        # Make sure stack is correctly configured
-        self.__configure_stack()
-
         # Retrieve the GATT server instance and set its profile
         logger.info("a device is now connected (connection handle: %d)",
                     connection_data.conn_handle)
@@ -593,13 +601,9 @@ class PeripheralClient(Peripheral):
             scan_data=scan_data,
             bd_address=bd_address,
             public=public,
-            stack=stack
+            stack=stack,
+            flavor="both"
         )
-
-        # Change ATTLayer to use GattClientServer and reinstantiate our stack
-        ATTLayer.add(GattClientServer)
-        self.use_stack(BleStack)
-
 
     def on_new_connection(self, connection):
         super().on_new_connection(connection)
