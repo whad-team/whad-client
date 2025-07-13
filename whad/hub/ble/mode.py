@@ -1,5 +1,6 @@
 """WHAD Protocol BLE mode messages abstraction layer.
 """
+from typing import Optional
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
 from whad.hub.message import pb_bind, PbFieldBytes, PbMessageWrapper, PbFieldBool, PbFieldInt
@@ -34,12 +35,19 @@ class PeriphMode(PbMessageWrapper):
     scan_data = PbFieldBytes('ble.periph_mode.scan_data')
     scanrsp_data = PbFieldBytes('ble.periph_mode.scanrsp_data')
 
+    def get_adv_data(self) -> Optional[bytes]:
+        """Retrieve advertising data."""
+        return self.get_field_value(PeriphMode.scan_data)
+
+    def get_scan_data(self) -> Optional[bytes]:
+        """Retrieve scan response data, if set."""
+        return self.get_field_value(PeriphMode.scanrsp_data)
 
 @pb_bind(BleDomain, 'start', 1)
 class BleStart(PbMessageWrapper):
     """BLE start mode message class
     """
-    
+
     def __init__(self, message: Message = None):
         super().__init__(message=message)
         self.message.ble.start.CopyFrom(BleStartCmd())
@@ -48,7 +56,7 @@ class BleStart(PbMessageWrapper):
 class BleStop(PbMessageWrapper):
     """BLE stop mode message class
     """
-    
+
     def __init__(self, message: Message = None):
         super().__init__(message=message)
         self.message.ble.stop.CopyFrom(BleStopCmd())
