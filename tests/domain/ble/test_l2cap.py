@@ -24,7 +24,7 @@ class LinkLayerMock(Sandbox):
         super().__init__(parent=parent, layer_name=layer_name, options=options)
 
         # Instantiate a L2CAP layer and configure target
-        self.__l2cap = self.instantiate(L2CAPLayer)
+        self.__l2cap = self.instantiate("l2cap")
         self.target = self.__l2cap.name
 
     @property

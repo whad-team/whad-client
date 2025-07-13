@@ -110,7 +110,7 @@ class Connector:
         :param device: Device to be used with this connector.
         :type device: Device
         """
-        self.__device = None
+        self.__device: Optional[WhadDevice] = None
         self.set_device(device)
         if self.__device is not None:
             self.__device.set_connector(self)
@@ -284,7 +284,7 @@ class Connector:
                 if packet_filter(packet):
                     callback(packet)
 
-    def set_device(self, device=None):
+    def set_device(self, device: Optional[WhadDevice] = None):
         """
         Set device linked to this connector.
 
@@ -309,19 +309,23 @@ class Connector:
         return self.__stalled
 
     @property
-    def device(self):
+    def device(self) -> Optional[WhadDevice]:
         """Get the connector associated device instance
         """
         return self.__device
 
     @property
-    def hub(self) -> ProtocolHub:
+    def hub(self) -> Optional[ProtocolHub]:
         """Get the connector protocol hub
 
         :return: Instance of ProtocolHub
         :rtype: ProtocolHub
         """
-        return self.__device.hub
+        if self.__device is not None:
+            return self.__device.hub
+
+        # No device configured
+        return None
 
     def enable_synchronous(self, enabled : bool, events: bool = False):
         """Enable or disable synchronous mode
@@ -502,6 +506,15 @@ class Connector:
     def send_packet(self, packet):
         """Send packet to our device.
         """
+        # Make sure we have a hub configured.
+        if self.hub is None:
+            logger.debug((
+                "[connector::send_packet] No protocol hub available, "
+                "cannot convert packet into WHAD message."
+            ))
+            # Failure
+            return False
+
         # Monitor this outgoing packet
         self.monitor_packet_tx(packet)
 
@@ -872,7 +885,7 @@ class LockedConnector(Connector):
     """Provides a lockable connector.
     """
 
-    def __init__(self, device):
+    def __init__(self, device: WhadDevice):
         # We set the connector with no interface for now
         super().__init__(None)
 
@@ -888,3 +901,4 @@ class LockedConnector(Connector):
 
 class WhadDeviceConnector(Connector):
     """Old class"""
+

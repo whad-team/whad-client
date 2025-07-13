@@ -95,24 +95,25 @@ class Sandbox(Layer):
         for layer in self.layers:
             self.layers[layer].register_monitor_callback(self.log_message)
 
-    def instantiate(self, clazz):
+    def instantiate(self, layer_name: (str | None) = None) -> (Layer | None):
         '''Instantiate a layer and install a custom message monitor callback
         '''
-        layer = super().instantiate(clazz)
-        layer.register_monitor_callback(self.log_message)
+        layer = super().instantiate(layer_name)
+        if layer is not None:
+            layer.register_monitor_callback(self.log_message)
         return layer
 
-    def get_layer(self, name: str):
+    def get_layer(self, name: str, children_only: bool = False):
         '''Retrieve a specific layer if one of ours, or this instance if layer
         cannot be found.
         '''
-        layer = super().get_layer(name)
+        layer = super().get_layer(name, children_only=children_only)
         if layer is None:
             self.destination = self
             return self
         else:
             return layer
-    
+
     def get_handler(self, source, tag):
         '''This method is called by our stack message handler search code, and is
         required here to return our dummy message handler.
@@ -158,9 +159,4 @@ class Sandbox(Layer):
                 if msg == messages:
                     return True
             return False
-
-    
-
-
-
 
