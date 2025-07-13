@@ -7,6 +7,8 @@ from whad.common.stack import Layer, alias, source
 from whad.common.stack.layer import DEFAULT_FLAVOR
 
 from .llm import LinkLayer
+from .att import ATTLayer
+from .gatt import GattClient, GattServer, GattClientServer, GattLayer
 from .constants import BtVersion
 
 logger = logging.getLogger(__name__)
@@ -114,3 +116,7 @@ class BleStack(Layer):
         )
 
 BleStack.add(LinkLayer)
+ATTLayer.add(GattLayer)
+ATTLayer.add(GattClient, flavor="client")
+ATTLayer.add(GattServer, flavor="server")
+ATTLayer.add(GattClientServer, flavor="both")

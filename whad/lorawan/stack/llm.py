@@ -184,7 +184,7 @@ class LWGwLinkLayer(Layer):
                 dev_nwkskey = derive_nwkskey(self.appkey, join_nonce, 0x13, join_req.dev_nonce)
 
                 # Instantiate a node for our connection
-                conn_mac = self.instantiate(LWMacLayer)
+                conn_mac = self.instantiate("mac")
                 conn_mac.set_devaddr(dev_addr)
 
                 # Save node information
@@ -261,7 +261,7 @@ class LWGwLinkLayer(Layer):
         )
 
         # Instantiate a node for our connection
-        conn_mac = self.instantiate(LWMacLayer)
+        conn_mac = self.instantiate("mac")
         conn_mac.set_devaddr(dev_addr)
         logger.debug("created a LWMACLayer instance for device: %s", conn_mac.name)
 
