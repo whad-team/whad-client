@@ -337,6 +337,8 @@ class HCIDevice(VirtualDevice):
             # Disconnect if necessary
             for handle in self._active_handles:
                 self._disconnect(handle)
+            # Delete all active handles
+            self._active_handles = []
         elif self.__conn_state == HCIConnectionState.INITIATING:
             # Cancel current connection if still trying to connect
             self.cancel_connection()
@@ -1152,6 +1154,8 @@ class HCIDevice(VirtualDevice):
                     logger.debug("[%s] Successfully disconnected.")
                 else:
                     logger.warning("[%s] Error while disconnecting !")
+            # Remove all known handles
+            self._active_handles = []
 
     @req_cmd("le_set_advertising_data")
     def _set_advertising_data(self, data, from_queue: bool = True) -> bool:
@@ -1426,6 +1430,10 @@ class HCIDevice(VirtualDevice):
     def _on_whad_ble_disconnect(self, message):
         success = self._disconnect(message.conn_handle)
         if success:
+            # Remove handle from active handles
+            self._active_handles.remove(message.conn_handle)
+
+            # Return success
             self._send_whad_command_result(CommandResult.SUCCESS)
             return
         self._send_whad_command_result(CommandResult.ERROR)
