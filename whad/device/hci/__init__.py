@@ -823,7 +823,7 @@ class Hci(VirtualDevice):
                 self._reset() and
                 self.read_local_supported_commands() and
                 self.read_local_le_supported_features() and
-                self.write_simple_pairing_mode() and
+                # self.write_simple_pairing_mode() and  # It looks like it causes issues with HCI :/
                 self.write_connect_accept_timeout() and
                 self.write_device_class() and
                 self._set_event_mask(b"\xff\xff\xfb\xff\x07\xf8\xbf\x3d") and
