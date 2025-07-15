@@ -338,6 +338,8 @@ class Hci(VirtualDevice):
             # Disconnect if necessary
             for handle in self._active_handles:
                 self._disconnect(handle)
+            # Delete all active handles
+            self._active_handles = []
         elif self.__conn_state == HCIConnectionState.INITIATING:
             # Cancel current connection if still trying to connect
             self.cancel_connection()
@@ -1424,6 +1426,10 @@ class Hci(VirtualDevice):
     def _on_whad_ble_disconnect(self, message):
         success = self._disconnect(message.conn_handle)
         if success:
+            # Remove handle from active handles
+            self._active_handles.remove(message.conn_handle)
+
+            # Return success
             self._send_whad_command_result(CommandResult.SUCCESS)
             return
         self._send_whad_command_result(CommandResult.ERROR)
