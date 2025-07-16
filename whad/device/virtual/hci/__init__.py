@@ -1676,7 +1676,7 @@ class HCIDevice(VirtualDevice):
                 self._send_whad_command_result(CommandResult.SUCCESS)
             elif self.__internal_state == HCIInternalState.PERIPHERAL:
                 # We are not advertising anymore
-                if self._advertising:
+                if self.__advertising:
                     self._set_advertising_mode(False)
                 self.terminate_connection()
                 self.__started = False
