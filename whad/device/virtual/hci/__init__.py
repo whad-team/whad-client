@@ -22,7 +22,7 @@ from scapy.layers.bluetooth import BluetoothSocketError, BluetoothUserSocket, \
     HCI_Cmd_Complete_Read_Local_Version_Information, HCI_Cmd_Read_Local_Version_Information, \
     HCI_Cmd_Write_Connect_Accept_Timeout, HCI_Cmd_LE_Read_Local_Supported_Features, \
     HCI_Cmd_LE_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Clear_Filter_Accept_List, \
-    EIR_Hdr, HCI_Cmd_LE_Create_Connection_Cancel
+    EIR_Hdr, HCI_Cmd_LE_Create_Connection_Cancel, HCI_Event_Hdr, HCI_Event_Command_Complete
 
 from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
     HCI_Cmd_Read_Buffer_Size, HCI_Cmd_Complete_Read_Buffer_Size, HCI_Cmd_LE_Set_Event_Mask, \
@@ -52,10 +52,15 @@ from whad.scapy.layers.hci import HCI_VERSIONS, BT_MANUFACTURERS, \
     HCI_Cmd_Ericsson_Write_BD_Address, HCI_Cmd_ST_Write_BD_Address, \
     HCI_Cmd_LE_Set_Host_Channel_Classification
 
-from whad.device.virtual.hci.converter import HCIConverter
-from whad.device.virtual.hci.hciconfig import HCIConfig
-from whad.device.virtual.hci.constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, \
-    HCIInternalState, HCIConnectionState
+from .exceptions import (
+    HCIUnsupportedCommand, HCIUnsupportedFeature, HCIUnsupportedLEFeature
+)
+from .helpers import req_cmd, le_only, req_feature, compute_max_time
+from .converter import HCIConverter
+from .hciconfig import HCIConfig
+from .constants import (
+    LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState, HCIConnectionState
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,126 +100,6 @@ def get_hci(index):
         logger.debug("WHAD device hci%d cannot be accessed.", index)
         raise WhadDeviceAccessDenied(f"hci{index}") from perm_err
 
-def compute_max_time(length: int, datarate: int) -> int:
-    """Compute the maximum transmission time for a given PDU length and
-    datarate.
-
-    Prefix is 80 bits (header + CRC), suffix is some kind of security margin.
-    """
-    return int(((80 + length*8 + 32)/datarate)*1000000.0)
-
-class HCIUnsupportedCommand(Exception):
-    """Raised when an HCI command requirement is not met by hardware.
-    """
-    def __init__(self, command):
-        super().__init__()
-        self.command = command
-
-    def __repr__(self):
-        return f"HCIUnsupportedCommand(cmd='{self.command}')"
-
-class HCIUnsupportedFeature(Exception):
-    """Raised when an HCI feature requirement is not met by hardware.
-    """
-    def __init__(self, feature):
-        super().__init__()
-        self.__feature = feature
-
-    def __repr__(self):
-        return f"HCIUnsupportedFeature(feature='{self.__feature}')"
-
-class HCIUnsupportedLEFeature(Exception):
-    """Raised when an HCI LE feature requirement is not met by hardware.
-    """
-    def __init__(self, feature):
-        super().__init__()
-        self.__feature = feature
-
-    def __repr__(self):
-        return f"HCIUnsupportedLEFeature(feature='{self.__feature}')"
-
-class req_cmd:
-    """HCI Decorator to handle command requirements.
-
-    Normally, we query an HCI interface to retrieve the list of its supported
-    commands, following the recommended initialization procedure
-    (Vol6, part D, section 1).
-
-    We need to check that all the required commands are supported by the target
-    hardware before starting a specific procedure, and this decorator provides
-    a way to declare one or more required commands for a decorated method of
-    HCIDevice, and blocks its execution if at least one of them is not provided
-    by the target hardware.
-    """
-
-    def __init__(self, *args):
-        """Save any string argument as a required HCI command.
-        """
-        self.__requires = []
-        for arg in args:
-            if isinstance(arg, str):
-                self.__requires.append(arg)
-
-    def __call__(self, method):
-        """Called to decorate the actual method.
-        """
-        requirements = self.__requires
-        def _wrap(self, *args, **kwargs):
-            # check our requirements are met
-            for command in requirements:
-                if not self.is_cmd_supported(command):
-                    raise HCIUnsupportedCommand(command)
-
-            # If all requirements are met, forward
-            return method(self, *args, **kwargs)
-        return _wrap
-
-class req_feature:
-    """HCI decorator to handle command feature requirement.
-    """
-    def __init__(self, *args):
-        self.__requires = []
-        for arg in args:
-            if isinstance(arg, str):
-                self.__requires.append(arg)
-
-    def __call__(self, method):
-        """Called to decorate the actual method.
-        """
-        requirements = self.__requires
-        def _wrap(self, *args, **kwargs):
-            # check our requirements are met
-            for feature in requirements:
-                if not self.is_feature_supported(feature):
-                    raise HCIUnsupportedFeature(feature)
-
-            # If all requirements are met, forward
-            return method(self, *args, **kwargs)
-        return _wrap
-
-class le_only(req_feature):
-    """Requires a LE-enabled controller
-    """
-    def __init__(self, *args):
-        super().__init__("le_supported_controller")
-        self.__requires = []
-        for arg in args:
-            if isinstance(arg, str):
-                self.__requires.append(arg)
-
-    def __call__(self, method):
-        requirements = self.__requires
-        def _wrap(self, *args, **kwargs):
-            # check our requirements are met
-            for feature in requirements:
-                if not self.is_le_feature_supported(feature):
-                    raise HCIUnsupportedLEFeature(feature)
-
-            # If all requirements are met, forward
-            return method(self, *args, **kwargs)
-
-        # Wrap with LE-enabled controller check (tested first)
-        return super()(_wrap)
 
 class HCIDevice(VirtualDevice):
     """Host/controller interface virtual device implementation.
@@ -237,32 +122,104 @@ class HCIDevice(VirtualDevice):
 
         return available_devices
 
-    def __init__(self, index):
+    def __init__(self, index: int):
+        """
+        Initialization of an HCI virtual device wrapping a system HCI
+        adapter with Scapy's BluetoothUserSocket.
+
+        The virtual HCI device is identified by the same interface index
+        than the one used on the host OS to avoid confusion.
+        """
         super().__init__(index=index)
+
+        # Create our message converter instance.
         self.__converter = HCIConverter(self)
+
+        # Default timeout for HCI communications
+        self.__timeout = 1.0
+
+        ###
+        ### WHAD device properties
+        ###
+
+        # Device index )same as host)
         self.__index = index
-        self.__lock = Lock()
-        self.__socket: Optional[BluetoothUserSocket]= None
-        self.__internal_state = HCIInternalState.NONE
-        self.__conn_state = HCIConnectionState.DISCONNECTED
-        self.__opened = False
-        self.__hci_responses = Queue()
+
+        # Device capabilities
         self._dev_capabilities = None
-        self._local_name = None
-        self._advertising = False
-        self._bd_address = None
-        self._bd_address_type = AddressType.PUBLIC
+
+        # Firmware version (emulated)
         self._fw_version = None
+
+        # Firmware URL
         self._fw_url = None
+
+        # Firmware Authro
         self._fw_author = None
+
+        # Device unique ID
         self._dev_id = None
-        self._manufacturer = None
+
+        ###
+        ### Virtual device state management
+        ###
+
+        # Internal state stores the current state for the device
+        # Set to HCIInternalState.UNINITIALIZED by default, will be updated
+        # once the device will be opened/accessed.
+        self.__internal_state = HCIInternalState.UNINITIALIZED
+        self.__started = False
+
+        # Connection state when in Peripheral or Central modes.
+        self.__conn_state: HCIConnectionState = HCIConnectionState.DISCONNECTED
+        self._connected: bool = False
+
+        # Specific states for Peripheral mode
+        self.__advertising: bool = False
         self._cached_scan_data = None
         self._cached_scan_response_data = None
-        self.__timeout = 1.0
-        self._connected = False
-        self.__closing = False
-        self.__local_supp_cmds = None
+
+        # Specific states for Observer mode
+        self.__scanning: bool = False
+
+        # Flag used to avoid recursion when closing.
+        self.__closing: bool = False
+
+        # Active handles, used in Peripheral and Central modes
+        self._active_handles: list[int] = []
+
+        ###
+        ### Scapy's BluetoothUserSocket related properties
+        ###
+
+        # We use a lock to avoid concurrency issues when accessing
+        # the underlying HCI socket.
+        self.__lock = Lock()
+        self.__socket: Optional[BluetoothUserSocket]= None
+        self.__opened = False
+
+        # Queue used for passing responses from the IO read thread to
+        # the main application thread.
+        self.__hci_responses = Queue()
+
+        ###
+        ### HCI device properties (cache)
+        ###
+
+        # Adapter's local name
+        self._local_name = None
+
+        # Adapter's BD address
+        self._bd_address = None
+
+        # Adapter's BD address type (default: public)
+        self._bd_address_type = AddressType.PUBLIC
+
+        # Adapter's supported commands (local)
+        self.__local_supp_cmd: Optional[HCI_Cmd_Complete_Supported_Commands] = None
+
+        # Adapter's manufacturer name
+        self._manufacturer = None
 
         # Data PDU Length management
         self.__datarate = HCIDevice.PHY_1M
@@ -276,10 +233,9 @@ class HCIDevice(VirtualDevice):
         self.__supported_max_tx_time = 0x148
         self.__supported_max_rx_octets = 27
         self.__supported_max_rx_time = 0x148
-        self._active_handles = []
 
         # Classic Features
-        self.__features = None
+        self.__features: Optional[HCI_Cmd_Complete_Supported_Features] = None
 
         # LE Features
         self.__le_features = None
@@ -296,15 +252,17 @@ class HCIDevice(VirtualDevice):
         return "hci" + str(self.__index)
 
 
-    def open(self):
+    def open(self) -> bool:
         """
-        Open device.
+        Open device. If already open, issue a warning (debug-only).
+
+        :raises WhadDeviceNotReady: An error occurred when trying to open the HCI device.
         """
         if not self.__opened:
             # Open a Bluetooth user socket
             self.__socket = get_hci(self.__index)
             if self.__socket is None:
-                # An error occured, raising error
+                # An error occured, raise WhadDeviceNotReady
                 logger.error("Whad device is not ready.")
                 raise WhadDeviceNotReady()
 
@@ -315,12 +273,22 @@ class HCIDevice(VirtualDevice):
             # Mark as opened
             self.__opened = True
 
-            # Ask parent class to run a background I/O thread
+            # Ask parent class to run background I/O threads
             super().open()
 
             # Initialize this HCI interface
-            if not self._initialize():
-                raise WhadDeviceNotReady()
+            #if not self._initialize():
+            #    # If something went wrong, raise a WhadDeviceNotReady excption.
+            #    raise WhadDeviceNotReady()
+        else:
+            # Device is already open, log this.
+            logger.debug("[%s] Device is already open, ignoring call to open().", self.interface)
+
+        # Device is now open and idling
+        self.__internal_state = HCIInternalState.IDLE
+
+        # Success
+        return True
 
     def close(self):
         """
@@ -333,6 +301,7 @@ class HCIDevice(VirtualDevice):
         # Marking device as in closing process
         self.__closing = True
 
+        # Terminate all active connections.
         if self.__conn_state == HCIConnectionState.ESTABLISHED:
             # Disconnect if necessary
             for handle in self._active_handles:
@@ -343,9 +312,14 @@ class HCIDevice(VirtualDevice):
             # Cancel current connection if still trying to connect
             self.cancel_connection()
 
-        # Stop advertising if enabled
-        if self._advertising:
+        # Stop advertising if still enabled.
+        if self.__advertising:
             self._set_advertising_mode(False)
+
+        # If device is still set in scanning mode, then stop scanning
+        # as well.
+        if self.__scanning:
+            self._set_scan_mode(False)
 
         # Ask parent class to stop I/O thread
         logger.debug("Stopping background IO threads ...")
@@ -371,7 +345,10 @@ class HCIDevice(VirtualDevice):
 
         :param bytes data: Data to write
         :return: number of bytes written to the device
+        :raises WhadDeviceNotReady: Virtual device cannot be accessed.
         """
+        # If device is not open or socket could not be created, raise
+        # a WhadDeviceNotReady exception.
         if not self.__opened or self.__socket is None:
             raise WhadDeviceNotReady()
         return self.__socket.send(data)
@@ -380,6 +357,8 @@ class HCIDevice(VirtualDevice):
         """
         Fetches data from the device, if there is any data to read. We call select()
         to make sure data is waiting to be read before reading it.
+
+        :raises WhadDeviceNotReady: HCI device is unresponsive or has been disconnected.
         """
         if not self.__opened:
             raise WhadDeviceNotReady()
@@ -407,13 +386,14 @@ class HCIDevice(VirtualDevice):
                             self.__internal_state == HCIInternalState.PERIPHERAL:
 
                         # If advertising was not enabled, skip
-                        if not self._advertising:
+                        if not self.__advertising:
                             return
 
+                        # We read the current advertising TX power
                         if not self._read_advertising_physical_channel_tx_power(from_queue=False):
                             logger.error("[%s] Cannot read advertising physical channel Tx power", self.interface)
 
-                        # if data are cached, configure them
+                        # If scan data has been cached, then update advertising data.
                         if self._cached_scan_data is not None:
                             # We can't wait for response because we are in the
                             # reception loop context
@@ -425,6 +405,7 @@ class HCIDevice(VirtualDevice):
                                 logger.error("[hci] cannot set advertising data!")
                                 raise WhadDeviceNotReady()
 
+                        # Same with scan response data
                         if self._cached_scan_response_data is not None:
                             success = self._set_scan_response_data(
                                 self._cached_scan_response_data, from_queue=False
@@ -437,7 +418,7 @@ class HCIDevice(VirtualDevice):
 
                         # We need to artificially disable advertising indicator
                         # to prevent cached operation
-                        self._advertising = False
+                        self.__advertising = False
                         self._set_advertising_mode(True, from_queue=False)
 
 
@@ -446,7 +427,7 @@ class HCIDevice(VirtualDevice):
             logger.error("Error, waiting...")
             sleep(1)
 
-    def _wait_response(self, timeout=None):
+    def _wait_response(self, timeout: Optional[float] = None) -> Optional[HCI_Event_Hdr]:
         response = None
         try:
             response = self.__hci_responses.get(block=True, timeout=timeout)
@@ -454,18 +435,22 @@ class HCIDevice(VirtualDevice):
             logger.debug("[hci] device did not respond")
         return response
 
-    def _write_packet(self, packet):
+    def _write_packet(self, packet) -> bool:
         """
-        Writes an HCI packet.
+        Writes an HCI packet to the underlying HCI socket.
         """
         logger.debug("[hci] sending packet ...")
 
         # We claim access to our socket by acquiring its lock
         with self.__lock:
-            # And we send our HCI ACL packet
-            self.__socket.send(packet)
+            if self.__socket is not None:
+                # And we send our HCI ACL packet
+                self.__socket.send(packet)
+            else:
+                logger.error("[%s] Cannot send HCI packet: missing socket.", self.interface)
+                return False
 
-        # Wait for response
+        # Wait for a response
         logger.debug("[hci] waiting for response (timeout: %s)...", self.__timeout)
         response = self._wait_response(timeout=self.__timeout)
         if response is None:
@@ -507,12 +492,54 @@ class HCIDevice(VirtualDevice):
 
             # And we wait for a response to be sent to our reception queue
             logger.debug("[%s][write_command] Waiting for response ...", self.interface)
-            response = self._wait_response()
+            response = self._wait_response(timeout=.5)
+
+            # Timeout reached ?
+            if response is None:
+                counter = 1
+                while counter <= 3:
+                    # Issue a warning that will be visible to the user
+                    logger.warning("[%s] HCI interface seems stalled, retrying (%d/3) ...", self.interface)
+
+                    # Try sending a NOOP HCI Command packet
+                    self.__socket.send(HCI_Hdr()/HCI_Command_Hdr(ogf=0, ocf=0, len=0))
+
+                    # Wait for an answer
+                    response = self._wait_response(timeout=.5)
+                    if response is not None and HCI_Event_Command_Complete in response:
+                        # If this response is sent for the last NOOP we sent, previous
+                        # command has been discarded and needs to be sent again and
+                        # things should be back in order.
+                        if response[HCI_Event_Command_Complete].opcode == 0:
+                            logger.debug("[%s] HCI interface answered NOOP, trying again with HCI command ...",
+                                         self.interface)
+                            self.__socket.send(hci_command)
+                            counter += 1
+                            response = self._wait_response(timeout=0.5)
+                        elif response[HCI_Event_Command_Complete].opcode == hci_command[HCI_Command_Hdr].opcode:
+                            # Brace yourselves, we received the answer we were waiting for,
+                            # exiting loop
+                            logger.debug("[%s] HCI interface answered the previous command, continuing",
+                                         self.interface)
+                            break
+                    else:
+                        # No answer, trying again
+                        logger.debug("[%s] HCI interface not answering our NOOP, trying again ...",
+                                     self.interface)
+                        counter += 1
+
+                # At this point, if response is None it simply means the HCI device is stuck.
+                # We raise a WhadDeviceNotReady exception to notify others that this device
+                # is not responding anymore.
+                if response is None:
+                    raise WhadDeviceNotReady()
+
+            # We obviously received an answer, process it.
             while response.opcode != hci_command[HCI_Command_Hdr].opcode:
                 logger.debug("[%s][write_command] Received response with opcode %d", self.interface, response.opcode)
                 response = self._wait_response()
             logger.debug("[%s][write_command] Response received.", self.interface)
-            
+
             if response is not None:
                 logger.debug("[%s] HCI write command returned status %d",
                             self.interface, response.status)
@@ -534,6 +561,7 @@ class HCIDevice(VirtualDevice):
             self.__lock.release()
             response = event
 
+        # Return the returned response.
         return response
 
     def reset(self):
@@ -541,7 +569,12 @@ class HCIDevice(VirtualDevice):
         self._bd_address = self._read_bd_address()
         self._local_name = self._read_local_name()
         """
-        self._initialize()
+        # Reset and initialize the underlying HCI adapter
+        if not self._initialize():
+            raise WhadDeviceNotReady()
+
+        # Build device information based on information
+        # retrieved from the HCI adapter
         self._read_local_name()
         self._fw_version, self._manufacturer = self._read_local_version_information()
         self._fw_author = self._manufacturer
@@ -554,6 +587,15 @@ class HCIDevice(VirtualDevice):
         if len(devid) < 16:
             devid += b"\x00" * (16 - len(devid))
         return devid
+
+    def is_valid_cmd(self, command: int) -> bool:
+        """Check if a specific WHAD message is supported by the virtual device."""
+        if self._dev_capabilities is None:
+            return False
+        if Domain.BtLE not in self._dev_capabilities:
+            return False
+        return command in self._dev_capabilities[Domain.BtLE][1]
+
 
     def _get_capabilities(self):
         supported_states = self._read_le_supported_states()
@@ -584,8 +626,9 @@ class HCIDevice(VirtualDevice):
         :return: True if command is supported, False otherwise
         :rtype: bool
         """
-        if cmd in self.__local_supp_cmds.supported_commands.names:
-            return getattr(self.__local_supp_cmds.supported_commands, cmd)
+        if self.__local_supp_cmds is not None:
+            if cmd in self.__local_supp_cmds.supported_commands.names:
+                return getattr(self.__local_supp_cmds.supported_commands, cmd)
         return False
 
     def is_feature_supported(self, feature: str) -> bool:
@@ -596,10 +639,11 @@ class HCIDevice(VirtualDevice):
         :return: True if feature is supported, False otherwise
         :rtype: bool
         """
-        if feature in self.__features.lmp_features.names:
-            return getattr(self.__features.lmp_features, feature)
+        if self.__features is not None:
+            if feature in self.__features.lmp_features.names:
+                return getattr(self.__features.lmp_features, feature)
         return False
- 
+
     def is_le_feature_supported(self, feature: str) -> bool:
         """Determine if a specific feature is supported by the HCI interface.
 
@@ -608,8 +652,9 @@ class HCIDevice(VirtualDevice):
         :return: True if feature is supported, False otherwise
         :rtype: bool
         """
-        if feature in self.__le_features.le_features.names:
-            return getattr(self.__le_features.le_features, feature)
+        if self.__le_features is not None:
+            if feature in self.__le_features.le_features.names:
+                return getattr(self.__le_features.le_features, feature)
         return False
 
     def _reset(self):
@@ -1084,6 +1129,12 @@ class HCIDevice(VirtualDevice):
             response = self._write_command(HCI_Cmd_LE_Set_Host_Channel_Classification(
                 chM=formatted_channel_map
             ))
+
+            # Error ?
+            if response is None:
+                return False
+
+            # Status different than expected ?
             if response.status != 0x00:
                 logger.debug("[%s] Failed setting Channel Map !", self.interface)
                 logger.debug("[%s] Connection aborted.", self.interface)
@@ -1148,14 +1199,18 @@ class HCIDevice(VirtualDevice):
         elif self.__conn_state == HCIConnectionState.ESTABLISHED:
             logger.debug("[%s] HCI interface is connected, disconnecting ...")
 
-            # Disconnect any active connection
+            # Terminate all active connections
             for handle in self._active_handles:
                 if self._disconnect(handle):
                     logger.debug("[%s] Successfully disconnected.")
                 else:
                     logger.warning("[%s] Error while disconnecting !")
+
             # Remove all known handles
             self._active_handles = []
+
+            # No more connection established
+            self.__conn_state = HCIConnectionState.DISCONNECTED
 
     @req_cmd("le_set_advertising_data")
     def _set_advertising_data(self, data, from_queue: bool = True) -> bool:
@@ -1246,25 +1301,31 @@ class HCIDevice(VirtualDevice):
             filter_policy=filter_policy
         ), from_queue=from_queue)
 
+        # Error ?
+        if response is None:
+            return False
+
         # Process response if required
         if from_queue:
             return response.status == 0x00
+
+        # Success
         return True
 
     @req_cmd("le_set_advertising_enable")
-    def _set_advertising_mode(self, enable=True, from_queue=True):
+    def _set_advertising_mode(self, enable=True, from_queue=True) -> bool:
         """
         Enable or disable advertising mode for HCI device.
         """
         # Already enable, nothing to do
-        if self._advertising and enable:
+        if self.__advertising and enable:
             logger.debug("[%s] Advertising is already enabled, nothing to do ...",
                     self.interface)
             return True
 
         # Not advertising and enabling, we need to configure our advertising
         # parameters.
-        if not self._advertising and enable:
+        if not self.__advertising and enable:
             result = self.set_advertising_parameters(
                     interval_min = 0x0020,
                     interval_max = 0x0020,
@@ -1283,7 +1344,10 @@ class HCIDevice(VirtualDevice):
                 if from_queue:
                     # Wait for a response and update result accordingly.
                     response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=int(enable)))
-                    result = response.status == 0x00
+                    if response is None:
+                        result = False
+                    else:
+                        result = response.status == 0x00
                 else:
                     # Don't wait, simply send command and consider it OK.
                     self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(
@@ -1292,20 +1356,22 @@ class HCIDevice(VirtualDevice):
                     result = True
 
             # On success, advertising has been enabled.
-            self._advertising = result
+            self.__advertising = result
         else:
             logger.debug("[%s] Sending HCI LE Set Advertise Enable (enable:0, blocking:%s)",
                             self.interface, from_queue)
             # Disabling advertising
             if from_queue:
                 response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=0))
-                result = response.status == 0x00
-                if result:
-                    self._advertising = False
+                if response is None:
+                    result = False
+                else:
+                    result = response.status == 0x00
+                    self.__advertising = False
             else:
                 response = self._write_command(HCI_Cmd_LE_Set_Advertise_Enable(enable=0),
                                                from_queue=False)
-                self._advertising = False
+                self.__advertising = False
                 result = True
 
         # Return result
@@ -1409,16 +1475,33 @@ class HCIDevice(VirtualDevice):
                                self.interface, handle)
 
     def _on_whad_ble_periph_mode(self, message):
+        """Process WHAD message requesting to switch to Peripheral mode."""
+
+        # Sanity Checks
+        if self._dev_capabilities is None:
+            raise WhadDeviceNotReady()
+
         logger.debug("whad ble periph mode message")
         if Commands.PeripheralMode in self._dev_capabilities[Domain.BtLE][1]:
             success = self._read_advertising_physical_channel_tx_power()
             if len(message.scan_data) > 0:
-                success = success and self._set_advertising_data(message.scan_data)
-                self._cached_scan_data = message.scan_data
+                # Set advertising data if set
+                if self._cached_scan_data != message.scan_data:
+                    logger.debug("[%s] New scan data received, updating advertising data ...", self.interface)
+                    success = success and self._set_advertising_data(message.scan_data)
+                    self._cached_scan_data = message.scan_data
             if len(message.scanrsp_data) > 0:
-                success = success and self._set_scan_response_data(message.scanrsp_data)
-                self._cached_scan_response_data = message.scanrsp_data
-            success = success and self._set_advertising_mode(True)
+                if self._cached_scan_response_data != message.scanrsp_data:
+                    logger.debug("[%s] New scanrsp data received, updating advertising data ...", self.interface)
+                    success = success and self._set_scan_response_data(message.scanrsp_data)
+                    self._cached_scan_response_data = message.scanrsp_data
+
+            # Set advertising mode if not already advertising.
+            if not self.__advertising and (not self._set_advertising_mode(True)):
+                logger.debug("[%s] Unable to switch to advertising mode !", self.interface)
+                success = False
+
+            # If everything went OK, update state and send Success message
             if success:
                 self.__internal_state = HCIInternalState.PERIPHERAL
                 self._send_whad_command_result(CommandResult.SUCCESS)
@@ -1439,8 +1522,23 @@ class HCIDevice(VirtualDevice):
         self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_connect(self, message):
-        logger.debug("[hci] received WHAD connect message")
-        if Commands.ConnectTo in self._dev_capabilities[Domain.BtLE][1]:
+        """ Handle a WHAD BleConnect message."""
+        logger.debug("[%s] Received a WHAD Connect message", self.interface)
+
+        # Are we supposed to process a Connect message ?
+        if not self.is_valid_cmd(Commands.ConnectTo):
+            logger.debug("[%s] Received an unsupported message (BLE::Connect) !",
+                         self.interface)
+            self._send_whad_command_result(CommandResult.ERROR)
+
+        # Must be in Central mode or return WrongMode error
+        elif self.__internal_state != HCIInternalState.CENTRAL:
+            logger.debug("[%s] Received a Connect message while not in Central mode !",
+                         self.interface)
+            self._send_whad_command_result(CommandResult.WRONG_MODE)
+
+        # All conditions met, process Connect message
+        else:
             bd_address = message.bd_address
             bd_address_type = message.addr_type
             channel_map = message.channel_map if message.channel_map is not None else None
@@ -1449,74 +1547,165 @@ class HCIDevice(VirtualDevice):
                              channel_map=channel_map):
                 self._send_whad_command_result(CommandResult.SUCCESS)
                 return
+
+        # Failure
         self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_central_mode(self, message):
-        if Commands.CentralMode in self._dev_capabilities[Domain.BtLE][1]:
+        """Process BLE Central mode message. """
+        # Make sure this command is valid
+        if not self.is_valid_cmd(Commands.CentralMode):
+            logger.debug("[%s] Received an unsupported message (BLE::CentralMode) !",
+                         self.interface)
+            self._send_whad_command_result(CommandResult.ERROR)
+
+        # If we already are in Central mode, return Success.
+        elif self.__internal_state == HCIInternalState.CENTRAL:
+            logger.debug("[%s] Device already in central mode, ignoring CentralMode command.",
+                         self.interface)
+            self._send_whad_command_result(CommandResult.SUCCESS)
+
+        # If current mode is running, cannot switch
+        elif self.__started:
+            logger.debug("[%s] A different mode is already enabled, cannot swith to Central mode !",
+                         self.interface)
+            self._send_whad_command_result(CommandResult.WRONG_MODE)
+        else:
+            # If not running, switch mode
             self.__internal_state = HCIInternalState.CENTRAL
             self._send_whad_command_result(CommandResult.SUCCESS)
-            return
-        self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_scan_mode(self, message):
-        if Commands.ScanMode in self._dev_capabilities[Domain.BtLE][1]:
+        # Make sure this command is valid
+        if not self.is_valid_cmd(Commands.ScanMode):
+            logger.debug("[%s] Received an unsupported message (BLE::ScanMode) !",
+                         self.interface)
+            self._send_whad_command_result(CommandResult.ERROR)
+
+        # If we already are in Central mode, return Success.
+        elif self.__internal_state == HCIInternalState.OBSERVER:
+            logger.debug("[%s] Device already in scanner mode, ignoring ScanMode command.",
+                         self.interface)
+            self._send_whad_command_result(CommandResult.SUCCESS)
+        elif self.__started:
+            logger.debug("[%s] A different mode is already enabled, cannot swith to Scanner mode !",
+                         self.interface)
+            self._send_whad_command_result(CommandResult.WRONG_MODE)
+        else:
+            # Switch to observer (scanner) mode
             active_scan = message.active
             if self._set_scan_parameters(active_scan):
-                self.__internal_state = HCIInternalState.SCANNING
+                self.__internal_state = HCIInternalState.OBSERVER
                 self._send_whad_command_result(CommandResult.SUCCESS)
-                return
-        self._send_whad_command_result(CommandResult.ERROR)
+            else:
+                self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_start(self, _):
         """Enable the current active mode.
 
         Configure the HCI interface based on selected mode.
         """
-        logger.info("whad internal state: %d", self.__internal_state)
-        if self.__internal_state == HCIInternalState.SCANNING:
-            self._set_scan_mode(True)
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        elif self.__internal_state == HCIInternalState.PERIPHERAL:
-            if not self._advertising:
-                if self._set_advertising_mode(True):
-                    self._advertising = True
-                    self._send_whad_command_result(CommandResult.SUCCESS)
-                else:
-                    self._send_whad_command_result(CommandResult.ERROR)
-            else:
-                self._send_whad_command_result(CommandResult.SUCCESS)
-
-        elif self.__internal_state == HCIInternalState.CENTRAL:
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        else:
+        # Make sure this command is valid
+        if not self.is_valid_cmd(Commands.Start):
+            logger.debug("[%s] Received an unsupported message (BLE::Start) !",
+                         self.interface)
             self._send_whad_command_result(CommandResult.ERROR)
+        elif self.__started:
+            # Return an error
+            logger.debug("[%s] Mode is already running !", self.interface)
+            self._send_whad_command_result(CommandResult.ERROR)
+        else:
+            # Handling mode start based on selected mode
+            logger.info("whad internal state: %d", self.__internal_state)
+            if self.__internal_state == HCIInternalState.OBSERVER:
+                # Starting the observer mode by enabling scanning
+                self._set_scan_mode(True)
+                self.__started = True
+                self._send_whad_command_result(CommandResult.SUCCESS)
+            elif self.__internal_state == HCIInternalState.PERIPHERAL:
+                # Peripheral mode: enable advertising if not already enabled.
+                if not self.__advertising:
+                    result = self._set_advertising_mode(True)
+                    if result:
+                        self.__started = True
+                        self._send_whad_command_result(CommandResult.SUCCESS)
+                    else:
+                        self._send_whad_command_result(CommandResult.ERROR)
+                else:
+                    self.__started = True
+                    self._send_whad_command_result(CommandResult.SUCCESS)
+
+            elif self.__internal_state == HCIInternalState.CENTRAL:
+                # Central mode does not require anything special
+                self.__started = True
+                self._send_whad_command_result(CommandResult.SUCCESS)
+            else:
+                self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_stop(self, message):
+        """Process WHAD Stop message.
 
-        # Stop any connection attempt, terminate established connection
-        self.terminate_connection()
-
-        # Process with requested mode
-        if self.__internal_state == HCIInternalState.SCANNING:
-            self._set_scan_mode(False)
-            self.__internal_state = HCIInternalState.NONE
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        elif self.__internal_state == HCIInternalState.CENTRAL:
-            # Update mode and return success
-            self.__internal_state = HCIInternalState.NONE
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        elif self.__internal_state == HCIInternalState.PERIPHERAL:
-            # We are not advertising anymore
-            self._set_advertising_mode(False)
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        else:
+        This message tells the device to stop running current mode, but
+        this current mode is kept until another mode is selected.
+        """
+        # Make sure this command is valid
+        if not self.is_valid_cmd(Commands.Stop):
+            logger.debug("[%s] Received an unsupported message (BLE::Stop) !",
+                         self.interface)
             self._send_whad_command_result(CommandResult.ERROR)
+        elif not self.__started:
+            # Return an error if we try to stop when we are already stopped.
+            logger.debug("[%s] Device is already stopped, cannot process BLE::Stop message.",
+                         self.interface)
+            self._send_whad_command_result(CommandResult.ERROR)
+        else:
+
+            # Process with requested mode
+            if self.__internal_state == HCIInternalState.OBSERVER:
+                logger.debug("[%s] Stopping scanning mode ...", self.interface)
+                self._set_scan_mode(False)
+                self.__started = False
+                self._send_whad_command_result(CommandResult.SUCCESS)
+            elif self.__internal_state == HCIInternalState.CENTRAL:
+                # Stop any connection attempt, terminate established connection
+                self.terminate_connection()
+                # Central is now off
+                self.__started = False
+                self._send_whad_command_result(CommandResult.SUCCESS)
+            elif self.__internal_state == HCIInternalState.PERIPHERAL:
+                # We are not advertising anymore
+                if self._advertising:
+                    self._set_advertising_mode(False)
+                self.terminate_connection()
+                self.__started = False
+                self._send_whad_command_result(CommandResult.SUCCESS)
+            else:
+                # IDLE mode: cannot stop.
+                self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_send_pdu(self, message):
         """Send a given PDU into the active connection
         """
+        # Make sure this command is valid
+        if not self.is_valid_cmd(Commands.SendPDU):
+            logger.debug("[%s] Received an unsupported message (BLE::SendPdu) !",
+                         self.interface)
+            self._send_whad_command_result(CommandResult.ERROR)
+
+        # Only available in Peripheral and Central modes
+        elif not self.__internal_state in (HCIInternalState.CENTRAL, HCIInternalState.PERIPHERAL):
+            logger.debug("[%s] Cannot send PDU in current mode (%d) !",
+                         self.interface, self.__internal_state)
+            self._send_whad_command_result(CommandResult.WRONG_MODE)
+
+        # Make sure current mode is running
+        elif not self.__started:
+            logger.debug("[%s] Current mode not started, cannot process BLE::SendPdu message !",
+                         self.interface)
+            self._send_whad_command_result(CommandResult.ERROR)
+
         # Make sure we have an active connection
-        if self.__conn_state == HCIConnectionState.ESTABLISHED:
+        elif self.__conn_state == HCIConnectionState.ESTABLISHED:
             logger.debug("[%s] Received WHAD BLE send_pdu message", self.interface)
             if ((self.__internal_state == HCIInternalState.CENTRAL and message.direction == BleDirection.MASTER_TO_SLAVE) or
             (self.__internal_state == HCIInternalState.PERIPHERAL and message.direction == BleDirection.SLAVE_TO_MASTER)):
@@ -1544,22 +1733,35 @@ class HCIDevice(VirtualDevice):
                         self._send_whad_message(pending_message)
 
                 except WhadDeviceUnsupportedOperation:
-                    logger.debug("Parameter error")
+                    logger.debug("[%s] Cannot send PDU: unsupported operation !", self.interface)
                     self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
             else:
                 # Wrong state, cannot send PDU
-                logger.debug("wrong state or packet direction.")
+                logger.debug("[%s] Cannot send PDU: wrong packet direction !", self.interface)
                 self._send_whad_command_result(CommandResult.ERROR)
         else:
             # Not connected
+            logger.debug("[%s] Cannot send PDU: no active connection with handle %d !", self.interface,
+                         message.conn_handle)
             logger.debug("[%s] Cannot send PDU: no connection.", self.interface)
             self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_set_bd_addr(self, message):
-        logger.debug("Received WHAD BLE set_bd_addr message")
-        if self._set_bd_address(message.bd_address, message.addr_type):
-            logger.debug("HCI adapter BD address set to %s", str(message.bd_address))
-            self._send_whad_command_result(CommandResult.SUCCESS)
-        else:
-            logger.debug("HCI adapter does not support BD address spoofing")
+        """Process a WHAD BLE SetBdAddress message."""
+        # Make sure this command is valid
+        if not self.is_valid_cmd(Commands.SetBdAddress):
+            logger.debug("[%s] Received an unsupported message (BLE::SetBdAddress) !",
+                         self.interface)
             self._send_whad_command_result(CommandResult.ERROR)
+        elif self.__started:
+            # Return an error
+            logger.debug("[%s] Mode is already running !", self.interface)
+            self._send_whad_command_result(CommandResult.ERROR)
+        else:
+            logger.debug("Received WHAD BLE set_bd_addr message")
+            if self._set_bd_address(message.bd_address, message.addr_type):
+                logger.debug("[%s] HCI adapter BD address set to %s", self.interface,str(message.bd_address))
+                self._send_whad_command_result(CommandResult.SUCCESS)
+            else:
+                logger.debug("[%s] HCI adapter does not support BD address spoofing", self.interface)
+                self._send_whad_command_result(CommandResult.ERROR)
