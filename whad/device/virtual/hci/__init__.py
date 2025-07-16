@@ -501,7 +501,7 @@ class HCIDevice(VirtualDevice):
                 counter = 1
                 while counter <= 3:
                     # Issue a warning that will be visible to the user
-                    logger.warning("[%s] HCI interface seems stalled, retrying (%d/3) ...", self.interface)
+                    logger.warning("[%s] HCI interface seems stalled, retrying (%d/3) ...", self.interface, counter)
 
                     # Try sending a NOOP HCI Command packet
                     self.__socket.send(HCI_Hdr()/HCI_Command_Hdr(ogf=0, ocf=0, len=0))
