@@ -297,6 +297,7 @@ class Hci(VirtualDevice):
 
         # Specific states for Observer mode
         self.__scanning: bool = False
+        self.__active_mode: bool = False
 
         # Flag used to avoid recursion when closing.
         self.__closing: bool = False
@@ -1685,15 +1686,15 @@ class Hci(VirtualDevice):
             self.__internal_state = HCIInternalState.CENTRAL
             self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_ble_scan_mode(self, message):
+    def _on_whad_ble_scan_mode(self, message: ScanMode):
         # Make sure this command is valid
         if not self.is_valid_cmd(Commands.ScanMode):
             logger.debug("[%s] Received an unsupported message (BLE::ScanMode) !",
                          self.interface)
             self._send_whad_command_result(CommandResult.ERROR)
 
-        # If we already are in Central mode, return Success.
-        elif self.__internal_state == HCIInternalState.OBSERVER:
+        # If we already are in Observer mode, return Success.
+        elif self.__internal_state == HCIInternalState.OBSERVER and message.active == self.__active_mode:
             logger.debug("[%s] Device already in scanner mode, ignoring ScanMode command.",
                          self.interface)
             self._send_whad_command_result(CommandResult.SUCCESS)
@@ -1703,8 +1704,8 @@ class Hci(VirtualDevice):
             self._send_whad_command_result(CommandResult.WRONG_MODE)
         else:
             # Switch to observer (scanner) mode
-            active_scan = message.active
-            if self._set_scan_parameters(active_scan):
+            self.__active_mode = message.active
+            if self._set_scan_parameters(self.__active_mode):
                 self.__internal_state = HCIInternalState.OBSERVER
                 self._send_whad_command_result(CommandResult.SUCCESS)
             else:
