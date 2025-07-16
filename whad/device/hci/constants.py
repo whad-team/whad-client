@@ -10,10 +10,11 @@ from whad.ble.stack.constants import BT_MANUFACTURERS
 class HCIInternalState(IntEnum):
     """Host/controller interface state enumeration.
     """
-    NONE = 0
-    SCANNING = 1
-    CENTRAL = 2
-    PERIPHERAL = 3
+    UNINITIALIZED = 0
+    IDLE = 1
+    OBSERVER = 2
+    CENTRAL = 3
+    PERIPHERAL = 4
 
 class HCIConnectionState(IntEnum):
     """Host/controller interface connection state
