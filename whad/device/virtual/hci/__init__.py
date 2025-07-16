@@ -43,6 +43,7 @@ from whad.hub.discovery import Domain
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.discovery import Capability
 from whad.hub.ble import Direction as BleDirection, Commands, AddressType, BDAddress
+from whad.hub.ble.mode import ScanMode
 
 # Whad custom layers
 from whad.scapy.layers.hci import HCI_VERSIONS, BT_MANUFACTURERS, \
