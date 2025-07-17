@@ -278,7 +278,7 @@ class LinkLayer(Layer):
                 address=self.get_layer('phy').address,
                 no_ack=True
         ) / ESB_Payload_Hdr() / data
-        self.send('phy', packet)
+        self.send('phy', packet, retransmission_count=5)
 
     def on_synchronized(self):
         """Synchronization callback that is called each time

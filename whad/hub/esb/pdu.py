@@ -55,7 +55,7 @@ class SendRawPdu(PbMessageWrapper):
         return SendRawPdu(
             channel=packet.metadata.channel,
             pdu=bytes(packet),
-            retr_count=retr_count
+            retr_count=packet.metadata.retransmission_count
         )
 
 @pb_bind(EsbDomain, 'pdu', 1)
