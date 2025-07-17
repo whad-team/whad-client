@@ -1463,7 +1463,7 @@ class HCIDevice(VirtualDevice):
                 logger.debug("[%s] Connection has terminated, restarting advertising ...",
                              self.interface)
                 self._set_advertising_mode(True, from_queue=False)
-            elif self.__internal_state == HCIInternalState.PERIPHERAL::
+            elif self.__internal_state == HCIInternalState.PERIPHERAL:
                 logger.debug("[%s] Peripheral connection terminated, not advertising because mode is stopped.",
                      self.interface)
             else:
