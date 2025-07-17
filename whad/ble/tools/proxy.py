@@ -507,10 +507,13 @@ class LinkLayerProxy:
         """Central event handler
         """
         if isinstance(event, CentralDisconnected):
+            # Stop central
+            self.__central.stop()
+
             # Central has disconnected, 
             if self.__peripheral.conn_handle is not None:
-                self.__peripheral.disconnect(self.__peripheral.conn_handle)
-                self.__peripheral.wait_disconnection()
+                #self.__peripheral.disconnect(self.__peripheral.conn_handle)
+                #self.__peripheral.wait_disconnection()
                 self.__peripheral.stop()
                 self.__listener.stop()
             else:
@@ -519,7 +522,7 @@ class LinkLayerProxy:
             # Reconnect to Central
             self.__central.stop()
             self.start()
-
+1
     def on_connect(self):
         """This method is called when a client connects to the proxy.
         """
