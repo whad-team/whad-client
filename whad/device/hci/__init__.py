@@ -1547,13 +1547,20 @@ class Hci(VirtualDevice):
         :param handle: Connection handle
         :type handle: int
         """
+        logger.debug("[%s] on_connection_terminated called for handle %d",
+                     self.interface, handle)
         if self.__conn_state == HCIConnectionState.ESTABLISHED:
+            logger.debug("[%s] on_connection_terminated: connection with handle %d is established, disconnecting...",
+                     self.interface, handle)
+
             # Connection is now terminated
             self.__conn_state = HCIConnectionState.DISCONNECTED
             self._connected = False
             self.__disconnected.set()
 
             # Remove handle from active handles
+            logger.debug("[%s] on_connection_terminated: removing handle %d from active handles...",
+                     self.interface, handle)
             if handle in self._active_handles:
                 self._active_handles.remove(handle)
             else:
@@ -1565,6 +1572,13 @@ class Hci(VirtualDevice):
                 logger.debug("[%s] Connection has terminated, restarting advertising ...",
                              self.interface)
                 self._set_advertising_mode(True, from_queue=False)
+            elif self.__internal_state == HCIInternalState.PERIPHERAL::
+                logger.debug("[%s] Peripheral connection terminated, not advertising because mode is stopped.",
+                     self.interface)
+            else:
+                logger.debug("[%s] Central mode and running:%s",
+                     self.interface, self.__started)
+
 
     def _on_whad_ble_periph_mode(self, message):
         """Process WHAD message requesting to switch to Peripheral mode."""
