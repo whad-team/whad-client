@@ -1261,15 +1261,19 @@ class Hci(VirtualDevice):
         self.__disconnected.clear()
 
         # Send a Disconnect command
-        logger.debug("[%s] sending HCI disconnect command ...")
+        logger.debug("[%s] sending HCI disconnect command ...", self.interface)
         response = self._write_command(HCI_Cmd_Disconnect(handle=handle))
         if response is not None and response.status == 0x00:
+            logger.debug("[%s] _disconnect: command successfully sent, waiting to complete", self.interface)
             # If we got a valid response, then wait for the read thread to
             # receive a disconnection event
             self.__disconnected.wait()
+            logger.debug("[%s] _disconnect: disconnection complete", self.interface)
             self.__conn_state = HCIConnectionState.DISCONNECTED
             self._connected = False
             return True
+        else:
+            logger.debug("[%s] _disconnect: error while sending Disconnect command: %s", self.interface, response)
         return False
 
     def terminate_connection(self, handle: int):
