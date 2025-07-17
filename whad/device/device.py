@@ -155,17 +155,20 @@ class WhadDeviceIOThread:
             try:
                 logger.info("Waiting for io thread ...")
                 self.__input.join(1.0)
+
+                while not self.__disconnected:
+                    try:
+                        logger.info("Waiting for processing thread ...")
+                        self.__processing.join(1.0)
+                        self.__disconnected = True
+                    except RuntimeError:
+                        logger.debug(("RuntimeError raised while joining processing thread,"
+                                      " we may try to wait for our thread to finish :/"))
             except RuntimeError:
                 logger.debug((
                     "RuntimeError raised while joining input thread, we may try"
                     " to wait for our thread to finish :/"))
 
-            try:
-                logger.info("Waiting for processing thread ...")
-                self.__processing.join(1.0)
-            except RuntimeError:
-                logger.debug(("RuntimeError raised while joining processing thread,"
-                              " we may try to wait for our thread to finish :/"))
 
         logger.info("WhadDevice IO management thread finished.")
         self.__alive = False
