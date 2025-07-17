@@ -914,8 +914,8 @@ class GattProxy:
         """
         if isinstance(event, CentralDisconnected):
             # Central has disconnected, kill peripheral
-            if self.__peripheral.conn_handle is not None:
-                self.__peripheral.disconnect(self.__peripheral.conn_handle)
+            #if self.__peripheral.conn_handle is not None:
+            #    self.__peripheral.disconnect(self.__peripheral.conn_handle)
 
             # Reconnect to Central using the already discovered GATT profile
             self.__peripheral.stop()
