@@ -5,7 +5,7 @@ import logging
 from time import sleep
 from queue import Queue, Empty
 from struct import unpack
-from threading import Lock
+from threading import Lock, Event
 from typing import Optional
 
 # Scapy layers for HCI
@@ -315,6 +315,12 @@ class Hci(VirtualDevice):
         self.__socket: Optional[BluetoothUserSocket]= None
         self.__opened = False
 
+        # Disconnection event
+        #
+        # This event is used by the Read thread to notify the
+        # main thread that a disconnection has completed.
+        self.__disconnected = Event()
+
         # Queue used for passing responses from the IO read thread to
         # the main application thread.
         self.__hci_responses = Queue()
@@ -494,50 +500,6 @@ class Hci(VirtualDevice):
                     if messages is not None:
                         for message in messages:
                             self._send_whad_message(message)
-
-                    # If the connection is stopped and peripheral mode is started,
-                    # automatically re-enable advertising based on cached data
-                    if HCI_Event_Disconnection_Complete in event:
-                        logger.debug("[hci] Disconnection complete")
-                    if HCI_Event_Disconnection_Complete in event and \
-                            self.__internal_state == HCIInternalState.PERIPHERAL:
-
-                        # If advertising was not enabled, skip
-                        if not self.__advertising:
-                            return
-
-                        # We read the current advertising TX power
-                        if not self._read_advertising_physical_channel_tx_power(from_queue=False):
-                            logger.error("[%s] Cannot read advertising physical channel Tx power", self.interface)
-
-                        # If scan data has been cached, then update advertising data.
-                        if self._cached_scan_data is not None:
-                            # We can't wait for response because we are in the
-                            # reception loop context
-                            success = self._set_advertising_data(self._cached_scan_data,
-                                                                 from_queue=False)
-
-                            # Raise an error if we cannot set the advertising data.
-                            if not success:
-                                logger.error("[hci] cannot set advertising data!")
-                                raise WhadDeviceNotReady()
-
-                        # Same with scan response data
-                        if self._cached_scan_response_data is not None:
-                            success = self._set_scan_response_data(
-                                self._cached_scan_response_data, from_queue=False
-                            )
-
-                            # Raise an error if we cannot set the scan response data.
-                            if not success:
-                                logger.error("[hci] cannot set scan response data!")
-                                raise WhadDeviceNotReady()
-
-                        # We need to artificially disable advertising indicator
-                        # to prevent cached operation
-                        self.__advertising = False
-                        self._set_advertising_mode(True, from_queue=False)
-
 
         except (BrokenPipeError, OSError) as err:
             print(err)
@@ -1295,9 +1257,16 @@ class Hci(VirtualDevice):
         """
         Establish a disconnection using HCI device.
         """
+        # Clear the disconnection event
+        self.__disconnected.clear()
+
+        # Send a Disconnect command
         logger.debug("[%s] sending HCI disconnect command ...")
         response = self._write_command(HCI_Cmd_Disconnect(handle=handle))
         if response is not None and response.status == 0x00:
+            # If we got a valid response, then wait for the read thread to
+            # receive a disconnection event
+            self.__disconnected.wait()
             self.__conn_state = HCIConnectionState.DISCONNECTED
             self._connected = False
             return True
@@ -1558,9 +1527,10 @@ class Hci(VirtualDevice):
                             self.interface, handle, self.__conn_state)
                 logger.warning("[%s] Received an unexpected connection event", self.interface)
         elif self.__internal_state == HCIInternalState.PERIPHERAL:
-            # HCI interface now connected
+            # HCI interface now connected and no more advertising
             self.__conn_state = HCIConnectionState.ESTABLISHED
             self._connected = True
+            self.__advertising = False
             if handle not in self._active_handles:
                 self._active_handles.append(handle)
             else:
@@ -1577,6 +1547,7 @@ class Hci(VirtualDevice):
             # Connection is now terminated
             self.__conn_state = HCIConnectionState.DISCONNECTED
             self._connected = False
+            self.__disconnected.set()
 
             # Remove handle from active handles
             if handle in self._active_handles:
@@ -1584,6 +1555,12 @@ class Hci(VirtualDevice):
             else:
                 logger.warning("[%s] Disconnect event received for unknown handle %d",
                                self.interface, handle)
+
+            # If we are in peripheral mode and running, re-enable advertising
+            if self.__internal_state == HCIInternalState.PERIPHERAL and self.__started:
+                logger.debug("[%s] Connection has terminated, restarting advertising ...",
+                             self.interface)
+                self._set_advertising_mode(True, from_queue=False)
 
     def _on_whad_ble_periph_mode(self, message):
         """Process WHAD message requesting to switch to Peripheral mode."""
@@ -1622,15 +1599,12 @@ class Hci(VirtualDevice):
         self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_disconnect(self, message):
-        success = self._disconnect(message.conn_handle)
-        if success:
-            # Remove handle from active handles
-            self._active_handles.remove(message.conn_handle)
+        if self._disconnect(message.conn_handle):
 
             # Return success
             self._send_whad_command_result(CommandResult.SUCCESS)
-            return
-        self._send_whad_command_result(CommandResult.ERROR)
+        else:
+            self._send_whad_command_result(CommandResult.ERROR)
 
     def _on_whad_ble_connect(self, message):
         """ Handle a WHAD BleConnect message."""
