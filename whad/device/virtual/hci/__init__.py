@@ -22,7 +22,8 @@ from scapy.layers.bluetooth import BluetoothSocketError, BluetoothUserSocket, \
     HCI_Cmd_Complete_Read_Local_Version_Information, HCI_Cmd_Read_Local_Version_Information, \
     HCI_Cmd_Write_Connect_Accept_Timeout, HCI_Cmd_LE_Read_Local_Supported_Features, \
     HCI_Cmd_LE_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Clear_Filter_Accept_List, \
-    EIR_Hdr, HCI_Cmd_LE_Create_Connection_Cancel, HCI_Event_Hdr, HCI_Event_Command_Complete
+    EIR_Hdr, HCI_Cmd_LE_Create_Connection_Cancel, HCI_Event_Hdr, HCI_Event_Command_Complete, \
+    HCI_Event_Command_Status
 
 from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
     HCI_Cmd_Read_Buffer_Size, HCI_Cmd_Complete_Read_Buffer_Size, HCI_Cmd_LE_Set_Event_Mask, \
@@ -165,6 +166,14 @@ class HCIDevice(VirtualDevice):
         ### Virtual device state management
         ###
 
+        # HCI control flow management
+        #
+        # This event flag is set to True once connected to an adapter,
+        # but can change to False whenever the adapter notifies the host.
+        # If so, no more command transmission is allowed and we have to
+        # wait for this event flag to be set again.
+        self.__can_send = Event()
+
         # Internal state stores the current state for the device
         # Set to HCIInternalState.UNINITIALIZED by default, will be updated
         # once the device will be opened/accessed.
@@ -278,8 +287,9 @@ class HCIDevice(VirtualDevice):
             logger.debug("[%s] Flushing HCI interface ...", self.interface)
             self.__socket.flush()
 
-            # Mark as opened
+            # Mark as opened, commands are allowed by default
             self.__opened = True
+            self.__can_send.set()
 
             # Ask parent class to run background I/O threads
             super().open()
@@ -297,6 +307,43 @@ class HCIDevice(VirtualDevice):
 
         # Success
         return True
+
+    def __control_flow(self, packet):
+        """Handle control flow as per stated in the Bluetooth Specifications
+        Vol 4, part E, Section 4.4.
+
+        :param event: HCI event to process
+        :type event: HCI_Event_Command_Status
+        :type event: HCI_Event_Command_Complete
+        """
+        # Extract command status/complete events from packet
+        if HCI_Event_Command_Complete in packet:
+            event = packet[HCI_Event_Command_Complete]
+        elif HCI_Event_Command_Status in packet:
+            event = packet[HCI_Event_Command_Status]
+        else:
+            return
+
+        # Process event
+        if event.opcode == 0 and event.status == 0x01:
+            logger.debug("[%s] controller sent a Command Complete/Status with opcode 0x00, processing...",
+                         self.interface)
+            # Check if number of allowed commands is set to 0,
+            # if so we need to stop sending commands until the
+            # adapter notifies us.
+            if event.number == 0:
+                logger.debug("[%s] Num_HCI_Command_Packets is 0, setting host on hold.",
+                         self.interface)
+                self.__can_send.clear()
+            else:
+                logger.debug("[%s] Num_HCI_Command_Packets >= 1, host is back to business.",
+                         self.interface)
+                self.__can_send.set()
+        elif event.opcode != 0:
+            if event.number == 0:
+                logger.debug("[%s] Num_HCI_Command_Packets is 0 (opcode!=0), setting host on hold.",
+                         self.interface)
+                self.__can_send.clear()
 
     def close(self):
         """
@@ -359,7 +406,15 @@ class HCIDevice(VirtualDevice):
         # a WhadDeviceNotReady exception.
         if not self.__opened or self.__socket is None:
             raise WhadDeviceNotReady()
-        return self.__socket.send(data)
+
+        result = 0
+
+        # Lock the socket to send a packet
+        with self.__lock:
+            result = self.__socket.send(data)
+
+        # Return number of bytes sent
+        return result
 
     def read(self):
         """
@@ -378,6 +433,11 @@ class HCIDevice(VirtualDevice):
                 self.__lock.acquire()
                 event = self.__socket.recv()
                 self.__lock.release()
+
+                # Handle flow control for HCI commands
+                self.__control_flow(event)
+
+                # Process event
                 if event.type == 0x4 and event.code in (0xe, 0xf, 0x13):
                     self.__hci_responses.put(event)
                 else:
@@ -437,6 +497,9 @@ class HCIDevice(VirtualDevice):
         """
         # Prepare HCI command
         hci_command = HCI_Hdr()/HCI_Command_Hdr()/command
+
+        # Wait to be allowed to send packets
+        self.__can_send.wait()
 
         # Acquire lock on our socket
         self.__lock.acquire()
@@ -514,11 +577,17 @@ class HCIDevice(VirtualDevice):
             # expected HCI_Command_Complete message is sent to the HCI RX
             # queue.
 
+            # Wait for an event and update control flow accordingly
             event = self.__socket.recv()
+            self.__control_flow(event)
+
             while not (event.type == 0x4 and event.code == 0xe):
                 if event.type == 0x4 and event.code in (0xf, 0x13):
                     self.__hci_responses.put(event)
+
+                # Wait for another event and update control flow
                 event = self.__socket.recv()
+                self.__control_flow(event)
 
             # We got our response: we release our socket lock and set the
             # captured event as the reponse to return to caller.
