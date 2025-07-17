@@ -32,16 +32,18 @@ if __name__ == '__main__':
             sniffer.set_device_number(0,7912)
             sniffer.set_device_type(0,120)
             sniffer.set_transmission_type(0,1)
-            sniffer.set_channel_period(0,8192//4)
+            sniffer.set_channel_period(0,32768)
             sniffer.assign_channel(0, 0, shared=False, direction=ChannelDirection.RX, unidirectional=False)
             sniffer.set_rf_channel(0,57)
             sniffer.open_channel(0)
-            # Start the sniffer and iterate over packets
+
             sniffer.start()
+
+            # Start the sniffer and iterate over packets
 
             while True:
                 input()
-                p= ANT_Hdr(bytes.fromhex("a6c5e81e78010a") + b"ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"ABCDEFGHIJKLMNOPQRSTUV")#b"SLAAVE")
                 p.broadcast = 1
                 print(sniffer.send(p))
                 

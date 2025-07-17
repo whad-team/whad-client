@@ -296,16 +296,14 @@ class ANT_Hdr(Packet):
 		"""Effectively build the ANTStick message and re-arrange it.
 		"""
 		if self.crc_present == 1 and self.crc is None:
-			print(p)
 			self.crc = compute_crc(p[:-3] + pay)
-			print("crc", hex(self.crc))
 
 		# Build the final frame
 		if self.crc_present == 1:
 			return p[:7] + p[9:] +pay  + pack("<H", self.crc)
 		else:
-			print(p, pay)
-			return p[:7] + p[8:] + pay
+			self.crc_present = 0x41
+			return p[:-1] + pay
 
 	def post_dissect(self, s):
 		"""Override layer post_dissect() function to reset raw packet cache.
