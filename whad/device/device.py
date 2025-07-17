@@ -213,8 +213,6 @@ class DevOutThread(Thread):
                 self.__iface.put_message(Disconnected(self.__iface))
                 return
 
-
-
 class Device:
     """WHAD hardware interface
     """
