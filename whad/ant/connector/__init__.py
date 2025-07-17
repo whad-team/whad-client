@@ -389,6 +389,7 @@ class ANT(WhadDeviceConnector):
             raise UnsupportedCapability("ChannelManagement")
 
         if direction == ChannelDirection.RX:
+            mode = "SLAVE"
             if shared:
                 channel_type = ChannelType.SHARED_BIDIRECTIONAL_RECEIVE_CHANNEL
             elif unidirectional:
@@ -396,6 +397,8 @@ class ANT(WhadDeviceConnector):
             else:
                 channel_type = ChannelType.BIDIRECTIONAL_RECEIVE_CHANNEL
         else:
+            mode = "MASTER"
+
             if shared:
                 channel_type = ChannelType.SHARED_BIDIRECTIONAL_TRANSMIT_CHANNEL
             elif unidirectional:
@@ -412,7 +415,15 @@ class ANT(WhadDeviceConnector):
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))
-        return isinstance(resp, Success)
+        if isinstance(resp, Success):
+            if mode == "MASTER":
+                msg = self.hub.ant.create_master_mode(channel_number = channel_number)
+            else:
+                msg = self.hub.ant.create_slave_mode(channel_number = channel_number)
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+        else:
+            return False
 
 
     def send(self, pdu: bytes, channel_number: int = 0, rf_channel: int = None, add_crc : bool = False):

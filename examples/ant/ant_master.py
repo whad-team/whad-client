@@ -19,8 +19,9 @@ if __name__ == '__main__':
 
             # Create the sniffer ANT connector
             sniffer = ANT(dev)
-            #print(sniffer.list_channels())
-            #print(sniffer.list_networks())
+            print(sniffer.list_channels())
+            print(sniffer.list_networks())
+            input()
             '''
             print(sniffer.sniff_ant(
                 device_type = 0, 
@@ -35,11 +36,13 @@ if __name__ == '__main__':
             
             sniffer.assign_channel(0, 0, shared=False, direction=ChannelDirection.TX, unidirectional=False)
             sniffer.set_rf_channel(0,57)
-            sniffer.set_channel_period(0,8192//4)
+            sniffer.set_channel_period(0,32768//4)
             sniffer.open_channel(0)
+
+
             # Start the sniffer and iterate over packets
             sniffer.start()
-            p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFFFF")+ b"MASTER")
+            p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"MASTER")
             p.broadcast = 0
             print(sniffer.send(p))
             #sniffer.send(pkt)

@@ -125,7 +125,7 @@ class ANTStickDevice(VirtualDevice):
         self.__response_queue = Queue()
         self.__ack_queue = Queue()
 
-        self.__last_timestamp = int(time() * 1000)
+        self.__last_timestamp = time() * 1000
         self.__sync = generate_sync_from_network_key(ANT_PLUS_NETWORK_KEY)
         self.__rf_channel = 57
         self.__number_of_channels = 0
@@ -296,13 +296,13 @@ class ANTStickDevice(VirtualDevice):
                         if ANTStick_Timestamp_Data_Extension in data:
                             timestamp = data.timestamp
                         else:
-                            now = int(time() * 1000)
+                            now = time() * 1000
                             timestamp = now - self.__last_timestamp
                             
                         self._send_whad_ant_pdu(
                             pdu=bytes(pkt), 
                             rf_channel=self.__rf_channel, 
-                            timestamp=timestamp, 
+                            timestamp=int(timestamp * 1000), 
                             rssi = rssi
                         )
                     else:
@@ -982,8 +982,13 @@ class ANTStickDevice(VirtualDevice):
         print("transmitting: ", repr(packet))
         if packet.broadcast == 1:
             print()
+             
             data = bytes(message.pdu)[7:]
             packets = len(data) // 8
+            if len(data) / 8 > packets:
+                packets = packets + 1
+                while (len(data) // 8) != packets:
+                    data = data + b"\x00" 
             for i in range(packets):
                 sequence = ((i - 1) % 3) + 1
                 if i == 0:
@@ -993,30 +998,32 @@ class ANTStickDevice(VirtualDevice):
 
                 channel_seq = message.channel_number | sequence << 5
                 packet_data = data[i * 8 : i * 8 + 8]
-                
+                print(">>>>", packet_data)
                 self._antstick_send_command(
                     ANTStick_Data_Burst_Data(
                         channel_number = channel_seq, 
                         pdu = packet_data
                     ), no_response = True
                 )
-                
-                
-                '''
-                while self.__ack_queue.empty():
-                    sleep(0.001)
+            
+            
+            
+            while self.__ack_queue.empty():
+                sleep(0.001)
                 ack_event = ANTStick_Message(self.__ack_queue.get())
                 print("ackevent", repr(ack_event))
                 if ack_event.message_code != 10:
                     break
-                '''
             '''
+            
             self._antstick_send_command(
                 ANTStick_Data_Acknowledged_Data(
                     channel_number = message.channel_number, 
                     pdu = bytes(message.pdu[-8:])
                 ), no_response = True
-            )'''
+            )
+            
+            '''
             while self.__ack_queue.empty():
                 sleep(0.001)
             ack_event = ANTStick_Message(self.__ack_queue.get())
@@ -1024,7 +1031,6 @@ class ANTStickDevice(VirtualDevice):
                 self._send_whad_command_result(CommandResult.ERROR)
             else:
                self._send_whad_command_result(CommandResult.SUCCESS)
-
         else:
             self._antstick_send_command(
                 ANTStick_Data_Broadcast_Data(
