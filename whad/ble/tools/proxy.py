@@ -510,19 +510,22 @@ class LinkLayerProxy:
             # Stop central
             self.__central.stop()
 
-            # Central has disconnected, 
+            # Central has disconnected, stop peripheral. This will force any central
+            # connected to our emulated peripheral to disconnect.
             if self.__peripheral.conn_handle is not None:
-                #self.__peripheral.disconnect(self.__peripheral.conn_handle)
-                #self.__peripheral.wait_disconnection()
+                # Stop our peripheral
                 self.__peripheral.stop()
                 self.__listener.stop()
             else:
                 logger.debug("[LinkLayerProxy] peripheral not connected")
 
-            # Reconnect to Central
+            # Reconnect our central to the target device.
+
+            # TODO: we need to make sure our peripheral is not advertising anymore
+            # to avoid connecting to it.
             self.__central.stop()
             self.start()
-1
+
     def on_connect(self):
         """This method is called when a client connects to the proxy.
         """
@@ -962,7 +965,7 @@ class GattProxy:
                 bd_address=self.__target_bd_addr,
                 public=not self.__target_random
             )
-            
+
             # Attach peripheral listener
             self.__listener = PeripheralEventListener(callback=self.on_periph_event)
             self.__peripheral.attach_event_listener(self.__listener)
@@ -983,7 +986,7 @@ class GattProxy:
 
         # Remove event handlers
         self.central.clear_event_handlers()
-        
+
         # Disconnect central and peripheral
         if self.__target.conn_handle is not None:
             self.__central.disconnect(self.__target.conn_handle)
