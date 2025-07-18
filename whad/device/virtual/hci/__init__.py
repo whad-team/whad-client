@@ -1736,11 +1736,15 @@ class HCIDevice(VirtualDevice):
                 self.__started = False
                 self._send_whad_command_result(CommandResult.SUCCESS)
             elif self.__internal_state == HCIInternalState.PERIPHERAL:
-                # We are not advertising anymore
+                # If we are advertising, stop advertising
                 if self.__advertising:
                     self._set_advertising_mode(False, from_queue=False)
                 self.__started = False
+
+                # Terminate all connections
                 self.terminate_connection()
+
+                # Success
                 self._send_whad_command_result(CommandResult.SUCCESS)
             else:
                 # IDLE mode: cannot stop.
