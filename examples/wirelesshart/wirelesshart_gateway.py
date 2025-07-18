@@ -44,10 +44,10 @@ if __name__ == '__main__':
             #pkt = Dot15d4(bytes.fromhex("41c836cd04010068d33200000d17001740f936040000f98000170d000032d368010000000a69ddbdc9c7c1822caf8d36fdd633d20ac188eea650acac"))
             #pkt.show()
             input()
-            if ts is not None:
+            '''if ts is not None:
                 # Synchronize the sniffer
                 print("SYNC !!!!!!!!!!!!")
-                sniffer.synchronize(ts, asn)
+                sniffer.synchronize(ts, asn)'''
             while True:
                 sleep(1)
 

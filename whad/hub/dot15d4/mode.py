@@ -3,7 +3,7 @@
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.dot15d4.dot15d4_pb2 import StartCmd, StopCmd
 from whad.hub.events import JammedEvt
-from ..message import pb_bind, PbFieldInt, PbMessageWrapper
+from ..message import pb_bind, PbFieldInt, PbMessageWrapper, PbFieldBool, PbFieldBytes
 from . import Dot15d4Domain
 
 @pb_bind(Dot15d4Domain, 'sniff', 1)
@@ -72,6 +72,35 @@ class Stop(PbMessageWrapper):
     def __init__(self, message: Message = None):
         super().__init__(message=message)
         self.message.dot15d4.stop.CopyFrom(StopCmd())
+        
+@pb_bind(Dot15d4Domain, 'EnableHopCmd', 1)
+class EnableHop(PbMessageWrapper):
+    """Dot15d4 enable frequency hopping message 
+    """
+    hopping = PbFieldBool('dot15d4.hopping.hopping')
+
+@pb_bind(Dot15d4Domain, 'AddLinksCmd', 1)
+class AddLinks(PbMessageWrapper):
+    """Dot15d4 adding new links to superframes message
+    """
+    nb_links = PbFieldInt('dot15d4.addLinks.nb_links')
+    links = PbFieldBytes('dot15d4.addLinks.links')
+    
+@pb_bind(Dot15d4Domain, 'ChannelMapCmd',1)
+class ChannelMap(PbMessageWrapper):
+    """Dot15d4 updating channel map message
+    """
+    channel_map = PbFieldInt('dot15d4.channelMap.channelMap')
+    
+@pb_bind(Dot15d4Domain, 'WriteModifySuperframeCmd', 1)
+class WriteModifySuperframe(PbMessageWrapper):
+    """Dot15d4 updating superframes by adding or modifying a superframe
+    """
+    superframeId = PbFieldInt('dot15d4.writeModifySuperframeCmd.superframeId')
+    numberOfSlots = PbFieldInt('dot15d4.writeModifySuperframeCmd.numberOfSlots')
+    flags = PbFieldInt('dot15d4.writeModifySuperframeCmd.flags')
+    asn = PbFieldInt('dot15d4.writeModifySuperframeCmd.asn', True)
+    
 
 @pb_bind(Dot15d4Domain, 'jammed', 1)
 class Jammed(PbMessageWrapper):

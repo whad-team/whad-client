@@ -93,8 +93,8 @@ class WirelessHart_DataLink_Advertisement(Packet):
         FiveBytesField("asn", 0),
         BitEnumField("security_level_supported",0,4,{0 : "session_keyed", 1 : "join_keyed", 2 : "reserved", 3: "reserved"}), 
         BitField("join_priority",0,4), 
-        FieldLenField("channel_count", None, fmt="B", length_of="channel_map"),
-        StrLenField("channel_map", None, length_from = lambda p: ceil(p.channel_count / 8)),
+        ByteField("channel_count", None),
+        StrFixedLenField("channel_map", None, length = 2),
         XShortField("graph_id", None), 
         FieldLenField("number_of_superframes", None, fmt="B", count_of="superframes"),
         PacketListField("superframes",[], Superframe, count_from=lambda p:p.number_of_superframes)

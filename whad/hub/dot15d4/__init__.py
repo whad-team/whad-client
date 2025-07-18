@@ -33,7 +33,13 @@ class Commands:
     Start = 0x09
     Stop = 0x0a
     ManInTheMiddle = 0x0b
-    Sync = 0x0c
+    EnableHop = 0x0c
+    AddLinks = 0x0d
+    DeleteLinks = 0x0e 
+    ChannelMap = 0x0f
+    WriteModifySuperframe = 0x10
+    DeleteSuperframe = 0x11
+    #Sync = 0x0c
 
 class MitmRole:
     """Dot15d4 Mitm role
@@ -219,7 +225,67 @@ class Dot15d4Domain(Registry):
             timestamp=timestamp,
             asn=asn
         )
+    
+    def create_hopping_cmd(self, val:bool) -> HubMessage:
+        """
+        Create an EnableHop message
+        
+        :return: instance of 'EnableHop'
+        """
+        return Dot15d4Domain.bound('EnableHopCmd', self.proto_version)(
+            hopping = val
+        )
+    
+    def create_add_links_cmd(self, nb_links, links) -> HubMessage:
+        """
+        Create an AddLinks message to add to superframes
+        
+        :return: instace of 'AddLinks'
+        """
+        return Dot15d4Domain.bound('add_links_cmd', self.proto_version)(
+            nb_links = nb_links,
+            links = links
+        )
+        
+    def create_channel_map_cmd(self, channel_map:int)->HubMessage:
+        """Create a channel map message to update the channel map 
+        
+        :return: instance of 'ChannelMap'
+        """
+        return Dot15d4Domain.bound('ChannelMapCmd', self.proto_version)(
+            channel_map = channel_map
+        )
+        
+    def create_write_modify_superframe_cmd(self, id:int, nb_slots:int, flags:int , asn:int)->HubMessage:
+        """Create a write modify superframe message to update the superframes 
+        
+        :return: instance of 'WriteModifySuperframe'
+        """
+        if asn:
+            return Dot15d4Domain.bound('WriteModifySuperframeCmd', self.proto_version)(
+            superframeId = id,
+            numberOfSlots = nb_slots,
+            flags = flags,
+            asn = asn
+        )
+        else:
+            return Dot15d4Domain.bound('WriteModifySuperframeCmd', self.proto_version)(
+                superframeId = id,
+                numberOfSlots = nb_slots,
+                flags = flags,
+            )
 
+    def create_add_links_cmd(self, nb_links:int, links:bytearray)->HubMessage:
+        """
+        Create an AddLinks message
+        
+        :return: instance of 'AddLinks'
+        """
+        return Dot15d4Domain.bound('AddLinksCmd', self.proto_version)(
+            nb_links = nb_links,
+            links = bytes(links)
+        )
+        
     def create_set_node_address(self, address: NodeAddress) -> HubMessage:
         """Create a SetNodeAddress message.
 
@@ -493,9 +559,9 @@ class WirelessHartDomain(Dot15d4Domain):
 
 from .address import SetNodeAddress
 from .mode import SniffMode, RouterMode, EndDeviceMode, CoordMode, EnergyDetectionMode, \
-    JamMode, MitmMode, Start, Stop, Jammed, EnergyDetectionSample
+    JamMode, MitmMode, Start, Stop, Jammed, EnableHop, AddLinks, ChannelMap, WriteModifySuperframe, EnergyDetectionSample
 from .pdu import SendPdu, SendRawPdu, PduReceived, RawPduReceived
-from .tsch import Sync
+#from .tsch import Sync
 
 __all__ = [
     'SetNodeAddress',
@@ -520,5 +586,9 @@ __all__ = [
     'NodeAddressExt',
     'NodeAddressType',
     'MitmRole', 
-    'Sync'
+    'EnableHop',
+    'AddLinks',
+    'ChannelMap',
+    'WriteModifySuperframe'
+    #, 'Sync'
 ]

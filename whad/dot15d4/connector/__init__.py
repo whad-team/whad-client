@@ -37,6 +37,7 @@ class Dot15d4(WhadDeviceConnector):
         the services (if not already discovered).
         """
         self.__ready = False
+        self.hopping = False #frequency hopping capability disabled
         super().__init__(device)
 
         # Capability cache
@@ -210,6 +211,63 @@ class Dot15d4(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
+    def enable_hopping(self)-> bool:
+        """
+        Enables frequency hopping
+        """
+        # check if hopping is already activated
+        if not self.hopping:
+            self.hopping = True
+            msg = self.hub.dot15d4.create_hopping_cmd(True)
+            print("enable : msg=",repr(msg))
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+        else:
+            return True #already activated
+        
+    def disable_hopping(self)-> bool:
+        """
+        Disables frequency hopping
+        """
+        # check if hopping is activated
+        if self.hopping:
+            self.hopping = False
+            msg = self.hub.dot15d4.create_hopping_cmd(False)
+            print("disable : msg=",repr(msg))
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+        else:
+            return True #already disactivated
+        
+    def update_dongle_channel_map(self, channel_map) ->bool :
+        """
+        Sends channel map to dongle
+        """
+        msg = self.hub.dot15d4.create_channel_map_cmd(channel_map)
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+    
+    def write_modify_superframe(self, id, nb_slots, flags, asn = None)->bool:
+        """
+        Sends a command to add or modify a superframe
+        """
+        msg = self.hub.dot15d4.create_write_modify_superframe_cmd(id, nb_slots, flags, asn)
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+    
+    def add_links(self, links:bytearray) -> bool:
+        """
+        Sends a command to add a new link : modifying a link should go by deleting it first otherwise the operation will be discarded
+        For each link 8 bytes :  1 for superframe id, 2 for join slot nb, 1 for offset, 2 for neighbor, 1 for flags, 1 for type
+        """
+        nb_links:int = len(links)//8 #each link a an 8 length byte array
+        msg = self.hub.dot15d4.create_add_links_cmd(nb_links, links)
+        print("add link msg=", msg)
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+        
+    
+    ''' Deprecated
     def synchronize(self, timestamp : int, asn : int) -> bool:
         """
         Synchronize with a TSCH-based network.
@@ -220,7 +278,7 @@ class Dot15d4(WhadDeviceConnector):
         # Create Sync message
         msg = self.hub.dot15d4.create_sync(timestamp, asn)
         resp = self.send_command(msg, message_filter(CommandResult))
-        return isinstance(resp, Success)
+        return isinstance(resp, Success)'''
 
     def send(self, pdu, channel:int = 11) -> bool:
         """
