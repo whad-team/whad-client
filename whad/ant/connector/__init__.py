@@ -16,7 +16,7 @@ from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 from whad.hub.generic.cmdresult import Success, CommandResult
 from whad.hub.discovery import Domain, Capability
 from whad.hub.ant import Commands, AvailableChannels, AvailableNetworks, \
-    ChannelType, ANTMetadata
+    ChannelType, ANTMetadata, ChannelEvent, ChannelEventCode
 
 # ANT-specific imports
 from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
@@ -493,6 +493,14 @@ class ANT(WhadDeviceConnector):
         """
         if not self.__ready:
             return
+        if isinstance(message, ChannelEvent):
+            self.on_channel_event(message.channel_number, message.event)
+
+    def on_channel_event(self, channel_number:int, event:ChannelEventCode):
+        """
+        Channel event handler.
+        """
+        pass
 
     def on_packet(self, packet):
         """ANT packet dispatch.
