@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, fields
 
 from whad.scapy.layers.ant import ANT_Hdr
 
-from whad.protocol.ant.ant_pb2 import AntChannelType
+from whad.protocol.ant.ant_pb2 import AntChannelType, AntChannelEvent
 
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
@@ -49,6 +49,30 @@ class ChannelType:
     SHARED_BIDIRECTIONAL_TRANSMIT_CHANNEL = AntChannelType.SHARED_BIDIRECTIONAL_TRANSMIT_CHANNEL
     RECEIVE_ONLY_CHANNEL = AntChannelType.RECEIVE_ONLY_CHANNEL
     TRANSMIT_ONLY_CHANNEL = AntChannelType.TRANSMIT_ONLY_CHANNEL    
+
+
+class ChannelEventCode:
+    """ANT Channel event
+    """
+    EVENT_NO_ERROR = AntChannelEvent.EVENT_NO_ERROR
+    EVENT_RX_SEARCH_TIMEOUT = AntChannelEvent.EVENT_RX_SEARCH_TIMEOUT
+    EVENT_RX_FAIL = AntChannelEvent.EVENT_RX_FAIL
+    EVENT_TX = AntChannelEvent.EVENT_TX
+    EVENT_TRANSFER_RX_FAILED = AntChannelEvent.EVENT_TRANSFER_RX_FAILED
+    EVENT_TRANSFER_TX_COMPLETED = AntChannelEvent.EVENT_TRANSFER_TX_COMPLETED
+    EVENT_TRANSFER_TX_FAILED = AntChannelEvent.EVENT_TRANSFER_TX_FAILED
+    EVENT_CHANNEL_CLOSED = AntChannelEvent.EVENT_CHANNEL_CLOSED
+    EVENT_RX_FAIL_TO_GO_TO_SEARCH = AntChannelEvent.EVENT_RX_FAIL_TO_GO_TO_SEARCH
+    EVENT_CHANNEL_COLLISION = AntChannelEvent.EVENT_CHANNEL_COLLISION
+    EVENT_TRANSFER_TX_START = AntChannelEvent.EVENT_TRANSFER_TX_START
+    EVENT_TRANSFER_NEXT_DATA_BLOCK = AntChannelEvent.EVENT_TRANSFER_NEXT_DATA_BLOCK
+    EVENT_CHANNEL_IN_WRONG_STATE = AntChannelEvent.EVENT_CHANNEL_IN_WRONG_STATE
+    EVENT_CHANNEL_NOT_OPENED = AntChannelEvent.EVENT_CHANNEL_NOT_OPENED
+    EVENT_CHANNEL_ID_NOT_SET = AntChannelEvent.EVENT_CHANNEL_ID_NOT_SET
+    EVENT_CLOSE_ALL_CHANNELS = AntChannelEvent.EVENT_CLOSE_ALL_CHANNELS
+    EVENT_TRANSFER_IN_PROGRESS = AntChannelEvent.EVENT_TRANSFER_IN_PROGRESS
+    EVENT_TRANSFER_SEQUENCE_NUMBER_ERROR = AntChannelEvent.EVENT_TRANSFER_SEQUENCE_NUMBER_ERROR
+    EVENT_TRANSFER_IN_ERROR = AntChannelEvent.EVENT_TRANSFER_IN_ERROR
 
 @dataclass(repr=False)
 class ANTMetadata(Metadata):
@@ -502,6 +526,20 @@ class AntDomain(Registry):
             timestamp = timestamp
         )
 
+    def create_channel_event(self, channel_number : int, event : ChannelEventCode) -> HubMessage:
+        """Create a Channel Event notification
+
+        :param channel_number: channel number of the concerned channel
+        :type channel_number: int
+        :param event: code of the incoming channel event
+        :type event: instance of `ChannelEventCode`
+        :return: instance of `ChannelEvent`
+        """
+        return AntDomain.bound('channel_event', self.proto_version)(
+            channel_number = channel_number, 
+            event = event
+        )
+
     def create_pdu_received(
                         self,
                         channel_number : int, 
@@ -577,7 +615,7 @@ class AntDomain(Registry):
 
 from .channel import SetDeviceNumber, SetDeviceType, SetTransmissionType, SetChannelPeriod, \
     SetNetworkKey, AssignChannel, UnassignChannel, OpenChannel, CloseChannel, SetRFChannel, \
-    ListChannels, ListNetworks, AvailableChannels, AvailableNetworks
+    ListChannels, ListNetworks, AvailableChannels, AvailableNetworks, ChannelEvent
 from .mode import SniffMode, JamMode, MasterMode, SlaveMode, Start, Stop, Jammed
 from .pdu import SendPdu, SendRawPdu, PduReceived, RawPduReceived
 
@@ -605,6 +643,7 @@ __all__ = [
     'Jammed',
     'SendPdu',
     'SendRawPdu',
+    'ChannelEvent',
     'PduReceived',
     'RawPduReceived',
     'ChannelType', 

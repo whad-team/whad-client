@@ -43,10 +43,25 @@ if __name__ == '__main__':
 
             while True:
                 input()
-                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"ABCDEFGHIJKLMNOPQRSTUV")#b"SLAAVE")
+                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"ABCDEF")#b"SLAAVE")
                 p.broadcast = 1
+                p.end = 0
                 print(sniffer.send(p))
-                
+
+                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"GHIJKL")#b"SLAAVE")
+                p.broadcast = 1
+                p.end = 0
+                print(sniffer.send(p))
+
+                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"MNOPQR")#b"SLAAVE")
+                p.broadcast = 1
+                p.end = 1
+                print(sniffer.send(p))
+                input()
+                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"SLAAVE")#b"SLAAVE")
+                p.broadcast = 1
+                p.end = 1
+                print(sniffer.send(p))
 
         except (KeyboardInterrupt, SystemExit):
             dev.close()

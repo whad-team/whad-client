@@ -190,7 +190,7 @@ class ANTStickDevice(VirtualDevice):
         self._initialize_networks()
         self._configure_extension_mode(enable=True)
         self._configure_lib(rssi=True, channel_id=True, timestamp=True)
-
+        self.pending_burst_packets = []
         self.__opened = True
         super().open()
 
@@ -264,6 +264,8 @@ class ANTStickDevice(VirtualDevice):
             if self.__opened_stream:
                 while not self.__event_queue.empty():
                     event = ANTStick_Message(self.__event_queue.get())
+                    if event.message_code in (5,6,10):
+                        self._send_whad_ant_channel_event(event.channel_number, event.message_code)
                     print("Event:", repr(event))
                     if event.message_code == 7 and self.__channels[event.channel_number].opened: # event_channel_closed
                         self.__reload_channel = event.channel_number
@@ -832,6 +834,17 @@ class ANTStickDevice(VirtualDevice):
         # Send message
         self._send_whad_message(msg)
 
+
+    def _send_whad_ant_channel_event(self, channel_number, event):
+        # create available channels notification
+        msg = self.hub.ant.create_channel_event(
+            channel_number, 
+            event
+        )
+        # Send message
+        self._send_whad_message(msg)
+
+
     def _on_whad_ant_open_channel(self, message):
         if message.channel_number not in self.__channels:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
@@ -981,56 +994,69 @@ class ANTStickDevice(VirtualDevice):
         packet = ANT_Hdr(message.pdu)
         print("transmitting: ", repr(packet))
         if packet.broadcast == 1:
-            print()
-             
-            data = bytes(message.pdu)[7:]
-            packets = len(data) // 8
-            if len(data) / 8 > packets:
-                packets = packets + 1
-                while (len(data) // 8) != packets:
-                    data = data + b"\x00" 
-            for i in range(packets):
-                sequence = ((i - 1) % 3) + 1
-                if i == 0:
-                    sequence = 0
-                elif i == packets - 1:
-                    sequence = sequence | 0b100
+            if packet.end == 0:
+                self.pending_burst_packets.append(message)
+                self._send_whad_command_result(CommandResult.SUCCESS)
 
-                channel_seq = message.channel_number | sequence << 5
-                packet_data = data[i * 8 : i * 8 + 8]
-                print(">>>>", packet_data)
-                self._antstick_send_command(
-                    ANTStick_Data_Burst_Data(
-                        channel_number = channel_seq, 
-                        pdu = packet_data
-                    ), no_response = True
-                )
-            
-            
-            
-            while self.__ack_queue.empty():
-                sleep(0.001)
-                ack_event = ANTStick_Message(self.__ack_queue.get())
-                print("ackevent", repr(ack_event))
-                if ack_event.message_code != 10:
-                    break
-            '''
-            
-            self._antstick_send_command(
-                ANTStick_Data_Acknowledged_Data(
-                    channel_number = message.channel_number, 
-                    pdu = bytes(message.pdu[-8:])
-                ), no_response = True
-            )
-            
-            '''
-            while self.__ack_queue.empty():
-                sleep(0.001)
-            ack_event = ANTStick_Message(self.__ack_queue.get())
-            if ack_event.message_code == 6:
-                self._send_whad_command_result(CommandResult.ERROR)
             else:
-               self._send_whad_command_result(CommandResult.SUCCESS)
+                if len(self.pending_burst_packets) > 0:
+                    data = b""
+                    self.pending_burst_packets.append(message)
+
+                    for burst in self.pending_burst_packets:
+                        data += bytes(burst.pdu)[7:]
+                    packets = len(data) // 8
+                    if len(data) / 8 > packets:
+                        packets = packets + 1
+                        while (len(data) // 8) != packets:
+                            data = data + b"\x00" 
+                    for i in range(packets):
+                        sequence = ((i - 1) % 3) + 1
+                        if i == 0:
+                            sequence = 0
+                        elif i == packets - 1:
+                            sequence = sequence | 0b100
+
+                        channel_seq = burst.channel_number | sequence << 5
+                        packet_data = data[i * 8 : i * 8 + 8]
+                        print(">>>>", packet_data)
+                        self._antstick_send_command(
+                            ANTStick_Data_Burst_Data(
+                                channel_number = channel_seq, 
+                                pdu = packet_data
+                            ), no_response = True
+                        )
+                    self.pending_burst_packets = []            
+            
+                    
+                    while self.__ack_queue.empty():
+                        sleep(0.001)
+                        ack_event = ANTStick_Message(self.__ack_queue.get())
+                        if ack_event.message_code == 6:
+                            self._send_whad_command_result(CommandResult.ERROR)
+                            return
+                        elif ack_event.message_code == 5:
+                            self._send_whad_command_result(CommandResult.SUCCESS)
+                            return
+                        else:
+                            pass
+                else:        
+                    self._antstick_send_command(
+                        ANTStick_Data_Acknowledged_Data(
+                            channel_number = message.channel_number, 
+                            pdu = bytes(message.pdu[-8:])
+                        ), no_response = True
+                    )
+                    
+                    while self.__ack_queue.empty():
+                        sleep(0.001)
+                    ack_event = ANTStick_Message(self.__ack_queue.get())
+                    if ack_event.message_code == 6:
+                        self._send_whad_command_result(CommandResult.ERROR)
+                        return
+                    else:
+                        self._send_whad_command_result(CommandResult.SUCCESS)
+                        return
         else:
             self._antstick_send_command(
                 ANTStick_Data_Broadcast_Data(

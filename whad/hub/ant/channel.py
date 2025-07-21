@@ -122,10 +122,17 @@ class AvailableChannels(PbMessageWrapper):
     number_of_channels = PbFieldInt('ant.available_channels.number_of_channels')
 
 
-
 @pb_bind(AntDomain, 'available_networks', 3)
 class AvailableNetworks(PbMessageWrapper):
     """ANT available networks notification
     """
 
     number_of_networks = PbFieldInt('ant.available_networks.number_of_networks')
+
+@pb_bind(AntDomain, 'channel_event', 3)
+class ChannelEvent(PbMessageWrapper):
+    """ANT channel event notification
+    """
+
+    channel_number = PbFieldInt('ant.channel_event.channel_number')
+    event = PbFieldInt('ant.channel_event.event')
