@@ -546,7 +546,7 @@ class ZigBeeDomain(Dot15d4Domain):
         conf.dot15d4_protocol = "zigbee"
 
 
-@pb_bind(ProtocolHub, name="wirelesshart", version=2)
+@pb_bind(ProtocolHub, name="wirelesshart", version=3)
 class WirelessHartDomain(Dot15d4Domain):
     NAME = 'wirelesshart'
     VERSIONS = {}

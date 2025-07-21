@@ -73,26 +73,26 @@ class Stop(PbMessageWrapper):
         super().__init__(message=message)
         self.message.dot15d4.stop.CopyFrom(StopCmd())
         
-@pb_bind(Dot15d4Domain, 'EnableHopCmd', 1)
+@pb_bind(Dot15d4Domain, 'EnableHopCmd', 3)
 class EnableHop(PbMessageWrapper):
     """Dot15d4 enable frequency hopping message 
     """
     hopping = PbFieldBool('dot15d4.hopping.hopping')
 
-@pb_bind(Dot15d4Domain, 'AddLinksCmd', 1)
+@pb_bind(Dot15d4Domain, 'AddLinksCmd', 3)
 class AddLinks(PbMessageWrapper):
     """Dot15d4 adding new links to superframes message
     """
     nb_links = PbFieldInt('dot15d4.addLinks.nb_links')
     links = PbFieldBytes('dot15d4.addLinks.links')
     
-@pb_bind(Dot15d4Domain, 'ChannelMapCmd',1)
+@pb_bind(Dot15d4Domain, 'ChannelMapCmd',3)
 class ChannelMap(PbMessageWrapper):
     """Dot15d4 updating channel map message
     """
     channel_map = PbFieldInt('dot15d4.channelMap.channelMap')
     
-@pb_bind(Dot15d4Domain, 'WriteModifySuperframeCmd', 1)
+@pb_bind(Dot15d4Domain, 'WriteModifySuperframeCmd', 3)
 class WriteModifySuperframe(PbMessageWrapper):
     """Dot15d4 updating superframes by adding or modifying a superframe
     """
