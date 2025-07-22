@@ -16,7 +16,7 @@ react on specific events.
 # Add arguments to connector for models/states
 
 from whad.btmesh.stack import PBAdvBearerLayer
-from whad.btmesh.connectors import BTMesh
+from whad.btmesh.connector import BTMesh
 
 from whad.btmesh.crypto import (
     NetworkLayerCryptoManager,
@@ -49,7 +49,7 @@ class Provisionee(BTMesh):
         profile=BaseMeshProfile(),
         net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
         dev_app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
-        unicast_addr=b"\x00\x02",
+        unicast_addr=0x0002,
         uuid=UUID("7462d668-bc88-3473-0000-000000000012"),
     ):
         """
@@ -63,8 +63,8 @@ class Provisionee(BTMesh):
         :type net_key: Bytes, optional
         :param dev_app_key: If auto provisioned : primary app key and dev key (both the same value), defaults to bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
         :type dev_app_key: Bytes, optional
-        :param unicast_addr: If auto provisioned, unicast addr, defaults to b"\x00\x02"
-        :type unicast_addr: Bytes, optional
+        :param unicast_addr: If auto provisioned, unicast addr, defaults to 0x0002
+        :type unicast_addr: int, optional
         :param uuid: The UUID of the node, defaults to UUID("7462d668-bc88-3473-0000-000000000012")
         :type: UUID, optional
         """

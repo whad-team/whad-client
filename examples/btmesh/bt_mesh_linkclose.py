@@ -1,9 +1,8 @@
-from whad.btmesh.connectors.linkcloser import PBAdvLinkCloser
+from whad.btmesh.connector.linkcloser import PBAdvLinkCloser
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
 from whad.ble.exceptions import ConnectionLostException
 
-from time import sleep
 import sys
 
 if len(sys.argv) != 2:

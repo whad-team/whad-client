@@ -1,6 +1,6 @@
 from whad.cli.shell import category
 from whad.btmesh.profile import BaseMeshProfile
-from whad.btmesh.connectors.df_attack import DFAttacks
+from whad.btmesh.connector.df_attack import DFAttacks
 from prompt_toolkit import HTML, print_formatted_text
 from whad.btmesh.cli.provisionee import BTMeshProvisioneeShell
 
@@ -509,7 +509,7 @@ class BTMeshDfAttackerShell(BTMeshProvisioneeShell):
             return
 
         topology = args[0].lower()
-        own_addr = self.profile.primary_element_addr
+        own_addr = self.profile.get_primary_element_addr()
         base = "aa:aa:aa:aa:aa:"
         if topology == "linear":
             self._connector.reset_whitelist()
