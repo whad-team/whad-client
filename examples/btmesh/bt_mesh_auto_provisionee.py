@@ -4,8 +4,7 @@ from whad.exceptions import WhadDeviceNotFound
 from whad.device import WhadDevice
 from whad.ble.exceptions import ConnectionLostException
 import sys
-from whad.btmesh.connectors.provisionee import Provisionee
-from threading import Thread
+from whad.btmesh.connecto.provisionee import Provisionee
 
 from whad.btmesh.stack.utils import MeshMessageContext
 

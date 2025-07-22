@@ -5,7 +5,7 @@ Basic Bluetooth Mesh Passive Sniffer
 """
 
 from scapy.layers.bluetooth4LE import BTLE_ADV, EIR_Hdr
-from whad.btmesh.connectors.provisionee import Provisionee
+from whad.btmesh.connector.provisionee import Provisionee
 from whad.scapy.layers.btmesh import BTMesh_Obfuscated_Network_PDU
 
 

@@ -312,6 +312,24 @@ class UpperTransportDFAttacks(UpperTransportLayer):
         pkt, ctx = message
         # reply probably for the topology discovery
         if pkt.path_origin == 0x7FFF:
+            if pkt.confirmation_request == 1:
+                resp_pkt = BTMesh_Upper_Transport_Control_Path_Confirmation(
+                    path_origin=pkt.path_origin,
+                    path_target=pkt.path_target_unicast_addr_range.range_start,
+                )
+                resp_ctx = MeshMessageContext()
+                resp_ctx.creds = DIRECTED_FORWARDING_CREDS
+                resp_ctx.src_addr = self.state.profile.primary_element_addr.to_bytes(
+                    2, "big"
+                )
+                resp_ctx.dest_addr = b"\xff\xfb"
+                resp_ctx.ttl = 0
+                resp_ctx.is_ctl = True
+                resp_ctx.net_key_id = 0
+                timer = Timer(1, self.send_control_message, args=[(resp_pkt, resp_ctx)])
+                timer.start()
+                sleep(1)
+
             if pkt.path_target_unicast_addr_range.length_present:
                 range_length = pkt.path_target_unicast_addr_range.range_length
             else:

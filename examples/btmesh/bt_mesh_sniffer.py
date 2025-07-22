@@ -1,5 +1,5 @@
 from whad.device import WhadDevice
-from whad.btmesh.connectors.sniffer import BTMeshSniffer
+from whad.btmesh.connector.sniffer import BTMeshSniffer
 from whad.exceptions import WhadDeviceNotFound
 import sys
 

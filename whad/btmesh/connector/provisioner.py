@@ -12,7 +12,7 @@ react on specific events.
 
 from time import time
 
-from whad.btmesh.connectors import BTMesh
+from whad.btmesh.connector import BTMesh
 
 from whad.btmesh.stack import PBAdvBearerLayer
 from whad.scapy.layers.btmesh import (

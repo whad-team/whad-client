@@ -7,7 +7,7 @@ It sniffs and reacts to any Generic Provisioning packet, retrives the Link Id, a
 The specification says that any device receiving that should close the connexion, hence Dos.
 """
 
-from whad.btmesh.connectors import BTMesh
+from whad.btmesh.connector import BTMesh
 from whad.scapy.layers.btmesh import (
     BTMesh_Generic_Provisioning_Hdr,
     BTMesh_Generic_Provisioning_Link_Close,

@@ -3,10 +3,9 @@ from whad.exceptions import WhadDeviceNotFound
 from whad.device import WhadDevice
 from whad.ble.exceptions import ConnectionLostException
 import sys
-from whad.btmesh.connectors.provisionee import Provisionee
+from whad.btmesh.connector.provisionee import Provisionee
 from time import sleep
 from whad.btmesh.stack.utils import MeshMessageContext
-
 
 
 if len(sys.argv) != 2:
@@ -37,8 +36,8 @@ try:
     while True:
         # create context in loop! (otherwise values get overwritten when sending ...)
         ctx = MeshMessageContext()
-        ctx.src_addr = provisionee.profile.primary_element_addr.to_bytes(2, "big")
-        ctx.dest_addr = b"\xff\xff"
+        ctx.src_addr = provisionee.profile.get_primary_element_addr()
+        ctx.dest_addr = 0xFFFF
         ctx.application_key_index = 0
         ctx.net_key_id = 0
         ctx.ttl = 127

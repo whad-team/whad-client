@@ -15,7 +15,7 @@ react on specific events.
 
 # Add arguments to connector for models/states
 
-from whad.btmesh.connectors.provisionee import Provisionee
+from whad.btmesh.connector.provisionee import Provisionee
 
 from whad.btmesh.stack.network import NetworkLayer
 

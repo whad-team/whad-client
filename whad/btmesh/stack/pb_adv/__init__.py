@@ -172,6 +172,7 @@ class PBAdvBearerLayer(Layer):
         """
 
         # In provisioner mode only, we finished the provisininning of the target node
+        # We add its dev_key to
         if message == "FINISHED_PROV":
             self.__connector.distant_node_provisioned = True
             if self.__connector.prov_event is not None:
@@ -179,12 +180,13 @@ class PBAdvBearerLayer(Layer):
 
             return
 
-        # if message is ProvisioningCompleteData, we complete the provisonning
+        # if message is ProvisioningCompleteData, we complete the provisonning of our node
         if isinstance(message, ProvisioningCompleteData):
             self._is_provisioning = False
             self.__connector.provisionning_complete(message)
             return
 
+        # If Authentication data needed
         if isinstance(message, ProvisioningAuthenticationData):
             self.__connector.provisonning_auth_data(message)
             return
@@ -196,7 +198,7 @@ class PBAdvBearerLayer(Layer):
             transaction_number=transaction_number,
             data=packet,
         )
-        # self.__connector.send_raw(pkt)
+
         thread = Thread(
             target=self.sending_thread,
             args=(pkt),

@@ -121,9 +121,9 @@ class NetworkLayer(Layer):
         Returns the type of the Address if compliant, or None if not.
 
         :param src_addr: The source address in the network PDU
-        :type src_addr: Bytes
+        :type src_addr: int
         :param dst_addr: The destination address in the network PDU (after decryption)
-        :type dst_addr: Bytes
+        :type dst_addr: int
         :param network_ctl: value of the network_ctl flag in the Network PDU
         :type network_ctl: int
         :returns: Address type if address ok, None otherwise
@@ -131,7 +131,7 @@ class NetworkLayer(Layer):
         """
         src_type = get_address_type(src_addr)
         if src_type != UNICAST_ADDR_TYPE or self.state.profile.is_unicast_addr_ours(
-            int.from_bytes(src_addr, "big"),
+            src_addr
         ):
             return None
 
@@ -183,12 +183,12 @@ class NetworkLayer(Layer):
         :param deobf_net_pdu: Deobfucated packet
         :type deobf_net_pdu: BTMesh_Network_PDU
         :param dst_addr: Destination addr of the packet
-        :type dst_addr: bytes
+        :type dst_addr: int
         :param net_key: Network Key used to (de)obfuscate the packet
         :type net_key: NetworkLayerCryptoManager
         """
         # Check if unicast addr is not ours
-        if self.state.profile.is_unicast_addr_ours(int.from_bytes(dst_addr, "big")):
+        if self.state.profile.is_unicast_addr_ours(dst_addr):
             return
 
         # Check TTL > 1
@@ -240,23 +240,23 @@ class NetworkLayer(Layer):
 
         network_ctl = (raw_deobf_net_pdu[0]) >> 7
         ttl = raw_deobf_net_pdu[0] & 0x7F
-        seq_number = raw_deobf_net_pdu[1:4]
-        src_addr = raw_deobf_net_pdu[4:6]
+        seq_number = int.from_bytes(raw_deobf_net_pdu[1:4], "big")
+        src_addr = int.from_bytes(raw_deobf_net_pdu[4:6], "big")
 
         deobf_net_pdu = BTMesh_Network_PDU(
             ivi=self.state.profile.iv_index[0] & 0b01,
             nid=net_pdu.nid,
             network_ctl=network_ctl,
             ttl=ttl,
-            seq_number=int.from_bytes(seq_number, "big"),
-            src_addr=int.from_bytes(src_addr, "big"),
+            seq_number=seq_number,
+            src_addr=src_addr,
             enc_dst_enc_transport_pdu_mic=net_pdu.enc_dst_enc_transport_pdu_mic,
         )
 
         # check if message in network cache. Mesh Spec section 3.4.5.6
         is_pdu_in_cache = self.__cache_verif(deobf_net_pdu)
         if is_pdu_in_cache:
-            # logger.warning("PDU Already received in Network Layer Cache, dropping")
+            logger.debug("PDU Already received in Network Layer Cache, dropping")
             return
 
         # decrypt the encrypted Lower Transport PDU
@@ -264,9 +264,9 @@ class NetworkLayer(Layer):
             deobf_net_pdu, self.state.profile.iv_index
         )
         if not is_auth_valid:
-            # logger.warning(
-            #    "Received Network PDU with wrong authentication value, dropping"
-            # )
+            logger.debug(
+                "Received Network PDU with wrong authentication value, dropping"
+            )
             return
 
         # If sniffing_only mode, we display packet and leave
@@ -288,12 +288,10 @@ class NetworkLayer(Layer):
             return
 
         # check address validity. Mesh Spec Section 3.4.3
-        dst_addr = plaintext[:2]
+        dst_addr = int.from_bytes(plaintext[:2], "big")
         addr_type = self.__check_address_validity(src_addr, dst_addr, network_ctl)
         if addr_type is None:
-            # logger.warning(
-            #    "Received Network PDU with non compliant addr types, dropping"
-            # )
+            logger.debug("Received Network PDU with non compliant addr types, dropping")
             return
 
         # If relay enabled, try to relay packet (if applicable)
@@ -319,7 +317,7 @@ class NetworkLayer(Layer):
         msg_ctx = MeshMessageContext()
         msg_ctx.src_addr = src_addr
         msg_ctx.dest_addr = dst_addr
-        msg_ctx.seq_number = int.from_bytes(seq_number, "big")
+        msg_ctx.seq_number = seq_number
         msg_ctx.net_key_id = net_key.key_index
         msg_ctx.ttl = ttl
         msg_ctx.is_ctl = network_ctl == 1
@@ -329,7 +327,7 @@ class NetworkLayer(Layer):
         if deobf_net_pdu.nid == net_key.nid_mf:
             msg_ctx.creds = MANAGED_FLOODING_CREDS
         elif deobf_net_pdu.nid == net_key.nid_df:
-            msg_ctx.creds == DIRECTED_FORWARDING_CREDS
+            msg_ctx.creds = DIRECTED_FORWARDING_CREDS
 
         self.send_to_lower_transport(msg_ctx, lower_transport_pdu)
 
@@ -385,7 +383,7 @@ class NetworkLayer(Layer):
             network_ctl=int(ctx.is_ctl),
             ttl=ctx.ttl,
             seq_number=ctx.seq_number,
-            src_addr=int.from_bytes(ctx.src_addr, "big"),
+            src_addr=ctx.src_addr,
         )
 
         # encrypt the message

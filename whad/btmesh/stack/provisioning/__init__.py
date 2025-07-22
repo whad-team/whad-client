@@ -487,8 +487,11 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
 
         # encrypt Provisioning Data payload
         # from sample data Spec p. 713
-        # ""
+        # ""bytes.fromhex("efb2255e6422d330088e09bb015ed707056700010203040b0c")
         plaintext = bytes.fromhex("efb2255e6422d330088e09bb015ed707056700010203040b0c")
+
+        # addr 0x0003, auto prov netkey, netkeyid = 0
+        plaintext = bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00000000000000000003")
         cipher, mic = self.state.crypto_manager.encrypt(plaintext)
 
         # send provisioning Data to provisionee
@@ -698,7 +701,7 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
             key_index=int.from_bytes(key_index, "little"),
             flags=flags,
             iv_index=iv_index,
-            unicast_addr=unicast_addr,
+            unicast_addr=int.from_bytes(unicast_addr, "big"),
             provisionning_crypto_manager=self.state.crypto_manager,
         )
         logger.debug("NetworkKey = " + plaintext[:16].hex())

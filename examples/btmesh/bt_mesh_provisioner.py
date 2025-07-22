@@ -4,7 +4,7 @@ from whad.exceptions import WhadDeviceNotFound
 from whad.device import WhadDevice
 from whad.ble.exceptions import ConnectionLostException
 import sys
-from whad.btmesh.connectors.provisioner import Provisioner
+from whad.btmesh.connector.provisioner import Provisioner
 
 from whad.scapy.layers.btmesh import *
 

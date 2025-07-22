@@ -131,16 +131,13 @@ class AccessLayer(Layer):
         dst_addr_type = get_address_type(dst_addr)
 
         # if all nodes address, send to all elements
-        if dst_addr == b"\xff\xff":
+        if dst_addr == 0xFFFF:
             target_elements = self.state.profile.get_all_elements()
 
         # if dst addr is unicast, only need to use the relevent element
         elif dst_addr_type == UNICAST_ADDR_TYPE:
             # Convert addr to offset from primary addr
-            element_index = (
-                int.from_bytes(dst_addr, "big")
-                - self.state.profile.primary_element_addr
-            )
+            element_index = dst_addr - self.state.profile.get_primary_element_addr()
 
             target_elements.append(self.state.profile.get_element(element_index))
 
@@ -174,7 +171,7 @@ class AccessLayer(Layer):
                 elif (
                     isinstance(model, ModelServer)
                     and ctx.dev_key_address
-                    != self.state.profile.primary_element_addr.to_bytes(2, "big")
+                    != self.state.profile.get_primary_element_addr()
                 ):
                     continue
 
@@ -198,8 +195,8 @@ class AccessLayer(Layer):
                 new_ctx.application_key_index = ctx.application_key_index
                 new_ctx.dev_key_address = ctx.dev_key_address
                 new_ctx.src_addr = (
-                    e.index + self.state.profile.primary_element_addr
-                ).to_bytes(2, "big")
+                    e.index + self.state.profile.get_primary_element_addr()
+                )
                 new_ctx.dest_addr = ctx.src_addr
                 new_ctx.net_key_id = ctx.net_key_id
                 new_ctx.is_ctl = False

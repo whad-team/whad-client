@@ -2,6 +2,7 @@
 Bluetooth Mesh Base Profile
 
 Supports only the Configuration Server Model on the primary element
+Used for basic node directly is ok.
 """
 
 from whad.btmesh.models import Element
@@ -14,7 +15,7 @@ from whad.btmesh.stack.constants import (
     VIRTUAL_ADDR_TYPE,
     UNASSIGNED_ADDR_TYPE,
 )
-from whad.btmesh.stack.utils import Subnet, MeshMessageContext
+from whad.btmesh.stack.utils import Subnet, MeshMessageContext, Node
 from whad.btmesh.crypto import (
     NetworkLayerCryptoManager,
     UpperTransportLayerAppKeyCryptoManager,
@@ -29,6 +30,7 @@ from whad.scapy.layers.btmesh import (
 )
 
 from threading import Lock
+from copy import copy
 
 
 def lock(f):
@@ -64,7 +66,7 @@ class BaseMeshProfile(object):
         # auto_prov_net_key=bytes.fromhex("efb2255e6422d330088e09bb015ed707"),
         auto_prov_dev_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
         auto_prov_app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
-        auto_prov_unicast_addr=b"\x00\x02",
+        auto_prov_unicast_addr=0x0002,
     ):
         """
         Init of the BTMesh generic profile.
@@ -75,8 +77,8 @@ class BaseMeshProfile(object):
         :type auto_prov_dev_key: bytes, optional
         :param auto_prov_app_key: App key of the node (index 0, binded to net_key at index 0) if auto_provisioned, defaults to bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
         :type auto_prov_app_key: bytes, optional
-        :param auto_prov_unicast_addr: Primary unicast_addr if auto_provisioned, defaults to b"\x00\x02"
-        :type auto_prov_unicast_addr: bytes, optional
+        :param auto_prov_unicast_addr: Primary unicast_addr if auto_provisioned, defaults to 0x0002
+        :type auto_prov_unicast_addr: int, optional
         """
 
         # Is the node provisioned ? (should be True on start if Provisioner)
@@ -85,15 +87,14 @@ class BaseMeshProfile(object):
         # Elements of the node. Ordered.
         self.__elements = []
 
-        # address of primary element, used as an offset for the others
-        # set after the provisioning
+        # NOT USED, KEPT FOR REFRACTORING
         self.primary_element_addr = 0
 
         # Set after the provisioning
         self.iv_index = b"\x00\x00\x00\x00"
 
         # Sequence number of the device for the iv_index
-        # used by basically every layer ...
+        # used by basically every layer ..XŒ
         self.__seq_number = 0
 
         # the forwarding number for "legitimate" PATH_REQUEST packets from our primary unicast addr
@@ -109,18 +110,22 @@ class BaseMeshProfile(object):
         # the forwarding number for "legitimate" PATH_REQUEST packets from our primary unicast addr
         self.__forwarding_number = 0
 
+        # dict of the subnets the node belongs to. (Subnet objects)
+        self.__subnets = []
+
         # Dev keys of other nodes AND ours
         # Key is primary address of the node
         self.__dev_keys = {}
 
-        # lock to access the seq_number
-        self.__seq_lock = Lock()
+        # Represents our own Node (unprovisioned for now, arbitrary address)
+        self.__local_node = Node(address=0x0001)
+
+        # List of Nodes object reprensenting the nodes within the network.
+        # Key is primary address of node. Automatically filled by provisioners when provisioning other nodes
+        self.__distant_nodes = {}
 
         # Create and register primary element
         self.register_element(is_primary=True)
-
-        # dict of the subnets of the node. (Subnet objects)
-        self.__subnets = []
 
         self._populate_elements_and_models()
 
@@ -153,9 +158,14 @@ class BaseMeshProfile(object):
     def unlock_seq(self):
         self.__seq_lock.release()
 
-    @property
-    def seqnum(self):
-        return self.__seq_number
+    def get_primary_element_addr(self):
+        """
+        Returns the primary unicast address of this node
+
+        :returns: The primary element address of this node
+        :rtype: int
+        """
+        return self.__local_node.address
 
     def set_primary_element_addr(self, primary_element_addr):
         """
@@ -164,7 +174,7 @@ class BaseMeshProfile(object):
         :param primary_element_addr: Primary unicast addr
         :type primary_element_addr: int
         """
-        self.primary_element_addr = primary_element_addr
+        self.__local_node.address = primary_element_addr
 
     def is_unicast_addr_ours(self, addr):
         """
@@ -175,9 +185,9 @@ class BaseMeshProfile(object):
         :param addr: Unicast addr to check
         :type addr: int
         """
-        max_addr = len(self.get_all_elements()) + self.primary_element_addr - 1
+        max_addr = self.__local_node.address + self.__local_node.addr_range - 1
 
-        if addr >= self.primary_element_addr and addr <= max_addr:
+        if addr >= self.__local_node.address and addr <= max_addr:
             return True
         return False
 
@@ -186,7 +196,7 @@ class BaseMeshProfile(object):
         Checks if an address (unicast, group or virtual) is a target of us (should we process it after the network layer ?)
 
         :param addr: Address to check
-        :type addr: byte
+        :type addr: int
         :param addr_type: Addr type
         :type addr_type: int
         :returns: True if we are a target, False otherwise
@@ -196,20 +206,25 @@ class BaseMeshProfile(object):
             return False
 
         if addr_type == UNICAST_ADDR_TYPE:
-            res = self.is_unicast_addr_ours(int.from_bytes(addr, "big")) or (
-                addr == b"\x7e\x00" or addr == b"\x7e\x01" or addr == b"\x7f\xff"
+            res = self.is_unicast_addr_ours(addr) or (
+                addr == 0x7E00 or addr == 0x7E01 or addr == 0x7FFF
             )
             return res
 
         if (
             addr_type == GROUP_ADDR_TYPE
         ):  # for now, only broadcast addr (all nodes and all directed forwarding) are considered
-            if addr == b"\xff\xff" or addr == b"\xff\xfb":
+            if addr == 0xFFFF or addr == 0xFFFB:
                 return True
             return False
 
         if addr_type == VIRTUAL_ADDR_TYPE:
             return False
+
+    @property
+    @lock
+    def seqnum(self):
+        return self.__seq_number
 
     @lock
     def get_next_seq_number(self, inc=1):
@@ -258,7 +273,7 @@ class BaseMeshProfile(object):
         :param flags: Flags of features
         :type flags: int
         :param unicast_addr: The unicast addr of the node
-        :type unicast_addr: bytes
+        :type unicast_addr: int
         :param app_key: App key to add when auto provisioning, defaults to None
         :type app_key: UpperTransportLayerAppKeyCryptoManager, optional
         """
@@ -266,9 +281,13 @@ class BaseMeshProfile(object):
         configuration_server_model.get_state("net_key_list").set_value(
             field_name=primary_net_key.key_index, value=primary_net_key
         )
-        self.__dev_keys[unicast_addr] = dev_key
         self.iv_index = iv_index
-        self.primary_element_addr = int.from_bytes(unicast_addr, "big")
+        # self.__dev_keys[unicast_addr] = dev_key
+        # self.primary_element_addr = int.from_bytes(unicast_addr, "big")
+
+        self.__local_node.address = unicast_addr
+        self.__local_node.dev_key = dev_key
+        self.__local_node.addr_range = len(self.__elements)
 
         # Add an app key if specified in arguments
         if app_key is not None:
@@ -323,11 +342,11 @@ class BaseMeshProfile(object):
         """
         for element in self.__elements:
             for model in element.models:
-                # check if model is not configuration model
-                if model.model_id != 0:
-                    self.get_configuration_server_model().get_state(
-                        "model_to_app_key_list"
-                    ).set_value(field_name=model.model_id, value=[0])
+                # check if model is not configuration model (for now we allow use of app key because easier to manage for examples)
+                # if model.model_id != 0:
+                self.get_configuration_server_model().get_state(
+                    "model_to_app_key_list"
+                ).set_value(field_name=model.model_id, value=[0])
 
     def get_dev_key(self, address=None):
         """
@@ -335,17 +354,30 @@ class BaseMeshProfile(object):
         Returns None is no dev_key stored for the adress in argument
 
         :param address: Primary Address of the node we want the dev_key of, defaults to None
-        :type address: bytes, optional
+        :type address: int, optional
         :returns: The dev_key asked, None if not found
         :rtype: UpperTransportLayerDevKeyCryptoManager | None
         """
-        if address is None or self.primary_element_addr.to_bytes(2, "big") == address:
-            address = self.primary_element_addr.to_bytes(2, "big")
+        if address is None or self.__local_node.address == address:
+            return self.__local_node.dev_key
 
-        if address in self.__dev_keys.keys():
-            return self.__dev_keys[address]
+        elif address in self.__distant_nodes.keys():
+            return self.__distant_nodes[address]
+
         else:
             return None
+
+    def get_all_nodes(self):
+        """
+        Returns a dict of all the nodes that we know of (distant and local)
+        Key is primary unicast address of the node.
+
+        :return: A disctionary of Node objects we have (local and distant) (copies)
+        :rtype: Dict[int, Node]
+        """
+        nodes = dict(self.__distant_nodes)
+        nodes[self.__local_node.address] = copy(self.__local_node)
+        return nodes
 
     def get_all_dev_keys(self):
         """
@@ -359,18 +391,29 @@ class BaseMeshProfile(object):
     def update_dev_key(self, address, dev_key):
         """
         Update or add a dev_key associated witht the given address
+        If the Node does not exist, we add it to the distant Nodes object.
+
         Returns True if success, False otherwise
 
         :param address: Address to bind to the dev_key
-        :type address: bytes
+        :type address: int
         :param dev_key: The dev key to add
         :type dev_key: UpperTransportLayerDevKeyCryptoManager
         :returns: True is success, False otherwise
         :rtype: Bool
         """
-        self.__dev_keys[address] = UpperTransportLayerDevKeyCryptoManager(
-            device_key=dev_key
-        )
+        dev_key = UpperTransportLayerDevKeyCryptoManager(device_key=dev_key)
+
+        if address == self.__local_node.address:
+            self.__local_node.dev_key = dev_key
+
+        elif address in self.__distant_nodes.keys():
+            self.__distant_nodes[address].dev_key = dev_key
+        else:
+            self.__distant_nodes[address] = Node(
+                address=address, addr_range=0, dev_key=dev_key
+            )
+
         return True
 
     def remove_dev_key(self, address):
@@ -381,13 +424,10 @@ class BaseMeshProfile(object):
 
 
         :param address: Address to remove the dev_key of
-        :type address: bytes
+        :type address: int
         """
-        if (
-            address in self.__dev_keys.keys()
-            and address != self.primary_element_addr.to_bytes(2, "big")
-        ):
-            self.__dev_keys.pop(address)
+        if address in self.__distant_nodes.keys():
+            self.__distant_nodes.pop(address)
             return True
 
         return False
@@ -645,9 +685,9 @@ class BaseMeshProfile(object):
         Sets the value to use for the unicast_addr of the node if auto_provision used
 
         :param unicast_addr: Unicast address to set
-        :type unicast_addr: bytes
+        :type unicast_addr: int
         """
-        self._auto_prov_unicast_addr = unicast_addr
+        self._auto_prov_unicast_addr = int
 
     def set_auto_prov_net_key(self, net_key):
         """

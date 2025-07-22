@@ -375,7 +375,7 @@ _NETKEY_INPUT1 = dict(
         network_id=bytes.fromhex("3ecaff672f673370"),
         identity_key=bytes.fromhex("84396c435ac48560b5965385253e210c"),
         beacon_key=bytes.fromhex("5423d967da639a99cb02231a83f7d254"),
-        clear_dst_addr=bytes.fromhex("fffd"),
+        clear_dst_addr=0xFFFD,
     ),
 )
 
@@ -408,7 +408,9 @@ class TestNetworkLayerCryptoManager(object):
 
     def test_network_id(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
-        assert crypto_manager.network_id == int.from_bytes(expected["network_id"], "big")
+        assert crypto_manager.network_id == int.from_bytes(
+            expected["network_id"], "big"
+        )
 
     def test_identity_key(self, network_crypto_manager_setup):
         crypto_manager, expected, pdus = network_crypto_manager_setup
@@ -451,7 +453,7 @@ class TestNetworkLayerCryptoManager(object):
         plaintext, is_auth_tag_valid = crypto_manager.decrypt(
             net_pdu, expected["iv_index"]
         )
-        dst_addr = plaintext[:2]
+        dst_addr = int.from_bytes(plaintext[:2], "big")
         lower_transport_pdu = BTMesh_Lower_Transport_Control_Message(plaintext[2:])
         assert (
             dst_addr == expected["clear_dst_addr"]
@@ -578,8 +580,8 @@ __APP_KEY_INPUT1 = dict(
         enc_data=bytes.fromhex("5a8bde6d9106ea078a"),
         iv_index=bytes.fromhex("12345678"),
         seq_number=bytes.fromhex("000007"),
-        src_addr=bytes.fromhex("1201"),
-        dst_addr=bytes.fromhex("ffff"),
+        src_addr=0x1201,
+        dst_addr=0xFFFF,
         aszmic=bytes.fromhex("00"),
         # first one is the one we want to match in the list
         label_uuid=None,
@@ -593,8 +595,8 @@ __APP_KEY_INPUT2 = dict(
         enc_data=bytes.fromhex("2456db5e3100eef65daa7a38"),
         iv_index=bytes.fromhex("12345677"),
         seq_number=bytes.fromhex("07080c"),
-        src_addr=bytes.fromhex("1234"),
-        dst_addr=bytes.fromhex("9736"),
+        src_addr=0x1234,
+        dst_addr=0x9736,
         aszmic=bytes.fromhex("00"),
         # first one is the one we want to match in the list
         label_uuid=[bytes.fromhex("f4a002c7fb1e4ca0a469a021de0db875")],
@@ -680,8 +682,8 @@ __DEV_KEY_INPUT1 = dict(
         enc_data=bytes.fromhex("18b0b6618b2b"),
         iv_index=bytes.fromhex("12345678"),
         seq_number=bytes.fromhex("df0410"),
-        src_addr=bytes.fromhex("0405"),
-        dst_addr=bytes.fromhex("0607"),
+        src_addr=0x0405,
+        dst_addr=0x0607,
         aszmic=bytes.fromhex("00"),
     ),
     expected=bytes.fromhex("80b1"),

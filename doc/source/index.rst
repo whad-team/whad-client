@@ -81,6 +81,12 @@ Welcome to WHAD's documentation!
 
 .. toctree::
     :maxdepth: 1
+    :caption: Bluetooth Mesh
+
+    btmesh/started
+
+.. toctree::
+    :maxdepth: 1
     :caption: Contributing
 
     device/firmware
