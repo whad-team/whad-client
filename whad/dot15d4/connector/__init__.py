@@ -255,6 +255,14 @@ class Dot15d4(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
     
+    def delete_superframe(self, id)->bool:
+        "Sends a command to delete the superframe corresponding to the given id"
+        msg = self.hub.dot15d4.delete_superframe_cmd(id)
+        print(f"msg = {msg.message}")
+        resp = self.send_command(msg, message_filter(CommandResult))
+        print(f"resp = {resp}")
+        return isinstance(resp, Success)
+    
     def add_links(self, links:bytearray) -> bool:
         """
         Sends a command to add a new link : modifying a link should go by deleting it first otherwise the operation will be discarded
@@ -266,6 +274,15 @@ class Dot15d4(WhadDeviceConnector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
         
+    def delete_link(self, superframeId, slotNumber, neighbor)->bool:
+        """"
+        Sends a command to delete a link
+        """
+        msg = self.hub.dot15d4.delete_link_cmd(superframeId, slotNumber, neighbor)
+        print(f"msg = {msg.message}")
+        resp = self.send_command(msg, message_filter(CommandResult))
+        print(f"resp = {resp}")
+        return isinstance(resp, Success)
     
     ''' Deprecated
     def synchronize(self, timestamp : int, asn : int) -> bool:

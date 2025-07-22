@@ -35,7 +35,7 @@ class Commands:
     ManInTheMiddle = 0x0b
     EnableHop = 0x0c
     AddLinks = 0x0d
-    DeleteLinks = 0x0e 
+    DeleteLink = 0x0e 
     ChannelMap = 0x0f
     WriteModifySuperframe = 0x10
     DeleteSuperframe = 0x11
@@ -274,6 +274,16 @@ class Dot15d4Domain(Registry):
                 numberOfSlots = nb_slots,
                 flags = flags,
             )
+    
+    def delete_superframe_cmd(self, id:int)->HubMessage:
+        """
+        Create a deleteSuperframeCmd to update the superframes
+        :return: instance of 'DeleteSuperframeCmd'
+        """
+        print("delete = ", id)
+        return Dot15d4Domain.bound('DeleteSuperframeCmd', self.proto_version)(
+                superframeId = id
+        )
 
     def create_add_links_cmd(self, nb_links:int, links:bytearray)->HubMessage:
         """
@@ -286,6 +296,18 @@ class Dot15d4Domain(Registry):
             links = bytes(links)
         )
         
+    def delete_link_cmd(self, superframeId:int, slotNumber:int, neighbor:int)->HubMessage:
+        """
+        create a DeleteLinkCmd message to update the links list
+        :return: instance of DeleteLinkCmd
+        """
+        return Dot15d4Domain.bound('DeleteLinkCmd', self.proto_version)(
+            superframeId = superframeId,
+            slotNumber = slotNumber,
+            neighbor = neighbor
+        )
+        
+
     def create_set_node_address(self, address: NodeAddress) -> HubMessage:
         """Create a SetNodeAddress message.
 
@@ -559,7 +581,7 @@ class WirelessHartDomain(Dot15d4Domain):
 
 from .address import SetNodeAddress
 from .mode import SniffMode, RouterMode, EndDeviceMode, CoordMode, EnergyDetectionMode, \
-    JamMode, MitmMode, Start, Stop, Jammed, EnableHop, AddLinks, ChannelMap, WriteModifySuperframe, EnergyDetectionSample
+    JamMode, MitmMode, Start, Stop, Jammed, EnableHop, AddLinks, DeleteLink, ChannelMap, WriteModifySuperframe, DeleteSuperframe, EnergyDetectionSample
 from .pdu import SendPdu, SendRawPdu, PduReceived, RawPduReceived
 #from .tsch import Sync
 
@@ -588,7 +610,9 @@ __all__ = [
     'MitmRole', 
     'EnableHop',
     'AddLinks',
+    'DeleteLink',
     'ChannelMap',
-    'WriteModifySuperframe'
+    'WriteModifySuperframe',
+    'DeleteSuperframe'
     #, 'Sync'
 ]

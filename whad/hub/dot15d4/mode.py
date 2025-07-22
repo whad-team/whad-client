@@ -86,6 +86,14 @@ class AddLinks(PbMessageWrapper):
     nb_links = PbFieldInt('dot15d4.addLinks.nb_links')
     links = PbFieldBytes('dot15d4.addLinks.links')
     
+@pb_bind(Dot15d4Domain, 'DeleteLinkCmd', 3)
+class DeleteLink(PbMessageWrapper):
+    """Dot15d4 delete link msg
+    """
+    superframeId = PbFieldInt("dot15d4.deleteLink.superframeId")
+    slotNumber = PbFieldInt("dot15d4.deleteLink.slotNumber")
+    neighbor = PbFieldInt("dot15d4.deleteLink.neighbor")
+    
 @pb_bind(Dot15d4Domain, 'ChannelMapCmd',3)
 class ChannelMap(PbMessageWrapper):
     """Dot15d4 updating channel map message
@@ -101,6 +109,11 @@ class WriteModifySuperframe(PbMessageWrapper):
     flags = PbFieldInt('dot15d4.writeModifySuperframeCmd.flags')
     asn = PbFieldInt('dot15d4.writeModifySuperframeCmd.asn', True)
     
+@pb_bind(Dot15d4Domain, 'DeleteSuperframeCmd', 3)
+class DeleteSuperframe(PbMessageWrapper):
+    """Dot15d4 deleting a superframe and all of its links
+    """
+    superframeId = PbFieldInt('dot15d4.deleteSuperframeCmd.superframeId')
 
 @pb_bind(Dot15d4Domain, 'jammed', 1)
 class Jammed(PbMessageWrapper):
