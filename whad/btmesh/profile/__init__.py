@@ -687,7 +687,7 @@ class BaseMeshProfile(object):
         :param unicast_addr: Unicast address to set
         :type unicast_addr: int
         """
-        self._auto_prov_unicast_addr = int
+        self._auto_prov_unicast_addr = unicast_addr
 
     def set_auto_prov_net_key(self, net_key):
         """
