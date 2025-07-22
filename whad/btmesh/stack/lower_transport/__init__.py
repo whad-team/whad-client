@@ -507,7 +507,7 @@ class LowerTransportLayer(Layer):
                         )
                         return
                     else:
-                        logger.warn("RECEIVED SEGMENT FOR UNSEGEMENTED SEQAUTH !")
+                        logger.debug("RECEIVED SEGMENT FOR UNSEGEMENTED SEQAUTH !")
                         return
 
             # if received seq_auth higher/ not stored seq_auth, start new transaction
@@ -524,6 +524,7 @@ class LowerTransportLayer(Layer):
             self.state.rx_transactions[ctx.src_addr] = transaction
             self.state.seq_auth_values[ctx.src_addr] = ctx.seq_auth
             transaction.event = Event()
+            transaction.event.set()
             transaction.main_ack_thread = Timer(
                 transaction.initial_ack_delay / 1000,
                 self.sending_ack_thread,
@@ -564,7 +565,7 @@ class LowerTransportLayer(Layer):
 
         else:
             # check if segment is one we have already received
-            if ctx.segment_number not in transaction.fragments.keys():
+            if pkt.seg_offset not in transaction.fragments.keys():
                 transaction.fragments[pkt.seg_offset] = pkt.getlayer(Raw).load
 
             # if all segments received, send ack and send to upper_transport
@@ -591,6 +592,7 @@ class LowerTransportLayer(Layer):
                     self.sending_ack_thread,
                     args=(transaction, False, transaction.event),
                 )
+                transaction.event.set()
                 transaction.main_ack_thread.start()
                 transaction.is_transaction_finished = True
 

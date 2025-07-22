@@ -3,9 +3,8 @@ from whad.exceptions import WhadDeviceNotFound
 from whad.device import WhadDevice
 from whad.ble.exceptions import ConnectionLostException
 import sys
-from whad.btmesh.connectors.df_attack import DFAttacks
+from whad.btmesh.connector.df_attack import DFAttacks
 from time import sleep
-from whad.btmesh.stack.utils import MeshMessageContext
 
 
 if len(sys.argv) != 2:

@@ -20,7 +20,7 @@ from whad.btmesh.stack.network import NetworkLayer
 from whad.btmesh.profile import BaseMeshProfile
 
 
-# lock for sending to not jam ?
+# lock for sending to not skip packets ?
 def txlock(f):
     def _wrapper(self, *args, **kwargs):
         self.lock_tx()
@@ -190,7 +190,7 @@ class BTMesh(Sniffer):
         :type channel: [TODO:type], optional
         """
         # AdvA = randbytes(6).hex(":")  # random in spec
-        AdvA = (self.profile.primary_element_addr & 0xFF).to_bytes(
+        AdvA = (self.profile.get_primary_element_addr() & 0xFF).to_bytes(
             1, "big"
         ) + b"\xaa\xaa\xaa\xaa\xaa"
         adv_pkt = BTLE_ADV(TxAdd=0) / BTLE_ADV_NONCONN_IND(AdvA=AdvA, data=packet)

@@ -1,7 +1,7 @@
 from whad.cli.shell import category
 from whad.btmesh.cli.base.shell import BTMeshBaseShell
 from whad.btmesh.profile import BaseMeshProfile
-from whad.btmesh.connectors.provisioner import Provisioner
+from whad.btmesh.connector.provisioner import Provisioner
 from whad.btmesh.stack.utils import (
     ProvisioningAuthenticationData,
 )

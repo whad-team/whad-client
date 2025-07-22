@@ -14,9 +14,7 @@ Model Publication Composition State
 
 class ModelPublicationAddressState(ModelState):
     def __init__(self):
-        super().__init__(
-            name="model_publication_publish_address", default_value=b"\x00\x00"
-        )
+        super().__init__(name="model_publication_publish_address", default_value=0x0000)
 
 
 class ModelPublicationPeriodState(ModelState):
@@ -101,7 +99,7 @@ class SubscriptionListState(ModelState):
         super().__init__(name="subscription_list", default_value=None)
 
         self.values["label_uuids"] = []
-        self.values["group_addrs"] = [b"\xff\xff"]  # Add the all-nodes addr
+        self.values["group_addrs"] = [0xFFFF]  # Add the all-nodes addr
 
 
 class NetKeyListState(ModelState):
@@ -250,9 +248,7 @@ HEARTBEAT PUBLICATION COMPOSITE STATE
 
 class HeartbeatPublicationDestinationState(ModelState):
     def __init__(self):
-        super().__init__(
-            name="heartbeat_publication_destination", default_value=b"\x00\x00"
-        )
+        super().__init__(name="heartbeat_publication_destination", default_value=0x0000)
 
 
 class HeartbeatPublicationCountState(ModelState):
@@ -308,14 +304,14 @@ Hearbeat Subscription COMPOSITE STATE
 class HeartbeatSubscriptionSourceState(ModelState):
     def __init__(self):
         super().__init__(
-            name="heartbeat_subscription_source", default_value=b"\x00\x00"
+            name="heartbeat_subscription_source", default_value=0x0000
         )
 
 
 class HeartbeatSubscriptionDestinationState(ModelState):
     def __init__(self):
         super().__init__(
-            name="heartbeat_subscription_destination", default_value=b"\x00\x00"
+            name="heartbeat_subscription_destination", default_value=0x0000
         )
 
 
@@ -733,11 +729,11 @@ class ForwardingTableEntry:
         fixed_path=1,
         backward_validated_path=1,
         path_not_ready=1,
-        path_origin=b"\x00\x00",
+        path_origin=0x0000,
         path_origin_secondary_elements_count=0,
         dependent_origin_list=[],
         dependent_origin_secondary_elements_count_list=[],
-        destination=b"\x00\x00",
+        destination=0x0000,
         path_target_secondary_elements_count=0,
         dependent_target_list=[],
         dependent_target_secondary_elements_count_list=[],
@@ -1179,9 +1175,7 @@ class PrivateNodeIdentityState(ModelState):
     """
 
     def __init__(self):
-        super().__init__(
-            name="private_node_identity", default_value=0x02
-        )
+        super().__init__(name="private_node_identity", default_value=0x02)
 
 
 class OnDemandeGATTProxyState(ModelState):
@@ -1331,6 +1325,7 @@ class SARReceiverCompositeState(CompositeModelState):
     """
     IS INSTANCED IN THE CONFIGURATION SERVER MODEL !!!
     """
+
     def __init__(self):
         super().__init__(
             name="sar_receiver",

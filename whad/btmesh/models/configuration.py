@@ -305,7 +305,7 @@ class ConfigurationModelServer(ModelServer):
         :rtype: Element | None
         """
         elements = self.profile.get_all_elements()
-        primary_addr = self.profile.primary_element_addr
+        primary_addr = self.profile.get_primary_element_addr()
         element_addr = int.from_bytes(element_addr, "2")
         for element in elements:
             if element.index + primary_addr == element_addr:
@@ -880,10 +880,8 @@ class ConfigurationModelServer(ModelServer):
 
             return response
 
-        addr = bytes.fromhex(hex(pkt.address))
-
         state.set_value(field_name="label_uuids", value=[])
-        state.set_value(field_name="group_addrs", value=[addr])
+        state.set_value(field_name="group_addrs", value=[pkt.addr])
         response = BTMesh_Model_Config_Subscription_Status(
             status=0,
             element_addr=pkt.element_addr,
@@ -1100,7 +1098,7 @@ class ConfigurationModelServer(ModelServer):
             )
         else:
             net_key_crypto_manager = NetworkLayerCryptoManager(
-                key_index=net_key_index, net_key=net_key
+                key_index=net_key_index, net_key=net_key.to_bytes(16, "little")
             )
             net_key_list.set_value(
                 field_name=net_key_index, value=net_key_crypto_manager

@@ -55,7 +55,7 @@ class GenericOnOffServer(ModelServer):
             present_onoff = pkt.onoff
             response = BTMesh_Model_Generic_OnOff_Status(present_onoff=present_onoff)
         onoff_state.set_value(pkt.onoff, delay=delay)
-        print("LED VALUE SET TO " + str(pkt.onoff))
+        #print("LED VALUE SET TO " + str(pkt.onoff))
         return response
 
     def on_onoff_set_unack(self, message):

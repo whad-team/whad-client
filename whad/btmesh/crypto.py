@@ -562,12 +562,14 @@ class NetworkLayerCryptoManager:
         :param raw_transport_pdu: Plaintext transport PDU
         :type raw_transport_pdu: Bytes
         :param clear_dst_addr: The plaintext dst_addr to be encrypted
-        :type clear_dst_addr: Bytes
+        :type clear_dst_addr: int
         :param net_pdu: Partial Network PDU with information to compute the NetworkNonce and the dest addr
         :type net_pdu: BTMesh_Network_PDU
         :param iv_index: The current iv_index
         :type iv_index: Bytes
         """
+
+        clear_dst_addr = clear_dst_addr.to_bytes(2, "big")
 
         # Mesh Spec Section 3.9.5.1 p. 194
         nonce = (
@@ -882,9 +884,9 @@ class UpperTransportLayerAppKeyCryptoManager:
         :param seq_number: segment number Value (of first segment)
         :type seq_number: Bytes
         :param src_addr: Source addr of the packet
-        :type src_addr: Bytes
+        :type src_addr: int
         :param dst_addr: Destination addr of the packet
-        :type dst_addr: Bytes
+        :type dst_addr: int
         :param iv_index: Current IV index
         :type iv_index: Bytes
         :param label_uuid: Label UUID associated with the virtual addr (Mesh Spec Section 3.4.2.3) if dst_addr is virtual addr
@@ -892,6 +894,9 @@ class UpperTransportLayerAppKeyCryptoManager:
         :returns: The encrypted message concatenated with mic and the seq_auth value
         :rtype: (Bytes, int)
         """
+        src_addr = src_addr.to_bytes(2, "big")
+        dst_addr = dst_addr.to_bytes(2, "big")
+
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
         nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
 
@@ -944,9 +949,9 @@ class UpperTransportLayerAppKeyCryptoManager:
         :param seq_number: segment number Value (of first segment)
         :type seq_number: Bytes
         :param src_addr: Source addr of the packet
-        :type src_addr: Bytes
+        :type src_addr: int
         :param dst_addr: Destination addr of the packet
-        :type dst_addr: Bytes
+        :type dst_addr: int
         :param iv_index: Current IV index
         :type iv_index: Bytes
         :param label_uuid: List of Label UUID that match with the virtual addr (Mesh Spec Section 3.4.2.3) if dst_addr is virtual addr.
@@ -954,6 +959,8 @@ class UpperTransportLayerAppKeyCryptoManager:
         :returns: The plaintext, wether authentication was valid and in case of virtual addr, the matching lable UUID that worked for the authentication
         :rtype: (Byte|None, (boolean Bytes|None)) or (Byte|None, boolean)
         """
+        src_addr = src_addr.to_bytes(2, "big")
+        dst_addr = dst_addr.to_bytes(2, "big")
 
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
         nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
@@ -1001,9 +1008,9 @@ class UpperTransportLayerAppKeyCryptoManager:
         :param seq_number: segment number Value (of first segment)
         :type seq_number: Bytes
         :param src_addr: Source addr of the packet
-        :type src_addr: Bytes
+        :type src_addr: int
         :param dst_addr: Destination addr of the packet
-        :type dst_addr: Bytes
+        :type dst_addr: int
         :param iv_index: Current IV index
         :type iv_index: Bytes
         :param label_uuids: List of Label UUID that match with the virtual addr (Mesh Spec Section 3.4.2.3) if dst_addr is virtual addr.
@@ -1011,6 +1018,8 @@ class UpperTransportLayerAppKeyCryptoManager:
         :returns: The plaintext, wether authentication was valid and in case of virtual addr, the matching lable UUID that worked for the authentication
         :rtype: (Byte|None, boolean, Bytes|None)
         """
+        src_addr = src_addr.to_bytes(2, "big")
+        dst_addr = dst_addr.to_bytes(2, "big")
 
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
         nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
@@ -1108,14 +1117,16 @@ class UpperTransportLayerDevKeyCryptoManager:
         :param seq_number: segment number Value (of first segment)
         :type seq_number: Bytes
         :param src_addr: Source addr of the packet
-        :type src_addr: Bytes
+        :type src_addr: int
         :param dst_addr: Destination addr of the packet
-        :type dst_addr: Bytes
+        :type dst_addr: int
         :param iv_index: Current IV index
         :type iv_index: Bytes
         :returns: The encrypted message concatenated with mic and the seq_auth value
         :rtype: (Bytes, Bytes)
         """
+        src_addr = src_addr.to_bytes(2, "big")
+        dst_addr = dst_addr.to_bytes(2, "big")
 
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
         nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
@@ -1148,14 +1159,18 @@ class UpperTransportLayerDevKeyCryptoManager:
         :param seq_number: segment number Value (of first segment)
         :type seq_number: int
         :param src_addr: Source addr of the packet
-        :type src_addr: Bytes
+        :type src_addr: int
         :param dst_addr: Destination addr of the packet
-        :type dst_addr: Bytes
+        :type dst_addr: int
         :param iv_index: Current IV index
         :type iv_index: Bytes
         :returns: The plaintext, wether authentication was valid.
         :rtype: (Byte, boolean)
         """
+
+        src_addr = src_addr.to_bytes(2, "big")
+        dst_addr = dst_addr.to_bytes(2, "big")
+
         seq_auth = self.__compute_seq_auth(iv_index, seq_number)
         nonce = self.__compute_nonce(aszmic, seq_auth, src_addr, dst_addr, iv_index)
         if aszmic == 1:
