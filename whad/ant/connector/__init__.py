@@ -541,4 +541,4 @@ class ANT(WhadDeviceConnector):
 
 
 from whad.ant.connector.sniffer import Sniffer
-
+from whad.ant.connector.master import Master
