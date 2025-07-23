@@ -266,9 +266,9 @@ class Dot15d4(WhadDeviceConnector):
     def add_links(self, links:bytearray) -> bool:
         """
         Sends a command to add a new link : modifying a link should go by deleting it first otherwise the operation will be discarded
-        For each link 8 bytes :  1 for superframe id, 2 for join slot nb, 1 for offset, 2 for neighbor, 1 for flags, 1 for type
+        For each link 10 bytes :  1 for superframe id, 2 for source @, 2 for join slot nb, 1 for offset, 2 for neighbor, 1 for flags, 1 for type
         """
-        nb_links:int = len(links)//8 #each link a an 8 length byte array
+        nb_links:int = len(links)//10 #each link is a 10 length byte array
         msg = self.hub.dot15d4.create_add_links_cmd(nb_links, links)
         print("add link msg=", msg)
         resp = self.send_command(msg, message_filter(CommandResult))
