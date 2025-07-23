@@ -264,9 +264,9 @@ class ANTStickDevice(VirtualDevice):
             if self.__opened_stream:
                 while not self.__event_queue.empty():
                     event = ANTStick_Message(self.__event_queue.get())
-                    if event.message_code in (5,6,10):
+                    if event.message_code in (3, 5,6,10):
                         self._send_whad_ant_channel_event(event.channel_number, event.message_code)
-                    print("Event:", repr(event))
+                    #print("Event:", repr(event))
                     if event.message_code == 7 and self.__channels[event.channel_number].opened: # event_channel_closed
                         self.__reload_channel = event.channel_number
                     elif event.message_code in (5,6) + (4,10,17):
@@ -274,7 +274,7 @@ class ANTStickDevice(VirtualDevice):
                     # acked: event_transfer_tx_completed or event_transfer_tx_failed  
                 while not self.__pdu_queue.empty():
                     data = ANTStick_Message(self.__pdu_queue.get())
-                    print(repr(data))
+                    #print(repr(data))
                     if data is not None:# and ANTStick_Data_Broadcast_Data in data:
                         cn = data.channel_number & 0b11111
                         pkt = bytes(
@@ -696,8 +696,8 @@ class ANTStickDevice(VirtualDevice):
 
     def _antstick_send_command(self, command, rsp_filter=lambda p:True, force_reset=False, timeout=200, no_response=False):
         data = bytes(ANTStick_Message() / command)
-        print(">", bytes(data))
-        print(repr(ANTStick_Message(data)))
+        #print(">", bytes(data))
+        #print(repr(ANTStick_Message(data)))
 
         while True:
             try:
@@ -718,7 +718,7 @@ class ANTStickDevice(VirtualDevice):
         while response is None:
             if not self.__opened:
                 self._antstick_read_message()
-                print(self.__in_buffer)
+                #print(self.__in_buffer)
             response = self._antstick_read_response(rsp_filter=rsp_filter)
             if response is None and force_reset:
                 self.__antstick.reset()
@@ -739,8 +739,8 @@ class ANTStickDevice(VirtualDevice):
                 self.__response_queue.put(msg)
                 msg = self.__response_queue.get()
 
-            print("<", msg.hex())
-            print(repr(ANTStick_Message(msg)))
+            #print("<", msg.hex())
+            #print(repr(ANTStick_Message(msg)))
             return ANTStick_Message(msg)
 
     def _antstick_read_message(self, timeout=200):
@@ -772,15 +772,13 @@ class ANTStickDevice(VirtualDevice):
             elif msg[2] == 0x40 and ANTStick_Message(msg).message_code >= 1 and ANTStick_Message(msg).message_code <= 17: # event range
                 self.__event_queue.put(msg)
             else:
-                print("Adding response: ", repr(ANTStick_Message(msg))) 
+                #print("Adding response: ", repr(ANTStick_Message(msg))) 
                 self.__response_queue.put(msg)
     
 
 
     # WHAD command handlers
     def _on_whad_ant_sniff(self, message):
-        print("ANT sniff cmd", message)
-        
         self._set_network_key(network_number = 0, network_key = message.network_key)
         self._assign_channel(
             channel_number = 0, 
@@ -992,7 +990,7 @@ class ANTStickDevice(VirtualDevice):
 
     def _on_whad_ant_send(self, message):
         packet = ANT_Hdr(message.pdu)
-        print("transmitting: ", repr(packet))
+        #print("transmitting: ", repr(packet))
         if packet.broadcast == 1:
             if packet.end == 0:
                 self.pending_burst_packets.append(message)
@@ -1019,7 +1017,7 @@ class ANTStickDevice(VirtualDevice):
 
                         channel_seq = burst.channel_number | sequence << 5
                         packet_data = data[i * 8 : i * 8 + 8]
-                        print(">>>>", packet_data)
+                        #print(">>>>", packet_data)
                         self._antstick_send_command(
                             ANTStick_Data_Burst_Data(
                                 channel_number = channel_seq, 

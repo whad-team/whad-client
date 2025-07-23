@@ -1,4 +1,4 @@
-from whad.ant import ANT, Master
+from whad.ant import ANT
 from whad.scapy.layers.ant import ANT_Hdr
 from whad.ant.channel import ChannelDirection
 from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
@@ -17,11 +17,10 @@ if __name__ == '__main__':
             # Create the WHAD Device
             dev = WhadDevice.create(interface)
 
-            # Create the  ANT master
-            master = Master(dev)
-            print(master.list_channels())
-            print(master.list_networks())
-            
+            # Create the sniffer ANT connector
+            sniffer = ANT(dev)
+            print(sniffer.list_channels())
+            print(sniffer.list_networks())
             input()
             '''
             print(sniffer.sniff_ant(

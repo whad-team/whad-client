@@ -45,21 +45,22 @@ if __name__ == '__main__':
                 input()
                 p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"ABCDEF")#b"SLAAVE")
                 p.broadcast = 1
+                p.count = 0
+                p.slot = 0
                 p.end = 0
                 print(sniffer.send(p))
 
                 p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"GHIJKL")#b"SLAAVE")
                 p.broadcast = 1
-                p.end = 0
-                print(sniffer.send(p))
-
-                p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"MNOPQR")#b"SLAAVE")
-                p.broadcast = 1
+                p.count = 1
+                p.slot = 0
                 p.end = 1
                 print(sniffer.send(p))
                 input()
+
                 p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"SLAAVE")#b"SLAAVE")
                 p.broadcast = 1
+                p.slot = 0
                 p.end = 1
                 print(sniffer.send(p))
 
