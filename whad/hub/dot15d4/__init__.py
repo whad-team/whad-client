@@ -236,16 +236,6 @@ class Dot15d4Domain(Registry):
             hopping = val
         )
     
-    def create_add_links_cmd(self, nb_links, links) -> HubMessage:
-        """
-        Create an AddLinks message to add to superframes
-        
-        :return: instace of 'AddLinks'
-        """
-        return Dot15d4Domain.bound('add_links_cmd', self.proto_version)(
-            nb_links = nb_links,
-            links = links
-        )
         
     def create_channel_map_cmd(self, channel_map:int)->HubMessage:
         """Create a channel map message to update the channel map 

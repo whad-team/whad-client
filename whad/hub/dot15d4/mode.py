@@ -3,6 +3,7 @@
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.dot15d4.dot15d4_pb2 import StartCmd, StopCmd
 from whad.hub.events import JammedEvt
+from whad.hub.dot15d4.events import DiscoveryEvt
 from ..message import pb_bind, PbFieldInt, PbMessageWrapper, PbFieldBool, PbFieldBytes
 from . import Dot15d4Domain
 
@@ -135,6 +136,26 @@ class Jammed(PbMessageWrapper):
         """
         return Jammed(
             timestamp=event.timestamp
+        )
+        
+@pb_bind(Dot15d4Domain, 'discovered_communication', 3)
+class DiscoveredCommunication(PbMessageWrapper):
+    """
+    Dot15d4 Discovery of a communication on an undefined channel notification
+    """
+    src= PbFieldInt("dot15d4.discovered_communication.src")
+    dst= PbFieldInt("dot15d4.discovered_communication.dst")
+    slot= PbFieldInt("dot15d4.discovered_communication.slot")
+    offset= PbFieldInt("dot15d4.discovered_communication.offset")
+    
+    def to_event(self) -> DiscoveryEvt:
+        """Convert this message into a WHAD event.
+        """
+        return DiscoveryEvt(
+            src=self.src,
+            dst=self.dst,
+            slot=self.slot,
+            offset=self.offset
         )
 
 @pb_bind(Dot15d4Domain, 'ed_sample', 1)

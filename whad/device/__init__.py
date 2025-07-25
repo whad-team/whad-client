@@ -8,6 +8,7 @@ from time import time, sleep
 # Whad imports
 from whad.exceptions import RequiredImplementation, UnsupportedDomain, \
     WhadDeviceNotReady, WhadDeviceNotFound, WhadDeviceDisconnected, WhadDeviceTimeout, WhadDeviceError
+from whad.hub.dot15d4.mode import DiscoveredCommunication
 from whad.protocol.generic_pb2 import ResultCode
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.device_pb2 import Capability, DeviceDomainInfoResp, DeviceType, DeviceResetQuery

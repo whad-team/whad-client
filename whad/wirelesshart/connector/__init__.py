@@ -1,5 +1,6 @@
 from whad.device import WhadDeviceConnector
 from whad.dot15d4.connector import Dot15d4
+from whad.hub.dot15d4.mode import DiscoveredCommunication
 from whad.scapy.layers.wirelesshart import WirelessHart_DataLink_Hdr
 
 class WirelessHart(Dot15d4):
@@ -21,5 +22,12 @@ class WirelessHart(Dot15d4):
 
     def sniff_wirelesshart(self, channel:int = 11) -> bool:
         return super().sniff_dot15d4(channel=channel)
+    
+    def on_domain_msg(self, domain, message):
+        if isinstance(message, DiscoveredCommunication):
+            # Convert message into event
+            event = message.to_event()
+        else:
+            return super().on_domain_msg(domain, message)
 
 from whad.wirelesshart.connector.sniffer import Sniffer
