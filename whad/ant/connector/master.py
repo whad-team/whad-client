@@ -44,6 +44,10 @@ class Master(ANT):
         self.__stack = ANTStack(self)
         self._enable_role()
 
+    @property
+    def stack(self):
+        return self.__stack
+
     def _enable_role(self):
         """Enable Master role.
         """
