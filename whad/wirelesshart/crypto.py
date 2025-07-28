@@ -92,10 +92,16 @@ class WirelessHartNetworkLayerCryptoManager:
             cipher.update(self.auth)
             decrypted = cipher.decrypt_and_verify(ciphertext, received_mac_tag=mic)
             del packet[Raw]
-            packet[WirelessHart_Network_Security_SubLayer_Hdr].security_types = 15
-            packet = packet / WirelessHart_Transport_Layer_Hdr(decrypted)
-            packet.metadata = metadata
-            return (packet, True)
+            decrypted_pkt = packet.copy()
+            decrypted_pkt[WirelessHart_Network_Security_SubLayer_Hdr].security_types = 15
+            
+            decrypted_pkt[WirelessHart_Network_Security_SubLayer_Hdr].remove_payload()
+            decrypted_pkt[WirelessHart_Network_Security_SubLayer_Hdr].add_payload(decrypted)
+
+            decrypted_pkt.metadata = metadata
+            
+            decrypted_pkt.metadata.decrypted = True
+            return (decrypted_pkt, True)
 
         except ValueError:
             packet.metadata = metadata
@@ -123,6 +129,18 @@ class WirelessHartDecryptor:
             self.keys.append(key)
             return True
         return False
+    
+    def extract_keys(self, packet):
+        # convert into scapy packet if bytes only
+        if isinstance(packet, bytes):
+            packet = Dot15d4FCS(packet)
+        
+        transport_layer = packet.getlayer(WirelessHart_Transport_Layer_Hdr)
+        if transport_layer is not None:
+            for c in transport_layer.commands:
+                if hasattr(c, "key_value"): #adding the keys if the command key_value is in the transport layer
+                    if c.key_value not in self.keys:
+                        self.add_key(c.key_value)
 
 
     def attempt_to_decrypt(self, packet):
@@ -134,8 +152,11 @@ class WirelessHartDecryptor:
             manager = WirelessHartNetworkLayerCryptoManager(key)
             decrypted, success = manager.decrypt(packet)
             if success:
+                decrypted = Dot15d4FCS(bytes(decrypted)) 
+                self.extract_keys(decrypted)
                 return decrypted, True
         # one key seems to be missing, check what is not correctly decrypted here
+        print("Decryption failed !!")
         packet.show()
-        exit()
+        #exit()
         return packet, False

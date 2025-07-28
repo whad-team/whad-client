@@ -2,8 +2,11 @@ import logging
 
 from scapy.packet import Packet
 from whad.wirelesshart.connector import WirelessHart
+from whad.wirelesshart.connector.superframes import Superframes
+
+from whad.wirelesshart.connector.channelmap import ChannelMap
 from whad.wirelesshart.sniffing import SnifferConfiguration
-from whad.scapy.layers.wirelesshart import WirelessHart_Network_Security_SubLayer_Hdr
+from whad.scapy.layers.wirelesshart import *
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter
 from whad.wirelesshart.crypto import WirelessHartDecryptor
@@ -31,6 +34,8 @@ class Sniffer(WirelessHart, EventsManager):
 
         self.__decryptor = WirelessHartDecryptor()
         self.__configuration = SnifferConfiguration()
+        self.superframes = Superframes(self)
+        self.channelmap = ChannelMap()
         
         # Check if device can perform sniffing
         if not self.can_sniff():
@@ -48,6 +53,14 @@ class Sniffer(WirelessHart, EventsManager):
         :type key: bytes
         """
         self.__configuration.keys.append(key)
+    
+    def add_decryption_key(self, key: bytes):
+        """Add a decryption key to our sniffer.
+
+        :param key: decryption key to add
+        :type key: bytes
+        """
+        self.__decryptor.keys.append(key)
 
     def clear_keys(self):
         """Clear all stored encryption keys.
@@ -109,10 +122,23 @@ class Sniffer(WirelessHart, EventsManager):
             decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
             if success:
                 packet = decrypted 
-                packet.metadata.decrypted = True
-                
+                for cmd in decrypted.getlayer(WirelessHart_Transport_Layer_Hdr).commands:
+                    if WirelessHart_Add_Link_Response in cmd:
+                        c = cmd[WirelessHart_Add_Link_Response]
+                        if c.status == 0:
+                            self.superframes.add_link(c.superframe_id, c.slot_number, c.channel_offset, packet.src_addr, c.neighbor_nickname, 0x4 if c.transmit else 0x2 if c.receive else 0x1, c.link_type)
+                   
+        if WirelessHart_DataLink_Advertisement in packet:
+            self.process_advertisement(packet)
+        else:
+            packet.show()
         return packet
-
+    
+    def process_advertisement(self, pkt:Packet):
+        self.superframes.update_from_advertisement(pkt)
+        self.channelmap.update_from_advertisement(pkt)
+        return pkt
+                
     def sniff(self):
         try:
             while True:
