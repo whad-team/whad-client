@@ -405,7 +405,7 @@ class Layer(object):
                 setattr(contextual_clazz, 'INSTCOUNT', 0)
                 instcount = 0
             instance_name = '%s#%d' % (contextual_clazz.alias, instcount)
-
+            
             # Create layer with this new instance name.
             return self.create_layer(contextual_clazz, instance_name)
         else:

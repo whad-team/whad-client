@@ -19,8 +19,21 @@ if __name__ == '__main__':
 
             # Create the  ANT master
             master = Master(dev)
-            print(master.list_channels())
-            print(master.list_networks())
+            
+            channel = master.stack.get_layer('ll').create_channel(7912, 120, 1)
+            master.start()
+            input()
+
+            p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"MASTER")
+            p.broadcast = 0
+            print(master.send(p))
+            input()
+
+            channel.close()
+            
+
+            #print(master.list_channels())
+            #print(master.list_networks())
             
             input()
             '''
