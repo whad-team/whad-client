@@ -159,10 +159,85 @@ device to the connected Central devicem no matter if the written value differs o
 from the previous one. If a Central device has subscribed for indications, an
 indication is sent to the Central device instead of a notification.
 
+The above example relies on the fact the GATT profile class defines its
+characteristic using WHAD's Device Model feature (see :ref:`whad-ble-device-model`),
+but some profile instances are created either from a JSON profile or
+dynamically populated, with no specific property defined. In this case,
+accessing a characteristics and updating its value is a bit more complex:
+
+.. code-block:: python
+
+    generic_service = profile.get_service_by_uuid(UUID(0x1800))
+    if generic_service is not None:
+        dev_name = battery_service.get_characteristic(UUID(0x2a00))
+        dev_name.value = b"NewDeviceName"
+
+If the Central device has subscribed for notifications or indications,
+a notifcation or indication will be sent once the characteristic's value
+has been modified.
+
 Reacting on specific GATT events for a service's characteristic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Any custom GATT profile class inheriting from :class:`~whad.ble.profile.GenericProfile`
+can use a set of specifically designed *decorators* to declare a method as a handler
+for a GATT event related to a specific characteristic. The :class:`~whad.ble.profile.read`
+decorator for instance can be used to intercept any read operation on a specific characteristic,
+like in the following example code:
 
+.. code-block:: python
+
+    from whad.device import WhadDevice
+    from whad.ble import Peripheral
+    from whad.ble.profile.advdata import AdvCompleteLocalName, \
+                                         AdvDataFieldList, AdvFlagsField
+    from whad.ble.profile.services import BatteryService
+    from whad.ble.profile import read, GenericProfile
+
+    class BatteryDevice(GenericProfile, BatteryService):
+        """Device exposing a battery service
+        """
+
+        @read(BatteryService.battery.level)
+        def on_battery_level_read(self, offset, length):
+            level = self.get_battery_level() - 10
+            if level <= 0:
+                level = 100
+            self.set_battery_level(level)
+            return self.battery.level.value
+
+In this example code, we define a new `BatteryDevice` class inheriting
+from :class:`~whad.ble.profile.GenericProfile` that also uses an additional
+GATT profile defined by :class:`~whad.ble.profile.BatteryService`. This
+generic service adds its own service and characteristics as specified in
+the `Bluetooth Battery Service specification <https://www.bluetooth.com/specifications/specs/html/?src=BAS_v1.1/out/en/index-en.html>`_
+as well as dedicated methods to retrieve and set the corresponding battery
+level.
+
+A custom GATT read event handler is defined for this profile's battery level
+characteristic (identified by UUID `0x2A19` within the corresponding battery service
+identified by UUID `0x180F`), thanks to the :class:`~whad.ble.profile.read` decorator.
+The argument passed to this decorator is declared within the :class:`~whad.ble.profile.BatteryService`
+class as `BatteryService.battery.level` and can be used to identify a specific
+characteristic belonging to the GATT model defined within any :class:`~whad.ble.profile.GenericProfile`
+class. Basically, any characteristic defined in a GATT profile class can be passed to this
+decorator.
+
+The decorated method, ``on_battery_level_read()`` accepts two parameters specifying the
+offset and length required by the GATT read operation and *shall* be used to return
+any partial value required by a Central device. In this example, we don't care about
+any offset or length because most of the Central devices will read this characteristic
+without using a GATT LongRead procedure (the characteristic value is stored on a single
+byte), but a better implementation would take care of it to properly handle errors.
+In our implementation, we first retrieve the current battery level from the characteristic's
+value, decrements this value by 10 (setting it back to 100 if it reaches 0 or below),
+write this value into the characteristic's value and return the updated characteristic value.
+This method is always called before WHAD's BLE stack returns any value to the Central
+device that initiated this GATT read operation, allowing to change the behavior of the
+peripheral when needed.
+
+The peripheral's GATT profile should be seen as a state machine associated to a peripheral
+device, that can be extended to implement specific and/or complex behaviors.
 
 Bluetooth Low Energy Peripheral connector
 -----------------------------------------
