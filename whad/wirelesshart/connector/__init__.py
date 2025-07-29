@@ -25,8 +25,9 @@ class WirelessHart(Dot15d4):
     
     def on_domain_msg(self, domain, message):
         if isinstance(message, DiscoveredCommunication):
-            # Convert message into event
+            # Convert message into event and trigger it
             event = message.to_event()
+            self.trigger_event(event) 
         else:
             return super().on_domain_msg(domain, message)
 

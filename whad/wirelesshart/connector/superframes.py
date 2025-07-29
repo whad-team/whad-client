@@ -11,19 +11,35 @@ class Superframes:
         for s in dot15d4_pkt[WirelessHart_DataLink_Advertisement].superframes:
             self.add_new_frame(s.superframe_id, s.superframe_number_of_slots)
             for l in s.superframe_links:
-                self.add_link(s.superframe_id, l.link_join_slot, l.link_channel_offset)
+                self.create_and_add_link(s.superframe_id,
+                              l.link_join_slot,
+                              l.link_channel_offset,
+                              dot15d4_pkt.src_addr, 
+                              dot15d4_pkt.src_addr,
+                              Link.OPTIONS_TRANSMIT if l.link_use_for_transmission else Link.OPTIONS_RECEIVE, 
+                              Link.TYPE_JOIN)
 
     def add_new_frame(self, frame_id, frame_nb_slots):
         frame = Superframe(frame_id, frame_nb_slots)
         if frame not in self.table:
             self.table[frame] = []
             self._sniffer.write_modify_superframe(frame.id, frame.nb_slots, frame.flags, frame.launch_asn)
+            self._sniffer.linkexplorer.added_superframe(frame)
+
+    def delete_superframe(self, id):
+        try:
+            self.table.pop(id)
+        except KeyError:
+            print(f"[Warning] Superframe ID {id} not found in table.")
 
     def get_frame_by_id(self, frame_id):
         for frame in self.table:
             if frame.id == frame_id:
                 return frame
         return None
+    
+    def get_all_superframes(self):
+        return self.table.keys()
 
     def contains(self, frame_id):
         return self.get_frame_by_id(frame_id) is not None
@@ -32,10 +48,20 @@ class Superframes:
         frame = self.get_frame_by_id(frame_id)
         return self.table.get(frame) if frame else None
 
-    def add_link(self, frame_id, join_slot, offset, src=0x0000, neighbor=0xffff, options=0x4, type=0x1):
+    def create_and_add_link(self, frame_id, join_slot, offset, src, neighbor=0xffff, options=None, type=None):
+        link = Link(
+            src, 
+            join_slot, 
+            offset, 
+            neighbor, 
+            options if options is not None else Link.OPTIONS_TRANSMIT,
+            type if type is not None else Link.TYPE_NORMAL
+        )
+        self.add_link(frame_id, link)
+        
+    def add_link(self, frame_id, link:Link):
         frame = self.get_frame_by_id(frame_id)
         if frame:
-            link = Link(src, join_slot, offset, neighbor, options, type)
             if link not in self.table[frame]:
                 self.table[frame].append(link)
                 bytesLink = link.getBytesArray()

@@ -9,4 +9,3 @@ class DiscoveryEvt(WhadEvent):
     """
     def __init__(self, **parameters):
         super().__init__(**parameters)
-        #print("discovery evt")
