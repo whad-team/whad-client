@@ -77,6 +77,7 @@ It is then possible to create an instance of :class:`Peripheral` using this cust
 GATT profile class and specific advertising data, as follows:
 
 .. code-block:: python
+
     from whad.ble import Peripheral
     from whad.ble.profile.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
     from whad.ble.profile.attribute import UUID
@@ -157,6 +158,9 @@ subscribed for notifications, a notification is automatically sent by the Periph
 device to the connected Central devicem no matter if the written value differs or not
 from the previous one. If a Central device has subscribed for indications, an
 indication is sent to the Central device instead of a notification.
+
+Reacting on specific GATT events for a service's characteristic
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 
