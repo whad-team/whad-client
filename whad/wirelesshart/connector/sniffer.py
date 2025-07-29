@@ -152,6 +152,7 @@ class Sniffer(WirelessHart, EventsManager):
         return packet
     
     def process_advertisement(self, pkt:Packet):
+        """Updates the channel map and the join links based on the packet"""
         self.superframes.update_from_advertisement(pkt)
         self.channelmap.update_from_advertisement(pkt)
         return pkt
@@ -163,6 +164,7 @@ class Sniffer(WirelessHart, EventsManager):
         self.linkexplorer.delete_superframe(id) 
                 
     def on_discovery_evt(self, evt: DiscoveryEvt):
+        """Calls linkexplorer to take into account the discovery of the new communication"""
         params = getattr(evt, '_WhadEvent__parameters', {})
         src = params.get("src")
         dst = params.get("dst")

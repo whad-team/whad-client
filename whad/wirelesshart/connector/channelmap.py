@@ -13,6 +13,9 @@ def channel_map_mutex(f):
     return _wrapper
 
 class ChannelMap:
+    """
+    This class permits the following of the activated channels on which the network communicates
+    """
     def __init__(self, list=[]):
         self.list = list
         self.channel_map = bytes(0xffff)
@@ -33,6 +36,9 @@ class ChannelMap:
         self.list = list
     
     def update_from_advertisement(self, pkt):
+        """
+        This method updates the channel map when listening to an advertising
+        """
         if self.channel_map != struct.unpack("<H", bytes(pkt[WirelessHart_DataLink_Advertisement].channel_map))[0]:
                 channel_map = bytes(pkt[WirelessHart_DataLink_Advertisement].channel_map)
                 channel_map = struct.unpack("<H", channel_map)[0]

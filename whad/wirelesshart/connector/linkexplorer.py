@@ -26,6 +26,7 @@ class LinkExplorer():
         self._thread.join()
 
     def added_superframe(self, sf: Superframe):
+        """This method updates the communication table length based on the new superframe"""
         self._superframes_info = [item for item in self._superframes_info if item[1] != sf.id]
         self._superframes_info.append((sf.nb_slots, sf.id))
         self._superframes_info = sorted(self._superframes_info, key=lambda x: x[0], reverse=True)
@@ -79,6 +80,7 @@ class LinkExplorer():
             
 
     def _monitor_communications(self):
+        """this method checks if some communications have been confirmed as links and sends command to the dongle"""
         while self._running:
             sleep(10*len(self._superframes_info))
             with self._lock:
