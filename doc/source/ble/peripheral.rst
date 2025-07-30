@@ -236,17 +236,55 @@ This method is always called before WHAD's BLE stack returns any value to the Ce
 device that initiated this GATT read operation, allowing to change the behavior of the
 peripheral when needed.
 
-The peripheral's GATT profile should be seen as a state machine associated to a peripheral
-device, that can be extended to implement specific and/or complex behaviors.
+In case a GATT profile has been dynamically populated from a JSON profile file, overriding
+:class:`~whad.ble.profile.GenericProfile`'s GATT operation handlers is the best way to
+intercept any operation and modify the profile instance accordingly. The following methods
+can be overriden to intercept different GATT operations:
+
+- :py:meth:`~whad.ble.profile.GenericProfile.on_characteristic_read`: this method is called
+  when a GATT read operation is about to be peformed by WHAD's BLE stack and is in charge of
+  calling any registered handler regarding the characteristic that is about to be read
+- :py:meth:`~whad.ble.profile.GenericProfile.on_characteristic_write`: this method is called
+  when a GATT write operation is requested by a Central device *before* writing to the destination
+  characteristic's value
+- :py:meth:`~whad.ble.profile.GenericProfile.on_characteristic_written`: this method is called
+  when a GATT write operation has just been performed, to allow post-processing
+- :py:meth:`~whad.ble.progile.GenericProfile.on_characteristic_subscribed`: this method is called
+  when a Central device has just subscribed to a characteristic for notification or indication
+- :py:meth:`~whad.bleprofile.GenericProfile.on_characteristic_unsubscribed`: this method is
+  called when a Central device has just unsubscribed from a characteristic
+
+If one or many of these methods are redefined (overriden) in a child class inheriting from
+:class:`~whad.ble.profile.GenericProfile`, calling the parent class implementation with ``super()``
+is *mandatory*:
+
+.. code-block:: python
+
+    class MyChildClass(GenericProfile):
+
+        def on_characteristic_read(self, service: Service, characteristic: Characteristic, offset: int = 0, length: int = 0):
+            """Hook for GATT read operation"""
+            
+            # Call parent method
+            super().on_characteristic_read(service, characteristic, offset=offset, length=length)
+            
+            # Continue with custom processing (Forcing characteristic value)
+            raise HookReturnValue(b"Oops")
+
+Python API for Peripheral Role
+------------------------------
+
+The Bluetooth Low Energy peripheral role is provided by the :class:`Peripheral` connector class, inheriting from
+the :class:`~whad.ble.connector.BLE` default connector.
 
 Bluetooth Low Energy Peripheral connector
------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: whad.ble.connector
-    :members: Peripheral
+.. autoclass:: whad.ble.connector.peripheral.Peripheral
+    :members:
 
 Bluetooth Low Energy Peripheral events
---------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: whad.ble.connector.peripheral.PeripheralEventConnected
     :members:

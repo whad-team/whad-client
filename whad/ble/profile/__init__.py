@@ -11,7 +11,7 @@ allows to interact with it:
 """
 import json
 import logging
-from typing import List, Iterator
+from typing import List, Iterator, Optional, Callable, Any
 
 from whad.ble.profile.attribute import Attribute, UUID
 from whad.ble.profile.characteristic import Characteristic as BleCharacteristic,\
@@ -208,7 +208,7 @@ class Characteristic:
     """GATT characteristic.
     """
     def __init__(self, name=None, uuid=None, value=b'', permissions=None, notify=False,
-                 indicate=False, description=None, security: list = None, **kwargs):
+                 indicate=False, description=None, security: Optional[list] = None, **kwargs):
         """Declares a GATT characteristic.
 
         Other named arguments are used to declare characteristic's descriptors.
@@ -246,7 +246,7 @@ class Characteristic:
             if isinstance(argval, CharacteristicDescriptor):
                 descriptor = argval
                 descriptor.handle = 0
-                descriptor.name = arg
+                #descriptor.name = arg
                 self.add_descriptor(descriptor)
 
                 # Add descriptor to a property to this ServiceModel instance
@@ -310,7 +310,7 @@ class Characteristic:
         return self.handle + self.get_required_handles() - 1
 
     @property
-    def name(self) -> str:
+    def name(self) -> Optional[str]:
         """Name
         """
         return self.__name
@@ -331,13 +331,13 @@ class Characteristic:
         return self.__uuid
 
     @property
-    def value(self) -> UUID:
-        """Characteristic value UUID
+    def value(self) -> bytes:
+        """Characteristic value
         """
         return self.__value
 
     @property
-    def permissions(self) -> List[str]:
+    def permissions(self) -> Optional[List[str]]:
         """Characteristics permissions
         """
         return self.__perms
@@ -361,7 +361,7 @@ class Characteristic:
         return self.__description
 
     @property
-    def service(self) -> Service:
+    def service(self) -> Optional[Service]:
         """Related service.
         """
         return self.__service
@@ -437,7 +437,7 @@ class ServiceModel:
         self.__end_handle = max(self.__end_handle, service_model.end)
 
     @property
-    def uuid(self) -> UUID:
+    def uuid(self) -> Optional[UUID]:
         """Service UUID
         """
         return self.__uuid
@@ -941,7 +941,7 @@ class GenericProfile:
         return [self.find_object_by_handle(handle) for handle in handles]
 
 
-    def find_characteristic_by_value_handle(self, value_handle) -> BleCharacteristic:
+    def find_characteristic_by_value_handle(self, value_handle) -> Optional[BleCharacteristic]:
         """Find characteristic object by its value handle.
 
         :param  value_handle:   Characteristic value handle
@@ -960,7 +960,7 @@ class GenericProfile:
             return None
 
 
-    def find_characteristic_end_handle(self, handle) -> int:
+    def find_characteristic_end_handle(self, handle) -> Optional[int]:
         """Find characteristic end handle based on its handle.
 
         :param  handle: Characteristic handle
@@ -1117,7 +1117,7 @@ class GenericProfile:
         return json.dumps(profile_dict)
 
 
-    def find_hook(self, service, characteristic, operation) -> callable:
+    def find_hook(self, service, characteristic, operation) -> Optional[Callable[..., Any]]:
         """Find a registered hook for a specific service, characteristic and operation.
 
         :param  service:        Service object
@@ -1141,7 +1141,7 @@ class GenericProfile:
     # Connection/disconnection hooks
     ################################################
 
-    def on_connect(self, conn_handle):
+    def on_connect(self, conn_handle: int):
         """Connection hook.
 
         This hook is only used to notify the connection of a device.
@@ -1149,8 +1149,10 @@ class GenericProfile:
         :param  conn_handle:    Connection handle
         :type   conn_handle:    int
         """
+        logger.debug("[profile] Connection established with handle %d",
+                     conn_handle)
 
-    def on_disconnect(self, conn_handle):
+    def on_disconnect(self, conn_handle: int):
         """Disconnection hook.
 
         This hook is only used to notify the disconnection of a device.
@@ -1158,13 +1160,16 @@ class GenericProfile:
         :param  conn_handle:    Connection handle
         :type   conn_handle:    int
         """
+        logger.debug("[profile] Connection terminated for handle %d",
+                     conn_handle)
 
 
     ################################################
     # Characteristic Read/Write/Subscribe hooks
     ################################################
 
-    def on_characteristic_read(self, service, characteristic, offset=0, length=0):
+    def on_characteristic_read(self, service: Service, characteristic: Characteristic,
+                               offset: int = 0, length: int = 0):
         """Characteristic read hook.
 
         This hook is called whenever a characteristic is about to be read by a GATT client.
@@ -1193,8 +1198,9 @@ class GenericProfile:
         # If no hook registered, then return the characteristic value
         return characteristic.value[offset:offset + length]
 
-    def on_characteristic_write(self, service, characteristic, offset=0, value=b'',
-                                without_response=False):
+    def on_characteristic_write(self, service: Service, characteristic: Characteristic,
+                                offset: int = 0, value: bytes = b'',
+                                without_response: bool = False):
         """Characteristic write hook
 
         This hook is called whenever a charactertistic is about to be written by a GATT
@@ -1222,8 +1228,9 @@ class GenericProfile:
         # No action
         return None
 
-    def on_characteristic_written(self, service, characteristic, offset=0, value=b'',
-                                  without_response=False):
+    def on_characteristic_written(self, service: Service, characteristic: Characteristic,
+                                  offset: int = 0, value: bytes = b'',
+                                  without_response: bool = False):
         """Characteristic written hook
 
         This hook is called whenever a charactertistic has been written by a GATT
@@ -1253,8 +1260,8 @@ class GenericProfile:
         # No action
         return None
 
-    def on_characteristic_subscribed(self, service, characteristic, notification=False,
-                                     indication=False):
+    def on_characteristic_subscribed(self, service: Service, characteristic: Characteristic,
+                                     notification: bool = False, indication: bool = False):
         """Characteristic subscribed hook
 
         This hook is called whenever a characteristic has been subscribed to.
@@ -1280,7 +1287,7 @@ class GenericProfile:
         # No action
         return None
 
-    def on_characteristic_unsubscribed(self, service, characteristic):
+    def on_characteristic_unsubscribed(self, service: Service, characteristic: Characteristic):
         """Characteristic unsubscribed hook
 
         This hook is called whenever a characteristic has been unsubscribed.
@@ -1299,7 +1306,7 @@ class GenericProfile:
         # No action
         return None
 
-    def on_notification(self, service, characteristic, value):
+    def on_notification(self, service: Service, characteristic: Characteristic, value: bytes):
         """Characteristic notification hook.
 
         This hook is called when a notification is sent to a characteristic.
@@ -1311,8 +1318,10 @@ class GenericProfile:
         :param  value:              Characteristic value
         :type   value:              bytes
         """
+        logger.debug("[profile] GATT notification sent for characteristic %s of service %s with value %s",
+                     characteristic.uuid, service.uuid,value)
 
-    def on_indication(self, service, characteristic, value):
+    def on_indication(self, service: Service, characteristic: Characteristic, value: bytes):
         """Characteristic indication hook.
 
         This hook is called when a indication is sent to a characteristic.
@@ -1324,6 +1333,8 @@ class GenericProfile:
         :param  value:              Characteristic value
         :type   value:              bytes
         """
+        logger.debug("[profile] GATT indication sent for characteristic %s of service %s with value %s",
+                     characteristic.uuid, service.uuid,value)
 
     def on_mtu_changed(self, mtu: int):
         """MTU change callback
@@ -1331,3 +1342,5 @@ class GenericProfile:
         :param  mtu: New MTU value
         :type   mtu: int
         """
+        logger.debug("[profile] GATT MTU updated to %d", mtu)
+
