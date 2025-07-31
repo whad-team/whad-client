@@ -71,6 +71,14 @@ class Sniffer(WirelessHart, EventsManager):
         :type key: bytes
         """
         self.__decryptor.keys.append(key)
+        
+    def add_join_key(self, key:bytes):
+        """Add join key to decrypt sniffed communications
+        
+        :param key: join key to add
+        :type key: bytes
+        """
+        self.__decryptor.set_join_key(key)
 
     def clear_keys(self):
         """Clear all stored encryption keys.
