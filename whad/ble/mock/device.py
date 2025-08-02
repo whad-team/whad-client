@@ -13,6 +13,7 @@ from whad.hub.ble.pdu import BlePduReceived
 from whad.hub.ble.pdu import AdvType, Direction
 
 from .stack.l2cap import Llcap
+from .stack.server import GattServer
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ class EmulatedDevice:
         self.__state = EmulatedDevice.STATE_CONNECTED
 
         # Create an instance of L2CAP
-        self.__l2cap = Llcap(self.__handle)
+        self.__l2cap = Llcap(GattServer,self.__handle)
 
     def set_disconnected(self):
         """Switch back to advertising mode.
