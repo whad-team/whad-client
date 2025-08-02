@@ -7,13 +7,13 @@ from scapy.layers.bluetooth import ATT_Read_Blob_Request, ATT_Read_Blob_Response
 from .attribute import find_attr_by_handle
 from .procedure import Procedure, UnexpectedProcError
 
-class ReadBlobProcedure(Procedure):
-    """ATT ReadBlob procedure."""
+class ServerReadBlobProcedure(Procedure):
+    """ATT server ReadBlob procedure."""
 
     OPCODE = 0x0C
 
     def __init__(self, attributes: list, mtu: int):
-        """Initialize our ReadBlob procedure."""
+        """Initialize our ServerReadBlob procedure."""
         super().__init__(attributes, mtu)
 
     @classmethod

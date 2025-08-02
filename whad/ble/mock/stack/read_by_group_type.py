@@ -15,14 +15,14 @@ from whad.ble.profile.attribute import UUID
 from .attribute import find_attr_by_type
 from .procedure import Procedure, UnexpectedProcError
 
-class ReadByGroupTypeProcedure(Procedure):
-    """ATT ReadByGroupType procedure."""
+class ServerReadByGroupTypeProcedure(Procedure):
+    """ATT server ReadByGroupType procedure."""
 
     # Procedure operation code
     OPCODE = 0x10
 
     def __init__(self, attributes: list, mtu: int):
-        """Initialize our ReadByGroupType procedure."""
+        """Initialize our ServerReadByGroupType procedure."""
         super().__init__(attributes, mtu)
 
     @classmethod

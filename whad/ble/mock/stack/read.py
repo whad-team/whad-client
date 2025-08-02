@@ -10,14 +10,14 @@ from scapy.layers.bluetooth import ATT_Read_Request, ATT_Read_Response
 from .attribute import find_attr_by_handle
 from .procedure import Procedure, UnexpectedProcError
 
-class ReadProcedure(Procedure):
-    """ATT Read procedure."""
+class ServerReadProcedure(Procedure):
+    """ATT server Read procedure."""
 
     # Read operation code
     OPCODE = 0x0A
 
     def __init__(self, attributes: list, mtu: int):
-        """Initialize our Read procedure."""
+        """Initialize our server Read procedure."""
         super().__init__(attributes, mtu)
 
     @classmethod
