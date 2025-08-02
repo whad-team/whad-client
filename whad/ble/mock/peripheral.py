@@ -2,20 +2,16 @@
 """
 
 import logging
-from re import I
-from time import time
-from queue import Queue
 from typing import Optional, Union
 
-from whad.exceptions import WhadDeviceDisconnected, WhadDeviceNotReady
 from whad.hub import ProtocolHub
-from whad.hub.message import HubMessage, PbMessageWrapper
+from whad.hub.message import HubMessage
 from whad.device.mock import MockDevice
 
 from whad.hub.ble.address import SetBdAddress
 from whad.hub.ble.mode import PeriphMode, BleStart, BleStop
 from whad.hub.ble.connect import Connected
-from whad.hub.ble import BDAddress, Commands, Direction
+from whad.hub.ble import AddressType, BDAddress, Commands, Direction
 from whad.hub.ble.pdu import SetAdvData, SendBlePdu
 from whad.hub.generic.cmdresult import Success, Error, WrongMode
 from whad.hub.discovery import Capability, Domain, DeviceType
@@ -33,11 +29,14 @@ class PeripheralMock(MockDevice):
     STATE_STARTED = 1
     STATE_CONNECTED = 2
 
-    def __init__(self):
+    def __init__(self, bd_address: str = "aa:bb:cc:dd:ee:ff"):
         """Initialization."""
 
         # Set state
         self.__state = PeripheralMock.STATE_STOPPED
+
+        # Advertiser address (default: aa:bb:cc:dd:ee:ff)
+        self.__bdaddr = BDAddress(bd_address)
 
         # Advertising data
         self.__adv_data = None
@@ -90,6 +89,29 @@ class PeripheralMock(MockDevice):
     def is_stopped(self) -> bool:
         """Check if peripheral mode is stopped."""
         return self.__state == PeripheralMock.STATE_STOPPED
+
+    def make_connection(self, initiator: BDAddress) -> bool:
+        """Initiate a connection from an emulated central device.
+
+        Peripheral must be started and advertising, the mocked interface
+        will generate a Connected message and send it to the connector.
+        """
+        if self.__state == PeripheralMock.STATE_STARTED:
+            # Add a Connected message to the connector received message queue
+            msg = Connected(
+                initiator=initiator.value,
+                advertiser=self.__bdaddr.value,
+                access_address=0,
+                adv_addr_type=self.__bdaddr.type,
+                init_addr_type=initiator.type
+            )
+            self.put_message(msg)
+
+            # Success
+            return True
+        else:
+            # Nope
+            return False
 
     @MockDevice.route(PeriphMode)
     def on_periph_mode(self, message: PeriphMode):
