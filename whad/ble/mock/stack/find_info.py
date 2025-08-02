@@ -15,13 +15,13 @@ from whad.ble.profile.attribute import UUID
 from .attribute import find_attr_by_range
 from .procedure import Procedure, UnexpectedProcError
 
-class FindInformationProcedure(Procedure):
+class ServerFindInformationProcedure(Procedure):
     """ATT FindInformation procedure."""
 
     OPCODE = 0x04
 
     def __init__(self, attributes: list, mtu: int):
-        """Initialize our FindInformation procedure."""
+        """Initialize our ServerFindInformation procedure."""
         super().__init__(attributes, mtu)
 
     @classmethod
@@ -30,7 +30,7 @@ class FindInformationProcedure(Procedure):
         return ATT_Find_Information_Request in request
 
     def process_request(self, request: Packet) -> list[Packet]:
-        """React only on a ReadByType request."""
+        """React only on a ATT_Find_Information_Request."""
         if ATT_Find_Information_Request not in request:
             self.set_state(Procedure.STATE_ERROR)
             raise UnexpectedProcError()

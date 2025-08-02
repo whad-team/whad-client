@@ -15,13 +15,13 @@ from whad.ble.profile.attribute import UUID
 from .attribute import find_attr_by_type
 from .procedure import Procedure, UnexpectedProcError
 
-class ReadByTypeProcedure(Procedure):
-    """ATT ReadByType procedure."""
+class ServerReadByTypeProcedure(Procedure):
+    """ATT server ReadByType procedure for GATT server."""
 
     OPCODE = 0x08
 
     def __init__(self, attributes: list, mtu: int):
-        """Initialize our ReadByType procedure.
+        """Initialize our ServerReadByType procedure.
 
         :param attributes: List of GATT attributes
         :type attributes: list
