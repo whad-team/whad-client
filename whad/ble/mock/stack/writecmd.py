@@ -7,13 +7,13 @@ from scapy.layers.bluetooth import ATT_Write_Command
 from .attribute import CharacteristicValue, find_attr_by_handle
 from .procedure import Procedure, UnexpectedProcError
 
-class WriteCommandProcedure(Procedure):
-    """ATT WriteCommand procedure."""
+class ServerWriteCommandProcedure(Procedure):
+    """ATT server WriteCommand procedure."""
 
     OPCODE = 0x52
 
     def __init__(self, attributes: list, mtu: int):
-        """Initialize our WriteCommand procedure."""
+        """Initialize our ServerWriteCommand procedure."""
         super().__init__(attributes, mtu)
 
     @classmethod

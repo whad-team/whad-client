@@ -7,15 +7,15 @@ from scapy.layers.bluetooth import ATT_Handle_Value_Indication, ATT_Handle_Value
 from .attribute import Characteristic, ClientCharacteristicConfigurationDescriptor, find_attr_by_handle, find_charac_by_desc_handle
 from .procedure import Procedure, UnexpectedProcError
 
-class WriteProcedure(Procedure):
-    """ATT Write procedure."""
+class ServerWriteProcedure(Procedure):
+    """ATT server Write procedure."""
 
     OPCODE = 0x12
 
     STATE_INDICATION_SENT = Procedure.STATE_USER
 
     def __init__(self, attributes: list, mtu: int):
-        """Initialize our Write procedure."""
+        """Initialize our ServerWrite procedure."""
         super().__init__(attributes, mtu)
 
     @classmethod

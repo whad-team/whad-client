@@ -25,13 +25,13 @@ from .attribute import Attribute, PrimaryService, Characteristic, Characteristic
 
 # ATT Procedures
 from .procedure import UnexpectedProcError
-from .read import ReadProcedure
-from .readblob import ReadBlobProcedure
-from .read_by_group_type import ReadByGroupTypeProcedure
-from .read_by_type import ReadByTypeProcedure
-from .find_info import FindInformationProcedure
-from .write import WriteProcedure
-from .writecmd import WriteCommandProcedure
+from .read import ServerReadProcedure
+from .readblob import ServerReadBlobProcedure
+from .read_by_group_type import ServerReadByGroupTypeProcedure
+from .read_by_type import ServerReadByTypeProcedure
+from .find_info import ServerFindInformationProcedure
+from .write import ServerWriteProcedure
+from .writecmd import ServerWriteCommandProcedure
 
 logger = logging.getLogger(__name__)
 
@@ -91,13 +91,13 @@ class GattServer:
 
         # Register procedures
         self.__procedures = [
-            ReadProcedure,
-            ReadBlobProcedure,
-            WriteProcedure,
-            WriteCommandProcedure,
-            ReadByGroupTypeProcedure,
-            ReadByTypeProcedure,
-            FindInformationProcedure,
+            ServerReadProcedure,
+            ServerReadBlobProcedure,
+            ServerWriteProcedure,
+            ServerWriteCommandProcedure,
+            ServerReadByGroupTypeProcedure,
+            ServerReadByTypeProcedure,
+            ServerFindInformationProcedure,
         ]
 
     @property
