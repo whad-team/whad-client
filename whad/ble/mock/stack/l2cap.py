@@ -7,12 +7,10 @@ from scapy.packet import Packet, Raw
 from scapy.layers.bluetooth import L2CAP_Hdr, ATT_Hdr
 from scapy.layers.bluetooth4LE import BTLE_DATA
 
-from .server import GattServer
-
 class Llcap:
     """L2CAP layer"""
 
-    def __init__(self, conn_handle: int):
+    def __init__(self, gatt_cls, conn_handle: int):
         """Initialize state."""
         self.__mtu = 23
         self.__conn_handle = conn_handle
@@ -22,7 +20,7 @@ class Llcap:
         self.__exp_length = 0
 
         # GATT
-        self.__gatt = GattServer()
+        self.__gatt = gatt_cls()
 
     def on_pdu(self, packet: Packet, fragment: bool = False) -> List[Packet]:
         """Process an L2CAP packet."""

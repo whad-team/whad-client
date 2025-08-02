@@ -1,0 +1,80 @@
+"""
+Bluetooth Low Energy Tiny Stack for Unit Testing
+================================================
+
+GATT client has no profile but implements a basic
+discovery procedure that will populate its internal
+attribute database.
+"""
+
+import logging
+from typing import List
+
+from scapy.packet import Packet
+from scapy.layers.bluetooth import ATT_Hdr
+
+from whad.ble.profile.attribute import UUID
+
+from .attribute import Attribute
+
+# ATT Procedures
+from .procedure import UnexpectedProcError
+from .read_by_group_type import ClientReadByGroupTypeProcedure
+
+logger = logging.getLogger(__name__)
+
+class GattClient:
+    """Tiny GATT client"""
+
+    def __init__(self):
+        """Initialize a GATT client."""
+
+        # Initialize client state
+        self.__attributes = []
+        self.__mtu = 23
+        self.__cur_procedure = None
+
+        # Register procedures
+        self.__procedures = [
+            ClientReadByGroupTypeProcedure,
+        ]
+
+    @property
+    def attributes(self) -> List[Attribute]:
+        """Remote server attributes."""
+        return self.__attributes
+
+    def on_pdu(self, request: Packet) -> list[Packet]:
+        """Process incoming response/error."""
+        # Find a suitable procedure if none in progress
+        if self.__cur_procedure is None:
+            # Find a procedure triggered by our request
+            for proc in self.__procedures:
+                if proc.trigger(request):
+                    self.__cur_procedure = proc(self.attributes, self.__mtu)
+
+        # If a suitable procedure has been found or is in progress, forward request.
+        if self.__cur_procedure is not None:
+            # Forward to current procedure
+            answers: list[Packet] = self.__cur_procedure.process_request(request)
+
+            # Unset current procedure if finished
+            if self.__cur_procedure.done():
+                self.__cur_procedure = None
+
+            # Automatically add ATT_Hdr()
+            if isinstance(answers, list):
+                return [ ATT_Hdr()/ans for ans in answers ]
+            else:
+                # Should not happen so raise an exception
+                raise UnexpectedProcError()
+        else:
+            logger.warning("[ble::mock::stack::gatt_client] No procedure to handle packet ! (%s)", request)
+            return []
+
+    def read_by_group_type(self, group_type: UUID, start_handle: int, end_handle: int):
+        """Enumerate attributes by group type."""
+        # Initiate a ClientReadByGroupTypeProcedure
+        self.__cur_procedure = ClientReadByGroupTypeProcedure(group_type, start_handle,
+                                                              end_handle)
+
