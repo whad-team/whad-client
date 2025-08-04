@@ -1,11 +1,14 @@
 """
 Bluetooth Low Energy Tiny Stack - LLCAP
 """
-from typing import List
+from typing import List, Union
 
 from scapy.packet import Packet, Raw
 from scapy.layers.bluetooth import L2CAP_Hdr, ATT_Hdr
 from scapy.layers.bluetooth4LE import BTLE_DATA
+
+from .client import GattClient
+from .server import GattServer
 
 class Llcap:
     """L2CAP layer"""
@@ -16,29 +19,34 @@ class Llcap:
         self.__conn_handle = conn_handle
 
         # Fragmentation
-        self.__fifo = b""
+        self.__rx_fifo = b""
+        self.__tx_fifo:List[Packet] = []
         self.__exp_length = 0
 
         # GATT
-        self.__gatt = gatt_cls()
+        self.__gatt = gatt_cls(self)
+
+    def get_gatt(self) -> Union[GattServer, GattClient]:
+        """ Retrieve the associated GATT client or server."""
+        return self.__gatt
 
     def on_pdu(self, packet: Packet, fragment: bool = False) -> List[Packet]:
         """Process an L2CAP packet."""
         if fragment:
             # Enqueue the whole L2CAP packet (including header)
-            self.__fifo += bytes(packet[L2CAP_Hdr])
+            self.__rx_fifo += bytes(packet[L2CAP_Hdr])
         else:
             # Enqueue received bytes into our fifo
             l2cap_data = packet[L2CAP_Hdr]
-            self.__fifo = bytes(l2cap_data)
+            self.__rx_fifo = bytes(l2cap_data)
 
             # Retrieve expected length ( + header size)
             self.__exp_length = l2cap_data.len + 4
 
         # Check if we received a complete L2CAP frame
-        if len(self.__fifo) >= self.__exp_length:
-            result = self.on_l2cap(L2CAP_Hdr(self.__fifo[:self.__exp_length]))
-            self.__fifo = self.__fifo[self.__exp_length:]
+        if len(self.__rx_fifo) >= self.__exp_length:
+            result = self.on_l2cap(L2CAP_Hdr(self.__rx_fifo[:self.__exp_length]))
+            self.__rx_fifo = self.__rx_fifo[self.__exp_length:]
             self.__exp_length = 0
             return result
 
@@ -55,6 +63,16 @@ class Llcap:
             for answer in self.__gatt.on_pdu(packet[ATT_Hdr]):
                 packets.extend(self.__convert(answer))
         return packets
+
+    def send_pdu(self, pdu: Packet):
+        """Send a given ATT PDU to the host."""
+        self.__tx_fifo.extend(self.__convert(pdu))
+
+    def get_pdus(self) -> List[Packet]:
+        """Retrieve PDUs to send from TX fifo."""
+        pdus = self.__tx_fifo
+        self.__tx_fifo = []
+        return pdus
 
     def __convert(self, packet: Packet) -> list[Packet]:
         """Convert GATT packet into fragmented L2CAP packets if required."""
