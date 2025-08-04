@@ -35,6 +35,8 @@ be processed as soon as possible.
 
 """
 import logging
+from typing import List, Optional, Any
+from threading import Event
 
 from scapy.packet import Packet
 from scapy.layers.bluetooth import ATT_Error_Response
@@ -82,6 +84,7 @@ class Procedure:
     ERR_VALUE_NOT_ALLOWED = 0x13
     ERR_APP_ERROR_BASE = 0x80
     ERR_COMMON_PROF_BASE = 0xE0
+    ERR_TIMEOUT = 0xFF
 
     def __init__(self, attributes: list, mtu: int):
         """Initialization."""
@@ -93,6 +96,12 @@ class Procedure:
 
         # Save ATT MTU
         self.__mtu = mtu
+
+        # Procedure terminated event
+        self.__terminated = Event()
+
+        # Procedure result
+        self.__result = None
 
     @classmethod
     def trigger(cls, request) -> bool:
@@ -119,6 +128,15 @@ class Procedure:
         """Set procedure state."""
         self.__state = state
 
+        # If procedure state is STATE_DONE or SATE_ERROR, procedure
+        # is considered as terminated.
+        self.__terminated.set()
+
+    def set_result(self, result: Any):
+        """Set procedure result. This result will be returned when the
+        procedure has terminated to the caller."""
+        self.__result = result
+
     def att_error_response(self, handle: int, ecode: int) -> list[Packet]:
         """
         Generate an ATT error response.
@@ -138,7 +156,27 @@ class Procedure:
         """Determine if procedure is done."""
         return self.__state == Procedure.STATE_DONE
 
-    def process_request(self, request: Packet) -> list[Packet]:
-        """Process an ATT request."""
+    def initiate(self) -> List[Packet]:
+        """Generate a list of ATT packets to send when this procedure
+        is initiated.
+
+        :return: List of packets (PDUs) to send following the procedure initiation.
+        :rtype: List
+        """
+        return []
+
+    def process_request(self, request: Packet) -> List[Packet]:
+        """Process a received ATT request/response.
+
+        :return: List of packets (PDUs) to send once the received PDUs processed.
+        :rtype: List
+        :raise UnexpectedProcError: An unexpected error occurred while processing incoming packets.
+        """
         raise UnexpectedProcError(request)
 
+    def wait(self, timeout: Optional[float] = None) -> Optional[Any]:
+        """Wait for this procedure to terminate."""
+        if self.__terminated.wait(timeout=timeout):
+            return self.__result
+        else:
+            raise UnexpectedProcError(Procedure.ERR_TIMEOUT)

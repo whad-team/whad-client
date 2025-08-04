@@ -2,7 +2,10 @@
 """
 
 import logging
-from typing import Optional, Union
+from typing import Optional, Union, List
+from random import randint
+
+from scapy.packet import Packet
 
 from whad.hub import ProtocolHub
 from whad.hub.message import HubMessage
@@ -12,9 +15,13 @@ from whad.hub.ble.address import SetBdAddress
 from whad.hub.ble.mode import PeriphMode, BleStart, BleStop
 from whad.hub.ble.connect import Connected
 from whad.hub.ble import AddressType, BDAddress, Commands, Direction
-from whad.hub.ble.pdu import SetAdvData, SendBlePdu
+from whad.hub.ble.pdu import BlePduReceived, SetAdvData, SendBlePdu, BlePduReceived
 from whad.hub.generic.cmdresult import Success, Error, WrongMode
 from whad.hub.discovery import Capability, Domain, DeviceType
+from whad.ble.profile.attribute import UUID
+
+from .stack.client import GattClient
+from .stack.l2cap import Llcap
 
 # Create logger for this module.
 logger = logging.getLogger(__name__)
@@ -41,6 +48,10 @@ class PeripheralMock(MockDevice):
         # Advertising data
         self.__adv_data = None
         self.__scan_data = None
+
+        # L2CAP
+        self.__l2cap = None
+        self.__conn_handle = None
 
         """Initialization."""
         super().__init__(
@@ -97,21 +108,61 @@ class PeripheralMock(MockDevice):
         will generate a Connected message and send it to the connector.
         """
         if self.__state == PeripheralMock.STATE_STARTED:
+            # Set state as Connected and set a connection handle
+            self.__state = PeripheralMock.STATE_CONNECTED
+            self.__conn_handle = randint(1, 100)
+
             # Add a Connected message to the connector received message queue
             msg = Connected(
                 initiator=initiator.value,
                 advertiser=self.__bdaddr.value,
                 access_address=0,
                 adv_addr_type=self.__bdaddr.type,
-                init_addr_type=initiator.type
+                init_addr_type=initiator.type,
+                conn_handle = self.__conn_handle,
             )
             self.put_message(msg)
+
+            # Initialize an emulated L2CAP connection
+            self.__l2cap = Llcap(GattClient, self.__conn_handle)
+            self.__client = self.__l2cap.get_gatt()
 
             # Success
             return True
         else:
             # Nope
             return False
+
+    def to_messages(self, pdus: List[Packet]) -> List[HubMessage]:
+        """Convert L2CAP PDUs to a list of BlePduReceived messages."""
+        messages = []
+        for pdu in pdus:
+            messages.append(BlePduReceived(
+                conn_handle=self.__conn_handle,
+                direction=Direction.MASTER_TO_SLAVE,
+                pdu=bytes(pdu),
+                processed=False,
+                decrypted=False
+            ))
+        return messages
+
+    def read_by_group_type(self, group_uuid: UUID, start_handle: int, end_handle: int):
+        """Emulate a ReadGroupByType procedure initiated by a remote central.
+
+        This method must be called by the application thread to avoid blocking one
+        of the mock device's message thread.
+        """
+        # Start a ReadGroupByType procedure from an emulated central device."""
+        self.__client.read_by_group_type(group_uuid, start_handle, end_handle)
+
+        # Retrieve waiting packets from L2CAP layer and convert them to messages,
+        # and send them to the attached connector (if any)
+        messages = self.to_messages(self.__l2cap.get_pdus())
+        for msg in messages:
+            self.put_message(msg)
+
+        # Wait for the client procedure to terminate
+        return self.__client.wait_procedure(timeout=1.0)
 
     @MockDevice.route(PeriphMode)
     def on_periph_mode(self, message: PeriphMode):
@@ -156,10 +207,32 @@ class PeripheralMock(MockDevice):
         return Success()
 
     @MockDevice.route(SendBlePdu)
-    def on_send_pdu(self, send_pdu: SendBlePdu) -> Union[HubMessage, list[HubMessage]]:
+    def on_send_pdu(self, send_pdu: SendBlePdu) -> Union[HubMessage, List[HubMessage]]:
         """Handle SendPdu command from connector.
 
         This callback forwards the given PDU to our emulated central.
         """
-        return Success()
+        if send_pdu.conn_handle == self.__conn_handle:
+            try:
+                # Forward to l2cap
+                answers = self.__l2cap.on_pdu(send_pdu.to_packet())
+                result: List[HubMessage] = [Success()]
+
+                # Convert response PDUs into BlePduReceived messages and add them
+                # to the messages sent back to the connector
+                for answer in answers:
+                    result.append(BlePduReceived(
+                        conn_handle=send_pdu.conn_handle,
+                        direction=Direction.MASTER_TO_SLAVE,
+                        pdu=bytes(answer),
+                        processed=False,
+                        decrypted=False
+                    ))
+
+                # Send messages to connector
+                return result
+            except (WhadDeviceDisconnected, WhadDeviceNotReady):
+                return Error()
+        else:
+            return Error()
 
