@@ -26,8 +26,10 @@ logger = logging.getLogger(__name__)
 class GattClient:
     """Tiny GATT client"""
 
-    def __init__(self):
+    def __init__(self, l2cap: 'Llcap'):
         """Initialize a GATT client."""
+
+        self.__l2cap = l2cap
 
         # Initialize client state
         self.__attributes = []
@@ -44,15 +46,8 @@ class GattClient:
         """Remote server attributes."""
         return self.__attributes
 
-    def on_pdu(self, request: Packet) -> list[Packet]:
+    def on_pdu(self, request: Packet) -> List[Packet]:
         """Process incoming response/error."""
-        # Find a suitable procedure if none in progress
-        if self.__cur_procedure is None:
-            # Find a procedure triggered by our request
-            for proc in self.__procedures:
-                if proc.trigger(request):
-                    self.__cur_procedure = proc(self.attributes, self.__mtu)
-
         # If a suitable procedure has been found or is in progress, forward request.
         if self.__cur_procedure is not None:
             # Forward to current procedure
@@ -72,9 +67,19 @@ class GattClient:
             logger.warning("[ble::mock::stack::gatt_client] No procedure to handle packet ! (%s)", request)
             return []
 
-    def read_by_group_type(self, group_type: UUID, start_handle: int, end_handle: int):
+    def read_by_group_type(self, group_type: UUID, start_handle: int, end_handle: int) -> List[Packet]:
         """Enumerate attributes by group type."""
         # Initiate a ClientReadByGroupTypeProcedure
-        self.__cur_procedure = ClientReadByGroupTypeProcedure(group_type, start_handle,
-                                                              end_handle)
+        self.__cur_procedure = ClientReadByGroupTypeProcedure(
+            group_type, start_handle,end_handle
+        )
 
+        # Generate ATT packets to send when this procedure is initiated
+        # and forward them to the underlying link-layer
+        for req in self.__cur_procedure.initiate():
+            self.__l2cap.send_pdu(ATT_Hdr()/req)
+
+    def wait_procedure(self, timeout: float = None):
+        """Wait for the current procedure to complete."""
+        return self.__cur_procedure.wait(timeout=timeout)
+ 

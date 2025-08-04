@@ -38,11 +38,14 @@ logger = logging.getLogger(__name__)
 class GattServer:
     """Tiny GATT server"""
 
-    def __init__(self):
+    def __init__(self, l2cap: 'Llcap'):
         """Initialize a GATT server."""
         ###
         # Initialize GATT attributes
         ###
+
+        # Save L2CAP reference
+        self.__l2cap = l2cap
 
         self.__attributes = [
             # Primary Service, Generic Access Service (0x1800), handle 1-3
