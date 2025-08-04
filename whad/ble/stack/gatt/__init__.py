@@ -26,6 +26,19 @@ from whad.common.stack import Layer, source, alias
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_GROUP_TYPES = (
+    UUID(0x2800), # Primary service
+    UUID(0x2801), # Secondary service
+    UUID(0x2802), # Include service
+    UUID(0x2803), # Characteristic
+    UUID(0x2900), # Characteristic extended properties
+    UUID(0x2901), # Characteristic User Description
+    UUID(0x2902), # Characteristic Client Configuration
+    UUID(0x2903), # Server Characteristic Configuration
+    UUID(0x2904), # Characteristic Presentation Format
+    UUID(0x2905), # Characteristic Aggregate Format
+)
+
 def txlock(f):
     def _wrapper(self, *args, **kwargs):
         self.lock_tx()
@@ -2157,52 +2170,69 @@ class GattServer(GattLayer):
 
         List attribute with given type UUID from `start` handle to ̀`end` handle.
         """
-        # List attributes by type UUID, sorted by handles
-        attrs = {}
-        attrs_handles = []
-        for attribute in self.server_model.attr_by_type_uuid(UUID(request.type), request.start, request.end):
-            attrs[attribute.handle] = attribute
-            attrs_handles.append(attribute.handle)
-        attrs_handles.sort()
+        # Make sure the requested start handle is valid:
+        # - start handle must not be 0
+        # - start handle must be lower or equal to end handle
+        if request.start == 0 or request.start > request.end:
+            self.error(
+                BleAttOpcode.READ_BY_GROUP_TYPE_REQUEST,
+                request.start,
+                BleAttErrorCode.INVALID_HANDLE
+            )
+        elif UUID(request.type) not in SUPPORTED_GROUP_TYPES:
+            # If request type UUID is unknown, return an error.
+            self.error(
+                BleAttOpcode.READ_BY_GROUP_TYPE_REQUEST,
+                request.start,
+                BleAttErrorCode.UNSUPPORTED_GROUP_TYPE
+            )
+        else:
+            # List attributes by type UUID, sorted by handles
+            attrs = {}
+            attrs_handles = []
+            for attribute in self.server_model.attr_by_type_uuid(UUID(request.type), request.start, request.end):
+                attrs[attribute.handle] = attribute
+                attrs_handles.append(attribute.handle)
+            attrs_handles.sort()
 
-        # If we have at least one item to return
-        if len(attrs_handles) > 0:
+            # If we have at least one item to return
+            if len(attrs_handles) > 0:
 
-            # Get MTU
-            mtu = self.att.get_client_mtu()
+                # Get MTU
+                mtu = self.att.get_client_mtu()
 
-            # Get item size (UUID size + 4)
-            uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
-            item_size = uuid_size + 4
-            max_nb_items = int((mtu - 2) / item_size)
+                # Get item size (UUID size + 4)
+                uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
+                item_size = uuid_size + 4
+                max_nb_items = int((mtu - 2) / item_size)
 
-            # Create our datalist
-            datalist = GattAttributeDataList(item_size)
+                # Create our datalist
+                datalist = GattAttributeDataList(item_size)
 
-            # Iterate over items while UUID size matches and data fits in MTU
-            for i in range(max_nb_items):
-                if i < len(attrs_handles):
-                    handle = attrs_handles[i]
-                    end_handle = attrs[handle].end_handle
-                    attr_uuid = attrs[handle].uuid
-                    if len(attr_uuid.packed) == uuid_size:
-                        datalist.append(
-                            GattGroupTypeItem(handle, end_handle, attr_uuid.packed)
-                        )
+                # Iterate over items while UUID size matches and data fits in MTU
+                for i in range(max_nb_items):
+                    if i < len(attrs_handles):
+                        handle = attrs_handles[i]
+                        end_handle = attrs[handle].end_handle
+                        attr_uuid = attrs[handle].uuid
+                        if len(attr_uuid.packed) == uuid_size:
+                            datalist.append(
+                                GattGroupTypeItem(handle, end_handle, attr_uuid.packed)
+                            )
+                        else:
+                            break
                     else:
                         break
-                else:
-                    break
 
-            # Once datalist created, send answer
-            datalist_raw = datalist.to_bytes()
-            self.att.read_by_group_type_response(item_size, datalist_raw)
-        else:
-            self.error(
-               BleAttOpcode.READ_BY_GROUP_TYPE_REQUEST,
-               request.start,
-               BleAttErrorCode.ATTRIBUTE_NOT_FOUND
-            )
+                # Once datalist created, send answer
+                datalist_raw = datalist.to_bytes()
+                self.att.read_by_group_type_response(item_size, datalist_raw)
+            else:
+                self.error(
+                   BleAttOpcode.READ_BY_GROUP_TYPE_REQUEST,
+                   request.start,
+                   BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                )
 
     def on_terminated(self):
         """Connection has been terminated, remove characteristics subscriptions.
