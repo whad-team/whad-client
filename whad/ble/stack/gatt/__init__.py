@@ -1288,68 +1288,80 @@ class GattServer(GattLayer):
 
         :param GattFindByTypeValueRequest request: Request
         """
-        # List attributes by type UUID, sorted by handles
-        attrs = {}
-        attrs_handles = []
-        for attribute in self.server_model.find_objects_by_range(request.start, request.end):
-            attrs[attribute.handle] = attribute
-            attrs_handles.append(attribute.handle)
-        attrs_handles.sort()
-
-        # Loop on attributes and return the attributes with a value that matches the request value
-        matching_attrs = []
-        for handle in attrs_handles:
-            # Retrieve attribute based on handle
-            attr = attrs[handle]
-
-            # If attribute is a characteristic value or a descriptor, we make sure the characteristic
-            # is readable before matching its value with the request value
-            if isinstance(attr, CharacteristicValue) or isinstance(attr, CharacteristicDescriptor):
-                if attr.characteristic.readable():
-                    # Find characteristic end handle
-                    if attr.value == request.value:
-                        matching_attrs.append((handle, attr.characteristic.end_handle))
-            else:
-                # PrimaryService and SecondaryService are grouping types
-                if isinstance(attr, PrimaryService) or isinstance(attr, SecondaryService):
-                    if attr.value == request.value:
-                        matching_attrs.append((handle, attr.end_handle))
-                else:
-                    if attr.value == request.value:
-                        matching_attrs.append((handle, handle))
-
-        # If we have found at least one attribute that matches the request, return a
-        # FindByTypeValueResponse PDU
-        if len(matching_attrs) > 0:
-            # Build the response
-            mtu = self.att.get_client_mtu()
-            max_nb_items = int((mtu - 1) / 4)
-
-            # Create our datalist
-            handles_list = []
-
-            # Iterate over items while UUID size matches and data fits in MTU
-            for i in range(max_nb_items):
-                if i < len(matching_attrs):
-                    handle, end_handle = matching_attrs[i]
-                    handles_list.append(
-                        ATT_Handle(
-                            handle=handle,
-                            value=end_handle
-                        )
-                    )
-                else:
-                    break
-
-            # Once datalist created, send answer
-            self.att.find_by_type_value_response(handles_list)
-        else:
-            # Attribute not found
+        # Make sure the requested start handle is valid:
+        # - start handle must not be 0
+        # - start handle must be lower or equal to end handle
+        if request.start == 0 or request.start > request.end:
             self.error(
-               BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST,
-               request.start,
-               BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST,
+                request.start,
+                BleAttErrorCode.INVALID_HANDLE
             )
+        else:
+            # List attributes by type UUID, sorted by handles
+            attrs = {}
+            attrs_handles = []
+            for attribute in self.server_model.find_objects_by_range(request.start, request.end):
+                attrs[attribute.handle] = attribute
+                attrs_handles.append(attribute.handle)
+            attrs_handles.sort()
+
+            # Loop on attributes and return the attributes with a value that matches the request value
+            matching_attrs = []
+            for handle in attrs_handles:
+                # Retrieve attribute based on handle
+                attr = attrs[handle]
+
+                if UUID(request.type_uuid) != attr.type_uuid:
+                    continue
+
+                # If attribute is a characteristic value or a descriptor, we make sure the characteristic
+                # is readable before matching its value with the request value
+                if isinstance(attr, CharacteristicValue) or isinstance(attr, CharacteristicDescriptor):
+                    # Find characteristic end handle
+                    if attr.value == request.attr_data:
+                        matching_attrs.append((handle, attr.characteristic.end_handle))
+                else:
+                    # PrimaryService and SecondaryService are grouping types
+                    if isinstance(attr, PrimaryService) or isinstance(attr, SecondaryService):
+                        if attr.value == request.value:
+                            matching_attrs.append((handle, attr.end_handle))
+                    else:
+                        if attr.value == request.value:
+                            matching_attrs.append((handle, handle))
+
+            # If we have found at least one attribute that matches the request, return a
+            # FindByTypeValueResponse PDU
+            if len(matching_attrs) > 0:
+                # Build the response
+                mtu = self.att.get_client_mtu()
+                max_nb_items = int((mtu - 1) / 4)
+
+                # Create our datalist
+                handles_list = []
+
+                # Iterate over items while UUID size matches and data fits in MTU
+                for i in range(max_nb_items):
+                    if i < len(matching_attrs):
+                        handle, end_handle = matching_attrs[i]
+                        handles_list.append(
+                            ATT_Handle(
+                                handle=handle,
+                                value=end_handle
+                            )
+                        )
+                    else:
+                        break
+
+                # Once datalist created, send answer
+                self.att.find_by_type_value_response(handles_list)
+            else:
+                # Attribute not found
+                self.error(
+                   BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST,
+                   request.start,
+                   BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                )
 
 
     @txlock
