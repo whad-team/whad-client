@@ -277,3 +277,29 @@ def test_find_by_type_value_no_result(connected_peripheral):
     assert result.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND
     assert result.handle == 2
 
+def test_remote_profile_discovery(connected_peripheral):
+    """Test remote GATT profile discovery."""
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # First, discover exposed services.
+    services = {}
+    attr_id = 1
+    while attr_id < 0xffff:
+        # Discover primary services by reading attributes with group type 0x2800:
+        response = mock.read_by_group_type(UUID(0x2800), attr_id, 0xffff)
+        if isinstance(response, ATT_Error_Response) and response.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND:
+            # Service discovery done
+            break
+        elif isinstance(response, GattAttributeDataList):
+            for item in response:
+                services[item.handle] = (UUID(item.value), item.end)
+                attr_id = item.end+1
+
+    # Check primary services
+    assert len(services) == 2
+    assert services[1] == (UUID(0x1800), 3)
+    assert services[4] == (UUID(0x180f), 7)
+
+    # Discovery characteristics for service 0x1800
+    # TODO: Implement unit tests for ReadByType procedure !
