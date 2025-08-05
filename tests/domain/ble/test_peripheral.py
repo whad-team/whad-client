@@ -1,7 +1,7 @@
 """Bluetooth Low Energy Peripheral connector unit tests.
 """
 import pytest
-from scapy.layers.bluetooth import ATT_Error_Response
+from scapy.layers.bluetooth import ATT_Error_Response, ATT_Find_By_Type_Value_Response
 
 from whad.ble.mock.peripheral import PeripheralMock
 from whad.ble import BDAddress, Peripheral
@@ -9,7 +9,7 @@ from whad.ble import BDAddress, Peripheral
 from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvShortenedLocalName
 from whad.ble.profile.attribute import UUID
-from whad.ble.stack.att.constants import BleAttErrorCode
+from whad.ble.stack.att.constants import BleAttErrorCode, BleAttOpcode
 from whad.ble.stack.gatt.attrlist import GattAttributeDataList
 from whad.hub.ble import connect
 
@@ -228,4 +228,52 @@ def test_find_information_with_wrong_start_handle(connected_peripheral):
     assert isinstance(result, ATT_Error_Response)
     assert result.ecode == BleAttErrorCode.INVALID_HANDLE
     assert result.handle == 3
+
+def test_find_by_type_value(connected_peripheral):
+    """Test a FindByTypeValue procedure with a known Service UUID."""
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a FindInformation request with valid start and end handle
+    result = mock.find_by_type_value(1, 3, UUID(0x2800), UUID(0x1800).packed)
+    assert isinstance(result,ATT_Find_By_Type_Value_Response)
+    assert len(result.handles) == 1
+    assert result.handles[0].handle == 1
+    assert result.handles[0].value == 3
+
+def test_find_by_type_value_invalid_start_handle(connected_peripheral):
+    """ Test sending a FindByTypeValue procedure with an invalid start handle (0). """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a FindInformation request with valid start and end handle
+    result = mock.find_by_type_value(0, 3, UUID(0x2800), UUID(0x1800).packed)
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST
+    assert result.ecode == BleAttErrorCode.INVALID_HANDLE
+    assert result.handle == 0
+
+def test_find_by_type_value_higher_start_handle(connected_peripheral):
+    """ Test sending a FindByTypeValue procedure with an invalid start handle (greater than end handle). """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a FindInformation request with valid start and end handle
+    result = mock.find_by_type_value(4, 3, UUID(0x2800), UUID(0x1800).packed)
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST
+    assert result.ecode == BleAttErrorCode.INVALID_HANDLE
+    assert result.handle == 4
+
+def test_find_by_type_value_no_result(connected_peripheral):
+    """ Test sending a FindByTypeValue procedure with an invalid start handle (greater than end handle). """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a FindInformation request with valid start and end handle
+    result = mock.find_by_type_value(2, 4, UUID(0x2800), UUID(0x1800).packed)
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST
+    assert result.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+    assert result.handle == 2
 

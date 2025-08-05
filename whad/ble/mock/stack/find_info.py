@@ -9,7 +9,10 @@ from typing import List
 from struct import pack
 
 from scapy.packet import Packet
-from scapy.layers.bluetooth import ATT_Error_Response, ATT_Find_Information_Request, ATT_Find_Information_Response
+from scapy.layers.bluetooth import (
+    ATT_Error_Response, ATT_Find_Information_Request, ATT_Find_Information_Response,
+    ATT_Find_By_Type_Value_Request, ATT_Find_By_Type_Value_Response
+)
 
 from whad.ble.profile.attribute import UUID
 from whad.ble.stack.gatt.attrlist import GattAttributeDataList, GattHandleUUIDItem
@@ -132,6 +135,68 @@ class ClientFindInformationProcedure(Procedure):
 
             # Build list
             self.set_result(response.handles)
+            self.set_state(Procedure.STATE_DONE)
+            return []
+        else:
+            self.set_result(None)
+            self.set_state(Procedure.STATE_ERROR)
+            return []
+
+class ClientFindByTypeValueProcedure(Procedure):
+    """GATT Client FindByTypeValue procedure."""
+
+    def __init__(self, start_handle: int, end_handle: int, attr_type: UUID, attr_value: bytes):
+        """Initialize a FindByTypeValue procedure.
+
+        :param start_handle: Start handle
+        :type start_handle: int
+        :param end_handle: End handle
+        :type end_handle: int
+        :param attr_type: Attribute Type UUID
+        :type attr_type: UUID
+        :param attr_value: Attribute value
+        :type attr_value: bytes
+        """
+        # Save start and end handles
+        self.__start_handle = start_handle
+        self.__end_handle = end_handle
+        self.__attr_type = attr_type
+        self.__attr_value = attr_value
+
+        # Initialize our parent Procedure
+        super().__init__([], 23)
+
+    def initiate(self) -> List[Packet]:
+        """Initiate a FindInformation procedure."""
+        return [
+            ATT_Find_By_Type_Value_Request(
+                start=self.__start_handle,
+                end=self.__end_handle,
+                uuid=self.__attr_type.value(),
+                data=self.__attr_value
+            )
+        ]
+
+    def process_request(self, request: Packet) -> List[Packet]:
+        """Process incoming packets, we expect to receive ATT_Error_Response or ATT_Find_Information_Response
+        packets.
+
+        :param packet: Received packet
+        :type packet: scapy.packet.Packet
+        :return: A list of packets to send in response to the received packets
+        :rtype: list
+        """
+        # Did we receive an ATT error ?
+        if ATT_Error_Response in request:
+            self.set_result(request[ATT_Error_Response])
+            self.set_state(Procedure.STATE_ERROR)
+            return []
+
+        # Or did we receive an ATT_Find_Information_Response ?
+        if ATT_Find_By_Type_Value_Response in request:
+            # Extract response
+            response = request[ATT_Find_By_Type_Value_Response]
+            self.set_result(response)
             self.set_state(Procedure.STATE_DONE)
             return []
         else:
