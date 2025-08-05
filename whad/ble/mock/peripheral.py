@@ -183,6 +183,20 @@ class PeripheralMock(MockDevice):
         # Wait for the client procedure to terminate
         return self.__client.wait_procedure(timeout=1.0)
 
+    def find_by_type_value(self, start_handle: int, end_handle: int, attr_type: UUID, attr_value: bytes):
+        """Emulate a FindByType procedure initiated by a remote central."""
+        # Start a FindInformation procedure from an emulated central device.
+        self.__client.find_by_type_value(start_handle, end_handle, attr_type, attr_value)
+
+        # Retrieve waiting packets from L2CAP layer and convert them to messages,
+        # and send them to the attached connector (if any)
+        messages = self.to_messages(self.__l2cap.get_pdus())
+        for msg in messages:
+            self.put_message(msg)
+
+        # Wait for the client procedure to terminate
+        return self.__client.wait_procedure(timeout=1.0)
+
     @MockDevice.route(PeriphMode)
     def on_periph_mode(self, message: PeriphMode):
         """BLE Peripheral node handler.
