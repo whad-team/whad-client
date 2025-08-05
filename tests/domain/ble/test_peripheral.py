@@ -194,3 +194,38 @@ def test_read_by_group_type_with_greater_start_handle(connected_peripheral):
     assert result.ecode == BleAttErrorCode.INVALID_HANDLE
     assert result.handle == 12
 
+def test_find_information(connected_peripheral):
+    """Test a successfull FindInformation request."""
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a FindInformation request with valid start and end handle
+    result = mock.find_information(1, 3)
+    assert isinstance(result, list)
+    assert len(result) == 3
+    assert (result[0].handle == 1) and (result[0].value == 0x2800) # Primary service 0x1800 with handle 1 and type 0x2800
+    assert (result[1].handle == 2) and (result[1].value == 0x2803) # Characteristic 0x2A00 with handle 2 and type 0x2803
+    assert (result[2].handle == 3) and (result[2].value == 0x2a00) # Characteristic value for characteristic 0x2A00
+
+def test_find_information_with_invalid_handle(connected_peripheral):
+    """Test a FindInformation with an invalid start handle."""
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a FindInformation request with valid start and end handle
+    result = mock.find_information(0, 3)
+    assert isinstance(result, ATT_Error_Response)
+    assert result.ecode == BleAttErrorCode.INVALID_HANDLE
+    assert result.handle == 0
+
+def test_find_information_with_wrong_start_handle(connected_peripheral):
+    """Test a FindInformation procedure with a start handle greater than its end handle."""
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a FindInformation request with valid start and end handle
+    result = mock.find_information(3, 0)
+    assert isinstance(result, ATT_Error_Response)
+    assert result.ecode == BleAttErrorCode.INVALID_HANDLE
+    assert result.handle == 3
+
