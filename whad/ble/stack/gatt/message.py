@@ -71,7 +71,7 @@ class GattFindByTypeValueRequest(GattDataHolder):
         super().__init__(
             start=start,
             end=end,
-            type=attr_type,
+            type_uuid=attr_type,
             value=attr_value
         )
 
