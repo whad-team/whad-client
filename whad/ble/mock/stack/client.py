@@ -20,6 +20,7 @@ from .attribute import Attribute
 # ATT Procedures
 from .procedure import UnexpectedProcError
 from .read_by_group_type import ClientReadByGroupTypeProcedure
+from .find_info import ClientFindInformationProcedure
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ class GattClient:
         # Register procedures
         self.__procedures = [
             ClientReadByGroupTypeProcedure,
+            ClientFindInformationProcedure,
         ]
 
     @property
@@ -79,7 +81,25 @@ class GattClient:
         for req in self.__cur_procedure.initiate():
             self.__l2cap.send_pdu(ATT_Hdr()/req)
 
+    def find_information(self, start_handle: int, end_handle: int) -> List[Packet]:
+        """Find information (attribute type) about a list of handles.
+
+        :param start_handle: Start handle
+        :type start_handle: int
+        :param end_handle: End handle, must be lower or equal to start handle
+        :type end_handle: int
+        :return: List of packets to send once the procedure initiated
+        :rtype: list
+        """
+        # Initiate a ClientFindInformationProcedure
+        self.__cur_procedure = ClientFindInformationProcedure(start_handle, end_handle)
+
+        # Generate ATT packets to send when this procedure is initiated and forward
+        # them to the underlying L2CAP layer.
+        for req in self.__cur_procedure.initiate():
+            self.__l2cap.send_pdu(ATT_Hdr()/req)
+
     def wait_procedure(self, timeout: float = None):
         """Wait for the current procedure to complete."""
         return self.__cur_procedure.wait(timeout=timeout)
- 
+
