@@ -10,6 +10,7 @@ from scapy.packet import Packet
 from whad.hub import ProtocolHub
 from whad.hub.message import HubMessage
 from whad.device.mock import MockDevice
+from whad.exceptions import WhadDeviceDisconnected, WhadDeviceNotReady
 
 from whad.hub.ble.address import SetBdAddress
 from whad.hub.ble.mode import PeriphMode, BleStart, BleStop
@@ -154,6 +155,24 @@ class PeripheralMock(MockDevice):
         """
         # Start a ReadGroupByType procedure from an emulated central device."""
         self.__client.read_by_group_type(group_uuid, start_handle, end_handle)
+
+        # Retrieve waiting packets from L2CAP layer and convert them to messages,
+        # and send them to the attached connector (if any)
+        messages = self.to_messages(self.__l2cap.get_pdus())
+        for msg in messages:
+            self.put_message(msg)
+
+        # Wait for the client procedure to terminate
+        return self.__client.wait_procedure(timeout=1.0)
+
+    def find_information(self, start_handle: int, end_handle: int):
+        """Emulate a FindInformation procedure initiated by a remote central.
+
+        This method must be called by the application thread to avoid blocking
+        one of the mock device's message thread.
+        """
+        # Start a FindInformation procedure from an emulated central device.
+        self.__client.find_information(start_handle, end_handle)
 
         # Retrieve waiting packets from L2CAP layer and convert them to messages,
         # and send them to the attached connector (if any)
