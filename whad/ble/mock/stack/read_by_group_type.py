@@ -121,7 +121,7 @@ class ClientReadByGroupTypeProcedure(Procedure):
             )
         ]
 
-    def process_request(self, request: Packet) -> list[Packet]:
+    def process_request(self, request: Packet) -> List[Packet]:
         """React only on a ReadByGroupType response."""
         # Do we received an ATT Error message ?
         if ATT_Error_Response in request:
