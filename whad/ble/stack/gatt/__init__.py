@@ -1221,56 +1221,66 @@ class GattServer(GattLayer):
     def on_find_info_request(self, request):
         """Find information request
         """
-        # List attributes by type UUID, sorted by handles
-        attrs = {}
-        attrs_handles = []
-        for attribute in self.server_model.find_objects_by_range(request.start, request.end):
-            attrs[attribute.handle] = attribute
-            attrs_handles.append(attribute.handle)
-        attrs_handles.sort()
-
-        # If we have at least one item to return
-        if len(attrs_handles) > 0:
-
-            # Get MTU
-            mtu = self.att.get_client_mtu()
-
-            # Get item size (UUID size + 2)
-            uuid_size = len(attrs[attrs_handles[0]].type_uuid.packed)
-            if uuid_size == 2:
-                item_format = 1
-            else:
-                item_format = 2
-            item_size = uuid_size + 2
-            max_nb_items = int((mtu - 2) / item_size)
-
-            # Create our datalist
-            datalist = GattAttributeDataList(item_size)
-
-            # Iterate over items while UUID size matches and data fits in MTU
-            for i in range(max_nb_items):
-                if i < len(attrs_handles):
-                    handle = attrs_handles[i]
-                    attr_obj = attrs[handle]
-                    if len(attr_obj.type_uuid.packed) == uuid_size:
-                        datalist.append(
-                            GattHandleUUIDItem(
-                                attr_obj.handle,
-                                attr_obj.type_uuid
-                            )
-                        )
-                else:
-                    break
-
-            # Once datalist created, send answer
-            datalist_raw = datalist.to_bytes()
-            self.att.find_info_response(item_format, datalist_raw)
-        else:
+        # Make sure the requested start handle is valid:
+        # - start handle must not be 0
+        # - start handle must be lower or equal to end handle
+        if request.start == 0 or request.start > request.end:
             self.error(
-               BleAttOpcode.FIND_INFO_REQUEST,
-               request.start,
-               BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                BleAttOpcode.FIND_INFO_REQUEST,
+                request.start,
+                BleAttErrorCode.INVALID_HANDLE
             )
+        else:
+            # List attributes by type UUID, sorted by handles
+            attrs = {}
+            attrs_handles = []
+            for attribute in self.server_model.find_objects_by_range(request.start, request.end):
+                attrs[attribute.handle] = attribute
+                attrs_handles.append(attribute.handle)
+            attrs_handles.sort()
+
+            # If we have at least one item to return
+            if len(attrs_handles) > 0:
+
+                # Get MTU
+                mtu = self.att.get_client_mtu()
+
+                # Get item size (UUID size + 2)
+                uuid_size = len(attrs[attrs_handles[0]].type_uuid.packed)
+                if uuid_size == 2:
+                    item_format = 1
+                else:
+                    item_format = 2
+                item_size = uuid_size + 2
+                max_nb_items = int((mtu - 2) / item_size)
+
+                # Create our datalist
+                datalist = GattAttributeDataList(item_size)
+
+                # Iterate over items while UUID size matches and data fits in MTU
+                for i in range(max_nb_items):
+                    if i < len(attrs_handles):
+                        handle = attrs_handles[i]
+                        attr_obj = attrs[handle]
+                        if len(attr_obj.type_uuid.packed) == uuid_size:
+                            datalist.append(
+                                GattHandleUUIDItem(
+                                    attr_obj.handle,
+                                    attr_obj.type_uuid
+                                )
+                            )
+                    else:
+                        break
+
+                # Once datalist created, send answer
+                datalist_raw = datalist.to_bytes()
+                self.att.find_info_response(item_format, datalist_raw)
+            else:
+                self.error(
+                   BleAttOpcode.FIND_INFO_REQUEST,
+                   request.start,
+                   BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                )
 
     @txlock
     def on_find_by_type_value_request(self, request: GattFindByTypeValueRequest):
