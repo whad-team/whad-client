@@ -128,12 +128,12 @@ class TestAttToL2CAP(GattTest):
         '''Check if ATT layer `find_info_request()` sends
         the correct message to L2CAP.
         '''
-        att.find_info_request(0, 1)
+        att.find_info_request(1, 1)
         assert l2cap_instance.expect(LayerMessage(
             'att',
             'l2cap',
             ATT_Hdr() / ATT_Find_Information_Request(
-                start=0,
+                start=1,
                 end=1
             )
         ))
@@ -156,28 +156,28 @@ class TestAttToL2CAP(GattTest):
         '''Check if ATT layer `find_by_type_value_request()` sends
         the correct message to L2CAP.
         '''
-        att.find_by_type_value_request(0, 1, UUID(0x2800), b'test')
+        att.find_by_type_value_request(1, 1, UUID(0x2800), b'test')
         assert l2cap_instance.expect(LayerMessage(
             'att',
             'l2cap',
             ATT_Hdr() / ATT_Find_By_Type_Value_Request(
-                start=0,
+                start=1,
                 end=1,
                 uuid=UUID(0x2800),
                 data=b'test'
             )
         ))
-    
+
     def test_read_by_type_request(self, l2cap_instance, att):
         '''Check if ATT layer `read_by_type_request()` sends
         the correct message to L2CAP.
         '''
-        att.read_by_type_request(0, 1, UUID(0x2800))
+        att.read_by_type_request(1, 1, UUID(0x2800))
         assert l2cap_instance.expect(LayerMessage(
             'att',
             'l2cap',
             ATT_Hdr() / ATT_Read_By_Type_Request(
-                start=0,
+                start=1,
                 end=1,
                 uuid=UUID(0x2800)
             )
@@ -276,12 +276,12 @@ class TestAttToL2CAP(GattTest):
         '''Check if ATT layer `read_by_group_type_request()` sends
         the correct message to L2CAP.
         '''
-        att.read_by_group_type_request(0, 1, UUID(0x2900))
+        att.read_by_group_type_request(1, 1, UUID(0x2900))
         assert l2cap_instance.expect(LayerMessage(
             'att',
             'l2cap',
             ATT_Hdr() / ATT_Read_By_Group_Type_Request(
-                start=0,
+                start=1,
                 end=1,
                 uuid=UUID(0x2900)
             )
@@ -481,7 +481,7 @@ class TestAttToGatt(GattTest):
         l2cap_instance.send(
             'att',
             ATT_Hdr() / ATT_Find_By_Type_Value_Request(
-                start=0,
+                start=1,
                 end=0x42,
                 uuid=UUID(0x2800),
                 data=b'foobar'
@@ -492,7 +492,7 @@ class TestAttToGatt(GattTest):
             'l2cap',
             ATT_Hdr() / ATT_Error_Response(
                 request=BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST,
-                handle=0,
+                handle=1,
                 ecode=BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
         ))
