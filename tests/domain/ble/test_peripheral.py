@@ -1,7 +1,7 @@
 """Bluetooth Low Energy Peripheral connector unit tests.
 """
 import pytest
-from scapy.layers.bluetooth import ATT_Error_Response, ATT_Find_By_Type_Value_Response
+from scapy.layers.bluetooth import ATT_Error_Response, ATT_Find_By_Type_Value_Response, ATT_Read_By_Type_Response
 
 from whad.ble.mock.peripheral import PeripheralMock
 from whad.ble import BDAddress, Peripheral
@@ -10,7 +10,7 @@ from whad.ble.profile import PrimaryService, Characteristic, GenericProfile
 from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvShortenedLocalName
 from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.constants import BleAttErrorCode, BleAttOpcode
-from whad.ble.stack.gatt.attrlist import GattAttributeDataList
+from whad.ble.stack.gatt.attrlist import GattAttributeDataList, GattAttributeValueItem
 from whad.hub.ble import connect
 
 @pytest.fixture
@@ -194,6 +194,46 @@ def test_read_by_group_type_with_greater_start_handle(connected_peripheral):
     assert result.ecode == BleAttErrorCode.INVALID_HANDLE
     assert result.handle == 12
 
+def test_read_by_type(profile, connected_peripheral):
+    """ Test ReadByType request. """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Retrieve the target characteristic definition
+    char_def = profile().find_object_by_handle(2).payload()
+
+    # Send a valid ReadByType request
+    result = mock.read_by_type(1, 3, UUID(0x2803))
+    assert isinstance(result, ATT_Read_By_Type_Response)
+    assert result.len == 7
+    assert len(result.handles) == 1
+    assert result.handles[0].handle == 2
+    assert result.handles[0].value == char_def
+
+def test_read_by_type_invalid_start_handle(connected_peripheral):
+    """ Test ReadByType request with invalid start handle (0)."""
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a valid ReadByType request
+    result = mock.read_by_type(0, 3, UUID(0x2803))
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.READ_BY_TYPE_REQUEST
+    assert result.handle == 0
+    assert result.ecode == BleAttErrorCode.INVALID_HANDLE
+
+def test_read_by_type_higher_start_handle(connected_peripheral):
+    """ Test ReadByType request with invalid start handle (0)."""
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a valid ReadByType request
+    result = mock.read_by_type(3, 0, UUID(0x2803))
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.READ_BY_TYPE_REQUEST
+    assert result.handle == 3
+    assert result.ecode == BleAttErrorCode.INVALID_HANDLE
+
 def test_find_information(connected_peripheral):
     """Test a successfull FindInformation request."""
     # Retrieve mock from current peripheral
@@ -284,6 +324,8 @@ def test_remote_profile_discovery(connected_peripheral):
 
     # First, discover exposed services.
     services = {}
+    services_chars = {}
+
     attr_id = 1
     while attr_id < 0xffff:
         # Discover primary services by reading attributes with group type 0x2800:
@@ -301,5 +343,29 @@ def test_remote_profile_discovery(connected_peripheral):
     assert services[1] == (UUID(0x1800), 3)
     assert services[4] == (UUID(0x180f), 7)
 
-    # Discovery characteristics for service 0x1800
-    # TODO: Implement unit tests for ReadByType procedure !
+    # Discovery characteristics for each service
+    for serv_handle, serv_params  in services.items():
+        serv_uuid, end_handle = serv_params
+
+        # Discover characteristics
+        services_chars[serv_handle] = []
+        attr_id = serv_handle
+        while attr_id <= end_handle:
+            # Read characteristic attributes
+            response = mock.read_by_type(attr_id, end_handle, UUID(0x2803))
+            if isinstance(response, ATT_Error_Response) and response.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND:
+                # Characs discovered
+                break
+            elif isinstance(response, ATT_Read_By_Type_Response):
+                for item in response.handles:
+                    chardef = GattAttributeValueItem.from_bytes(bytes(item))
+                    services_chars[serv_handle].append((item.handle,item.value))
+                    attr_id = chardef.handle + 1
+
+    # Make sure our characteristics have successfully been discovered
+    assert len(services_chars.keys()) == 2
+    assert len(services_chars[1]) == 1
+    assert 2 in services_chars[1][0]
+    assert len(services_chars[4]) == 1
+    assert 5 in services_chars[4][0]
+
