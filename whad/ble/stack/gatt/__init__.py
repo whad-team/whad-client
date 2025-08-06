@@ -14,7 +14,7 @@ from whad.ble.exceptions import HookReturnValue, HookReturnAuthentRequired,\
     HookReturnNotFound, ConnectionLostException
 from whad.ble.stack.att.constants import BleAttOpcode, BleAttErrorCode, ReadAccess, \
     WriteAccess, Authentication, Authorization, Encryption
-from whad.ble.stack.att.exceptions import error_response_to_exc, AttErrorCode, AttError
+from whad.ble.stack.att.exceptions import InsufficientAuthenticationError, InsufficientAuthorizationError, error_response_to_exc, AttErrorCode, AttError
 from whad.ble.stack.gatt.message import *
 from whad.ble.stack.gatt.exceptions import GattTimeoutException
 from whad.ble.profile import GenericProfile
@@ -836,9 +836,12 @@ class GattClient(GattLayer):
         for service in self.__model.services():
             for characteristic in service.characteristics():
                 for descriptor in self.discover_characteristic_descriptors(characteristic):
-                    desc = self.get_descriptor(characteristic, descriptor.uuid, descriptor.handle)
-                    if desc is not None:
-                        characteristic.add_descriptor(desc)
+                    try:
+                        desc = self.get_descriptor(characteristic, descriptor.uuid, descriptor.handle)
+                        if desc is not None:
+                            characteristic.add_descriptor(desc)
+                    except (InsufficientAuthenticationError, InsufficientAuthorizationError):
+                        pass
 
     @proclock
     def read(self, handle):
