@@ -255,7 +255,7 @@ class GattLayer(Layer):
 
         :param GattFindByTypeValueRequest request: Request
         """
-        logger.debug("[gatt] FindByTypeValueRequest, start: %d, type: %s", request.start, request.type)
+        logger.debug("[gatt] FindByTypeValueRequest, start: %d, type: %s", request.start, request.type_uuid)
         self.error(
             BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST, request.start, BleAttErrorCode.ATTRIBUTE_NOT_FOUND
         )
@@ -2072,119 +2072,129 @@ class GattServer(GattLayer):
     def on_read_by_type_request(self, request: GattReadByTypeRequest):
         """Read attribute by type request
         """
-        # List attributes by type UUID, sorted by handles
-        attrs = {}
-        attrs_handles = []
-        for attribute in self.server_model.attr_by_type_uuid(UUID(request.type), request.start, request.end):
-            attrs[attribute.handle] = attribute
-            attrs_handles.append(attribute.handle)
-        attrs_handles.sort()
+        # Make sure the requested start handle is valid:
+        # - start handle must not be 0
+        # - start handle must be lower or equal to end handle
+        if request.start == 0 or request.start > request.end:
+            self.error(
+                BleAttOpcode.READ_BY_TYPE_REQUEST,
+                request.start,
+                BleAttErrorCode.INVALID_HANDLE
+            )
+        else:
+            # List attributes by type UUID, sorted by handles
+            attrs = {}
+            attrs_handles = []
+            for attribute in self.server_model.attr_by_type_uuid(UUID(request.type), request.start, request.end):
+                attrs[attribute.handle] = attribute
+                attrs_handles.append(attribute.handle)
+            attrs_handles.sort()
 
-        # If we have at least one item to return
-        if len(attrs_handles) > 0:
+            # If we have at least one item to return
+            if len(attrs_handles) > 0:
 
-            # Get MTU
-            mtu = self.att.get_client_mtu()
+                # Get MTU
+                mtu = self.att.get_client_mtu()
 
-            # If client is looking for characteristic declaration,
-            # we compute the correct item size and maximum number
-            # of items we can put in a response PDU
-            #
-            # In the case of a characteristic declaration, UUID could
-            # be 16-bit or 128-bit long so we shall only put in the same
-            # answer characteristics with same size UUIDs.
-
-            if UUID(request.type) == UUID(0x2803):
-
-                # Get item size (UUID size + 2)
-                uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
-                item_size = uuid_size + 5
-                max_nb_items = int((mtu - 2) / item_size)
-
-                # Create our datalist
-                datalist = GattAttributeDataList(item_size)
-            elif UUID(request.type) == UUID(0x2802):
-
-                # If client is looking for included services,
+                # If client is looking for characteristic declaration,
                 # we compute the correct item size and maximum number
                 # of items we can put in a response PDU
                 #
-                # In the case of an included service declaration, UUID could
+                # In the case of a characteristic declaration, UUID could
                 # be 16-bit or 128-bit long so we shall only put in the same
                 # answer characteristics with same size UUIDs.
 
-                # Get item size
-                uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
-                item_size = uuid_size + 6
-                max_nb_items = int((mtu - 2) / item_size)
+                if UUID(request.type) == UUID(0x2803):
 
-                # Create our datalist
-                datalist = GattAttributeDataList(item_size)
-            else:
-                max_nb_items = 0
-                datalist = GattAttributeDataList(0)
+                    # Get item size (UUID size + 2)
+                    uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
+                    item_size = uuid_size + 5
+                    max_nb_items = int((mtu - 2) / item_size)
 
-            # Iterate over items while UUID size matches and data fits in MTU
-            for i in range(max_nb_items):
-                if i < len(attrs_handles):
-                    handle = attrs_handles[i]
-                    attr_obj = attrs[handle]
-                    if len(attr_obj.uuid.packed) == uuid_size:
-                        if isinstance(attrs[handle], Characteristic):
-                            datalist.append(
-                                GattAttributeValueItem(
-                                    handle,
-                                    pack(
-                                        '<BH',
-                                        attr_obj.properties,
-                                        attr_obj.value_handle,
-                                    ) + attr_obj.uuid.packed
-                                )
-                            )
-                        elif isinstance(attrs[handle], IncludeService):
-                            if attrs[handle].service_uuid.type == UUID.TYPE_16:
+                    # Create our datalist
+                    datalist = GattAttributeDataList(item_size)
+                elif UUID(request.type) == UUID(0x2802):
+
+                    # If client is looking for included services,
+                    # we compute the correct item size and maximum number
+                    # of items we can put in a response PDU
+                    #
+                    # In the case of an included service declaration, UUID could
+                    # be 16-bit or 128-bit long so we shall only put in the same
+                    # answer characteristics with same size UUIDs.
+
+                    # Get item size
+                    uuid_size = len(attrs[attrs_handles[0]].uuid.packed)
+                    item_size = uuid_size + 6
+                    max_nb_items = int((mtu - 2) / item_size)
+
+                    # Create our datalist
+                    datalist = GattAttributeDataList(item_size)
+                else:
+                    max_nb_items = 0
+                    datalist = GattAttributeDataList(0)
+
+                # Iterate over items while UUID size matches and data fits in MTU
+                for i in range(max_nb_items):
+                    if i < len(attrs_handles):
+                        handle = attrs_handles[i]
+                        attr_obj = attrs[handle]
+                        if len(attr_obj.uuid.packed) == uuid_size:
+                            if isinstance(attrs[handle], Characteristic):
                                 datalist.append(
                                     GattAttributeValueItem(
                                         handle,
                                         pack(
-                                            '<HH',
-                                            attr_obj.service_start_handle,
-                                            attr_obj.service_end_handle,
-                                        ) + attr_obj.service_uuid.packed
+                                            '<BH',
+                                            attr_obj.properties,
+                                            attr_obj.value_handle,
+                                        ) + attr_obj.uuid.packed
                                     )
                                 )
-                            else:
-                                datalist.append(
-                                    GattAttributeValueItem(
-                                        handle,
-                                        pack(
-                                            '<HH',
-                                            attr_obj.service_start_handle,
-                                            attr_obj.service_end_handle,
+                            elif isinstance(attrs[handle], IncludeService):
+                                if attrs[handle].service_uuid.type == UUID.TYPE_16:
+                                    datalist.append(
+                                        GattAttributeValueItem(
+                                            handle,
+                                            pack(
+                                                '<HH',
+                                                attr_obj.service_start_handle,
+                                                attr_obj.service_end_handle,
+                                            ) + attr_obj.service_uuid.packed
                                         )
                                     )
-                                )
-                else:
-                    break
+                                else:
+                                    datalist.append(
+                                        GattAttributeValueItem(
+                                            handle,
+                                            pack(
+                                                '<HH',
+                                                attr_obj.service_start_handle,
+                                                attr_obj.service_end_handle,
+                                            )
+                                        )
+                                    )
+                    else:
+                        break
 
-            # Check that our result datalist does contain something
-            if len(datalist) > 0:
-                # Once datalist created, send answer
-                datalist_raw = datalist.to_bytes()
-                self.att.read_by_type_response(item_size, datalist_raw)
+                # Check that our result datalist does contain something
+                if len(datalist) > 0:
+                    # Once datalist created, send answer
+                    datalist_raw = datalist.to_bytes()
+                    self.att.read_by_type_response(item_size, datalist_raw)
+                else:
+                    # If not, send an error.
+                    self.error(
+                        BleAttOpcode.READ_BY_TYPE_REQUEST,
+                        request.start,
+                        BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                    )
             else:
-                # If not, send an error.
                 self.error(
-                    BleAttOpcode.READ_BY_TYPE_REQUEST,
-                    request.start,
-                    BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+                   BleAttOpcode.READ_BY_TYPE_REQUEST,
+                   request.start,
+                   BleAttErrorCode.ATTRIBUTE_NOT_FOUND
                 )
-        else:
-            self.error(
-               BleAttOpcode.READ_BY_TYPE_REQUEST,
-               request.start,
-               BleAttErrorCode.ATTRIBUTE_NOT_FOUND
-            )
 
     @txlock
     def on_read_by_group_type_request(self, request: GattReadByGroupTypeRequest):
