@@ -56,7 +56,7 @@ class TestGattClientProcedures(object):
     @pytest.fixture
     def sandbox(self):
         return GattClientSandbox()
-    
+
     @pytest.fixture
     def att(self, sandbox):
         return sandbox.get_layer('att')
@@ -64,7 +64,7 @@ class TestGattClientProcedures(object):
     @pytest.fixture
     def gatt(self, sandbox):
         return sandbox.get_layer('gatt')
-    
+
     def test_discover_primary_services_endhandle(self, att, gatt):
         # Build primary service discovery response
         resp0 = GattReadByGroupTypeResponse(6)
@@ -80,11 +80,11 @@ class TestGattClientProcedures(object):
         # in its reception queue
         for msg in messages:
             gatt.on_gatt_message(msg)
-        
+
         # Start primary service discovery procedure
         services = list(gatt.discover_primary_services())
         assert len(services) == 2
-                
+
     def test_discover_primary_services_attrerror(self, att, gatt):
         # Build primary service discovery response
         resp0 = GattReadByGroupTypeResponse(6)
@@ -99,7 +99,7 @@ class TestGattClientProcedures(object):
         # in its reception queue
         for msg in messages:
             gatt.on_gatt_message(msg)
-        
+
         # Start primary service discovery procedure
         services = list(gatt.discover_primary_services())
         assert len(services)==1
@@ -584,7 +584,7 @@ class TestGattServerProcedures(object):
 
         # Search for Generic Device Profile service (0x1800)
         gatt.on_find_by_type_value_request(GattFindByTypeValueRequest(
-            start=0,
+            start=1,
             end=5,
             attr_type=UUID(0x2800),
             attr_value=UUID(0x1800).packed
@@ -611,7 +611,7 @@ class TestGattServerProcedures(object):
 
         # Search for Generic Device Profile service (0x1800)
         gatt.on_find_by_type_value_request(GattFindByTypeValueRequest(
-            start=0,
+            start=1,
             end=5,
             attr_type=UUID(0x2800),
             attr_value=UUID(0x1F00).packed
@@ -622,7 +622,7 @@ class TestGattServerProcedures(object):
             'l2cap',
             ATT_Hdr() / ATT_Error_Response(
                 request=BleAttOpcode.FIND_BY_TYPE_VALUE_REQUEST,
-                handle=0,
+                handle=1,
                 ecode=BleAttErrorCode.ATTRIBUTE_NOT_FOUND
             )
         ))
@@ -638,7 +638,7 @@ class TestGattServerProcedures(object):
 
         # Ask server to enumerate characteristics
         gatt.on_read_by_type_request(GattReadByTypeRequest(
-            start=0,
+            start=1,
             end=5,
             attr_type=UUID(0x2803)
         ))
@@ -665,7 +665,7 @@ class TestGattServerProcedures(object):
 
         # Ask server to enumerate characteristics
         gatt.on_read_by_group_type_request(GattReadByGroupTypeRequest(
-            start=0,
+            start=1,
             end=5,
             group_type=UUID(0x2803)
         ))
