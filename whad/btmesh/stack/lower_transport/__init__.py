@@ -13,6 +13,7 @@ from whad.btmesh.stack.utils import (
     UNICAST_ADDR_TYPE,
     calculate_seq_auth,
 )
+from whad.btmesh.stack.constants import OPCODE_TO_PAYLOAD_CLASS_LOWER_TRANSPORT
 from queue import Queue
 from whad.scapy.layers.btmesh import (
     BTMesh_Upper_Transport_Access_PDU,
@@ -49,35 +50,17 @@ from copy import copy
 
 logger = logging.getLogger(__name__)
 
-OPCODE_TO_PAYLOAD_CLASS_LOWER_TRANSPORT = {
-    0x01: BTMesh_Upper_Transport_Control_Friend_Poll,
-    0x02: BTMesh_Upper_Transport_Control_Friend_Update,
-    0x03: BTMesh_Upper_Transport_Control_Friend_Request,
-    0x04: BTMesh_Upper_Transport_Control_Friend_Offer,
-    0x05: BTMesh_Upper_Transport_Control_Friend_Clear,
-    0x06: BTMesh_Upper_Transport_Control_Friend_Clear_Confirm,
-    0x07: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add,
-    0x08: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove,
-    0x09: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm,
-    0x0A: BTMesh_Upper_Transport_Control_Heartbeat,
-    0x0B: BTMesh_Upper_Transport_Control_Path_Request,
-    0x0C: BTMesh_Upper_Transport_Control_Path_Reply,
-    0x0D: BTMesh_Upper_Transport_Control_Path_Confirmation,
-    0x0E: BTMesh_Upper_Transport_Control_Path_Echo_Request,
-    0x0F: BTMesh_Upper_Transport_Control_Path_Echo_Reply,
-    0x10: BTMesh_Upper_Transport_Control_Dependent_Node_Update,
-    0x11: BTMesh_Upper_Transport_Control_Path_Request_Solicitation,
-}
-
 
 class Transaction:
     def __init__(self, message):
         """
-        Initiates a transaction, Rx or Tx
+        Initiates a transaction, Rx or Tx (Lower Transport Layer)
+        Used to segment and reassemble on the Lower Transport Layer
 
         :param message: The message received or to be sent and its context
         :type message: (Packet, MeshMessageContext)
         """
+
         self.pkt, self.ctx = message
 
         self.src_addr_type = get_address_type(self.ctx.src_addr)
@@ -100,9 +83,6 @@ class Transaction:
 
 
 class TxTransaction(Transaction):
-    """
-    Initiates a Tx transaction of a PDU to the network Layer
-    """
 
     def __init__(self, message, sar_transmitter_state):
         """
@@ -113,6 +93,7 @@ class TxTransaction(Transaction):
         :param sar_transmitter_state: The  SARTransmitterCompositeState  that lives in the ConfigurationServerModel
         :param:  SARTransmitterCompositeState
         """
+
         super().__init__(message)
 
         self.sending_thread = None
@@ -172,6 +153,7 @@ class TxTransaction(Transaction):
         :param message: The Lower Transport Layer Ack received and its context
         :type message: (BTMesh_Lower_Transport_Segment_Acknoledgment_Message, MeshMessageContext)
         """
+
         pkt, ctx = message
         if self.is_transaction_finished:
             return
@@ -216,8 +198,8 @@ class TxTransaction(Transaction):
 
 class RxTransaction(Transaction):
     """
-    Initiates an Rx transaction for a received PDU from the network layer
-    Only segmented messages (unsegmented get sent to upper transport layer directly)
+    Initiates an Rx transaction for a received PDU from the network layer (Lower Transport Layer and sniffer)
+    Only segmented messages (unsegmented get sent to upper transport layer directly/yieled by sniffer)
     """
 
     def __init__(self, first_message, sar_receiver_state):
@@ -228,9 +210,10 @@ class RxTransaction(Transaction):
 
         :param first_message: The message received that initiated the transaction with its context
         :type first_message: (BTMesh_Lower_Transport_Segmented_Access_Message, MeshMessageContext)
-        :param sar_receiver_state: The SAR received composite state  (lives in the ConfigurationServerModel)
-        :param: SARReceiverCompositeState
+        :param sar_receiver_state: The SAR received composite state  (lives in the ConfigurationServerModel), defaults to None
+        :type sar_receiver_state: SARReceiverCompositeState, optional
         """
+
         super().__init__(first_message)
 
         # get the sar states
@@ -718,14 +701,16 @@ class LowerTransportLayer(Layer):
                     segment_ctx = copy(transaction.ctx)
                     segment_ctx.segment_number = fragment_index
                     segment_ctx.seq_number = transaction.ctx.seq_number + fragment_index
-                    self.send_to_network((
-                        BTMesh_Lower_Transport_Control_Message(
-                            seg=1,
-                            opcode=transaction.opcode,
-                            payload_field=payload,
-                        ),
-                        segment_ctx,
-                    ))
+                    self.send_to_network(
+                        (
+                            BTMesh_Lower_Transport_Control_Message(
+                                seg=1,
+                                opcode=transaction.opcode,
+                                payload_field=payload,
+                            ),
+                            segment_ctx,
+                        )
+                    )
                     sleep(transaction.interval_step / 1000)
             if transaction.ctx.ttl == 0:
                 event.wait(transaction.unicast_retrans_interval_step / 1000)
@@ -780,15 +765,17 @@ class LowerTransportLayer(Layer):
                     else:
                         application_key_flag = 1
                         application_key_id = transaction.ctx.aid
-                    self.send_to_network((
-                        BTMesh_Lower_Transport_Access_Message(
-                            seg=1,
-                            application_key_flag=application_key_flag,
-                            application_key_id=application_key_id,
-                            payload_field=payload,
-                        ),
-                        segment_ctx,
-                    ))
+                    self.send_to_network(
+                        (
+                            BTMesh_Lower_Transport_Access_Message(
+                                seg=1,
+                                application_key_flag=application_key_flag,
+                                application_key_id=application_key_id,
+                                payload_field=payload,
+                            ),
+                            segment_ctx,
+                        )
+                    )
                     sleep(transaction.interval_step / 1000)
             if transaction.ctx.ttl == 0:
                 event.wait(transaction.unicast_retrans_interval_step / 1000)
@@ -842,15 +829,17 @@ class LowerTransportLayer(Layer):
 
                     segment_ctx.seq_number = transaction.ctx.seq_number + fragment_index
 
-                    self.send_to_network((
-                        BTMesh_Lower_Transport_Access_Message(
-                            seg=1,
-                            application_key_id=application_key_id,
-                            application_key_flag=application_key_flag,
-                            payload_field=payload,
-                        ),
-                        segment_ctx,
-                    ))
+                    self.send_to_network(
+                        (
+                            BTMesh_Lower_Transport_Access_Message(
+                                seg=1,
+                                application_key_id=application_key_id,
+                                application_key_flag=application_key_flag,
+                                payload_field=payload,
+                            ),
+                            segment_ctx,
+                        )
+                    )
                     sleep(transaction.interval_step / 1000)
             sleep(transaction.multicast_retrans_interval_step / 1000)
 
@@ -887,14 +876,16 @@ class LowerTransportLayer(Layer):
 
                     segment_ctx.seq_number = transaction.ctx.seq_number + fragment_index
 
-                    self.send_to_network((
-                        BTMesh_Lower_Transport_Control_Message(
-                            seg=1,
-                            opcode=transaction.opcode,
-                            payload_field=payload,
-                        ),
-                        segment_ctx,
-                    ))
+                    self.send_to_network(
+                        (
+                            BTMesh_Lower_Transport_Control_Message(
+                                seg=1,
+                                opcode=transaction.opcode,
+                                payload_field=payload,
+                            ),
+                            segment_ctx,
+                        )
+                    )
                     sleep(transaction.interval_step / 1000)
             sleep(transaction.multicast_retrans_interval_step / 1000)
 
@@ -916,15 +907,17 @@ class LowerTransportLayer(Layer):
             application_key_flag = 1
             application_key_id = transaction.ctx.aid
 
-        self.send_to_network((
-            BTMesh_Lower_Transport_Access_Message(
-                seg=0,
-                application_key_flag=application_key_flag,
-                application_key_id=application_key_id,
+        self.send_to_network(
+            (
+                BTMesh_Lower_Transport_Access_Message(
+                    seg=0,
+                    application_key_flag=application_key_flag,
+                    application_key_id=application_key_id,
+                )
+                / transaction.pkt,
+                transaction.ctx,
             )
-            / transaction.pkt,
-            transaction.ctx,
-        ))
+        )
         transaction.is_transaction_finished = True
 
     def sending_thread_ctl_unsegmented(self, transaction, event):
@@ -938,11 +931,13 @@ class LowerTransportLayer(Layer):
         :param event: Event object to received signal from main thread
         :type: Event
         """
-        self.send_to_network((
-            BTMesh_Lower_Transport_Control_Message(seg=0, opcode=transaction.opcode)
-            / transaction.pkt,
-            transaction.ctx,
-        ))
+        self.send_to_network(
+            (
+                BTMesh_Lower_Transport_Control_Message(seg=0, opcode=transaction.opcode)
+                / transaction.pkt,
+                transaction.ctx,
+            )
+        )
         transaction.is_transaction_finished = True
 
     def sending_ack_thread(self, transaction, resend=True, event=None):

@@ -920,4 +920,3 @@ class BLE(Connector):
     def on_mtu_changed(self, conn_handle, mtu: int):
         """Connection MTU has been updated.
         """
-

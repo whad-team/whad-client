@@ -78,7 +78,6 @@ class MeshMessageContext:
         self.is_ctl: bool = False
 
         # Seq auth value set by the Upper Transport Layer when encrypting the access pdu
-        # Set by the Network layer on Rx messages
         self.seq_auth: int = None
 
         # Set by model layer, if the message is too small to be segmented but still want acknowlegment on network layer

@@ -12,11 +12,14 @@ if __name__ == "__main__":
         # Connect to target device and performs discovery
         try:
             dev = WhadDevice.create(interface)
-            sniffer = BTMeshSniffer(
-                dev, net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00")
-            )
-            sniffer.configure(advertisements=True, connection=False)
+            sniffer = BTMeshSniffer(dev)
+            sniffer.configure()
             sniffer.start()
+            print("Sniffer started")
+
+            for pkt in sniffer.sniff(timeout=30):
+                pkt.show()
+                print(pkt.metadata)
 
         except (KeyboardInterrupt, SystemExit):
             dev.close()

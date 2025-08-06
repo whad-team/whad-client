@@ -16,7 +16,7 @@ react on specific events.
 # Add arguments to connector for models/states
 
 from whad.btmesh.stack import PBAdvBearerLayer
-from whad.btmesh.connector import BTMesh
+from whad.btmesh.connector.node import BTMeshNode
 
 from whad.btmesh.crypto import (
     NetworkLayerCryptoManager,
@@ -42,7 +42,7 @@ from time import sleep
 from uuid import UUID
 
 
-class Provisionee(BTMesh):
+class Provisionee(BTMeshNode):
     def __init__(
         self,
         device,
@@ -50,7 +50,7 @@ class Provisionee(BTMesh):
         net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
         dev_app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
         unicast_addr=0x0002,
-        uuid=UUID("7462d668-bc88-3473-0000-000000000012"),
+        uuid=UUID("ddddaaaa-aaaa-aa01-0000-000000000000"),
     ):
         """
         Contructor of a Provisionee (node) device
@@ -102,6 +102,7 @@ class Provisionee(BTMesh):
     def set_uuid(self, uuid):
         """
         Sets the UUID of the device for provisioning process
+        IN THEORY SHOULD BE LINKED TO ADVA ADDRESS USED IN ADV PACKETS !
 
         :param uuid: UUID to use (16 bytes long hex string)
         :type uuid: str

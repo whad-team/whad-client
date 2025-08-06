@@ -184,7 +184,7 @@ class UpperTransportLayer(Layer):
             label_uuids = self.__get_all_label_uuids()
             (plaintext_message, is_auth_valid, label_uuid) = key.decrypt_virtual(
                 enc_data=raw(pkt),
-                aszmic=ctx,
+                aszmic=ctx.aszmic,
                 seq_number=ctx.seq_number,
                 src_addr=ctx.src_addr,
                 dst_addr=ctx.dest_addr,

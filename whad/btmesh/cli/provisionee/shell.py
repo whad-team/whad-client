@@ -70,6 +70,10 @@ class BTMeshProvisioneeShell(BTMeshBaseShell):
         If no argument, "start" by default
 
         """
+        if self._current_mode != self.MODE_NORMAL:
+            self.error("Cannot reprovision a node, please reset")
+            return
+
         action = args[0].lower() if len(args) >= 1 else "start"
 
         if action == "start":

@@ -882,7 +882,7 @@ class UpperTransportLayerAppKeyCryptoManager:
         :param aszmic: Size of MIC value (0 or 1). For Nonce
         :type aszmic: int
         :param seq_number: segment number Value (of first segment)
-        :type seq_number: Bytes
+        :type seq_number: int
         :param src_addr: Source addr of the packet
         :type src_addr: int
         :param dst_addr: Destination addr of the packet
@@ -939,7 +939,7 @@ class UpperTransportLayerAppKeyCryptoManager:
         label_uuid=None,
     ):
         """
-        Encrypts the access_message with this application key.
+        Decrypts the access_message with this application key.
         Mesh Spec Section 3.9.7.1 p. 205
 
         :param enc_data: Raw encrypted access message and mic
@@ -947,7 +947,7 @@ class UpperTransportLayerAppKeyCryptoManager:
         :param aszmic: Size of MIC value (0 or 1). For Nonce
         :type aszmic: int
         :param seq_number: segment number Value (of first segment)
-        :type seq_number: Bytes
+        :type seq_number: int
         :param src_addr: Source addr of the packet
         :type src_addr: int
         :param dst_addr: Destination addr of the packet
@@ -998,7 +998,7 @@ class UpperTransportLayerAppKeyCryptoManager:
         label_uuids,
     ):
         """
-        Encrypts the access_message with this application key if dest address is virtual
+        Decrypts the access_message with this application key if dest address is virtual
         Mesh Spec Section 3.9.7.1 p. 205
 
         :param enc_data: Raw encrypted access message and mic
@@ -1006,7 +1006,7 @@ class UpperTransportLayerAppKeyCryptoManager:
         :param aszmic: Size of MIC value (0 or 1). For Nonce
         :type aszmic: int
         :param seq_number: segment number Value (of first segment)
-        :type seq_number: Bytes
+        :type seq_number: int
         :param src_addr: Source addr of the packet
         :type src_addr: int
         :param dst_addr: Destination addr of the packet

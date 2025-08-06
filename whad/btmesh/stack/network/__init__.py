@@ -5,6 +5,7 @@ Handles Relay and Proxy features, Cipher/Decipher network level (netkey), cachin
 """
 
 import logging
+from collections import deque
 from whad.common.stack import Layer, alias, source
 from whad.scapy.layers.btmesh import (
     BTMesh_Network_PDU,
@@ -59,7 +60,8 @@ class NetworkLayer(Layer):
         self.state.df_nid_to_net_key_id = {}
 
         # Stores concatenation of seq_number and src_addr.
-        self.state.cache = []
+        # Max 100 PDUs stored ... (This cache is only for speed purposes, replay protection on Lower Transport Layer)
+        self.state.cache = deque(maxlen=100)
 
         # Check if relay feature is enabled on this device (proxy not implemented)
         self.state.is_relay_enabled = False
@@ -267,24 +269,6 @@ class NetworkLayer(Layer):
             logger.debug(
                 "Received Network PDU with wrong authentication value, dropping"
             )
-            return
-
-        # If sniffing_only mode, we display packet and leave
-        if self.__connector.sniffing_only:
-            raw_lower_transport = plaintext[2:]
-            if network_ctl == 1:
-                lower_transport_pdu = BTMesh_Lower_Transport_Control_Message(
-                    raw_lower_transport
-                )
-            else:
-                lower_transport_pdu = BTMesh_Lower_Transport_Access_Message(
-                    raw_lower_transport
-                )
-
-            print("====================== START MESSAGE ===========================")
-            deobf_net_pdu.show()
-            lower_transport_pdu.show()
-            print("====================== END MESSAGE =============================")
             return
 
         # check address validity. Mesh Spec Section 3.4.3

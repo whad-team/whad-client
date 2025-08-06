@@ -1,6 +1,6 @@
 from whad.cli.shell import InteractiveShell, category
 from whad.btmesh.profile import BaseMeshProfile
-from whad.btmesh.connector import BTMesh
+from whad.btmesh.connector.node import BTMeshNode
 from whad.btmesh.models import CompositeModelState
 from whad.btmesh.stack.utils import MeshMessageContext
 from whad.btmesh.stack.constants import (
@@ -78,7 +78,17 @@ class BTMeshBaseShell(InteractiveShell):
 
         # Instanciate our Peripheral
         # PLACEHOLDER, OVERWRITE IN SUBCLASSES WITH OTHER CONNECTOR
-        self._connector = BTMesh(self.interface, profile=self.profile)
+        self._connector = BTMeshNode(self.interface, profile=self.profile)
+
+    def update_prompt(self, force=False):
+        """Update prompt to reflect current state
+        PLACEHOLDER FOR BASE SHELL, OVERWRITTEN IN SUBCLASSES
+        """
+        self.set_prompt(
+            HTML(
+                "<b>wbtmesh-base<ansimagenta> BTMeshBaseShell SHOULD NOT BE USED AS IS</ansimagenta>></b> "
+            )
+        )
 
     def create_msg_context(self, is_ctl):
         """
@@ -295,8 +305,11 @@ class BTMeshBaseShell(InteractiveShell):
         By default, will print de device's address
         """
 
-        if self._current_mode != self.MODE_STARTED:
-            self.error("Need to have the devices started")
+        if (
+            self._current_mode != self.MODE_STARTED
+            and self._current_mode != self.MODE_ELEMENT_EDIT
+        ):
+            self.error("Need to have the devices started and provisioned")
             return
 
         if len(arg) >= 1:
@@ -345,7 +358,10 @@ class BTMeshBaseShell(InteractiveShell):
         By default, this command shows the relay status of the node
         """
 
-        if self._current_mode != self.MODE_STARTED:
+        if (
+            self._current_mode != self.MODE_STARTED
+            and self._current_mode != self.MODE_ELEMENT_EDIT
+        ):
             self.error("Can only managed relaying on a provisioned node.")
             return
 
@@ -374,8 +390,9 @@ class BTMeshBaseShell(InteractiveShell):
         <ansicyan><b>resume</b></ansicyan>
         """
 
-        self._connector.start_listening()
+        self._connector.start()
         self._current_mode = self.MODE_STARTED
+        self.update_prompt()
 
     def complete_element(self):
         """Autocomplete wireshark command"""
@@ -459,7 +476,7 @@ class BTMeshBaseShell(InteractiveShell):
                         return
 
                     if self._connector is not None:
-                        self._connector.stop_listening()
+                        self._connector.stop()
 
                     self._selected_element = index
                     self._current_mode = self.MODE_ELEMENT_EDIT
@@ -701,7 +718,10 @@ class BTMeshBaseShell(InteractiveShell):
         - To reset the whitelist : whitelist reset
         """
 
-        if self._current_mode != self.MODE_STARTED:
+        if (
+            self._current_mode != self.MODE_STARTED
+            and self._current_mode != self.MODE_ELEMENT_EDIT
+        ):
             self.error(
                 "Need to have a provisioned node/not in element edit to manage whitelist"
             )
@@ -758,7 +778,10 @@ class BTMeshBaseShell(InteractiveShell):
         > seqnum 0xA10010
         """
 
-        if self._current_mode != self.MODE_STARTED:
+        if (
+            self._current_mode != self.MODE_STARTED
+            and self._current_mode != self.MODE_ELEMENT_EDIT
+        ):
             self.error("Can only set the sequence number of a provisioned node.")
             return
 
@@ -790,7 +813,9 @@ class BTMeshBaseShell(InteractiveShell):
         By default uses TID (transaction ID) incremented of this node if not specified.
         """
         if self._current_mode != self.MODE_STARTED:
-            self.error("Can only send a message from a provisioned node.")
+            self.error(
+                "Can only send a message from a provisioned node and not in element edit mode."
+            )
             return
 
         tid = None
@@ -960,7 +985,9 @@ class BTMeshBaseShell(InteractiveShell):
         """
 
         if self._current_mode != self.MODE_STARTED:
-            self.error("Cannot manage keys on an unprovisionned device")
+            self.error(
+                "Cannot manage keys on an unprovisionned device or in element edit mode"
+            )
 
         action = args[0].lower() if len(args) >= 1 else "list"
         if action == "list":
@@ -1052,7 +1079,9 @@ class BTMeshBaseShell(InteractiveShell):
         """
 
         if self._current_mode != self.MODE_STARTED:
-            self.error("Cannot manage keys on an unprovisionned device")
+            self.error(
+                "Cannot manage keys on an unprovisionned device or in element edit mode"
+            )
 
         action = args[0].lower() if len(args) >= 1 else "list"
         if action == "list":
@@ -1125,7 +1154,9 @@ class BTMeshBaseShell(InteractiveShell):
         First arugment is key refresh flag, second is IV update flag
         """
         if self._current_mode != self.MODE_STARTED:
-            self.error("Can only send a message from a provisioned node.")
+            self.error(
+                "Can only send a message from a provisioned node and not in element edit mode."
+            )
             return
 
         if len(args) < 2:
@@ -1235,7 +1266,9 @@ class BTMeshBaseShell(InteractiveShell):
         """
 
         if self._current_mode != self.MODE_STARTED:
-            self.error("Need a provisioned node to access message context")
+            self.error(
+                "Need a provisioned node to access message context and not in element edit mode"
+            )
             return
 
         if len(args) >= 2:
