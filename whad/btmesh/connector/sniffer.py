@@ -38,7 +38,6 @@ from whad.btmesh.crypto import (
 from whad.btmesh.stack.utils import (
     MeshMessageContext,
     calculate_seq_auth,
-    RxTransaction,
 )
 from whad.btmesh.stack.constants import OPCODE_TO_PAYLOAD_CLASS_LOWER_TRANSPORT
 
