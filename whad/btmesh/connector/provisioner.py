@@ -12,7 +12,7 @@ react on specific events.
 
 from time import time
 
-from whad.btmesh.connector import BTMesh
+from whad.btmesh.connector.node import BTMeshNode
 
 from whad.btmesh.stack import PBAdvBearerLayer
 from whad.scapy.layers.btmesh import (
@@ -33,7 +33,6 @@ class UnprovisionedDeviceList:
     def __init__(self):
         super().__init__()
         self.__devices = {}
-        self.__provisioned_node = []
 
     def update(self, dev_uuid):
         """
@@ -52,11 +51,7 @@ class UnprovisionedDeviceList:
         :param dev_uuid: [TODO:description]
         :type dev_uuid: [TODO:type]
         """
-        return (
-            dev_uuid in self.__devices
-            and (time() - self.__devices[dev_uuid] < 30)
-            and dev_uuid not in self.__provisioned_node
-        )
+        return dev_uuid in self.__devices and (time() - self.__devices[dev_uuid] < 30)
 
     def remove(self, dev_uuid):
         if dev_uuid in self.__devices:
@@ -70,17 +65,8 @@ class UnprovisionedDeviceList:
 
         return dev_list
 
-    def add_provisioned_node(self, dev_uuid):
-        """
-        Add a node to the already provisioned list
 
-        :param dev_uuid: [TODO:description]
-        :type dev_uuid: [TODO:type]
-        """
-        self.__provisioned_node.append(dev_uuid)
-
-
-class Provisioner(BTMesh):
+class Provisioner(BTMeshNode):
     def __init__(
         self,
         device,
@@ -157,11 +143,7 @@ class Provisioner(BTMesh):
         :returns: True if success, False if fail
         :rtype: bool
         """
-        if (
-            self.__unprovisioned_devices.check(dev_uuid)
-            and self._is_listening_for_beacons
-        ):
-            self.__unprovisioned_devices.add_provisioned_node(dev_uuid)
+        if self.__unprovisioned_devices.check(dev_uuid):
             self.__unprovisioned_devices.remove(dev_uuid)
             self._prov_stack.on_new_unprovisoned_device(dev_uuid)
 

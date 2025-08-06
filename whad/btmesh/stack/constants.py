@@ -13,6 +13,23 @@ from whad.scapy.layers.btmesh import (
     BTMesh_Provisioning_Records_Get,
     BTMesh_Provisioning_Records_List,
     BTMesh_Provisioning_Record_Response,
+    BTMesh_Upper_Transport_Control_Friend_Poll,
+    BTMesh_Upper_Transport_Control_Friend_Update,
+    BTMesh_Upper_Transport_Control_Friend_Request,
+    BTMesh_Upper_Transport_Control_Friend_Offer,
+    BTMesh_Upper_Transport_Control_Friend_Clear,
+    BTMesh_Upper_Transport_Control_Friend_Clear_Confirm,
+    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add,
+    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove,
+    BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm,
+    BTMesh_Upper_Transport_Control_Heartbeat,
+    BTMesh_Upper_Transport_Control_Path_Request,
+    BTMesh_Upper_Transport_Control_Path_Reply,
+    BTMesh_Upper_Transport_Control_Path_Confirmation,
+    BTMesh_Upper_Transport_Control_Path_Echo_Request,
+    BTMesh_Upper_Transport_Control_Path_Echo_Reply,
+    BTMesh_Upper_Transport_Control_Dependent_Node_Update,
+    BTMesh_Upper_Transport_Control_Path_Request_Solicitation,
 )
 
 # ARBITRARY, ONLY FOR INTERNAL USE IN WHAD
@@ -74,4 +91,24 @@ PROVISIONING_TYPES = {
     BTMesh_Provisioning_Record_Response: 0x0B,
     BTMesh_Provisioning_Records_Get: 0x0C,
     BTMesh_Provisioning_Records_List: 0x0D,
+}
+
+OPCODE_TO_PAYLOAD_CLASS_LOWER_TRANSPORT = {
+    0x01: BTMesh_Upper_Transport_Control_Friend_Poll,
+    0x02: BTMesh_Upper_Transport_Control_Friend_Update,
+    0x03: BTMesh_Upper_Transport_Control_Friend_Request,
+    0x04: BTMesh_Upper_Transport_Control_Friend_Offer,
+    0x05: BTMesh_Upper_Transport_Control_Friend_Clear,
+    0x06: BTMesh_Upper_Transport_Control_Friend_Clear_Confirm,
+    0x07: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add,
+    0x08: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove,
+    0x09: BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm,
+    0x0A: BTMesh_Upper_Transport_Control_Heartbeat,
+    0x0B: BTMesh_Upper_Transport_Control_Path_Request,
+    0x0C: BTMesh_Upper_Transport_Control_Path_Reply,
+    0x0D: BTMesh_Upper_Transport_Control_Path_Confirmation,
+    0x0E: BTMesh_Upper_Transport_Control_Path_Echo_Request,
+    0x0F: BTMesh_Upper_Transport_Control_Path_Echo_Reply,
+    0x10: BTMesh_Upper_Transport_Control_Dependent_Node_Update,
+    0x11: BTMesh_Upper_Transport_Control_Path_Request_Solicitation,
 }

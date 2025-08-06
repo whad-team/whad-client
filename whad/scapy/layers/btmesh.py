@@ -1528,6 +1528,9 @@ class BTMesh_Model_Message(Packet):
         # Size Will be changed in post_build ! size depend on value of first 2 bits
         VariableLengthOpcodeField("opcode", None),
     ]
+    def dissection_done(self, pkt):
+        if self.opcode == 0x8201:
+            self.add_payload(BTMesh_Model_Generic_OnOff_Get())
 
 
 class BTMesh_Model_Generic_OnOff_Get(Packet):
@@ -4748,6 +4751,27 @@ class BTMesh_Network_PDU_Bis(Packet):
         return b"".join(f for f in built_fields)
 """
 
+class BTMesh_Network_Clear_PDU(Packet):
+    """
+    Simpler version of Network PDU.
+    To be used only in Sniffer mode linked with upper layer data decrypted
+    Not used in protocol, only to store/show sniffer mode decrypted packets
+    """
+
+    name = "Bluetooth Network Clear PDU"
+    fields_desc = [
+        BitField("ivi", 0, 1),
+        BitField("nid", 0, 7),
+        BitEnumField(
+            "network_ctl", 0, 1, {0b0: "Access Message", 0b1: "Control message"}
+        ),
+        BitField("ttl", 0, 7),
+        ThreeBytesField("seq_number", None),
+        XShortField("src_addr", None),
+        XShortField("dst_addr", None),
+    ]
+
+
 
 class BTMesh_Network_PDU(Packet):
     """
@@ -4783,6 +4807,13 @@ class BTMesh_Obfuscated_Network_PDU(Packet):
         StrField("enc_dst_enc_transport_pdu_mic", None),
     ]
 
+bind_layers(
+    BTMesh_Network_Clear_PDU, BTMesh_Lower_Transport_Control_Message, network_ctl=1
+)
+
+bind_layers(
+    BTMesh_Network_Clear_PDU, BTMesh_Model_Message, network_ctl=0
+)
 
 """
 BEACONS

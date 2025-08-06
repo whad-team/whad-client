@@ -101,7 +101,7 @@ class PBAdvBearerLayer(Layer):
         new_gen_prov.get_layer("provisioning").set_capabilities(self.state.capabilities)
 
         if self.state.gen_prov_layer is not None:
-            self.state.gen_prov_layer.destroy()
+            self.destroy(self.state.gen_prov_layer)
 
         self.state.gen_prov_layer = new_gen_prov
         self.state.current_link_id = link_id
