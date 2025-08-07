@@ -43,400 +43,14 @@ from scapy.layers.bluetooth import EIR_Element, EIR_Hdr, EIR_Raw
 from scapy.all import Raw, raw, RawVal, NoPayload
 from scapy.config import conf
 
-MESSAGE_MODEL_OPCODES = {
-    0x8201: "Generic_OnOff_Get",
-    0x8202: "Generic_OnOff_Set",
-    0x8203: "Generic_OnOff_Set_Unacknowledged",
-    0x8204: "Generic_OnOff_Status",
-    0x8205: "Generic_Level_Get",
-    0x8206: "Generic_Level_Set",
-    0x8207: "Generic_Level_Set_Unacknowledged",
-    0x8208: "Generic_Level_Status",
-    0x8209: "Generic_Delta_Set",
-    0x820A: "Generic_Delta_Set_Unacknowledged",
-    0x820B: "Generic_Move_Set",
-    0x820C: "Generic_Move_Set_Unacknowledged",
-    0x820D: "Generic_Default_Transition_Time_Get",
-    0x820E: "Generic_Default_Transition_Time_Set",
-    0x820F: "Generic_Default_Transition_Time_Set_Unacknowledged",
-    0x8210: "Generic_Default_Transition_Time_Status",
-    0x8211: "Generic_OnPowerUp_Get",
-    0x8212: "Generic_OnPowerUp_Status",
-    0x8213: "Generic_OnPowerUp_Set",
-    0x8214: "Generic_OnPowerUp_Set_Unacknowledged",
-    0x8215: "Generic_Power_Level_Get",
-    0x8216: "Generic_Power_Level_Set",
-    0x8217: "Generic_Power_Level_Set_Unacknowledged",
-    0x8218: "Generic_Power_Level_Status",
-    0x8219: "Generic_Power_Last_Get",
-    0x821A: "Generic_Power_Last_Status",
-    0x821B: "Generic_Power_Default_Get",
-    0x821C: "Generic_Power_Default_Status",
-    0x821D: "Generic_Power_Range_Get",
-    0x821E: "Generic_Power_Range_Status",
-    0x821F: "Generic_Power_Default_Set",
-    0x8220: "Generic_Power_Default_Set_Unacknowledged",
-    0x8221: "Generic_Power_Range_Set",
-    0x8222: "Generic_Power_Range_Set_Unacknowledged",
-    0x8223: "Generic_Battery_Get",
-    0x8224: "Generic_Battery_Status",
-    0x8225: "Generic_Location_Global_Get",
-    0x40: "Generic_Location_Global_Status",
-    0x8226: "Generic_Location_Local_Get",
-    0x8227: "Generic_Location_Local_Status",
-    0x41: "Generic_Location_Global_Set",
-    0x42: "Generic_Location_Global_Set_Unacknowledged",
-    0x8228: "Generic_Location_Local_Set",
-    0x8229: "Generic_Location_Local_Set_Unacknowledged",
-    0x822A: "Generic_Manufacturer_Properties_Get",
-    0x43: "Generic_Manufacturer_Properties_Status",
-    0x822B: "Generic_Manufacturer_Property_Get",
-    0x44: "Generic_Manufacturer_Property_Set",
-    0x45: "Generic_Manufacturer_Property_Set_Unacknowledged",
-    0x46: "Generic_Manufacturer_Property_Status",
-    0x822C: "Generic_Admin_Properties_Get",
-    0x47: "Generic_Admin_Properties_Status",
-    0x822D: "Generic_Admin_Property_Get",
-    0x48: "Generic_Admin_Property_Set",
-    0x49: "Generic_Admin_Property_Set_Unacknowledged",
-    0x4A: "Generic_Admin_Property_Status",
-    0x822E: "Generic_User_Properties_Get",
-    0x4B: "Generic_User_Properties_Status",
-    0x822F: "Generic_User_Property_Get",
-    0x4C: "Generic_User_Property_Set",
-    0x4D: "Generic_User_Property_Set_Unacknowledged",
-    0x4E: "Generic_User_Property_Status",
-    0x4F: "Generic_Client_Properties_Get",
-    0x50: "Generic_Client_Properties_Status",
-    0x8230: "Sensor_Descriptor_Get",
-    0x51: "Sensor_Descriptor_Status",
-    0x8231: "Sensor_Get",
-    0x52: "Sensor_Status",
-    0x8232: "Sensor_Column_Get",
-    0x53: "Sensor_Column_Status",
-    0x8233: "Sensor_Series_Get",
-    0x54: "Sensor_Series_Status",
-    0x8234: "Sensor_Cadence_Get",
-    0x55: "Sensor_Cadence_Set",
-    0x56: "Sensor_Cadence_Set_Unacknowledged",
-    0x57: "Sensor_Cadence_Status",
-    0x8235: "Sensor_Settings_Get",
-    0x58: "Sensor_Settings_Status",
-    0x8236: "Sensor_Setting_Get",
-    0x59: "Sensor_Setting_Set",
-    0x5A: "Sensor_Setting_Set_Unacknowledged",
-    0x5B: "Sensor_Setting_Status",
-    0x8237: "Time_Get",
-    0x5C: "Time_Set",
-    0x5D: "Time_Status",
-    0x8238: "Time_Role_Get",
-    0x8239: "Time_Role_Set",
-    0x823A: "Time_Role_Status",
-    0x823B: "Time_Zone_Get",
-    0x823C: "Time_Zone_Set",
-    0x823D: "Time_Zone_Status",
-    0x823E: "TAI-UTC_Delta_Get",
-    0x823F: "TAI-UTC_Delta_Set",
-    0x8240: "TAI-UTC_Delta_Status",
-    0x8241: "Scene_Get",
-    0x8242: "Scene_Recall",
-    0x8243: "Scene_Recall_Unacknowledged",
-    0x5E: "Scene_Status",
-    0x8244: "Scene_Register_Get",
-    0x8245: "Scene_Register_Status",
-    0x8246: "Scene_Store",
-    0x8247: "Scene_Store_Unacknowledged",
-    0x829E: "Scene_Delete",
-    0x829F: "Scene_Delete_Unacknowledged",
-    0x8248: "Scheduler_Action_Get",
-    0x5F: "Scheduler_Action_Status",
-    0x8249: "Scheduler_Get",
-    0x824A: "Scheduler_Status",
-    0x60: "Scheduler_Action_Set",
-    0x61: "Scheduler_Action_Set_Unacknowledged",
-    0x824B: "Light_Lightness_Get",
-    0x824C: "Light_Lightness_Set",
-    0x824D: "Light_Lightness_Set_Unacknowledged",
-    0x824E: "Light_Lightness_Status",
-    0x824F: "Light_Lightness_Linear_Get",
-    0x8250: "Light_Lightness_Linear_Set",
-    0x8251: "Light_Lightness_Linear_Set_Unacknowledged",
-    0x8252: "Light_Lightness_Linear_Status",
-    0x8253: "Light_Lightness_Last_Get",
-    0x8254: "Light_Lightness_Last_Status",
-    0x8255: "Light_Lightness_Default_Get",
-    0x8256: "Light_Lightness_Default_Status",
-    0x8257: "Light_Lightness_Range_Get",
-    0x8258: "Light_Lightness_Range_Status",
-    0x8259: "Light_Lightness_Default_Set",
-    0x825A: "Light_Lightness_Default_Set_Unacknowledged",
-    0x825B: "Light_Lightness_Range_Set",
-    0x825C: "Light_Lightness_Range_Set_Unacknowledged",
-    0x825D: "Light_CTL_Get",
-    0x825E: "Light_CTL_Set",
-    0x825F: "Light_CTL_Set_Unacknowledged",
-    0x8260: "Light_CTL_Status",
-    0x8261: "Light_CTL_Temperature_Get",
-    0x8262: "Light_CTL_Temperature_Range_Get",
-    0x8263: "Light_CTL_Temperature_Range_Status",
-    0x8264: "Light_CTL_Temperature_Set",
-    0x8265: "Light_CTL_Temperature_Set_Unacknowledged",
-    0x8266: "Light_CTL_Temperature_Status",
-    0x8267: "Light_CTL_Default_Get",
-    0x8268: "Light_CTL_Default_Status",
-    0x8269: "Light_CTL_Default_Set",
-    0x826A: "Light_CTL_Default_Set_Unacknowledged",
-    0x826B: "Light_CTL_Temperature_Range_Set",
-    0x826C: "Light_CTL_Temperature_Range_Set_Unacknowledged",
-    0x826D: "Light_HSL_Get",
-    0x826E: "Light_HSL_Hue_Get",
-    0x826F: "Light_HSL_Hue_Set",
-    0x8270: "Light_HSL_Hue_Set_Unacknowledged",
-    0x8271: "Light_HSL_Hue_Status",
-    0x8272: "Light_HSL_Saturation_Get",
-    0x8273: "Light_HSL_Saturation_Set",
-    0x8274: "Light_HSL_Saturation_Set_Unacknowledged",
-    0x8275: "Light_HSL_Saturation_Status",
-    0x8276: "Light_HSL_Set",
-    0x8277: "Light_HSL_Set_Unacknowledged",
-    0x8278: "Light_HSL_Status",
-    0x8279: "Light_HSL_Target_Get",
-    0x827A: "Light_HSL_Target_Status",
-    0x827B: "Light_HSL_Default_Get",
-    0x827C: "Light_HSL_Default_Status",
-    0x827D: "Light_HSL_Range_Get",
-    0x827E: "Light_HSL_Range_Status",
-    0x827F: "Light_HSL_Default_Set",
-    0x8280: "Light_HSL_Default_Set_Unacknowledged",
-    0x8281: "Light_HSL_Range_Set",
-    0x8282: "Light_HSL_Range_Set_Unacknowledged",
-    0x8283: "Light_xyL_Get",
-    0x8284: "Light_xyL_Set",
-    0x8285: "Light_xyL_Set_Unacknowledged",
-    0x8286: "Light_xyL_Status",
-    0x8287: "Light_xyL_Target_Get",
-    0x8288: "Light_xyL_Target_Status",
-    0x8289: "Light_xyL_Default_Get",
-    0x828A: "Light_xyL_Default_Status",
-    0x828B: "Light_xyL_Range_Get",
-    0x828C: "Light_xyL_Range_Status",
-    0x828D: "Light_xyL_Default_Set",
-    0x828E: "Light_xyL_Default_Set_Unacknowledged",
-    0x828F: "Light_xyL_Range_Set",
-    0x8290: "Light_xyL_Range_Set_Unacknowledged",
-    0x8291: "Light_LC_Mode_Get",
-    0x8292: "Light_LC_Mode_Set",
-    0x8293: "Light_LC_Mode_Set_Unacknowledged",
-    0x8294: "Light_LC_Mode_Status",
-    0x8295: "Light_LC_OM_Get",
-    0x8296: "Light_LC_OM_Set",
-    0x8297: "Light_LC_OM_Set_Unacknowledged",
-    0x8298: "Light_LC_OM_Status",
-    0x8299: "Light_LC_Light_OnOff_Get",
-    0x829A: "Light_LC_Light_OnOff_Set",
-    0x829B: "Light_LC_Light_OnOff_Set_Unacknowledged",
-    0x829C: "Light_LC_Light_OnOff_Status",
-    0x829D: "Light_LC_Property_Get",
-    0x62: "Light_LC_Property_Set",
-    0x63: "Light_LC_Property_Set_Unacknowledged",
-    0x64: "Light_LC_Property_Status",
-    0x00: "Config_AppKey_Add",
-    0x8000: "Config_AppKey_Delete",
-    0x8001: "Config_AppKey_Get",
-    0x8002: "Config_AppKey_List",
-    0x8003: "Config_AppKey_Status",
-    0x01: "Config_AppKey_Update",
-    0x8009: "Config_Beacon_Get",
-    0x800A: "Config_Beacon_Set",
-    0x800B: "Config_Beacon_Status",
-    0x8008: "Config_Composition_Data_Get",
-    0x02: "Config_Composition_Data_Status",
-    0x03: "Config_Model_Publication_Set",
-    0x800C: "Config_Default_TTL_Get",
-    0x800D: "Config_Default_TTL_Set",
-    0x800E: "Config_Default_TTL_Status",
-    0x800F: "Config_Friend_Get",
-    0x8010: "Config_Friend_Set",
-    0x8011: "Config_Friend_Status",
-    0x8012: "Config_GATT_Proxy_Get",
-    0x8013: "Config_GATT_Proxy_Set",
-    0x8014: "Config_GATT_Proxy_Status",
-    0x8038: "Config_Heartbeat_Publication_Get",
-    0x8039: "Config_Heartbeat_Publication_Set",
-    0x06: "Config_Heartbeat_Publication_Status",
-    0x803A: "Config_Heartbeat_Subscription_Get",
-    0x803B: "Config_Heartbeat_Subscription_Set",
-    0x803C: "Config_Heartbeat_Subscription_Status",
-    0x8015: "Config_Key_Refresh_Phase_Get",
-    0x8016: "Config_Key_Refresh_Phase_Set",
-    0x8017: "Config_Key_Refresh_Phase_Status",
-    0x802D: "Config_Low_Power_Node_PollTimeout_Get",
-    0x802E: "Config_Low_Power_Node_PollTimeout_Status",
-    0x803D: "Config_Model_App_Bind",
-    0x803E: "Config_Model_App_Status",
-    0x803F: "Config_Model_App_Unbind",
-    0x8018: "Config_Model_Publication_Get",
-    0x8019: "Config_Model_Publication_Status",
-    0x801A: "Config_Model_Publication_Virtual_Address_Set",
-    0x801B: "Config_Model_Subscription_Add",
-    0x801C: "Config_Model_Subscription_Delete",
-    0x801D: "Config_Model_Subscription_Delete_All",
-    0x801E: "Config_Model_Subscription_Overwrite",
-    0x801F: "Config_Model_Subscription_Status",
-    0x8020: "Config_Model_Subscription_Virtual_Address_Add",
-    0x8021: "Config_Model_Subscription_Virtual_Address_Delete",
-    0x8022: "Config_Model_Subscription_Virtual_Address_Overwrite",
-    0x8040: "Config_NetKey_Add",
-    0x8041: "Config_NetKey_Delete",
-    0x8042: "Config_NetKey_Get",
-    0x8043: "Config_NetKey_List",
-    0x8044: "Config_NetKey_Status",
-    0x8045: "Config_NetKey_Update",
-    0x8023: "Config_Network_Transmit_Get",
-    0x8024: "Config_Network_Transmit_Set",
-    0x8025: "Config_Network_Transmit_Status",
-    0x8046: "Config_Node_Identity_Get",
-    0x8047: "Config_Node_Identity_Set",
-    0x8048: "Config_Node_Identity_Status",
-    0x8049: "Config_Node_Reset",
-    0x804A: "Config_Node_Reset_Status",
-    0x8026: "Config_Relay_Get",
-    0x8027: "Config_Relay_Set",
-    0x8028: "Config_Relay_Status",
-    0x804B: "Config_SIG_Model_App_Get",
-    0x804C: "Config_SIG_Model_App_List",
-    0x8029: "Config_SIG_Model_Subscription_Get",
-    0x802A: "Config_SIG_Model_Subscription_List",
-    0x804D: "Config_Vendor_Model_App_Get",
-    0x804E: "Config_Vendor_Model_App_List",
-    0x802B: "Config_Vendor_Model_Subscription_Get",
-    0x802C: "Config_Vendor_Model_Subscription_List",
-    0x8004: "Health_Attention_Get",
-    0x8005: "Health_Attention_Set",
-    0x8006: "Health_Attention_Set_Unacknowledged",
-    0x8007: "Health_Attention_Status",
-    0x04: "Health_Current_Status",
-    0x802F: "Health_Fault_Clear",
-    0x8030: "Health_Fault_Clear_Unacknowledged",
-    0x8031: "Health_Fault_Get",
-    0x05: "Health_Fault_Status",
-    0x8032: "Health_Fault_Test",
-    0x8033: "Health_Fault_Test_Unacknowledged",
-    0x8034: "Health_Period_Get",
-    0x8035: "Health_Period_Set",
-    0x8036: "Health_Period_Set_Unacknowledged",
-    0x8037: "Health_Period_Status",
-    0x804F: "Remote_Provisioning_Scan_Capabilities_Get",
-    0x8050: "Remote_Provisioning_Scan_Capabilities_Status",
-    0x8051: "Remote_Provisioning_Scan_Get",
-    0x8052: "Remote_Provisioning_Scan_Start",
-    0x8053: "Remote_Provisioning_Scan_Stop",
-    0x8054: "Remote_Provisioning_Scan_Status",
-    0x8055: "Remote_Provisioning_Scan_Report",
-    0x8056: "Remote_Provisioning_Extended_Scan_Start",
-    0x8057: "Remote_Provisioning_Extended_Scan_Report",
-    0x8058: "Remote_Provisioning_Link_Get",
-    0x8059: "Remote_Provisioning_Link_Open",
-    0x805A: "Remote_Provisioning_Link_Close",
-    0x805B: "Remote_Provisioning_Link_Status",
-    0x805C: "Remote_Provisioning_Link_Report",
-    0x805D: "Remote_Provisioning_PDU_Send",
-    0x805E: "Remote_Provisioning_PDU_Outbound_Report",
-    0x805F: "Remote_Provisioning_PDU_Report",
-    0x807B: "DIRECTED_CONTROL_GET",
-    0x807C: "DIRECTED_CONTROL_SET",
-    0x807D: "DIRECTED_CONTROL_STATUS",
-    0x807E: "PATH_METRIC_GET",
-    0x807F: "PATH_METRIC_SET",
-    0x8080: "PATH_METRIC_STATUS",
-    0x8081: "DISCOVERY_TABLE_CAPABILITIES_GET",
-    0x8082: "DISCOVERY_TABLE_CAPABILITIES_SET",
-    0x8083: "DISCOVERY_TABLE_CAPABILITIES_STATUS",
-    0x8084: "FORWARDING_TABLE_ADD",
-    0x8085: "FORWARDING_TABLE_DELETE",
-    0x8086: "FORWARDING_TABLE_STATUS",
-    0x8087: "FORWARDING_TABLE_DEPENDENTS_ADD",
-    0x8088: "FORWARDING_TABLE_DEPENDENTS_DELETE",
-    0x8089: "FORWARDING_TABLE_DEPENDENTS_STATUS",
-    0x808A: "FORWARDING_TABLE_DEPENDENTS_GET",
-    0x808B: "FORWARDING_TABLE_DEPENDENTS_GET_STATUS",
-    0x808C: "FORWARDING_TABLE_ENTRIES_COUNT_GET",
-    0x808D: "FORWARDING_TABLE_ENTRIES_COUNT_STATUS",
-    0x808E: "FORWARDING_TABLE_ENTRIES_GET",
-    0x808F: "FORWARDING_TABLE_ENTRIES_STATUS",
-    0x8090: "WANTED_LANES_GET",
-    0x8091: "WANTED_LANES_SET",
-    0x8092: "WANTED_LANES_STATUS",
-    0x8093: "TWO_WAY_PATH_GET",
-    0x8094: "TWO_WAY_PATH_SET",
-    0x8095: "TWO_WAY_PATH_STATUS",
-    0x8096: "PATH_ECHO_INTERVAL_GET",
-    0x8097: "PATH_ECHO_INTERVAL_SET",
-    0x8098: "PATH_ECHO_INTERVAL_STATUS",
-    0x8099: "DIRECTED_NETWORK_TRANSMIT_GET",
-    0x809A: "DIRECTED_NETWORK_TRANSMIT_SET",
-    0x809B: "DIRECTED_NETWORK_TRANSMIT_STATUS",
-    0x809C: "DIRECTED_RELAY_RETRANSMIT_GET",
-    0x809D: "DIRECTED_RELAY_RETRANSMIT_SET",
-    0x809E: "DIRECTED_RELAY_RETRANSMIT_STATUS",
-    0x809F: "RSSI_THRESHOLD_GET",
-    0x80A0: "RSSI_THRESHOLD_SET",
-    0x80A1: "RSSI_THRESHOLD_STATUS",
-    0x80A2: "DIRECTED_PATHS_GET",
-    0x80A3: "DIRECTED_PATHS_STATUS",
-    0x80A4: "DIRECTED_PUBLISH_POLICY_GET",
-    0x80A5: "DIRECTED_PUBLISH_POLICY_SET",
-    0x80A6: "DIRECTED_PUBLISH_POLICY_STATUS",
-    0x80A7: "PATH_DISCOVERY_TIMING_CONTROL_GET",
-    0x80A8: "PATH_DISCOVERY_TIMING_CONTROL_SET",
-    0x80A9: "PATH_DISCOVERY_TIMING_CONTROL_STATUS",
-    0x80AA: "this_opcode_is_not_used",
-    0x80AB: "DIRECTED_CONTROL_NETWORK_TRANSMIT_GET",
-    0x80AC: "DIRECTED_CONTROL_NETWORK_TRANSMIT_SET",
-    0x80AD: "DIRECTED_CONTROL_NETWORK_TRANSMIT_STATUS",
-    0x80AE: "DIRECTED_CONTROL_RELAY_RETRANSMIT_GET",
-    0x80AF: "DIRECTED_CONTROL_RELAY_RETRANSMIT_SET",
-    0x80B0: "DIRECTED_CONTROL_RELAY_RETRANSMIT_STATUS",
-    0x8060: "PRIVATE_BEACON_GET",
-    0x8061: "PRIVATE_BEACON_SET",
-    0x8062: "PRIVATE_BEACON_STATUS",
-    0x8063: "PRIVATE_GATT_PROXY_GET",
-    0x8064: "PRIVATE_GATT_PROXY_SET",
-    0x8065: "PRIVATE_GATT_PROXY_STATUS",
-    0x8066: "PRIVATE_NODE_IDENTITY_GET",
-    0x8067: "PRIVATE_NODE_IDENTITY_SET",
-    0x8068: "PRIVATE_NODE_IDENTITY_STATUS",
-    0x8069: "ON_DEMAND_PRIVATE_PROXY_GET",
-    0x806A: "ON_DEMAND_PRIVATE_PROXY_SET",
-    0x806B: "ON_DEMAND_PRIVATE_PROXY_STATUS",
-    0x806C: "SAR_TRANSMITTER_GET",
-    0x806D: "SAR_TRANSMITTER_SET",
-    0x806E: "SAR_TRANSMITTER_STATUS",
-    0x806F: "SAR_RECEIVER_GET",
-    0x8070: "SAR_RECEIVER_SET",
-    0x8071: "SAR_RECEIVER_STATUS",
-    0x8072: "OPCODES_AGGREGATOR_SEQUENCE",
-    0x8073: "OPCODES_AGGREGATOR_STATUS",
-    0x8074: "LARGE_COMPOSITION_DATA_GET",
-    0x8075: "LARGE_COMPOSITION_DATA_STATUS",
-    0x8076: "MODELS_METADATA_GET",
-    0x8077: "MODELS_METADATA_STATUS",
-    0x8078: "SOLICITATION_PDU_RPL_ITEM_CLEAR",
-    0x8079: "SOLICITATION_PDU_RPL_ITEM_CLEAR_UNACKNOWLEDGED",
-    0x807A: "SOLICITATION_PDU_RPL_ITEM_STATUS",
-    0x80B1: "SUBNET_BRIDGE_GET",
-    0x80B2: "SUBNET_BRIDGE_SET",
-    0x80B3: "SUBNET_BRIDGE_STATUS",
-    0x80B4: "BRIDGING_TABLE_ADD",
-    0x80B5: "BRIDGING_TABLE_REMOVE",
-    0x80B6: "BRIDGING_TABLE_STATUS",
-    0x80B7: "BRIDGED_SUBNETS_GET",
-    0x80B8: "BRIDGED_SUBNETS_LIST",
-    0x80B9: "BRIDGING_TABLE_GET",
-    0x80BA: "BRIDGING_TABLE_LIST",
-    0x80BB: "BRIDGING_TABLE_SIZE_GET",
-    0x80BC: "BRIDGING_TABLE_SIZE_STATUS",
-}
+
+# Correspondance of Model Message opcodes to the Packet Class
+# Only used for Payload classes that are empty (.i.e no fields)
+# Scapy doesnt check for bound layers if payload is empty hence this hack
+# See : https://github.com/secdev/scapy/issues/2192
+# Dynamically populated right after the class definition in this file 
+# If you create a new Model message with no fields, dont forget to add it with `OPCODE_TO_EMPTY_MODEL_PACKET[opcode] = clazz`
+OPCODE_TO_EMPTY_MODEL_PACKET = {}
 
 """
 Custome Fields
@@ -1528,14 +1142,23 @@ class BTMesh_Model_Message(Packet):
         # Size Will be changed in post_build ! size depend on value of first 2 bits
         VariableLengthOpcodeField("opcode", None),
     ]
+
+    # Have to specify this for payloads that are empty packets ...
+    # Check out https://github.com/secdev/scapy/issues/2192
+    # Usually Get messages are empty, the rest is not
+    # The dict of opcode -> Packet class Dynamically populated right after Packet class definition
     def dissection_done(self, pkt):
-        if self.opcode == 0x8201:
-            self.add_payload(BTMesh_Model_Generic_OnOff_Get())
+        if isinstance(self.payload, NoPayload) and self.opcode in OPCODE_TO_EMPTY_MODEL_PACKET.keys():
+            self.add_payload(OPCODE_TO_EMPTY_MODEL_PACKET[self.opcode]())
+
 
 
 class BTMesh_Model_Generic_OnOff_Get(Packet):
     name = "Bluetooth Mesh Model Generic OnOff Get"
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8201] = BTMesh_Model_Generic_OnOff_Get
 
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Generic_OnOff_Get, opcode=0x8201)
 
@@ -1679,6 +1302,10 @@ class BTMesh_Model_Config_Beacon_Get(Packet):
     name = "Bluetooth Mesh Config Model Beacon Get"
 
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8009] = BTMesh_Model_Config_Beacon_Get
+
+
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Beacon_Get, opcode=0x8009)
 
 
@@ -1722,6 +1349,10 @@ class BTMesh_Model_Config_Default_TTL_Get(Packet):
     name = "Bluetooth Mesh Config Model Default TTL Get"
 
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x800C] = BTMesh_Model_Config_Default_TTL_Get
+
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Default_TTL_Get, opcode=0x800C)
 
 
@@ -1745,6 +1376,9 @@ class BTMesh_Model_Config_Gatt_Proxy_Get(Packet):
     name = "Bluetooth Mesh Config Model Gatt Proxy Get"
 
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8012] = BTMesh_Model_Config_Gatt_Proxy_Get
+
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Gatt_Proxy_Get, opcode=0x8012)
 
 
@@ -1767,6 +1401,9 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Gatt_Proxy_Status, opcode=
 class BTMesh_Model_Config_Relay_Get(Packet):
     name = "Bluetooth Mesh Config Model Default Relay Get"
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8026] = BTMesh_Model_Config_Relay_Get
 
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Relay_Get, opcode=0x8026)
 
@@ -2086,6 +1723,11 @@ class BTMesh_Model_Config_Net_Key_Get(Packet):
     name = "Bluetooth Mesh Model Config NetKey Status"
 
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8042] = BTMesh_Model_Config_Net_Key_Get
+
+
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Net_Key_Get, opcode=0x8042)
 
 
@@ -2303,6 +1945,9 @@ class BTMesh_Model_Config_Friend_Get(Packet):
     name = "Bluetooth Mesh Model Config Friend Get"
 
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x800F] = BTMesh_Model_Config_Friend_Get
+
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Friend_Get, opcode=0x800F)
 
 
@@ -2352,6 +1997,10 @@ class BTMesh_Config_Model_Heartbeat_Publication_Get(Packet):
     name = "Bluetooth Mesh Config Model Heartbeat Publication Get"
 
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8038] = BTMesh_Config_Model_Heartbeat_Publication_Get
+
+
 bind_layers(
     BTMesh_Model_Message, BTMesh_Config_Model_Heartbeat_Publication_Get, opcode=0x8038
 )
@@ -2397,6 +2046,9 @@ bind_layers(
 class BTMesh_Config_Model_Heartbeat_Subscription_Get(Packet):
     name = "Bluetooth Mesh Config Model Heartbeat Subscription Get"
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x303A] = BTMesh_Config_Model_Heartbeat_Subscription_Get
 
 bind_layers(
     BTMesh_Model_Message, BTMesh_Config_Model_Heartbeat_Subscription_Get, opcode=0x303A
@@ -2466,6 +2118,10 @@ bind_layers(
 
 class BTMesh_Model_Config_Network_Transmit_Get(Packet):
     name = "Bluetooth Mesh Model Config Network Transmit Get"
+
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8023] = BTMesh_Model_Config_Network_Transmit_Get
 
 
 bind_layers(
@@ -2566,6 +2222,9 @@ class BTMesh_Model_Health_Period_Get(Packet):
     name = "Bluetooth Mesh Model Health Period Get"
 
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8034] = BTMesh_Model_Health_Period_Get
+
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Health_Period_Get, opcode=0x8034)
 
 
@@ -2598,6 +2257,8 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Health_Period_Status, opcode=0x80
 class BTMesh_Model_Health_Attention_Get(Packet):
     name = "Bluetooth Mesh Model Health Attention Get"
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8004] = BTMesh_Model_Health_Attention_Get
 
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Health_Attention_Get, opcode=0x8004)
 
@@ -2637,6 +2298,9 @@ class BTMesh_Model_Remote_Provisioning_Scan_Capabilities_Get(Packet):
     name = "Bluetooth Mesh Model Remote Provisioning Scan Capabilities Get"
 
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x804F] = BTMesh_Model_Remote_Provisioning_Scan_Capabilities_Get
+
 bind_layers(
     BTMesh_Model_Message,
     BTMesh_Model_Remote_Provisioning_Scan_Capabilities_Get,
@@ -2659,6 +2323,9 @@ bind_layers(
 class BTMesh_Model_Remote_Provisioning_Scan_Get(Packet):
     name = "Bluetooth Mesh Model Remote Provisioning Scan Get"
 
+    
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8051] = BTMesh_Model_Remote_Provisioning_Scan_Get
 
 bind_layers(
     BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Scan_Get, opcode=0x8051
@@ -2757,6 +2424,9 @@ bind_layers(
 class BTMesh_Model_Remote_Provisioning_Link_Get(Packet):
     name = "Bluetooth Mesh Model Remote Provisioning Link Get"
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8058] = BTMesh_Model_Remote_Provisioning_Link_Get
 
 bind_layers(
     BTMesh_Model_Message, BTMesh_Model_Remote_Provisioning_Link_Get, opcode=0x8058
@@ -3506,6 +3176,9 @@ class BTMesh_Model_Directed_Forwarding_Directed_Network_Transmit_Get(Packet):
     name = "Bluetooth Mesh Model Directed Forwarding Directed Network Trasmit Get"
 
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8099] = BTMesh_Model_Directed_Forwarding_Directed_Network_Transmit_Get
+
 bind_layers(
     BTMesh_Model_Message,
     BTMesh_Model_Directed_Forwarding_Directed_Network_Transmit_Get,
@@ -3545,6 +3218,9 @@ bind_layers(
 
 class BTMesh_Model_Directed_Forwarding_Directed_Relay_Retransmit_Get(Packet):
     name = "Bluetooth Mesh Model Directed Forwarding Directed Relay Retransmit Get"
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x809C] = BTMesh_Model_Directed_Forwarding_Directed_Relay_Retransmit_Get
 
 
 bind_layers(
@@ -3588,6 +3264,9 @@ class BTMesh_Model_Directed_Forwarding_Rssi_Threshold_Get(Packet):
     name = "Bluetooth Mesh Model Directed Forwarding RSSI Threshold Get"
 
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x809F] = BTMesh_Model_Directed_Forwarding_Rssi_Threshold_Get
+
 bind_layers(
     BTMesh_Model_Message,
     BTMesh_Model_Directed_Forwarding_Rssi_Threshold_Get,
@@ -3625,6 +3304,9 @@ bind_layers(
 class BTMesh_Model_Directed_Forwarding_Directed_Paths_Get(Packet):
     name = "Bluetooth Mesh Model Directed Forwarding Directed Paths Get"
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x80A2] = BTMesh_Model_Directed_Forwarding_Directed_Paths_Get
 
 bind_layers(
     BTMesh_Model_Message,
@@ -3698,6 +3380,9 @@ bind_layers(
 class BTMesh_Model_Directed_Forwarding_Path_Discovery_Timing_Control_Get(Packet):
     name = "Bluetooth Mesh Model Directed Forwarding Path Discovery Timing Control Get"
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x80A7] = BTMesh_Model_Directed_Forwarding_Path_Discovery_Timing_Control_Get
+
 
 bind_layers(
     BTMesh_Model_Message,
@@ -3750,6 +3435,10 @@ class BTMesh_Model_Directed_Forwarding_Directed_Control_Network_Transmit_Get(Pac
     )
 
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x80AB] = BTMesh_Model_Directed_Forwarding_Directed_Control_Network_Transmit_Get
+
 bind_layers(
     BTMesh_Model_Message,
     BTMesh_Model_Directed_Forwarding_Directed_Control_Network_Transmit_Get,
@@ -3797,6 +3486,11 @@ class BTMesh_Model_Directed_Forwarding_Directed_Control_Relay_Transmit_Get(Packe
     )
 
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x80AE] = BTMesh_Model_Directed_Forwarding_Directed_Control_Relay_Transmit_Get
+
+
 bind_layers(
     BTMesh_Model_Message,
     BTMesh_Model_Directed_Forwarding_Directed_Control_Relay_Transmit_Get,
@@ -3842,6 +3536,9 @@ bind_layers(
 class BTMesh_Model_On_Demand_Private_Gatt_Proxy_Get(Packet):
     name = "Bluetooth Mesh Model On Demand Private Gatt Proxy Get"
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8063] = BTMesh_Model_On_Demand_Private_Gatt_Proxy_Get
 
 bind_layers(
     BTMesh_Model_Message, BTMesh_Model_On_Demand_Private_Gatt_Proxy_Get, opcode=0x8063
@@ -3905,6 +3602,9 @@ bind_layers(
 class BTMesh_SAR_Transmitter_Get(Packet):
     name = "Bluetooth Mesh Model SAR Transmitter Get"
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x806C] = BTMesh_SAR_Transmitter_Get
+
 
 bind_layers(BTMesh_Model_Message, BTMesh_SAR_Transmitter_Get, opcode=0x806C)
 
@@ -3946,6 +3646,9 @@ bind_layers(BTMesh_Model_Message, BTMesh_SAR_Transmitter_Status, opcode=0x806E)
 class BTMesh_SAR_Receiver_Get(Packet):
     name = "Bluetooth Mesh Model SAR Receiver Get"
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x806F] = BTMesh_SAR_Receiver_Get
 
 bind_layers(BTMesh_Model_Message, BTMesh_SAR_Receiver_Get, opcode=0x806F)
 
@@ -4070,7 +3773,11 @@ class BTMesh_Model_Bridge_Subnet_Bridge_Get(Packet):
     name = "Bluetooth Mesh Model Bridge Subnet Bridge Get"
 
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x80B1] = BTMesh_Model_Bridge_Subnet_Bridge_Get
+
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Bridge_Subnet_Bridge_Get, opcode=0x80B1)
+
 
 
 class BTMesh_Model_Bridge_Subnet_Bridge_Set(Packet):
@@ -4221,6 +3928,9 @@ bind_layers(
 class BTMesh_Model_Bridge_Bridging_Table_Size_Get(Packet):
     name = "Bluetooth Mesh Model Bridge Bridging Table Size Status"
 
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x80BB] = BTMesh_Model_Bridge_Bridging_Table_Size_Get
+
 
 bind_layers(
     BTMesh_Model_Message, BTMesh_Model_Bridge_Bridging_Table_Size_Get, opcode=0x80BB
@@ -4243,6 +3953,9 @@ bind_layers(
 class BTMesh_Model_Private_Beacon_Get(Packet):
     name = "Bluetooth Mesh Model Private Beacon Get"
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8060] = BTMesh_Model_Private_Beacon_Get
 
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Private_Beacon_Get, opcode=0x8060)
 
@@ -4272,6 +3985,9 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Private_Beacon_Status, opcode=0x8
 class BTMesh_Model_Private_Beacon_Private_Gatt_Proxy_Get(Packet):
     name = "Bluetooth Mesh Private Beacon Private Gatt Proxy Get"
 
+
+# Empty packet, add to Payload dictionary for dissection
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8063] = BTMesh_Model_Private_Beacon_Private_Gatt_Proxy_Get
 
 bind_layers(
     BTMesh_Model_Message,
