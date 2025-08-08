@@ -1373,6 +1373,13 @@ class GattServer(GattLayer):
 
         :param int handle: Characteristic or descriptor handle
         """
+        if request.handle == 0:
+            return self.error(
+                BleAttOpcode.READ_REQUEST,
+                request.handle,
+                BleAttErrorCode.INVALID_HANDLE
+            )
+
         try:
             local_mtu = self.att.get_client_mtu()
 
