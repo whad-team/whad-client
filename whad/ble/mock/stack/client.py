@@ -21,6 +21,7 @@ from .attribute import Attribute
 from .procedure import UnexpectedProcError
 from .read_by_group_type import ClientReadByGroupTypeProcedure
 from .read_by_type import ClientReadByTypeProcedure
+from .read import ClientReadProcedure
 from .find_info import ClientFindInformationProcedure, ClientFindByTypeValueProcedure
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ class GattClient:
         self.__procedures = [
             ClientReadByGroupTypeProcedure,
             ClientReadByTypeProcedure,
+            ClientReadProcedure,
             ClientFindInformationProcedure,
             ClientFindByTypeValueProcedure,
         ]
@@ -91,6 +93,16 @@ class GattClient:
         self.__cur_procedure = ClientReadByTypeProcedure(
             start_handle, end_handle, type_uuid
         )
+
+        # Generate ATT packets to send when this procedure is initiated
+        # and forward them to the underlying link-layer
+        for req in self.__cur_procedure.initiate():
+            self.__l2cap.send_pdu(ATT_Hdr()/req)
+
+    def read(self, handle: int) -> List[Packet]:
+        """Read attribute."""
+        # Initiate a ClientReadProcedure
+        self.__cur_procedure = ClientReadProcedure(handle)
 
         # Generate ATT packets to send when this procedure is initiated
         # and forward them to the underlying link-layer
