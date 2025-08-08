@@ -230,7 +230,7 @@ def test_read_by_type_invalid_start_handle(connected_peripheral):
     # Retrieve mock from current peripheral
     mock:PeripheralMock = connected_peripheral.device
 
-    # Send a valid ReadByType request
+    # Send a ReadByType request wth invalid start handle (0)
     result = mock.read_by_type(0, 3, UUID(0x2803))
     assert isinstance(result, ATT_Error_Response)
     assert result.request == BleAttOpcode.READ_BY_TYPE_REQUEST
@@ -238,11 +238,11 @@ def test_read_by_type_invalid_start_handle(connected_peripheral):
     assert result.ecode == BleAttErrorCode.INVALID_HANDLE
 
 def test_read_by_type_higher_start_handle(connected_peripheral):
-    """ Test ReadByType request with invalid start handle (0)."""
+    """ Test ReadByType request with invalid end handle."""
     # Retrieve mock from current peripheral
     mock:PeripheralMock = connected_peripheral.device
 
-    # Send a valid ReadByType request
+    # Send a ReadByType request with start handle greater than end handle
     result = mock.read_by_type(3, 0, UUID(0x2803))
     assert isinstance(result, ATT_Error_Response)
     assert result.request == BleAttOpcode.READ_BY_TYPE_REQUEST
@@ -263,7 +263,7 @@ def test_read_invalid_handle(connected_peripheral):
     # Retrieve mock from current peripheral
     mock:PeripheralMock = connected_peripheral.device
 
-    # Send a valid Read request
+    # Send a Read request with an invalid handle (0)
     result = mock.read(0)
     assert isinstance(result, ATT_Error_Response)
     assert result.request == BleAttOpcode.READ_REQUEST
@@ -275,10 +275,55 @@ def test_read_not_permitted(connected_peripheral):
     # Retrieve mock from current peripheral
     mock:PeripheralMock = connected_peripheral.device
 
-    # Send a valid Read request
+    # Send a Read request on an attribute without read permission
     result = mock.read(10)
     assert isinstance(result, ATT_Error_Response)
     assert result.request == BleAttOpcode.READ_REQUEST
+    assert result.ecode == BleAttErrorCode.READ_NOT_PERMITTED
+    assert result.handle == 10
+
+def test_read_blob(connected_peripheral):
+    """ Test ReadBlob request. """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a valid ReadBlob request
+    result = mock.read_blob(3, 8)
+    assert result == b"Device"
+
+def test_read_blob_invalid_handle(connected_peripheral):
+    """ Test ReadBlob request with invalid handle. """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a ReadBlob request with invalid handle (0)
+    result = mock.read_blob(0, 8)
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.READ_BLOB_REQUEST
+    assert result.ecode == BleAttErrorCode.INVALID_HANDLE
+    assert result.handle == 0
+
+def test_read_blob_invalid_offset(connected_peripheral):
+    """ Test ReadBlob request with invalid offset. """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a ReadBlob request with invalid offset (bigger than attribute's value)
+    result = mock.read_blob(3, 40)
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.READ_BLOB_REQUEST
+    assert result.ecode == BleAttErrorCode.INVALID_OFFSET
+    assert result.handle == 3
+
+def test_read_blob_not_permitted(connected_peripheral):
+    """ Test ReadBlob request with invalid handle. """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a ReadBlob request on an attribute that is not readable
+    result = mock.read_blob(10, 0)
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.READ_BLOB_REQUEST
     assert result.ecode == BleAttErrorCode.READ_NOT_PERMITTED
     assert result.handle == 10
 
