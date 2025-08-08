@@ -48,7 +48,7 @@ class NetworkLayer(Layer):
         """
         super().__init__(options=options)
 
-        # save connector (BLE phy stack, advertising Bearer (and GATT I guess ?))
+        # save connector to send packets 
         self.__connector = connector
 
         # Network Key Crypto managers. Correspondance between nid and net_key_index

@@ -145,6 +145,17 @@ class BaseMeshProfile(object):
         self._auto_prov_app_key = auto_prov_app_key
         self._auto_prov_unicast_addr = auto_prov_unicast_addr
 
+        # Provisioning Capabilities of the Device, set via shell or configuration.
+        self.capabilities = dict(
+            algorithms=0b11,  # default support 2 algs
+            public_key_type=0x00,  # default no OOB public key support
+            oob_type=0b00,  # no static OOB supported
+            output_oob_size=0x04,
+            output_oob_action=0b01000,  # default no output OOB action available
+            input_oob_size=0x00,
+            input_oob_action=0b0000,  # default no input OOB a available
+        )
+
     def _populate_elements_and_models(self):
         """
         Populate elements and models for the node (except the ConfigurationModelServer, HealthModelServer and primary element creation, by default)
@@ -379,6 +390,15 @@ class BaseMeshProfile(object):
         nodes[self.__local_node.address] = copy(self.__local_node)
         return nodes
 
+    def add_distant_node(self, node):
+        """
+        Adds a new distance node to our disctionary
+
+        :param node: The new node object to add
+        :type node: Node
+        """
+        self.__distant_nodes[node.address] = node
+
     def get_all_dev_keys(self):
         """
         Returns a dict of all the devkeys this node stores (at least it has its own)
@@ -521,10 +541,12 @@ class BaseMeshProfile(object):
             message = BTMesh_Model_Config_Net_Key_Add(
                 net_key_index=net_key_index, net_key=key
             )
-            response = self.get_configuration_server_model().on_net_key_add((
-                message,
-                MeshMessageContext(),
-            ))
+            response = self.get_configuration_server_model().on_net_key_add(
+                (
+                    message,
+                    MeshMessageContext(),
+                )
+            )
             if response.status != 0:
                 return False
 
@@ -542,10 +564,12 @@ class BaseMeshProfile(object):
         :rtype: bool
         """
         message = BTMesh_Model_Config_Net_Key_Delete(net_key_index=index)
-        response = self.get_configuration_server_model().on_net_key_delete((
-            message,
-            MeshMessageContext(),
-        ))
+        response = self.get_configuration_server_model().on_net_key_delete(
+            (
+                message,
+                MeshMessageContext(),
+            )
+        )
         return response.status == 0
 
     def get_subnet(self, index):
@@ -646,18 +670,22 @@ class BaseMeshProfile(object):
             message = BTMesh_Model_Config_App_Key_Update(
                 app_key_index=app_key_index, net_key_index=net_key_index, app_key=value
             )
-            response = self.get_configuration_server_model().on_app_key_update((
-                message,
-                MeshMessageContext(),
-            ))
+            response = self.get_configuration_server_model().on_app_key_update(
+                (
+                    message,
+                    MeshMessageContext(),
+                )
+            )
         else:
             message = BTMesh_Model_Config_App_Key_Add(
                 app_key_index=app_key_index, net_key_index=net_key_index, app_key=value
             )
-            response = self.get_configuration_server_model().on_app_key_add((
-                message,
-                MeshMessageContext(),
-            ))
+            response = self.get_configuration_server_model().on_app_key_add(
+                (
+                    message,
+                    MeshMessageContext(),
+                )
+            )
 
         return response.status == 0
 
@@ -674,10 +702,12 @@ class BaseMeshProfile(object):
         message = BTMesh_Model_Config_App_Key_Delete(
             app_key_index=app_key_index, net_key_index=net_key_index
         )
-        response = self.get_configuration_server_model().on_app_key_delete((
-            message,
-            MeshMessageContext(),
-        ))
+        response = self.get_configuration_server_model().on_app_key_delete(
+            (
+                message,
+                MeshMessageContext(),
+            )
+        )
         return response.status == 0
 
     def set_auto_prov_unicast_addr(self, unicast_addr):

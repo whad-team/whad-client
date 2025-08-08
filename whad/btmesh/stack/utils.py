@@ -136,7 +136,9 @@ class Node:
         self,
         address,
         addr_range=0,
-        dev_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
+        dev_key=UpperTransportLayerDevKeyCryptoManager(
+            device_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
+        ),
     ):
         """
         Creates a node object.
@@ -145,32 +147,33 @@ class Node:
         :type address: int
         :param addr_range: Number of addresses in the range. If 0 or 1, one address. If greater than 2, range. defaults to 0
         :type addr_range: int, optional
-        :param dev_key: Dev key value of the node, defaults to bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
-        :type dev_key: bytes, optional
+        :param dev_key: Dev key of the node, defaults to UpperTransportLayerDevKeyCryptoManager(bytes.fromhex("63964771734fbd76e3b40519d1d94a48"))
+        :type dev_key: UpperTransportLayerDevKeyCryptoManager, optional
         """
 
         self.address = address
-        self.addr_range = addr_range
-        self.dev_key = UpperTransportLayerDevKeyCryptoManager(device_key=dev_key)
+        self.addr_range = 0 if addr_range in (0, 1) else addr_range
+        self.dev_key = dev_key
 
 
-class ProvisioningCompleteData:
+class ProvisioningData:
     """
     Message sent by Provisioning Layer through the provisioning stack in ordrer to send it to the connector with the provisioning data
     """
 
     def __init__(
         self,
-        net_key,
-        key_index,
-        flags,
-        iv_index,
-        unicast_addr,
-        provisionning_crypto_manager,
+        net_key=None,
+        key_index=None,
+        flags=None,
+        iv_index=None,
+        unicast_addr=None,
+        addr_range=None,
+        provisioning_crypto_manager=None,
     ):
         """
         Init the Data with the received provisioning data
-        Also the provisionning_crypto_manager is sent to comptute the device_key
+        Also the provisioning_crypto_manager is sent to comptute the device_key
         Or we use the dev_key value in arg. ONE OR THE OTHER ARGUMENT IS PRESENT (not both)
 
         :param net_key: The value of the netkey
@@ -183,15 +186,30 @@ class ProvisioningCompleteData:
         :type iv_index: Bytes
         :param unicast_addr: Unicast addr of the device
         :type unicast_addr: int
-        :param provisionning_crypto_manager: The provisionning_crypto_manager used during provisioning
-        :type provisioning: ProvisioningBearerAdvCryptoManagerProvisionee
+        :param addr_range: Range of unicast_addr of the node
+        :type addr_range: int
+        :param provisioning_crypto_manager: The provisionning_crypto_manager used during provisioning
+        :type provisioning_crypto_manager: ProvisioningBearerAdvCryptoManagerProvisionee
         """
         self.net_key = net_key
         self.key_index = key_index
         self.flags = flags
         self.iv_index = iv_index
         self.unicast_addr = unicast_addr
-        self.provisionning_crypto_manager = provisionning_crypto_manager
+        self.provisioning_crypto_manager = provisioning_crypto_manager
+        self.addr_range = addr_range
+
+    def get_data_string(self):
+        """
+        Returns the byte object to send in a Provisioning_Data packet
+        """
+        return (
+            self.net_key
+            + self.key_index.to_bytes(2, "big")
+            + self.flags
+            + self.iv_index
+            + self.unicast_addr.to_bytes(2, "big")
+        )
 
 
 class ProvisioningAuthenticationData:

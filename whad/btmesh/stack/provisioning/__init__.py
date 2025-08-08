@@ -47,7 +47,7 @@ from whad.btmesh.crypto import (
     ProvisioningBearerAdvCryptoManagerProvisionee,
 )
 from whad.btmesh.stack.utils import (
-    ProvisioningCompleteData,
+    ProvisioningData,
     ProvisioningAuthenticationData,
 )
 
@@ -69,16 +69,7 @@ class ProvisioningState(LayerState):
     def __init__(self):
         super().__init__()
 
-        self.capabilities = dict(
-            algorithms=0b11,  # default support 2 algs
-            public_key_type=0x00,  # default no OOB public key support
-            oob_type=0b00,  # no static OOB supported
-            output_oob_size=0x00,
-            output_oob_action=0b00000,  # default no output OOB action available
-            input_oob_size=0x00,
-            input_oob_action=0b0000,  # default no input OOB a available
-        )
-
+        # The chosen parameters of the provisioning process
         self.chosen_parameters = dict(
             algorithms=0b10,  # default BTM_ECDH_P256_HMAC_SHA256_AES_CCM
             public_key_type=0x00,  # default no OOB public key
@@ -95,16 +86,18 @@ class ProvisioningState(LayerState):
 
         self.next_expected_packet = None
 
-        self.is_provisionning_started = False
+        self.is_provisioning_started = False
 
-    def set_crypto_manager(self, crypto_manager):
-        self.crypto_manager = crypto_manager
+        self.prov_data = ProvisioningData()
 
 
 @state(ProvisioningState)
 @alias("provisioning")
 class ProvisioningLayer(Layer):
-    """Provisioning Provisioner/Provisionee base class"""
+    """Provisioning Provisioner/Provisionee base class
+    Since it is upper layer of Generic Provisioning Layer (instanced, ContextualLayer)
+    This class and subclasses are used for one provisioning only.
+    """
 
     def configure(self, options):
         """Configure the Provisioning Layer"""
@@ -124,7 +117,6 @@ class ProvisioningLayer(Layer):
             BTMesh_Provisioning_Records_Get: self.on_records_get,
             BTMesh_Provisioning_Records_List: self.on_records_list,
             BTMesh_Provisioning_Record_Response: self.on_record_response,
-            ProvisioningAuthenticationData: self.on_provisioning_auth_data,
         }
 
     def send_error_response(self, error_code):
@@ -143,7 +135,7 @@ class ProvisioningLayer(Layer):
         :param value: The value to set
         :type value: int | str
         """
-        if self.is_provisionning_started:
+        if self.is_provisioning_started:
             return
         self.state.auth_data = ProvisioningAuthenticationData(
             auth_method=STATIC_OOB_AUTH, auth_action=None, value=value
@@ -155,14 +147,14 @@ class ProvisioningLayer(Layer):
         )
         self.send("gen_prov", hdr)
 
-    def set_capabilities(self, capabilities):
+    def set_profile(self, profile):
         """
-        Sets the capablities dict. Should be done before receiving/sending any messages (when instanciation in PB-ADV layer)
+        Sets the profile object of our node to be able to access it from this layer
 
-        :param capablities: capablities to set
-        :type value: dict
+        :param profile: The profile object of our node
+        :type profile: BTMeshProfile
         """
-        self.state.capabilities = capabilities
+        self.state.profile = profile
 
     @instance("gen_prov")
     def on_packet_received(self, source, packet):
@@ -215,11 +207,10 @@ class ProvisioningLayer(Layer):
         # compute ECDH secret
         self.state.crypto_manager.compute_ecdh_secret()
 
-        # compute Confirmation Salt, and confirmation key, and generate random value
+        # compute Confirm0b01000ation Salt, and confirmation key, and generate random value
         self.state.crypto_manager.compute_confirmation_salt(
             self.state.invite_pdu, self.state.capabilities_pdu, self.state.start_pdu
         )
-        self.state.crypto_manager.compute_confirmation_key()
         self.state.crypto_manager.generate_random()
 
     def on_input_complete(self, packet):
@@ -265,9 +256,9 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         When Unprovisoned Beacon received and we choose to provision, send invite
         """
 
-        self.state.is_provisionning_started = True
+        self.state.is_provisioning_started = True
 
-        invite_packet = BTMesh_Provisioning_Invite(attention_duration=20)
+        invite_packet = BTMesh_Provisioning_Invite(attention_duration=100)
         # store for Confirmation Inputs
         self.state.invite_pdu = raw(invite_packet)
         self.send_to_gen_prov(invite_packet)
@@ -281,41 +272,41 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         Send Start pdu after
         """
 
+        self.state.prov_data.addr_range = packet.number_of_elements
+
         # store for Confirmation inputs
         self.state.capabilities_pdu = raw(packet)
+        own_capabilities = self.get_layer("pb_adv").state.connector.profile.capabilities
 
-        if packet.algorithms & 0b10 and self.state.capabilities["algorithms"] & 0b10:
+        if packet.algorithms & 0b10 and own_capabilities["algorithms"] & 0b10:
             self.state.chosen_parameters["algorithms"] = 0x01
-        elif packet.algorithms & 0b01 and self.state.capabilities["algorithms"] & 0b01:
+        elif packet.algorithms & 0b01 and own_capabilities["algorithms"] & 0b01:
             self.state.chosen_parameters["algorithms"] = 0x00
         else:
             raise UncompatibleAlgorithmsAvailableError
 
-        # Try to see if we can use OUTPUT_OOB_AUTH or INPUT_OOB_AUTH (only numeric for now)
-        print(self.state.capabilities)
-
         if (
             packet.output_oob_size != 0
-            and self.state.capabilities["output_oob_size"] != 0
+            and own_capabilities["output_oob_size"] != 0
             and packet.output_oob_action & 0b11000 != 0
-            and self.state.capabilities["output_oob_action"] & 0b11000
+            and own_capabilities["output_oob_action"] & 0b11000
         ):
             self.state.chosen_parameters["authentication_method"] = OUTPUT_OOB_AUTH
             self.state.chosen_parameters["authentication_action"] = OUTPUT_NUMERIC_AUTH
             self.state.chosen_parameters["authentication_size"] = max(
-                packet.output_oob_size, self.state.capabilities["output_oob_size"]
+                packet.output_oob_size, own_capabilities["output_oob_size"]
             )
 
         elif (
             packet.input_oob_size != 0
-            and self.state.capabilities["input_oob_size"] != 0
+            and own_capabilities["input_oob_size"] != 0
             and packet.input_oob_action & 0b1100
-            and self.state.capabilities["input_oob_action"] & 0b1100
+            and own_capabilities["input_oob_action"] & 0b1100
         ):
             self.state.chosen_parameters["authentication_method"] = INPUT_OOB_AUTH
             self.state.chosen_parameters["authentication_action"] = INPUT_NUMERIC_AUTH
             self.state.chosen_parameters["authentication_size"] = max(
-                packet.input_oob_size, self.state.capabilities["input_oob_size"]
+                packet.input_oob_size, own_capabilities["input_oob_size"]
             )
 
         # the rest is static for now, already set in state init
@@ -371,6 +362,7 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
             if self.state.auth_data == STATIC_OOB_AUTH:
                 self.state.crypto_manager.set_auth_value(self.state.auth_data.value)
                 # Compute Confirmation Provisioner Value and send it
+                self.state.crypto_manager.compute_confirmation_key()
                 self.state.crypto_manager.compute_confirmation_provisioner()
                 self.send_to_gen_prov(
                     BTMesh_Provisioning_Confirmation(
@@ -385,19 +377,22 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
                 self.state.auth_data.generate_value()
                 self.state.crypto_manager.set_auth_value(self.state.auth_data.value)
                 self.state.next_expected_packet = BTMesh_Provisioning_Input_Complete
-                self.send(
-                    "gen_prov", self.state.auth_data
-                )  # KEEP USE OF THIS FUNCTION (and not send_to_gen_prov, no encapsulation)
+
+                # get connector to notify the need for auth
+                self.get_layer("pb_adv").state.connector.provisioning_auth_data(
+                    self.state.auth_data
+                )
 
             elif self.state.auth_data.auth_method == OUTPUT_OOB_AUTH:
-                self.send(
-                    "gen_prov", self.state.auth_data
-                )  # KEEP USE OF THIS FUNCTION (and not send_to_gen_prov, no encapsulation)
-                # Next expected message is auth data typed by user
-                self.state.next_expected_packet = ProvisioningAuthenticationData
+
+                self.get_layer("pb_adv").state.connector.provisioning_auth_data(
+                    self.state.auth_data
+                )
+                self.state.next_expected_packet = None
 
         else:
             # Compute Confirmation Provisioner Value and send it
+            self.state.crypto_manager.compute_confirmation_key()
             self.state.crypto_manager.compute_confirmation_provisioner()
             self.send_to_gen_prov(
                 BTMesh_Provisioning_Confirmation(
@@ -406,19 +401,21 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
             )
             self.state.next_expected_packet = BTMesh_Provisioning_Confirmation
 
-    def on_provisioning_auth_data(self, packet):
+    def on_provisioning_auth_data(self, auth_data):
         """
-        Process a ProvisioningAuthenticationData received from the used that typed the OOB auth value
+        Process a ProvisioningAuthenticationData received from the user that typed the OOB auth value
+        (sent by connector directly)
 
-        :param packet: The auth data
-        :type packet: ProvisioningAuthenticationData
+        :param auth_data: The auth data
+        :type auth_data: ProvisioningAuthenticationData
         """
-        if packet.auth_method != OUTPUT_OOB_AUTH:
+        if auth_data.auth_method != OUTPUT_OOB_AUTH:
             return
-        self.state.auth_data = packet
+        self.state.auth_data = auth_data
         self.state.crypto_manager.set_auth_value(self.state.auth_data.value)
 
         # Send the Confirmation Provisoner
+        self.state.crypto_manager.compute_confirmation_key()
         self.state.crypto_manager.compute_confirmation_provisioner()
         self.send_to_gen_prov(
             BTMesh_Provisioning_Confirmation(
@@ -435,6 +432,7 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         :param packet: [TODO:description]
         :type packet: [TODO:type]
         """
+        self.state.crypto_manager.compute_confirmation_key()
         self.state.crypto_manager.compute_confirmation_provisioner()
         self.send_to_gen_prov(
             BTMesh_Provisioning_Confirmation(
@@ -488,10 +486,13 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         # encrypt Provisioning Data payload
         # from sample data Spec p. 713
         # ""bytes.fromhex("efb2255e6422d330088e09bb015ed707056700010203040b0c")
-        plaintext = bytes.fromhex("efb2255e6422d330088e09bb015ed707056700010203040b0c")
+        # plaintext = bytes.fromhex("efb2255e6422d330088e09bb015ed707056700010203040b0c")
+        self.get_layer("pb_adv").state.connector.get_prov_data(
+            prov_data=self.state.prov_data
+        )
 
-        # addr 0x0003, auto prov netkey, netkeyid = 0
-        plaintext = bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00000000000000000003")
+        # plaintext = bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00000000000000000003")
+        plaintext = self.state.prov_data.get_data_string()
         cipher, mic = self.state.crypto_manager.encrypt(plaintext)
 
         # send provisioning Data to provisionee
@@ -506,8 +507,13 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         """
         On receiving Provisionee Complete packet
         """
-        # notify gen_prov to close the link by sending None becasue prov finished
-        self.send("gen_prov", "FINISHED_PROV")
+        # notify gen_prov to close the link
+        self.get_layer("gen_prov").close_link()
+
+        # Send the information of the new distant node to be stored to the profile
+        self.get_layer("pb_adv").state.connector.on_provisioning_complete(
+            self.state.prov_data
+        )
 
 
 class ProvisioningLayerProvisionee(ProvisioningLayer):
@@ -523,8 +529,8 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
         """
         Responds to an invite to connect to network with capablities
         """
-        self.state.is_provisionning_started = True
-        capabilities = self.state.capabilities
+        self.state.is_provisioning_started = True
+        capabilities = self.get_layer("pb_adv").state.connector.profile.capabilities
 
         # store for Confirmation Inputs
         self.state.invite_pdu = raw(packet)
@@ -594,34 +600,34 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
 
             # If input oob, we notify user that it needs to input it.
             elif self.state.auth_data.auth_method == INPUT_OOB_AUTH:
-                self.send(
-                    "gen_prov", self.state.auth_data
-                )  # KEEP USE OF THIS FUNCTION (and not send_to_gen_prov, no encapsulation)
-                # next expected message received is from the user that inputed the auth_value
-                self.state.next_expected_packet = ProvisioningAuthenticationData
+                self.get_layer("pb_adv").state.connector.provisioning_auth_data(
+                    self.state.auth_data
+                )
+                self.state.next_expected_packet = None
 
             # If output oob, we need to output it (thus generate it)
             elif self.state.auth_data.auth_method == OUTPUT_OOB_AUTH:
                 self.state.auth_data.generate_value()
                 self.state.crypto_manager.set_auth_value(self.state.auth_data.value)
-                self.send(
-                    "gen_prov", self.state.auth_data
-                )  # KEEP USE OF THIS FUNCTION (and not send_to_gen_prov, no encapsulation)
+                self.get_layer("pb_adv").state.connector.provisioning_auth_data(
+                    self.state.auth_data
+                )
                 self.state.next_expected_packet = BTMesh_Provisioning_Confirmation
 
         else:
             self.state.next_expected_packet = BTMesh_Provisioning_Confirmation
 
-    def on_provisioning_auth_data(self, packet):
+    def on_provisioning_auth_data(self, auth_data):
         """
         Process a ProvisioningAuthenticationData received from the used that typed the OOOB auth value
+        (sent by connector directly)
 
-        :param packet: The auth data
-        :type packet: ProvisioningAuthenticationData
+        :param auth_data: The auth data
+        :type auth_data: ProvisioningAuthenticationData
         """
-        if packet.auth_method != INPUT_OOB_AUTH:
+        if auth_data.auth_method != INPUT_OOB_AUTH:
             return
-        self.state.auth_data = packet
+        self.state.auth_data = auth_data
         self.state.crypto_manager.set_auth_value(self.state.auth_data.value)
 
         self.send_to_gen_prov(BTMesh_Provisioning_Input_Complete())
@@ -638,6 +644,7 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
             packet.confirmation
         )
 
+        self.state.crypto_manager.compute_confirmation_key()
         self.state.crypto_manager.compute_confirmation_provisionee()
         self.send_to_gen_prov(
             BTMesh_Provisioning_Confirmation(
@@ -693,17 +700,17 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
         plaintext, verify = self.state.crypto_manager.decrypt(cipher, mic)
         net_key = plaintext[:16]
         key_index = plaintext[16:18]
-        flags = plaintext[18:19]  # ignored for now
+        flags = plaintext[18:19]
         iv_index = plaintext[19:23]
         unicast_addr = plaintext[23:]
-        prov_data = ProvisioningCompleteData(
-            net_key=net_key,
-            key_index=int.from_bytes(key_index, "little"),
-            flags=flags,
-            iv_index=iv_index,
-            unicast_addr=int.from_bytes(unicast_addr, "big"),
-            provisionning_crypto_manager=self.state.crypto_manager,
-        )
+
+        self.state.prov_data.net_key = net_key
+        self.state.prov_data.key_index = int.from_bytes(key_index, "big")
+        self.state.prov_data.flags = flags
+        self.state.prov_data.iv_index = iv_index
+        self.state.prov_data.unicast_addr = int.from_bytes(unicast_addr, "big")
+        self.state.prov_data.provisioning_crypto_manager = self.state.crypto_manager
+
         logger.debug("NetworkKey = " + plaintext[:16].hex())
         logger.debug("KeyIndex = " + plaintext[16:18].hex())
         logger.debug("Flags = " + plaintext[18:19].hex())
@@ -712,7 +719,5 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
 
         # send complete
         self.send_to_gen_prov(BTMesh_Provisioning_Complete())
-        self.send(
-            "gen_prov", prov_data
-        )  # KEEP USE OF THIS FUNCTION (and not send_to_gen_prov, no encapsulation)
+        self.get_layer("pb_adv").state.connector.provisioning_complete(prov_data)
         self.state.next_expected_packet = None

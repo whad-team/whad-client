@@ -20,10 +20,6 @@ from whad.scapy.layers.btmesh import (
     BTMesh_Provisioning_Hdr,
 )
 from whad.common.stack import ContextualLayer, alias, source
-from whad.btmesh.stack.utils import (
-    ProvisioningCompleteData,
-    ProvisioningAuthenticationData,
-)
 from whad.btmesh.stack.gen_prov.message import GenericProvisioningMessage
 from whad.btmesh.stack.exceptions import (
     InvalidFrameCheckSequenceError,
@@ -122,9 +118,8 @@ class GenericProvisioningLayer(ContextualLayer):
 
         self.state.is_thread_running = False
 
-        # stores the current thread sending fragments
-        self.state.sending_thread = Thread(target=self.send_packet_thread)
-        self.state.sending_thread.start()
+        # stores the current thread sending fragments (send_packet_thread function)
+        self.state.sending_thread = None
 
         # Transaction number of last received provsioning PDU
         self.state.last_received_transaction_number = -100000000
@@ -136,13 +131,12 @@ class GenericProvisioningLayer(ContextualLayer):
         """
         Sends one ack to the peer. Is resent when we receive again a packet from a transaction from which we have received all segments
         """
-        logger.debug("SENDING ACK FOR TRANSACTION " + hex(transaction_number))
         self.send_to_peer(
             transaction_number, BTMesh_Generic_Provisioning_Transaction_Ack()
         )
-        self.send_to_peer(
-            transaction_number, BTMesh_Generic_Provisioning_Transaction_Ack()
-        )
+        # self.send_to_peer
+        #    transaction_number, BTMesh_Generic_Provisioning_Transaction_Ack()
+        # )
 
     def send_packet_thread(self):
         """
@@ -178,14 +172,17 @@ class GenericProvisioningLayer(ContextualLayer):
                             ),
                         )
 
-            sleep(0.4)
+                sleep(0.04)
+            sleep(1)
             i -= 1
 
     def activate_sending_thread(self):
         """
         Activate thread that sends all the fragments (Start and Continuation).
         """
+        self.state.sending_thread = Thread(target=self.send_packet_thread)
         self.state.is_thread_running = True
+        self.state.sending_thread.start()
 
     def stop_sending_thread(self):
         """
@@ -198,20 +195,13 @@ class GenericProvisioningLayer(ContextualLayer):
         """
         Handler when receiving a packet from the Provisioning Layer
         """
-        # check if is provisioning complete message or ProvisioningAuthenticationData
-        if isinstance(packet, ProvisioningCompleteData) or isinstance(
-            packet, ProvisioningAuthenticationData
-        ):
-            self.send("pb_adv", packet)
-            return
-
         # Check if link already open or not
         if not self.state.is_link_open:
             self.open_link()
             self._queue.put(packet)
             return
 
-        # if not Transaction currently, process direclty
+        # if not in Transaction currently, process direclty
         if self._queue.empty() and not self.state.in_transaction:
             self.process_provisioning_packet(packet)
             return
@@ -224,9 +214,6 @@ class GenericProvisioningLayer(ContextualLayer):
         """
         Handler for messages received from the GenericProvisioningLayer
         """
-        if isinstance(message, ProvisioningAuthenticationData):
-            self.send_to_upper_layer(message)
-            return
         pkt = message.gen_prov_pkt
         # if we get here, we have the packet we were waiting for
         self._handlers[type(pkt)](message)
@@ -268,6 +255,15 @@ class GenericProvisioningLayer(ContextualLayer):
         In subclass Provisioner. Open a Link with peer device
         """
         pass
+
+    def close_link(self):
+        """
+        Closes the link when provisioning is finished or on error in Provisioning layer
+        """
+        self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
+        self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
+        self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
+        self.state.is_link_open = False
 
     def on_link_open(self, message):
         """In subclass, provisioner should never receive this"""
@@ -414,17 +410,7 @@ class GenericProvisioningLayer(ContextualLayer):
     def process_provisioning_packet(self, packet):
         """
         Process a Provisioning packet to divide it into fragments, set the expected next packets, and send the first fragment
-        If packet is equal to "FINISHED_PROV", means we close the link
         """
-
-        # if packet is FINISHED_PROV, signal from the Provisioning Layer that we need to close on complete
-        if packet == "FINISHED_PROV":
-            self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
-            self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
-            self.send_to_peer(0x00, BTMesh_Generic_Provisioning_Link_Close(reason=0x00))
-
-            self.send("pb_adv", "FINISHED_PROV")
-            return
 
         # limit size of a fragment is 23 bytes
         self.state.in_transaction = True

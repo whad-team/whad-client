@@ -12,7 +12,6 @@ The connector provides some callbacks such as :meth:`Peripheral.on_connected` to
 react on specific events.
 """
 
-
 # Add arguments to connector for models/states
 
 from whad.btmesh.stack import PBAdvBearerLayer
@@ -47,6 +46,7 @@ class Provisionee(BTMeshNode):
         self,
         device,
         profile=BaseMeshProfile(),
+        prov_stack=PBAdvBearerLayer,
         net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
         dev_app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
         unicast_addr=0x0002,
@@ -59,6 +59,8 @@ class Provisionee(BTMeshNode):
         :param device: Device object
         :type device: Device
         :param profile: Profile class used for the node (elements and models layout), defaults to BaseMeshProfile
+        :param prov_stack: Provisionning Stack to use, defaults to PBAdvBearerLayer
+        :type prov_stack: Layer, optional
         :param net_key: If auto provisioned : primary NetKey , defaults to bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00")
         :type net_key: Bytes, optional
         :param dev_app_key: If auto provisioned : primary app key and dev key (both the same value), defaults to bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
@@ -71,7 +73,6 @@ class Provisionee(BTMeshNode):
         super().__init__(
             device,
             profile,
-            prov_stack=PBAdvBearerLayer,
         )
 
         # Used to stop the unprov_beacons_sending_thread function from running
@@ -79,6 +80,8 @@ class Provisionee(BTMeshNode):
 
         # UUID of the node, used in beacons
         self.uuid = uuid
+
+        self._prov_stack = prov_stack(connector=self, options={}, is_provisioner=False)
 
     def process_rx_packets(self, packet):
         """
@@ -186,7 +189,9 @@ class Provisionee(BTMeshNode):
         """
 
         self.prov_auth_data.value = value
-        self._prov_stack.get_layer("pb_adv").on_auth_data(self.prov_auth_data)
+        self._prov_stack.get_layer("pb_adv").on_provisioning_auth_data(
+            self.prov_auth_data
+        )
         self.prov_event = Event()
         self.prov_event.wait(20)
         return self.profile.is_provisioned
