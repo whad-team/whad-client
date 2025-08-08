@@ -21,6 +21,7 @@ from .attribute import Attribute
 from .procedure import UnexpectedProcError
 from .read_by_group_type import ClientReadByGroupTypeProcedure
 from .read_by_type import ClientReadByTypeProcedure
+from .readblob import ClientReadBlobProcedure
 from .read import ClientReadProcedure
 from .find_info import ClientFindInformationProcedure, ClientFindByTypeValueProcedure
 
@@ -44,6 +45,7 @@ class GattClient:
             ClientReadByGroupTypeProcedure,
             ClientReadByTypeProcedure,
             ClientReadProcedure,
+            ClientReadBlobProcedure,
             ClientFindInformationProcedure,
             ClientFindByTypeValueProcedure,
         ]
@@ -103,6 +105,16 @@ class GattClient:
         """Read attribute."""
         # Initiate a ClientReadProcedure
         self.__cur_procedure = ClientReadProcedure(handle)
+
+        # Generate ATT packets to send when this procedure is initiated
+        # and forward them to the underlying link-layer
+        for req in self.__cur_procedure.initiate():
+            self.__l2cap.send_pdu(ATT_Hdr()/req)
+
+    def read_blob(self, handle: int, offset: int) -> List[Packet]:
+        """Read part of attribute."""
+        # Initiate a ClientReadBlobProcedure
+        self.__cur_procedure = ClientReadBlobProcedure(handle, offset)
 
         # Generate ATT packets to send when this procedure is initiated
         # and forward them to the underlying link-layer
