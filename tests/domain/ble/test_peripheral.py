@@ -40,6 +40,21 @@ def profile() -> GenericProfile:
             ),
         )
 
+        prim2 = PrimaryService(
+            uuid=UUID("6d02b600-1b51-4ef9-b753-1399e05debfd"),
+            tx=Characteristic(
+                uuid=UUID("6d02b601-1b51-4ef9-b753-1399e05debfd"),
+                permissions=['write_without_resp'],
+                value=b"\x00\x00\x00\x00",
+            ),
+            rx=Characteristic(
+                uuid=UUID("6d02b602-1b51-4ef9-b753-1399e05debfd"),
+                permissions=['notify', 'indicate'],
+                notify=True,
+                value=b"\x00\x00\x00\x00",
+            )
+        )
+
     return EmulatedProfile
 
 @pytest.fixture
@@ -234,6 +249,39 @@ def test_read_by_type_higher_start_handle(connected_peripheral):
     assert result.handle == 3
     assert result.ecode == BleAttErrorCode.INVALID_HANDLE
 
+def test_read(connected_peripheral):
+    """ Test Read request. """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a valid Read request
+    result = mock.read(3)
+    assert result == b"EmulatedDevice"
+
+def test_read_invalid_handle(connected_peripheral):
+    """ Test Read request with invalid handle. """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a valid Read request
+    result = mock.read(0)
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.READ_REQUEST
+    assert result.ecode == BleAttErrorCode.INVALID_HANDLE
+    assert result.handle == 0
+
+def test_read_not_permitted(connected_peripheral):
+    """ Test Read request on attribute with no read permission. """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a valid Read request
+    result = mock.read(10)
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.READ_REQUEST
+    assert result.ecode == BleAttErrorCode.READ_NOT_PERMITTED
+    assert result.handle == 10
+
 def test_find_information(connected_peripheral):
     """Test a successfull FindInformation request."""
     # Retrieve mock from current peripheral
@@ -339,9 +387,10 @@ def test_remote_profile_discovery(connected_peripheral):
                 attr_id = item.end+1
 
     # Check primary services
-    assert len(services) == 2
+    assert len(services) == 3
     assert services[1] == (UUID(0x1800), 3)
     assert services[4] == (UUID(0x180f), 7)
+    assert services[8] == (UUID("6d02b600-1b51-4ef9-b753-1399e05debfd"), 13)
 
     # Discovery characteristics for each service
     for serv_handle, serv_params  in services.items():
@@ -363,9 +412,11 @@ def test_remote_profile_discovery(connected_peripheral):
                     attr_id = chardef.handle + 1
 
     # Make sure our characteristics have successfully been discovered
-    assert len(services_chars.keys()) == 2
+    assert len(services_chars.keys()) == 3
     assert len(services_chars[1]) == 1
     assert 2 in services_chars[1][0]
     assert len(services_chars[4]) == 1
     assert 5 in services_chars[4][0]
+    assert len(services_chars[8]) == 2
+    assert 9 in services_chars[8][0]
 

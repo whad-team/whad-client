@@ -4,8 +4,10 @@
 The Read procedure is initiated by a Read request, and based on the required
 attribute handle returns the attribute value (success) or an error (failure).
 """
+from typing import List
+
 from scapy.packet import Packet
-from scapy.layers.bluetooth import ATT_Read_Request, ATT_Read_Response
+from scapy.layers.bluetooth import ATT_Error_Response, ATT_Read_Request, ATT_Read_Response
 
 from .attribute import find_attr_by_handle
 from .procedure import Procedure, UnexpectedProcError
@@ -54,4 +56,33 @@ class ServerReadProcedure(Procedure):
         except IndexError:
             self.set_state(Procedure.STATE_DONE)
             return self.att_error_response(request.gatt_handle, Procedure.ERR_ATTR_NOT_FOUND)
+
+class ClientReadProcedure(Procedure):
+    """GATT Client Read procedure."""
+
+    def __init__(self, handle: int):
+        """Initialize a GATT client Read procedure.
+
+        :param handle: Handle of attribute to read
+        :type handle: int
+        """
+        self.__handle = handle
+        super().__init__([], 23)
+
+    def initiate(self) -> List[Packet]:
+        """Initiate this Read procedure."""
+        return [
+            ATT_Read_Request(gatt_handle=self.__handle)
+        ]
+
+    def process_request(self, request: Packet) -> List[Packet]:
+        """Process incoming packet."""
+        if ATT_Error_Response in request:
+            self.set_result(request[ATT_Error_Response])
+            self.set_state(Procedure.STATE_ERROR)
+        elif ATT_Read_Response in request:
+            response = request[ATT_Read_Response]
+            self.set_result(response.value)
+            self.set_state(Procedure.STATE_DONE)
+        return []
 
