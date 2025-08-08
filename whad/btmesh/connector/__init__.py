@@ -43,16 +43,13 @@ class BTMesh(BLE):
     def __init__(
         self,
         device,
-        options={},
     ):
         """
         Creates a BTMesh base connector
 
         :param device: Whad device handle
         :type device: WhadDeviceConnector
-        :param options: options de pass to provisioning stack, defaults to {}
-        :type options: dict, optional
-        :raises UnsupportedCapability: Device Cannot sniff or inject
+        :raises UnsupportedCapability: Device Cannot sniff
         """
         super().__init__(device)
 
@@ -77,4 +74,3 @@ class BTMesh(BLE):
                     )
                 ):
                     return True
-

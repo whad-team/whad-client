@@ -43,9 +43,6 @@ class BTMeshNode(BTMesh):
         self,
         device,
         profile=BaseMeshProfile(),
-        prov_stack=PBAdvBearerLayer,
-        is_provisioner=False,
-        options={},
     ):
         """
         Creates a Mesh generic Node
@@ -53,28 +50,17 @@ class BTMeshNode(BTMesh):
         :param device: Whad device handle
         :type device: WhadDeviceConnector
         :param prov_stack: Provisionning Stack to use, defaults to PBAdvBearerLayer
-        :type prov_stack: Stack, optional
-        :param is_provisioner: Is the node we create a provisiner node ? defaults to False
-        :type is_provisioner: bool, optional
-        :param options: options de pass to provisioning stack, defaults to {}
-        :type options: dict, optional
-        :raises UnsupportedCapability: Device Cannot sniff or inject
+        :type prov_stack: Layer, optional
+        :raises UnsupportedCapability: Device Cannot inject
         """
         super().__init__(device)
         if not self.can_inject():
             raise UnsupportedCapability("Inject")
 
-        self._prov_stack = prov_stack(
-            connector=self, options=options, is_provisioner=is_provisioner
-        )
-
         # Queue of received messages, filled in on reception callback
         self.__queue = Queue()
 
         self.__tx_lock = Lock()
-
-        # The stack used after provisioning (instanced after)
-        self._main_stack = None
 
         self.profile = profile
 
@@ -96,6 +82,9 @@ class BTMeshNode(BTMesh):
         self.whitelist = []
 
         self._main_stack = NetworkLayer(connector=self, options=self.options)
+
+        # Provisionning stack, only instanced in Provisioner/Provisionee if needed
+        self._prov_stack = None
 
         # used to communicate with Shell/terminal to prompt user to type authentication value (provisioning)
         self.prov_event = None
@@ -287,28 +276,7 @@ class BTMeshNode(BTMesh):
         """
         self._main_stack.get_layer("access").process_new_message(message)
 
-    def set_capability(self, name, value):
-        """
-        On the Provisionning layer, set the value of the specified capability
-        Returns True if success, False if fail
-
-        :param name: Name of the capability
-        :type name: str
-        :param value: Value to set
-        :type value: int
-        """
-        return self._prov_stack.get_layer("pb_adv").set_capability(name, value)
-
-    def get_capabilities(self):
-        """
-        On the Provisionning layer, returns the dict of capabilities of the node
-
-        :returns: The dict of capabilities of the node
-        :rtype: dict
-        """
-        return self._prov_stack.get_layer("pb_adv").get_capabilities()
-
-    def provisonning_auth_data(self, message):
+    def provisioning_auth_data(self, message):
         """
         Handler of a ProvisionningAuthenticationData received from the stack.
 

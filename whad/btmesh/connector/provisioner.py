@@ -22,6 +22,8 @@ from whad.scapy.layers.btmesh import (
 )
 from whad.btmesh.profile import BaseMeshProfile
 from whad.btmesh.stack.constants import OUTPUT_OOB_AUTH, INPUT_OOB_AUTH
+from whad.btmesh.crypto import UpperTransportLayerDevKeyCryptoManager
+from whad.btmesh.stack.utils import Node
 from threading import Event
 
 
@@ -81,9 +83,13 @@ class Provisioner(BTMeshNode):
         :type device: Device
         :param profile: Profile class used, defaults to BaseMeshProfile
         """
-        super().__init__(device, profile, prov_stack=prov_stack, is_provisioner=True)
+        super().__init__(device, profile)
         self.__unprovisioned_devices = UnprovisionedDeviceList()
         self._is_listening_for_beacons = False
+        self._is_currently_provisioning = False
+        self._prov_data = None
+
+        self._prov_stack = prov_stack(connector=self, options={}, is_provisioner=True)
 
     def process_rx_packets(self, packet):
         """
@@ -134,6 +140,32 @@ class Provisioner(BTMeshNode):
         """
         return self.__unprovisioned_devices.list()
 
+    def get_prov_data(self, prov_data):
+        """
+        Fills the ProvisioningData of the distant node with relevant information
+
+        :param prov_data: The object to fill
+        """
+        net_key = self.profile.get_net_key(0)
+        prov_data.net_key = net_key.net_key
+        prov_data.key_index = net_key.key_index
+        prov_data.flags = b"\x00"
+        prov_data.iv_index = self.profile.iv_index
+
+        # Get an available unicast addr that fits the addr range
+        # For now we take the lastly provisioned node addr + range + 1 (no deletion of nodes)
+        last_node = sorted(self.profile.get_all_nodes().items())[-1][1]
+        prov_data.unicast_addr = last_node.address + last_node.addr_range + 1
+
+    def on_provisioning_complete(self, prov_data):
+        """
+        Notification from the provisioning layer that a distant node has been provisioned
+
+        :param prov_data:Data sent to the distant node
+        """
+        self._prov_data = prov_data
+        self.prov_event.set()
+
     def provision_distant_node(self, dev_uuid):
         """
         Provisions the node with the given dev_uuid if it is in the Unprovisioned devices list
@@ -144,6 +176,7 @@ class Provisioner(BTMeshNode):
         :rtype: bool
         """
         if self.__unprovisioned_devices.check(dev_uuid):
+            self._is_currently_provisioning = True
             self.__unprovisioned_devices.remove(dev_uuid)
             self._prov_stack.on_new_unprovisoned_device(dev_uuid)
 
@@ -152,15 +185,23 @@ class Provisioner(BTMeshNode):
             auth_done = False
 
             start_time = time()
-            duration = 50
+            duration = 60
 
             while time() - start_time < duration:
-                # Check if event timedout, we fail
-                self.prov_event.wait(timeout=5)
+                self.prov_event.wait(timeout=1)
 
                 # if distant node is provisioned, finished
-                if self.distant_node_provisioned:
-                    self.distant_node_provisioned = False
+                if self._prov_data is not None:
+                    new_node = Node(
+                        self._prov_data.unicast_addr,
+                        self._prov_data.addr_range,
+                        UpperTransportLayerDevKeyCryptoManager(
+                            provisioning_crypto_manager=self._prov_data.provisioning_crypto_manager
+                        ),
+                    )
+                    self.profile.add_distant_node(new_node)
+                    self._prov_data = None
+                    self._is_currently_provisioning = False
                     return True
 
                 elif not auth_done and self.prov_auth_data is not None:
@@ -186,11 +227,14 @@ class Provisioner(BTMeshNode):
         """
 
         self.prov_auth_data.value = value
-        self._prov_stack.get_layer("pb_adv").on_auth_data(self.prov_auth_data)
+        self._prov_stack.get_layer("pb_adv").on_provisioning_auth_data(
+            self.prov_auth_data
+        )
         self.prov_event = Event()
-        self.prov_event.wait(20)
-        if self.distant_node_provisioned:
-            self.distant_node_provisioned = False
+        res = self.prov_event.wait(20)
+        self._is_currently_provisioning = False
+        # if timedout, provisioning failed
+        if res:
             return True
         else:
             return False

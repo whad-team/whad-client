@@ -269,7 +269,7 @@ class BTMeshBaseShell(InteractiveShell):
         """
 
         if len(args) < 1:
-            capablities = self._connector.get_capabilities()
+            capablities = self._connector.profile.capabilities
             print_formatted_text(
                 HTML("<ansicyan><b>Provisioning Capabilities</b></ansicyan>")
             )
@@ -286,11 +286,8 @@ class BTMeshBaseShell(InteractiveShell):
                 self.error("Value needs to be an int.")
                 return
 
-            res = self._connector.set_capability(name, value)
-            if res:
-                self.success("Successfully set %s to value %d" % (name, value))
-            else:
-                self.error("Fail, the capability %s does not exist" % name)
+            self._connector.profile.capabilities[name] = value
+            self.success("Successfully set %s to value %d" % (name, value))
 
     @category(SETUP_CAT)
     def do_address(self, arg):
