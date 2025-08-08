@@ -1507,6 +1507,13 @@ class GattServer(GattLayer):
     def on_read_blob_request(self, request: GattReadBlobRequest):
         """Read blob request
         """
+        if request.handle == 0:
+            return self.error(
+                BleAttOpcode.READ_BLOB_REQUEST,
+                request.handle,
+                BleAttErrorCode.INVALID_HANDLE
+            )
+
         try:
             local_mtu = self.att.get_client_mtu()
 
