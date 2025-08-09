@@ -150,7 +150,7 @@ class Provisionee(BTMeshNode):
 
     def start_unprovisioned_beacons_sending(self):
         """
-        Starts the sending of an Unprovisioned Device Beacons (provisionning)
+        Starts the sending of an Unprovisioned Device Beacons (provisioning)
         """
 
         self._unprov_beacons_sending = True
@@ -196,11 +196,11 @@ class Provisionee(BTMeshNode):
         self.prov_event.wait(20)
         return self.profile.is_provisioned
 
-    def provisionning_complete(self, prov_data):
+    def provisioning_complete(self, prov_data):
         """
         When Provisionning (not auto) is complete, we received the information to setup the node from the Provisioner and start normal behavior with main stack
 
-        :param prov_data: The provisionning data content
+        :param prov_data: The provisioning data content
         :type prov_data: ProvisioningCompleteData
         """
 
@@ -208,7 +208,7 @@ class Provisionee(BTMeshNode):
             key_index=prov_data.key_index, net_key=prov_data.net_key
         )
         dev_key = UpperTransportLayerDevKeyCryptoManager(
-            provisioning_crypto_manager=prov_data.provisionning_crypto_manager
+            provisioning_crypto_manager=prov_data.provisioning_crypto_manager
         )
         self.profile.provision(
             primary_net_key,
