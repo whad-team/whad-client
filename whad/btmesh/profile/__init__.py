@@ -150,10 +150,10 @@ class BaseMeshProfile(object):
             algorithms=0b11,  # default support 2 algs
             public_key_type=0x00,  # default no OOB public key support
             oob_type=0b00,  # no static OOB supported
-            output_oob_size=0x04,
-            output_oob_action=0b01000,  # default no output OOB action available
+            output_oob_size=0x00,
+            output_oob_action=0b00000,  # default no output OOB action available, for tests, 0b11000
             input_oob_size=0x00,
-            input_oob_action=0b0000,  # default no input OOB a available
+            input_oob_action=0b0000,  # default no input OOB a available. For test, 0b1100
         )
 
     def _populate_elements_and_models(self):

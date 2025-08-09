@@ -142,6 +142,7 @@ class ProvisioningLayer(Layer):
         )
 
     def send_to_gen_prov(self, packet):
+        packet.show()
         hdr = BTMesh_Provisioning_Hdr(
             type=PROVISIONING_TYPES[type(packet)], message=packet
         )
@@ -719,5 +720,7 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
 
         # send complete
         self.send_to_gen_prov(BTMesh_Provisioning_Complete())
-        self.get_layer("pb_adv").state.connector.provisioning_complete(prov_data)
+        self.get_layer("pb_adv").state.connector.provisioning_complete(
+            self.state.prov_data
+        )
         self.state.next_expected_packet = None
