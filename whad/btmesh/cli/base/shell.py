@@ -2,7 +2,7 @@ from whad.cli.shell import InteractiveShell, category
 from whad.btmesh.profile import BaseMeshProfile
 from whad.btmesh.connector.node import BTMeshNode
 from whad.btmesh.models import CompositeModelState
-from whad.btmesh.stack.utils import MeshMessageContext
+from whad.btmesh.stack.utils import MeshMessageContext, Node
 from whad.btmesh.stack.constants import (
     MANAGED_FLOODING_CREDS,
     DIRECTED_FORWARDING_CREDS,
@@ -291,7 +291,7 @@ class BTMeshBaseShell(InteractiveShell):
 
     @category(SETUP_CAT)
     def do_address(self, arg):
-        """Manages the device's primary unicast address
+        """Manages the device's primary unicast address and range
 
         <ansicyan><b>address</b> <i>value</i></ansicyan>
 
@@ -309,16 +309,12 @@ class BTMeshBaseShell(InteractiveShell):
             self.error("Need to have the devices started and provisioned")
             return
 
-        if len(arg) >= 1:
+        if len(args) >= 1:
             try:
-                addr = int(arg[0], 0) & 0xFFFF
+                addr = int(args[0], 0) & 0xFFFF
             except ValueError:
                 self.error("Address is an integer")
                 return
-
-            # Add the same dev key we have with previous address if none available with new one
-            if self.profile.get_dev_key(addr) is None:
-                self.profile.update_dev_key(addr, self.profile.get_dev_key().device_key)
 
             # If msg_context for src_addr or dst_addr, or dev_key_addr was the previous addr of the node, update
             if self._src_addr == self.profile.get_primary_element_addr():
@@ -865,72 +861,114 @@ class BTMeshBaseShell(InteractiveShell):
         self.success("Successfully sent the message below.")
         message.show()
 
-    def complete_dev_keys(self):
-        """Autocomplete wireshark command"""
+    def complete_nodes(self):
+        """Autocomplete nodes command"""
         completions = {}
         completions["list"] = {}
-        completions["update"] = {}
+        completions["add"] = {}
         completions["remove"] = {}
+        completions["dev_key"] = {}
         return completions
 
     @category(SETUP_CAT)
-    def do_dev_keys(self, args):
-        """Manages the dev key of the node, and the dev key associated to other nodes (update, add, remove)
+    def do_nodes(self, args):
+        """Manages the information specific to each distant/local Node that we possess (namely their dev_key,elements and addresses)
 
-        <ansicyan><b>dev_keys</b> [<i>ACTION</i>] [<i>NODE_ADDR</i>] [<i>DEV_KEY_VALUE</i>]</ansicyan>
+        <ansicyan><b>nodes</b> [<i>ACTION</i>] [<i>PRIMARY_NODE_ADDR</i>] [<i>VALUES</i>]</ansicyan>
+
+        All actions are performed to update information stored on the local node, no messages are sent on the network
+        If no PRIMARY_NODE_ADDR specified, affects the local node !
+        If PRIMARY_NODE_ADDR specified, affects a distant node (in the case of spoofing, local and a distant node can share an address)
 
         For the <i>ACTION</i> field :
 
-        - <b>list</b> : Lists the dev_keys and theis values
-        - <b>update</b> : Adds or update a dev key associated to the address (can be ours)
-        - <b>remove</b> : Removes the dev_key for an address and distant node, cannot remove our own dev key.
+        - <b>list</b> : Lists the distant nodes (and our own) we are aware of, and the information we have
+        - <b>add</b> : Adds a distant node (need address, optional address range). If already present, does nothing. Adds a default value for dev_key as placeholder (invalid for real use)
+        - <b>remove</b> : Remove a distant node from the list
+        - <b>dev_key</b> : Update the dev_key of the given node (only in local database !). If no address given, changes the dev_key of the local node.
 
-        > To list  :  dev_keys list
+        > To list : nodes list
 
-        > To update/add key :  det_keys update 0x0002 efb2255e6422d330088e09bb015ed707
+        > To add (node address 0x0005, address range 3) : nodes add 0x0005
 
-        > To remove : det_keys remove 0x00FF
+        > To remove a node : nodes remove 0x0005
 
-        By default, list
+        > To change/add dev_key of a node: nodes dev_key 0x0005 63964771734fbd76e3b40519d1d94a48
+        Change dev_key of local node : nodes dev_key 77964771734fbd76e3b40519d1d94a89
+
+        By default, lists information.
         """
-
         if self._current_mode != self.MODE_STARTED:
-            self.error("Cannot manage keys on an unprovisionned device")
+            self.error("Cannot manage nodes on an unprovisionned device or in element edit mode")
+            return
 
         action = args[0].lower() if len(args) >= 1 else "list"
         if action == "list":
             nodes = self.profile.get_all_nodes()
-            for node in nodes.items():
+            for node in nodes.values():
                 print_formatted_text(
                     HTML(
-                        "|─ <ansimagenta><b>Address: 0x%x Key : %s</b></ansimagenta>"
-                        % (node.address, node.dev_key.hex())
+                        "|─ <ansimagenta><b>Address: 0x%x DevKey : %s</b></ansimagenta>"
+                        % (node.address, node.dev_key.device_key.hex())
                     )
                 )
             return
-        elif action == "update":
-            if len(args) < 3:
-                self.error("Specify address (hex) and value of the key")
+        elif action == "dev_key":
+            if len(args) < 2:
+                self.error("Specify value of the key")
                 return
 
             try:
-                address = int(args[1], 0) & 0xFFFF
-                key = bytes.fromhex(args[2])
+                if len(args) >= 3:
+                    address = int(args[1], 0) & 0xFFFF
+                    key = bytes.fromhex(args[2])
+                else:
+                    address = None
+                    key = bytes.fromhex(args[2])
             except ValueError:
                 self.error("The address is 2 bytes int and the key is a hex string.")
                 return
 
-            success = self.profile.update_dev_key(address, key)
+            success = self.profile.update_dev_key(address=address, dev_key=key)
+
             if not success:
-                self.error("Update of dev_key failed")
+                self.error(
+                    "Update of dev_key failed. If you want to change the local node device_key, do not specify its address."
+                )
                 return
             else:
                 self.success("Update of dev_key successfull")
 
+        elif action == "add":
+            if len(args) < 2:
+                self.error("Specify primary unicast address of the node to add")
+                return
+
+            addr_range = 0
+            try:
+                address = int(args[1], 0) & 0xFFFF
+                if len(args) >= 3:
+                    addr_range = int(args[2], 0) & 0xFFFF
+            except ValueError:
+                self.error("The address and range are 2 bytes int.")
+                return
+
+            added_node = Node(address=address, addr_range=addr_range)
+            success = self.profile.add_distant_node(added_node)
+
+            if not success:
+                self.error("Addition of new distant node failed")
+                return
+            else:
+                self.success("Addition of new distant node successfull")
+
         elif action == "remove":
             if len(args) < 2:
-                self.error("Need to specify address to remove")
+                self.error(
+                    "Need to specify address of distant node to remove from local database"
+                )
                 return
+
             try:
                 address = int(args[1], 0) & 0xFFFF
             except ValueError:
@@ -938,17 +976,22 @@ class BTMeshBaseShell(InteractiveShell):
                 return
 
             if self._dev_key_address == address:
-                self.error("Cannot delete this key for now, used in message context ! ")
-                return
-
-            success = self.profile.remove_dev_key(address)
-
-            if not success:
                 self.error(
-                    "Removal of DevKey failed, does it exist ? Or maybe trying to delete our devkey"
+                    "Cannot delete this node for now, address used in message context as dev_key address ! "
                 )
                 return
-            self.success("Successfully removed DevKey from list")
+
+            removed_node = self.profile.remove_distant_node(address)
+
+            if removed_node is None:
+                self.error(
+                    "Removal of node %x failed, does it exist ? Or maybe trying to delete our node"
+                    % address
+                )
+                return
+            self.success(
+                "Successfully removed Node %x from list" % removed_node.address
+            )
             return
 
     def complete_net_keys(self):
