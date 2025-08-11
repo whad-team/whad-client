@@ -19,20 +19,20 @@ For example, the following command will use all available BLE analyzers:
 
 .. code-block:: text
 
-  $ wplay --flush resources/pcaps/ble_pairing.pcap | wanalyze
+  $ wplay --flush ble_pairing.pcap | wanalyze
 
 The following command will use only *"legacy_pairing_cracking"* and *"encrypted_session_initialization"*:
 
 .. code-block:: text
 
-  $ wplay --flush resources/pcaps/ble_pairing.pcap | wanalyze legacy_pairing_cracking encrypted_session_initialization
+  $ wplay --flush ble_pairing.pcap | wanalyze legacy_pairing_cracking encrypted_session_initialization
 
 It is also possible to select only a specific field of an analyzer output, using the expression ANALYZER.FIELD.
 For example, the following command line will display only the Short-Term Key (STK) of the *"legacy_pairing_cracking"* analyzer:
 
 .. code-block:: text
 
-  $ wplay --flush resources/pcaps/ble_pairing.pcap | wanalyze legacy_pairing_cracking.stk
+  $ wplay --flush ble_pairing.pcap | wanalyze legacy_pairing_cracking.stk
 
 
 Command-line options
