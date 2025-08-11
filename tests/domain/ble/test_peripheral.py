@@ -415,7 +415,7 @@ def test_write(connected_peripheral):
     # Retrieve mock from current peripheral
     mock:PeripheralMock = connected_peripheral.device
 
-    # Send a valid Read request
+    # Send a valid Write request
     result = mock.write(3, b"Foobar")
     assert result
     # Read profile characteristic value
@@ -423,10 +423,63 @@ def test_write(connected_peripheral):
     assert charval.value == b"Foobar"
 
 def test_write_invalid_handle(connected_peripheral):
-    """TODO: Test write procedure with handle 0 and check we receive an INVALID_HANDLE error"""
+    """Test write procedure with handle 0 and check we receive an INVALID_HANDLE error"""
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a Write request with invalide handle (0)
+    result = mock.write(0, b"Foobar")
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.WRITE_REQUEST
+    assert result.ecode == BleAttErrorCode.INVALID_HANDLE
+    assert result.handle == 0
 
 def test_write_unknown_handle(connected_peripheral):
-    """TODO: Test write procedure with handle 120 and check we receive an ATTRIBUTE_NOT_FOUND error"""
+    """Test write procedure with handle 120 and check we receive an ATTRIBUTE_NOT_FOUND error"""
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a Write request with an unknown handle
+    result = mock.write(120, b"Foobar")
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.WRITE_REQUEST
+    assert result.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+    assert result.handle == 120
+
+def test_write_cmd(connected_peripheral):
+    """ Test WriteCommand request. """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a valid WriteCommand request
+    result = mock.write_cmd(3, b"Foobar")
+    # Read profile characteristic value
+    charval = connected_peripheral.profile.find_object_by_handle(3)
+    assert charval.value == b"Foobar"
+
+def test_write_cmd_invalid_handle(connected_peripheral):
+    """Test WriteCommand procedure with handle 0 and check we receive an INVALID_HANDLE error"""
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a WriteCommand request with handle=0
+    result = mock.write_cmd(0, b"Foobar")
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.WRITE_COMMAND
+    assert result.ecode == BleAttErrorCode.INVALID_HANDLE
+    assert result.handle == 0
+
+def test_write_cmd_unknown_handle(connected_peripheral):
+    """Test WriteCommand procedure with handle 120 and check we receive an ATTRIBUTE_NOT_FOUND error"""
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a valid Write request
+    result = mock.write_cmd(120, b"Foobar")
+    assert isinstance(result, ATT_Error_Response)
+    assert result.request == BleAttOpcode.WRITE_COMMAND
+    assert result.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND
+    assert result.handle == 120
 
 def test_remote_profile_discovery(connected_peripheral):
     """Test remote GATT profile discovery."""
