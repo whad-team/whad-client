@@ -113,10 +113,6 @@ class BaseMeshProfile(object):
         # dict of the subnets the node belongs to. (Subnet objects)
         self.__subnets = []
 
-        # Dev keys of other nodes AND ours
-        # Key is primary address of the node
-        self.__dev_keys = {}
-
         # Represents our own Node (unprovisioned for now, arbitrary address)
         self.__local_node = Node(address=0x0001)
 
@@ -293,8 +289,6 @@ class BaseMeshProfile(object):
             field_name=primary_net_key.key_index, value=primary_net_key
         )
         self.iv_index = iv_index
-        # self.__dev_keys[unicast_addr] = dev_key
-        # self.primary_element_addr = int.from_bytes(unicast_addr, "big")
 
         self.__local_node.address = unicast_addr
         self.__local_node.dev_key = dev_key
@@ -392,31 +386,38 @@ class BaseMeshProfile(object):
 
     def add_distant_node(self, node):
         """
-        Adds a new distance node to our disctionary
+        Adds a new distant node to our dictionnary
 
         :param node: The new node object to add
         :type node: Node
         """
         self.__distant_nodes[node.address] = node
+        return True
 
-    def get_all_dev_keys(self):
+    def remove_distant_node(self, address):
         """
-        Returns a dict of all the devkeys this node stores (at least it has its own)
+        Removes the distant node that has the given primary unicast address from our dictionnary
+        Local change only
 
-        :returns: The dev_keys this node stores (dict, key is primary_element_addr of the node in question)
-        :rtype: dict
+        :param address: The primary uniast address of the node we want to remove from our database
+        :type address: int
+        :returns: The removed node if successfull, None otherwise
+        :rtype: Node | None
         """
-        return self.__dev_keys
+        try:
+            return self.__distant_nodes.pop(address)
+        except KeyError:
+            return None
 
-    def update_dev_key(self, address, dev_key):
+    def update_dev_key(self, address=None, dev_key=None):
         """
-        Update or add a dev_key associated witht the given address
+        Update or add a dev_key associated witht the given address (or local node if no address given)
         If the Node does not exist, we add it to the distant Nodes object.
 
         Returns True if success, False otherwise
 
-        :param address: Address to bind to the dev_key
-        :type address: int
+        :param address: Address to bind to the dev_key, defaults to None
+        :type address: int, optional
         :param dev_key: The dev key to add
         :type dev_key: UpperTransportLayerDevKeyCryptoManager
         :returns: True is success, False otherwise
@@ -424,7 +425,7 @@ class BaseMeshProfile(object):
         """
         dev_key = UpperTransportLayerDevKeyCryptoManager(device_key=dev_key)
 
-        if address == self.__local_node.address:
+        if address is None:
             self.__local_node.dev_key = dev_key
 
         elif address in self.__distant_nodes.keys():
@@ -436,21 +437,6 @@ class BaseMeshProfile(object):
 
         return True
 
-    def remove_dev_key(self, address):
-        """
-        Removes a dev_key from the list we have
-        Address cannot be the current primary adress of this node
-        Returns True if success, False if fail
-
-
-        :param address: Address to remove the dev_key of
-        :type address: int
-        """
-        if address in self.__distant_nodes.keys():
-            self.__distant_nodes.pop(address)
-            return True
-
-        return False
 
     def get_element(self, index):
         """
