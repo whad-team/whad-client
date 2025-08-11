@@ -24,6 +24,7 @@ from .read_by_type import ClientReadByTypeProcedure
 from .readblob import ClientReadBlobProcedure
 from .read import ClientReadProcedure
 from .write import ClientWriteProcedure
+from .writecmd import ClientWriteCommandProcedure
 from .find_info import ClientFindInformationProcedure, ClientFindByTypeValueProcedure
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class GattClient:
             ClientReadProcedure,
             ClientReadBlobProcedure,
             ClientWriteProcedure,
+            ClientWriteCommandProcedure,
             ClientFindInformationProcedure,
             ClientFindByTypeValueProcedure,
         ]
@@ -170,6 +172,23 @@ class GattClient:
         """Write value into a specified attribute."""
         # Initiate a ClientWriteProcedure
         self.__cur_procedure = ClientWriteProcedure(handle, value)
+
+        # Generate ATT packets to send when this procedure is initiated
+        # and forward them to the underlying link-layer
+        for req in self.__cur_procedure.initiate():
+            self.__l2cap.send_pdu(ATT_Hdr()/req)
+
+    def write_cmd(self, handle: int, value: bytes) -> List[Packet]:
+        """Write value into a specific attribute without waiting
+        for a response.
+
+        :param handle: Handle of the target attribute
+        :type handle: int
+        :param value: Value to write into the target attribute
+        :type value: bytes
+        """
+        # Initiate a ClientWriteCommandProcedure
+        self.__cur_procedure = ClientWriteCommandProcedure(handle, value)
 
         # Generate ATT packets to send when this procedure is initiated
         # and forward them to the underlying link-layer
