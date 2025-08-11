@@ -1,8 +1,11 @@
 """
 Write command procedure
 """
+from typing import List, Optional, Any
+from time import sleep
+
 from scapy.packet import Packet
-from scapy.layers.bluetooth import ATT_Write_Command
+from scapy.layers.bluetooth import ATT_Write_Command, ATT_Error_Response
 
 from .attribute import CharacteristicValue, find_attr_by_handle
 from .procedure import Procedure, UnexpectedProcError
@@ -42,5 +45,39 @@ class ServerWriteCommandProcedure(Procedure):
 
         # We don't send anything in return
         self.set_state(Procedure.STATE_DONE)
+        return []
+
+class ClientWriteCommandProcedure(Procedure):
+    """GATT Client WriteCommand procedure"""
+
+    def __init__(self, handle: int, value: bytes):
+        """Initialize a client WriteCommand procedure."""
+        self.__handle = handle
+        self.__value = value
+        super().__init__([], 23)
+
+
+    def initiate(self) -> List[Packet]:
+        """Initiate WriteCommand procedure."""
+        self.set_result(None)
+        return [
+            ATT_Write_Command(
+                gatt_handle=self.__handle,
+                data=self.__value
+            )
+        ]
+
+    def wait(self, timeout: Optional[float] = None) -> Optional[Any]:
+        sleep(.3)
+        if self.get_state() == Procedure.STATE_INITIAL:
+            self.set_result(None)
+            self.set_state(Procedure.STATE_DONE)
+        return super().wait(timeout=timeout)
+
+    def process_request(self, request: Packet) -> List[Packet]:
+        """Process incoming PDUs."""
+        if ATT_Error_Response in request:
+            self.set_result(request[ATT_Error_Response])
+            self.set_state(Procedure.STATE_ERROR)
         return []
 
