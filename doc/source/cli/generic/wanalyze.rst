@@ -19,20 +19,20 @@ For example, the following command will use all available BLE analyzers:
 
 .. code-block:: text
 
-  $ wplay --flush ressources/pcaps/ble_pairing.pcap | wanalyze
+  $ wplay --flush resources/pcaps/ble_pairing.pcap | wanalyze
 
 The following command will use only *"legacy_pairing_cracking"* and *"encrypted_session_initialization"*:
 
 .. code-block:: text
 
-  $ wplay --flush ressources/pcaps/ble_pairing.pcap | wanalyze legacy_pairing_cracking encrypted_session_initialization
+  $ wplay --flush resources/pcaps/ble_pairing.pcap | wanalyze legacy_pairing_cracking encrypted_session_initialization
 
 It is also possible to select only a specific field of an analyzer output, using the expression ANALYZER.FIELD.
 For example, the following command line will display only the Short-Term Key (STK) of the *"legacy_pairing_cracking"* analyzer:
 
 .. code-block:: text
 
-  $ wplay --flush ressources/pcaps/ble_pairing.pcap | wanalyze legacy_pairing_cracking.stk
+  $ wplay --flush resources/pcaps/ble_pairing.pcap | wanalyze legacy_pairing_cracking.stk
 
 
 Command-line options
@@ -99,7 +99,7 @@ To demonstrate the attack, let's first download a PCAP file containing a vulnera
 
 .. code-block:: text
 
-    wget https://github.com/whad-team/whad-client/raw/main/ressources/pcaps/ble_pairing.pcap
+    wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/ble_pairing.pcap
 
 We can easily replay this PCAP file using ``wplay`` tool, with option ``--flush`` to display all the traffic without taking into account the timestamps:
 
@@ -184,7 +184,7 @@ Let's download a PCAP file containing such procedure:
 
 .. code-block:: text
 
-    $ wget https://github.com/whad-team/whad-client/raw/main/ressources/pcaps/zigbee_philips_hue_association.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/zigbee_philips_hue_association.pcap
 
 
 We can then replay and decrypt the traffic using ``wplay`` with ``-d`` (decrypt) option. We need to provide the transport key using ``-k`` (keys) option.
@@ -211,7 +211,7 @@ You can easily break Touchlink protocol using ``wanalyze`` tool. Let's first dow
 
 .. code-block:: text
 
-    $ wget https://github.com/whad-team/whad-client/raw/main/ressources/pcaps/zigbee_touchlink_provisioning.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/zigbee_touchlink_provisioning.pcap
 
 To break the key, let's replay the PCAP file using ``wplay`` with ``--flush`` option to ignore timestamps and combine it with ``wanalyze``:
 
@@ -253,7 +253,7 @@ Let's download a PCAP file containing such weak pairing procedure:
 
 .. code-block:: text
 
-    $ wget https://github.com/whad-team/whad-client/raw/main/ressources/pcaps/rf4ce_pairing_keystrokes_audio.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/rf4ce_pairing_keystrokes_audio.pcap
 
 Then, cracking the key is as simple as running the following command:
 
@@ -286,7 +286,7 @@ Alternatively, you can download a PCAP file containing a captured pairing using 
 
 .. code-block:: text
 
-    $ wget https://github.com/whad-team/whad-client/raw/main/ressources/pcaps/logitech_pairing.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/logitech_pairing.pcap
 
 And replay it using ``wplay``:
 
@@ -307,7 +307,7 @@ Then, let's use this key to decrypt some encrypted traffic. Download the PCAP fi
 
 .. code-block:: text
 
-    $ wget https://github.com/whad-team/whad-client/raw/main/ressources/pcaps/logitech_encrypted_traffic.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/logitech_encrypted_traffic.pcap
 
 You can then use ``wplay`` with ``-d`` option (decrypt) and provide the key using ``-k`` (keys):
 
@@ -337,7 +337,7 @@ For example, the following PCAP contain such a discovery procedure:
 
 .. code-block:: text
 
-    $ wget https://github.com/whad-team/whad-client/raw/main/ressources/pcaps/ble_pairing.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/ble_pairing.pcap
 
 You can extract the discovered profile using:
 
@@ -413,7 +413,7 @@ For example, the following PCAP file contains such keystrokes:
 
 .. code-block:: text
 
-    $ wget https://github.com/whad-team/whad-client/raw/main/ressources/pcaps/rf4ce_pairing_keystrokes_audio.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/rf4ce_pairing_keystrokes_audio.pcap
 
 Let's decrypt the traffic using the corresponding encryption key:
 
@@ -481,7 +481,7 @@ The following PCAP file contains such audio stream:
 
 .. code-block:: text
 
-    $ wget https://github.com/whad-team/whad-client/raw/main/ressources/pcaps/rf4ce_pairing_keystrokes_audio.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/rf4ce_pairing_keystrokes_audio.pcap
 
 Let's decrypt the traffic using the corresponding encryption key:
 
@@ -523,7 +523,7 @@ For example, let's download a PCAP file corresponding to a capture of a Logitech
 
 .. code-block:: text
 
-    $ wget https://github.com/whad-team/whad-client/raw/main/ressources/pcaps/logitech_mouse.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/logitech_mouse.pcap
 
 If you use ``wanalyze`` on the corresponding packet stream, the *"mouse"* analyzer will be automatically triggered:
 
@@ -611,7 +611,7 @@ As an example, let's download some traffic from a Logitech Unifying keyboard:
 
 .. code-block:: text
 
-    $ wget https://github.com/whad-team/whad-client/raw/main/ressources/pcaps/logitech_encrypted_traffic.pcap
+    $ wget https://github.com/whad-team/whad-client/raw/main/whad/resources/pcaps/logitech_encrypted_traffic.pcap
 
 You can then use ``wplay`` with ``-d`` option (decrypt) and provide the key using ``-k`` (keys):
 
