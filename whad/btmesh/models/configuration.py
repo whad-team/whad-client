@@ -3,7 +3,7 @@ Implementation of the Confiruation Server And Client Models
 Mesh Protocol Specificiation Section 4.4.1 and 4.4.2
 """
 
-from whad.btmesh.models import ModelServer, Element
+from whad.btmesh.models import ModelServer, Element, ModelClient
 from whad.btmesh.stack.utils import Subnet
 
 
@@ -182,53 +182,53 @@ class ConfigurationModelServer(ModelServer):
         """
         super().__init__(model_id=0x0000, name="Configuration Server")
 
-        self.handlers[0x8009] = self.on_secure_beacon_get
-        self.handlers[0x800A] = self.on_secure_beacon_set
-        self.handlers[0x8008] = self.on_composition_data_get
-        self.handlers[0x800C] = self.on_default_ttl_get
-        self.handlers[0x800D] = self.on_default_ttl_set
-        self.handlers[0x8012] = self.on_gatt_proxy_get
-        self.handlers[0x8013] = self.on_gatt_proxy_set
-        self.handlers[0x800F] = self.on_friend_get
-        self.handlers[0x0010] = self.on_friend_set
-        self.handlers[0x8026] = self.on_relay_get
-        self.handlers[0x8027] = self.on_relay_set
-        self.handlers[0x8018] = self.on_model_publication_get
-        self.handlers[0x801A] = self.on_model_publication_set
-        self.handlers[0x03] = self.on_model_publication_set
-        self.handlers[0x801B] = self.on_model_subscription_add
-        self.handlers[0x801C] = self.on_model_subscription_delete
-        self.handlers[0x801D] = self.on_model_subscription_delete_all
-        self.handlers[0x801E] = self.on_model_subscription_overwrite
-        self.handlers[0x8020] = self.on_model_subscription_virtual_address_add
-        self.handlers[0x8021] = self.on_model_subscription_virtual_address_delete
-        self.handlers[0x8022] = self.on_model_subscription_virtual_overwrite
-        self.handlers[0x8029] = self.on_model_subscription_sig_get
-        self.handlers[0x802B] = self.on_model_subscription_sig_get
-        self.handlers[0x8040] = self.on_net_key_add
-        self.handlers[0x8045] = self.on_net_key_update
-        self.handlers[0x8041] = self.on_net_key_delete
-        self.handlers[0x8042] = self.on_net_key_get
-        self.handlers[0x00] = self.on_app_key_add
-        self.handlers[0x01] = self.on_app_key_update
-        self.handlers[0x8000] = self.on_app_key_delete
-        self.handlers[0x8001] = self.on_app_key_get
-        self.handlers[0x803D] = self.on_model_to_app_key_bind
-        self.handlers[0x803F] = self.on_model_to_app_key_unbind
-        self.handlers[0x804B] = self.on_sig_model_to_app_key_get
-        self.handlers[0x804D] = self.on_vendor_model_to_app_key_get
-        self.handlers[0x8046] = self.on_node_identity_get
-        self.handlers[0x8047] = self.on_node_identity_set
-        self.handlers[0x8049] = self.on_node_reset
-        self.handlers[0x8015] = self.on_key_refresh_phase_get
-        self.handlers[0x8016] = self.on_key_refresh_phase_set
-        self.handlers[0x8038] = self.on_heartbeat_publication_get
-        self.handlers[0x8039] = self.on_heartbeat_publication_set
-        self.handlers[0x803A] = self.on_heartbeat_subscription_get
-        self.handlers[0x803B] = self.on_heartbeat_subscription_set
-        self.handlers[0x802D] = self.on_lpn_poll_timeout_get
-        self.handlers[0x8023] = self.on_network_transmit_get
-        self.handlers[0x8024] = self.on_network_transmit_set
+        self.rx_handlers[0x8009] = self.on_secure_beacon_get
+        self.rx_handlers[0x800A] = self.on_secure_beacon_set
+        self.rx_handlers[0x8008] = self.on_composition_data_get
+        self.rx_handlers[0x800C] = self.on_default_ttl_get
+        self.rx_handlers[0x800D] = self.on_default_ttl_set
+        self.rx_handlers[0x8012] = self.on_gatt_proxy_get
+        self.rx_handlers[0x8013] = self.on_gatt_proxy_set
+        self.rx_handlers[0x800F] = self.on_friend_get
+        self.rx_handlers[0x0010] = self.on_friend_set
+        self.rx_handlers[0x8026] = self.on_relay_get
+        self.rx_handlers[0x8027] = self.on_relay_set
+        self.rx_handlers[0x8018] = self.on_model_publication_get
+        self.rx_handlers[0x801A] = self.on_model_publication_set
+        self.rx_handlers[0x03] = self.on_model_publication_set
+        self.rx_handlers[0x801B] = self.on_model_subscription_add
+        self.rx_handlers[0x801C] = self.on_model_subscription_delete
+        self.rx_handlers[0x801D] = self.on_model_subscription_delete_all
+        self.rx_handlers[0x801E] = self.on_model_subscription_overwrite
+        self.rx_handlers[0x8020] = self.on_model_subscription_virtual_address_add
+        self.rx_handlers[0x8021] = self.on_model_subscription_virtual_address_delete
+        self.rx_handlers[0x8022] = self.on_model_subscription_virtual_overwrite
+        self.rx_handlers[0x8029] = self.on_model_subscription_sig_get
+        self.rx_handlers[0x802B] = self.on_model_subscription_sig_get
+        self.rx_handlers[0x8040] = self.on_net_key_add
+        self.rx_handlers[0x8045] = self.on_net_key_update
+        self.rx_handlers[0x8041] = self.on_net_key_delete
+        self.rx_handlers[0x8042] = self.on_net_key_get
+        self.rx_handlers[0x00] = self.on_app_key_add
+        self.rx_handlers[0x01] = self.on_app_key_update
+        self.rx_handlers[0x8000] = self.on_app_key_delete
+        self.rx_handlers[0x8001] = self.on_app_key_get
+        self.rx_handlers[0x803D] = self.on_model_to_app_key_bind
+        self.rx_handlers[0x803F] = self.on_model_to_app_key_unbind
+        self.rx_handlers[0x804B] = self.on_sig_model_to_app_key_get
+        self.rx_handlers[0x804D] = self.on_vendor_model_to_app_key_get
+        self.rx_handlers[0x8046] = self.on_node_identity_get
+        self.rx_handlers[0x8047] = self.on_node_identity_set
+        self.rx_handlers[0x8049] = self.on_node_reset
+        self.rx_handlers[0x8015] = self.on_key_refresh_phase_get
+        self.rx_handlers[0x8016] = self.on_key_refresh_phase_set
+        self.rx_handlers[0x8038] = self.on_heartbeat_publication_get
+        self.rx_handlers[0x8039] = self.on_heartbeat_publication_set
+        self.rx_handlers[0x803A] = self.on_heartbeat_subscription_get
+        self.rx_handlers[0x803B] = self.on_heartbeat_subscription_set
+        self.rx_handlers[0x802D] = self.on_lpn_poll_timeout_get
+        self.rx_handlers[0x8023] = self.on_network_transmit_get
+        self.rx_handlers[0x8024] = self.on_network_transmit_set
 
         # profile of the node
         self.profile = profile
@@ -1702,3 +1702,16 @@ class ConfigurationModelServer(ModelServer):
         )
 
         return response
+
+
+class ConfigurationModelClient(ModelClient):
+    """
+    Configuration Model Client. Incomplete, only used function/handlers are added.
+    """
+
+    def __init__(self):
+        super().__init__(model_id=0x1, name="Configuration Client")
+
+        self.rx_handlers[0x803E] = lambda message: None
+        self.rx_handlers[0x8003] = lambda message: None
+

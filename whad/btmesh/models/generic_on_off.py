@@ -19,9 +19,9 @@ class GenericOnOffServer(ModelServer):
     def __init__(self):
         super().__init__(model_id=0x1000, name="Generic On/Off Server")
 
-        self.handlers[0x8201] = self.on_onoff_get
-        self.handlers[0x8202] = self.on_onoff_set
-        self.handlers[0x8203] = self.on_onoff_set_unack
+        self.rx_handlers[0x8201] = self.on_onoff_get
+        self.rx_handlers[0x8202] = self.on_onoff_set
+        self.rx_handlers[0x8203] = self.on_onoff_set_unack
 
         # already to false by default, but for clarity
         self.allows_dev_keys = False
@@ -55,7 +55,7 @@ class GenericOnOffServer(ModelServer):
             present_onoff = pkt.onoff
             response = BTMesh_Model_Generic_OnOff_Status(present_onoff=present_onoff)
         onoff_state.set_value(pkt.onoff, delay=delay)
-        #print("LED VALUE SET TO " + str(pkt.onoff))
+        # print("LED VALUE SET TO " + str(pkt.onoff))
         return response
 
     def on_onoff_set_unack(self, message):
@@ -75,33 +75,38 @@ class GenericOnOffClient(ModelClient):
     def __init__(self):
         super().__init__(model_id=0x1001, name="Generic On/Off Client")
 
-        self.handlers[0x8204] = self.on_onoff_status
+        self.rx_handlers[0x8204] = None
+
+        self.tx_handlers[0x8202] = self.tx_on_off_acked
+        self.tx_handlers[0x8203] = self.tx_on_off_unacked
+
         self.tid = 0
 
-    def on_onoff_status(self, message):
+    def tx_on_off_unacked(self, message, access_layer, is_acked, timeout):
+        """
+        Custom handler to send a GenericOnOff_Set_Unacke message
+        """
         pkt, ctx = message
-        print("RECEIVED ONOFF STATUS")
-        pkt.show()
+        pkt[1].transaction_id = self.tid + 1
+        self.tid += 1
+
+        access_layer.process_new_message(message)  # send the message via stack
         return None
 
-    def registered_function_on_keypress(self, key_pressed):
-        """
-        On keypress, we send an Access message BTMesh_Model_Generic_OnOff_Set_Unacknowldged
-        to the all-nodes addr
 
-        :param key_pressed: [TODO:description]
-        :type key_pressed: [TODO:type]
+    def tx_on_off_acked(self, message, access_layer, is_acked, timeout):
         """
-        print("IN GenericOnOff CLIENT ON KEYPRESS")
-        onoff_state = self.get_state("generic_onoff")
-        # also set our led to the value to synchronize, because why not
-        onoff_state.set_value((onoff_state.get_value() + 1) % 2)
-        onoff = onoff_state.get_value()
+        Custom handler to send a GenericOnOff_Set message
+        """
+        pkt, ctx = message
+        pkt[1].transaction_id = self.tid + 1
+        self.tid += 1
 
-        pkt = BTMesh_Model_Generic_OnOff_Set(onoff=onoff, transaction_id=self.tid)
-        self.tid += 1 % 255
-        ctx = MeshMessageContext()
-        # ctx.dest_addr = b"\xff\xff"
-        ctx.dest_addr = bytes.fromhex(key_pressed)
-        ctx.ttl = 1
-        return pkt, ctx
+        self.expected_response_clazz = BTMesh_Model_Generic_OnOff_Status
+        access_layer.process_new_message(message)  # send the message via stack
+        response = None
+        if is_acked:
+            self.event.wait(timeout)
+            response = self.response
+            self.response = None
+        return response

@@ -10,6 +10,7 @@ from whad.btmesh.stack.constants import (
 )
 from whad.scapy.layers.btmesh import (
     BTMesh_Model_Message,
+    BTMesh_Model_Generic_OnOff_Set,
 )
 
 from prompt_toolkit import HTML, print_formatted_text
@@ -306,9 +307,9 @@ class BTMeshBaseShell(InteractiveShell):
             self.error("Need to have the devices started and provisioned")
             return
 
-        if len(args) >= 1:
+        if len(arg) >= 1:
             try:
-                addr = int(args[0], 0) & 0xFFFF
+                addr = int(arg[0], 0) & 0xFFFF
             except ValueError:
                 self.error("Address is an integer")
                 return
@@ -795,21 +796,19 @@ class BTMeshBaseShell(InteractiveShell):
 
     @category(MISC)
     def do_onoff(self, args):
-        """Sends an onoff (acked) message
-        <ansicyan><b>onoff</b> [<i>"1"|"0"</i>] [<i>TID</i>]</ansicyan>
+        """Sends an onoff (acked) message if the Element 0 has the GenericOnOff Client Model
+        <ansicyan><b>onoff</b> [<i>"1"|"0"</i>]</ansicyan>
 
-        > onoff 1 82
+        > onoff 1
 
         Uses the parameters from the message context (msg_context command).
-        By default uses TID (transaction ID) incremented of this node if not specified.
+        Mainly for testing purposes.
         """
         if self._current_mode != self.MODE_STARTED:
             self.error(
                 "Can only send a message from a provisioned node and not in element edit mode."
             )
             return
-
-        tid = None
 
         if len(args) < 1:
             self.error("Need to specify value to send (0 or 1)")
@@ -821,16 +820,29 @@ class BTMeshBaseShell(InteractiveShell):
             self.error("Value is either '0' or '1'")
             return
 
-        if len(args) >= 2:
-            try:
-                tid = int(args[1], 0) & 0xFF
-            except ValueError:
-                self.error("TID is an integer bewteen 0 and 255.")
-                return
-
         ctx = self.create_msg_context(False)
-        self._connector.do_onoff(value, ctx, tid)
-        self.success("Successfully sent onoff message.")
+        pkt = BTMesh_Model_Generic_OnOff_Set(onoff=value)
+
+        # Get The GenericOnOff model in element 0
+        model = self.profile.local_node.get_element(0).get_model_by_id(0x1001)
+        if model is None:
+            self.error(
+                "This node does not implement de GenericOnOff Client Model in element 0"
+            )
+            return
+
+        self.warning(
+            "Sending BTMesh_Model_Generic_OnOff_Set message, waiting for response."
+        )
+        response = self._connector.send_model_message(
+            model=model, message=(pkt, ctx), is_acked=True
+        )
+        if response is None:
+            self.error("No response received from node.")
+        else:
+            self.success("Status reponse received from node.")
+            resp_pkt, resp_ctx = response
+            resp_pkt.show()
 
     # TODO : send control message (need to have an opcode argument ?)
     @category(MISC)

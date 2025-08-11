@@ -113,7 +113,6 @@ class AccessLayer(Layer):
         packet, ctx = message
         dst_addr = ctx.dest_addr
 
-        packet.show()
         # If waiting for a particular message, check and set event if needed
         if self.state.expected_class is not None:
             if type(packet[1]) is self.state.expected_class:
@@ -225,23 +224,3 @@ class AccessLayer(Layer):
         ctx.is_ctl = False
         ctx.azsmic = 0
         self.send_to_upper_transport(message)
-
-    def do_onoff(self, value, ctx, tid):
-        """
-        Sends a Generic On/Off set message (acked or unacked)
-
-        :param value: Value to be set (0 or 1)
-        :type value: int
-        :param ctx: Context of the message
-        :type ctx: MeshMessageContext
-        :param tid: Transaction Id
-        :type tid: int
-        """
-        if tid is None:
-            tid = self.transaction_id
-            self.transaction_id = (self.transaction_id + 1) % 256
-
-        pkt = BTMesh_Model_Generic_OnOff_Set(onoff=value, transaction_id=tid)
-
-        pkt = BTMesh_Model_Message() / pkt
-        self.process_new_message((pkt, ctx))

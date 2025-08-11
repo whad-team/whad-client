@@ -3,7 +3,7 @@ Mesh Model Generic classes.
 """
 
 import logging
-from threading import Lock, Timer
+from threading import Lock, Timer, Event
 from whad.scapy.layers.btmesh import BTMesh_Model_Message
 from whad.btmesh.crypto import compute_virtual_addr_from_label_uuid
 
@@ -271,11 +271,12 @@ class Model(object):
         # belongs the element at index n (set automatically by the element when model registered)
         self.element_index = None
 
-        # List of handlers for incoming messages. Opcode -> handler
-        self.handlers = {}
-
         # If set to true, need to add corresponding state subscription_list
         self.supports_subscribe = False
+
+        # List of handlers for incoming messages. Opcode -> handler
+        # For ModelClient, handler lists opcode of response messages, function is irrelevant (put lambda function)
+        self.rx_handlers = {}
 
         # If this attribute if True, Model will allows sending/receiving with DevKey
         # If Server model, only with our own DevKey. If Client Model, with any DevKey we have
@@ -284,16 +285,11 @@ class Model(object):
     def handle_message(self, message):
         """
         Handles the received message based on the model handlers
+        (in sub classes)
 
         :param message: Message received by the Access layer
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
-        pkt, ctx = message
-        if pkt.opcode in self.handlers.keys():
-            response = self.handlers[pkt.opcode]((pkt[1], ctx))
-            if response is not None:
-                response = BTMesh_Model_Message() / response
-            return response
         return None
 
 
@@ -312,39 +308,118 @@ class ModelServer(StatesManager, Model):
         # List of ModelRelationships object where this model is the base model (or any model if corresponding rel)
         self.relationships = []
 
-        # Handlers for each type of Access pdus supported by the Model. take as an argument
-        self.handlers = {}
-
     def add_relationship(self, model_relationship):
         self.relationships.append(model_relationship)
 
+    def handle_message(self, message):
+        """
+        Handles the received message based on the model handlers
+
+        :param message: Message received by the Access layer
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
+        """
+        pkt, ctx = message
+        if pkt.opcode in self.rx_handlers.keys():
+            response = self.rx_handlers[pkt.opcode]((pkt[1], ctx))
+            if response is not None:
+                response = BTMesh_Model_Message() / response
+            return response
+        return None
+
 
 class ModelClient(Model):
+    """
+    ModelClient, model that sends messages at will and only receives responses (no unexepected messages received in theory)
+
+    Every message valid in Tx should be listed in self.tx_handlers object with prototype lambda (message, access_layer, is_acked, timeout): pass
+    generic function of this is self.send_message
+
+    Message handled in Rx are listed in self.rx_handlers, function doesnt matter.
+    """
+
+    # lock for sending packet, only one at a time (and only one response waiting at a time)
+    def txlock(f):
+        def _wrapper(self, *args, **kwargs):
+            self.lock_tx()
+            result = f(self, *args, **kwargs)
+            self.unlock_tx()
+            return result
+
+        return _wrapper
+
+    def lock_tx(self):
+        self.__tx_lock.acquire()
+
+    def unlock_tx(self):
+        self.__tx_lock.release()
+
     def __init__(self, model_id, name):
         super().__init__(model_id, name)
 
-    def handle_user_input(self, key_pressed=""):
-        """
-        Handle a user key press to use the Client Model to send a message
-        (WIP, hardcoded behaviour for tests)
+        # Event used to notify the model a message has been received (in response to a sent message)
+        self.event = Event()
+        # Expected packet class of the response received
+        self.expected_response_clazz = None
+        # The response message received (a Status messahe usually)
+        self.response = None
 
-        For now, one key press = one model CLient does one particular thing
+        # Custom handlers for the messages in emission. Should behave like send_message with same prototype, but with custom things if needed
+        self.tx_handlers = {}
 
-        :param key_pressed: The key pressed (if useful ?)
-        :type key_pressed: str
-        """
-        logger.debug("KEY PRESS FOR MODELCLIENT")
-        pkt, ctx = self.registered_function_on_keypress(key_pressed)
-        return pkt, ctx
+        self.__tx_lock = Lock()
 
-    def registered_function_on_keypress(self, key_pressed):
+    @txlock
+    def send_message(
+        self, message, access_layer, is_acked, expected_response_clazz, timeout
+    ):
         """
-        Function to be overwritten if we send a message on user keypress
+        Setup of a message to be sent.
+        The access layer to use is specified
 
-        :param key_pressed: [TODO:description]
-        :type key_pressed: [TODO:type]
+        :param message: The Model message to send.
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
+        :param access_layer: The access_layer to use to send the message
+        :type access_layer: AccessLayer
+        :param is_acked: Is the message acked
+        :type is_acked: bool
+        :param expected_response_clazz: Expected class of the response if acked. Should be a valid message listed in hanlders of model. If not specified, first valid message received in model processed, defaults to None
+        :param expected_response_clazz: Any
+        :param timeout: Timeout delay before if message is acked and no response received (in sec)
+        :type timeout: int
+        :returns: If unacked message, None. If acked, returns the status packet (or custom return in Model has specific implementation)
+        :rtype: Any
         """
-        logger.warn("NO HANDLER FOR MODELCLIENT ON KEYPRESS")
+        pkt, ctx = message
+
+        self.expected_response_clazz = expected_response_clazz
+        self.response = None
+
+        # If custom handler exists in model, use it and it handles everything
+        if pkt.opcode in self.tx_handlers.keys():
+            return self.tx_handlers[pkt.opcode](
+                message, access_layer, is_acked, timeout
+            )
+
+        access_layer.process_new_message(message)  # send the message via stack
+        response = None
+        if is_acked:
+            self.event.wait(timeout)
+            response = self.response
+            self.response = None
+        return response
+
+    def handle_message(self, message):
+        """
+        Handles the received message. Always a response to a packet sent, since we are in ModelClient.
+
+        :param message: Message received by the Access layer
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
+        """
+        pkt, ctx = message
+        if self.expected_response_clazz is None or isinstance(pkt[1], self.expected_response_clazz):
+            self.response = message
+            self.event.set()
+        self.event.clear()
         return None
 
 
@@ -402,15 +477,12 @@ class Element(object):
 
         # Register the opcodes supported in reception by the model
         model_index = len(self.models) - 1
-        model_opcodes = model.handlers.keys()
+        model_opcodes = model.rx_handlers.keys()
         already_registered_opcodes = self.opcode_to_model_index.keys()
         self.model_count = len(self.models)
         for opcode in model_opcodes:
             if opcode not in already_registered_opcodes:
                 self.opcode_to_model_index[opcode] = model_index
-
-        if is_keypress_model:
-            self.keypress_model = model_index
 
     def get_index_of_model(self, model):
         """
@@ -442,7 +514,7 @@ class Element(object):
 
     def get_model_for_opcode(self, opcode):
         """
-        For a received message with an opocode, returns the model in the Element that managed it (if any)
+        For a received message with an opocode, returns the model in the Element that managed it in reception (if any)
 
         :param opcode: The opcode of the Access message
         :type opcode: int | None
