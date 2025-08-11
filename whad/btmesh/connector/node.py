@@ -333,9 +333,9 @@ class BTMeshNode(BTMesh):
         if not pkt.haslayer(BTMesh_Model_Message):
             pkt = BTMesh_Model_Message() / pkt
 
-        return model.send_message(
+        return self._main_stack.get_layer("access").send_access_message(
+            model,
             (pkt, ctx),
-            self._main_stack.get_layer("access"),
             is_acked,
             expected_response_clazz,
             timeout,

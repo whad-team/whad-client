@@ -75,26 +75,23 @@ class GenericOnOffClient(ModelClient):
     def __init__(self):
         super().__init__(model_id=0x1001, name="Generic On/Off Client")
 
-        self.rx_handlers[0x8204] = None
+        self.rx_handlers[0x8204] = self.rx_on_on_onff_status # BTMesh_Model_Generic_OnOff_Status
 
         self.tx_handlers[0x8202] = self.tx_on_off_acked
         self.tx_handlers[0x8203] = self.tx_on_off_unacked
 
         self.tid = 0
 
-    def tx_on_off_unacked(self, message, access_layer, is_acked, timeout):
+    def tx_on_off_unacked(self, message):
         """
         Custom handler to send a GenericOnOff_Set_Unacke message
         """
         pkt, ctx = message
         pkt[1].transaction_id = self.tid + 1
         self.tid += 1
-
-        access_layer.process_new_message(message)  # send the message via stack
         return None
 
-
-    def tx_on_off_acked(self, message, access_layer, is_acked, timeout):
+    def tx_on_off_acked(self, message):
         """
         Custom handler to send a GenericOnOff_Set message
         """
@@ -102,11 +99,14 @@ class GenericOnOffClient(ModelClient):
         pkt[1].transaction_id = self.tid + 1
         self.tid += 1
 
-        self.expected_response_clazz = BTMesh_Model_Generic_OnOff_Status
-        access_layer.process_new_message(message)  # send the message via stack
-        response = None
-        if is_acked:
-            self.event.wait(timeout)
-            response = self.response
-            self.response = None
-        return response
+        # Set the expected class of the response
+        self._expected_response_clazz = BTMesh_Model_Generic_OnOff_Status
+
+        return None
+
+    def rx_on_on_onff_status(self, message):
+        """
+        Custom handler when waiting to receive an expected BTMesh_Model_Generic_OnOff_Status message
+        Useless, but to show custom handlers creation for Rx in ModelClient.
+        """
+        return None
