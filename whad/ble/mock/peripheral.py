@@ -195,7 +195,7 @@ class PeripheralMock(MockDevice):
 
     def read_blob(self, handle: int, offset: int):
         """Emulate a ReadBlob procedure initiated by a remote central."""
-        # Start a Read procedure from an emulated central device.
+        # Start a ReadBlob procedure from an emulated central device.
         self.__client.read_blob(handle, offset)
 
         # Retrieve waiting packets from L2CAP layer and convert them to messages,
@@ -207,6 +207,19 @@ class PeripheralMock(MockDevice):
         # Wait for the client procedure to terminate
         return self.__client.wait_procedure(timeout=1.0)
 
+    def write(self, handle: int, value: bytes):
+        """Emulate a Write procedure initiated by a remote central."""
+        # Start a Write procedure from an emulated central device.
+        self.__client.write(handle, value)
+
+        # Retrieve waiting packets from L2CAP layer and convert them to messages,
+        # and send them to the attached connector (if any)
+        messages = self.to_messages(self.__l2cap.get_pdus())
+        for msg in messages:
+            self.put_message(msg)
+
+        # Wait for the client procedure to terminate
+        return self.__client.wait_procedure(timeout=1.0)
 
     def find_information(self, start_handle: int, end_handle: int):
         """Emulate a FindInformation procedure initiated by a remote central.

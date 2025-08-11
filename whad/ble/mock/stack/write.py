@@ -1,8 +1,12 @@
 """
 Write procedure
 """
+from typing import List
+
 from scapy.packet import Packet
-from scapy.layers.bluetooth import ATT_Handle_Value_Indication, ATT_Handle_Value_Notification, ATT_Write_Request, ATT_Write_Response, ATT_Hdr
+from scapy.layers.bluetooth import ATT_Error_Response, ATT_Handle_Value_Indication, ATT_Handle_Value_Notification, ATT_Write_Request, ATT_Write_Response, ATT_Hdr
+
+from whad.ble.stack.att.constants import BleAttOpcode
 
 from .attribute import Characteristic, ClientCharacteristicConfigurationDescriptor, find_attr_by_handle, find_charac_by_desc_handle
 from .procedure import Procedure, UnexpectedProcError
@@ -81,4 +85,36 @@ class ServerWriteProcedure(Procedure):
         except IndexError:
             self.set_state(Procedure.STATE_DONE)
             return self.att_error_response(request.gatt_handle, Procedure.ERR_ATTR_NOT_FOUND)
+
+class ClientWriteProcedure(Procedure):
+    """GATT Client Write procedure emulation."""
+
+    def __init__(self, handle: int, value: bytes):
+        """Initialize a GATT client Write procedure."""
+        self.__handle = handle
+        self.__value = value
+        super().__init__([], 23)
+
+    def initiate(self) -> List[Packet]:
+        """Initiate a Write procedure."""
+        return [
+            ATT_Write_Request(
+                gatt_handle=self.__handle,
+                data=self.__value,
+            )
+        ]
+
+    def process_request(self, request: Packet) -> List[Packet]:
+        """Process incoming PDU."""
+        if ATT_Error_Response in request:
+            self.set_result(request[ATT_Error_Response])
+            self.set_state(Procedure.STATE_ERROR)
+        elif ATT_Hdr in request and request[ATT_Hdr].opcode == BleAttOpcode.WRITE_RESPONSE:
+            self.set_result(True)
+            self.set_state(Procedure.STATE_DONE)
+        else:
+            print("Error !")
+            self.set_result(None)
+            self.set_state(Procedure.STATE_ERROR)
+        return []
 
