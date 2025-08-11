@@ -8,7 +8,7 @@ Used for basic node directly is ok.
 from whad.btmesh.models import Element
 from whad.btmesh.models.configuration import ConfigurationModelServer
 from whad.btmesh.models.health import HealthModelServer
-from whad.btmesh.models.generic_on_off import GenericOnOffServer
+from whad.btmesh.models.generic_on_off import GenericOnOffServer, GenericOnOffClient
 from whad.btmesh.stack.constants import (
     GROUP_ADDR_TYPE,
     UNICAST_ADDR_TYPE,
@@ -154,6 +154,7 @@ class BaseMeshProfile(object):
         """
         primary_element = self.__local_node.get_element(0)
         primary_element.register_model(GenericOnOffServer())
+        primary_element.register_model(GenericOnOffClient())
 
     def lock_seq(self):
         self.__seq_lock.acquire()

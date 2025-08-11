@@ -177,3 +177,24 @@ class InvalidConfirmationError(Exception):
 
     def __repr__(self):
         return str(self)
+
+#############
+# Message sending
+#############
+
+
+class InvalidModelToSend(Exception):
+    """
+    Raised when a ModelServer is used to send a message
+    """
+
+    def __init__(self, pkt_type):
+        super().__init__()
+
+    def __str__(self):
+        return "InvalidModelToSend()"
+
+    def __repr__(self):
+        return str(self)
+
+

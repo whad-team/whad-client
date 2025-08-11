@@ -42,7 +42,7 @@ class MeshMessageContext:
 
     def __init__(self):
         self.src_addr: int = None
-        self.dest_addr: int = None
+        self.dest_addr: int = 0xFFFF
 
         # Credentials used at the network layer (managed flooding or directed forwarding) (frienship creds not supported)
         self.creds: int = MANAGED_FLOODING_CREDS
@@ -57,13 +57,13 @@ class MeshMessageContext:
         self.aid: int = None
 
         # Index of the app key if not device_key used, -1 if device key used
-        self.application_key_index: int = None
+        self.application_key_index: int = 0
 
         # Address of the node we use the DevKey of to decrypt/encrypt the message (should be dst or src addr...)
         self.dev_key_address: int = None
 
         # Net key id used
-        self.net_key_id: int = None
+        self.net_key_id: int = 0
 
         # lower transport value (size of mic)
         self.aszmic: int = 0

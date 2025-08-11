@@ -6,16 +6,20 @@ Manages basic Tx/Rx. (Based on BLE sniffer because it works)
 """
 
 from scapy.layers.bluetooth4LE import BTLE_ADV, BTLE_ADV_NONCONN_IND, EIR_Hdr
+from whad.scapy.layers.btmesh import BTMesh_Model_Message
 from whad.ble import Peripheral
 from whad.hub.ble import Direction as BleDirection
 from whad.exceptions import UnsupportedCapability
 from whad.exceptions import WhadDeviceDisconnected
+from whad.btmesh.stack.exceptions import InvalidModelToSend
 from queue import Queue, Empty
 from time import sleep
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 from whad.btmesh.stack import PBAdvBearerLayer
 from whad.btmesh.stack.network import NetworkLayer
 from whad.btmesh.connector import BTMesh
+from whad.btmesh.models import ModelClient
+from whad.btmesh.stack.utils import MeshMessageContext
 
 from whad.btmesh.profile import BaseMeshProfile
 
@@ -271,8 +275,8 @@ class BTMeshNode(BTMesh):
         """
         Sends a message created from raw hex string and its context to the access layer to be sent to the network
 
-        :param message: Messsage and its context
-        :type message: (BTMesh_Model_Messsage, MeshMessageContext)
+        :param message: Message and its context
+        :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         self._main_stack.get_layer("access").process_new_message(message)
 
@@ -287,3 +291,52 @@ class BTMeshNode(BTMesh):
         self.prov_auth_data = message
         if self.prov_event is not None:
             self.prov_event.set()
+
+    def send_model_message(
+        self, model, message, is_acked=False, expected_response_clazz=None, timeout=3
+    ):
+        """
+        Sends a message from the model (client) specified.
+        The message should be a valid message sent by the model specified (no BTMesh_Model_Message layer needed !)
+
+        Handlers to send these messages are defined in the `handler` object of the ModelClient object.
+        If is_acked is True, message is expecting a Status response before Timeout.
+
+        Blocking function for timeout time maximum.
+
+        :param model: The model to send the message from. If Acked message, will handle the response and return relevant information (based on handler implementation).
+        :type model: ModelClient
+        :param message: The Model message to send. Context can be None or non existant, use of default values.
+        :type message: (BTMesh_Model_Message, MeshMessageContext | None)  | BTMesh_Model_Message
+        :param is_acked: Is the message acked, defaults to False
+        :type is_acked: bool, optional
+        :param expected_response_clazz: Expected class of the response if acked. Should be a valid message listed in hanlders of model. If not specified, first valid message received in model processed, defaults to None
+        :param expected_response_clazz: Any
+        :param timeout: Timeout delay before if message is acked and no response received (in sec), defaults to 3
+        :type timeout: int, optional
+        :returns: If unacked message, None. If acked, returns the status packet (or custom return in Model has specific implementation) or None
+        :rtype: Any
+        :raises InvalidModelToSend: [TODO:description]
+        """
+        if not isinstance(model, ModelClient):
+            raise InvalidModelToSend(
+                "This model is not a ModelClient, cannot send messages from it."
+            )
+
+        try:
+            pkt, ctx = message
+        except TypeError:
+            pkt = message
+            ctx = MeshMessageContext()
+            ctx.src_addr = self.profile.get_primary_element_addr() + model.element_index
+
+        if not pkt.haslayer(BTMesh_Model_Message):
+            pkt = BTMesh_Model_Message() / pkt
+
+        return model.send_message(
+            (pkt, ctx),
+            self._main_stack.get_layer("access"),
+            is_acked,
+            expected_response_clazz,
+            timeout,
+        )

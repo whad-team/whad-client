@@ -61,7 +61,6 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
         completions["off"] = {}
         return completions
 
-
     @category(MISC)
     def do_listen_beacons(self, args):
         """Starts/stops the listening for Unprovisioned Device Beacons for nodes that want to be provisioned and stores them.
@@ -122,7 +121,6 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
         completions["start"] = {}
         completions["auth"] = {}
         return completions
-
 
     @category(MISC)
     def do_prov(self, args):
@@ -200,11 +198,39 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
         else:
             self.error("This action does not exist")
 
-
         @category(MISC)
         def do_bind_app_key(self, args):
             """Binding of models to app keys of distant nodes.
 
-            <ansicyan><b>bind_app_keys <i>["start"|"auth"]</i> <i>index|value</i></b></ansicyan>
+            <ansicyan><b>bind_app_keys <i>NODE_PRIMARY_ADDRESS</i> <i>ELEMENT_IDX</i> <i>MODEL_ID</i> <i>APP_KEY_IDX</i></b></ansicyan>
+
+            Bind the given model in the given element of the specified node with the app_key specified.
+            Node needs to be added if not already with <ansimagenta>nodes add</ansimagenta> command or via provisioning.
+            No checks will be made on parameters, but response from distant node announces success or fail.
+
+            > bind_app_keys 0x0005 0 0x1000 1
+            Binds the model 0x1000 at Element 0 of node 0x0005 with app_key at index 1
+
+            Does not take into account the parameters in the msg_context command.
             """
-            pass
+            if self._current_mode != self.MODE_STARTED:
+                self.error(
+                    "Cannot bind app keys if not provisioned or in element edit mode."
+                )
+                return
+
+            if len(args) < 4:
+                self.error(
+                    "Need to specify all parameters (node address, element index, model_id and app_key_index)"
+                )
+                return
+
+            try:
+                address = int(args[0], 0) & 0xFFFF
+                element_idx = int(args[1], 0) & 0xFFFF
+                model_id = int(args[2], 0)
+                app_key_index = int(args[3], 0) & 0xFFFF
+            except ValueError:
+                self.error("All parameters are int.")
+                return
+
