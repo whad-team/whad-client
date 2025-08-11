@@ -1644,6 +1644,13 @@ class GattServer(GattLayer):
     def on_write_request(self, request):
         """Write request for characteristic or descriptor value
         """
+        if request.handle == 0:
+            return self.error(
+                BleAttOpcode.WRITE_REQUEST,
+                request.handle,
+                BleAttErrorCode.INVALID_HANDLE
+            )
+
         try:
             # Retrieve attribute from model
             attr = self.server_model.find_object_by_handle(request.handle)
@@ -1821,6 +1828,13 @@ class GattServer(GattLayer):
     def on_write_command(self, request):
         """Write command (without response)
         """
+        if request.handle == 0:
+            return self.error(
+                BleAttOpcode.WRITE_COMMAND,
+                request.handle,
+                BleAttErrorCode.INVALID_HANDLE
+            )
+
         try:
             # Retrieve attribute from model
             attr = self.server_model.find_object_by_handle(request.handle)
@@ -1903,7 +1917,7 @@ class GattServer(GattLayer):
                         )
                     except HookReturnAuthorRequired:
                         self.error(
-                            BleAttOpcode.READ_REQUEST,
+                            BleAttOpcode.WRITE_COMMAND,
                             request.handle,
                             BleAttErrorCode.INSUFFICIENT_AUTHOR
                         )
