@@ -10,6 +10,7 @@ import logging
 from time import sleep
 from queue import Queue, Empty
 from threading import Thread, Event
+from typing import Optional
 
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble import Direction as BleDirection
@@ -246,6 +247,11 @@ class Peripheral(BLE):
         """Connection handle
         """
         return self.__conn_handle
+
+    @property
+    def profile(self) -> Optional[GenericProfile]:
+        """GATT Profile"""
+        return self.__profile
 
     def __configure_stack(self, phy_layer=None, gatt_layer=None):
         """

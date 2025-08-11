@@ -23,6 +23,7 @@ from .read_by_group_type import ClientReadByGroupTypeProcedure
 from .read_by_type import ClientReadByTypeProcedure
 from .readblob import ClientReadBlobProcedure
 from .read import ClientReadProcedure
+from .write import ClientWriteProcedure
 from .find_info import ClientFindInformationProcedure, ClientFindByTypeValueProcedure
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class GattClient:
             ClientReadByTypeProcedure,
             ClientReadProcedure,
             ClientReadBlobProcedure,
+            ClientWriteProcedure,
             ClientFindInformationProcedure,
             ClientFindByTypeValueProcedure,
         ]
@@ -163,4 +165,14 @@ class GattClient:
     def wait_procedure(self, timeout: float = None):
         """Wait for the current procedure to complete."""
         return self.__cur_procedure.wait(timeout=timeout)
+
+    def write(self, handle: int, value: bytes) -> List[Packet]:
+        """Write value into a specified attribute."""
+        # Initiate a ClientWriteProcedure
+        self.__cur_procedure = ClientWriteProcedure(handle, value)
+
+        # Generate ATT packets to send when this procedure is initiated
+        # and forward them to the underlying link-layer
+        for req in self.__cur_procedure.initiate():
+            self.__l2cap.send_pdu(ATT_Hdr()/req)
 

@@ -410,6 +410,24 @@ def test_find_by_type_value_no_result(connected_peripheral):
     assert result.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND
     assert result.handle == 2
 
+def test_write(connected_peripheral):
+    """ Test Write request. """
+    # Retrieve mock from current peripheral
+    mock:PeripheralMock = connected_peripheral.device
+
+    # Send a valid Read request
+    result = mock.write(3, b"Foobar")
+    assert result
+    # Read profile characteristic value
+    charval = connected_peripheral.profile.find_object_by_handle(3)
+    assert charval.value == b"Foobar"
+
+def test_write_invalid_handle(connected_peripheral):
+    """TODO: Test write procedure with handle 0 and check we receive an INVALID_HANDLE error"""
+
+def test_write_unknown_handle(connected_peripheral):
+    """TODO: Test write procedure with handle 120 and check we receive an ATTRIBUTE_NOT_FOUND error"""
+
 def test_remote_profile_discovery(connected_peripheral):
     """Test remote GATT profile discovery."""
     # Retrieve mock from current peripheral
