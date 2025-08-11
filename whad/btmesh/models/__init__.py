@@ -353,14 +353,14 @@ class Element(object):
     This class represents one element of the device. Each element is assigned an address (254 max per device, sub-addr of the Unicast addr of the device).
     """
 
-    def __init__(self, index, is_primary=False):
+    def __init__(self, index=None, is_primary=False):
         """
         Element init. Creates an element and assigns it an address.
 
-        :param index: Index of the element (in the profile). If index is 1, then its address is primary_unicast_addr + 1
-        :type addr: int
+        :param index: Index of the element (in the profile). If index is 1, then its address is primary_unicast_addr + 1, defaults to None
+        :type addr: int | None, optional
         :param is_primary: Is this element primary (only one per device). True if yes., optional defaults to False
-        :type is_primary: boolean
+        :type is_primary: bool
         """
 
         self.is_primary = is_primary

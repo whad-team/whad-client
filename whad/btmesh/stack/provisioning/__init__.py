@@ -142,7 +142,6 @@ class ProvisioningLayer(Layer):
         )
 
     def send_to_gen_prov(self, packet):
-        packet.show()
         hdr = BTMesh_Provisioning_Hdr(
             type=PROVISIONING_TYPES[type(packet)], message=packet
         )
@@ -328,6 +327,7 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         self.state.crypto_manager = ProvisioningBearerAdvCryptoManagerProvisioner(
             alg=_ALGS_FLAGS[params["algorithms"]]
         )
+        self.state.prov_data.provisioning_crypto_manager = self.state.crypto_manager
 
         # generate keys
         self.state.crypto_manager.generate_keypair()

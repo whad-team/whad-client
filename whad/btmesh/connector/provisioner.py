@@ -193,9 +193,9 @@ class Provisioner(BTMeshNode):
                 # if distant node is provisioned, finished
                 if self._prov_data is not None:
                     new_node = Node(
-                        self._prov_data.unicast_addr,
-                        self._prov_data.addr_range,
-                        UpperTransportLayerDevKeyCryptoManager(
+                        address=self._prov_data.unicast_addr,
+                        addr_range=self._prov_data.addr_range,
+                        dev_key=UpperTransportLayerDevKeyCryptoManager(
                             provisioning_crypto_manager=self._prov_data.provisioning_crypto_manager
                         ),
                     )

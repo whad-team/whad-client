@@ -1,7 +1,7 @@
 from whad.cli.shell import InteractiveShell, category
 from whad.btmesh.profile import BaseMeshProfile
 from whad.btmesh.connector.node import BTMeshNode
-from whad.btmesh.models import CompositeModelState
+from whad.btmesh.models import CompositeModelState, Element
 from whad.btmesh.stack.utils import MeshMessageContext, Node
 from whad.btmesh.stack.constants import (
     MANAGED_FLOODING_CREDS,
@@ -56,9 +56,6 @@ class BTMeshBaseShell(InteractiveShell):
 
         # Index of element in MODE_ELEMENT_EDIT and MODE_MODEL_EDIT modes
         self._selected_element = None
-
-        # Model id of the selected model in MODE_MODEL_EDIT
-        self._selected_model = None
 
         self._connector = None
         self._wireshark = None
@@ -291,7 +288,7 @@ class BTMeshBaseShell(InteractiveShell):
 
     @category(SETUP_CAT)
     def do_address(self, arg):
-        """Manages the device's primary unicast address and range
+        """Manages the device's primary unicast address
 
         <ansicyan><b>address</b> <i>value</i></ansicyan>
 
@@ -397,7 +394,7 @@ class BTMeshBaseShell(InteractiveShell):
 
     @category(SETUP_CAT)
     def do_element(self, args):
-        """Manage device's elements
+        """Manage local node's elements
 
         <ansicyan><b>element</b> [<i>ACTION</i> <i>[PARAMS]</i>]</ansicyan>
 
@@ -424,7 +421,7 @@ class BTMeshBaseShell(InteractiveShell):
                     self.error("Cannot add elements after provisioning")
                     return
 
-                index = self.profile.register_element(is_primary=False)
+                index = self.profile.local_node.add_element()
 
                 self.success("Element %d successfully added." % index)
 
@@ -443,7 +440,7 @@ class BTMeshBaseShell(InteractiveShell):
                     if index == 0:
                         self.error("Cannot delete primary element")
 
-                    elif self.profile.remove_elements(index):
+                    elif self.profile.local_node.remove_element(index):
                         self.success(
                             "Successfully removed element at index %d." % index
                         )
@@ -461,7 +458,7 @@ class BTMeshBaseShell(InteractiveShell):
                         self.error("Index needs to be an int")
                         return
 
-                    element = self.profile.get_element(index)
+                    element = self.profile.local_node.get_element(index)
                     if element is None:
                         self.error(
                             "Invalid element index, element %d does not exist." % index
@@ -478,7 +475,7 @@ class BTMeshBaseShell(InteractiveShell):
                     self.error("Need to specify an element index to edit")
 
         else:
-            elements = self.profile.get_all_elements()
+            elements = self.profile.local_node.get_all_elements()
 
             for element in elements:
                 print_formatted_text(
@@ -554,7 +551,7 @@ class BTMeshBaseShell(InteractiveShell):
             self.error("Can only edit models whilst in Element edit mode.")
             return
 
-        element = self.profile.get_element(self._selected_element)
+        element = self.profile.local_node.get_element(self._selected_element)
 
         if len(args) >= 2:
             try:
@@ -665,6 +662,7 @@ class BTMeshBaseShell(InteractiveShell):
                         return
 
                 # If the values have only a single element, no list
+                print(values)
                 if len(values) == 1:
                     values = values[0]
 
@@ -899,7 +897,9 @@ class BTMeshBaseShell(InteractiveShell):
         By default, lists information.
         """
         if self._current_mode != self.MODE_STARTED:
-            self.error("Cannot manage nodes on an unprovisionned device or in element edit mode")
+            self.error(
+                "Cannot manage nodes on an unprovisionned device or in element edit mode"
+            )
             return
 
         action = args[0].lower() if len(args) >= 1 else "list"
@@ -1627,8 +1627,9 @@ class BTMeshBaseShell(InteractiveShell):
             # Try to parse as int
             try:
                 parsed_values.append(int(arg, 0))
-            except ValueError:
                 continue
+            except ValueError:
+                pass
 
             # Check for bytes in hex (e.g., '0a78FF')
             if hex_bytes_pattern.match(arg) and len(arg) % 2 == 0:

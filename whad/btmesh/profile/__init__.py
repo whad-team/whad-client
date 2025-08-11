@@ -58,6 +58,8 @@ class BaseMeshProfile(object):
     Manages the local data of the node and allows interaction from user code or shell to manage the device (no interaction with network)
 
     All nodes should have the ConfigurationModelServer and HealthModelServer on the primary element (stack does not function without it)
+
+    When creating a new profile, the only function that the subclass should overwrite is the _populate_elements_and_models function
     """
 
     def __init__(
@@ -81,19 +83,13 @@ class BaseMeshProfile(object):
         :type auto_prov_unicast_addr: int, optional
         """
 
-        # Is the node provisioned ? (should be True on start if Provisioner)
+        # Is the local node provisioned ? (should be True on start if Provisioner)
         self.is_provisioned = False
-
-        # Elements of the node. Ordered.
-        self.__elements = []
-
-        # NOT USED, KEPT FOR REFRACTORING
-        self.primary_element_addr = 0
 
         # Set after the provisioning
         self.iv_index = b"\x00\x00\x00\x00"
 
-        # Sequence number of the device for the iv_index
+        # Sequence number of the local node for the iv_index
         # used by basically every layer ..XŒ
         self.__seq_number = 0
 
@@ -110,7 +106,7 @@ class BaseMeshProfile(object):
         # the forwarding number for "legitimate" PATH_REQUEST packets from our primary unicast addr
         self.__forwarding_number = 0
 
-        # dict of the subnets the node belongs to. (Subnet objects)
+        # list of the subnets the local node belongs to. (Subnet objects)
         self.__subnets = []
 
         # Represents our own Node (unprovisioned for now, arbitrary address)
@@ -121,11 +117,11 @@ class BaseMeshProfile(object):
         self.__distant_nodes = {}
 
         # Create and register primary element
-        self.register_element(is_primary=True)
+        self.__local_node.add_element(index=0, is_primary=True)
 
         self._populate_elements_and_models()
 
-        primary_element = self.get_element(0)
+        primary_element = self.__local_node.get_element(0)
 
         # Configure and add HealthModelServer
         health_server = HealthModelServer()
@@ -156,7 +152,7 @@ class BaseMeshProfile(object):
         """
         Populate elements and models for the node (except the ConfigurationModelServer, HealthModelServer and primary element creation, by default)
         """
-        primary_element = self.get_element(0)
+        primary_element = self.__local_node.get_element(0)
         primary_element.register_model(GenericOnOffServer())
 
     def lock_seq(self):
@@ -164,6 +160,10 @@ class BaseMeshProfile(object):
 
     def unlock_seq(self):
         self.__seq_lock.release()
+
+    @property
+    def local_node(self):
+        return self.__local_node
 
     def get_primary_element_addr(self):
         """
@@ -292,7 +292,7 @@ class BaseMeshProfile(object):
 
         self.__local_node.address = unicast_addr
         self.__local_node.dev_key = dev_key
-        self.__local_node.addr_range = len(self.__elements)
+        self.__local_node.addr_range = len(self.__local_node.elements)
 
         # Add an app key if specified in arguments
         if app_key is not None:
@@ -340,12 +340,12 @@ class BaseMeshProfile(object):
 
     def bind_all(self, app_key_index):
         """
-        Used when auto provisioning. Bind all the models of the node to app_key with index in argument
+        Used when auto provisioning. Bind all the models of the local node to app_key with index in argument
 
         :param app_key_index: Index of the app key
         :type app_key_index: int
         """
-        for element in self.__elements:
+        for element in self.__local_node.get_all_elements():
             for model in element.models:
                 # check if model is not configuration model (for now we allow use of app key because easier to manage for examples)
                 # if model.model_id != 0:
@@ -355,7 +355,7 @@ class BaseMeshProfile(object):
 
     def get_dev_key(self, address=None):
         """
-        Retrieves the dev_key of the address in argument. If address is None, returns the dev key of this node.
+        Retrieves the dev_key of the address in argument. If address is None, returns the dev key of the node.
         Returns None is no dev_key stored for the adress in argument
 
         :param address: Primary Address of the node we want the dev_key of, defaults to None
@@ -367,7 +367,7 @@ class BaseMeshProfile(object):
             return self.__local_node.dev_key
 
         elif address in self.__distant_nodes.keys():
-            return self.__distant_nodes[address]
+            return self.__distant_nodes[address].dev_key
 
         else:
             return None
@@ -437,57 +437,13 @@ class BaseMeshProfile(object):
 
         return True
 
-
-    def get_element(self, index):
-        """
-        Returns the nth element of the profile. Index 0 for primary element
-
-        :param index: Index of the element in the list
-        :type index: int
-        """
-        try:
-            return self.__elements[index]
-        except IndexError:
-            return None
-
-    def get_all_elements(self):
-        """
-        Retrieves all the elements of the node
-        """
-        return self.__elements
-
-    def remove_elements(self, index):
-        """
-        Used to remove an element (cannot be the primary one)
-
-        :param index: Index of the element to remove
-        :type index: int
-        :returns: True if successfull, False otherwise
-        """
-        if len(self.__elements) < index:
-            return False
-        self.__elements.pop(index)
-        return True
-
-    def register_element(self, is_primary=False):
-        """
-        Add an element to a profile
-
-        :param is_primary: Is the element the primary element of the node, defaults to False
-        :type is_primary: Bool, optional
-        """
-        self.__elements.append(
-            Element(is_primary=is_primary, index=len(self.__elements))
-        )
-        return len(self.__elements) - 1
-
     def get_configuration_server_model(self):
         """
-        Returns the ConfigurationModelServer associated with the Node
+        Returns the ConfigurationModelServer associated with the local Node (speficic model needed in the stack)
         :returns: The ConfigurationModelServer object of the node
         :rtype: ConfigurationModelServer
         """
-        return self.get_element(0).get_model_by_id(0)
+        return self.local_node.get_element(0).get_model_by_id(0)
 
     def get_net_key(self, index):
         """

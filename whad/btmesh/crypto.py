@@ -1056,8 +1056,8 @@ class UpperTransportLayerAppKeyCryptoManager:
 
 class UpperTransportLayerDevKeyCryptoManager:
     """
-    This manages the Device Key (that sits in the UpperTransportLayer).
-    ONE PER DEVICE (in theory) (bound to all networks).
+    This manages a Device Key (that used in the UpperTransportLayer).
+    ONE PER NODE (in theory) (bound to all networks).
     Generated after provisioning complete.
     """
 

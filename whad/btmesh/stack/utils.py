@@ -9,7 +9,7 @@ from whad.btmesh.stack.constants import (
     UNASSIGNED_ADDR_TYPE,
     MANAGED_FLOODING_CREDS,
 )
-from whad.btmesh.models import StatesManager
+from whad.btmesh.models import StatesManager, Element
 from whad.btmesh.models.states import (
     NodeIdentityState,
     PrivateNodeIdentityState,
@@ -139,6 +139,7 @@ class Node:
         dev_key=UpperTransportLayerDevKeyCryptoManager(
             device_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
         ),
+        elements={},
     ):
         """
         Creates a node object.
@@ -149,11 +150,66 @@ class Node:
         :type addr_range: int, optional
         :param dev_key: Dev key of the node, defaults to UpperTransportLayerDevKeyCryptoManager(bytes.fromhex("63964771734fbd76e3b40519d1d94a48"))
         :type dev_key: UpperTransportLayerDevKeyCryptoManager, optional
+        :param elements: dictionnary of Elements of the node, defaults to {}. Key is element index
+        :type elements: dict(int, Element)
         """
 
         self.address = address
         self.addr_range = 0 if addr_range in (0, 1) else addr_range
         self.dev_key = dev_key
+        self.elements = elements
+
+    def add_element(self, index=None, is_primary=False):
+        """
+        Adds an element to the list of elements of the node at index given.
+        Ideally, no index should be passed (can raise error if not subsequent, elements added in order, index + 1 each time)
+
+        :param index: index of the element to add (should not be used ideally), defaults to None
+        :type element: int, optional
+        :param is_primary: Is the element the primary index ?
+        :return: Index of the Element if successful, -1 if fail
+        :rtype: int
+        """
+        if index is None:
+            index = len(self.elements)
+
+        self.elements[index] = Element(is_primary=is_primary, index=index)
+        return index
+
+    def get_element(self, index):
+        """
+        Returns the nth element of the node. Index 0 for primary element
+        Returns None if not found
+
+        :param index: Index of the element in the list
+        :type index: int
+        :returns: The element at index given, None if doesnt exist
+        :rtype: Element | None
+        """
+        try:
+            return self.elements[index]
+        except KeyError:
+            return None
+
+    def get_all_elements(self):
+        """
+        Retrieves all the elements of the node (list of elements, sorted by index)
+        """
+        return dict(sorted(self.elements.items())).values()
+
+    def remove_element(self, index):
+        """
+        Used to remove an element (cannot be the primary one)
+
+        :param index: Index of the element to remove
+        :type index: int
+        :returns: True if successfull, False otherwise
+        """
+        try:
+            self.__elements.pop(index)
+            return True
+        except KeyError:
+            return False
 
 
 class ProvisioningData:
