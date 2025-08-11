@@ -275,7 +275,7 @@ class Model(object):
         self.supports_subscribe = False
 
         # List of handlers for incoming messages. Opcode -> handler
-        # For ModelClient, handler lists opcode of response messages, function is irrelevant (put lambda function)
+        # For ModelClient, handler lists opcode of response messages
         self.rx_handlers = {}
 
         # If this attribute if True, Model will allows sending/receiving with DevKey
@@ -330,83 +330,60 @@ class ModelServer(StatesManager, Model):
 class ModelClient(Model):
     """
     ModelClient, model that sends messages at will and only receives responses (no unexepected messages received in theory)
-
     Every message valid in Tx should be listed in self.tx_handlers object with prototype lambda (message, access_layer, is_acked, timeout): pass
     generic function of this is self.send_message
 
-    Message handled in Rx are listed in self.rx_handlers, function doesnt matter.
+    Message handled in Rx are listed in self.rx_handlers, function is handler. Can be used to change a state, try to resend somthing ...
+    Most of the time, if response is not needed/not special processing, set to `lambda message: None`
     """
 
     # lock for sending packet, only one at a time (and only one response waiting at a time)
-    def txlock(f):
+    def clientlock(f):
         def _wrapper(self, *args, **kwargs):
-            self.lock_tx()
+            self.lock()
             result = f(self, *args, **kwargs)
-            self.unlock_tx()
+            self.unlock()
             return result
 
         return _wrapper
 
-    def lock_tx(self):
-        self.__tx_lock.acquire()
+    def lock(self):
+        self._lock.acquire()
 
-    def unlock_tx(self):
-        self.__tx_lock.release()
+    def unlock(self):
+        self._lock.release()
 
     def __init__(self, model_id, name):
         super().__init__(model_id, name)
 
-        # Event used to notify the model a message has been received (in response to a sent message)
-        self.event = Event()
-        # Expected packet class of the response received
-        self.expected_response_clazz = None
-        # The response message received (a Status messahe usually)
-        self.response = None
+        # Event used to notify the sending thread (in Access Layer) a response message has been received (in response to a sent message)
+        self._response_event = Event()
+        # Expected packet class of the response to receive
+        self._expected_response_clazz = None
+        # The response message received and its Context (a Status messahe usually)
+        self._response = None
 
         # Custom handlers for the messages in emission. Should behave like send_message with same prototype, but with custom things if needed
         self.tx_handlers = {}
 
-        self.__tx_lock = Lock()
+        self._lock = Lock()
 
-    @txlock
-    def send_message(
-        self, message, access_layer, is_acked, expected_response_clazz, timeout
-    ):
+    @clientlock
+    def message_sending_setup(self, message):
         """
-        Setup of a message to be sent.
-        The access layer to use is specified
+        Setup of a message to be sent by this model. Should be called by the Access Layer.
 
         :param message: The Model message to send.
         :type message: (BTMesh_Model_Message, MeshMessageContext)
-        :param access_layer: The access_layer to use to send the message
-        :type access_layer: AccessLayer
-        :param is_acked: Is the message acked
-        :type is_acked: bool
-        :param expected_response_clazz: Expected class of the response if acked. Should be a valid message listed in hanlders of model. If not specified, first valid message received in model processed, defaults to None
-        :param expected_response_clazz: Any
-        :param timeout: Timeout delay before if message is acked and no response received (in sec)
-        :type timeout: int
-        :returns: If unacked message, None. If acked, returns the status packet (or custom return in Model has specific implementation)
-        :rtype: Any
         """
         pkt, ctx = message
-
-        self.expected_response_clazz = expected_response_clazz
-        self.response = None
+        self._response = None
 
         # If custom handler exists in model, use it and it handles everything
         if pkt.opcode in self.tx_handlers.keys():
-            return self.tx_handlers[pkt.opcode](
-                message, access_layer, is_acked, timeout
-            )
+            self.tx_handlers[pkt.opcode](message)
 
-        access_layer.process_new_message(message)  # send the message via stack
-        response = None
-        if is_acked:
-            self.event.wait(timeout)
-            response = self.response
-            self.response = None
-        return response
+        return None
 
     def handle_message(self, message):
         """
@@ -416,11 +393,41 @@ class ModelClient(Model):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         pkt, ctx = message
-        if self.expected_response_clazz is None or isinstance(pkt[1], self.expected_response_clazz):
-            self.response = message
-            self.event.set()
-        self.event.clear()
+        if self._expected_response_clazz is not None and isinstance(
+            pkt[1], self._expected_response_clazz
+        ):
+            if callable(self.rx_handlers[pkt.opcode]):
+                self.rx_handlers[pkt.opcode]((pkt[1], ctx))
+
+        # Notify the thread that initiated the sending if it was waiting
+        self.notify_response(message)
+
         return None
+
+    @clientlock
+    def wait_response(self, timeout):
+        """
+        Function called by thread initiating the sending of a message to wait for the response (Status/Acknoledgment)
+
+        :param timeout: The timeout before we exit the wait
+        :returns: The response packet and its context (only Application layer) or None if no reception
+        :rtype: (Packet, MeshMessageContext) | None
+        """
+        self._response = None
+        self._response_event.wait(timeout)
+        self._response_event.clear()
+        return self._response
+
+    def notify_response(self, message):
+        """
+        Notify a response has been received for an awaited message.
+
+        :param message: The received packet corresponding to the awaited packet from the model, with its context
+        :type message: (Packet, MeshMessageContext)
+        """
+        self._response = message
+        self._response_event.set()
+        self._response_event.clear()
 
 
 class Element(object):

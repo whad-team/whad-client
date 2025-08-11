@@ -213,14 +213,43 @@ class AccessLayer(Layer):
                     )
                 self.send_to_upper_transport((response, new_ctx))
 
-    def process_new_message(self, message):
+    def send_access_message(
+        self, model, message, is_acked=False, expected_response_clazz=None, timeout=3
+    ):
         """
-        Process a message originating from us directly (not in response from another message, usually a message from a ModelClient/Shell)
+        Sends a message from the model (client) specified.
+        The message should be a valid message sent by the model specified (no BTMesh_Model_Message layer needed !)
 
-        :param message: Packet and its context
+        Handlers to send these messages are defined in the `handler` object of the ModelClient object.
+        If is_acked is True, message is expecting a Status response before Timeout.
+
+        Blocking function for timeout time maximum.
+
+        :param model: The model to send the message from. If Acked message, will handle the response and return relevant information (based on handler implementation).
+        :type model: ModelClient
+        :param message: The Model message to send. Context can be None or non existant, use of default values.
         :type message: (BTMesh_Model_Message, MeshMessageContext)
+        :param is_acked: Is the message acked, defaults to False
+        :type is_acked: bool, optional
+        :param expected_response_clazz: Expected class of the response if acked. Should be a valid message listed in hanlders of model. If not specified, first valid message received in model processed, defaults to None
+        :param expected_response_clazz: Any
+        :param timeout: Timeout delay before if message is acked and no response received (in sec), defaults to 3
+        :type timeout: int, optional
+        :returns: If unacked message, None. If acked, returns the status packet (or custom return in Model has specific implementation) or None
+        :rtype: Any
         """
+        # Send the message
         pkt, ctx = message
         ctx.is_ctl = False
         ctx.azsmic = 0
+
+        # Setup the model to send the message (may modify the message, and sets the expected response if any)
+        model.expected_response_clazz = expected_response_clazz
+        model.message_sending_setup(message)
         self.send_to_upper_transport(message)
+
+        # Wait for response and return it
+        response = None
+        if is_acked:
+            response = model.wait_response(timeout)
+        return response

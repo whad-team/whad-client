@@ -1712,6 +1712,6 @@ class ConfigurationModelClient(ModelClient):
     def __init__(self):
         super().__init__(model_id=0x1, name="Configuration Client")
 
-        self.rx_handlers[0x803E] = lambda message: None
-        self.rx_handlers[0x8003] = lambda message: None
+        self.rx_handlers[0x803E] = self.rx_default_handler
+        self.rx_handlers[0x8003] = self.rx_default_handler
 
