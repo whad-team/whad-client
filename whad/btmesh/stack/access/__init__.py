@@ -113,6 +113,7 @@ class AccessLayer(Layer):
         packet, ctx = message
         dst_addr = ctx.dest_addr
 
+        packet.show()
         # If waiting for a particular message, check and set event if needed
         if self.state.expected_class is not None:
             if type(packet[1]) is self.state.expected_class:
@@ -139,16 +140,18 @@ class AccessLayer(Layer):
             # Convert addr to offset from primary addr
             element_index = dst_addr - self.state.profile.get_primary_element_addr()
 
-            target_elements.append(self.state.profile.get_element(element_index))
+            target_elements.append(
+                self.state.profile.local_node.get_element(element_index)
+            )
 
         # Check which element have a model that subscribed to this address
         elif dst_addr_type == GROUP_ADDR_TYPE:
-            for e in self.state.profile.get_all_elements():
+            for e in self.state.profile.local_node.get_all_elements():
                 if e.check_group_subscription(dst_addr):
                     target_elements.append(e)
 
         elif dst_addr_type == VIRTUAL_ADDR_TYPE:
-            for e in self.state.profile.get_all_elements():
+            for e in self.state.profile.local_node.get_all_elements():
                 if e.check_virtual_subscription(dst_addr):
                     target_elements.append(e)
 

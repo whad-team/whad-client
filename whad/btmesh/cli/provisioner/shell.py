@@ -199,3 +199,12 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
 
         else:
             self.error("This action does not exist")
+
+
+        @category(MISC)
+        def do_bind_app_key(self, args):
+            """Binding of models to app keys of distant nodes.
+
+            <ansicyan><b>bind_app_keys <i>["start"|"auth"]</i> <i>index|value</i></b></ansicyan>
+            """
+            pass

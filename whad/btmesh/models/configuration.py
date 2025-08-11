@@ -304,13 +304,10 @@ class ConfigurationModelServer(ModelServer):
         :returns: The element object corresponding
         :rtype: Element | None
         """
-        elements = self.profile.get_all_elements()
         primary_addr = self.profile.get_primary_element_addr()
         element_addr = int.from_bytes(element_addr, "2")
-        for element in elements:
-            if element.index + primary_addr == element_addr:
-                return element
-        return None
+        element_index = element_addr - primary_addr
+        return self.profile.local_node.get_element(element_index)
 
     def on_secure_beacon_get(self, message):
         pkt, ctx = message
@@ -329,6 +326,9 @@ class ConfigurationModelServer(ModelServer):
     def on_composition_data_get(self, message):
         pkt, ctx = message
 
+        # sorted elements (by index)
+        elements = self.profile.local_node.get_all_elements()
+
         if pkt.page == 0:
             self.composition_data.init_page0(
                 cid=b"\x00\x00",
@@ -336,12 +336,12 @@ class ConfigurationModelServer(ModelServer):
                 vid=b"\x00\x00",
                 crpl=10,
                 features=b"\x00\x00",
-                elements=self.profile.get_all_elements(),
+                elements=elements,
             )
             p0_data = self.composition_data.get_p0_data()
             response = BTMesh_Model_Config_Composition_Data_Status(page=0, data=p0_data)
         elif pkt.page == 1:
-            self.composition_data.init_page1(self.profile.get_all_elements())
+            self.composition_data.init_page1(elements)
             p1_data = self.composition_data.get_p1_data()
             response = BTMesh_Model_Config_Composition_Data_Status(page=1, data=p1_data)
         # if composition page not supported, send highest page number supported
@@ -1115,7 +1115,7 @@ class ConfigurationModelServer(ModelServer):
         Disable the publication for models that use a deleted app_key_index
         If model_id specified, only disables publication for the model if app_key_index is used for publication of this Model (and need also element_addr)
         """
-        elements = self.profile.get_all_elements()
+        elements = self.profile.local_node.get_all_elements()
 
         for element in elements:
             for model in element.models:
