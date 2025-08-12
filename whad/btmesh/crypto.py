@@ -106,7 +106,7 @@ def generate_private_key_from_bytes(hex_key):
     """
     return derive_private_key(
         int.from_bytes(hex_key, byteorder="big"),
-        SECP256R1(),  # You can change this to the appropriate curve if needed
+        SECP256R1(),
     )
 
 
