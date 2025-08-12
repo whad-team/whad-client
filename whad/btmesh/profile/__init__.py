@@ -6,7 +6,10 @@ Used for basic node directly is ok.
 """
 
 from whad.btmesh.models import Element
-from whad.btmesh.models.configuration import ConfigurationModelServer
+from whad.btmesh.models.configuration import (
+    ConfigurationModelServer,
+    ConfigurationModelClient,
+)
 from whad.btmesh.models.health import HealthModelServer
 from whad.btmesh.models.generic_on_off import GenericOnOffServer, GenericOnOffClient
 from whad.btmesh.stack.constants import (
@@ -31,7 +34,6 @@ from whad.scapy.layers.btmesh import (
 
 from threading import Lock
 from copy import copy
-
 
 def lock(f):
     """
@@ -117,13 +119,11 @@ class BaseMeshProfile(object):
         self.__distant_nodes = {}
 
         # Create and register primary element
-        self.__local_node.add_element(index=0, is_primary=True)
+        primary_element = self.__local_node.add_element(index=0, is_primary=True) 
 
         self._populate_elements_and_models()
 
-        primary_element = self.__local_node.get_element(0)
-
-        # Configure and add HealthModelServer
+       # Configure and add HealthModelServer
         health_server = HealthModelServer()
         primary_element.register_model(health_server)
 
@@ -152,9 +152,15 @@ class BaseMeshProfile(object):
         """
         Populate elements and models for the node (except the ConfigurationModelServer, HealthModelServer and primary element creation, by default)
         """
+
+        new_element = self.__local_node.add_element()
+        new_element.register_model(GenericOnOffServer())
+
         primary_element = self.__local_node.get_element(0)
         primary_element.register_model(GenericOnOffServer())
         primary_element.register_model(GenericOnOffClient())
+        # for convenience, we add a ConfigurationModelClient to all nodes for testing.
+        primary_element.register_model(ConfigurationModelClient())
 
     def lock_seq(self):
         self.__seq_lock.acquire()
@@ -293,7 +299,7 @@ class BaseMeshProfile(object):
 
         self.__local_node.address = unicast_addr
         self.__local_node.dev_key = dev_key
-        self.__local_node.addr_range = len(self.__local_node.elements)
+        self.__local_node.addr_range = len(self.__local_node.get_all_elements())
 
         # Add an app key if specified in arguments
         if app_key is not None:
@@ -395,6 +401,21 @@ class BaseMeshProfile(object):
         self.__distant_nodes[node.address] = node
         return True
 
+    def get_distant_node(self, address):
+        """
+        Returns a Node object that has the specified primary address if we have one.
+        None if it doesnt exist.
+
+        :param address: Primary unicast address of the node
+        :type address: int
+        :return: The node that has the address, None if not found
+        :rtype: Node | None
+        """
+        try:
+            return self.__distant_nodes[address]
+        except KeyError:
+            return None
+
     def remove_distant_node(self, address):
         """
         Removes the distant node that has the given primary unicast address from our dictionnary
@@ -437,6 +458,14 @@ class BaseMeshProfile(object):
             )
 
         return True
+
+    def update_distant_node_elements(self, address, composition_packet):
+        """
+        Updates the list of elements/models of the node with primary address specified based on a received Composition page.
+
+        :param composition_packet: A Composition page (sent by node or generated ?)
+        :type composition_packet: BTMesh_Model_Config_Composition_Data_Status
+        """
 
     def get_configuration_server_model(self):
         """

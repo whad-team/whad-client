@@ -56,6 +56,8 @@ class CompositionDataState(object):
     Composition Data state containing the page 0 and page 1 only (for now)
     Should be initialised ONCE and never change until term of node.
     One per sub network (for now not supported)
+
+    This class is not relevant with new Scapy packet for Page0, but it functions so I keep it.
     """
 
     def __init__(self):
@@ -92,9 +94,12 @@ class CompositionDataState(object):
             )
             for model in element.models:
                 elements_field = elements_field + model.model_id.to_bytes(2, "little")
-            # no vendor models yet so nothing
+
+            for model in element.vnd_models:
+                elements_field = elements_field + model.model_id.to_bytes(4, "little")
 
         self.p0_data = self.p0_data + elements_field
+        CompositionPage0(self.p0_data).show()
 
     def get_p0_data(self):
         return self.p0_data
@@ -177,10 +182,12 @@ class ConfigurationModelServer(ModelServer):
         """
         Initialization of the ConfigurationModelServer. Needed on all nodes (all profiles)
 
-        :param profile: Profile of the node
+        :param profile: Profile of the node (specific to this Model constructor)
         :type profile: BaseMeshProfile
         """
-        super().__init__(model_id=0x0000, name="Configuration Server")
+        super().__init__(
+            model_id=0x0000, allows_dev_keys=True
+        )
 
         self.rx_handlers[0x8009] = self.on_secure_beacon_get
         self.rx_handlers[0x800A] = self.on_secure_beacon_set
@@ -234,8 +241,6 @@ class ConfigurationModelServer(ModelServer):
         self.profile = profile
 
         self.composition_data = CompositionDataState()
-
-        self.allows_dev_keys = True
 
         self.__init_states()
 
@@ -339,7 +344,9 @@ class ConfigurationModelServer(ModelServer):
                 elements=elements,
             )
             p0_data = self.composition_data.get_p0_data()
-            response = BTMesh_Model_Config_Composition_Data_Status(page=0, data=p0_data)
+            response = BTMesh_Model_Config_Composition_Data_Status(
+                page=0, data=CompositionPage0(p0_data)
+            )
         elif pkt.page == 1:
             self.composition_data.init_page1(elements)
             p1_data = self.composition_data.get_p1_data()
@@ -1710,8 +1717,24 @@ class ConfigurationModelClient(ModelClient):
     """
 
     def __init__(self):
-        super().__init__(model_id=0x1, name="Configuration Client")
+        super().__init__(
+            model_id=0x1, allows_dev_keys=True
+        )
 
-        self.rx_handlers[0x803E] = self.rx_default_handler
-        self.rx_handlers[0x8003] = self.rx_default_handler
+        self.rx_handlers[0x803E] = (
+            lambda message: None
+        )  # BTMesh_Model_Config_Model_App_Status
+        self.rx_handlers[0x8003] = (
+            lambda message: None
+        )  # BTMesh_Model_Config_App_Key_Status
+        self.rx_handlers[0x02] = (
+            lambda message: None
+        )  # BTMesh_Model_Large_Composition_Data_Status
 
+        self.tx_handlers[0x8008] = self.tx_on_composition_data_get
+
+    def tx_on_composition_data_get(self, message):
+        """
+        Handler to setup Client when sending a BTMesh_Model_Config_Composition_Data_Get
+        """
+        self.expected_response_clazz = BTMesh_Model_Config_Composition_Data_Status

@@ -63,9 +63,6 @@ class NetworkLayer(Layer):
         # Max 100 PDUs stored ... (This cache is only for speed purposes, replay protection on Lower Transport Layer)
         self.state.cache = deque(maxlen=100)
 
-        # Check if relay feature is enabled on this device (proxy not implemented)
-        self.state.is_relay_enabled = False
-
         # profile used that stores elements
         self.state.profile = options["profile"]
 
@@ -279,7 +276,7 @@ class NetworkLayer(Layer):
             return
 
         # If relay enabled, try to relay packet (if applicable)
-        if self.state.is_relay_enabled:
+        if self.state.profile.local_node.is_relay:
             self.relay_packet(deobf_net_pdu, dst_addr, addr_type, net_key)
 
         # Check if addr should be processed by our device

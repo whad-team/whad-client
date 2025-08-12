@@ -20,11 +20,9 @@ from whad.scapy.layers.btmesh import *
 # TODO : Implement the actual stuff ...
 class HealthModelServer(ModelServer):
     def __init__(self):
-        super().__init__(model_id=0x0002, name="Health Server")
+        super().__init__(model_id=0x0002, allows_dev_keys=True)
 
         self.__init_states()
-
-        self.allows_dev_keys = True
 
     def __init_states(self):
         self.add_state(CurrentHealthFaultCompositeState())

@@ -6,6 +6,7 @@ import logging
 from threading import Lock, Timer, Event
 from whad.scapy.layers.btmesh import BTMesh_Model_Message
 from whad.btmesh.crypto import compute_virtual_addr_from_label_uuid
+from whad.btmesh.models.constants import MODEL_ID_TO_NAME
 
 
 logger = logging.getLogger(__name__)
@@ -260,13 +261,26 @@ class StatesManager:
 class Model(object):
     """
     This class represents a Model defined in SIG Bluetooth spec (no support for vendor specific models yet).
-    Should never be used alone (use ModelClient or ModelServer).
+    For local node Models, always use subclasses ModelServer and ModelClient.
+
+    Use this class directly to stored distant node models (for information only).
     """
 
-    def __init__(self, model_id, name):
+    def __init__(self, model_id, name="No Name", allows_dev_keys=False):
+        """
+        Creates the Model Object
+
+        :param model_id: The model unique identifier (see BLE Assigned Numbers)
+        :type model_id: int
+        :param name: Name (if not standard), default to "No Name"
+        :type name: str
+        :param allows_dev_keys: Does the model allow messages to be received via a devkey, defaults to False
+        :param allows_dev_keys: bool, optional
+        """
         self.model_id = model_id
 
-        self.name = name
+        if model_id in MODEL_ID_TO_NAME.keys():
+            self.name = MODEL_ID_TO_NAME[model_id]
 
         # belongs the element at index n (set automatically by the element when model registered)
         self.element_index = None
@@ -280,7 +294,7 @@ class Model(object):
 
         # If this attribute if True, Model will allows sending/receiving with DevKey
         # If Server model, only with our own DevKey. If Client Model, with any DevKey we have
-        self.allows_dev_keys = False
+        self.allows_dev_keys = allows_dev_keys
 
     def handle_message(self, message):
         """
@@ -298,9 +312,27 @@ class ModelServer(StatesManager, Model):
     This class implements a generic Server Model.
     """
 
-    def __init__(self, model_id, name, corresponding_group_id=None):
+    def __init__(
+        self,
+        model_id,
+        name="No Name Server",
+        allows_dev_keys=False,
+        corresponding_group_id=None,
+    ):
+        """
+        Creates the ModelServer Object
+
+        :param model_id: The model unique identifier (see BLE Assigned Numbers)
+        :type model_id: int
+        :param name: Name (if not standard), default to "No Name Server"
+        :type name: str
+        :param allows_dev_keys: Does the model allow messages to be received via the local devkey, defaults to False
+        :param allows_dev_keys: bool, optional
+        :param corresponding_group_id: [TODO:description]
+        """
+
         super().__init__()
-        super(StatesManager, self).__init__(model_id, name)
+        super(StatesManager, self).__init__(model_id, name, allows_dev_keys)
 
         # if model part of a corresponding_group, add its id
         self.corresponding_group_id = corresponding_group_id
@@ -353,8 +385,20 @@ class ModelClient(Model):
     def unlock(self):
         self._lock.release()
 
-    def __init__(self, model_id, name):
-        super().__init__(model_id, name)
+    def __init__(self, model_id, name="No Name Client", allows_dev_keys=False):
+        """
+        Creates the ModelClient Object
+
+        :param model_id: The model unique identifier (see BLE Assigned Numbers)
+        :type model_id: int
+        :param name: Name (if not standard), default to "No Name Client"
+        :type name: str
+        :param allows_dev_keys: Does the model allow messages to be received via the distant node devkey, defaults to False
+        :param allows_dev_keys: bool, optional
+        :param corresponding_group_id: [TODO:description]
+        """
+
+        super().__init__(model_id, name, allows_dev_keys)
 
         # Event used to notify the sending thread (in Access Layer) a response message has been received (in response to a sent message)
         self._response_event = Event()
@@ -368,6 +412,14 @@ class ModelClient(Model):
 
         self._lock = Lock()
 
+    @property
+    def expected_response_clazz(self):
+        return self._expected_response_clazz
+
+    @expected_response_clazz.setter
+    def expected_response_clazz(self, value):
+        self._expected_response_clazz = value
+
     @clientlock
     def message_sending_setup(self, message):
         """
@@ -379,7 +431,9 @@ class ModelClient(Model):
         pkt, ctx = message
         self._response = None
 
-        # If custom handler exists in model, use it and it handles everything
+        # If custom handler exists in model, use it to setup the message, and expected response
+        # Be careful, in the the Access layer `send_access_message` function, you specified a one time _expected_response_clazz
+        # it will overwrite the one set in custom handler !
         if pkt.opcode in self.tx_handlers.keys():
             self.tx_handlers[pkt.opcode](message)
 
@@ -458,35 +512,44 @@ class Element(object):
         # location descriptor, not used except in Composition Data
         self.loc = 0
 
-        # List of models in the Element. List of Model objects (ModelClient or ModelServer).
+        # List of models in the Element. List of Model objects (ModelClient|ModelServer,or Model if distant node).
         # Order after init should never change since we use the index to access Models
         self.models = []
+
+        # Like self.models but for vendor models
+        self.vnd_models = []
 
         # Dictionary of opcode to model index (in self.models) that refers to the model that handle this message.
         self.opcode_to_model_index = {}
 
-        # index of model registred to send a message on key press
-        self.keypress_model = None
-
-    def register_model(self, model, is_keypress_model=False):
+    def register_model(self, model, is_vendor_model=False):
         """
         Adds a model to this element. Associate the opcodes allowed in Rx to this model instance.
 
+        Vendor models not supported (TODO: Composition Page 1 generation for VND models)
+
         :param model: The Model object to add
         :type model: Model
+        :param is_vendor_model: Is the model a vendor model, defaults to False
+        :type is_vendor_model: bool, optional
         :param is_keypress_model: True if the model is the one registered to send messages on key_press
         """
 
         # Set the element_index of the model
         model.element_index = self.index
 
-        self.models.append(model)
+        if is_vendor_model:
+            self.vnd_models.append(model)
+            self.vnd_model_count += 1
+        else:
+            self.models.append(model)
+            self.model_count += 1
 
         # Register the opcodes supported in reception by the model
         model_index = len(self.models) - 1
         model_opcodes = model.rx_handlers.keys()
         already_registered_opcodes = self.opcode_to_model_index.keys()
-        self.model_count = len(self.models)
+
         for opcode in model_opcodes:
             if opcode not in already_registered_opcodes:
                 self.opcode_to_model_index[opcode] = model_index
@@ -505,6 +568,20 @@ class Element(object):
         except ValueError:
             return None
 
+    def get_index_of_vnd_model(self, model):
+        """
+        Returns the index of the vendor model (index in the self.vnd_models list) or None if not in list
+
+        :param model: Model in question
+        :type model: Model
+        :returns: The index of the Model or None if not found[TODO:type]
+        :rtype: int | None
+        """
+        try:
+            return self.vnd_models.index(model)
+        except ValueError:
+            return None
+
     def get_model_by_id(self, model_id):
         """
         Returns the model with the model id in argument that lives in the Element
@@ -514,7 +591,7 @@ class Element(object):
         :returns: The model associated with the model id
         :rtype: Model | None
         """
-        for model in self.models:
+        for model in self.models + self.vnd_models:
             if model.model_id == model_id:
                 return model
         return None
@@ -539,35 +616,6 @@ class Element(object):
 
         return self.models[self.opcode_to_model_index[opcode]]
 
-    """
-    def handle_message(self, message):
-        pkt, ctx = message
-        opcode = pkt.opcode
-        if opcode not in self.opcode_to_model_index:
-            logger.debug(
-                "NO MODEL IN ELEMENT "
-                + str(self.index)
-                + " CAN HANDLE OPCODE "
-                + str(opcode)
-            )
-            logger.debug(pkt.show(dump=True))
-            return None
-
-        model = self.models[self.opcode_to_model_index[opcode]]
-
-        # check if app_key used is bound to the model
-        app_key_indexes = self.global_states_manager.get_state(
-            "model_to_app_key_list"
-        ).get_value(model.model_id)
-
-        # if dev_key used, index is -1 ! (dont forget to add it when creating the model ...)
-        if ctx.application_key_index not in app_key_indexes:
-            raise Exception
-        resp_pkt, resp_ctx = model.handle_message(message)
-        resp_ctx.src_addr = self.index
-        return (resp_pkt, resp_ctx)
-        """
-
     def check_group_subscription(self, addr):
         """
         Checks if any model server in the element is subscribed to the addr in parameter
@@ -578,7 +626,7 @@ class Element(object):
         :returns: True is one model in the Element is subscribed to the addr, False otherwise
         """
         res = False
-        for model in self.models:
+        for model in self.models + self.vnd_models:
             if isinstance(model, ModelServer) and model.supports_subscribe:
                 sub_list = model.get_state("subscription_list").get_value("group_addrs")
                 if addr in sub_list:
@@ -596,7 +644,7 @@ class Element(object):
         :returns: True is one model in the Element is subscribed to the addr, False otherwise
         """
         res = False
-        for model in self.models:
+        for model in self.models + self.vnd_models:
             if isinstance(model, ModelServer) and model.supports_subscribe:
                 sub_list = model.get_state("subscription_list").get_value("label_uuids")
                 for label in sub_list:
@@ -604,30 +652,6 @@ class Element(object):
                         res = True
                         break
         return res
-
-    def handle_user_input(self, key_pressed=""):
-        """
-        Process a keypressed message from the user to send a message from a ModelClient
-
-        :param key_pressed: [TODO:description]
-        :type key_pressed: [TODO:type]
-        """
-        if self.keypress_model is None:
-            return
-        model = self.models[self.keypress_model]
-        pkt, ctx = model.handle_user_input(key_pressed)
-        app_key_index = self.global_states_manager.get_state(
-            "model_to_app_key_list"
-        ).get_value(model.model_id)[0]
-        ctx.application_key_index = app_key_index
-        aid = (
-            self.global_states_manager.get_state("app_key_list")
-            .get_value(app_key_index)
-            .aid
-        )
-        ctx.aid = aid
-        ctx.net_key_id = 0
-        return BTMesh_Model_Message() / pkt, ctx
 
 
 class ModelRelationship(object):
