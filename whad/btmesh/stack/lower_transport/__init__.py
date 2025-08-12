@@ -307,6 +307,7 @@ class LowerTransportLayer(Layer):
         :param message: PDU and its context
         :type message: (Packet, MeshMessageContext)
         """
+        pkt, ctx = message
         self.send("network", message)
 
     def send_to_upper_transport(self, message):
@@ -355,7 +356,6 @@ class LowerTransportLayer(Layer):
         :type message: (BTMesh_Lower_Transport_Control_Message, MeshMessageContext)
         """
         pkt, ctx = message
-
         seg = pkt.seg
 
         if seg == 0:
@@ -539,11 +539,15 @@ class LowerTransportLayer(Layer):
             else:
                 delay = transaction.min_ack_delay / 1000
 
+            # Stop previous thread if necessary
+            transaction.event.clear()
+            transaction.event = Event()
             transaction.main_ack_thread = Timer(
                 delay,
                 self.sending_ack_thread,
                 args=(transaction, False, transaction.event),
             )
+            transaction.event.set()
             transaction.main_ack_thread.start()
 
         else:
@@ -564,8 +568,6 @@ class LowerTransportLayer(Layer):
                     )
                 else:
                     delay = transaction.min_ack_delay / 1000
-
-                ctx.seq_number = ctx.seq_auth & 0xFFFFFF
 
                 # "kill" previous ack sending thread to send last one
                 transaction.event.clear()
@@ -952,11 +954,7 @@ class LowerTransportLayer(Layer):
         :param event: Event object to communicate with main thread
         :type event: Event
         """
-        while (
-            event.is_set()
-            and transaction.seg_n > transaction.sar_segment_threshold
-            and transaction.sar_ack_retrans_count > 0
-        ):
+        while event.is_set():
             pkt = BTMesh_Lower_Transport_Segment_Acknoledgment_Message(
                 obo=0,
                 seq_zero=transaction.ctx.seq_zero,
@@ -974,7 +972,11 @@ class LowerTransportLayer(Layer):
             transaction.time_last_ack = time()
             transaction.sar_ack_retrans_count = -1
 
-            if not resend:
+            if (
+                not resend
+                or transaction.seg_n <= transaction.sar_segment_threshold
+                or transaction.sar_ack_retrans_count > 0
+            ):
                 return
 
             sleep(transaction.sar_seg_reception_interval / 1000)

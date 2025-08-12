@@ -11,6 +11,8 @@ from whad.btmesh.stack.constants import (
 from whad.scapy.layers.btmesh import (
     BTMesh_Model_Message,
     BTMesh_Model_Generic_OnOff_Set,
+    BTMesh_Model_Config_Composition_Data_Get,
+    BTMesh_Model_Config_Composition_Data_Status,
 )
 
 from prompt_toolkit import HTML, print_formatted_text
@@ -19,6 +21,7 @@ from whad.exceptions import ExternalToolNotFound
 
 from whad.common.monitors import WiresharkMonitor
 from re import match, compile
+from time import sleep
 
 INTRO = """
 wbtmesh-base, the WHAD Bluetooth Mesh Base utility (not usable as is)
@@ -49,7 +52,7 @@ class BTMeshBaseShell(InteractiveShell):
         self._complete_name = "WhadDev"
         self._shortened_name = None
 
-        #        self._main_stack = NetworkLayer(connector=self, options=self.options) If interface is None, pick the first matching our needs
+        # self._main_stack = NetworkLayer(connector=self, options=self.options) If interface is None, pick the first matching our needs
         self.interface = interface
 
         # Profile
@@ -422,9 +425,9 @@ class BTMeshBaseShell(InteractiveShell):
                     self.error("Cannot add elements after provisioning")
                     return
 
-                index = self.profile.local_node.add_element()
+                element = self.profile.local_node.add_element()
 
-                self.success("Element %d successfully added." % index)
+                self.success("Element %d successfully added." % element.index)
 
             elif action == "remove":
                 if self._current_mode != self.MODE_NORMAL:
@@ -477,21 +480,7 @@ class BTMeshBaseShell(InteractiveShell):
 
         else:
             elements = self.profile.local_node.get_all_elements()
-
-            for element in elements:
-                print_formatted_text(
-                    HTML("<ansicyan><b>Element %d</b></ansicyan>:" % element.index)
-                )
-                if len(element.models) > 0:
-                    for model in element.models:
-                        print_formatted_text(
-                            HTML(
-                                "|─ <ansimagenta><b>Model %s</b> (0x%x)</ansimagenta>"
-                                % (model.name, model.model_id)
-                            )
-                        )
-                else:
-                    print_formatted_text(HTML(" <i>No models defined</i>"))
+            self._show_elements(elements)
 
         self.update_prompt()
 
@@ -878,6 +867,7 @@ class BTMeshBaseShell(InteractiveShell):
         completions["add"] = {}
         completions["remove"] = {}
         completions["dev_key"] = {}
+        completions["get_composition"] = {}
         return completions
 
     @category(SETUP_CAT)
@@ -886,7 +876,7 @@ class BTMeshBaseShell(InteractiveShell):
 
         <ansicyan><b>nodes</b> [<i>ACTION</i>] [<i>PRIMARY_NODE_ADDR</i>] [<i>VALUES</i>]</ansicyan>
 
-        All actions are performed to update information stored on the local node, no messages are sent on the network
+        All actions are performed to update information stored on the local node. Some messages might be sent only to read states of other nodes.
         If no PRIMARY_NODE_ADDR specified, affects the local node !
         If PRIMARY_NODE_ADDR specified, affects a distant node (in the case of spoofing, local and a distant node can share an address)
 
@@ -896,6 +886,7 @@ class BTMeshBaseShell(InteractiveShell):
         - <b>add</b> : Adds a distant node (need address, optional address range). If already present, does nothing. Adds a default value for dev_key as placeholder (invalid for real use)
         - <b>remove</b> : Remove a distant node from the list
         - <b>dev_key</b> : Update the dev_key of the given node (only in local database !). If no address given, changes the dev_key of the local node.
+        - <b>get_composition</b> : Retrives the composition data of the node (need a valid DevKey for the distant node and a ConfigurationModelClient in primary element !)
 
         > To list : nodes list
 
@@ -905,6 +896,8 @@ class BTMeshBaseShell(InteractiveShell):
 
         > To change/add dev_key of a node: nodes dev_key 0x0005 63964771734fbd76e3b40519d1d94a48
         Change dev_key of local node : nodes dev_key 77964771734fbd76e3b40519d1d94a89
+
+        > To retrieve composition data for a Node : nodes get_composition 0x000a
 
         By default, lists information.
         """
@@ -920,14 +913,27 @@ class BTMeshBaseShell(InteractiveShell):
             for node in nodes.values():
                 print_formatted_text(
                     HTML(
-                        "|─ <ansimagenta><b>Address: 0x%x DevKey : %s</b></ansimagenta>"
-                        % (node.address, node.dev_key.device_key.hex())
+                        "<ansimagenta><b>Address: 0x%x -> 0x%x</b></ansimagenta>"
+                        % (
+                            node.address,
+                            (node.address + node.addr_range),
+                        )
                     )
                 )
+                print_formatted_text(
+                    HTML(
+                        "   <ansigreen>DevKey : <i>%s</i></ansigreen>"
+                        % node.dev_key.device_key.hex()
+                    )
+                )
+                self._show_elements(
+                    elements=node.get_all_elements(), indentation_level=1
+                )
             return
+
         elif action == "dev_key":
             if len(args) < 2:
-                self.error("Specify value of the key")
+                self.error("Specify value of the key.")
                 return
 
             try:
@@ -951,19 +957,24 @@ class BTMeshBaseShell(InteractiveShell):
             else:
                 self.success("Update of dev_key successfull")
 
-        elif action == "add":
-            if len(args) < 2:
-                self.error("Specify primary unicast address of the node to add")
-                return
+        # All other actions require address
+        if len(args) < 2:
+            self.error("Specify the address of the node for the action.")
+            return
+        try:
+            address = int(args[1], 0) & 0xFFFF
+        except ValueError:
+            self.error("The address is a 2 bytes int")
+            return
 
+        if action == "add":
             addr_range = 0
-            try:
-                address = int(args[1], 0) & 0xFFFF
-                if len(args) >= 3:
+            if len(args) >= 3:
+                try:
                     addr_range = int(args[2], 0) & 0xFFFF
-            except ValueError:
-                self.error("The address and range are 2 bytes int.")
-                return
+                except ValueError:
+                    self.error("The address and range are 2 bytes int.")
+                    return
 
             added_node = Node(address=address, addr_range=addr_range)
             success = self.profile.add_distant_node(added_node)
@@ -975,18 +986,6 @@ class BTMeshBaseShell(InteractiveShell):
                 self.success("Addition of new distant node successfull")
 
         elif action == "remove":
-            if len(args) < 2:
-                self.error(
-                    "Need to specify address of distant node to remove from local database"
-                )
-                return
-
-            try:
-                address = int(args[1], 0) & 0xFFFF
-            except ValueError:
-                self.error("The address is a 2 bytes int")
-                return
-
             if self._dev_key_address == address:
                 self.error(
                     "Cannot delete this node for now, address used in message context as dev_key address ! "
@@ -1005,6 +1004,54 @@ class BTMeshBaseShell(InteractiveShell):
                 "Successfully removed Node %x from list" % removed_node.address
             )
             return
+
+        elif action == "get_composition":
+            distant_node = self.profile.get_distant_node(address)
+
+            if distant_node is None:
+                self.error(
+                    "No distant node with the primary address %x in our database."
+                    % address
+                )
+                return
+
+            # Fetch our ConfigurationModelClient on element 0 to send the message
+            configuration_model_client = self.profile.local_node.get_element(
+                0
+            ).get_model_by_id(0x01)
+            if configuration_model_client is None:
+                self.error(
+                    "This node does not implement a ConfigurationModelClient on the primary element, cannot fetch composition data."
+                )
+                return
+
+            # Send message for page 0
+            pkt = BTMesh_Model_Config_Composition_Data_Get(page=0)
+            # Use message context set by user, but force destination, src and use of dev key
+            ctx = self.create_msg_context(is_ctl=False)
+            ctx.dest_addr = address
+            ctx.src_addr = self.profile.get_primary_element_addr()
+            ctx.dev_key_address = address
+            ctx.application_key_index = -1
+
+            self.warning("Fetching CompositionData page 0...")
+            response = self._connector.send_model_message(
+                model=configuration_model_client, message=(pkt, ctx), is_acked=True
+            )
+            if response is None:
+                self.error(
+                    "Failed to retrived CompositionData page 0 for node %x." % address
+                )
+                return
+            self.success("Successfully fetched CompositionData page 0.")
+            pkt, ctx = response
+
+            distant_node.dissect_composition_data(
+                pkt.getlayer(BTMesh_Model_Config_Composition_Data_Status)
+            )
+
+            # Display the information
+            self._show_elements(distant_node.get_all_elements())
 
     def complete_net_keys(self):
         """Autocomplete wireshark command"""
@@ -1658,3 +1705,38 @@ class BTMeshBaseShell(InteractiveShell):
                     raise ValueError(f"Unrecognized value: {arg}")
 
         return parsed_values
+
+    def _show_elements(self, elements, indentation_level=0):
+        """
+        From a list of elements, pretty display
+
+        :param elements: List of Element objects
+        :type elements: list(Elements)
+        :param indentation_level: Add an identiation level (or multiple based on value), defaults to 0
+        :type indentation_level: int, optional
+        """
+        if len(elements) == 0:
+            print_formatted_text(
+                HTML(
+                    "   " * indentation_level
+                    + "<ansicyan><b>No Elements listed.</b></ansicyan> Try <ansiyellow>`nodes get_composition` command</ansiyellow>"
+                )
+            )
+        for element in elements:
+            print_formatted_text(
+                HTML(
+                    "   " * indentation_level
+                    + "<ansicyan><b>Element %d</b></ansicyan>:" % element.index
+                )
+            )
+            if len(element.models) > 0:
+                for model in element.models:
+                    print_formatted_text(
+                        HTML(
+                            "  " * indentation_level
+                            + " |─ <ansiyellow><i>Model : %s</i> <b>(0x%x)</b></ansiyellow>"
+                            % (model.name, model.model_id)
+                        )
+                    )
+            else:
+                print_formatted_text(HTML(" <i>No models defined</i>"))

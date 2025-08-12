@@ -17,7 +17,7 @@ from whad.scapy.layers.btmesh import *
 
 class GenericOnOffServer(ModelServer):
     def __init__(self):
-        super().__init__(model_id=0x1000, name="Generic On/Off Server")
+        super().__init__(model_id=0x1000)
 
         self.rx_handlers[0x8201] = self.on_onoff_get
         self.rx_handlers[0x8202] = self.on_onoff_set
@@ -73,7 +73,7 @@ class GenericOnOffServer(ModelServer):
 
 class GenericOnOffClient(ModelClient):
     def __init__(self):
-        super().__init__(model_id=0x1001, name="Generic On/Off Client")
+        super().__init__(model_id=0x1001)
 
         self.rx_handlers[0x8204] = self.rx_on_on_onff_status # BTMesh_Model_Generic_OnOff_Status
 
@@ -100,7 +100,7 @@ class GenericOnOffClient(ModelClient):
         self.tid += 1
 
         # Set the expected class of the response
-        self._expected_response_clazz = BTMesh_Model_Generic_OnOff_Status
+        self.expected_response_clazz = BTMesh_Model_Generic_OnOff_Status
 
         return None
 

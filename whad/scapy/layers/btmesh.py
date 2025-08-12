@@ -48,7 +48,7 @@ from scapy.config import conf
 # Only used for Payload classes that are empty (.i.e no fields)
 # Scapy doesnt check for bound layers if payload is empty hence this hack
 # See : https://github.com/secdev/scapy/issues/2192
-# Dynamically populated right after the class definition in this file 
+# Dynamically populated right after the class definition in this file
 # If you create a new Model message with no fields, dont forget to add it with `OPCODE_TO_EMPTY_MODEL_PACKET[opcode] = clazz`
 OPCODE_TO_EMPTY_MODEL_PACKET = {}
 
@@ -137,9 +137,10 @@ class VariableLengthOpcodeField(Field):
             return s[2:], struct.unpack("!H", s[:2])[0]
         elif first_byte & 0b11000000 == 0b11000000:
             # 11xxxxxx -> 3-byte opcode
-            return s[3:], struct.unpack("!I", b"\x00" + s[:3])[
-                0
-            ]  # Unpack 3 bytes as 4 bytes (prepend a 0 byte)
+            return (
+                s[3:],
+                struct.unpack("!I", b"\x00" + s[:3])[0],
+            )  # Unpack 3 bytes as 4 bytes (prepend a 0 byte)
         else:
             # Reserved opcode (01111111)
             raise ValueError("Reserved opcode encountered: 01111111")
@@ -149,9 +150,7 @@ class VariableLengthOpcodeField(Field):
         first_byte = (
             (val >> 16) & 0xFF
             if val > 0xFFFF
-            else (val >> 8) & 0xFF
-            if val > 0xFF
-            else val
+            else (val >> 8) & 0xFF if val > 0xFF else val
         )
 
         if first_byte & 0b10000000 == 0b00000000 and first_byte != 0b01111111:
@@ -1148,9 +1147,11 @@ class BTMesh_Model_Message(Packet):
     # Usually Get messages are empty, the rest is not
     # The dict of opcode -> Packet class Dynamically populated right after Packet class definition
     def dissection_done(self, pkt):
-        if isinstance(self.payload, NoPayload) and self.opcode in OPCODE_TO_EMPTY_MODEL_PACKET.keys():
+        if (
+            isinstance(self.payload, NoPayload)
+            and self.opcode in OPCODE_TO_EMPTY_MODEL_PACKET.keys()
+        ):
             self.add_payload(OPCODE_TO_EMPTY_MODEL_PACKET[self.opcode]())
-
 
 
 class BTMesh_Model_Generic_OnOff_Get(Packet):
@@ -1335,9 +1336,69 @@ bind_layers(
 )
 
 
+class ElementPacket(Packet):
+    name = "Element (Composition Data)"
+    fields_desc = [
+        LEShortField("loc", None),
+        ByteField("num_s", None),
+        ByteField("num_v", None),
+        FieldListField(
+            "sig_models",
+            None,
+            field=XLEShortField("", None),
+            count_from=lambda pkt: pkt.num_s,
+        ),
+        FieldListField(
+            "vendor_models",
+            None,
+            field=XNBytesField("", None, sz=4),
+            count_from=lambda pkt: pkt.num_v,
+        ),
+    ]
+
+    def extract_padding(self, s):
+        """
+        Pass the remaining data of the Packet the the next Layer (tricky).
+        We use this packet in a PacketField so we need to have the remaining data passed to the parent.
+        """
+        return "", s
+
+
+class CompositionPage0(Packet):
+    name = "Composition Page 0"
+    fields_desc = [
+        LEShortField("cid", None),
+        LEShortField("pid", None),
+        LEShortField("vid", None),
+        LEShortField("crpl", None),
+        BitField("RFU", 0, 4),
+        FlagsField("features", None, 4, ["relay", "proxy", "friend", "low_power"]),
+        BitField("RFU2", 0, 8),
+        PacketListField("elements", None, pkt_cls=ElementPacket),
+    ]
+
+
 class BTMesh_Model_Config_Composition_Data_Status(Packet):
     name = "Bluetooth Mesh Config Model Composition Data Status"
-    fields_desc = [ByteField("page", None), StrField("data", None)]
+    fields_desc = [
+        ByteField("page", None),
+        MultipleTypeField(
+            [
+                (
+                    PacketField(
+                        "data",
+                        None,
+                        pkt_cls=CompositionPage0,
+                    ),
+                    lambda pkt: pkt.page == 0x0,
+                ),
+            ],
+            StrField(
+                "data",
+                None,
+            ),
+        ),
+    ]
 
 
 bind_layers(
@@ -1347,7 +1408,6 @@ bind_layers(
 
 class BTMesh_Model_Config_Default_TTL_Get(Packet):
     name = "Bluetooth Mesh Config Model Default TTL Get"
-
 
 
 # Empty packet, add to Payload dictionary for dissection
@@ -1721,7 +1781,6 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Config_Net_Key_Status, opcode=0x8
 
 class BTMesh_Model_Config_Net_Key_Get(Packet):
     name = "Bluetooth Mesh Model Config NetKey Status"
-
 
 
 # Empty packet, add to Payload dictionary for dissection
@@ -2257,6 +2316,7 @@ bind_layers(BTMesh_Model_Message, BTMesh_Model_Health_Period_Status, opcode=0x80
 class BTMesh_Model_Health_Attention_Get(Packet):
     name = "Bluetooth Mesh Model Health Attention Get"
 
+
 # Empty packet, add to Payload dictionary for dissection
 OPCODE_TO_EMPTY_MODEL_PACKET[0x8004] = BTMesh_Model_Health_Attention_Get
 
@@ -2299,7 +2359,9 @@ class BTMesh_Model_Remote_Provisioning_Scan_Capabilities_Get(Packet):
 
 
 # Empty packet, add to Payload dictionary for dissection
-OPCODE_TO_EMPTY_MODEL_PACKET[0x804F] = BTMesh_Model_Remote_Provisioning_Scan_Capabilities_Get
+OPCODE_TO_EMPTY_MODEL_PACKET[0x804F] = (
+    BTMesh_Model_Remote_Provisioning_Scan_Capabilities_Get
+)
 
 bind_layers(
     BTMesh_Model_Message,
@@ -2323,7 +2385,7 @@ bind_layers(
 class BTMesh_Model_Remote_Provisioning_Scan_Get(Packet):
     name = "Bluetooth Mesh Model Remote Provisioning Scan Get"
 
-    
+
 # Empty packet, add to Payload dictionary for dissection
 OPCODE_TO_EMPTY_MODEL_PACKET[0x8051] = BTMesh_Model_Remote_Provisioning_Scan_Get
 
@@ -3177,7 +3239,9 @@ class BTMesh_Model_Directed_Forwarding_Directed_Network_Transmit_Get(Packet):
 
 
 # Empty packet, add to Payload dictionary for dissection
-OPCODE_TO_EMPTY_MODEL_PACKET[0x8099] = BTMesh_Model_Directed_Forwarding_Directed_Network_Transmit_Get
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8099] = (
+    BTMesh_Model_Directed_Forwarding_Directed_Network_Transmit_Get
+)
 
 bind_layers(
     BTMesh_Model_Message,
@@ -3219,8 +3283,11 @@ bind_layers(
 class BTMesh_Model_Directed_Forwarding_Directed_Relay_Retransmit_Get(Packet):
     name = "Bluetooth Mesh Model Directed Forwarding Directed Relay Retransmit Get"
 
+
 # Empty packet, add to Payload dictionary for dissection
-OPCODE_TO_EMPTY_MODEL_PACKET[0x809C] = BTMesh_Model_Directed_Forwarding_Directed_Relay_Retransmit_Get
+OPCODE_TO_EMPTY_MODEL_PACKET[0x809C] = (
+    BTMesh_Model_Directed_Forwarding_Directed_Relay_Retransmit_Get
+)
 
 
 bind_layers(
@@ -3265,7 +3332,9 @@ class BTMesh_Model_Directed_Forwarding_Rssi_Threshold_Get(Packet):
 
 
 # Empty packet, add to Payload dictionary for dissection
-OPCODE_TO_EMPTY_MODEL_PACKET[0x809F] = BTMesh_Model_Directed_Forwarding_Rssi_Threshold_Get
+OPCODE_TO_EMPTY_MODEL_PACKET[0x809F] = (
+    BTMesh_Model_Directed_Forwarding_Rssi_Threshold_Get
+)
 
 bind_layers(
     BTMesh_Model_Message,
@@ -3306,7 +3375,9 @@ class BTMesh_Model_Directed_Forwarding_Directed_Paths_Get(Packet):
 
 
 # Empty packet, add to Payload dictionary for dissection
-OPCODE_TO_EMPTY_MODEL_PACKET[0x80A2] = BTMesh_Model_Directed_Forwarding_Directed_Paths_Get
+OPCODE_TO_EMPTY_MODEL_PACKET[0x80A2] = (
+    BTMesh_Model_Directed_Forwarding_Directed_Paths_Get
+)
 
 bind_layers(
     BTMesh_Model_Message,
@@ -3380,8 +3451,11 @@ bind_layers(
 class BTMesh_Model_Directed_Forwarding_Path_Discovery_Timing_Control_Get(Packet):
     name = "Bluetooth Mesh Model Directed Forwarding Path Discovery Timing Control Get"
 
+
 # Empty packet, add to Payload dictionary for dissection
-OPCODE_TO_EMPTY_MODEL_PACKET[0x80A7] = BTMesh_Model_Directed_Forwarding_Path_Discovery_Timing_Control_Get
+OPCODE_TO_EMPTY_MODEL_PACKET[0x80A7] = (
+    BTMesh_Model_Directed_Forwarding_Path_Discovery_Timing_Control_Get
+)
 
 
 bind_layers(
@@ -3435,9 +3509,10 @@ class BTMesh_Model_Directed_Forwarding_Directed_Control_Network_Transmit_Get(Pac
     )
 
 
-
 # Empty packet, add to Payload dictionary for dissection
-OPCODE_TO_EMPTY_MODEL_PACKET[0x80AB] = BTMesh_Model_Directed_Forwarding_Directed_Control_Network_Transmit_Get
+OPCODE_TO_EMPTY_MODEL_PACKET[0x80AB] = (
+    BTMesh_Model_Directed_Forwarding_Directed_Control_Network_Transmit_Get
+)
 
 bind_layers(
     BTMesh_Model_Message,
@@ -3486,9 +3561,10 @@ class BTMesh_Model_Directed_Forwarding_Directed_Control_Relay_Transmit_Get(Packe
     )
 
 
-
 # Empty packet, add to Payload dictionary for dissection
-OPCODE_TO_EMPTY_MODEL_PACKET[0x80AE] = BTMesh_Model_Directed_Forwarding_Directed_Control_Relay_Transmit_Get
+OPCODE_TO_EMPTY_MODEL_PACKET[0x80AE] = (
+    BTMesh_Model_Directed_Forwarding_Directed_Control_Relay_Transmit_Get
+)
 
 
 bind_layers(
@@ -3601,6 +3677,7 @@ bind_layers(
 
 class BTMesh_SAR_Transmitter_Get(Packet):
     name = "Bluetooth Mesh Model SAR Transmitter Get"
+
 
 # Empty packet, add to Payload dictionary for dissection
 OPCODE_TO_EMPTY_MODEL_PACKET[0x806C] = BTMesh_SAR_Transmitter_Get
@@ -3779,7 +3856,6 @@ OPCODE_TO_EMPTY_MODEL_PACKET[0x80B1] = BTMesh_Model_Bridge_Subnet_Bridge_Get
 bind_layers(BTMesh_Model_Message, BTMesh_Model_Bridge_Subnet_Bridge_Get, opcode=0x80B1)
 
 
-
 class BTMesh_Model_Bridge_Subnet_Bridge_Set(Packet):
     name = "Bluetooth Mesh Model Bridge Subnet Bridge Set"
     fields_desc = [ByteField("subnet_bridge_state", None)]
@@ -3928,6 +4004,7 @@ bind_layers(
 class BTMesh_Model_Bridge_Bridging_Table_Size_Get(Packet):
     name = "Bluetooth Mesh Model Bridge Bridging Table Size Status"
 
+
 # Empty packet, add to Payload dictionary for dissection
 OPCODE_TO_EMPTY_MODEL_PACKET[0x80BB] = BTMesh_Model_Bridge_Bridging_Table_Size_Get
 
@@ -3987,7 +4064,9 @@ class BTMesh_Model_Private_Beacon_Private_Gatt_Proxy_Get(Packet):
 
 
 # Empty packet, add to Payload dictionary for dissection
-OPCODE_TO_EMPTY_MODEL_PACKET[0x8063] = BTMesh_Model_Private_Beacon_Private_Gatt_Proxy_Get
+OPCODE_TO_EMPTY_MODEL_PACKET[0x8063] = (
+    BTMesh_Model_Private_Beacon_Private_Gatt_Proxy_Get
+)
 
 bind_layers(
     BTMesh_Model_Message,
@@ -4467,6 +4546,7 @@ class BTMesh_Network_PDU_Bis(Packet):
         return b"".join(f for f in built_fields)
 """
 
+
 class BTMesh_Network_Clear_PDU(Packet):
     """
     Simpler version of Network PDU.
@@ -4486,7 +4566,6 @@ class BTMesh_Network_Clear_PDU(Packet):
         XShortField("src_addr", None),
         XShortField("dst_addr", None),
     ]
-
 
 
 class BTMesh_Network_PDU(Packet):
@@ -4523,13 +4602,12 @@ class BTMesh_Obfuscated_Network_PDU(Packet):
         StrField("enc_dst_enc_transport_pdu_mic", None),
     ]
 
+
 bind_layers(
     BTMesh_Network_Clear_PDU, BTMesh_Lower_Transport_Control_Message, network_ctl=1
 )
 
-bind_layers(
-    BTMesh_Network_Clear_PDU, BTMesh_Model_Message, network_ctl=0
-)
+bind_layers(BTMesh_Network_Clear_PDU, BTMesh_Model_Message, network_ctl=0)
 
 """
 BEACONS

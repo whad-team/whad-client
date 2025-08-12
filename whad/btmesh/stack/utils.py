@@ -9,7 +9,7 @@ from whad.btmesh.stack.constants import (
     UNASSIGNED_ADDR_TYPE,
     MANAGED_FLOODING_CREDS,
 )
-from whad.btmesh.models import StatesManager, Element
+from whad.btmesh.models import StatesManager, Element, Model
 from whad.btmesh.models.states import (
     NodeIdentityState,
     PrivateNodeIdentityState,
@@ -31,6 +31,7 @@ from whad.btmesh.stack.constants import (
 )
 from random import randrange, choices
 from string import ascii_letters, digits
+from struct import unpack
 from whad.btmesh.crypto import UpperTransportLayerDevKeyCryptoManager
 
 
@@ -139,7 +140,6 @@ class Node:
         dev_key=UpperTransportLayerDevKeyCryptoManager(
             device_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
         ),
-        elements={},
     ):
         """
         Creates a node object.
@@ -150,14 +150,74 @@ class Node:
         :type addr_range: int, optional
         :param dev_key: Dev key of the node, defaults to UpperTransportLayerDevKeyCryptoManager(bytes.fromhex("63964771734fbd76e3b40519d1d94a48"))
         :type dev_key: UpperTransportLayerDevKeyCryptoManager, optional
-        :param elements: dictionnary of Elements of the node, defaults to {}. Key is element index
-        :type elements: dict(int, Element)
         """
 
-        self.address = address
-        self.addr_range = 0 if addr_range in (0, 1) else addr_range
-        self.dev_key = dev_key
-        self.elements = elements
+        self.__address = address & 0xFFFF
+        self.__addr_range = 0 if addr_range in (0, 1) else addr_range & 0xFFFF
+        self.__dev_key = dev_key
+        self.__elements = {}
+
+        # Features
+        self.__is_relay = False
+        self.__is_proxy = False
+        self.__is_friend = False
+        self.__is_lpn = False
+
+    @property
+    def address(self):
+        return self.__address
+
+    @address.setter
+    def address(self, value):
+        self.__address = value & 0xFFFF
+
+    @property
+    def addr_range(self):
+        return self.__addr_range
+
+    @addr_range.setter
+    def addr_range(self, value):
+        self.__addr_range = 0 if value in (0, 1) else value & 0xFFFF
+
+    @property
+    def dev_key(self):
+        return self.__dev_key
+
+    @dev_key.setter
+    def dev_key(self, value):
+        self.__dev_key = value
+
+    @property
+    def is_relay(self):
+        return self.__is_relay
+
+    @is_relay.setter
+    def is_relay(self, value):
+        self.__is_relay = value
+
+    @property
+    def is_proxy(self):
+        return self.__is_proxy
+
+    @is_proxy.setter
+    def is_proxy(self, value):
+        self.__is_proxy = value
+
+    @property
+    def is_friend(self):
+        return self.__is_friend
+
+    @is_friend.setter
+    def is_friend(self, value):
+        self.__is_friend = value
+
+    @property
+    def is_lpn(self):
+        return self.__is_lpn
+
+    @is_lpn.setter
+    def is_lpn(self, value):
+        self.__is_lpn = value
 
     def add_element(self, index=None, is_primary=False):
         """
@@ -167,14 +227,14 @@ class Node:
         :param index: index of the element to add (should not be used ideally), defaults to None
         :type element: int, optional
         :param is_primary: Is the element the primary index ?
-        :return: Index of the Element if successful, -1 if fail
-        :rtype: int
+        :return: The Element created (object contains index as well)
+        :rtype: Element
         """
         if index is None:
-            index = len(self.elements)
+            index = len(self.__elements)
 
-        self.elements[index] = Element(is_primary=is_primary, index=index)
-        return index
+        self.__elements[index] = Element(is_primary=is_primary, index=index)
+        return self.__elements[index]
 
     def get_element(self, index):
         """
@@ -187,7 +247,7 @@ class Node:
         :rtype: Element | None
         """
         try:
-            return self.elements[index]
+            return self.__elements[index]
         except KeyError:
             return None
 
@@ -195,7 +255,7 @@ class Node:
         """
         Retrieves all the elements of the node (list of elements, sorted by index)
         """
-        return dict(sorted(self.elements.items())).values()
+        return dict(sorted(self.__elements.items())).values()
 
     def remove_element(self, index):
         """
@@ -210,6 +270,32 @@ class Node:
             return True
         except KeyError:
             return False
+
+    def dissect_composition_data(self, page_0):
+        """
+        Interprets the pages of Composition data to fill the elements list with Elements and associated Models
+        (Only from page0, no relashionship information)
+        The Models are only placeholders and do not allow sending/receving.
+        Used to get information about distant nodes
+
+        :param page_0: Page 0 of the CompositionData
+        :type page_0: BTMesh_Model_Config_Composition_Data_Status
+        """
+        data = page_0.data
+
+        self.is_relay = bool(data.features & 0b1000)
+        self.is_proxy = bool(data.features & 0b100)
+        self.is_friend = bool(data.features & 0b10)
+        self.is_lpn = bool(data.features & 0b1)
+
+        for element in data.elements:
+            new_element = self.add_element()
+            for model_id in element.sig_models:
+                new_element.register_model(Model(model_id=model_id, name=""))
+            for model_id in element.vendor_models:
+                new_element.register_model(
+                    Model(model_id=model_id, name=""), is_vendor_model=True
+                )
 
 
 class ProvisioningData:

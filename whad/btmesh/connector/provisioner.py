@@ -73,7 +73,7 @@ class Provisioner(BTMeshNode):
         self,
         device,
         prov_stack=PBAdvBearerLayer,
-        profile=BaseMeshProfile(),
+        profile=None,
     ):
         """
         Create a Provisionner device (listening to beacons)

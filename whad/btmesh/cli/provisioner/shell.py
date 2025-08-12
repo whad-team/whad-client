@@ -224,7 +224,6 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
                     "Need to specify all parameters (node address, element index, model_id and app_key_index)"
                 )
                 return
-
             try:
                 address = int(args[0], 0) & 0xFFFF
                 element_idx = int(args[1], 0) & 0xFFFF
@@ -233,4 +232,3 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
             except ValueError:
                 self.error("All parameters are int.")
                 return
-

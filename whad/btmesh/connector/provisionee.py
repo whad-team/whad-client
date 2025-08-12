@@ -45,7 +45,7 @@ class Provisionee(BTMeshNode):
     def __init__(
         self,
         device,
-        profile=BaseMeshProfile(),
+        profile=None,
         prov_stack=PBAdvBearerLayer,
         net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
         dev_app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
@@ -58,7 +58,7 @@ class Provisionee(BTMeshNode):
 
         :param device: Device object
         :type device: Device
-        :param profile: Profile class used for the node (elements and models layout), defaults to BaseMeshProfile
+        :param profile: Profile class used for the node (elements and models layout), defaults to None
         :param prov_stack: Provisionning Stack to use, defaults to PBAdvBearerLayer
         :type prov_stack: Layer, optional
         :param net_key: If auto provisioned : primary NetKey , defaults to bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00")

@@ -46,7 +46,7 @@ class BTMeshNode(BTMesh):
     def __init__(
         self,
         device,
-        profile=BaseMeshProfile(),
+        profile=None,
     ):
         """
         Creates a Mesh generic Node
@@ -66,7 +66,10 @@ class BTMeshNode(BTMesh):
 
         self.__tx_lock = Lock()
 
-        self.profile = profile
+        if profile is None:
+            self.profile = BaseMeshProfile()
+        else:
+            self.profile = profile
 
         self.options = {
             "profile": self.profile,
@@ -185,7 +188,7 @@ class BTMeshNode(BTMesh):
                 conn_handle=38,
                 direction=BleDirection.UNKNOWN,
             )
-            sleep(0.003)
+            sleep(0.02)
         return res
 
     def change_sniffing_channel(self):
@@ -197,7 +200,7 @@ class BTMeshNode(BTMesh):
                 self.channel = channels[i]
                 self.start()
                 i = (i + 1) % 3
-            sleep(0.05)
+            sleep(0.03)
 
     def do_secure_network_beacon(self, key_refresh, iv_update):
         """
