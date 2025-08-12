@@ -459,14 +459,6 @@ class BaseMeshProfile(object):
 
         return True
 
-    def update_distant_node_elements(self, address, composition_packet):
-        """
-        Updates the list of elements/models of the node with primary address specified based on a received Composition page.
-
-        :param composition_packet: A Composition page (sent by node or generated ?)
-        :type composition_packet: BTMesh_Model_Config_Composition_Data_Status
-        """
-
     def get_configuration_server_model(self):
         """
         Returns the ConfigurationModelServer associated with the local Node (speficic model needed in the stack)
