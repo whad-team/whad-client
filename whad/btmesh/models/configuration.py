@@ -1725,11 +1725,18 @@ class ConfigurationModelClient(ModelClient):
         self.rx_handlers[0x02] = (
             lambda message: None
         )  # BTMesh_Model_Large_Composition_Data_Status
+        self.rx_handlers[0x803E] = (
+            lambda message: None
+        )  # BTMesh_Model_Config_Model_App_Status
 
         self.tx_handlers[0x8008] = self.tx_on_composition_data_get
+        self.tx_handlers[0x803D] = self.tx_on_app_bind
 
     def tx_on_composition_data_get(self, message):
         """
         Handler to setup Client when sending a BTMesh_Model_Config_Composition_Data_Get
         """
         self.expected_response_clazz = BTMesh_Model_Config_Composition_Data_Status
+
+    def tx_on_app_bind(self, message):
+        self.expected_response_clazz = BTMesh_Model_Config_Model_App_Status

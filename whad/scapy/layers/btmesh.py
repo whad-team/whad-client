@@ -168,6 +168,34 @@ class VariableLengthOpcodeField(Field):
             raise ValueError("Reserved opcode (01111111) cannot be used")
 
 
+class ModelIdentifierField(Field):
+    """
+    For Model identifiers when it is not certain wheter is is SIG or vendor model
+    """
+
+    def __init__(self, name, default):
+        super().__init__(name, default, fmt="H")
+
+    def getfield(self, pkt, s):
+        # Accept 2 or 4 bytes for model_identifier
+        if len(s) >= 4:
+            value = int.from_bytes(s[:4], "little")
+            return s[4:], value
+        elif len(s) >= 2:
+            value = int.from_bytes(s[:2], "little")
+            return s[2:], value
+        else:
+            raise ValueError("Not enough bytes for model_identifier")
+
+    def addfield(self, pkt, s, val):
+        # Use 2 bytes if fits, else 4 bytes
+        if val <= 0xFFFF:
+            data = int(val).to_bytes(2, "little")
+        else:
+            data = int(val).to_bytes(4, "little")
+        return s + data
+
+
 class UnicastAddr(Packet):
     """
     Describes a Unicast Addr, as specifiied in Spec p. 55 Section 3.4.2.2.1
@@ -1236,8 +1264,10 @@ class BTMesh_Model_Generic_Level_Set(Packet):
     fields_desc = [
         ShortField("level", None),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transition_time", None), lambda pkt: len(pkt) > 2),
-        ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
+        ByteField("transition_time", None),
+        ConditionalField(
+            ByteField("delay", 0), lambda pkt: pkt.transition_time is not None
+        ),
     ]
 
 
@@ -1249,8 +1279,10 @@ class BTMesh_Model_Generic_Level_Set_Unacknowledged(Packet):
     fields_desc = [
         ShortField("level", None),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transition_time", None), lambda pkt: len(pkt) > 2),
-        ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
+        ByteField("transition_time", None),
+        ConditionalField(
+            ByteField("delay", 0), lambda pkt: pkt.transition_time is not None
+        ),
     ]
 
 
@@ -1262,8 +1294,10 @@ class BTMesh_Model_Generic_Delta_Set(Packet):
     fields_desc = [
         IntField("delta", None),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transition_time", None), lambda pkt: len(pkt) > 2),
-        ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
+        ByteField("transition_time", None),
+        ConditionalField(
+            ByteField("delay", 0), lambda pkt: pkt.transition_time is not None
+        ),
     ]
 
 
@@ -1275,8 +1309,10 @@ class BTMesh_Model_Generic_Delta_Set_Unacknowledged(Packet):
     fields_desc = [
         IntField("delta", None),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transition_time", None), lambda pkt: len(pkt) > 2),
-        ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
+        ByteField("transition_time", None),
+        ConditionalField(
+            ByteField("delay", 0), lambda pkt: pkt.transition_time is not None
+        ),
     ]
 
 
@@ -1288,8 +1324,10 @@ class BTMesh_Model_Generic_Move_Set(Packet):
     fields_desc = [
         ShortField("delta_level", None),
         ByteField("transaction_id", None),
-        ConditionalField(ByteField("transition_time", None), lambda pkt: len(pkt) > 2),
-        ConditionalField(ByteField("delay", None), lambda pkt: len(pkt) > 2),
+        ByteField("transition_time", None),
+        ConditionalField(
+            ByteField("delay", 0), lambda pkt: pkt.transition_time is not None
+        ),
     ]
 
 
@@ -1496,7 +1534,7 @@ class BTMesh_Model_Config_Publication_Get(Packet):
     name = "Bluetooth Mesh Config Model Publication Get"
     fields_desc = [
         XLEShortField("element_addr", None),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1515,7 +1553,7 @@ class BTMesh_Model_Config_Publication_Set(Packet):
         ByteField("publish_period", None),
         BitField("publish_retransmit_interval_steps", None, 5),
         BitField("publish_retransmit_count", None, 3),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1534,7 +1572,7 @@ class BTMesh_Model_Config_Publication_Virtual_Addr_Set(Packet):
         ByteField("publish_period", None),
         BitField("publish_retransmit_interval_steps", None, 5),
         BitField("publish_retransmit_count", None, 3),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1558,7 +1596,7 @@ class BTMesh_Model_Config_Publication_Status(Packet):
         ByteField("publish_period", None),
         BitField("publish_retransmit_interval_steps", None, 5),
         BitField("publish_retransmit_count", None, 3),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1570,7 +1608,7 @@ class BTMesh_Model_Config_Subscription_Add(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XLEShortField("address", None),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1582,7 +1620,7 @@ class BTMesh_Model_Config_Subscription_Virtual_Addr_Add(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XNBytesField("label", None, sz=16),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1598,7 +1636,7 @@ class BTMesh_Model_Config_Subscription_Delete(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XLEShortField("address", None),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1612,7 +1650,7 @@ class BTMesh_Model_Config_Subscription_Virtual_Addr_Delete(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XNBytesField("label", None, sz=16),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1628,7 +1666,7 @@ class BTMesh_Model_Config_Subscription_Overwrite(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XLEShortField("address", None),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1642,7 +1680,7 @@ class BTMesh_Model_Config_Subscription_Virtual_Addr_Overwrite(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XNBytesField("label", None, sz=16),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1657,7 +1695,7 @@ class BTMesh_Model_Config_Subscription_Delete_All(Packet):
     name = "Bluetooth Mesh Config Subscription Delete All"
     fields_desc = [
         XLEShortField("element_addr", None),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1672,7 +1710,7 @@ class BTMesh_Model_Config_Subscription_Status(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         XLEShortField("address", None),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1902,7 +1940,7 @@ class BTMesh_Model_Config_Model_App_Bind(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XLEShortField("app_key_index", None),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1914,7 +1952,7 @@ class BTMesh_Model_Config_Model_App_Unbind(Packet):
     fields_desc = [
         XLEShortField("element_addr", None),
         XLEShortField("app_key_index", None),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -1927,7 +1965,7 @@ class BTMesh_Model_Config_Model_App_Status(Packet):
         ByteField("status", None),
         XLEShortField("element_addr", None),
         XLEShortField("app_key_index", None),
-        XLEStrField("model_identifier", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -3405,7 +3443,10 @@ bind_layers(
 
 class BTMesh_Model_Directed_Forwarding_Directed_Publish_Policy_Get(Packet):
     name = "Bluetooth Mesh Model Directed Forwarding Directed Publish Policy Get"
-    fields_desc = [XLEShortField("element_addr", None), XLEStrField("model_id", None)]
+    fields_desc = [
+        XLEShortField("element_addr", None),
+        ModelIdentifierField("model_identifier", None),
+    ]
 
 
 bind_layers(
@@ -3420,7 +3461,7 @@ class BTMesh_Model_Directed_Forwarding_Directed_Publish_Policy_Set(Packet):
     fields_desc = [
         XByteField("directed_publish_policy", None),
         XLEShortField("element_addr", None),
-        XLEStrField("model_id", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
@@ -3437,7 +3478,7 @@ class BTMesh_Model_Directed_Forwarding_Directed_Publish_Policy_Status(Packet):
         ByteField("status", None),
         XByteField("directed_publish_policy", None),
         XLEShortField("element_addr", None),
-        XLEStrField("model_id", None),
+        ModelIdentifierField("model_identifier", None),
     ]
 
 
