@@ -13,6 +13,10 @@ from whad.scapy.layers.btmesh import (
     BTMesh_Model_Generic_OnOff_Set,
     BTMesh_Model_Config_Composition_Data_Get,
     BTMesh_Model_Config_Composition_Data_Status,
+    BTMesh_Model_Config_Model_App_Bind,
+    BTMesh_Model_Config_Model_App_Status,
+    BTMesh_Model_Config_App_Key_Add,
+    BTMesh_Model_Config_App_Key_Status,
 )
 
 from prompt_toolkit import HTML, print_formatted_text
@@ -1061,6 +1065,89 @@ class BTMeshBaseShell(InteractiveShell):
         completions["remove"] = {}
         return completions
 
+    @category(MISC)
+    def do_bind_app_key(self, args):
+        """Binding of models to app keys of distant nodes.
+
+        ConfigurationModelClient is needed on Element 0 of the local node.
+
+        <ansicyan><b>bind_app_keys <i>NODE_PRIMARY_ADDRESS</i> <i>ELEMENT_IDX</i> <i>MODEL_ID</i> <i>APP_KEY_IDX</i></b></ansicyan>
+
+        Bind the given model in the given element of the specified node with the app_key specified.
+        Node needs to be added if not already with <ansimagenta>nodes add</ansimagenta> command or via provisioning in provisioner node.
+        No checks will be made on parameters, but response from distant node announces success or fail.
+
+        You can check the implemented models of the distant node with the <ansiyellow>nodes get_composition</ansiyellow> command
+
+        > bind_app_keys 0x0005 0 0x1000 1
+        Binds the model 0x1000 at Element 0 of node 0x0005 with app_key at index 1
+
+        Does not take into account the parameters in the msg_context command.
+        """
+        if self._current_mode != self.MODE_STARTED:
+            self.error(
+                "Cannot bind app keys if not provisioned or in element edit mode."
+            )
+            return
+        if len(args) < 4:
+            self.error(
+                "Need to specify all parameters (node address, element index, model_id and app_key_index)"
+            )
+            return
+        try:
+            address = int(args[0], 0) & 0xFFFF
+            element_idx = int(args[1], 0) & 0xFFFF
+            model_id = int(args[2], 0)
+            app_key_index = int(args[3], 0) & 0xFFFF
+        except ValueError:
+            self.error("All parameters are int.")
+            return
+
+        distant_node = self.profile.get_distant_node(address)
+
+        if distant_node is None:
+            self.error(
+                "No distant node with the primary address %x in our database." % address
+            )
+            return
+
+        # Fetch our ConfigurationModelClient on element 0 to send the message
+        configuration_model_client = self.profile.local_node.get_element(
+            0
+        ).get_model_by_id(0x01)
+        if configuration_model_client is None:
+            self.error(
+                "This node does not implement a ConfigurationModelClient on the primary element, cannot fetch composition data."
+            )
+            return
+
+        ctx = self.create_msg_context(is_ctl=False)
+        pkt = BTMesh_Model_Config_Model_App_Bind(
+            element_addr=address + element_idx,
+            app_key_index=app_key_index,
+            model_identifier=model_id,
+        )
+        ctx.src_addr = self.profile.get_primary_element_addr()
+        ctx.dest_addr = address
+        ctx.dev_key_address = address
+        ctx.application_key_index = -1
+
+        response = self._connector.send_model_message(
+            model=configuration_model_client, message=(pkt, ctx), is_acked=True
+        )
+
+        if response is None:
+            self.error(
+                "Failed to send the message/did not receive any response %x." % address
+            )
+            return
+
+        pkt, ctx = response
+        if pkt.getlayer(BTMesh_Model_Config_Model_App_Status).status != 0:
+            self.error("Status message in response indicates failure of binding.")
+        else:
+            self.success("Successfully binded the app key to the model.")
+
     @category(SETUP_CAT)
     def do_net_keys(self, args):
         """Manages the net keys of the node (update, add, remove)
@@ -1153,19 +1240,21 @@ class BTMeshBaseShell(InteractiveShell):
         completions["list"] = {}
         completions["update"] = {}
         completions["remove"] = {}
+        completions["send"] = {}
         return completions
 
     @category(SETUP_CAT)
     def do_app_keys(self, args):
-        """Manages the app keys of the node (update, add, remove)
+        """Manages the app keys of the local node (update, add, remove) and send them to other nodes.
 
-        <ansicyan><b>app_keys</b> [<i>ACTION</i>] [<i>APP_KEY_IDX</i>] [<i>NET_KEY_IDX</i>] [<i>APP_KEY_VALUE</i>]</ansicyan>
+        <ansicyan><b>app_keys</b> [<i>ACTION</i>] [<i>APP_KEY_IDX</i>] [<i>NET_KEY_IDX</i>] [<i>APP_KEY_VALUE | DISTANT_NODE_ADDR</i>]</ansicyan>
 
         For the <i>ACTION</i> field :
 
         - <b>list</b> : Lists the appkeys and theis values, and the netkey they are bound to
         - <b>update</b> : If app_key_idx not already there, add the app_key with app_key_value, bound to the net_key specified. If already present, update the value of the key
-        - <b>remove</b> : If app_key_idx present, removes the key (cannot have less than 1 app_key though, specification)
+        - <b>remove</b> : If app_key_idx exists, removes the key (cannot have less than 1 app_key though, specification)
+        - <b>send</b> : If app_key_idx exists, sends the app_key to the distant node specified via a BTMesh_Model_Config_App_Key_Add message. Need the ConfigurationModelClient as well as the distant node DevKey in local database.
 
         > To list  :  app_keys list
 
@@ -1173,6 +1262,8 @@ class BTMeshBaseShell(InteractiveShell):
         > To update/add key (index 1, bound to net_key_idx 0) :  app_keys update 1 0 aab2255e6422d330088e09bb015ed707
 
         > To remove : app_keys remove 1
+
+        > To send an AppKey (index 0, bound to netkey 1) to node 0x0005  : app_keys send 0 1 0x0005
 
         By default, list
         """
@@ -1221,7 +1312,7 @@ class BTMeshBaseShell(InteractiveShell):
 
         elif action == "remove":
             if len(args) < 3:
-                self.error("Need to specify app_key_index to remove")
+                self.error("Need to specify app_key_index/net_key_index to remove")
                 return
             try:
                 app_key_index = int(args[1], 0) & 0xFFFF
@@ -1243,6 +1334,77 @@ class BTMeshBaseShell(InteractiveShell):
                 return
             self.success("Successfully removed NetKey with index %d" % net_key_index)
             return
+
+        elif action == "send":
+            if len(args) < 4:
+                self.error(
+                    "Specify app_key_index, net_key_index and distant_node address"
+                )
+                return
+
+            try:
+                app_key_index = int(args[1], 0) & 0xFFFF
+                net_key_index = int(args[2], 0) & 0xFFFF
+                address = int(args[3], 0) & 0xFFFF
+            except ValueError:
+                self.error(
+                    "All arguments are 2 bytes integer (app_key_index, net_key_index, distant_node_addr)"
+                )
+                return
+
+            app_key = self.profile.get_app_key(index=app_key_index)
+            if app_key is None:
+                self.error("No app_key at index %x" % app_key_index)
+                return
+
+            distant_node = self.profile.get_distant_node(address)
+
+            if distant_node is None:
+                self.error(
+                    "No distant node with the primary address %x in our database."
+                    % address
+                )
+                return
+
+            # Fetch our ConfigurationModelClient on element 0 to send the message
+            configuration_model_client = self.profile.local_node.get_element(
+                0
+            ).get_model_by_id(0x01)
+            if configuration_model_client is None:
+                self.error(
+                    "This node does not implement a ConfigurationModelClient on the primary element, cannot send app_keys."
+                )
+                return
+
+            # Send message for page 0
+            pkt = BTMesh_Model_Config_App_Key_Add(
+                app_key_index=app_key_index,
+                net_key_index=net_key_index,
+                app_key=app_key.app_key,
+            )
+            # Use message context set by user, but force destination, src and use of dev key
+            ctx = self.create_msg_context(is_ctl=False)
+            ctx.dest_addr = address
+            ctx.src_addr = self.profile.get_primary_element_addr()
+            ctx.dev_key_address = address
+            ctx.application_key_index = -1
+
+            self.warning("Sending appkey to distant node...")
+            response = self._connector.send_model_message(
+                model=configuration_model_client, message=(pkt, ctx), is_acked=True
+            )
+            if response is None:
+                self.error("Failed to send the message to node %x." % address)
+                return
+
+            pkt, ctx = response
+            pkt = pkt.getlayer(BTMesh_Model_Config_App_Key_Status)
+            if pkt.status != 0:
+                self.error(
+                    "Received App_Key_Status but error while adding the new app_key."
+                )
+            else:
+                self.success("Successfully sent the app_key to the distant node")
 
     @category(MISC)
     def do_secure_network_beacon(self, args):
