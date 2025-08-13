@@ -245,6 +245,12 @@ class RxTransaction(Transaction):
         # main ack sending thread
         self.main_ack_thread = None
 
+        # Allocate enough seq numbers for all acks that could be sent for this Transaction
+        # We have the initial ack, plus a number of retransmission, plus one if replay of already received transaction
+        self.max_nb_ack_sent = self.sar_ack_retrans_count + 2
+        self.ack_seq_num = None
+        self.max_ack_seq_num = None
+
         # initial delay before sending the first ack message
         self.initial_ack_delay = (
             min(self.seg_n + 0.5, self.sar_ack_delay_inc)
@@ -954,7 +960,17 @@ class LowerTransportLayer(Layer):
         :param event: Event object to communicate with main thread
         :type event: Event
         """
-        while event.is_set():
+        # If the seq numbers for the acks have not been allocated yet
+        # We allocate the total number of seq numbers for all the acks possibly sent for this RxTransaction
+        if transaction.ack_seq_num is None:
+            transaction.ack_seq_num = self.state.profile.get_next_seq_number(
+                inc=transaction.max_nb_ack_sent
+            )
+            transaction.max_ack_seq_num = (
+                transaction.ack_seq_num + transaction.max_nb_ack_sent - 1
+            )
+
+        while event.is_set() and transaction.ack_seq_num <= transaction.max_ack_seq_num:
             pkt = BTMesh_Lower_Transport_Segment_Acknoledgment_Message(
                 obo=0,
                 seq_zero=transaction.ctx.seq_zero,
@@ -966,8 +982,9 @@ class LowerTransportLayer(Layer):
             ctx.dest_addr = transaction.ctx.src_addr
             ctx.is_ctl = True
 
-            # the sequence number of the ack is
-            ctx.seq_number = self.state.profile.get_next_seq_number()
+            # the sequence number of the ack is the one from our pool for this transaction
+            ctx.seq_number = transaction.ack_seq_num
+            transaction.ack_seq_num += 1
             self.send_to_network((pkt, ctx))
             transaction.time_last_ack = time()
             transaction.sar_ack_retrans_count = -1

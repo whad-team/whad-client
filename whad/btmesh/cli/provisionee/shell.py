@@ -55,6 +55,14 @@ class BTMeshProvisioneeShell(BTMeshBaseShell):
                 )
             )
 
+    def complete_prov(self):
+        """autocomplete wireshark command"""
+        completions = {}
+        completions["start"] = {}
+        completions["auth"] = {}
+        completions["uuid"] = {}
+        return completions
+
     @category(SETUP_CAT)
     def do_prov(self, args):
         """Manages the provisioning process of the node (when not auto provisioned)
@@ -123,7 +131,6 @@ class BTMeshProvisioneeShell(BTMeshBaseShell):
                 return
 
             try:
-                print(type(args[1]))
                 value = int(args[1], 0)
             except ValueError:
                 value = args[1]
