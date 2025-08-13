@@ -291,10 +291,10 @@ class Node:
         for element in data.elements:
             new_element = self.add_element()
             for model_id in element.sig_models:
-                new_element.register_model(Model(model_id=model_id, name=""))
+                new_element.register_model(Model(model_id=model_id))
             for model_id in element.vendor_models:
                 new_element.register_model(
-                    Model(model_id=model_id, name=""), is_vendor_model=True
+                    Model(model_id=model_id), is_vendor_model=True
                 )
 
 

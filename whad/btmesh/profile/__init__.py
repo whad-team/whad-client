@@ -144,8 +144,8 @@ class BaseMeshProfile(object):
             oob_type=0b00,  # no static OOB supported
             output_oob_size=0x00,
             output_oob_action=0b00000,  # default no output OOB action available, for tests, 0b11000
-            input_oob_size=0x00,
-            input_oob_action=0b0000,  # default no input OOB a available. For test, 0b1100
+            input_oob_size=0x04,
+            input_oob_action=0b1100,  # default no input OOB a available. For test, 0b1100
         )
 
     def _populate_elements_and_models(self):

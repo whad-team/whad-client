@@ -99,7 +99,6 @@ class CompositionDataState(object):
                 elements_field = elements_field + model.model_id.to_bytes(4, "little")
 
         self.p0_data = self.p0_data + elements_field
-        CompositionPage0(self.p0_data).show()
 
     def get_p0_data(self):
         return self.p0_data
@@ -185,9 +184,7 @@ class ConfigurationModelServer(ModelServer):
         :param profile: Profile of the node (specific to this Model constructor)
         :type profile: BaseMeshProfile
         """
-        super().__init__(
-            model_id=0x0000, allows_dev_keys=True
-        )
+        super().__init__(model_id=0x0000, allows_dev_keys=True)
 
         self.rx_handlers[0x8009] = self.on_secure_beacon_get
         self.rx_handlers[0x800A] = self.on_secure_beacon_set
@@ -1717,9 +1714,7 @@ class ConfigurationModelClient(ModelClient):
     """
 
     def __init__(self):
-        super().__init__(
-            model_id=0x1, allows_dev_keys=True
-        )
+        super().__init__(model_id=0x1, allows_dev_keys=True)
 
         self.rx_handlers[0x803E] = (
             lambda message: None
