@@ -249,19 +249,6 @@ class BTMeshNode(BTMesh):
             return
         self.whitelist.pop(index)
 
-    def do_onoff(self, value, ctx, tid):
-        """
-        Sends a Generic On/Off set message (acked or unacked)
-
-        :param value: Value to be set (0 or 1)
-        :type value: int
-        :param ctx: Context of the message
-        :type ctx: MeshMessageContext
-        :param tid: Transaction Id
-        :type tid: int
-        """
-        self._main_stack.get_layer("access").do_onoff(value, ctx, tid)
-
     def set_relay(self, onoff):
         """
         Enables of disabled relaying on the NetworkLayer
