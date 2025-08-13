@@ -531,11 +531,17 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
         Responds to an invite to connect to network with capablities
         """
         self.state.is_provisioning_started = True
-        capabilities = self.get_layer("pb_adv").state.connector.profile.capabilities
+
+        # get capabilities from profile
+        profile = self.get_layer("pb_adv").state.connector.profile
+        capabilities = profile.capabilities
+        number_of_elements = len(profile.local_node.get_all_elements())
 
         # store for Confirmation Inputs
         self.state.invite_pdu = raw(packet)
-        capabilities_packet = BTMesh_Provisioning_Capabilities(**capabilities)
+        capabilities_packet = BTMesh_Provisioning_Capabilities(
+            number_of_elements=number_of_elements, **capabilities
+        )
         self.send_to_gen_prov(capabilities_packet)
         # store for Confirmation Inputs
         self.state.capabilities_pdu = raw(capabilities_packet)
@@ -620,7 +626,7 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
 
     def on_provisioning_auth_data(self, auth_data):
         """
-        Process a ProvisioningAuthenticationData received from the used that typed the OOOB auth value
+        Process a ProvisioningAuthenticationData received from the user that typed the OOOB auth value
         (sent by connector directly)
 
         :param auth_data: The auth data
@@ -631,8 +637,8 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
         self.state.auth_data = auth_data
         self.state.crypto_manager.set_auth_value(self.state.auth_data.value)
 
-        self.send_to_gen_prov(BTMesh_Provisioning_Input_Complete())
         self.state.next_expected_packet = BTMesh_Provisioning_Confirmation
+        self.send_to_gen_prov(BTMesh_Provisioning_Input_Complete())
 
     def on_confirmation(self, packet):
         """
@@ -720,7 +726,7 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
 
         # send complete
         self.send_to_gen_prov(BTMesh_Provisioning_Complete())
-        self.get_layer("pb_adv").state.connector.provisioning_complete(
+        self.get_layer("pb_adv").state.connector.on_provisioning_complete(
             self.state.prov_data
         )
         self.state.next_expected_packet = None

@@ -99,6 +99,9 @@ class BTMeshNode(BTMesh):
         # Provisionning auth data received from the stack (Provisioner and provisionee)
         self.prov_auth_data = None
 
+        # Data from the provisioning process (of local node if provisionee, distant node if Provisioner)
+        self._prov_data = None
+
         # Channel we listen on (regularly changed by thread change_sniffing_channel)
         self.channel = 37
 
@@ -282,6 +285,15 @@ class BTMeshNode(BTMesh):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         self._main_stack.get_layer("access").process_new_message(message)
+
+    def on_provisioning_complete(self, prov_data):
+        """
+        Notification from the provisioning layer that a distant node has been provisioned or that we are provisioned
+
+        :param prov_data:Data sent to the distant node
+        """
+        self._prov_data = prov_data
+        self.prov_event.set()
 
     def provisioning_auth_data(self, message):
         """

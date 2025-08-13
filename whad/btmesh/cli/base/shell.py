@@ -916,7 +916,7 @@ class BTMeshBaseShell(InteractiveShell):
                         "<ansimagenta><b>Address: 0x%x -> 0x%x</b></ansimagenta>"
                         % (
                             node.address,
-                            (node.address + node.addr_range),
+                            (node.address + node.addr_range - 1),
                         )
                     )
                 )

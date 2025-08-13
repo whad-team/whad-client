@@ -323,7 +323,6 @@ class GenericProvisioningLayer(ContextualLayer):
                 self.state.current_transaction.transaction_number
             )
             self.state.in_transaction = False
-            self.send_ack(transaction_number)
             self.send_to_upper_layer(prov_packet)
 
         # if more fragmentx expected, add the first one to the list

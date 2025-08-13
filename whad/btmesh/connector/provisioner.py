@@ -87,7 +87,6 @@ class Provisioner(BTMeshNode):
         self.__unprovisioned_devices = UnprovisionedDeviceList()
         self._is_listening_for_beacons = False
         self._is_currently_provisioning = False
-        self._prov_data = None
 
         self._prov_stack = prov_stack(connector=self, options={}, is_provisioner=True)
 
@@ -155,16 +154,7 @@ class Provisioner(BTMeshNode):
         # Get an available unicast addr that fits the addr range
         # For now we take the lastly provisioned node addr + range + 1 (no deletion of nodes)
         last_node = sorted(self.profile.get_all_nodes().items())[-1][1]
-        prov_data.unicast_addr = last_node.address + last_node.addr_range + 1
-
-    def on_provisioning_complete(self, prov_data):
-        """
-        Notification from the provisioning layer that a distant node has been provisioned
-
-        :param prov_data:Data sent to the distant node
-        """
-        self._prov_data = prov_data
-        self.prov_event.set()
+        prov_data.unicast_addr = last_node.address + last_node.addr_range
 
     def provision_distant_node(self, dev_uuid):
         """
@@ -184,57 +174,65 @@ class Provisioner(BTMeshNode):
 
             auth_done = False
 
-            start_time = time()
             duration = 60
+            self.prov_event.wait(timeout=60)
 
-            while time() - start_time < duration:
-                self.prov_event.wait(timeout=1)
+            # if distant node is provisioned, finished
+            if self._prov_data is not None:
+                self.add_distant_after_provisioning()
+                return True
 
-                # if distant node is provisioned, finished
-                if self._prov_data is not None:
-                    new_node = Node(
-                        address=self._prov_data.unicast_addr,
-                        addr_range=self._prov_data.addr_range,
-                        dev_key=UpperTransportLayerDevKeyCryptoManager(
-                            provisioning_crypto_manager=self._prov_data.provisioning_crypto_manager
-                        ),
-                    )
-                    self.profile.add_distant_node(new_node)
-                    self._prov_data = None
-                    self._is_currently_provisioning = False
-                    return True
+            elif not auth_done and self.prov_auth_data is not None:
+                auth_done = True
+                if self.prov_auth_data.auth_method == INPUT_OOB_AUTH:
+                    print("AUTH VALUE IS : ")
+                    print(self.prov_auth_data.value)
+                    res = self.resume_provisioning_with_auth()
+                    return res
 
-                elif not auth_done and self.prov_auth_data is not None:
-                    auth_done = True
-                    if self.prov_auth_data.auth_method == INPUT_OOB_AUTH:
-                        print("AUTH VALUE IS : ")
-                        print(self.prov_auth_data.value)
+                # ouput auth should be handled by user code or shell
+                elif self.prov_auth_data.auth_method == OUTPUT_OOB_AUTH:
+                    return self.prov_auth_data
 
-                    # ouput auth should be handled by user code or shell
-                    elif self.prov_auth_data.auth_method == OUTPUT_OOB_AUTH:
-                        return self.prov_auth_data
-
+            # provisioning failed
             return False
 
-    def resume_provisioning_with_auth(self, value):
+    def resume_provisioning_with_auth(self, value=None):
         """
-        Resume the provisioning process with the user.
+        Resume the provisioning process after auth value has been
+        displayed/entered
 
-        :param value: The value types by the user
-        :type value: str
+        :param value: The value types by the user if INPUT_OOB_AUTH, defaults to None
+        :type value: str, optional
         :returns: True if provisioning success, False if fail
         :rtype: bool
         """
 
-        self.prov_auth_data.value = value
-        self._prov_stack.get_layer("pb_adv").on_provisioning_auth_data(
-            self.prov_auth_data
-        )
+        # If output oob, give value to stack
+        if self.prov_auth_data.auth_method == OUTPUT_OOB_AUTH and value is not None:
+            self.prov_auth_data.value = value
+            self._prov_stack.get_layer("pb_adv").on_provisioning_auth_data(
+                self.prov_auth_data
+            )
         self.prov_event = Event()
-        res = self.prov_event.wait(20)
+        self.prov_event.wait(20)
         self._is_currently_provisioning = False
-        # if timedout, provisioning failed
-        if res:
+        if self._prov_data is not None:
+            self.add_distant_after_provisioning()
             return True
         else:
             return False
+
+    def add_distant_after_provisioning(self):
+        """
+        After provisioning of a distant node is successfull, add it to our database
+        """
+        new_node = Node(
+            address=self._prov_data.unicast_addr,
+            addr_range=self._prov_data.addr_range,
+            dev_key=UpperTransportLayerDevKeyCryptoManager(
+                provisioning_crypto_manager=self._prov_data.provisioning_crypto_manager
+            ),
+        )
+        self.profile.add_distant_node(new_node)
+        self._prov_data = None
