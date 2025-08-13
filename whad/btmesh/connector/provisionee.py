@@ -129,24 +129,68 @@ class Provisionee(BTMeshNode):
         self.prov_event = Event()
 
         auth_done = False
+        self.prov_event.wait(timeout=60)
 
-        while not self.profile.is_provisioned:
-            # Check if event timedout, we fail
-            if not self.prov_event.wait(timeout=10):
-                self.stop_unprovisioned_beacons()
-                return False
+        # if we have prov_data, provisioning finished
+        if self._prov_data is not None:
+            self.provisioning_finished()
+            return True
 
-            elif not auth_done and self.prov_auth_data is not None:
-                auth_done = True
-                if self.prov_auth_data.auth_method == OUTPUT_OOB_AUTH:
-                    print("AUTH VALUE IS : ")
-                    print(self.prov_auth_data.value)
+        elif not auth_done and self.prov_auth_data is not None:
+            auth_done = True
+            if self.prov_auth_data.auth_method == OUTPUT_OOB_AUTH:
+                print("AUTH VALUE IS : ")
+                print(self.prov_auth_data.value)
+                res = self.resume_provisioning_with_auth()
+                return res
 
-                # Input auth should be handled by user code or shell
-                elif self.prov_auth_data.auth_method == INPUT_OOB_AUTH:
-                    return self.prov_auth_data
+            # Input auth should be handled by user code or shell
+            elif self.prov_auth_data.auth_method == INPUT_OOB_AUTH:
+                return self.prov_auth_data
 
-        return True
+        return False
+
+    def provisioning_finished(self):
+        """
+        Called when the local node has been successfully provisioned to instanciate stack and keys
+        """
+        primary_net_key = NetworkLayerCryptoManager(
+            key_index=self._prov_data.key_index, net_key=self._prov_data.net_key
+        )
+        dev_key = UpperTransportLayerDevKeyCryptoManager(
+            provisioning_crypto_manager=self._prov_data.provisioning_crypto_manager
+        )
+        self.profile.provision(
+            primary_net_key,
+            dev_key,
+            self._prov_data.iv_index,
+            self._prov_data.flags,
+            self._prov_data.unicast_addr,
+        )
+
+        self._main_stack = NetworkLayer(connector=self, options=self.options)
+        self.profile.is_provisioned = True
+
+    def resume_provisioning_with_auth(self, value=None):
+        """
+        Resume the provisioning process with the user.
+
+        :param value: The value typed by the user if INPUT_OOB_AUTH, default
+        :type value: str, optional
+        """
+        # If output oob, give value to stack
+        if self.prov_auth_data.auth_method == INPUT_OOB_AUTH and value is not None:
+            self.prov_auth_data.value = value
+            self._prov_stack.get_layer("pb_adv").on_provisioning_auth_data(
+                self.prov_auth_data
+            )
+
+        self.prov_event = Event()
+        self.prov_event.wait(20)
+        if self._prov_data is not None:
+            self.provisioning_finished()
+            return True
+        return False
 
     def start_unprovisioned_beacons_sending(self):
         """
@@ -179,70 +223,3 @@ class Provisionee(BTMeshNode):
                 return
             self.send_raw(pkt_beacon)
             sleep(2)
-
-    def resume_provisioning_with_auth(self, value):
-        """
-        Resume the provisioning process with the user.
-
-        :param value: The value types by the user
-        :type value: str
-        """
-
-        self.prov_auth_data.value = value
-        self._prov_stack.get_layer("pb_adv").on_provisioning_auth_data(
-            self.prov_auth_data
-        )
-        self.prov_event = Event()
-        self.prov_event.wait(20)
-        return self.profile.is_provisioned
-
-    def provisioning_complete(self, prov_data):
-        """
-        When Provisionning (not auto) is complete, we received the information to setup the node from the Provisioner and start normal behavior with main stack
-
-        :param prov_data: The provisioning data content
-        :type prov_data: ProvisioningCompleteData
-        """
-
-        primary_net_key = NetworkLayerCryptoManager(
-            key_index=prov_data.key_index, net_key=prov_data.net_key
-        )
-        dev_key = UpperTransportLayerDevKeyCryptoManager(
-            provisioning_crypto_manager=prov_data.provisioning_crypto_manager
-        )
-        self.profile.provision(
-            primary_net_key,
-            dev_key,
-            prov_data.iv_index,
-            prov_data.flags,
-            prov_data.unicast_addr,
-        )
-
-        self._main_stack = NetworkLayer(connector=self, options=self.options)
-
-        if self.prov_event is not None:
-            self.prov_auth_data = None
-            self.prov_event.set()
-
-        """
-    def handle_key_press(self, onoff, transaction_id):
-        pkt = BTMesh_Model_Generic_OnOff_Set(onoff=onoff, transaction_id=transaction_id)
-
-        ctx = MeshMessageContext()
-        ctx.creds = MANAGED_FLOODING_CREDS
-        ctx.src_addr = self.profile.primary_element_addr.to_bytes(2, "big")
-        ctx.dest_addr = b"\xff\xff"
-        ctx.ttl = 7
-        ctx.is_ctl = False
-        ctx.net_key_id = 0
-        ctx.application_key_index = 0
-        ctx.aid = (
-            self.profile.get_configuration_server_model()
-            .get_state("app_key_list")
-            .get_value(0)
-            .aid
-        )
-        pkt = BTMesh_Model_Message() / pkt
-        self._main_stack.get_layer("access").process_new_message((pkt, ctx))
-
-"""

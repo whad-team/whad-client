@@ -136,7 +136,7 @@ class Node:
     def __init__(
         self,
         address,
-        addr_range=0,
+        addr_range=1,
         dev_key=UpperTransportLayerDevKeyCryptoManager(
             device_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
         ),
@@ -146,14 +146,14 @@ class Node:
 
         :param address: Primary unicast Address of the node
         :type address: int
-        :param addr_range: Number of addresses in the range. If 0 or 1, one address. If greater than 2, range. defaults to 0
+        :param addr_range: Number of addresses in the range. If 0 or 1, one address (set to 1). If greater than 2, range. defaults to 0
         :type addr_range: int, optional
         :param dev_key: Dev key of the node, defaults to UpperTransportLayerDevKeyCryptoManager(bytes.fromhex("63964771734fbd76e3b40519d1d94a48"))
         :type dev_key: UpperTransportLayerDevKeyCryptoManager, optional
         """
 
         self.__address = address & 0xFFFF
-        self.__addr_range = 0 if addr_range in (0, 1) else addr_range & 0xFFFF
+        self.__addr_range = 1 if addr_range in (0, 1) else addr_range & 0xFFFF
         self.__dev_key = dev_key
         self.__elements = {}
 
@@ -177,7 +177,7 @@ class Node:
 
     @addr_range.setter
     def addr_range(self, value):
-        self.__addr_range = 0 if value in (0, 1) else value & 0xFFFF
+        self.__addr_range = 1 if value in (0, 1) else value & 0xFFFF
 
     @property
     def dev_key(self):
@@ -328,7 +328,7 @@ class ProvisioningData:
         :type iv_index: Bytes
         :param unicast_addr: Unicast addr of the device
         :type unicast_addr: int
-        :param addr_range: Range of unicast_addr of the node
+        :param addr_range: Range of unicast_addr of the node (number of addresses for the node)
         :type addr_range: int
         :param provisioning_crypto_manager: The provisionning_crypto_manager used during provisioning
         :type provisioning_crypto_manager: ProvisioningBearerAdvCryptoManagerProvisionee
