@@ -44,7 +44,7 @@ from whad.btmesh.stack.constants import OPCODE_TO_PAYLOAD_CLASS_LOWER_TRANSPORT
 logger = logging.getLogger(__name__)
 
 
-class BTMeshSniffer(BTMesh, EventsManager):
+class Sniffer(BTMesh, EventsManager):
     """
     Connector class for BTMesh sniffing, with decryption if keys given in configuration
 
@@ -262,9 +262,7 @@ class BTMeshSniffer(BTMesh, EventsManager):
             return packet
         else:
             metadata = packet.metadata
-            packet = self.process_mesh_pdu(
-                packet.getlayer(BTMesh_Obfuscated_Network_PDU)
-            )
+            packet = self.process_mesh_pdu(packet)
             if packet is not None:
                 metadata.decrypted = True
                 packet.metadata = metadata
@@ -408,13 +406,14 @@ class BTMeshSniffer(BTMesh, EventsManager):
         else:
             return None
 
-    def process_mesh_pdu(self, net_pdu):
+    def process_mesh_pdu(self, pdu):
         """
         Process a Mesh PDU (not a Beacon or Provisioning packet)
         """
         if not self.__configuration.decrypt:
-            return net_pdu
+            return pdu
 
+        net_pdu = pdu.getlayer(BTMesh_Obfuscated_Network_PDU)
         deobf_net_pdu, plaintext, iv_index = self.try_network_message_decrypt(net_pdu)
         if plaintext is None:
             return None
