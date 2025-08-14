@@ -14,10 +14,13 @@ INTRO = """
 wbtmesh-provisionee, the WHAD Bluetooth Mesh Provisionee utility
 """
 
-SETUP_CAT = "Setup node"
-ELEMENT_CAT = "Element edit"
+PROV_CAT = "Provisioning utilities"
+CONF_CAT = "Node configuration node"
+MESSAGE_CAT = "Message sending utilities"
+ELEMENT_CAT = "Element edit mode"
 ATTACK_CAT = "Attacks"
-MISC = "Miscellaneous"
+MISC_CAT = "Misc"
+
 
 
 class BTMeshProvisioneeShell(BTMeshBaseShell):
@@ -63,7 +66,7 @@ class BTMeshProvisioneeShell(BTMeshBaseShell):
         completions["uuid"] = {}
         return completions
 
-    @category(SETUP_CAT)
+    @category(PROV_CAT)
     def do_prov(self, args):
         """Manages the provisioning process of the node (when not auto provisioned)
 
