@@ -6,7 +6,24 @@ Manages basic Tx/Rx. (Based on BLE sniffer because it works)
 """
 
 from whad.ble.connector import Sniffer
-from scapy.layers.bluetooth4LE import BTLE_ADV, BTLE_ADV_NONCONN_IND, EIR_Hdr
+from scapy.layers.bluetooth4LE import (
+    BTLE_ADV,
+    BTLE_ADV_NONCONN_IND,
+    EIR_Hdr,
+    BTLE_RF,
+    BTLE_DATA,
+    BTLE,
+)
+from whad.scapy.layers.btmesh import (
+    EIR_BTMesh_Beacon,
+    EIR_Hdr,
+    EIR_BTMesh_Message,
+    BTMesh_Obfuscated_Network_PDU,
+    BTMesh_Secure_Network_Beacon,
+    BTMesh_Private_Beacon,
+    BTMesh_Unprovisioned_Device_Beacon,
+    EIR_PB_ADV_PDU,
+)
 from whad.ble import Peripheral
 from whad.ble.connector.base import BLE
 from whad.hub.ble import Direction as BleDirection
@@ -39,6 +56,8 @@ class BTMesh(BLE):
 
     Allows user code or shell to interact with the network, and also manages callbacks on received messages.
     """
+
+    domain = "btmesh"
 
     def __init__(
         self,

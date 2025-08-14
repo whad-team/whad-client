@@ -1,5 +1,5 @@
 from whad.device import WhadDevice
-from whad.btmesh.connector.sniffer import BTMeshSniffer
+from whad.btmesh.connector.sniffer import Sniffer
 from whad.exceptions import WhadDeviceNotFound
 import sys
 
@@ -12,7 +12,7 @@ if __name__ == "__main__":
         # Connect to target device and performs discovery
         try:
             dev = WhadDevice.create(interface)
-            sniffer = BTMeshSniffer(dev)
+            sniffer = Sniffer(dev)
             sniffer.configure()
             sniffer.start()
             print("Sniffer started")

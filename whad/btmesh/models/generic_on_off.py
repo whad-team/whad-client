@@ -41,9 +41,8 @@ class GenericOnOffServer(ModelServer):
     def on_onoff_set(self, message):
         pkt, ctx = message
         onoff_state = self.get_state("generic_onoff")
-        onoff_state: ModelState
         if pkt.transition_time is not None:
-            delay = ptk.delay
+            delay = pkt.delay
             present_onoff = onoff_state.get_value()
             response = BTMesh_Model_Generic_OnOff_Status(
                 present_onoff=present_onoff,
