@@ -13,10 +13,13 @@ INTRO = """
 wbtmesh-provisioner, the WHAD Bluetooth Mesh Provisioner utility
 """
 
-SETUP_CAT = "Setup node"
-ELEMENT_CAT = "Element edit"
+PROV_CAT = "Provisioning utilities"
+CONF_CAT = "Node configuration node"
+MESSAGE_CAT = "Message sending utilities"
+ELEMENT_CAT = "Element edit mode"
 ATTACK_CAT = "Attacks"
-MISC = "Miscellaneous"
+MISC_CAT = "Misc"
+
 
 
 class BTMeshProvisionerShell(BTMeshBaseShell):
@@ -61,7 +64,7 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
         completions["off"] = {}
         return completions
 
-    @category(MISC)
+    @category(PROV_CAT)
     def do_listen_beacons(self, args):
         """Starts/stops the listening for Unprovisioned Device Beacons for nodes that want to be provisioned and stores them.
 
@@ -89,6 +92,7 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
 
         return
 
+    @category(PROV_CAT)
     def do_list_unprov(self, args):
         """Lists the Unprovisioned devices that sent an Unprovisioned device beacon
 
@@ -122,7 +126,7 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
         completions["auth"] = {}
         return completions
 
-    @category(MISC)
+    @category(PROV_CAT)
     def do_prov(self, args):
         """Provisions the device at index specified in the list (via command list_unprov)
 

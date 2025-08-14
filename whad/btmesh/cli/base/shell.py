@@ -31,10 +31,12 @@ INTRO = """
 wbtmesh-base, the WHAD Bluetooth Mesh Base utility (not usable as is)
 """
 
-SETUP_CAT = "Setup node"
-ELEMENT_CAT = "Element edit"
+PROV_CAT = "Provisioning utilities"
+CONF_CAT = "Node configuration node"
+MESSAGE_CAT = "Message sending utilities"
+ELEMENT_CAT = "Element edit mode"
 ATTACK_CAT = "Attacks"
-MISC = "Miscellaneous"
+MISC_CAT = "Misc"
 
 
 class BTMeshBaseShell(InteractiveShell):
@@ -143,7 +145,7 @@ class BTMeshBaseShell(InteractiveShell):
         completions["start"] = {}
         return completions
 
-    @category(SETUP_CAT)
+    @category(PROV_CAT)
     def do_auto_prov(self, args):
         """Start the provisionee or provisioner with preset of provisioning data and manages this data.
         Recalling it will reset the node.
@@ -260,7 +262,7 @@ class BTMeshBaseShell(InteractiveShell):
         completions["input_oob_action"] = {}
         return completions
 
-    @category(SETUP_CAT)
+    @category(PROV_CAT)
     def do_prov_capabilities(self, args):
         """Manages the capabilities of the node when being provisioned/provisionnes a node
 
@@ -294,7 +296,7 @@ class BTMeshBaseShell(InteractiveShell):
             self._connector.profile.capabilities[name] = value
             self.success("Successfully set %s to value %d" % (name, value))
 
-    @category(SETUP_CAT)
+    @category(CONF_CAT)
     def do_address(self, arg):
         """Manages the device's primary unicast address
 
@@ -345,7 +347,7 @@ class BTMeshBaseShell(InteractiveShell):
         completions["off"] = {}
         return completions
 
-    @category(SETUP_CAT)
+    @category(CONF_CAT)
     def do_relay(self, arg):
         """Activate or deactivate the relaying of messages by the device (should be provisioned)
 
@@ -381,7 +383,7 @@ class BTMeshBaseShell(InteractiveShell):
             else:
                 self.error("Wrong argument, should be on/off")
 
-    @category(SETUP_CAT)
+    @category(MISC_CAT)
     def do_resume(self, arg):
         """Resumes the normal behaviour of a provisioned node (after editing an element)
 
@@ -400,7 +402,7 @@ class BTMeshBaseShell(InteractiveShell):
         completions["edit"] = {}
         return completions
 
-    @category(SETUP_CAT)
+    @category(ELEMENT_CAT)
     def do_element(self, args):
         """Manage local node's elements
 
@@ -495,7 +497,7 @@ class BTMeshBaseShell(InteractiveShell):
         completions["write"] = {}
         return completions
 
-    @category(SETUP_CAT)
+    @category(ELEMENT_CAT)
     def do_model(self, args):
         """Manage device's models (in an element), specifically its bounded states (and those of its base models). Only functions on Server models !
 
@@ -683,7 +685,7 @@ class BTMeshBaseShell(InteractiveShell):
         completions["reset"] = {}
         return completions
 
-    @category(SETUP_CAT)
+    @category(CONF_CAT)
     def do_whitelist(self, args):
         """Manages the whitelist of the node.
 
@@ -750,7 +752,7 @@ class BTMeshBaseShell(InteractiveShell):
                         "Successfully removed addr %s from the whitelist." % addr
                     )
 
-    @category(SETUP_CAT)
+    @category(CONF_CAT)
     def do_seqnum(self, arg):
         """Manages the sequence number of the node (proper sequence number of the node)
 
@@ -787,7 +789,7 @@ class BTMeshBaseShell(InteractiveShell):
             self._connector.profile.set_seq_number(seqnum)
             self.success("Successfully set the sequence number to 0x%x." % seqnum)
 
-    @category(MISC)
+    @category(MESSAGE_CAT)
     def do_onoff(self, args):
         """Sends an onoff (acked) message if the Element 0 has the GenericOnOff Client Model
         <ansicyan><b>onoff</b> [<i>"1"|"0"</i>]</ansicyan>
@@ -838,7 +840,7 @@ class BTMeshBaseShell(InteractiveShell):
             resp_pkt.show()
 
     # TODO : send control message (need to have an opcode argument ?)
-    @category(MISC)
+    @category(MESSAGE_CAT)
     def do_send_raw_access(self, args):
         """Sends an Access message based on message context (msg_context command) and a hex string of the raw Packet
 
@@ -874,7 +876,7 @@ class BTMeshBaseShell(InteractiveShell):
         completions["get_composition"] = {}
         return completions
 
-    @category(SETUP_CAT)
+    @category(CONF_CAT)
     def do_nodes(self, args):
         """Manages the information specific to each distant/local Node that we possess (namely their dev_key,elements and addresses)
 
@@ -1065,7 +1067,7 @@ class BTMeshBaseShell(InteractiveShell):
         completions["remove"] = {}
         return completions
 
-    @category(MISC)
+    @category(MESSAGE_CAT)
     def do_bind_app_key(self, args):
         """Binding of models to app keys of distant nodes.
 
@@ -1148,7 +1150,7 @@ class BTMeshBaseShell(InteractiveShell):
         else:
             self.success("Successfully binded the app key to the model.")
 
-    @category(SETUP_CAT)
+    @category(CONF_CAT)
     def do_net_keys(self, args):
         """Manages the net keys of the node (update, add, remove)
 
@@ -1243,7 +1245,7 @@ class BTMeshBaseShell(InteractiveShell):
         completions["send"] = {}
         return completions
 
-    @category(SETUP_CAT)
+    @category(CONF_CAT)
     def do_app_keys(self, args):
         """Manages the app keys of the local node (update, add, remove) and send them to other nodes.
 
@@ -1406,7 +1408,7 @@ class BTMeshBaseShell(InteractiveShell):
             else:
                 self.success("Successfully sent the app_key to the distant node")
 
-    @category(MISC)
+    @category(MESSAGE_CAT)
     def do_secure_network_beacon(self, args):
         """Sends a secure network beacon with the given parameters.
 
@@ -1495,7 +1497,7 @@ class BTMeshBaseShell(InteractiveShell):
         completions["ttl"] = {}
         return completions
 
-    @category(SETUP_CAT)
+    @category(MESSAGE_CAT)
     def do_msg_context(self, args):
         """Set the parameters/context to send messages via the access-send or control-send commands.
 
