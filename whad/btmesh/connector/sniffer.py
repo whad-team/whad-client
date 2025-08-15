@@ -12,7 +12,6 @@ from time import time
 from scapy.packet import Packet, Raw
 
 from scapy.layers.bluetooth4LE import BTLE_ADV, EIR_Hdr
-from whad.ble.connector.base import BLE
 from whad.exceptions import WhadDeviceDisconnected
 from whad.helpers import message_filter
 from whad.hub.ble.pdu import BleAdvPduReceived, BleRawPduReceived
@@ -40,6 +39,7 @@ from whad.btmesh.stack.utils import (
     calculate_seq_auth,
 )
 from whad.btmesh.stack.constants import OPCODE_TO_PAYLOAD_CLASS_LOWER_TRANSPORT
+from whad.hub.message import AbstractPacket
 
 logger = logging.getLogger(__name__)
 
@@ -255,18 +255,18 @@ class Sniffer(BTMesh, EventsManager):
         :param packet: Packet received
         :type packet: Packet
         """
-        if not self.bt_mesh_filter(packet, True):
-            return None
+        # We do not filter here, since wsniff calls this function we always need to return something
+
         # if the packet is not a Network PDU, we display it directly (its a beacon, no crypto)
-        if not packet.haslayer(BTMesh_Obfuscated_Network_PDU):
-            return packet
-        else:
+        if packet.haslayer(BTMesh_Obfuscated_Network_PDU):
             metadata = packet.metadata
-            packet = self.process_mesh_pdu(packet)
-            if packet is not None:
+            decrypted_packet = self.process_mesh_pdu(packet)
+            if decrypted_packet is not None:
                 metadata.decrypted = True
+                packet.payload = decrypted_packet.payload
                 packet.metadata = metadata
-            return packet
+
+        return packet
 
     def process_segmented_pdu(self, clear_net_pdu, lower_transport_pdu, iv_index):
         """
@@ -498,17 +498,23 @@ class Sniffer(BTMesh, EventsManager):
             else:
                 message_type = BleAdvPduReceived
 
+            msg_filter = lambda message: message_filter(message_type)(
+                message
+            ) and self.bt_mesh_filter(message, True)
+
             while True:
-                message = self.wait_for_message(
-                    filter=message_filter(message_type), timeout=0.1
-                )
+                message = self.wait_for_message(filter=msg_filter, timeout=0.1)
 
                 if message is not None:
                     packet = message.to_packet()
                     packet = self.process_packet(packet)
-                    if packet is not None:
-                        self.monitor_packet_rx(packet)
-                        yield packet
+                    self.monitor_packet_rx(packet)
+                    yield packet
+
+                # Check if timeout has been reached
+                if timeout is not None:
+                    if time() - start >= timeout:
+                        break
 
         except WhadDeviceDisconnected:
             return
