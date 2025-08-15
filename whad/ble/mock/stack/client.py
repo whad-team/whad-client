@@ -26,6 +26,7 @@ from .read import ClientReadProcedure
 from .write import ClientWriteProcedure
 from .writecmd import ClientWriteCommandProcedure
 from .find_info import ClientFindInformationProcedure, ClientFindByTypeValueProcedure
+from .notif import ClientNotificationCheckProcedure
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ class GattClient:
             ClientWriteCommandProcedure,
             ClientFindInformationProcedure,
             ClientFindByTypeValueProcedure,
+            ClientNotificationCheckProcedure,
         ]
 
     @property
@@ -68,7 +70,8 @@ class GattClient:
 
             # Unset current procedure if finished
             if self.__cur_procedure.done():
-                self.__cur_procedure = None
+                #self.__cur_procedure = None
+                """nope"""
 
             # Automatically add ATT_Hdr()
             if isinstance(answers, list):
@@ -189,6 +192,16 @@ class GattClient:
         """
         # Initiate a ClientWriteCommandProcedure
         self.__cur_procedure = ClientWriteCommandProcedure(handle, value)
+
+        # Generate ATT packets to send when this procedure is initiated
+        # and forward them to the underlying link-layer
+        for req in self.__cur_procedure.initiate():
+            self.__l2cap.send_pdu(ATT_Hdr()/req)
+
+    def sub_notif(self, handle: int):
+        """Subscribe to notification for the specified handler."""
+        # Initiate a ClientNotificationCheckProcedure
+        self.__cur_procedure = ClientNotificationCheckProcedure(handle)
 
         # Generate ATT packets to send when this procedure is initiated
         # and forward them to the underlying link-layer

@@ -1,7 +1,9 @@
 """Bluetooth Low Energy Peripheral connector unit tests.
 """
 import pytest
-from scapy.layers.bluetooth import ATT_Error_Response, ATT_Find_By_Type_Value_Response, ATT_Read_By_Type_Response
+from typing import Type
+
+from scapy.layers.bluetooth import ATT_Error_Response, ATT_Find_By_Type_Value_Response, ATT_Handle_Value_Notification, ATT_Read_By_Type_Response
 
 from whad.ble.mock.peripheral import PeripheralMock
 from whad.ble import BDAddress, Peripheral
@@ -11,10 +13,9 @@ from whad.ble.profile.advdata import AdvDataFieldList, AdvFlagsField, AdvShorten
 from whad.ble.profile.attribute import UUID
 from whad.ble.stack.att.constants import BleAttErrorCode, BleAttOpcode
 from whad.ble.stack.gatt.attrlist import GattAttributeDataList, GattAttributeValueItem
-from whad.hub.ble import connect
 
 @pytest.fixture
-def profile() -> GenericProfile:
+def profile() -> Type[GenericProfile]:
     """Generate our emulated GATT profile, similar to the one used when testing
     our Central connector.
     """
@@ -481,6 +482,26 @@ def test_write_cmd_unknown_handle(connected_peripheral):
     assert result.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND
     assert result.handle == 120
 
+def test_notification_sub(connected_peripheral):
+    """Test notification subscription.
+    1. central subscribes to a characteristic with notify permission
+    2. peripheral updates this characteristic value and send notification to central
+    3. check central got a notification
+    """
+    # Retrieve mock from current peripheral
+    mock: PeripheralMock = connected_peripheral.device
+
+    # Start our dedicated notification check procedure from central
+    charac = connected_peripheral.profile.find_object_by_handle(5)
+    result = mock.sub_notif(7, charac)
+
+    assert isinstance(result, ATT_Handle_Value_Notification)
+    assert result.value == b"FOOBAR"
+
+
+def test_indication_sub(connected_peripheral):
+    """Test indication subscription."""
+
 def test_remote_profile_discovery(connected_peripheral):
     """Test remote GATT profile discovery."""
     # Retrieve mock from current peripheral
@@ -524,8 +545,12 @@ def test_remote_profile_discovery(connected_peripheral):
             elif isinstance(response, ATT_Read_By_Type_Response):
                 for item in response.handles:
                     chardef = GattAttributeValueItem.from_bytes(bytes(item))
-                    services_chars[serv_handle].append((item.handle,item.value))
-                    attr_id = chardef.handle + 1
+                    if chardef is not None:
+                        services_chars[serv_handle].append((item.handle,item.value))
+                        attr_id = chardef.handle + 1
+                    else:
+                        # Invalid attribute/value item returned by the peripheral !
+                        assert False
 
     # Make sure our characteristics have successfully been discovered
     assert len(services_chars.keys()) == 3
