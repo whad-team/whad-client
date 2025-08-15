@@ -130,7 +130,8 @@ class Procedure:
 
         # If procedure state is STATE_DONE or SATE_ERROR, procedure
         # is considered as terminated.
-        self.__terminated.set()
+        if state in (self.STATE_DONE, self.STATE_ERROR):
+            self.__terminated.set()
 
     def set_result(self, result: Any):
         """Set procedure result. This result will be returned when the
