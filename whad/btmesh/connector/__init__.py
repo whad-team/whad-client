@@ -40,7 +40,7 @@ class BTMesh(BLE):
         if not self.can_sniff_advertisements:
             raise UnsupportedCapability("SniffAdvertisements")
 
-    def bt_mesh_filter(self, packet, ignore_regular_adv):
+    def bt_mesh_filter(self, packet, ignore_regular_adv=True):
         """
         Filter out non Mesh advertising packets
         """
@@ -58,3 +58,5 @@ class BTMesh(BLE):
                     )
                 ):
                     return True
+
+        return False

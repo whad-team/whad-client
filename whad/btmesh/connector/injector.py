@@ -6,20 +6,19 @@ to perform packet injection.
 
 from time import sleep
 
-from whad.ble.connector.injector import Injector as BleInjector
+from whad.btmesh.connector import BTMesh
 from whad.exceptions import UnsupportedCapability
 from whad.hub.ble import Direction as BleDirection
 from whad.btmesh.injecting import InjectionConfiguration
+from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA
+from whad.hub.ble import Direction as BleDirection
 
 
-class Injector(BleInjector):
+class Injector(BTMesh):
     """BTMesh injecion connector."""
-    domain = 'btmesh'
 
     def __init__(self, device):
         super().__init__(device)
-        self.__connection = None
-        self.__synchronized = None
 
         # Check if device accepts injection
         if not self.can_inject():
@@ -50,4 +49,13 @@ class Injector(BleInjector):
 
     def inject(self, packet):
         """Inject packet."""
-        return self.raw_inject(packet)
+        access_address = 0x8e89bed6
+        if self.__configuration.channel is not None:
+            channel = self.__configuration.channel
+        if hasattr(packet, "metadata") and hasattr(packet.metadata, "channel"):
+            channel = packet.metadata.channel
+        else:
+            channel = 37 # fallback to channel 37
+
+        return self.send_pdu(packet, access_address=access_address, conn_handle=channel,
+                             direction=BleDirection.UNKNOWN)

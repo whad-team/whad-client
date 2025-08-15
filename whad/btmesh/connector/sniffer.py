@@ -255,9 +255,10 @@ class Sniffer(BTMesh, EventsManager):
         :param packet: Packet received
         :type packet: Packet
         """
-        # We do not filter here, since wsniff calls this function we always need to return something
+        if not self.bt_mesh_filter(packet, True):
+            return None
 
-        # if the packet is not a Network PDU, we display it directly (its a beacon, no crypto)
+        # if the packet is a Network PDU, we process it before sending
         if packet.haslayer(BTMesh_Obfuscated_Network_PDU):
             metadata = packet.metadata
             decrypted_packet = self.process_mesh_pdu(packet)
@@ -267,6 +268,7 @@ class Sniffer(BTMesh, EventsManager):
                 packet.metadata = metadata
 
         return packet
+
 
     def process_segmented_pdu(self, clear_net_pdu, lower_transport_pdu, iv_index):
         """
@@ -498,12 +500,9 @@ class Sniffer(BTMesh, EventsManager):
             else:
                 message_type = BleAdvPduReceived
 
-            msg_filter = lambda message: message_filter(message_type)(
-                message
-            ) and self.bt_mesh_filter(message, True)
 
             while True:
-                message = self.wait_for_message(filter=msg_filter, timeout=0.1)
+                message = self.wait_for_message(filter=message_filter(message_type), timeout=0.1)
 
                 if message is not None:
                     packet = message.to_packet()
