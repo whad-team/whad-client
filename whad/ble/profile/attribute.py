@@ -516,9 +516,9 @@ class UUID:
     TYPE_16 = 1
     TYPE_128 = 2
 
-    uuid = None
-    packed: Optional[bytes] = None
-    type = None
+    uuid: str = ''
+    packed: bytes = b''
+    type: int = TYPE_16
 
     def __init__(self, uuid):
         if isinstance(uuid, UUID):
