@@ -40,8 +40,9 @@ class WhadSniffOutputPipe(Bridge):
         if hasattr(message, "to_packet") and hasattr(self.input, "process_packet"):
             pkt = message.to_packet()
             pkt = self.input.process_packet(pkt)
-            msg = message.from_packet(pkt)
-            super().on_outbound(msg)
+            if pkt is not None:
+                msg = message.from_packet(pkt)
+                super().on_outbound(msg)
         else:
             logger.debug('[wsniff][input-pipe] forward default outbound message %s', message)
             # Forward other messages
