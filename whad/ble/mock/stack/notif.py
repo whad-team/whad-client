@@ -3,7 +3,7 @@ from typing import List
 
 from scapy.packet import Packet
 from scapy.layers.bluetooth import (
-    ATT_Error_Response, ATT_Write_Request, ATT_Write_Response, ATT_Handle_Value_Notification,
+    ATT_Error_Response, ATT_Hdr, ATT_Write_Request, ATT_Write_Response, ATT_Handle_Value_Notification,
 )
 from .procedure import Procedure
 
@@ -29,10 +29,11 @@ class ClientNotificationCheckProcedure(Procedure):
 
     def process_request(self, request: Packet) -> List[Packet]:
         """Process incoming PDUs."""
-
+        request.show()
         # Do we got an error ? Force state to ERROR and save
         # the error details. Procedure is considered terminated.
         if ATT_Error_Response in request:
+            print(f"Error received while in state {self.get_state()}")
             self.set_result(request[ATT_Error_Response])
             self.set_state(Procedure.STATE_ERROR)
             return []
@@ -40,7 +41,8 @@ class ClientNotificationCheckProcedure(Procedure):
         # We are expecting a write response following our Initial
         # write into the target attribute (CCC descriptor)
         if self.get_state() == self.STATE_INITIAL:
-            if ATT_Write_Response in request:
+            if ATT_Hdr in request and request[ATT_Hdr].opcode == 0x13:
+                print(f"Descriptor successfully modified, wait for notification ...")
                 # Write response received, update state
                 self.set_state(self.STATE_SUB_DONE)
                 return []

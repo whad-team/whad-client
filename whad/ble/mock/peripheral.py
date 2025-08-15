@@ -4,6 +4,7 @@
 import logging
 from typing import Optional, Union, List
 from random import randint
+from time import sleep
 
 from scapy.packet import Packet
 
@@ -20,6 +21,7 @@ from whad.hub.ble.pdu import BlePduReceived, SetAdvData, SendBlePdu, BlePduRecei
 from whad.hub.generic.cmdresult import Success, Error, WrongMode
 from whad.hub.discovery import Capability, Domain, DeviceType
 from whad.ble.profile.attribute import UUID
+from whad.ble.profile.characteristic import Characteristic
 
 from .stack.client import GattClient
 from .stack.l2cap import Llcap
@@ -234,6 +236,24 @@ class PeripheralMock(MockDevice):
 
         # Wait for the client procedure to terminate
         return self.__client.wait_procedure(timeout=1.0)
+
+    def sub_notif(self, handle: int, charac: Characteristic):
+        """Subscribe for notification by writing into the specified attribute (descriptor)."""
+        # Start a NotificationCheck procedure
+        self.__client.sub_notif(handle)
+
+        # Retrieve waiting packets from L2CAP layer and convert them to messages,
+        # and send them to the attached connector (if any)
+        messages = self.to_messages(self.__l2cap.get_pdus())
+        for msg in messages:
+            self.put_message(msg)
+
+        # Update characteristic value (supposed to trigger a notification)
+        sleep(1)
+        charac.value = b"FOOBAR"
+
+        # Wait for the client procedure to terminate
+        return self.__client.wait_procedure(timeout=2.0)
 
     def find_information(self, start_handle: int, end_handle: int):
         """Emulate a FindInformation procedure initiated by a remote central.
