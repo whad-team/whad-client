@@ -1,11 +1,45 @@
+"""
+WHAD Unit Tests Procedures
+==========================
+
+This module provides a basic implementation of a test
+procedure for mocks through the `Procedure` class. This
+class is a simple state-machine that must be extended
+to define any testing procedure including a single or
+multiple steps.
+
+A procedure has an initial state and three possible terminal
+states:
+- a state indicating that the procedure has successfully completed
+  and returned a result (*DONE* state) or
+- a state indicating that an error occurred during the procedure
+  (*ERROR* state)
+- a state indicating the procedure has been canceled (*CANCELED* state)
+
+"""
 import logging
 from re import I
-from typing import List, Optional, Any, Callable, Type
+from typing import Optional, Any, Callable, Self, List
 from threading import Event
 from enum import IntEnum
 
+from scapy.packet import Packet
+
 # Default module logger
 logger = logging.getLogger(__name__)
+
+def proc_state(state: int):
+    """Decorator to specify a method as an handler for a specific state.
+
+    :param state: State associated with the decorated method.
+    """
+    def _wrapper(f):
+        setattr(f, "__state_handler", state)
+        return f
+    return _wrapper
+
+class ProcTimeoutError(Exception):
+    """Procedure has not completed in due time."""
 
 class ProcedureState(IntEnum):
     """Default procedure states.
@@ -17,38 +51,91 @@ class ProcedureState(IntEnum):
 
     The `USER` state shall be used to implement any user-defined states.
     """
+    UNDEFINED = -1
     INITIAL = 0
     DONE = 1
     ERROR = 2
-    USER = 3
+    CANCELED = 3
+    USER = 4
 
+class ProcedureMetaclass(type):
+    """Procedure metaclass used to automatically register handlers
+    associated with a procedure class.
 
-class Procedure:
+    This metaclass is used by the `Procedure` class to automatically
+    register any method decorated with `proc_state` as an handler
+    associated with a specific state.
+
+    A dictionary of registered handlers is injected in the class
+    based on this metaclass as `STATE_HANDLERS`, that is then used
+    in the `Procedure` class and its derived classes to call these
+    the correct handler each time the procedure enters a specific
+    state.
+    """
+
+    def __new__(cls, name, bases, dct):
+        """Look for state handlers and update class's state handlers dictionary."""
+        # Iterate over dct to register decorated handlers
+        handlers = {}
+        for name,obj in dct.items():
+            if hasattr(obj, "__state_handler"):
+                handlers[getattr(obj, "__state_handler")] = obj
+
+        # Inject handlers dictionnary if not defined
+        dct["STATE_HANDLERS"] = handlers
+
+        # Create instance
+        return super().__new__(cls, name, bases, dct)
+
+class Procedure(metaclass=ProcedureMetaclass):
     """WHAD generic procedure for mocks.
 
     This class defines a generic test procedure used in mocks. It is a basic
     state machine able to process incoming and outgoing packets independently
     of a specific protocol. It is designed to be used in mocks to interact with
     any WHAD device in order to implement speciic unit tests.
+
+    Handlers associated with a given state can be declared in this class by using
+    the `proc_state` decorator. Such handlers will be called each time the procedure
+    enters their associated states.
+
+    Procedure is considered completed when its state is one of the terminal states:
+    `ProcedureState.DONE`, `ProcedureState.ERROR` or `ProcedureState.CANCELED`.
+    Waiting for procedure completion can be achieved by calling its `wait()` method.
     """
+    # Handlers for various states
+    STATE_HANDLERS = {}
 
-    # State handlers
-    __HANDLERS = {}
-
-    @classmethod
-    def proc_state(cls, state: Type[ProcedureState]):
-        """Decorator to register a method as a handler for a specific state."""
-        def proc_state_wrapper(method: Callable[[int, int], None]):
-            """Register method as handler for state `state`."""
-            cls.__HANDLERS[state] = method
-            return method
-
-        # Return wrapper
-        return proc_state_wrapper
+    # Terminal states
+    TERMINAL_STATES = (
+        ProcedureState.DONE,
+        ProcedureState.ERROR,
+        ProcedureState.CANCELED
+    )
 
     def __init__(self):
         """Initialize this procedure."""
+        # Set default state
+        self.__state = ProcedureState.UNDEFINED
+        self.__result = None
+        self.__completed = Event()
         self.set_state(ProcedureState.INITIAL)
+
+    @classmethod
+    def get_handler(cls, state: int) -> Optional[Callable[[Self, int, int], None]]:
+        """Retrieve the handler associated with a given state, if any."""
+        if state in cls.STATE_HANDLERS:
+            return cls.STATE_HANDLERS[state]
+        return None
+
+    def call_handler(self, prev:int, state: int) -> bool:
+        """Call handler for given state."""
+        handler = self.get_handler(state)
+        if handler is not None:
+            handler(self, prev, state)
+            return True
+        else:
+            return False
 
     def set_state(self, state: ProcedureState):
         """Set current state and triggers state handlers if any.
@@ -60,7 +147,103 @@ class Procedure:
         prev_state = self.__state
         self.__state = state
 
-        # Trigger the associated state callback, if any.
-        if state in self.__HANDLERS:
-            self.__HANDLERS[state](prev_state, state)
+        if state not in Procedure.TERMINAL_STATES:
+            # Call handler on state change
+            self.call_handler(prev_state, state)
+        else:
+            # Mark procedure as terminated
+            self.__completed.set()
+
+    def get_state(self) -> ProcedureState:
+        """Get current procedure state."""
+        return self.__state
+
+    def is_state(self, state: int) -> bool:
+        """Check current state."""
+        return self.__state == state
+
+    def set_result(self, result: Any):
+        """Set result for procedure."""
+        self.__result = result
+
+    def get_result(self) -> Any:
+        """Procedure result."""
+        return self.__result
+
+    def success(self) -> bool:
+        """Determine if the procedure has been successful."""
+        return self.__state == ProcedureState.DONE
+
+    def error(self) -> bool:
+        """Determine if an error occurred during the procedure."""
+        return self.__state == ProcedureState.ERROR
+
+    def cancel(self):
+        """Cancel current procedure."""
+        self.set_result(None)
+        self.set_state(ProcedureState.CANCELED)
+
+    def canceled(self) -> bool:
+        """Determine if the procedure has been canceled."""
+        return self.__state == ProcedureState.CANCELED
+
+    def wait(self, timeout: Optional[float] = None) -> Optional[Any]:
+        """Wait for this procedure to terminate.
+
+        :param timeout: Maximum time allowed for the procedure to complete
+        :type timeout: float, optional
+        :return: Procedure result
+        :rtype: object, optional
+        """
+        if self.__completed.wait(timeout=timeout):
+            return self.__result
+        else:
+            raise ProcTimeoutError()
+
+class StackProcedure(Procedure):
+    """
+    Test procedure implementation for device mocks.
+
+    This class provides all the features required to implement
+    test procedures for protocol stacks.
+    """
+
+    @proc_state(ProcedureState.INITIAL)
+    def initiate_procedure(self) -> List[Packet]:
+        """Procedure initiation state handler.
+
+        When a stack procedure is initiated, it may require to
+        send one or multiple packets. This specific handler
+        is in charger of calling the `initiate()` callback
+        to gather any packet that should be sent first.
+        This callback can be overriden by derived class to
+        customize the packets to send on procedure initiation.
+
+        :return: List of packets to send when the procedure has
+                 just been initiated
+        :rtype: list
+        """
+        return self.initiate()
+
+    def initiate(self) -> List[Packet]:
+        """Procedure initiation callback.
+
+        :return: List of packets to send when the procedure has
+                 just been initiated
+        :rtype: list
+        """
+        return []
+
+    def process(self, packet: Packet) -> List[Packet]:
+        """Incoming packet processing callback.
+
+        This callback can be overriden to update the procedure state
+        depending on any received packet.
+
+        :param packet: Received packet
+        :type packet: Packet
+        :return: List of packets to send in response of the received packet, if any
+        :rtype: list
+        """
+        return []
 
