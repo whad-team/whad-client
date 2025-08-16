@@ -41,6 +41,8 @@ from threading import Event
 from scapy.packet import Packet
 from scapy.layers.bluetooth import ATT_Error_Response
 
+from whad.device.mock.procedure import StackProcedure
+
 from .attribute import Attribute
 
 logger = logging.getLogger(__name__)
@@ -181,3 +183,61 @@ class Procedure:
             return self.__result
         else:
             raise UnexpectedProcError(Procedure.ERR_TIMEOUT)
+
+class BleStackProcedure(StackProcedure):
+    """Bluetooth Low Energy stack procedure."""
+
+    # ATT Operation code (0 is invalid)
+    OPCODE = 0
+
+    # ATT Error codes
+    ERR_INVALID_HANDLE = 0x01
+    ERR_READ_NOT_PERMITTED = 0x02
+    ERR_WRITE_NOT_PERMITTED = 0x03
+    ERR_INVALID_PDU = 0x04
+    ERR_INSU_AUTHENT = 0x05
+    ERR_REQ_NOT_SUPP = 0x06
+    ERR_INVALID_OFFSET = 0x07
+    ERR_INSU_AUTHOR = 0x08
+    ERR_PREP_QUEUE_FULL = 0x09
+    ERR_ATTR_NOT_FOUND = 0x0A
+    ERR_ATTR_NOT_LONG = 0x0B
+    ERR_ENC_KEY_TOO_SHORT = 0x0C
+    ERR_INVALID_ATTR_LEN = 0x0D
+    ERR_UNLIKELY_ERROR = 0x0E
+    ERR_INSU_ENCRYPT = 0x0F
+    ERR_UNSUPP_GROUP_TYPE = 0x10
+    ERR_INSU_RESOURCES = 0x11
+    ERR_DB_OUT_OF_SYNC = 0x12
+    ERR_VALUE_NOT_ALLOWED = 0x13
+    ERR_APP_ERROR_BASE = 0x80
+    ERR_COMMON_PROF_BASE = 0xE0
+    ERR_TIMEOUT = 0xFF
+
+    def __init__(self, packets: List[Packet]):
+        super().__init__(packets)
+
+    def done(self) -> bool:
+        return self.success()
+
+    def att_error_response(self, handle: int, ecode: int) -> list[Packet]:
+        """
+        Generate an ATT error response.
+
+        :param handle: Attribute handle
+        :type handle: int
+        :param ecode: ATT error code as defined in Vol 3, Part F, section 3.3.3, Table 3.3
+        :type ecode: int
+        """
+        return [ATT_Error_Response(request=self.OPCODE, handle=handle, ecode=ecode)]
+
+    def process_request(self, request: Packet) -> List[Packet]:
+        """Process a received ATT request/response.
+
+        :return: List of packets (PDUs) to send once the received PDUs processed.
+        :rtype: List
+        :raise UnexpectedProcError: An unexpected error occurred while processing incoming packets.
+        """
+        raise UnexpectedProcError(request)
+
+

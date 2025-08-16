@@ -10,7 +10,7 @@ from scapy.packet import Packet
 from scapy.layers.bluetooth import ATT_Error_Response, ATT_Read_Request, ATT_Read_Response
 
 from .attribute import find_attr_by_handle
-from .procedure import Procedure, UnexpectedProcError
+from .procedure import Procedure, UnexpectedProcError, BleStackProcedure
 
 class ServerReadProcedure(Procedure):
     """ATT server Read procedure."""
@@ -57,7 +57,7 @@ class ServerReadProcedure(Procedure):
             self.set_state(Procedure.STATE_DONE)
             return self.att_error_response(request.gatt_handle, Procedure.ERR_ATTR_NOT_FOUND)
 
-class ClientReadProcedure(Procedure):
+class ClientReadProcedure(BleStackProcedure):
     """GATT Client Read procedure."""
 
     def __init__(self, handle: int):
@@ -67,13 +67,9 @@ class ClientReadProcedure(Procedure):
         :type handle: int
         """
         self.__handle = handle
-        super().__init__([], 23)
-
-    def initiate(self) -> List[Packet]:
-        """Initiate this Read procedure."""
-        return [
+        super().__init__([
             ATT_Read_Request(gatt_handle=self.__handle)
-        ]
+        ])
 
     def process_request(self, request: Packet) -> List[Packet]:
         """Process incoming packet."""
