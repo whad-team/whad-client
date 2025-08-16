@@ -41,7 +41,7 @@ def proc_state(state: int):
 class ProcTimeoutError(Exception):
     """Procedure has not completed in due time."""
 
-class ProcedureState(IntEnum):
+class ProcedureState:
     """Default procedure states.
 
     `INITIAL` state is the default state used in procedures when
@@ -119,7 +119,6 @@ class Procedure(metaclass=ProcedureMetaclass):
         self.__state = ProcedureState.UNDEFINED
         self.__result = None
         self.__completed = Event()
-        self.set_state(ProcedureState.INITIAL)
 
     @classmethod
     def get_handler(cls, state: int) -> Optional[Callable[[Self, int, int], None]]:
@@ -127,6 +126,10 @@ class Procedure(metaclass=ProcedureMetaclass):
         if state in cls.STATE_HANDLERS:
             return cls.STATE_HANDLERS[state]
         return None
+
+    def start(self):
+        """Initiate procedure."""
+        self.set_state(ProcedureState.INITIAL)
 
     def call_handler(self, prev:int, state: int) -> bool:
         """Call handler for given state."""
@@ -137,11 +140,11 @@ class Procedure(metaclass=ProcedureMetaclass):
         else:
             return False
 
-    def set_state(self, state: ProcedureState):
+    def set_state(self, state: int):
         """Set current state and triggers state handlers if any.
 
         :param state: Procedure state to set
-        :type state: ProcedureState
+        :type state: int
         """
         # Update state
         prev_state = self.__state
@@ -154,7 +157,7 @@ class Procedure(metaclass=ProcedureMetaclass):
             # Mark procedure as terminated
             self.__completed.set()
 
-    def get_state(self) -> ProcedureState:
+    def get_state(self) -> int:
         """Get current procedure state."""
         return self.__state
 
@@ -204,35 +207,29 @@ class StackProcedure(Procedure):
     """
     Test procedure implementation for device mocks.
 
-    This class provides all the features required to implement
-    test procedures for protocol stacks.
+    This procedure base class allows to define a list of packets to be sent
+    when the procedure is initiated, and to process incoming packets through
+    its `process` method. Procedure state is updated when `process()` is called,
+    until it reaches a final state (*DONE*, *ERROR* or *CANCEL*).
     """
 
-    @proc_state(ProcedureState.INITIAL)
-    def initiate_procedure(self) -> List[Packet]:
-        """Procedure initiation state handler.
+    def __init__(self, packets: Optional[List[Packet]] = None):
+        """Initialize stack procedure.
 
-        When a stack procedure is initiated, it may require to
-        send one or multiple packets. This specific handler
-        is in charger of calling the `initiate()` callback
-        to gather any packet that should be sent first.
-        This callback can be overriden by derived class to
-        customize the packets to send on procedure initiation.
-
-        :return: List of packets to send when the procedure has
-                 just been initiated
-        :rtype: list
+        :param packets: List of initial packets for this procedure
+        :type packets: list, optional
         """
-        return self.initiate()
+        self.__initial_packets = packets or []
+        super().__init__()
 
     def initiate(self) -> List[Packet]:
-        """Procedure initiation callback.
+        """Start stack procedure and return initial packets.
 
-        :return: List of packets to send when the procedure has
-                 just been initiated
+        :return: List of initial packets for this procedure
         :rtype: list
         """
-        return []
+        self.start()
+        return self.__initial_packets
 
     def process(self, packet: Packet) -> List[Packet]:
         """Incoming packet processing callback.
@@ -245,5 +242,6 @@ class StackProcedure(Procedure):
         :return: List of packets to send in response of the received packet, if any
         :rtype: list
         """
+        logger.debug("processing packet %s", packet)
         return []
 
