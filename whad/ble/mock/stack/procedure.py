@@ -184,8 +184,44 @@ class Procedure:
         else:
             raise UnexpectedProcError(Procedure.ERR_TIMEOUT)
 
-class BleStackProcedure(StackProcedure):
-    """Bluetooth Low Energy stack procedure."""
+class BleClientProcedure(StackProcedure):
+    """Bluetooth Low Energy ATT Client procedure."""
+
+    # ATT Operation code (0 is invalid)
+    OPCODE = 0
+
+    def __init__(self, packets: List[Packet]):
+        super().__init__(packets)
+
+    def done(self) -> bool:
+        """
+        Determine if the procedure has completed.
+
+        TODO: replace with call to success() in other dependencies."""
+        return self.success()
+
+    def att_error_response(self, handle: int, ecode: int) -> list[Packet]:
+        """
+        Generate an ATT error response.
+
+        :param handle: Attribute handle
+        :type handle: int
+        :param ecode: ATT error code as defined in Vol 3, Part F, section 3.3.3, Table 3.3
+        :type ecode: int
+        """
+        return [ATT_Error_Response(request=self.OPCODE, handle=handle, ecode=ecode)]
+
+    def process_request(self, request: Packet) -> List[Packet]:
+        """Process a received ATT request/response.
+
+        :return: List of packets (PDUs) to send once the received PDUs processed.
+        :rtype: List
+        :raise UnexpectedProcError: An unexpected error occurred while processing incoming packets.
+        """
+        raise UnexpectedProcError(request)
+
+class BleServerProcedure:
+    """Bluetooth Low Energy ATT Server procedure."""
 
     # ATT Operation code (0 is invalid)
     OPCODE = 0
@@ -214,11 +250,39 @@ class BleStackProcedure(StackProcedure):
     ERR_COMMON_PROF_BASE = 0xE0
     ERR_TIMEOUT = 0xFF
 
-    def __init__(self, packets: List[Packet]):
-        super().__init__(packets)
+    def __init__(self, attributes: list, mtu: int):
+        """Initialization."""
+        # Initialize state to STATE_INITIAL
+        self.__state = Procedure.STATE_INITIAL
 
-    def done(self) -> bool:
-        return self.success()
+        # Save attribute list
+        self.__attributes = attributes
+
+        # Save ATT MTU
+        self.__mtu = mtu
+
+        # Procedure terminated event
+        self.__terminated = Event()
+
+        # Procedure result
+        self.__result = None
+
+    @classmethod
+    def trigger(cls, request) -> bool:
+        """Trigger or not the procedure."""
+        logger.warning("[ble::stack::mock::Procedure] trigger method must be overriden")
+        logger.debug("[ble::stack::mock::Procedure] trigger() called with packet %s", bytes(request).hex())
+        return False
+
+    @property
+    def attributes(self) -> list[Attribute]:
+        """GATT attributes dictionary."""
+        return self.__attributes
+
+    @property
+    def mtu(self) -> int:
+        """ATT MTU."""
+        return self.__mtu
 
     def att_error_response(self, handle: int, ecode: int) -> list[Packet]:
         """
@@ -239,5 +303,4 @@ class BleStackProcedure(StackProcedure):
         :raise UnexpectedProcError: An unexpected error occurred while processing incoming packets.
         """
         raise UnexpectedProcError(request)
-
 
