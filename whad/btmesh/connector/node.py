@@ -342,3 +342,33 @@ class BTMeshNode(BTMesh):
             expected_response_clazz,
             timeout,
         )
+
+    def do_network_discovery(self, addr_low, addr_high, delay=3.5):
+        """
+        launch the network discovery "attack" via Directed Forwarding
+
+        :param addr_low: Lowest address to test
+        :type addr_low: int
+        :param addr_high: Highest address to test
+        :type addr_high: int
+        :param delay: Delay between 2 Path Requests, defaults to 3.5
+        :type delay: float, optional
+        """
+        thread = Thread(
+            target=self._main_stack.get_layer(
+                "upper_transport"
+            ).discover_topology_thread,
+            args=[addr_low, addr_high, delay],
+        )
+        thread.start()
+
+    def do_get_hops(self):
+        """
+        Get the distance between attacker to discovred nodes via network discovery attack
+        """
+        thread = Thread(
+            target=self._main_stack.get_layer(
+                "upper_transport"
+            ).discovery_get_hops_thread
+        )
+        thread.start()

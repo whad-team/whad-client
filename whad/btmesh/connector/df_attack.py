@@ -59,40 +59,6 @@ class DFAttacks(Provisionee):
         # reinstantiate NetworkLayer with the correct options
         self._main_stack = NetworkLayer(connector=self, options=self.options)
 
-    def do_network_discovery(self, addr_low, addr_high, delay=3.5):
-        """
-        launch the discovery attack
-
-        :param addr_low: Lowest address to test
-        :type addr_low: int
-        :param addr_high: Highest address to test
-        :type addr_high: int
-        :param delay: Delay between 2 Path Requests, defaults to 3.5
-        :type delay: float, optional
-        """
-        thread = Thread(
-            target=self._main_stack.get_layer(
-                "upper_transport"
-            ).discover_topology_thread,
-            args=[addr_low, addr_high, delay],
-        )
-        thread.start()
-
-    def do_get_hops(self):
-        """
-        Get the distance between attacker to discovred node via network discovery attack
-        """
-        thread = Thread(
-            target=self._main_stack.get_layer("upper_transport").discovery_get_hops
-        )
-        thread.start()
-
-    def get_network_topology(self):
-        """
-        Returns the Topology dictionary
-        """
-        return self._main_stack.get_layer("upper_transport").get_network_topology()
-
     def df_set(self, dest):
         """
         Activates DF via a DIRECTED_CONTROL_SET (Access message) to the destination specified

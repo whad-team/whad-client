@@ -917,15 +917,28 @@ class BTMeshBaseShell(InteractiveShell):
         if action == "list":
             nodes = self.profile.get_all_nodes()
             for node in nodes.values():
-                print_formatted_text(
-                    HTML(
-                        "<ansimagenta><b>Address: 0x%x -> 0x%x</b></ansimagenta>"
-                        % (
-                            node.address,
-                            (node.address + node.addr_range - 1),
+
+                if node.distance is None:
+                    print_formatted_text(
+                        HTML(
+                            "<ansimagenta><b>Address: 0x%x -> 0x%x</b></ansimagenta>"
+                            % (
+                                node.address,
+                                (node.address + node.addr_range - 1),
+                            )
                         )
                     )
-                )
+                else:
+                    print_formatted_text(
+                        HTML(
+                            "<ansimagenta><b>Address: 0x%x -> 0x%x</b></ansimagenta> | <ansicyan>%d hops away</ansicyan>"
+                            % (
+                                node.address,
+                                (node.address + node.addr_range - 1),
+                                node.distance,
+                            )
+                        )
+                    )
                 print_formatted_text(
                     HTML(
                         "   <ansigreen>DevKey : <i>%s</i></ansigreen>"
@@ -1757,6 +1770,72 @@ class BTMeshBaseShell(InteractiveShell):
                     % self._ttl
                 )
             )
+
+    @category(MISC_CAT)
+    def do_network_discovery(self, args):
+        """Performs discovery of the network (on a network with directed forwarding)
+
+        <ansicyan><b>network_discovery</b> <i>addr_low</i> <i>addr_low</i> [<i>delay</i>]</ansicyan>
+
+        > network_discovery 0001 00AA 4
+
+        The delay value defaults to 3.5 seconds (delay between 2 Path Requests sent)
+        """
+        if self._current_mode != self.MODE_STARTED:
+            self.error(
+                "Need to have a provisioned node started to launch the discovery."
+            )
+            return
+
+        if len(args) < 2:
+            self.error("Please provide the range of addresses to discover")
+            return
+
+        try:
+            addr_low = int(args[0], 0) & 0xFFFF
+            addr_high = int(args[1], 0) & 0xFFFF
+        except ValueError:
+            self.error("Please provide the addresses as ints")
+            return
+
+        if addr_low > addr_high:
+            self.error("High address should be larger than low address")
+            return
+
+        if len(args) >= 3:
+            try:
+                delay = float(args[2])
+            except ValueError:
+                self.error("Delay is a float.")
+        else:
+            delay = 3.5
+
+        self._connector.do_network_discovery(addr_low, addr_high, delay)
+        self.success("Successfully started the network_discovery attack.")
+        self.success(
+            "Wait a little to use the `nodes` command, in about %.1f seconds"
+            % ((addr_high - addr_low + 1) * delay)
+        )
+
+    @category(MISC_CAT)
+    def do_get_hops(self, arg):
+        """Launches the distance discovery attack on discovered nodes
+
+        <ansicyan><b>get_hops</b></ansicyan>
+        """
+
+        if self._current_mode != self.MODE_STARTED:
+            self.error(
+                "Need to have a provisioned node started to launch the discovery."
+            )
+            return
+
+        nb_nodes = len(self._connector.profile.distant_nodes.keys())
+        self._connector.do_get_hops()
+        self.success(
+            "Successfully launched distance evaluation of discovered nodes. Launch 'nodes' to see results in about %.1f seconds."
+            % (nb_nodes * 0.5)
+        )
 
     def _show_state(self, state, sub_state_name=None):
         """
