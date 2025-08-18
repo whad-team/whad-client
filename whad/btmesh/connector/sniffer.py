@@ -156,7 +156,7 @@ class Sniffer(BTMesh, EventsManager):
                 len(self.__configuration.net_keys)
                 - len(self.__configuration.iv_indexes),
             ):
-                self.__configuration.__iv_indexes.append("00000000")
+                self.__configuration.iv_indexes.append("00000000")
 
             for iv_index in self.__configuration.iv_indexes:
                 try:
@@ -268,7 +268,6 @@ class Sniffer(BTMesh, EventsManager):
                 packet.metadata = metadata
 
         return packet
-
 
     def process_segmented_pdu(self, clear_net_pdu, lower_transport_pdu, iv_index):
         """
@@ -500,15 +499,17 @@ class Sniffer(BTMesh, EventsManager):
             else:
                 message_type = BleAdvPduReceived
 
-
             while True:
-                message = self.wait_for_message(filter=message_filter(message_type), timeout=0.1)
+                message = self.wait_for_message(
+                    filter=message_filter(message_type), timeout=0.1
+                )
 
                 if message is not None:
                     packet = message.to_packet()
                     packet = self.process_packet(packet)
-                    self.monitor_packet_rx(packet)
-                    yield packet
+                    if packet is not None:
+                        self.monitor_packet_rx(packet)
+                        yield packet
 
                 # Check if timeout has been reached
                 if timeout is not None:

@@ -172,6 +172,10 @@ class BaseMeshProfile(object):
     def local_node(self):
         return self.__local_node
 
+    @property
+    def distant_nodes(self):
+        return self.__distant_nodes
+
     def get_primary_element_addr(self):
         """
         Returns the primary unicast address of this node
@@ -221,7 +225,7 @@ class BaseMeshProfile(object):
 
         if addr_type == UNICAST_ADDR_TYPE:
             res = self.is_unicast_addr_ours(addr) or (
-                addr == 0x7E00 or addr == 0x7E01 or addr == 0x7FFF
+                addr == 0x7E00 or addr == 0x7E01 or addr == 0x7FFF # For attacks on DF
             )
             return res
 

@@ -49,13 +49,17 @@ class Injector(BTMesh):
 
     def inject(self, packet):
         """Inject packet."""
-        access_address = 0x8e89bed6
+        access_address = 0x8E89BED6
         if self.__configuration.channel is not None:
             channel = self.__configuration.channel
         if hasattr(packet, "metadata") and hasattr(packet.metadata, "channel"):
             channel = packet.metadata.channel
         else:
-            channel = 37 # fallback to channel 37
+            channel = 37  # fallback to channel 37
 
-        return self.send_pdu(packet, access_address=access_address, conn_handle=channel,
-                             direction=BleDirection.UNKNOWN)
+        return self.send_pdu(
+            packet,
+            access_address=access_address,
+            conn_handle=channel,
+            direction=BleDirection.UNKNOWN,
+        )

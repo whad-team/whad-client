@@ -5,12 +5,16 @@ Performs encryption and decryption at application level for Access Messages
 Sends and respondes to UpperLayer Control messages (no application encryption)
 """
 
-import logging
-from threading import Event
 from whad.common.stack import Layer, alias, source
 from whad.btmesh.stack.utils import (
     get_address_type,
     VIRTUAL_ADDR_TYPE,
+    Node,
+    MeshMessageContext,
+)
+from whad.btmesh.stack.constants import (
+    DIRECTED_FORWARDING_CREDS,
+    MANAGED_FLOODING_CREDS,
 )
 from whad.scapy.layers.btmesh import (
     BTMesh_Upper_Transport_Access_PDU,
@@ -32,11 +36,18 @@ from whad.scapy.layers.btmesh import (
     BTMesh_Upper_Transport_Control_Friend_Subscription_List_Add,
     BTMesh_Upper_Transport_Control_Friend_Subscription_List_Remove,
     BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm,
+    UnicastAddr,
 )
 from whad.btmesh.stack.access import AccessLayer
+from whad.btmesh.crypto import UpperTransportLayerAppKeyCryptoManager
+
 from queue import Queue
 from scapy.all import raw
-from whad.btmesh.crypto import UpperTransportLayerAppKeyCryptoManager
+from time import sleep
+import logging
+from threading import Event, Timer
+from copy import copy
+
 
 logger = logging.getLogger(__name__)
 
@@ -375,7 +386,7 @@ class UpperTransportLayer(Layer):
         """
         pkt, ctx = message
         if (
-            ctx.src_addr == self.state.profile.primary_element_addr.to_bytes(2, "big")
+            ctx.src_addr == self.state.profile.get_primary_element_addr()
             or ctx.seq_number is None
         ):
             ctx.seq_number = self.state.profile.get_next_seq_number(inc=5)
@@ -396,6 +407,161 @@ class UpperTransportLayer(Layer):
         :type callback: [TODO:type]
         """
         self._handlers[clazz] = callback
+
+    """Functions and callbacks for the Network discovery method using Directed Forwarding, not protocol compliant"""
+
+    def on_path_reply_network_discovery(self, message):
+        """
+        On Path Reply received when in a network discovery mode (thread running)
+        For network discovery (A1), or for A5 (dependent_nodes_update attack)
+
+        :param message: Path Reply Received with its context
+        :type message: (BTMesh_Upper_Transport_Control_Path_Reply,MeshMessageContext)
+        """
+
+        pkt, ctx = message
+        # reply probably for the topology discovery
+        if pkt.path_origin == 0x7FFF:
+            if pkt.confirmation_request == 1:
+                resp_pkt = BTMesh_Upper_Transport_Control_Path_Confirmation(
+                    path_origin=pkt.path_origin,
+                    path_target=pkt.path_target_unicast_addr_range.range_start,
+                )
+                resp_ctx = MeshMessageContext()
+                resp_ctx.creds = DIRECTED_FORWARDING_CREDS
+                resp_ctx.src_addr = self.state.profile.get_primary_element_addr()
+                resp_ctx.dest_addr = 0xFFFB
+                resp_ctx.ttl = 0
+                resp_ctx.is_ctl = True
+                resp_ctx.net_key_id = 0
+                timer = Timer(
+                    0.5, self.send_control_message, args=[(resp_pkt, resp_ctx)]
+                )
+                timer.start()
+
+            if pkt.path_target_unicast_addr_range.length_present:
+                range_length = pkt.path_target_unicast_addr_range.range_length
+            else:
+                range_length = 0
+
+            distant_node_addr = pkt.path_target_unicast_addr_range.range_start
+            distant_node = self.state.profile.get_distant_node(distant_node_addr)
+
+            if distant_node is None:
+                distant_node = Node(address=distant_node_addr, addr_range=range_length)
+                self.state.profile.add_distant_node(distant_node)
+
+            return
+
+    def discover_topology_thread(self, addr_low, addr_high, delay=3.5):
+        """
+        "Attack" to discover all the nodes that support DF (they all should ...) and the distance to them
+
+        We send PATH_REQUEST with a PATH_ORIGIN that doesnt exist (very high address) for all the addrs in the range specified
+
+        :param addr_low: [TODO:description]
+        :type addr_low: [TODO:type]
+        :param addr_high: [TODO:description]
+        :type addr_high: [TODO:type]
+        :param delay: Delay between 2 Path Request sent, defaults to 3.5
+        :type: float, optional
+        """
+        base_pkt = BTMesh_Upper_Transport_Control_Path_Request(
+            on_behalf_of_dependent_origin=0,
+            path_origin_path_metric_type=0,
+            path_discovery_interval=0,
+            path_origin_path_lifetime=0,
+            path_origin_path_metric=0,
+            destination=0,
+            path_origin_unicast_addr_range=UnicastAddr(range_start=0x7FFF),
+        )
+        base_ctx = MeshMessageContext()
+        base_ctx.creds = DIRECTED_FORWARDING_CREDS
+        base_ctx.src_addr = self.state.profile.get_primary_element_addr()
+        base_ctx.dest_addr = 0xFFFB  # all directed forwading nodes
+        base_ctx.ttl = 0
+        base_ctx.is_ctl = True
+        base_ctx.net_key_id = 0
+
+        try:
+            old_callback = self._handlers[BTMesh_Upper_Transport_Control_Path_Reply]
+        except KeyError:
+            old_callback = lambda message: None
+        self.register_callback_ctl_message(
+            BTMesh_Upper_Transport_Control_Path_Reply,
+            self.on_path_reply_network_discovery,
+        )
+        for dest in range(addr_low, addr_high + 1):
+            if self.state.profile.is_unicast_addr_ours(dest):
+                continue
+            base_pkt.destination = dest
+            self.send_control_message(
+                (
+                    base_pkt,
+                    base_ctx,
+                )
+            )
+            sleep(delay)
+
+        # Wait a little to be sure we receive all resonponses before resetting the Path_Reply callback
+        sleep(3)
+        self.register_callback_ctl_message(
+            BTMesh_Upper_Transport_Control_Path_Reply, old_callback
+        )
+
+    def discovery_get_hops_thread(self):
+        """
+        For the nodes we have discovered with the network discovery attack, we try to get their distance with the
+        Path Echo Request technique
+        """
+
+        ctx = MeshMessageContext()
+        ctx.ttl = 127
+        ctx.creds = DIRECTED_FORWARDING_CREDS
+        ctx.src_addr = 0x7FFF
+        ctx.is_ctl = True
+        ctx.net_key_id = 0
+
+        try:
+            old_callback = self._handlers[
+                BTMesh_Upper_Transport_Control_Path_Echo_Reply
+            ]
+        except KeyError:
+            old_callback = lambda message: None
+
+        self.register_callback_ctl_message(
+            BTMesh_Upper_Transport_Control_Path_Echo_Reply,
+            self.on_path_echo_reply_network_discovery,
+        )
+
+        distant_nodes = self.state.profile.distant_nodes
+        for addr in distant_nodes.keys():
+            pkt = BTMesh_Upper_Transport_Control_Path_Echo_Request()
+            ctx_send = copy(ctx)
+            ctx_send.dest_addr = addr
+            self.send_control_message((pkt, ctx_send))
+            sleep(1)
+
+        # Wait a little to be sure we receive all resonponses before resetting the Path_Reply callback
+        sleep(1)
+        self.register_callback_ctl_message(
+            BTMesh_Upper_Transport_Control_Path_Echo_Reply, old_callback
+        )
+
+    def on_path_echo_reply_network_discovery(self, message):
+        pkt, ctx = message
+
+        # Path Echo reply for the network discovery
+        if ctx.dest_addr == 0x7FFF:
+            try:
+                distant_node = self.state.profile.get_distant_node(pkt.destination)
+            except KeyError:
+                return
+            if (
+                distant_node.distance is None
+                or (0x7F - ctx.ttl) < distant_node.distance
+            ):
+                distant_node.distance = 0x7F - ctx.ttl
 
 
 UpperTransportLayer.add(AccessLayer)

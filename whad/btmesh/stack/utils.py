@@ -156,6 +156,7 @@ class Node:
         self.__addr_range = 1 if addr_range in (0, 1) else addr_range & 0xFFFF
         self.__dev_key = dev_key
         self.__elements = {}
+        self.__distance = None  # Distance between local node and distant node (via network discovery DF)
 
         # Features
         self.__is_relay = False
@@ -218,6 +219,14 @@ class Node:
     @is_lpn.setter
     def is_lpn(self, value):
         self.__is_lpn = value
+
+    @property
+    def distance(self):
+        return self.__distance
+
+    @distance.setter
+    def distance(self, value):
+        self.__distance = value
 
     def add_element(self, index=None, is_primary=False):
         """
