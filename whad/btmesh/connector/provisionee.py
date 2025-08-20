@@ -24,13 +24,6 @@ from whad.btmesh.crypto import (
 from whad.btmesh.stack.network import NetworkLayer
 
 from whad.btmesh.profile import BaseMeshProfile
-from whad.scapy.layers.btmesh import (
-    BTMesh_Unprovisioned_Device_Beacon,
-    EIR_Hdr,
-    EIR_PB_ADV_PDU,
-    BTMesh_Obfuscated_Network_PDU,
-    EIR_BTMesh_Beacon,
-)
 from whad.btmesh.stack.constants import INPUT_OOB_AUTH, OUTPUT_OOB_AUTH
 
 from scapy.layers.bluetooth4LE import BTLE_ADV_NONCONN_IND, BTLE_ADV
@@ -46,7 +39,6 @@ class Provisionee(BTMeshNode):
         self,
         device,
         profile=None,
-        prov_stack=PBAdvBearerLayer,
         net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
         dev_app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
         unicast_addr=0x0002,
@@ -59,8 +51,6 @@ class Provisionee(BTMeshNode):
         :param device: Device object
         :type device: Device
         :param profile: Profile class used for the node (elements and models layout), defaults to None
-        :param prov_stack: Provisionning Stack to use, defaults to PBAdvBearerLayer
-        :type prov_stack: Layer, optional
         :param net_key: If auto provisioned : primary NetKey , defaults to bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00")
         :type net_key: Bytes, optional
         :param dev_app_key: If auto provisioned : primary app key and dev key (both the same value), defaults to bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
@@ -80,27 +70,6 @@ class Provisionee(BTMeshNode):
 
         # UUID of the node, used in beacons
         self.uuid = uuid
-
-        self._prov_stack = prov_stack(connector=self, options={}, is_provisioner=False)
-
-    def process_rx_packets(self, packet):
-        """
-        Process a received Mesh Packet. Sends to stack if provisioning PDU
-
-        :param packet: Packet received
-        :type packet: Packet
-        """
-        if not self.profile.is_provisioned:
-            if packet.haslayer(EIR_PB_ADV_PDU):
-                self._prov_stack.on_provisioning_pdu(packet.getlayer(EIR_PB_ADV_PDU))
-        elif packet.haslayer(BTMesh_Obfuscated_Network_PDU):
-            if (
-                self.whitelist == []
-                or packet.getlayer(BTLE_ADV_NONCONN_IND).AdvA in self.whitelist
-            ):
-                self._main_stack.on_net_pdu_received(
-                    packet.getlayer(BTMesh_Obfuscated_Network_PDU), packet.metadata.rssi
-                )
 
     def set_uuid(self, uuid):
         """
@@ -168,7 +137,6 @@ class Provisionee(BTMeshNode):
             self._prov_data.unicast_addr,
         )
 
-        self._main_stack = NetworkLayer(connector=self, options=self.options)
         self.profile.is_provisioned = True
 
     def resume_provisioning_with_auth(self, value=None):
@@ -181,9 +149,7 @@ class Provisionee(BTMeshNode):
         # If output oob, give value to stack
         if self.prov_auth_data.auth_method == INPUT_OOB_AUTH and value is not None:
             self.prov_auth_data.value = value
-            self._prov_stack.get_layer("pb_adv").on_provisioning_auth_data(
-                self.prov_auth_data
-            )
+            self._prov_stack.on_provisioning_auth_data(self.prov_auth_data)
 
         self.prov_event = Event()
         self.prov_event.wait(20)

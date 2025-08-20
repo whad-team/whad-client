@@ -102,6 +102,12 @@ class ProvisioningLayer(Layer):
     def configure(self, options):
         """Configure the Provisioning Layer"""
 
+        # Custom handler for packets received from parent layer
+        # Should take the message as argument (with context)
+        # Returns True if normal processing continues, False to directy return after custom handler
+        self._custom_handlers = {}
+
+        # normal processing handlers
         self._handlers = {
             BTMesh_Provisioning_Invite: self.on_invite,
             BTMesh_Provisioning_Capabilities: self.on_capabilities,
@@ -165,6 +171,13 @@ class ProvisioningLayer(Layer):
             packet = packet.message
 
         packet_type = type(packet)
+
+        # if custom handler, use it
+        if packet_type in self._custom_handlers:
+            continue_processing = self._custom_handlers[packet_type](packet)
+            # if custom handler says to return after itself
+            if not continue_processing:
+                return
 
         if (
             packet_type not in self._handlers

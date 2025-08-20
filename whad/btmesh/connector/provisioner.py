@@ -15,11 +15,6 @@ from time import time
 from whad.btmesh.connector.node import BTMeshNode
 
 from whad.btmesh.stack import PBAdvBearerLayer
-from whad.scapy.layers.btmesh import (
-    EIR_PB_ADV_PDU,
-    BTMesh_Obfuscated_Network_PDU,
-    EIR_BTMesh_Beacon,
-)
 from whad.btmesh.profile import BaseMeshProfile
 from whad.btmesh.stack.constants import OUTPUT_OOB_AUTH, INPUT_OOB_AUTH
 from whad.btmesh.crypto import UpperTransportLayerDevKeyCryptoManager
@@ -72,7 +67,6 @@ class Provisioner(BTMeshNode):
     def __init__(
         self,
         device,
-        prov_stack=PBAdvBearerLayer,
         profile=None,
     ):
         """
@@ -84,30 +78,14 @@ class Provisioner(BTMeshNode):
         :param profile: Profile class used, defaults to BaseMeshProfile
         """
         super().__init__(device, profile)
+
+        self.profile.is_provisioner = True
+
         self.__unprovisioned_devices = UnprovisionedDeviceList()
         self._is_listening_for_beacons = False
         self._is_currently_provisioning = False
 
-        self._prov_stack = prov_stack(connector=self, options={}, is_provisioner=True)
-
-    def process_rx_packets(self, packet):
-        """
-        Process a received Mesh Packet. Sends to stack if provisioning PDU OR
-        initiates provisioning if unprovisioned beacon
-
-        :param packet: Packet received
-        :type packet: Packet
-        """
-        if packet.haslayer(EIR_BTMesh_Beacon):
-            self.process_beacon(packet.getlayer(EIR_BTMesh_Beacon))
-        elif packet.haslayer(EIR_PB_ADV_PDU):
-            self._prov_stack.on_provisioning_pdu(packet.getlayer(EIR_PB_ADV_PDU))
-        elif self.profile.is_provisioned and packet.haslayer(
-            BTMesh_Obfuscated_Network_PDU
-        ):
-            self._main_stack.on_net_pdu_received(
-                packet.getlayer(BTMesh_Obfuscated_Network_PDU), packet.metadata.rssi
-            )
+        self._prov_stack = PBAdvBearerLayer(connector=self, options={})
 
     def stop_listening_beacons(self):
         """

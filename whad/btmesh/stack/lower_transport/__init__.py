@@ -281,6 +281,11 @@ class LowerTransportLayer(Layer):
 
         super().configure(options=options)
 
+        # Custom handler for packets received from parent layer
+        # Should take the message as argument (with context)
+        # Returns True if normal processing continues, False to directy return after custom handler
+        self._custom_handlers = {}
+
         # list queue of pending upper_transport layer message waiting to be sent to the network layer
         # keys are the dst_addr and the value are queues for each message where the dst_addr matches
         self.__queues = {}
@@ -305,6 +310,27 @@ class LowerTransportLayer(Layer):
         if "df_attacks" in options:
             self.remove(UpperTransportLayer)
             self.add(UpperTransportDFAttacks)
+
+    def register_custom_handler(self, clazz, handler):
+        """
+        Sets the handler function of the Access Message with class (Scapy packet) specified
+        If long processing, creating a handler that launches a seperate thread is advised.
+
+        :param clazz: The class of the scapy packet we handle
+        :param handler: The handler function, taking (Packet | MeshMessageContext) as arguments and returning nothing
+        """
+        self._custom_handlers[clazz] = handler
+
+    def unregister_custom_hanlder(self, clazz):
+        """
+        Unregisters a previously registerd custom callback for an Access message received
+
+        :param clazz: The class of the scapy packet not handled by custom handler anymore
+        """
+        try:
+            self._custom_handlers.pop(clazz)
+        except KeyError:
+            pass
 
     def send_to_network(self, message):
         """
@@ -334,6 +360,13 @@ class LowerTransportLayer(Layer):
         :type message: (Packet, MeshMessageContext)
         """
         pkt, ctx = message
+        # if custom handler, use it
+        if type(pkt) in self._custom_handlers:
+            continue_processing = self._custom_handlers[type(pkt)](message)
+            # if custom handler says to return after itself
+            if not continue_processing:
+                return
+
         # if ack received
         if isinstance(pkt, BTMesh_Lower_Transport_Control_Message):
             if pkt.opcode == 0 and ctx.src_addr in self.state.tx_transactions.keys():

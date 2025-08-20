@@ -42,7 +42,10 @@ class AccessLayer(Layer):
         # Set to True when a handler for an Access Message is executed
         self.state.__is_processing_message = False
 
-        # Custom handlers for specific packets (will skip the elements)
+
+        # Custom handler for packets received from parent layer
+        # Should take the message as argument (with context)
+        # Returns True if normal processing continues, False to directy return after custom handler
         self._custom_handlers = {}
 
         self.state.profile = options["profile"]
@@ -55,6 +58,26 @@ class AccessLayer(Layer):
 
         # For onoff messages (testing), transaction_id
         self.transaction_id = 0
+
+    def register_custom_handler(self, clazz, handler):
+        """
+        Sets the handler function of the Access Message with class (Scapy packet) specified
+
+        :param clazz: The class of the scapy packet we handle
+        :param handler: The handler function, taking (Packet | MeshMessageContext) as arguments and returning nothing
+        """
+        self._custom_handlers[clazz] = handler
+
+    def unregister_custom_hanlder(self, clazz):
+        """
+        Unregisters a previously registerd custom callback for an Access message received
+
+        :param clazz: The class of the scapy packet not handled by custom handler anymore
+        """
+        try:
+            self._custom_handlers.pop(clazz)
+        except KeyError:
+            pass
 
     def check_queue(self):
         """
@@ -111,7 +134,13 @@ class AccessLayer(Layer):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         packet, ctx = message
-        dst_addr = ctx.dest_addr
+
+        # if custom handler, use it
+        if type(packet) in self._custom_handlers:
+            continue_processing = self._custom_handlers[type(packet)](message)
+            # if custom handler says to return after itself
+            if not continue_processing:
+                return
 
         # If waiting for a particular message, check and set event if needed
         if self.state.expected_class is not None:
@@ -121,13 +150,11 @@ class AccessLayer(Layer):
                 self.state.event.set()
             return
 
-        if type(packet[1]) in self._custom_handlers:
-            self._custom_handlers[type(packet[1])](message)
-            return
-
-        # Elements that will process the message
+            # Elements that will process the message
         target_elements = []
 
+
+        dst_addr = ctx.dest_addr
         dst_addr_type = get_address_type(dst_addr)
 
         # if all nodes address, send to all elements
