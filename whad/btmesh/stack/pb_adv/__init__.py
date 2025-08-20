@@ -29,7 +29,6 @@ class PBAdvBearerLayer(Layer):
     def __init__(
         self,
         connector,
-        is_provisioner=False,
         options={},
     ):
         """
@@ -37,13 +36,16 @@ class PBAdvBearerLayer(Layer):
 
         :param connector: The connector that creates this layer
         :type connector: BTMesh
-        :param is_provisioner: Is the device a provisioner node ?, defaults to False
-        :type is_provisioner: bool, optional
         :param options: [TODO:description], defaults to {}
         :type options: [TODO:type], optional
         """
         # list of Generic provisioning layers for each link_id
         super().__init__(options=options)
+
+        # Custom handler for packets received from parent layer
+        # Should take the message as argument
+        # Returns True if normal processing continues, False to directy return after custom handler
+        self._custom_handlers = {}
 
         # Current link_id (the current Provisining process running)
         self.state.current_link_id = None
@@ -54,12 +56,33 @@ class PBAdvBearerLayer(Layer):
         # save connector (send RAW adv pdu)
         self.state.connector = connector
 
-        self.state.is_provisioner = is_provisioner
+        self.state.is_provisioner = self.state.connector.profile.is_provisioner
 
         if self.state.is_provisioner:
             self.state.generic_prov_layer_class = GenericProvisioningLayerProvisioner
         else:
             self.state.generic_prov_layer_class = GenericProvisioningLayerProvisionee
+
+    def register_custom_handler(self, clazz, handler):
+        """
+        Sets the handler function of the Access Message with class (Scapy packet) specified
+        If long processing, creating a handler that launches a seperate thread is advised.
+
+        :param clazz: The class of the scapy packet we handle
+        :param handler: The handler function, taking (Packet | MeshMessageContext) as arguments and returning nothing
+        """
+        self._custom_handlers[clazz] = handler
+
+    def unregister_custom_hanlder(self, clazz):
+        """
+        Unregisters a previously registerd custom callback for an Access message received
+
+        :param clazz: The class of the scapy packet not handled by custom handler anymore
+        """
+        try:
+            self._custom_handlers.pop(clazz)
+        except KeyError:
+            pass
 
     def send_to_gen_prov(self, packet):
         """
@@ -103,6 +126,20 @@ class PBAdvBearerLayer(Layer):
         :param packet: [TODO:description]
         :type packet: EIR_PB_ADV_PDU
         """
+        # if custom handler, use it
+        if type(packet) in self._custom_handlers:
+            continue_processing = self._custom_handlers[type(packet)](packet)
+            # if custom handler says to return after itself
+            if not continue_processing:
+                return
+
+        # if provisionee node and already provisionned, ignore
+        if (
+            not self.state.is_provisioner
+            and self.state.connector.profile.is_provisioned
+        ):
+            return
+
         if self.state.gen_prov_layer is None:
             # If no gen_prov layer existing and Provisioner mode, somthing went wrong ...
             if self.state.is_provisioner:

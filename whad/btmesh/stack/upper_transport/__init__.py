@@ -76,7 +76,12 @@ class UpperTransportLayer(Layer):
         self.state.event = Event()
         self.state.received_message = None
 
-        # handlers for the Upper Transport Control messages
+        # Custom handler for packets received from parent layer
+        # Should take the message as argument (with context)
+        # Returns True if normal processing continues, False to directy return after custom handler
+        self._custom_handlers = {}
+
+        # handlers for the Upper Transport Control messages (normal processing)
         self._handlers = {
             BTMesh_Upper_Transport_Control_Heartbeat: self.default_ctl_handler,
             BTMesh_Upper_Transport_Control_Path_Reply: self.default_ctl_handler,
@@ -341,6 +346,13 @@ class UpperTransportLayer(Layer):
         :type message: (Packet, MeshMessageContext)
         """
         pkt, ctx = message
+
+        # if custom handler, use it
+        if type(pkt) in self._custom_handlers:
+            continue_processing = self._custom_handlers[type(pkt)](message)
+            # if custom handler says to return after itself
+            if not continue_processing:
+                return
 
         # if control message, get handler for message and run it
         if not isinstance(pkt, BTMesh_Upper_Transport_Access_PDU):

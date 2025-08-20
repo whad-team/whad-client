@@ -35,6 +35,7 @@ from whad.scapy.layers.btmesh import (
 from threading import Lock
 from copy import copy
 
+
 def lock(f):
     """
     Decorator to lock the seq_number
@@ -87,6 +88,9 @@ class BaseMeshProfile(object):
 
         # Is the local node provisioned ? (should be True on start if Provisioner)
         self.is_provisioned = False
+ 
+        # Is the local node a provisioner node ?
+        self.is_provisioner = False
 
         # Set after the provisioning
         self.iv_index = b"\x00\x00\x00\x00"
@@ -119,11 +123,11 @@ class BaseMeshProfile(object):
         self.__distant_nodes = {}
 
         # Create and register primary element
-        primary_element = self.__local_node.add_element(index=0, is_primary=True) 
+        primary_element = self.__local_node.add_element(index=0, is_primary=True)
 
         self._populate_elements_and_models()
 
-       # Configure and add HealthModelServer
+        # Configure and add HealthModelServer
         health_server = HealthModelServer()
         primary_element.register_model(health_server)
 
@@ -225,7 +229,7 @@ class BaseMeshProfile(object):
 
         if addr_type == UNICAST_ADDR_TYPE:
             res = self.is_unicast_addr_ours(addr) or (
-                addr == 0x7E00 or addr == 0x7E01 or addr == 0x7FFF # For attacks on DF
+                addr == 0x7E00 or addr == 0x7E01 or addr == 0x7FFF  # For attacks on DF
             )
             return res
 
@@ -244,6 +248,17 @@ class BaseMeshProfile(object):
     def seqnum(self):
         return self.__seq_number
 
+    @seqnum.setter
+    @lock
+    def seqnum(self, seq):
+        """
+        Sets the seq number to a particular value (will still increment starting from that)
+
+        :param seq: The new seq number of the node
+        :type seq: int
+        """
+        self.__seq_number = seq
+
     @lock
     def get_next_seq_number(self, inc=1):
         """
@@ -256,16 +271,6 @@ class BaseMeshProfile(object):
         seq = self.__seq_number
         self.__seq_number += inc
         return seq
-
-    @lock
-    def set_seq_number(self, seq):
-        """
-        Sets the seq number to a particular value (will still increment starting from that)
-
-        :param seq: The new seq number of the node
-        :type seq: int
-        """
-        self.__seq_number = seq
 
     def get_next_forwarding_number(self):
         """

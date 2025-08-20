@@ -6,7 +6,14 @@ Manages basic Tx/Rx. (Based on BLE sniffer because it works)
 """
 
 from scapy.layers.bluetooth4LE import BTLE_ADV, BTLE_ADV_NONCONN_IND, EIR_Hdr
-from whad.scapy.layers.btmesh import BTMesh_Model_Message
+from whad.scapy.layers.btmesh import (
+    BTMesh_Unprovisioned_Device_Beacon,
+    EIR_Hdr,
+    EIR_PB_ADV_PDU,
+    BTMesh_Obfuscated_Network_PDU,
+    EIR_BTMesh_Beacon,
+    BTMesh_Model_Message,
+)
 from whad.ble import Peripheral
 from whad.hub.ble import Direction as BleDirection
 from whad.exceptions import UnsupportedCapability
@@ -90,9 +97,10 @@ class BTMeshNode(BTMesh):
 
         self._main_stack = NetworkLayer(connector=self, options=self.options)
 
-        # Provisionning stack, only instanced in Provisioner/Provisionee if needed
-        self._prov_stack = None
-
+        # Provisionning stack, (probably reinstancd by Provisioner/Provisionee)
+        self._prov_stack = PBAdvBearerLayer(
+            connector=self, options={}
+        )
         # used to communicate with Shell/terminal to prompt user to type authentication value (provisioning)
         self.prov_event = None
 
@@ -108,6 +116,22 @@ class BTMeshNode(BTMesh):
         self.sniffer_channel_switch_thread = Thread(
             target=self.change_sniffing_channel
         ).start()
+
+    @property
+    def main_stack(self):
+        return self._main_stack
+
+    @main_stack.setter
+    def main_stack(self, value):
+        self._main_stack = value
+
+    @property
+    def prov_stack(self):
+        return self._prov_stack
+
+    @prov_stack.setter
+    def prov_stack(self, value):
+        self._prov_stack = value
 
     def lock_tx(self):
         self.__tx_lock.acquire()
@@ -147,12 +171,31 @@ class BTMeshNode(BTMesh):
 
     def process_rx_packets(self, packet):
         """
-        Process a received Mesh Packet. Logic in subclasses
+        Process a received Mesh Packet. Sends to stack if provisioning PDU OR
+        initiates provisioning if unprovisioned beacon
 
         :param packet: Packet received
         :type packet: Packet
         """
-        # packet.show()
+        if packet.haslayer(EIR_BTMesh_Beacon):
+            self.process_beacon(packet.getlayer(EIR_BTMesh_Beacon))
+        elif packet.haslayer(EIR_PB_ADV_PDU):
+            self._prov_stack.on_provisioning_pdu(packet.getlayer(EIR_PB_ADV_PDU))
+        elif self.profile.is_provisioned and packet.haslayer(
+            BTMesh_Obfuscated_Network_PDU
+        ):
+            self._main_stack.on_net_pdu_received(
+                packet.getlayer(BTMesh_Obfuscated_Network_PDU), packet.metadata.rssi
+            )
+
+    def process_beacon(self, packet):
+        """
+        Process a received beacon, not supported yet
+        unprovisioned_device_beacons handled in Provisioner
+
+        :param packet:
+        :type packet: EIR_BTMesh_Beacon
+        """
         pass
 
     @txlock

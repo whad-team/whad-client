@@ -786,7 +786,7 @@ class BTMeshBaseShell(InteractiveShell):
                 self.error("Sequence number should be an int.")
                 return
 
-            self._connector.profile.set_seq_number(seqnum)
+            self._connector.profile.seqnum = seqnum
             self.success("Successfully set the sequence number to 0x%x." % seqnum)
 
     @category(MESSAGE_CAT)

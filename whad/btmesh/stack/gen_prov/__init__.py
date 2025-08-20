@@ -109,6 +109,11 @@ class GenericProvisioningLayer(ContextualLayer):
             BTMesh_Generic_Provisioning_Transaction_Continuation: self.on_transaction_continuation,
         }
 
+        # Custom handler for packets received from parent layer
+        # Should take the message as argument
+        # Returns True if normal processing continues, False to directy return after custom handler
+        self._custom_handlers = {}
+
         # True when in the middle of a transaction
         self.state.in_transaction = False
 
@@ -126,6 +131,26 @@ class GenericProvisioningLayer(ContextualLayer):
 
         # Simple FIFO queue for Provisioning messages. Since Provisioning Layer can send  2 packets back to back, need to make sure that all fragments/acks of first packet get there before seinding next one.
         self._queue = Queue()
+
+    def register_custom_handler(self, clazz, handler):
+        """
+        Sets the handler function of the Message with class (Scapy packet) specified
+
+        :param clazz: The class of the scapy packet we handle
+        :param handler: The handler function, taking (Packet | MeshMessageContext) as arguments and returning nothing
+        """
+        self._custom_handlers[clazz] = handler
+
+    def unregister_custom_hanlder(self, clazz):
+        """
+        Unregisters a previously registerd custom callback for a message received
+
+        :param clazz: The class of the scapy packet not handled by custom handler anymore
+        """
+        try:
+            self._custom_handlers.pop(clazz)
+        except KeyError:
+            pass
 
     def send_ack(self, transaction_number):
         """
@@ -215,7 +240,14 @@ class GenericProvisioningLayer(ContextualLayer):
         Handler for messages received from the GenericProvisioningLayer
         """
         pkt = message.gen_prov_pkt
-        # if we get here, we have the packet we were waiting for
+
+        if type(pkt) in self._custom_handlers:
+            continue_processing = self._custom_handlers[type(pkt)](message)
+            # if custom handler says to return after itself
+            if not continue_processing:
+                return
+
+        pkt.show()
         self._handlers[type(pkt)](message)
 
     def send_to_peer(self, transaction_number, packet):

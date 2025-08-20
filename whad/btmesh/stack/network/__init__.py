@@ -48,7 +48,13 @@ class NetworkLayer(Layer):
         """
         super().__init__(options=options)
 
-        # save connector to send packets 
+
+        # Custom handler for packets received from parent layer
+        # Should take the message as argument (with context)
+        # Returns True if normal processing continues, False to directy return after custom handler
+        self._custom_handlers = {}
+
+        # save connector to send packets
         self.__connector = connector
 
         # Network Key Crypto managers. Correspondance between nid and net_key_index
@@ -67,6 +73,26 @@ class NetworkLayer(Layer):
         self.state.profile = options["profile"]
 
         self.update_net_keys()
+
+    def register_custom_handler(self, clazz, handler):
+        """
+        Sets the handler function of the Message with class (Scapy packet) specified
+
+        :param clazz: The class of the scapy packet we handle
+        :param handler: The handler function, taking (Packet | MeshMessageContext) as arguments and returning nothing
+        """
+        self._custom_handlers[clazz] = handler
+
+    def unregister_custom_hanlder(self, clazz):
+        """
+        Unregisters a previously registerd custom callback for a message received
+
+        :param clazz: The class of the scapy packet not handled by custom handler anymore
+        """
+        try:
+            self._custom_handlers.pop(clazz)
+        except KeyError:
+            pass
 
     def update_net_keys(self):
         """
@@ -349,6 +375,13 @@ class NetworkLayer(Layer):
         :type message: (BTMesh_Lower_Transport_Access_Message|BTMesh_Lower_Transport_Control_Message, MeshMessageContext)
         """
         pkt, ctx = message
+        
+        # if custom handler, use and return
+        if type(pkt) in self._custom_handlers:
+            continue_processing = self._custom_handlers[type(pkt)](message)
+            # if custom handler says to return after itself
+            if not continue_processing:
+                return
 
         net_key = self.state.profile.get_net_key(ctx.net_key_id)
 

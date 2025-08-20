@@ -5,7 +5,7 @@ from whad.common.sniffing import SniffingEvent
 @dataclass
 class SnifferConfiguration:
     """
-    Configuration for sniffing a RF4CE communication.
+    Configuration for sniffing BTMesh
 
     :param decrypt: indicate if decryption is enabled (d)
     :param whitelist_addresses: filter on AdVA addresses (w)
