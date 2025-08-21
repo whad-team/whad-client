@@ -4,6 +4,10 @@ from whad.btmesh.connector.node import BTMeshNode
 from whad.btmesh.models import CompositeModelState, Element, ModelServer
 from whad.btmesh.stack.utils import MeshMessageContext, Node
 from whad.btmesh.attacker.link_closer import LinkCloserAttacker, LinkCloserConfiguration
+from whad.btmesh.attacker.seqnum_desynch import (
+    SeqNumDesynchConfiguration,
+    SeqNumDesynchAttacker,
+)
 from whad.btmesh.stack.constants import (
     MANAGED_FLOODING_CREDS,
     DIRECTED_FORWARDING_CREDS,
@@ -21,6 +25,7 @@ from whad.scapy.layers.btmesh import (
 )
 from whad.tools.utils import (
     get_sniffer_parameters as get_attack_config_parameters,
+    gen_config_param_name,
 )  # Same layout of parameters for Sniffers or Attackers ...
 
 from prompt_toolkit import HTML, print_formatted_text
@@ -31,6 +36,7 @@ from whad.common.monitors import WiresharkMonitor
 from re import match, compile
 from time import sleep
 import types
+from typing import get_args, get_origin, Any
 
 INTRO = """
 wbtmesh-base, the WHAD Bluetooth Mesh Base utility (not usable as is)
@@ -51,7 +57,10 @@ class BTMeshBaseShell(InteractiveShell):
     MODE_ATTACK = 3
 
     # List of attacks with their configuration object available from shell.
-    ATTACKS = {LinkCloserAttacker.name: (LinkCloserAttacker, LinkCloserConfiguration)}
+    ATTACKS = {
+        LinkCloserAttacker.name: (LinkCloserAttacker, LinkCloserConfiguration),
+        SeqNumDesynchAttacker.name: (SeqNumDesynchAttacker, SeqNumDesynchConfiguration),
+    }
 
     def __init__(
         self,
@@ -1904,7 +1913,8 @@ class BTMeshBaseShell(InteractiveShell):
             and not self._connector.profile.is_provisioned
         ):
             self.error(
-                "This node is not provisioned and attack %s necessiates a provisioned node."
+                "This node is not provisioned and attack %s necessitates a provisioned node."
+                % attack_clazz.name
             )
             return
 
@@ -1914,8 +1924,9 @@ class BTMeshBaseShell(InteractiveShell):
 
         self._selected_attack_conf = conf_clazz()
 
+        # Create the auto completion of the configuration of this attack
         self.COMPLETION_CONGFIGURE = {
-            key: {}
+            gen_config_param_name(key): {}
             for key in get_attack_config_parameters(
                 self._selected_attack_conf.__class__
             ).keys()
@@ -1955,6 +1966,9 @@ class BTMeshBaseShell(InteractiveShell):
         # Get the parameters of the configuration class
         parameters = get_attack_config_parameters(self._selected_attack_conf.__class__)
 
+        # Fix the replacement of _ to - done by gen_config_param_name ...
+        parameters = {gen_config_param_name(k): v for k, v in parameters.items()}
+
         # show
         if len(args) < 2:
             print_formatted_text(
@@ -1963,20 +1977,33 @@ class BTMeshBaseShell(InteractiveShell):
                     % (self._selected_attack.name)
                 )
             )
+
             for param_name, (param_type, _, _, param_description) in parameters.items():
                 # get a str reprensation of type
                 if isinstance(param_type, types.UnionType):
-                    type_str = " | ".join(t.__name__ for t in param_type.__args__)
+                    type_str = " | ".join(
+                        self._type_hint_representation(t) for t in param_type.__args__
+                    )
                 else:
-                    type_str = param_type.__name__
+                    type_str = self._type_hint_representation(param_type)
+
+                param_value = getattr(self._selected_attack_conf, param_name)
+
+                # if int or list of ints, print in hex format ...
+                if isinstance(param_value, int):
+                    param_value = hex(param_value)
+                elif type(param_value) is list and all(
+                    isinstance(item, int) for item in param_value
+                ):
+                    param_value = str([hex(i) for i in param_value])
 
                 print_formatted_text(
                     HTML(
-                        "   |─ <ansicyan><b>%s</b></ansicyan> (<ansiyellow>%s</ansiyellow>) [%s] : <i>%s</i>"
+                        "   |─ <ansicyan><b>%s</b></ansicyan> (<ansiyellow>%s</ansiyellow>) (<b>%s</b>) : <i>%s</i>"
                         % (
                             param_name,
                             type_str,
-                            str(getattr(self._selected_attack_conf, param_name)),
+                            param_value,
                             param_description,
                         )
                     )
@@ -1991,15 +2018,30 @@ class BTMeshBaseShell(InteractiveShell):
         param_type, _, _, _ = parameters[param_name]
         param_values = self._parse_args(args[1:])
 
-        # Check if list is ok, or if only one arg it is ok
-        if isinstance(param_values, param_type):
-            setattr(self._selected_attack_conf, param_name, param_values)
-        elif len(param_values) == 1 and isinstance(param_values[0], param_type):
+        # Check typing of the fiven paramter, does it match what is expected ?
+        # If only one item and type of param is not a list
+        if (
+            get_origin(param_type) != list
+            and len(param_values) == 1
+            and isinstance(param_values[0], param_type)
+        ):
             param_values = param_values[0]
             setattr(self._selected_attack_conf, param_name, param_values)
+
         else:
-            self.error("Wrong type for the parameter %s." % param_name)
-            return
+            type_hint = get_args(param_type)
+            if len(type_hint) < 1:
+                type_hint = Any
+            else:
+                type_hint = type_hint[0]
+
+            if get_origin(param_type) == list and all(
+                isinstance(item, type_hint) for item in param_values
+            ):
+                setattr(self._selected_attack_conf, param_name, param_values)
+            else:
+                self.error("Wrong type for the parameter %s." % param_name)
+                return
 
         self.success(
             "Successfully set the parameter %s to value %s"
@@ -2049,7 +2091,10 @@ class BTMeshBaseShell(InteractiveShell):
             )
 
         self.warning("Running the attack...")
+
+        # configure the attack with our configuration object
         self._selected_attack.configure(self._selected_attack_conf)
+
         if asynch is None:
             self._selected_attack.launch()
         else:
@@ -2295,3 +2340,16 @@ class BTMeshBaseShell(InteractiveShell):
         completions["read"] = models_dict
         completions["write"] = models_dict
         self.COMPLETION_MODEL = completions
+
+    def _type_hint_representation(self, type_hint):
+        """
+        Used to return a str reprensation of a type
+        """
+        if hasattr(type_hint, "__origin__") and type_hint.__origin__ is list:
+            return (
+                f'list[{", ".join((self._type_hint_representation(t) for t in type_hint.__args__))}]'
+                if hasattr(type_hint, "__args__")
+                else "list"
+            )
+        else:
+            return type_hint.__name__

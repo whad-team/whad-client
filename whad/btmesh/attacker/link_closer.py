@@ -6,7 +6,6 @@ import logging
 
 from dataclasses import dataclass, field
 from whad.btmesh.attacker import Attacker
-from whad.btmesh.stack.pb_adv.link_closer import LinkCloserLayer
 
 from whad.scapy.layers.btmesh import (
     EIR_PB_ADV_PDU,
@@ -77,6 +76,7 @@ class LinkCloserAttacker(Attacker):
             pb_adv = self._connector.prov_stack.get_layer("pb_adv")
             pb_adv.unregister_custom_hanlder(EIR_PB_ADV_PDU)
             self._connector.start()
+            self._is_setup = False
 
     def _attack_runner(self):
         self._is_attack_running = True
