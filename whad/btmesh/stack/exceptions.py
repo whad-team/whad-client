@@ -178,6 +178,7 @@ class InvalidConfirmationError(Exception):
     def __repr__(self):
         return str(self)
 
+
 #############
 # Message sending
 #############
@@ -198,3 +199,21 @@ class InvalidModelToSend(Exception):
         return str(self)
 
 
+#############
+# Attacks
+#############
+
+
+class UnprovisionedNodeForAttack(Exception):
+    """
+    Raised when an unprovisioned node connector is used for an attack that needs a provisioned node.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self):
+        return "UnprovisionedNodeForAttack()"
+
+    def __repr__(self):
+        return str(self)

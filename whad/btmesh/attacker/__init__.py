@@ -10,6 +10,8 @@ import logging
 from dataclasses import dataclass, field
 from threading import Thread, Event
 
+from whad.btmesh.stack.exceptions import UnprovisionedNodeForAttack
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,7 @@ class Attacker:
 
     name = "Default Attacker"
     description = "An attack that does nothing."
-    _need_provisioned_node = False
+    need_provisioned_node = False
 
     def __init__(self, connector, configuration=AttackerConfiguration()):
         """Initializes the attacker object with the given connector.
@@ -75,6 +77,10 @@ class Attacker:
         # Even set when attack is finished/failed/timeoudout or used to stop it
         self._event = Event()
 
+        # check if the node is provisioned if needed
+        if self.need_provisioned_node and not self._connector.profile.is_provisioned:
+            raise UnprovisionedNodeForAttack()
+
         self._setup()
 
     @property
@@ -99,11 +105,9 @@ class Attacker:
 
         Called in init function
         """
-        self._connector.stop()
         # Example of setting the seq number to another (here). We first stash the value
         self._backup_seq_num = self._connector.profile.seqnum
         self._connector.profile.seqnum = 0x1
-        self._connector.start()
         self._is_setup = True
 
     def restore(self):
@@ -158,8 +162,8 @@ class Attacker:
 
     def stop(self):
         """If the attack is in async mode and still running, stops the attack from running."""
-        self._is_attack_running = False
         self.event.clear()
+        self._is_attack_running = False
 
     def show_result(self):
         """Function implemented in each Attacker to display the result of the attack"""
