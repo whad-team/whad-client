@@ -116,12 +116,12 @@ class LinkCloserAttacker(Attacker):
             isinstance(message[1], BTMesh_Generic_Provisioning_Hdr)
             and link_id not in self._link_closed
         ):
-            Thread(target=self.send_link_clode_thread, args=[link_id]).start()
+            Thread(target=self.send_link_close_thread, args=[link_id]).start()
             return False
 
         return True
 
-    def send_link_clode_thread(self, link_id):
+    def send_link_close_thread(self, link_id):
         """
         Threat to send link close messages
 

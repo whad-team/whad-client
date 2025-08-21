@@ -102,6 +102,26 @@ class UpperTransportLayer(Layer):
             BTMesh_Upper_Transport_Control_Friend_Subscription_List_Confirm: self.default_ctl_handler,
         }
 
+    def register_custom_handler(self, clazz, handler):
+        """
+        Sets the handler function of the Message with class (Scapy packet) specified
+
+        :param clazz: The class of the scapy packet we handle
+        :param handler: The handler function, taking (Packet | MeshMessageContext) as arguments and returning nothing
+        """
+        self._custom_handlers[clazz] = handler
+
+    def unregister_custom_hanlder(self, clazz):
+        """
+        Unregisters a previously registerd custom callback for a message received
+
+        :param clazz: The class of the scapy packet not handled by custom handler anymore
+        """
+        try:
+            self._custom_handlers.pop(clazz)
+        except KeyError:
+            pass
+
     def check_queue(self):
         """
         If the queue is not empty, process the next UpperTransportLayer Message
@@ -402,23 +422,10 @@ class UpperTransportLayer(Layer):
             or ctx.seq_number is None
         ):
             ctx.seq_number = self.state.profile.get_next_seq_number(inc=5)
-        if isinstance(pkt, BTMesh_Upper_Transport_Control_Path_Request):
             pkt.path_origin_forwarding_number = (
                 self.state.profile.get_next_forwarding_number()
             )
         self.send_to_lower_transport((pkt, ctx))
-
-    def register_callback_ctl_message(self, clazz, callback):
-        """
-        Registers a callback for a type of ctl packet on reception.
-        Callback should be declared in the Connector
-
-        :param clazz: The packet class
-        :type clazz: [TODO:type]
-        :param callback: The callback to call with message as argument
-        :type callback: [TODO:type]
-        """
-        self._handlers[clazz] = callback
 
     """Functions and callbacks for the Network discovery method using Directed Forwarding, not protocol compliant"""
 
