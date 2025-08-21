@@ -1,8 +1,9 @@
 from whad.cli.shell import InteractiveShell, category
 from whad.btmesh.profile import BaseMeshProfile
 from whad.btmesh.connector.node import BTMeshNode
-from whad.btmesh.models import CompositeModelState, Element
+from whad.btmesh.models import CompositeModelState, Element, ModelServer
 from whad.btmesh.stack.utils import MeshMessageContext, Node
+from whad.btmesh.attacker.link_closer import LinkCloserAttacker, LinkCloserConfiguration
 from whad.btmesh.stack.constants import (
     MANAGED_FLOODING_CREDS,
     DIRECTED_FORWARDING_CREDS,
@@ -18,6 +19,9 @@ from whad.scapy.layers.btmesh import (
     BTMesh_Model_Config_App_Key_Add,
     BTMesh_Model_Config_App_Key_Status,
 )
+from whad.tools.utils import (
+    get_sniffer_parameters as get_attack_config_parameters,
+)  # Same layout of parameters for Sniffers or Attackers ...
 
 from prompt_toolkit import HTML, print_formatted_text
 
@@ -26,6 +30,7 @@ from whad.exceptions import ExternalToolNotFound
 from whad.common.monitors import WiresharkMonitor
 from re import match, compile
 from time import sleep
+import types
 
 INTRO = """
 wbtmesh-base, the WHAD Bluetooth Mesh Base utility (not usable as is)
@@ -43,6 +48,10 @@ class BTMeshBaseShell(InteractiveShell):
     MODE_NORMAL = 0
     MODE_STARTED = 1
     MODE_ELEMENT_EDIT = 2
+    MODE_ATTACK = 3
+
+    # List of attacks with their configuration object available from shell.
+    ATTACKS = {LinkCloserAttacker.name: (LinkCloserAttacker, LinkCloserConfiguration)}
 
     def __init__(
         self,
@@ -86,6 +95,18 @@ class BTMeshBaseShell(InteractiveShell):
         # Instanciate our Peripheral
         # PLACEHOLDER, OVERWRITE IN SUBCLASSES WITH OTHER CONNECTOR
         self._connector = BTMeshNode(self.interface, profile=self.profile)
+
+        # Do it once instead of every time we have to autocomplete...
+        self.COMPLETION_ATTACKS = {key: {} for key in self.ATTACKS.keys()}
+
+        # Dynamically filled with parameter names when attack selected, or node provisioned, or element selected
+        self.COMPLETION_CONGFIGURE = {}
+        self.COMPLETION_ELEMENTS = {}
+        self.COMPLETION_MODEL = {}
+
+        # In attack mode, the currently selected attack and configuration instances
+        self._selected_attack_conf = None
+        self._selected_attack = None
 
     def update_prompt(self, force=False):
         """Update prompt to reflect current state
@@ -385,22 +406,28 @@ class BTMeshBaseShell(InteractiveShell):
 
     @category(MISC_CAT)
     def do_resume(self, arg):
-        """Resumes the normal behaviour of a provisioned node (after editing an element)
+        """Resumes the normal behaviour of a provisioned node (after editing an element or in attack mode)
 
         <ansicyan><b>resume</b></ansicyan>
         """
+        if self._current_mode is self.MODE_ATTACK and self._selected_attack is not None:
+            self._selected_attack.stop()
+            self._selected_attack.restore()
+            self.COMPLETION_CONGFIGURE = {}
+        else:
+            self._connector.start()
 
-        self._connector.start()
-        self._current_mode = self.MODE_STARTED
+        if self._connector.profile.is_provisioned:
+            self._current_mode = self.MODE_STARTED
+        else:
+            self._current_mode = self.MODE_NORMAL
         self.update_prompt()
 
     def complete_element(self):
         """Autocomplete wireshark command"""
-        completions = {}
-        completions["remove"] = {}
-        completions["add"] = {}
-        completions["edit"] = {}
-        return completions
+        if self.COMPLETION_ELEMENTS == {}:
+            self._fill_elements_completion()
+        return self.COMPLETION_ELEMENTS
 
     @category(ELEMENT_CAT)
     def do_element(self, args):
@@ -433,6 +460,7 @@ class BTMeshBaseShell(InteractiveShell):
 
                 element = self.profile.local_node.add_element()
 
+                self._fill_elements_completion()
                 self.success("Element %d successfully added." % element.index)
 
             elif action == "remove":
@@ -451,6 +479,7 @@ class BTMeshBaseShell(InteractiveShell):
                         self.error("Cannot delete primary element")
 
                     elif self.profile.local_node.remove_element(index):
+                        self._fill_elements_completion()
                         self.success(
                             "Successfully removed element at index %d." % index
                         )
@@ -480,6 +509,7 @@ class BTMeshBaseShell(InteractiveShell):
 
                     self._selected_element = index
                     self._current_mode = self.MODE_ELEMENT_EDIT
+                    self._fill_models_completion()
 
                 else:
                     self.error("Need to specify an element index to edit")
@@ -491,11 +521,8 @@ class BTMeshBaseShell(InteractiveShell):
         self.update_prompt()
 
     def complete_model(self):
-        """Autocomplete wireshark command"""
-        completions = {}
-        completions["read"] = {}
-        completions["write"] = {}
-        return completions
+        """Autocomplete model command"""
+        return self.COMPLETION_MODEL
 
     @category(ELEMENT_CAT)
     def do_model(self, args):
@@ -658,7 +685,6 @@ class BTMeshBaseShell(InteractiveShell):
                         return
 
                 # If the values have only a single element, no list
-                print(values)
                 if len(values) == 1:
                     values = values[0]
 
@@ -1837,6 +1863,249 @@ class BTMeshBaseShell(InteractiveShell):
             % (nb_nodes * 0.5)
         )
 
+    def complete_attacks(self):
+        """Autocomplete attacks command"""
+        return self.COMPLETION_ATTACKS
+
+    @category(ATTACK_CAT)
+    def do_attacks(self, arg):
+        """Attack setup to go into attack mode. Stops the node until attack launched.
+
+        <ansicyan><b>attacks</b> <i>ATTACK_NAME</i></ansicyan>
+
+        Goes into attack mode for the attack selected. If no name provided, lists the available attacks
+        """
+        if (
+            self._current_mode is self.MODE_ELEMENT_EDIT
+            or self._current_mode is self.MODE_ATTACK
+        ):
+            self.error("Cannot use this command in element or attack mode")
+            return
+
+        if len(arg) < 1:
+            for attack, configuration in self.ATTACKS.values():
+                print_formatted_text(
+                    HTML(
+                        "   <ansimagenta><b>%s</b></ansimagenta>: %s"
+                        % (attack.name, attack.description)
+                    )
+                )
+
+            return
+
+        attack_name = arg[0]
+        if attack_name not in self.ATTACKS.keys():
+            self.error("Attack %s does not exist." % attack_name)
+            return
+
+        attack_clazz, conf_clazz = self.ATTACKS[attack_name]
+        if (
+            attack_clazz.need_provisioned_node
+            and not self._connector.profile.is_provisioned
+        ):
+            self.error(
+                "This node is not provisioned and attack %s necessiates a provisioned node."
+            )
+            return
+
+        self._selected_attack = attack_clazz(
+            connector=self._connector
+        )  # configuration given when running the attack...
+
+        self._selected_attack_conf = conf_clazz()
+
+        self.COMPLETION_CONGFIGURE = {
+            key: {}
+            for key in get_attack_config_parameters(
+                self._selected_attack_conf.__class__
+            ).keys()
+        }
+        self._current_mode = self.MODE_ATTACK
+        self.update_prompt()
+
+    def complete_configure(self):
+        """Autocomplete attacks command"""
+        return self.COMPLETION_CONGFIGURE
+
+    @category(ATTACK_CAT)
+    def do_configure(self, args):
+        """In Attack mode only. Manages the configuration of the selected attack.
+
+        <ansicyan><b>configure</b> <i>PARAM_NAME</i> [<i>VALUE(S)</i>]</ansicyan>
+
+        If no argument provided, lists the configuration parameter, description and current values.
+
+        To set the value of parameter "timeout" for example :
+
+        > configuration timeout 20
+
+        To set a list of values as parameters :
+
+        > configuration victims 0x0002 0x0003 0x0004
+
+        The lastest value of the configuration will always be used when running the attack.
+        """
+
+        if self._current_mode != self.MODE_ATTACK:
+            self.error(
+                "Cannot configure an attack if not in Attack mode. Use `attacks` command."
+            )
+            return
+
+        # Get the parameters of the configuration class
+        parameters = get_attack_config_parameters(self._selected_attack_conf.__class__)
+
+        # show
+        if len(args) < 2:
+            print_formatted_text(
+                HTML(
+                    "<ansigreen><b>Parameters for attack %s</b></ansigreen>"
+                    % (self._selected_attack.name)
+                )
+            )
+            for param_name, (param_type, _, _, param_description) in parameters.items():
+                # get a str reprensation of type
+                if isinstance(param_type, types.UnionType):
+                    type_str = " | ".join(t.__name__ for t in param_type.__args__)
+                else:
+                    type_str = param_type.__name__
+
+                print_formatted_text(
+                    HTML(
+                        "   |─ <ansicyan><b>%s</b></ansicyan> (<ansiyellow>%s</ansiyellow>) [%s] : <i>%s</i>"
+                        % (
+                            param_name,
+                            type_str,
+                            str(getattr(self._selected_attack_conf, param_name)),
+                            param_description,
+                        )
+                    )
+                )
+            return
+
+        param_name = args[0]
+        if param_name not in parameters.keys():
+            self.error("Parameter %s does not exist." % param_name)
+            return
+
+        param_type, _, _, _ = parameters[param_name]
+        param_values = self._parse_args(args[1:])
+
+        # Check if list is ok, or if only one arg it is ok
+        if isinstance(param_values, param_type):
+            setattr(self._selected_attack_conf, param_name, param_values)
+        elif len(param_values) == 1 and isinstance(param_values[0], param_type):
+            param_values = param_values[0]
+            setattr(self._selected_attack_conf, param_name, param_values)
+        else:
+            self.error("Wrong type for the parameter %s." % param_name)
+            return
+
+        self.success(
+            "Successfully set the parameter %s to value %s"
+            % (param_name, str(param_values))
+        )
+
+    def complete_run(self):
+        """Autocomplete run command"""
+        completions = {}
+        completions["asynch"] = {}
+        completions["synch"] = {}
+        return completions
+
+    @category(ATTACK_CAT)
+    def do_run(self, arg):
+        """Only in Attack mode. Runs the attack with the current configuration.
+
+        <ansicyan><b>run</b> [<i>SYNCH|ASYNCH</i>]</ansicyan>
+
+        The attacks are designed to run asynchronously or synchronously based on what they do.
+
+        To force run synchronously (shell will only return when attack finished):
+
+        > run synch
+
+        To force run asynchronously:
+
+        > run asynch
+
+        """
+        if self._current_mode != self.MODE_ATTACK or self._selected_attack is None:
+            self.error("Can only run an attack in attack mode. Use `attacks` command")
+            return
+
+        if self._selected_attack.is_attack_running:
+            self.error(
+                "Attack already running in the background. Stop it before starting another."
+            )
+            return
+
+        asynch = None
+        if len(arg) > 0:
+            asynch = (
+                True
+                if arg[0].lower() == "asynch"
+                else (False if arg[0].lower() == "synch" else None)
+            )
+
+        self.warning("Running the attack...")
+        self._selected_attack.configure(self._selected_attack_conf)
+        if asynch is None:
+            self._selected_attack.launch()
+        else:
+            self._selected_attack.launch(asynch=asynch)
+
+        self.update_prompt()
+
+        if self._selected_attack.is_attack_running:
+            self.warning(
+                "Attack is running asynchronously, check results and state with `check` command when needed. Use `stop` to stop the attack."
+            )
+        else:
+            self.success("The attack is complete.")
+            self._selected_attack.show_result()
+
+    @category(ATTACK_CAT)
+    def do_check(self, arg):
+        """Only in attack mode. Checks whether the attack is running or not, and displays the current results if any.
+
+        <ansicyan><b>check</b></ansicyan>
+        """
+
+        if self._current_mode != self.MODE_ATTACK or self._selected_attack is None:
+            self.error(
+                "Can only run check command in attack mode. Use `attacks` command."
+            )
+            return
+
+        if self._selected_attack.is_attack_running:
+            self.success(
+                "The attack is currently running asynchronously. Use `stop` to stop it."
+            )
+        else:
+            self.warning("The attack is not running. Use the `run` command.")
+
+        self._selected_attack.show_result()
+
+    @category(ATTACK_CAT)
+    def do_stop(self, arg):
+        """Only in attack mode. Stops the currently running attack.
+
+        <ansicyan><b>check</b></ansicyan>
+        """
+        if self._current_mode != self.MODE_ATTACK or self._selected_attack is None:
+            self.error(
+                "Can only run stop command in attack mode. Use `attacks` command."
+            )
+            return
+
+        if not self._selected_attack.is_attack_running:
+            self.error("The attack is not running, nothing to stop.")
+        else:
+            self._selected_attack.stop()
+            self.success("Successfully stopped the attack.")
+            self._selected_attack.show_result()
+
     def _show_state(self, state, sub_state_name=None):
         """
         Nice display of a state with its value(s). For composite state, can specify a sub_state or None if show all sub_states
@@ -1913,6 +2182,7 @@ class BTMeshBaseShell(InteractiveShell):
     def _parse_args(self, args):
         """
         Function to parse the arguments for the values of a state, used in do_model
+        Or for parameters in configuration of attacks
 
         :param args: The args to parse
         :type args: List
@@ -1926,6 +2196,11 @@ class BTMeshBaseShell(InteractiveShell):
         for arg in args:
             arg = arg.strip()
 
+            # Try to parse as None
+            if arg.lower() == "none":
+                parsed_values.append(None)
+                continue
+
             # Try to parse as int
             try:
                 parsed_values.append(int(arg, 0))
@@ -1938,14 +2213,14 @@ class BTMeshBaseShell(InteractiveShell):
                 try:
                     parsed_values.append(bytes.fromhex(arg))
                 except ValueError:
-                    raise ValueError(f"Invalid hex string for bytes: {arg}")
+                    pass
 
             # Try to interpret as float
             else:
                 try:
                     parsed_values.append(float(arg))
                 except ValueError:
-                    raise ValueError(f"Unrecognized value: {arg}")
+                    pass
 
         return parsed_values
 
@@ -1983,3 +2258,40 @@ class BTMeshBaseShell(InteractiveShell):
                     )
             else:
                 print_formatted_text(HTML(" <i>No models defined</i>"))
+
+    def _fill_elements_completion(self):
+        """
+        Called when the node is started to fill the completion dict for the `elements` command.
+        Recalled everytime the elements add/remove command is called.
+        """
+        if self._connector.profile.is_provisioned:
+            return
+
+        completions = {"edit": {}, "add": {}, "remove": {}}
+        for element in self._connector.profile.local_node.get_all_elements():
+            completions["edit"][str(element.index)] = {}
+            completions["remove"][str(element.index)] = {}
+
+        self.COMPLETION_ELEMENTS = completions
+
+    def _fill_models_completion(self):
+        """
+        Called anytime we are in element edit mode for the first time.
+        """
+        completions = {"read": {}, "write": {}}
+
+        models_dict = {}
+        for model in self.profile.local_node.get_element(self._selected_element).models:
+            states_dict = {}
+            if isinstance(model, ModelServer):
+                for state in model.get_all_states():
+                    if isinstance(state, CompositeModelState):
+                        for substate in state.get_all_sub_states():
+                            states_dict[state.name + "." + substate.name] = {}
+                    else:
+                        states_dict[state.name] = {}
+            models_dict[hex(model.model_id)] = states_dict
+
+        completions["read"] = models_dict
+        completions["write"] = models_dict
+        self.COMPLETION_MODEL = completions

@@ -21,11 +21,7 @@ ATTACK_CAT = "Attacks"
 MISC_CAT = "Misc"
 
 
-
 class BTMeshProvisionerShell(BTMeshBaseShell):
-    MODE_NORMAL = 0
-    MODE_STARTED = 1
-    MODE_ELEMENT_EDIT = 2
 
     def __init__(self, interface=None, profile=BaseMeshProfile):
         super().__init__(interface, profile, HTML("<b>wbtmesh-provisioner></b> "))
@@ -56,6 +52,25 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
                     "<b>wbtmesh-provisioner<ansimagenta> [running]</ansimagenta>></b> "
                 )
             )
+        elif (
+            self._current_mode == self.MODE_ATTACK and self._selected_attack is not None
+        ):
+            if self._selected_attack.is_attack_running:
+                self.set_prompt(
+                    HTML(
+                        "<b>wbtmesh-provisionee | <ansired>%s</ansired> (<ansiyellow>running</ansiyellow>)></b> "
+                        % (self._selected_attack.name)
+                    ),
+                    force,
+                )
+            else:
+                self.set_prompt(
+                    HTML(
+                        "<b>wbtmesh-provisionee | <ansired>%s</ansired>></b> "
+                        % (self._selected_attack.name)
+                    ),
+                    force,
+                )
 
     def complete_listen_beacons(self):
         """Autocomplete wireshark command"""
@@ -201,4 +216,3 @@ class BTMeshProvisionerShell(BTMeshBaseShell):
 
         else:
             self.error("This action does not exist")
-  

@@ -33,8 +33,7 @@ try:
     print("Lauching the LinkCloser attacker for 20 seconds")
     link_closer.launch(asynch=False)
 
-    print("Attack finished, closed links : ")
-    print(link_closer.link_closed)
+    link_closer.show_result()
 
 except ConnectionLostException as e:
     print("Connection lost", e)

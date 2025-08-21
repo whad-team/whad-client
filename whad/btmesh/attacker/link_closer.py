@@ -26,16 +26,19 @@ logger = logging.getLogger(__name__)
 class LinkCloserConfiguration:
     """Configuration for an the LinkCloser attack
 
-
-    :param timeout: timeout (sec) of the attack before quitting. Infinite if not specified (default) (v)
+    :param timeout: Timeout (sec) of the attack before quitting. Infinite if not specified (None).
     """
 
-    timeout: int = None
+    timeout: int | None = None
 
 
 class LinkCloserAttacker(Attacker):
 
-    def __init__(self, connector, configuration=None):
+    name = "LinkCloserAttack"
+    description = "Reacts on Provisionning packets to close the link and deny the Provisionning of all nodes."
+    need_provisioned_node = False
+
+    def __init__(self, connector, configuration=LinkCloserConfiguration()):
         """LinkCloser Attacke object. Does not need a provisioned node's connector.
 
         :param connector: The btmesh connector to use
@@ -69,10 +72,11 @@ class LinkCloserAttacker(Attacker):
         """
         Restores the PB_ADV stack to normal
         """
-        self._connector.stop()
-        pb_adv = self._connector.prov_stack.get_layer("pb_adv")
-        pb_adv.unregister_custom_hanlder(EIR_PB_ADV_PDU)
-        self._connector.start()
+        if self._is_setup:
+            self._connector.stop()
+            pb_adv = self._connector.prov_stack.get_layer("pb_adv")
+            pb_adv.unregister_custom_hanlder(EIR_PB_ADV_PDU)
+            self._connector.start()
 
     def _attack_runner(self):
         self._is_attack_running = True
@@ -135,3 +139,8 @@ class LinkCloserAttacker(Attacker):
             sleep(uniform(0.02, 0.05))
 
         self._link_closed.append(link_id)
+
+    def show_result(self):
+        """Function implemented in each Attacker to display the result of the attack"""
+        print("Closed links are :")
+        print(self._link_closed)
