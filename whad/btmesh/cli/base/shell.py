@@ -4,6 +4,10 @@ from whad.btmesh.connector.node import BTMeshNode
 from whad.btmesh.models import CompositeModelState, Element, ModelServer
 from whad.btmesh.stack.utils import MeshMessageContext, Node
 from whad.btmesh.attacker.link_closer import LinkCloserAttacker, LinkCloserConfiguration
+from whad.btmesh.attacker.path_poison_bidir import (
+    PathPoisonBidirAttacker,
+    PathPoisonBidirConfiguration,
+)
 from whad.btmesh.attacker.seqnum_desynch import (
     SeqNumDesynchConfiguration,
     SeqNumDesynchAttacker,
@@ -60,6 +64,10 @@ class BTMeshBaseShell(InteractiveShell):
     ATTACKS = {
         LinkCloserAttacker.name: (LinkCloserAttacker, LinkCloserConfiguration),
         SeqNumDesynchAttacker.name: (SeqNumDesynchAttacker, SeqNumDesynchConfiguration),
+        PathPoisonBidirAttacker.name: (
+            PathPoisonBidirAttacker,
+            PathPoisonBidirConfiguration,
+        ),
     }
 
     def __init__(
@@ -2106,9 +2114,11 @@ class BTMeshBaseShell(InteractiveShell):
             self.warning(
                 "Attack is running asynchronously, check results and state with `check` command when needed. Use `stop` to stop the attack."
             )
-        else:
+        elif self._selected_attack.success:
             self.success("The attack is complete.")
             self._selected_attack.show_result()
+        else:
+            self.error("The attack finished but failed.`check` command might give details.")
 
     @category(ATTACK_CAT)
     def do_check(self, arg):

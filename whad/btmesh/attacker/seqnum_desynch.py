@@ -9,13 +9,6 @@ from whad.btmesh.attacker import Attacker
 from whad.scapy.layers.btmesh import BTMesh_Upper_Transport_Control_Heartbeat
 from whad.btmesh.stack.utils import MeshMessageContext
 
-from whad.scapy.layers.btmesh import (
-    EIR_PB_ADV_PDU,
-    BTMesh_Generic_Provisioning_Link_Close,
-    BTMesh_Generic_Provisioning_Hdr,
-    EIR_Hdr,
-)
-
 from time import sleep
 from random import uniform
 from threading import Thread

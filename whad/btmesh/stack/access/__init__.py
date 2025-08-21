@@ -42,6 +42,8 @@ class AccessLayer(Layer):
         # Set to True when a handler for an Access Message is executed
         self.state.__is_processing_message = False
 
+        # If this layer is not active, ignore all messages comming in.
+        self.state.is_layer_active = True
 
         # Custom handler for packets received from parent layer
         # Should take the message as argument (with context)
@@ -86,6 +88,18 @@ class AccessLayer(Layer):
         if not self.__queue.empty():
             self.process_access_message(self.__queue.get_nowait())
 
+    def set_layer_active(self):
+        """
+        Activate the layer to receive and process messages.
+        """
+        self.state.is_layer_active = True
+
+    def set_layer_active(self):
+        """
+        Activate the layer to receive and process messages.
+        """
+        self.state.is_layer_active = False
+
     @source("upper_transport")
     def on_access_message(self, message):
         """
@@ -94,6 +108,9 @@ class AccessLayer(Layer):
         :param message: Message Received with its context
         :type message: (Packet,MeshMessageContext)
         """
+        if not self.state.is_layer_active:
+            return
+
         self.__queue.put_nowait(message)
         if not self.state.__is_processing_message:
             self.check_queue()
@@ -134,6 +151,9 @@ class AccessLayer(Layer):
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
         packet, ctx = message
+
+        if self.state.is_layer_active:
+            return
 
         # if custom handler, use it
         if type(packet) in self._custom_handlers:
