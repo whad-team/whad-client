@@ -40,6 +40,10 @@ class Attacker:
     While an attack is running, the local node does not keep its normal behaviour (attack dependent).
     """
 
+    name = "Default Attacker"
+    description = "An attack that does nothing."
+    _need_provisioned_node = False
+
     def __init__(self, connector, configuration=AttackerConfiguration()):
         """Initializes the attacker object with the given connector.
 
@@ -71,21 +75,11 @@ class Attacker:
         # Even set when attack is finished/failed/timeoudout or used to stop it
         self._event = Event()
 
-        self._name = "Default Attacker"
-
         self._setup()
 
     @property
     def event(self):
         return self._event
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, value):
-        self._name = value
 
     @property
     def success(self):
@@ -94,6 +88,10 @@ class Attacker:
     @success.setter
     def success(self, value):
         self._success = value
+
+    @property
+    def is_attack_running(self):
+        return self._is_attack_running
 
     def _setup(self):
         """Setup of the connector, profile, stack handlers... for the attack.
@@ -114,8 +112,9 @@ class Attacker:
         Each attack class need to know what is could possibly change that needs to be reversed.
         As an example here, we restore the original stack.
         """
-        self._is_setup = False
-        self._connector.profile.seqnum = self._backup_seq_num
+        if self._is_setup:
+            self._is_setup = False
+            self._connector.profile.seqnum = self._backup_seq_num
 
     def configure(self, configuration):
         """
@@ -161,3 +160,7 @@ class Attacker:
         """If the attack is in async mode and still running, stops the attack from running."""
         self._is_attack_running = False
         self.event.clear()
+
+    def show_result(self):
+        """Function implemented in each Attacker to display the result of the attack"""
+        print("This attack does nothing, hence is a success ;)")
