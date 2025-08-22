@@ -247,7 +247,6 @@ class GenericProvisioningLayer(ContextualLayer):
             if not continue_processing:
                 return
 
-        pkt.show()
         self._handlers[type(pkt)](message)
 
     def send_to_peer(self, transaction_number, packet):
