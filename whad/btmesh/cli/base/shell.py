@@ -4,6 +4,10 @@ from whad.btmesh.connector.node import BTMeshNode
 from whad.btmesh.models import CompositeModelState, Element, ModelServer
 from whad.btmesh.stack.utils import MeshMessageContext, Node
 from whad.btmesh.attacker.link_closer import LinkCloserAttacker, LinkCloserConfiguration
+from whad.btmesh.attacker.path_poison_solicitation import (
+    PathPoisonSolicitationConfiguration,
+    PathPoisonSolicitationAttacker,
+)
 from whad.btmesh.attacker.path_poison_bidir import (
     PathPoisonBidirAttacker,
     PathPoisonBidirConfiguration,
@@ -67,6 +71,10 @@ class BTMeshBaseShell(InteractiveShell):
         PathPoisonBidirAttacker.name: (
             PathPoisonBidirAttacker,
             PathPoisonBidirConfiguration,
+        ),
+        PathPoisonSolicitationAttacker.name: (
+            PathPoisonSolicitationAttacker,
+            PathPoisonSolicitationConfiguration,
         ),
     }
 
@@ -2118,7 +2126,9 @@ class BTMeshBaseShell(InteractiveShell):
             self.success("The attack is complete.")
             self._selected_attack.show_result()
         else:
-            self.error("The attack finished but failed.`check` command might give details.")
+            self.error(
+                "The attack finished but failed.`check` command might give details."
+            )
 
     @category(ATTACK_CAT)
     def do_check(self, arg):
@@ -2160,6 +2170,7 @@ class BTMeshBaseShell(InteractiveShell):
             self._selected_attack.stop()
             self.success("Successfully stopped the attack.")
             self._selected_attack.show_result()
+            self.update_prompt()
 
     def _show_state(self, state, sub_state_name=None):
         """

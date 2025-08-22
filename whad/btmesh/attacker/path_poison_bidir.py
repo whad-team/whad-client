@@ -47,7 +47,7 @@ class PathPoisonBidirConfiguration:
 class PathPoisonBidirAttacker(Attacker):
 
     name = "PathPoisonBidir"
-    description = "Tries to poison DF paths via a bidirectional path poisoned."
+    description = "Tries to poison DF paths via a bidirectional path poisoned. (A3)"
     need_provisioned_node = True
 
     def __init__(self, connector, configuration=PathPoisonBidirConfiguration()):
