@@ -93,7 +93,11 @@ class WhadInjectApp(CommandLineApp):
         self._input_queue = Queue()
         self._repeat_queue = Queue()
 
-        # Don't build yet if piped
+        # Load implemented injectors (introspection)
+        self.environment = None
+
+        # Build subparsers if stdin is not piped, when piped we will do
+        # it in the pre_run() method.
         if not self.is_stdin_piped():
             self.subparsers = self.add_subparsers(
                 required=True,
@@ -101,7 +105,7 @@ class WhadInjectApp(CommandLineApp):
                 parser_class=WhadDomainSubParser,
                 help='Domain in use'
             )
-
+            self.environment = list_implemented_injectors()
             self.build_subparsers(self.subparsers)
         else:
             self.subparsers = None
@@ -110,15 +114,12 @@ class WhadInjectApp(CommandLineApp):
         """
         Generate the subparsers argument according to the environment.
         """
-        # List every domain implementing an injector
-        self.environment = list_implemented_injectors()
 
         # Iterate over domain, and get the associated sniffer parameters
         for domain_name, domain in self.environment.items():
             domain["parameters"] = get_injector_parameters(
                 domain["configuration_class"]
             )
-
 
             domain["subparser"] = subparsers.add_parser(
                 domain_name,
@@ -150,18 +151,18 @@ class WhadInjectApp(CommandLineApp):
                     parameter_shortnames = []
 
                 # Process parameter type
-                if parameter_type != bool:
+                if parameter_type is not bool:
                     # If we got an int
-                    if parameter_type == int:
+                    if parameter_type is int:
                         # allow to provide hex arguments
                         # pylint: disable-next=unnecessary-lambda-assignment
                         parameter_type = lambda x: int(x,0)
                     # If we got a list, it is a list of string
-                    if parameter_type == list:
+                    if parameter_type is list:
                         parameter_default=[]
                         parameter_type=str
                         action = "append"
-                    elif parameter_type == bytes:
+                    elif parameter_type is bytes:
                         parameter_type = bytes.fromhex
                         action = "store"
                     else:
@@ -250,11 +251,18 @@ class WhadInjectApp(CommandLineApp):
             self.print_help()
             sys.exit(1)
 
-
         error_func = self.error
         if self.subparsers is None:
             self.error  = lambda m : None
+
+        # Load implemented injectors *before* calling super().__init__()
+        # drastically improves performances... and I have no clue why o_o
+        if self.environment is None:
+            self.environment = list_implemented_injectors()
+
+        # Call CLI app pre-run: it will initialize our source interface
         super().pre_run()
+
         try:
             domain = self.args.domain
         except AttributeError:
@@ -274,13 +282,17 @@ class WhadInjectApp(CommandLineApp):
                 help='Domain in use'
             )
 
+            # We build subparsers.
             self.build_subparsers(self.subparsers)
 
+            # And we inject the domain parameter retrieved from the parameters
+            # given by the input tool through the Unix socket URI.
             if domain not in start_argv and domain not in end_argv:
                 sys.argv = start_argv + [domain] + end_argv
             else:
                 sys.argv = start_argv + end_argv
 
+            # Parse winject arguments and propagate into the `self.args` namespace.
             for k, v in self.parse_args().__dict__.items():
                 setattr(self.args, k, v)
 
@@ -288,7 +300,9 @@ class WhadInjectApp(CommandLineApp):
         if not self.args.nocolor:
             conf.color_theme = BrightTheme()
 
+        # Generate packets if provided through commandline
         self.generate_packets()
+
 
     def is_input_alive(self) -> bool:
         """Determine if the input interface is providing packets to inject.
@@ -324,7 +338,6 @@ class WhadInjectApp(CommandLineApp):
 
 
                     if self.is_piped_interface():
-
                         connector = UnixConnector(self.input_interface)
 
                         connector.domain = self.args.domain

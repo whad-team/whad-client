@@ -2,7 +2,6 @@
 """
 from json import loads
 
-from binascii import unhexlify, Error as BinasciiError
 from prompt_toolkit import print_formatted_text, HTML
 
 from hexdump import hexdump
@@ -103,8 +102,8 @@ def check_profile(profile):
     if 'adv_data' not in profile['devinfo']:
         return False
     try:
-        unhexlify(profile['devinfo']['adv_data'])
-    except BinasciiError:
+        bytes.fromhex(profile["devinfo"]["adv_data"])
+    except ValueError:
         return False
 
     # Make sure we have a valid scan_rsp entry (if provided)
@@ -112,8 +111,8 @@ def check_profile(profile):
         return False
     if profile['devinfo']['scan_rsp'] is not None:
         try:
-            unhexlify(profile['devinfo']['scan_rsp'])
-        except BinasciiError:
+            bytes.fromhex(profile["devinfo"]["scan_rsp"])
+        except ValueError:
             return False
 
     # Make sure we have a BD address
@@ -149,8 +148,8 @@ def emulate_handler(app, command_args):
             # Check profile and emulate if everything is OK
             if check_profile(profile):
                 # Load device info
-                device_adv_data = unhexlify(profile['devinfo']['adv_data'])
-                device_scan_rsp = unhexlify(profile['devinfo']['scan_rsp'])
+                device_adv_data = bytes.fromhex(profile["devinfo"]["adv_data"])
+                device_scan_rsp = bytes.fromhex(profile["devinfo"]["scan_rsp"])
 
                 # Create a profile
                 device_profile = MonitoringProfile(from_json = profile_json)

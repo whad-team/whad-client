@@ -799,7 +799,7 @@ class BLE(WhadDeviceConnector):
                       access_address=0x8e89bed6, encrypt=None):
         """Send control PDU
         """
-        logger.info("send control PDU to connection (handle:%d)", conn_handle)
+        logger.info("send control PDU to connection (handle:%d, direction: %d)", conn_handle, direction)
         return self.send_pdu(pdu, conn_handle=conn_handle, direction=direction,
                              access_address=access_address, encrypt=encrypt)
 
@@ -807,7 +807,7 @@ class BLE(WhadDeviceConnector):
                       access_address=0x8e89bed6, encrypt=None):
         """Send data (L2CAP) PDU.
         """
-        logger.info("send data PDU to connection (handle:%d)", conn_handle)
+        logger.info("send data PDU to connection (handle:%d, direction: %d)", conn_handle, direction)
         return self.send_pdu(data, conn_handle=conn_handle, direction=direction,
                              access_address=access_address, encrypt=encrypt)
 

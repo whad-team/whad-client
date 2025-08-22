@@ -752,7 +752,8 @@ class AdvURI(AdvDataField):
         if len(ad_record) >= 2:
             # Fetch the first UTF-8 character codepoint
             scheme = ord(ad_record.decode("utf-8")[0])
-            uri = ad_record[2:]
+            scheme_size = len(ad_record.decode("utf-8")[0].encode("utf-8"))
+            uri = ad_record[scheme_size:]
             scheme_alias = AdvURI.get_scheme(scheme)
             decoded_uri = uri.decode('utf-8')
             if scheme_alias is not None:

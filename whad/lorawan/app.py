@@ -15,7 +15,6 @@ import sys
 import json
 from os import unlink
 from os.path import exists, isfile
-from binascii import hexlify, unhexlify
 
 # Including type hint Iterator based on python version
 if sys.version_info[0] == 3 and sys.version_info[1] >= 9:
@@ -59,8 +58,8 @@ class LWNode(object):
         return 'LWNode(eui:%s, address:%s, appskey:%s, nwkskey:%s, uplink_count:%d, downlink_count:%d)' % (
             self.dev_eui,
             self.dev_addr,
-            hexlify(self.__appskey).decode('ascii') if self.__appskey is not None else None,
-            hexlify(self.__nwkskey).decode('ascii') if self.__nwkskey is not None else None,
+            self.__appskey.hex() if self.__appskey is not None else None,
+            self.__nwkskey.hex() if self.__nwkskey is not None else None,
             self.__upcount,
             self.__dncount
         )
@@ -162,8 +161,8 @@ class LWNode(object):
         return {
             'dev_eui': self.dev_eui,
             'dev_addr': self.dev_addr,
-            'appskey': hexlify(self.appskey).decode('ascii'),
-            'nwkskey': hexlify(self.nwkskey).decode('ascii'),
+            'appskey': self.appskey.hex(),
+            'nwkskey': self.nwkskey.hex(),
             'upcount': self.upcount,
             'dncount': self.dncount
         }
@@ -178,12 +177,12 @@ class LWNode(object):
         :rtype: LWNode
         """
         return LWNode(
-            data['dev_eui'],
-            data['dev_addr'],
-            unhexlify(data['appskey']),
-            unhexlify(data['nwkskey']),
-            data['upcount'],
-            data['dncount']
+            data["dev_eui"],
+            data["dev_addr"],
+            bytes.fromhex(data["appskey"]),
+            bytes.fromhex(data["nwkskey"]),
+            data["upcount"],
+            data["dncount"]
         )
     
 
@@ -216,19 +215,19 @@ class LWNodeRegistry(object):
                         node_ = LWNode.fromJSON(node)
                         self.__nodes[node_.dev_eui] = node_
                     registry.close()
-            except IOError as file_err:
+            except IOError:
                 raise InvalidNodeRegistryError(path)
-            except Exception as other_err:
+            except Exception:
                 # Oops, error while loading registry. Unlink file.
-                logger.error('Error while loading registry file %s, removing file.' % path)
+                logger.error("Error while loading registry file %s, removing file.", path)
                 unlink(path)
         else:
             # File does not exist, create it.
             try:
                 self.save()
-            except IOError as file_err:
+            except IOError:
                 raise InvalidNodeRegistryError(path)
-            
+
     def add_node(self, node: LWNode):
         """Register a LoRaWAN node.
 
@@ -236,12 +235,10 @@ class LWNodeRegistry(object):
         :type node: LWNode
         """
         if node.dev_eui in self.__nodes:
-            logger.warning('Device %s is already present in node registry' % (
-                node.dev_eui
-            ))
+            logger.warning("Device %s is already present in node registry", node.dev_eui)
             self.__nodes[node.dev_eui] = node
         else:
-            logger.debug('adding node %s' % node)
+            logger.debug("adding node %s", node)
             self.__nodes[node.dev_eui] = node
 
     def get_node(self, eui:str = None) -> LWNode:
@@ -273,7 +270,7 @@ class LWNodeRegistry(object):
                     nodes.append(self.__nodes[node_eui].toDict())
                 json.dump(nodes, registry)
                 registry.close()
-        except IOError as file_err:
+        except IOError:
             raise InvalidNodeRegistryError(self.__path)
 
     

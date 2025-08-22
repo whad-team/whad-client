@@ -5,7 +5,7 @@ This module provides multiple classes to handle WHAD device communication,
 including background threads.
 """
 import logging
-from binascii import hexlify
+import struct
 from time import time, sleep
 from queue import Queue, Empty
 from threading import Thread, Lock
@@ -708,8 +708,7 @@ class WhadDevice:
         :param bytes data: Data received from the device.
         """
         #logger.info("[WhadDevice] entering on_data_received()")
-        logger.debug("[WhadDevice] received raw data from device <%s>: %s",
-                     self.interface, hexlify(data))
+        logger.debug("[WhadDevice] received raw data from device <%s>: %s", self.interface, data.hex())
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
             # Is the magic correct ?
@@ -794,6 +793,14 @@ class WhadDevice:
                          "save in default message queue"))
             self.__messages.put(message, block=True)
             logger.info("message added to default message queue")
+
+    def has_pending_messages(self) -> bool:
+        """Determine if the device has sent some messages.
+
+        :return: True if there are some messages awaiting for processing, False otherwise
+        :rtype: bool
+        """
+        return not self.__messages.empty()
 
     def process_messages(self, timeout=1.0) -> bool:
         """Process pending messages
@@ -1075,20 +1082,23 @@ class WhadDevice:
         """Process packet message
         """
         # Convert message into packet
-        packet = message.to_packet()
-        if packet is not None:
+        try:
+            packet = message.to_packet()
+            if packet is not None:
 
-            # Report packet to monitors
-            self.__connector.monitor_packet_rx(packet)
+                # Report packet to monitors
+                self.__connector.monitor_packet_rx(packet)
 
-            # Forward to our connector
-            if self.__connector.is_synchronous():
-                # If we are in synchronous mode, add packet as pending
-                self.__connector.add_pending_packet(packet)
-            else:
-                #logger.debug("[WhadDevice] on_domain_msg() for device %s: %s",
-                #             self.interface, message)
-                self.__connector.on_packet(packet)
+                # Forward to our connector
+                if self.__connector.is_synchronous():
+                    # If we are in synchronous mode, add packet as pending
+                    self.__connector.add_pending_packet(packet)
+                else:
+                    #logger.debug("[WhadDevice] on_domain_msg() for device %s: %s",
+                    #             self.interface, message)
+                    self.__connector.on_packet(packet)
+        except struct.error:
+            logger.debug("received malformed packet !")
 
 class VirtualDevice(WhadDevice):
     """

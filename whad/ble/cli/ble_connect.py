@@ -67,16 +67,16 @@ class BleConnectInputPipe(Bridge):
     def dispatch_pending_input_pdu(self, message):
         """Dispatch pending PDU.
         """
-        logger.info("Dispatching input pdu %s" % message)
+        logger.info("Dispatching input pdu %s", message)
 
         # Send message to our chained tool
         command = self.convert_packet_message(message, self.__out_handle)
         self.output.send_command(command)
 
-    def dispatch_pending_output_pdu(self, pdu):
+    def dispatch_pending_output_pdu(self, message):
         """Dispatch pending out PDUs (received)
         """
-        logger.info("Dispatching output pdu %s" % message)
+        logger.info("Dispatching output pdu %s", message)
         self.input.send_message(message)
 
     def convert_packet_message(self, message, conn_handle: int):
@@ -338,7 +338,7 @@ class BleConnectApp(CommandLineDevicePipe):
                 print("Connected: %d" % periph.conn_handle)
 
                 # Create our bridge: it will drive the connection process
-                output_pipe = BleConnectInputPipe(
+                BleConnectInputPipe(
                     LockedConnector(self.input_interface),
                     central,
                     periph.conn_handle,

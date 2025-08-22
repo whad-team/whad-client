@@ -3,18 +3,19 @@
 from typing import List
 from dataclasses import dataclass, field, fields
 
-from scapy.layers.dot15d4 import Dot15d4FCS
-from whad.scapy.layers.rf4ce import RF4CE_Hdr
 from scapy.config import conf
-from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4MitmRole, AddressType
+from scapy.layers.dot15d4 import Dot15d4FCS
+
 from whad.scapy.layers.dot15d4tap import Dot15d4TAP_Hdr, Dot15d4TAP_TLV_Hdr,\
     Dot15d4TAP_Received_Signal_Strength, Dot15d4TAP_Channel_Assignment, \
     Dot15d4TAP_Channel_Center_Frequency, Dot15d4TAP_Link_Quality_Indicator, \
     Dot15d4TAP_FCS_Type
+
+from whad.protocol.dot15d4.dot15d4_pb2 import Dot15d4MitmRole, AddressType
 from whad.hub.registry import Registry
 from whad.hub.message import HubMessage, pb_bind
-from whad.hub import ProtocolHub
 from whad.hub.metadata import Metadata, channel_to_frequency
+from whad.hub import ProtocolHub
 
 class Commands:
     """Dot15d4 commands
@@ -39,21 +40,27 @@ class MitmRole:
     CORRECTOR=Dot15d4MitmRole.CORRECTOR
 
 class NodeAddressType:
+    """IEEE 802.15.4 Node address type enum.
+    """
     SHORT=AddressType.SHORT
     EXTENDED=AddressType.EXTENDED
 
 class NodeAddress(object):
+    """IEEE 802.15.4 Node address.
+    """
 
     def __init__(self, address: int, addr_type: int):
         self.__address = address
         self.__address_type = addr_type
 
     @property
-    def address(self):
+    def address(self) -> int:
+        """Node address"""
         return self.__address
 
     @property
-    def address_type(self):
+    def address_type(self) -> int:
+        """Address type"""
         return self.__address_type
 
 class NodeAddressShort(NodeAddress):
@@ -87,11 +94,18 @@ class NodeAddressExt(NodeAddress):
 
 @dataclass(repr=False)
 class Dot15d4Metadata(Metadata):
+    """Dot15d4 meta-data holding class.
+    """
     is_fcs_valid : bool = None
     lqi : int = None
     timestamp : int = None
 
-    def convert_to_header(self):
+    def convert_to_header(self) -> Dot15d4TAP_Hdr:
+        """Convert stored metadata into a Scapy Dot15d4TAP_Hdr instance.
+
+        :return: Scapy header for 802.15.4 packet
+        :rtype: Dot15d4TAP_Hdr
+        """
         timestamp = None
         tlv = []
         if self.timestamp is not None:
@@ -101,13 +115,16 @@ class Dot15d4Metadata(Metadata):
         if self.lqi is not None:
             tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Link_Quality_Indicator(lqi = self.lqi))
         if self.channel is not None:
-            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Channel_Assignment(channel_number=self.channel, channel_page=0))
+            tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Channel_Assignment(channel_number=self.channel,
+                                                                          channel_page=0))
             channel_frequency = channel_to_frequency(self.channel) * 1000
             tlv.append(Dot15d4TAP_TLV_Hdr()/Dot15d4TAP_Channel_Center_Frequency(channel_frequency=channel_frequency))
         return Dot15d4TAP_Hdr(data=tlv), timestamp
 
     @classmethod
-    def convert_from_header(cls, pkt):
+    def convert_from_header(cls, pkt) -> "Dot15d4Metadata":
+        """Load metadata from packet header into a Dot15d4Metadata structure
+        """
         rssi = None
         lqi = None
         channel = None
@@ -127,7 +144,9 @@ class Dot15d4Metadata(Metadata):
             timestamp = int(100000 * pkt.time)
         )
 
-def generate_dot15d4_metadata(message):
+def generate_dot15d4_metadata(message: HubMessage) -> Dot15d4Metadata:
+    """Generate a Dot15d4Metadata object from a WHAD message.
+    """
     metadata = Dot15d4Metadata()
 
     if message.lqi is not None:

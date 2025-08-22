@@ -4,7 +4,6 @@ $ ble-clone --dump [bd address] profile.json
 $ ble-clone -i hci0 profile.json
 """
 from time import time
-from binascii import hexlify, unhexlify
 from json import loads, dumps
 from json.decoder import JSONDecodeError
 
@@ -33,12 +32,12 @@ def check_profile(profile):
     if 'adv_data' not in profile['devinfo']:
         return False
     try:
-        unhexlify(profile['devinfo']['adv_data'])
+        bytes.fromhex(profile["devinfo"]["adv_data"])
     except JSONDecodeError:
         return False
     except KeyError:
         return False
-    except TypeError:
+    except ValueError:
         return False
 
     # Make sure we have a valid scan_rsp entry (if provided)
@@ -46,12 +45,12 @@ def check_profile(profile):
         return False
     if profile['devinfo']['scan_rsp'] is not None:
         try:
-            unhexlify(profile['devinfo']['scan_rsp'])
+            bytes.fromhex(profile["devinfo"]["scan_rsp"])
         except JSONDecodeError:
             return False
         except KeyError:
             return False
-        except TypeError:
+        except ValueError:
             return False
 
     # Make sure we have a BD address
@@ -185,12 +184,12 @@ class BleCloneApp(CommandLineApp):
 
         # Generate device advertising information
         if device.scan_rsp_records is not None:
-            scan_rsp = hexlify(device.scan_rsp_records.to_bytes()).decode('utf-8')
+            scan_rsp = device.scan_rsp_records.to_bytes().hex()
         else:
             scan_rsp = None
 
         device_metadata = {
-            'adv_data': hexlify(device.adv_records.to_bytes()).decode('utf-8'),
+            'adv_data': device.adv_records.to_bytes().hex(),
             'scan_rsp': scan_rsp,
             'bd_addr': str(device.address),
             'addr_type': device.address_type
@@ -293,8 +292,8 @@ class BleCloneApp(CommandLineApp):
                 # Check profile and emulate if everything is OK
                 if check_profile(profile):
                     # Load device info
-                    device_adv_data = unhexlify(profile['devinfo']['adv_data'])
-                    device_scan_rsp = unhexlify(profile['devinfo']['scan_rsp'])
+                    device_adv_data = bytes.fromhex(profile["devinfo"]["adv_data"])
+                    device_scan_rsp = bytes.fromhex(profile["devinfo"]["scan_rsp"])
 
                     # Create a profile
                     device_profile = MonitoringProfile(from_json = profile_json)
@@ -326,4 +325,3 @@ def ble_clone_main():
     """
     app = BleCloneApp()
     run_app(app)
-

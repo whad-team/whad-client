@@ -1,3 +1,5 @@
+.. _whad-ble-device-model:
+
 Device Model
 ============
 

@@ -1,5 +1,4 @@
 import pytest
-from binascii import unhexlify, hexlify
 from whad.lorawan.crypto import derive_appskey, derive_nwkskey, decrypt_packet, encrypt_packet
 from whad.scapy.layers.lorawan import PHYPayload, JoinAccept, JoinRequest, MACPayloadUplink
 from scapy.all import RawVal
@@ -8,11 +7,11 @@ class TestLoRaWANCrypto:
 
     @pytest.fixture
     def appkey(self):
-        return unhexlify('00000000000000000000000000000000')
+        return bytes.fromhex("00000000000000000000000000000000")
     
     @pytest.fixture
     def encrypted_join_accept(self):
-        return unhexlify('20fed423bb9faca7e68a967a02fde49c41')
+        return bytes.fromhex("20fed423bb9faca7e68a967a02fde49c41")
 
     def test_encrypt_join_accept(self, appkey, encrypted_join_accept):
         """Test encryption of Join Accept

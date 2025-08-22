@@ -30,10 +30,11 @@ class UserTransformPipe(Bridge):
         """
         if hasattr(message, "to_packet"):
             pkt = message.to_packet()
-            pkt = self.on_rx_packet(pkt)
             if pkt is not None:
-                msg = message.from_packet(pkt)
-                super().on_outbound(msg)
+                pkt = self.on_rx_packet(pkt)
+                if pkt is not None:
+                    msg = message.from_packet(pkt)
+                    super().on_outbound(msg)
         else:
             logger.debug(
                 '[user-transform][input-pipe] forward default outbound message %s',
@@ -51,10 +52,11 @@ class UserTransformPipe(Bridge):
         """
         if hasattr(message, "to_packet"):
             pkt = message.to_packet()
-            pkt = self.on_tx_packet(pkt)
             if pkt is not None:
-                msg = message.from_packet(pkt)
-                super().on_inbound(msg)
+                pkt = self.on_tx_packet(pkt)
+                if pkt is not None:
+                    msg = message.from_packet(pkt)
+                    super().on_inbound(msg)
         else:
             logger.debug(
                 '[user-transform][input-pipe] forward default inbound message %s',
@@ -130,7 +132,6 @@ class UserTransformApp(CommandLineApp):
                 if self.is_stdout_piped():
                     unix_server = UnixConnector(UnixSocketServerDevice(parameters=parameters))
 
-
                     while not unix_server.device.opened:
                         if unix_server.device.timedout:
                             return
@@ -147,6 +148,9 @@ class UserTransformApp(CommandLineApp):
 
                 else:
                     connector.on_packet = self.on_rx_packet
+
+                # Once configured, unlock connector to enable packet processing
+                connector.unlock()
 
                 # Keep running while interface is active
                 while interface.opened:

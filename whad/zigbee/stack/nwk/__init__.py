@@ -1086,7 +1086,7 @@ class NWKManager(Dot15d4Manager):
         )
         if securityMaterial not in networkSecurityMaterialSet:
             networkSecurityMaterialSet.append(securityMaterial)
-        logger.info("[nwk] new security material added: {}".format(str(securityMaterial)))
+        logger.info("[nwk] new security material added: %s", str(securityMaterial))
         self.database.set("nwkSecurityMaterialSet", networkSecurityMaterialSet)
 
 

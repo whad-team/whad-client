@@ -1,8 +1,9 @@
 """BLE GATT Central tool interactive shell.
 """
 import re
+import html
+
 from typing import List
-from binascii import unhexlify, Error as BinasciiError
 
 from prompt_toolkit import print_formatted_text, HTML
 from hexdump import hexdump
@@ -25,7 +26,7 @@ from whad.ble import Scanner, Central
 from whad.ble.profile.device import PeripheralCharacteristic, PeripheralDevice
 from whad.ble.profile.characteristic import CharacteristicProperties
 from whad.ble.profile.advdata import AdvDataFieldList
-from whad.ble.profile.attribute import UUID
+from whad.ble.profile.attribute import UUID, InvalidUUIDException
 from whad.ble.stack.att.exceptions import AttError, AttributeNotFoundError, \
     InsufficientAuthenticationError, InsufficientAuthorizationError, \
     InsufficientEncryptionKeySize, ReadNotPermittedError, \
@@ -58,7 +59,6 @@ def show_adv_record(offset, raw_record):
     for line in range(0, nlines):
         line_str = " ".join([f"{c:02x}" for c in raw_record[line*16:(line+1)*16]])
         print("  " + line_str)
-
 
 class BleCentralShell(InteractiveShell):
     """Bluetooth Low Energy interactive shell
@@ -361,7 +361,6 @@ class BleCentralShell(InteractiveShell):
                 target_bd_addr = target['info'].address
                 target_random_address_type = target['info'].address_type == 1
             except IndexError:
-                print("Device not in cache")
                 # If target not in cache, we are expecting a BD address
                 if re.match(BDADDR_REGEXP, args[0]):
                     target_bd_addr = args[0]
@@ -428,6 +427,9 @@ class BleCentralShell(InteractiveShell):
             except PeripheralNotFound:
                 print(f"Unable to connect to device {target_bd_addr}")
                 self.__target_bd = None
+            except KeyboardInterrupt:
+                # Connection interrupted by user, stop current mode
+                self.__connector.stop()
         except IndexError:
             print(f"Device {args[0]} not found")
         except PermissionError:
@@ -564,9 +566,9 @@ class BleCentralShell(InteractiveShell):
 
                     for desc in charac.descriptors():
                         print_formatted_text(HTML((
-                            f"  | <ansiblue><b>Descriptor type {desc.name}</b></ansiblue> "
-                            f"handle: <b>{desc.handle:d}</b>"
-                        )))
+                            "  | <ansiblue><b>Descriptor type {name}</b></ansiblue> "
+                            "handle: <b>{handle}</b>"
+                        )).format(name=desc.name, handle=desc.handle))
                 print('')
 
 
@@ -706,6 +708,9 @@ class BleCentralShell(InteractiveShell):
                 except ValueError:
                     try:
                         handle = UUID(args[0])
+                    except InvalidUUIDException:
+                        self.error(f"Wrong UUID: {args[0]}")
+                        return
                     except ValueError:
                         self.error(f"Wrong UUID: {args[0]}")
                         return
@@ -787,6 +792,9 @@ class BleCentralShell(InteractiveShell):
             except ValueError:
                 try:
                     handle = UUID(args[0])
+                except InvalidUUIDException:
+                    self.error(f"Wrong UUID: {args[0]}")
+                    return
                 except ValueError:
                     self.error(f"Wrong UUID: {args[0]}")
                     return
@@ -796,8 +804,8 @@ class BleCentralShell(InteractiveShell):
             # Decode hex data
             hex_data = ''.join(args[2:])
             try:
-                char_value = unhexlify(hex_data.replace('\t',''))
-            except BinasciiError:
+                char_value = bytes.fromhex(hex_data.replace("\t", ""))
+            except ValueError:
                 self.error("Provided hex value contains non-hex characters.")
                 return
         else:
@@ -914,7 +922,7 @@ class BleCentralShell(InteractiveShell):
             try:
                 if len(args) >= 1:
                     hex_value = ''.join(args)
-                    raw_pdu = unhexlify(hex_value.replace(' ',''))
+                    raw_pdu = bytes.fromhex(hex_value.replace(" ", ""))
                     res = self.__connector.send_pdu(
                         BTLE_DATA(raw_pdu),
                         conn_handle=self.__target.conn_handle
@@ -923,7 +931,7 @@ class BleCentralShell(InteractiveShell):
                         self.error("An error occured while sending PDU.")
                 else:
                     self.error('Invalid hex value.')
-            except BinasciiError:
+            except ValueError:
                 self.error("Invalid hex value.")
             except ConnectionLostException:
                 self.error("Sending PDU failed (peripheral disconnected)")
@@ -1061,6 +1069,9 @@ class BleCentralShell(InteractiveShell):
                 except ValueError:
                     try:
                         handle = UUID(args[0])
+                    except InvalidUUIDException:
+                        self.error(f"Wrong UUID: {args[0]}")
+                        return
                     except Exception:
                         self.error(f"Wrong UUID: {args[0]}")
                         return
@@ -1169,6 +1180,9 @@ class BleCentralShell(InteractiveShell):
                 except ValueError:
                     try:
                         handle = UUID(args[0])
+                    except InvalidUUIDException:
+                        self.error(f"Wrong UUID: {args[0]}")
+                        return
                     except Exception:
                         self.error(f"Wrong handle: {args[0]}")
                         return

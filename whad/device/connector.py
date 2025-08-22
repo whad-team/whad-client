@@ -315,7 +315,7 @@ class WhadDeviceConnector:
         :param  Packet pdu:  Packet to add to locked packets queue
         :type   pdu: scapy.packet.Packet
         """
-        logger.info("Add locked pdu: %s" % pdu)
+        logger.info("Add locked pdu: %s", pdu)
         self.__locked_pdus.put(pdu)
 
     # Device interaction

@@ -26,7 +26,7 @@ class BatteryDevice(GenericProfile, BatteryService):
         return self.battery.level.value
 
 # Start advertising on hci0
-periph = Peripheral(WhadDevice.create('hci1'), profile=BatteryDevice())
+periph = Peripheral(WhadDevice.create('hci0'), profile=BatteryDevice())
 periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
     AdvCompleteLocalName(b'BatteryDevice'),
     AdvFlagsField()

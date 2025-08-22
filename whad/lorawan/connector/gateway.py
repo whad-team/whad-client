@@ -1,5 +1,3 @@
-from binascii import hexlify
-
 from whad.device import WhadDevice
 from whad.lorawan.stack import LWGatewayStack
 from whad.scapy.layers.lorawan import PHYPayload
@@ -96,10 +94,11 @@ class LWGateway(LoRaWAN):
         :param nwkskey: Device network encryption session key
         :type nwkske: bytes
         """
-        logger.info('[gateway] Device %s joined network with address 0x%08x' % (
+        logger.info(
+            "[gateway] Device %s joined network with address 0x%08x",
             dev_eui,
             dev_addr,
-        ))
+        )
 
         self.__app.on_device_joined(
             dev_eui,
@@ -123,10 +122,7 @@ class LWGateway(LoRaWAN):
         :return: Data to be sent back to the device
         :rtype: bytes
         """
-        logger.info('[gateway] Device %s sent data: %s' % (
-            dev_eui,
-            hexlify(data)
-        ))
+        logger.info("[gateway] Device %s sent data: %s", dev_eui, data.hex())
         return self.__app.on_device_data(
             dev_eui,
             dev_addr,

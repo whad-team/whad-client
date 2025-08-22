@@ -182,12 +182,24 @@ class CharacteristicUserDescriptionDescriptor(CharacteristicDescriptor):
     @property
     def name(self):
         """Descriptor name
+
+        Clean description as it may contain null chars.
         """
-        return f"{super().name}, '{self.text}'"
+        # End string at the first null char encountered
+        if '\x00' in self.__description:
+            desc = self.__description[:self.__description.index('\x00')]
+        else:
+            desc = self.__description
+
+        return f"{super().name}, '{desc}'"
 
     @staticmethod
     def from_value(characteristic, handle, value):
-        return CharacteristicUserDescriptionDescriptor(characteristic, handle, description=value.decode('utf-8'))
+        """Create CUD descriptor from value
+        """
+        return CharacteristicUserDescriptionDescriptor(
+            characteristic, handle, description=value.decode('utf-8')
+        )
 
 class CharacteristicValue(Attribute):
     """Characteristic value attribute.
@@ -368,7 +380,6 @@ class Characteristic(Attribute):
         if alias is not None:
             return f"{alias} (0x{self.__charac_uuid})"
 
-        
         # Search in collaborative CLUES database
         alias = CluesDb.get_uuid_alias(self.__charac_uuid)
         if alias is not None:

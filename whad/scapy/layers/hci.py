@@ -152,13 +152,13 @@ class HCI_Cmd_LE_Set_Host_Channel_Classification(Packet):
 	]
 
 
-bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Version_Information,                        opcode=0x1001)
-bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Local_Version_Information,    opcode=0x1001)
-bind_layers(HCI_Command_Hdr,HCI_Cmd_Read_Local_Name,			                            opcode=0x0c14)
-bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Local_Name,                   opcode=0x0c14)
-bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Supported_States,                              opcode=0x201c)
+#bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Version_Information,                        opcode=0x1001)
+#bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Local_Version_Information,    opcode=0x1001)
+#bind_layers(HCI_Command_Hdr,HCI_Cmd_Read_Local_Name,			                            opcode=0x0c14)
+#bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Local_Name,                   opcode=0x0c14)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Read_Supported_States, ogf=0x08, ocf=0x001c)
 bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_LE_Read_Supported_States,          opcode=0x201c)
-bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Host_Channel_Classification,                    opcode=0x2014)
+bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Host_Channel_Classification, ogf=0x08, ocf=0x0014)
 
 bind_layers(HCI_Event_LE_Meta, HCI_LE_Meta_Enhanced_Connection_Complete,                    event=0xa)
 

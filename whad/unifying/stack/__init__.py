@@ -135,9 +135,6 @@ class UnifyingApplicativeLayer(Layer):
         self.__packets_queue.put(message)
         return True
 
-    def __del__(self):
-        self.unlock_channel()
-
     @property
     def role(self):
         return self.state.role
@@ -427,7 +424,7 @@ class UnifyingApplicativeLayer(Layer):
 
     @dongle_callback
     def on_wakeup(self, dev_index):
-        logger.info("Waked up by device (dev_index=0x{:02x})".format(dev_index))
+        logger.info("Waked up by device (dev_index=0x%02x)", dev_index)
 
     @dongle_callback
     def on_set_keepalive(self, timeout):

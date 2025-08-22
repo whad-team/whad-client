@@ -1,7 +1,6 @@
 """
 Pythonic LoRaWAN 1.0 stack
 """
-from binascii import unhexlify
 from whad.scapy.layers.lorawan import PHYPayload
 from whad.lorawan.stack.llm import LWGwLinkLayer
 from whad.lorawan.helpers import EUI
@@ -20,7 +19,7 @@ class LWGatewayState(LayerState):
         super().__init__()
 
         # Set APPKey to default value
-        self.appkey = unhexlify('00000000000000000000000000000000')
+        self.appkey = bytes.fromhex("00000000000000000000000000000000")
         self.appeui = EUI('01:02:03:04:05:06:07:08')
 
 
@@ -50,7 +49,7 @@ class LWGatewayStack(Layer):
 
         # APPKey must be provided
         if 'appkey' in options:
-            self.state.appkey = unhexlify(options['appkey'])
+            self.state.appkey = bytes.fromhex(options["appkey"])
 
         # APP EUI too
         if 'appeui' in options:
@@ -112,7 +111,7 @@ class LWGatewayStack(Layer):
         :type timestamp: float
         """
         # Switch to RX1
-        logger.debug('[phy] sending frame of %d bytes' % len(bytes(frame)))
+        logger.debug("[phy] sending frame of %d bytes", len(bytes(frame)))
         self.__connector.rx1()
         self.__connector.send(bytes(frame), timestamp=timestamp)
         

@@ -16,7 +16,7 @@ from scapy.layers.dot15d4 import Dot15d4
 from scapy.utils import PcapReader
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
-    WhadDeviceDisconnected
+    WhadDeviceDisconnected, WhadDeviceError
 from whad.device import VirtualDevice
 from whad.device.virtual.pcap.capabilities import CAPABILITIES
 from whad.hub.generic.cmdresult import CommandResult
@@ -104,7 +104,12 @@ class PCAPDevice(VirtualDevice):
         return None
 
     def _get_domain(self):
-        return list(CAPABILITIES[self.__dlt][0].keys())[0]
+        """Retrieve the domain associated with the current link-layer type (DLT).
+        """
+        if self.__dlt in CAPABILITIES:
+            return list(CAPABILITIES[self.__dlt][0].keys())[0]
+        else:
+            return None
 
     def open(self):
         try:
@@ -113,10 +118,13 @@ class PCAPDevice(VirtualDevice):
                 self.__pcap_reader = PcapReader(self.__filename)
                 self.__dlt = self._get_dlt()
                 self.__domain = self._get_domain()
+                if self.__domain is None:
+                    raise WhadDeviceError(f"Unsupported PCAP file (DLT: {self.__dlt})")
             else:
                 logger.info("No PCAP file")
                 raise WhadDeviceNotFound("pcap")
-
+        except WhadDeviceError as deverr:
+            raise deverr
         except Exception as access_error:
             raise WhadDeviceAccessDenied("pcap") from access_error
 

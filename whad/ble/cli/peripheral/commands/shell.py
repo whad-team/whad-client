@@ -1,6 +1,7 @@
 """BLE peripheral emulation interactive shell
 """
-from binascii import unhexlify, Error as BinasciiError
+import json
+
 from whad.cli.app import command
 from whad.ble.cli.peripheral.shell import BlePeriphShell
 
@@ -18,8 +19,8 @@ def check_profile(profile):
     if 'adv_data' not in profile['devinfo']:
         return False
     try:
-        unhexlify(profile['devinfo']['adv_data'])
-    except BinasciiError:
+        bytes.fromhex(profile["devinfo"]["adv_data"])
+    except ValueError:
         return False
 
     # Make sure we have a valid scan_rsp entry (if provided)
@@ -27,8 +28,8 @@ def check_profile(profile):
         return False
     if profile['devinfo']['scan_rsp'] is not None:
         try:
-            unhexlify(profile['devinfo']['scan_rsp'])
-        except BinasciiError:
+            bytes.fromhex(profile["devinfo"]["scan_rsp"])
+        except ValueError:
             return False
 
     # Make sure we have a BD address
@@ -56,6 +57,14 @@ def interactive_handler(app, _):
             # Read profile
             with open(app.args.profile,'rb') as f:
                 profile_json = f.read()
+            try:
+                if not check_profile(json.loads(profile_json)):
+                    app.error("Invalid JSON file (does not contain a valid GATT profile).")
+                    profile_json = None
+            except json.decoder.JSONDecodeError as parsing_err:
+                app.error((f"Invalid JSON file, parsing error line {parsing_err.lineno}: "
+                          f"{parsing_err.msg}"))
+                app.exit()
         else:
             profile_json = None
 

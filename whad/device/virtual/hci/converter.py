@@ -63,6 +63,21 @@ class HCIConverter:
         """
         self.__locked = False
 
+    def split_l2cap_into_hci(self, l2cap_data: bytes, conn_handle: int):
+        """Split L2CAP packet into multiple HCI packets.
+        """
+        max_acl_len = self.__device.get_max_acl_len()
+        nb_hci_packets = len(l2cap_data)//max_acl_len
+        if len(l2cap_data)%max_acl_len > 0:
+            nb_hci_packets += 1
+        hci_packets = []
+        for i in range(nb_hci_packets):
+            pkt = HCI_Hdr() / HCI_ACL_Hdr(handle = conn_handle, PB=1 if i>0 else 0)
+            pkt = pkt / l2cap_data[i*max_acl_len:(i+1)*max_acl_len]
+            hci_packets.append(pkt)
+        logger.debug("[hci converter] split ACL data into %d chunks (total: %d, acl_len: %d)", nb_hci_packets, len(l2cap_data), max_acl_len)
+        return hci_packets
+
     def process_message(self, message: HubMessage):
         """This function turns a BLE hub message into the corresponding HCI
         packet.
@@ -81,34 +96,36 @@ class HCIConverter:
                 self.cached_l2cap_length = ll_packet[L2CAP_Hdr:].len
 
                 # No HCI packet to send for now (data queued)
-                logger.debug("l2cap is incomplete")
+                logger.debug("l2cap is incomplete (%s/%s)",
+                             len(self.cached_l2cap_payload)-4,
+                             self.cached_l2cap_length)
                 return []
 
             if self.waiting_l2cap_fragments:
                 self.cached_l2cap_payload += raw(ll_packet[BTLE_DATA:][1:])
-                if self.cached_l2cap_length == (len(self.cached_l2cap_payload) - 4):
-
+                if self.cached_l2cap_length <= (len(self.cached_l2cap_payload) - 4):
+                    if self.cached_l2cap_length < len(self.cached_l2cap_payload) - 4:
+                        logger.debug("[hci device][%s] too much data (got %d, expected %d)",
+                                     self.__device.interface, len(self.cached_l2cap_payload) - 4,
+                                     self.cached_l2cap_length)
                     self.waiting_l2cap_fragments = False
                     logger.debug("[hci device] reassembled l2cap data !")
 
                     # L2CAP data has been reassembled, then split in respect of
                     # the underlying device max ACL length
-                    l2cap_data = bytes(L2CAP_Hdr(self.cached_l2cap_payload))
-                    max_acl_len = self.__device.get_max_acl_len()
-                    nb_hci_packets = len(l2cap_data)//max_acl_len
-                    if len(l2cap_data)%max_acl_len > 0:
-                        nb_hci_packets += 1
-                    hci_packets = []
-                    for i in range(nb_hci_packets):
-                        pkt = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle)
-                        pkt = pkt / l2cap_data[i*max_acl_len:(i+1)*max_acl_len]
-                        hci_packets.append(pkt)
-                    logger.debug("[hci converter] split ACL data into %d chunks (total: %d, acl_len: %d)", nb_hci_packets, len(l2cap_data), max_acl_len)
-                    return hci_packets
+                    return self.split_l2cap_into_hci(
+                        bytes(L2CAP_Hdr(self.cached_l2cap_payload)),
+                        message.conn_handle
+                    )
 
                 # No HCI packet for now.
-                logger.debug("l2cap is incomplete, more fragments")
+                logger.debug("l2cap is incomplete, more fragments needed (%s/%s).", len(self.cached_l2cap_payload) - 4, self.cached_l2cap_length)
                 return []
+
+            # L2CAP packet is complete but must be split
+            l2cap_data = bytes(ll_packet[L2CAP_Hdr:])
+            if len(l2cap_data) > self.__device.get_max_acl_len():
+                return self.split_l2cap_into_hci(l2cap_data, message.conn_handle)
 
             # No fragmentation, send data as-is.
             hci_packet = HCI_Hdr() / HCI_ACL_Hdr(handle = message.conn_handle)
@@ -347,15 +364,14 @@ class HCIConverter:
         if event.status == 0x00:
 
             # Mark device as connected and register handle.
-            self.__device._connected = True
-            self.__device._active_handles.append(event.handle)
+            self.__device.on_connection_created(event.handle)
 
             # Send BLE connected message to consumer.
             handle = event.handle
             if event.role == 0: # master role
                 self.role = HCIRole.CENTRAL
-                initiator_address = bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
-                initiator_address_type = self.__device._bd_address_type
+                initiator_address = self.__device._bd_address.value
+                initiator_address_type = self.__device._bd_address.type
                 responder_address = bytes.fromhex(event.paddr.replace(":",""))[::-1]
                 responder_address_type = (
                     BleAddrType.PUBLIC if event.patype == 0 else BleAddrType.RANDOM
@@ -366,8 +382,8 @@ class HCIConverter:
                 initiator_address_type = (
                     BleAddrType.PUBLIC if event.patype == 0 else BleAddrType.RANDOM
                 )
-                responder_address = bytes.fromhex(self.__device._bd_address.replace(":",""))[::-1]
-                responder_address_type = self.__device._bd_address_type
+                responder_address = self.__device._bd_address.value
+                responder_address_type = self.__device._bd_address.type
 
             msg = self.__device.hub.ble.create_connected(
                 BDAddress(initiator_address, addr_type=initiator_address_type),
@@ -377,7 +393,9 @@ class HCIConverter:
             )
 
             return [msg]
-        
+        else:
+            logger.debug("[%s] Connection complete event with status 0x%x", self.__device.interface,
+                         event.status)
         # Nothing to convert
         return []
 
@@ -386,8 +404,9 @@ class HCIConverter:
         """
         if event.status == 0x00:
             # Mark device as disconnected and remove handle
-            self.__device._connected = False
-            self.__device._active_handles.remove(event.handle)
+            #self.__device._connected = False
+            #self.__device._active_handles.remove(event.handle)
+            self.__device.on_connection_terminated(event.handle)
 
             # Send disconnection message to consumer.
             logger.debug("[hci] sending Disconnected message to host")

@@ -10,7 +10,6 @@ read, write, notification and indication) between a client and the target
 device.
 """
 import logging
-from binascii import hexlify
 
 from scapy.layers.bluetooth4LE import BTLE_DATA
 from scapy.layers.bluetooth import L2CAP_Hdr
@@ -151,12 +150,12 @@ class LowLevelPeripheral(Peripheral):
             logger.debug("Sending pending PDUs to other half...")
             for _pdu in self.__pending_data_pdus:
                 if self.__proxy is not None:
-                    logger.debug("Calling proxy on_data_pdu with PDU %s..." % _pdu)
+                    logger.debug("Calling proxy on_data_pdu with PDU %s...", _pdu)
                     pdu = self.__proxy.on_data_pdu(_pdu, BleDirection.SLAVE_TO_MASTER)
                     if pdu is not None:
                         self.send_pdu(reshape_pdu(pdu), self.__conn_handle, direction=BleDirection.SLAVE_TO_MASTER)
                 else:
-                    logger.debug("Directly sending PDU %s..." % _pdu)
+                    logger.debug("Directly sending PDU %s...", _pdu)
                     self.send_pdu(reshape_pdu(_pdu), self.__conn_handle)
 
 
@@ -543,10 +542,7 @@ class LinkLayerProxy:
         :return: A PDU to be sent to the target device or None to avoid forwarding.
         :rtype: Packet, None
         """
-        logger.info("Received a Control PDU: %s (Direction: %d)",
-            hexlify(bytes(pdu)),
-            direction
-        )
+        logger.info("Received a Control PDU: %s (Direction: %d)", bytes(pdu).hex(), direction)
         return pdu
 
 
@@ -560,10 +556,7 @@ class LinkLayerProxy:
         :return: A PDU to be sent to the target device or None to avoid forwarding.
         :rtype: Packet, None
         """
-        logger.info("Received a Data PDU: %s (Direction: %d)",
-            hexlify(bytes(pdu)),
-            direction
-        )
+        logger.info("Received a Data PDU: %s (Direction: %d)", bytes(pdu).hex(), direction)
         return pdu
 
 

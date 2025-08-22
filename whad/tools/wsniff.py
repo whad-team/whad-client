@@ -43,6 +43,10 @@ class WhadSniffOutputPipe(Bridge):
             if pkt is not None:
                 msg = message.from_packet(pkt)
                 super().on_outbound(msg)
+            if pkt is not None:
+                pkt = self.input.process_packet(pkt)
+                msg = message.from_packet(pkt)
+                super().on_outbound(msg)
         else:
             logger.debug('[wsniff][input-pipe] forward default outbound message %s', message)
             # Forward other messages
@@ -292,17 +296,17 @@ class WhadSniffApp(CommandLineApp):
 
 
                 # Process parameter type
-                if parameter_type != bool:
+                if parameter_type is not bool:
                     # If we got an int
-                    if parameter_type == int:
+                    if parameter_type is int:
                         # allow to provide hex arguments
                         parameter_type = lambda x: int(x,0)
                     # If we got a list, it is a list of string
-                    if parameter_type == list:
+                    if parameter_type is list:
                         parameter_default=[]
                         parameter_type=str
                         action = "append"
-                    elif parameter_type == bytes:
+                    elif parameter_type is bytes:
                         parameter_type = bytes.fromhex
                         action = "store"
                     else:

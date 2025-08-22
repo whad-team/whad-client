@@ -3,7 +3,8 @@
 from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.phy import Phy_Packet
 from whad.hub.phy import PhyMetadata, Endianness, Modulation, Syncword
-from ..message import pb_bind, PbFieldInt, PbFieldBytes,PbFieldArray, PbMessageWrapper
+from ..message import pb_bind, PbFieldInt, PbFieldBytes,PbFieldArray, PbMessageWrapper, \
+    dissect_failsafe
 from . import PhyDomain
 
 from .timestamp import Timestamp
@@ -51,6 +52,7 @@ class SendPacket(PbMessageWrapper):
 
     packet = PbFieldBytes('phy.send.packet')
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message to packet
         """
@@ -72,6 +74,7 @@ class SendRawPacket(PbMessageWrapper):
 
     iq = PbFieldArray('phy.send_raw.iq')
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message to packet
         """
@@ -96,6 +99,7 @@ class PacketReceived(PbMessageWrapper):
     rssi = PbFieldInt('phy.packet.rssi', optional=True)
     timestamp = PbFieldInt('phy.packet.timestamp', optional=True)
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message to packet
         """
@@ -121,7 +125,7 @@ class PacketReceived(PbMessageWrapper):
         if packet.metadata.rssi is not None:
             msg.rssi = packet.metadata.rssi
         if packet.metadata.timestamp is not None:
-            msg.timstamp = packet.metadata.timestamp
+            msg.timestamp = packet.metadata.timestamp
 
         return msg
 
@@ -141,6 +145,7 @@ class ExtendedPacketReceived(PacketReceived):
     endian = PbFieldInt('phy.packet.endian')
     modulation = PbFieldInt('phy.packet.modulation')
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message to packet
         """
@@ -208,6 +213,7 @@ class RawPacketReceived(PbMessageWrapper):
     iq = PbFieldArray('phy.raw_packet.iq')
     timestamp = PbFieldInt('phy.raw_packet.timestamp', optional=True)
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message to packet
         """
@@ -257,6 +263,7 @@ class ExtendedRawPacketReceived(PbMessageWrapper):
     endianness = PbFieldInt('phy.packet.endian')
     modulation = PbFieldInt('phy.packet.modulation')
 
+    @dissect_failsafe
     def to_packet(self):
         """Convert message to packet
         """

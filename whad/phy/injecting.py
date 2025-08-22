@@ -20,12 +20,14 @@ class LoRaConfiguration:
     :param bandwidth: select the bandwidth (bw)
     :param enable_crc: enable LoRa CRC (crc)
     :param enable_explicit_mode: enable LoRa explicit mode (em)
+    :param preamble_length: set LoRa preamble length in symbols (pl)
     """
     spreading_factor : int = 7
     coding_rate : int = 45
     bandwidth : int = 125000
     enable_crc: bool = False
     enable_explicit_mode: bool = False
+    preamble_length: int = 12
 
 
 @dataclass

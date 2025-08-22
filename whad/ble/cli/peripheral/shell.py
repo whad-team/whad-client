@@ -2,7 +2,6 @@
 """
 import json
 from typing import Union, List, Tuple
-from binascii import unhexlify, Error as BinasciiError
 
 # pylint: disable-next=wildcard-import,unused-wildcard-import
 from scapy.layers.bluetooth4LE import *
@@ -306,7 +305,6 @@ class AdvRecordsManager:
         """Update a specific record.
         """
         # Remove record and add it again
-        old_record = self.get_record(record.__class__)
         self.remove_record(record.__class__)
         self.add_record(record)
         
@@ -1026,7 +1024,7 @@ class BlePeriphShell(InteractiveShell):
             try:
                 handle = int(args[0].lower(), 16)
             except ValueError:
-                self.error("Wrong handle: {args[0]}")
+                self.error(f"Wrong handle: {args[0]}")
                 return
         else:
             try:
@@ -1035,7 +1033,7 @@ class BlePeriphShell(InteractiveShell):
                 try:
                     handle = UUID(args[0].replace("-",''))
                 except Exception:
-                    self.error("Wrong UUID: {args[0]}")
+                    self.error(f"Wrong UUID: {args[0]}")
                     return
 
         # Do we have hex data ?
@@ -1043,8 +1041,8 @@ class BlePeriphShell(InteractiveShell):
             # Decode hex data
             hex_data = ''.join(args[2:])
             try:
-                char_value = unhexlify(hex_data.replace("\t",''))
-            except BinasciiError:
+                char_value = bytes.fromhex(hex_data.replace("\t", ""))
+            except ValueError:
                 self.error("Provided hex value contains non-hex characters.")
                 return
         else:
@@ -1343,9 +1341,9 @@ class BlePeriphShell(InteractiveShell):
                         return
 
             try:
-                self.__adv_manager.manufacturer_data = (manuf_comp, unhexlify(manuf_data))
+                self.__adv_manager.manufacturer_data = (manuf_comp, bytes.fromhex(manuf_data))
                 self.success("Manufacturer data set.")
-            except BinasciiError:
+            except ValueError:
                 self.__manuf_data = []
                 self.error("Error while parsing manufacturer data (not valid hex)")
             except AdvDataFieldListOverflow:

@@ -46,10 +46,11 @@ class WhadFilterPipe(Bridge):
         """
         if hasattr(message, "to_packet"):
             pkt = message.to_packet()
-            pkt = self.on_rx_packet(pkt)
             if pkt is not None:
-                msg = message.from_packet(pkt)
-                super().on_outbound(msg)
+                pkt = self.on_rx_packet(pkt)
+                if pkt is not None:
+                    msg = message.from_packet(pkt)
+                    super().on_outbound(msg)
         else:
             logger.debug("[wfilter][input-pipe] forward default outbound message %s", message)
             # Forward other messages
@@ -64,10 +65,11 @@ class WhadFilterPipe(Bridge):
         """
         if hasattr(message, "to_packet"):
             pkt = message.to_packet()
-            pkt = self.on_tx_packet(pkt)
             if pkt is not None:
-                msg = message.from_packet(pkt)
-                super().on_inbound(msg)
+                pkt = self.on_tx_packet(pkt)
+                if pkt is not None:
+                    msg = message.from_packet(pkt)
+                    super().on_inbound(msg)
         else:
             logger.debug("[wfilter][input-pipe] forward default inbound message %s", message)
             # Forward other messages
@@ -93,6 +95,24 @@ class WhadFilterApp(CommandLineApp):
             'filter',
             help='filter to evaluate',
             nargs='?'
+        )
+
+        # Metada can be disabled here
+        self.add_argument(
+            '--no-metadata',
+            dest='metadata',
+            action="store_false",
+            help='Hide packets metadata'
+        )
+
+        # Format can be overriden here
+        self.add_argument(
+            '--format',
+            dest='format',
+            action="store",
+            default='repr',
+            choices=['repr', 'show', 'raw', 'hexdump', 'tshark'],
+            help='Indicate format to display packet'
         )
 
         self.add_argument(
@@ -339,11 +359,11 @@ class WhadFilterApp(CommandLineApp):
                 if not self.args.nocolor:
                     conf.color_theme = BrightTheme()
 
+                # Load parameters from input tool
                 parameters = self.args.__dict__
                 connector = UnixConnector(interface)
                 connector.domain = self.args.domain
                 hub = ProtocolHub(2)
-                connector.format = hub.get(self.args.domain).format
 
                 if self.is_stdout_piped():
                     unix_server = UnixConnector(UnixSocketServerDevice(parameters=parameters))
@@ -362,6 +382,11 @@ class WhadFilterApp(CommandLineApp):
                 else:
                     # Unlock Unix connector
                     connector.unlock()
+
+                    # Take format and metadata settings from input tool,
+                    # if provided.
+                    if "format" in parameters and parameters["format"] in ('repr', 'show', 'raw', 'hexdump', 'tshark'):
+                        self.args.format = parameters["format"]
 
                     # Overwrite its packet rx method
                     connector.on_packet = self.on_rx_packet

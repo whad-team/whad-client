@@ -16,7 +16,6 @@ import re
 import logging
 from threading import Thread
 from random import randint
-from binascii import hexlify
 
 from scapy.config import conf
 
@@ -73,6 +72,7 @@ class UnixSocketDevice(WhadDevice):
         self.__fileno = None
         self.__socket = None
         self.__opened = False
+        self.__stalled = False
 
     @property
     def identifier(self):
@@ -130,7 +130,7 @@ class UnixSocketDevice(WhadDevice):
         :param bytes data: Data to write
         :returns: number of bytes written to the device
         """
-        logger.debug("sending data to unix socket: %s", hexlify(data))
+        logger.debug("sending data to unix socket: %s", data.hex())
         if not self.__opened:
             raise WhadDeviceNotReady()
 
@@ -154,6 +154,7 @@ class UnixSocketDevice(WhadDevice):
         and message parsing and dispatch.
         """
         try:
+            # If not opened, device is not ready
             if not self.__opened:
                 raise WhadDeviceNotReady()
 
@@ -174,8 +175,19 @@ class UnixSocketDevice(WhadDevice):
                 if len(data) > 0:
                     self.on_data_received(data)
                 else:
-                    logger.debug('No data received from device')
-                    raise WhadDeviceDisconnected()
+                    # Unix socket client is stalled if we have pending messages
+                    if not self.has_pending_messages():
+                        # If no pending message then consider the socket disconnected
+                        logger.debug("[%s] Socket closed by remote peer.",
+                                     self.interface)
+                        raise WhadDeviceDisconnected()
+                    elif not self.__stalled:
+                        logger.debug((
+                            "[%s] There are pending messages awaiting "
+                            "for processing, consider unix socket stalled."),
+                            self.interface)
+                        self.__stalled = True
+
             elif len(errors) > 0:
                 raise WhadDeviceDisconnected()
         except ConnectionResetError:
@@ -364,7 +376,7 @@ class UnixSocketServerDevice(WhadDevice):
         :param bytes data: Data to write
         :returns: number of bytes written to the device
         """
-        logger.debug("sending data to unix server client socket: %s", hexlify(data))
+        logger.debug("sending data to unix server client socket: %s", data.hex())
         if not self.__opened:
             raise WhadDeviceNotReady()
 
@@ -428,8 +440,18 @@ class UnixConnector(WhadDeviceConnector):
             #Create a dummy connector.
             super().__init__(device)
 
-        # Open device
-        device.open()
+        # Open device if not already opened
+        if not device.opened:
+            # Unix socket server has already sent some messages but is now
+            # closed, the previous tool must have finished earlier. We don't
+            # need to open the socket again (it would fail) but simply consider
+            # it open in order to process messages.
+            if device.has_pending_messages():
+                logger.debug("[%s] Unix socket has sent messages and closed.",
+                             device.interface)
+            else:
+                # Open socket if no pending message
+                device.open()
 
     def on_discovery_msg(self, message):
         pass
@@ -528,7 +550,7 @@ class UnixSocketConnector(WhadDeviceConnector):
     def on_data_received(self, data):
         """Handle received data from the unix socket.
         """
-        logger.debug("received raw data from socket: %s", hexlify(data))
+        logger.debug("received raw data from socket: %s", data.hex())
         self.__inpipe.extend(data)
         while len(self.__inpipe) > 2:
             # Is the magic correct ?
@@ -728,10 +750,10 @@ class UnixSocketCallbacksConnector(UnixSocketConnector):
 
             if isinstance(message, AbstractPacket):
                 pkt = message.to_packet()
-                pkt = on_rx_packet(pkt)
                 if pkt is None:
                     msg = None
                 else:
+                    pkt = on_rx_packet(pkt)
                     msg = msg.from_packet(pkt)
 
         if msg is not None:

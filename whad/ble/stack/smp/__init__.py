@@ -13,7 +13,6 @@ BleSMP provides these different pairing strategies:
 # refactoring, maybe some states can be merged
 
 from struct import pack, unpack
-from binascii import hexlify
 from random import randint
 from time import sleep
 
@@ -306,7 +305,7 @@ class SM_Peer(object):
         By default, peers are configured to only accept Legacy JustWorks pairing.
         """
 
-        logger.info('Initiate SM_Peer object for peer %s' % address)
+        logger.info("Initiate SM_Peer object for peer %s", address)
 
         # Peer address and address type
         self.__address = address
@@ -487,7 +486,7 @@ class SM_Peer(object):
             if self.__kd_sign_key:
                 keys.append('csrk')
                 self.__dist_csrk = True
-            logger.debug('Set distribute key for peer: %s' % (','.join(keys)))
+            logger.debug("Set distribute key for peer: %s", ",".join(keys))
         elif self.__pairing_method in [PM_LESC_JUSTWORKS, PM_LESC_NUMCOMP, PM_LESC_OOB]:
             keys=[]
             if self.__kd_id_key:
@@ -499,7 +498,7 @@ class SM_Peer(object):
             if self.__kd_link_key:
                 keys.append('ltk')
                 self.__dist_ltk = True
-            logger.debug('Set distribute key for peer: %s' % (','.join(keys)))
+            logger.debug("Set distribute key for peer: %s", ",".join(keys))
 
     def get_key_distribution(self):
         """Get the key distribution byte from the peer.
@@ -600,7 +599,7 @@ class SM_Peer(object):
         :param int pairing_method: Pairing method as defined in PM_* in BleSMP.
         """
         self.__pairing_method = pairing_method
-        logger.info('Pairing method set to %d' % self.__pairing_method)
+        logger.info("Pairing method set to %d", self.__pairing_method)
 
     @property
     def pairing_method(self):
@@ -616,10 +615,7 @@ class SM_Peer(object):
         """
         # Rand
         self.__rand = generate_random_value(128)
-        logger.info('(%s) Generated RAND value: %s' % (
-            self.__address,
-            hexlify(self.__rand)
-        ))
+        logger.info("(%s) Generated RAND value: %s", self.__address, self.__rand.hex())
 
     @property
     def rand(self):
@@ -631,10 +627,7 @@ class SM_Peer(object):
         """
         if isinstance(value, bytes) and len(value) == 16:
             self.__rand = value
-            logger.debug('(%s) Set RAND value: %s' % (
-                self.__address,
-                hexlify(value)
-            ))
+            logger.debug("(%s) Set RAND value: %s", self.__address, value.hex())
         else:
             raise SMInvalidParameterFormat()
 
@@ -648,24 +641,15 @@ class SM_Peer(object):
         """
         if isinstance(value, bytes) and len(value) == 16:
             self.__confirm = value
-            logger.debug('(%s) Set confirm value: %s' % (
-                self.__address,
-                hexlify(value)
-            ))
+            logger.debug("(%s) Set confirm value: %s", self.__address, value.hex())
         else:
             raise SMInvalidParameterFormat()
 
     def check_peer_confirm(self, tk, preq, pres, peer, initiator=True):
         """Check peer confirm value
         """
-        logger.debug('(%s) RAND value: %s' % (
-            self.__address,
-            hexlify(self.__rand)
-        ))
-        logger.debug('(%s) CONFIRM value: %s' % (
-            self.__address,
-            hexlify(self.__confirm)
-        ))
+        logger.debug("(%s) RAND value: %s", self.__address, self.__rand.hex())
+        logger.debug("(%s) CONFIRM value: %s", self.__address, self.__confirm.hex())
         # First, compute confirm based on rand
         if initiator:
             _confirm = self.get_custom_function("compute_legacy_confirm_value")(
@@ -703,14 +687,8 @@ class SM_Peer(object):
             pack('<B', resp_addr_type),
             resp_addr[::-1]
         )
-        logger.info('(%s) Using RAND to compute confirm: %s' % (
-            self.__address,
-            hexlify(self.__rand)
-        ))
-        logger.info('(%s) Computed CONFIRM: %s' % (
-            self.__address,
-            hexlify(_confirm)
-        ))
+        logger.info("(%s) Using RAND to compute confirm: %s", self.__address, self.__rand.hex())
+        logger.info("(%s) Computed CONFIRM: %s", self.__address, _confirm.hex())
         return _confirm
 
 
@@ -928,7 +906,7 @@ class SMPLayer(Layer):
         :param SM_Peer initiator: Pairing initiator
         :param SM_Peer responder: Pairing responder
         """
-        logger.debug('[check_initiator_legacy_confirm] RAND=%s' % hexlify(self.state.initiator.rand))
+        logger.debug("[check_initiator_legacy_confirm] RAND=%s", self.state.initiator.rand.hex())
         # Compute expected confirm value
         expected_confirm = self.compute_legacy_confirm_value(
             tk,
@@ -938,8 +916,8 @@ class SMPLayer(Layer):
             self.state.initiator,
             self.state.responder
         )
-        logger.debug('[check_initiator_legacy_confirm] Computed CONFIRM=%s' % hexlify(expected_confirm))
-        logger.debug('[check_initiator_legacy_confirm] Expected CONFIRM=%s' % hexlify(self.state.initiator.confirm))
+        logger.debug("[check_initiator_legacy_confirm] Computed CONFIRM=%s", expected_confirm.hex())
+        logger.debug("[check_initiator_legacy_confirm] Expected CONFIRM=%s", self.state.initiator.confirm.hex())
 
         # Compare with confirm value
         return (expected_confirm == self.state.initiator.confirm)
@@ -954,7 +932,7 @@ class SMPLayer(Layer):
         :param SM_Peer initiator: Pairing initiator
         :param SM_Peer responder: Pairing responder
         """
-        logger.debug('[check_responder_legacy_confirm] RAND=%s' % hexlify(self.state.initiator.rand))
+        logger.debug("[check_responder_legacy_confirm] RAND=%s", self.state.initiator.rand.hex())
 
         # Compute expected confirm value
         expected_confirm = self.compute_legacy_confirm_value(
@@ -966,8 +944,8 @@ class SMPLayer(Layer):
             self.state.responder
         )
 
-        logger.debug('[check_initiator_legacy_confirm] Computed CONFIRM=%s' % hexlify(expected_confirm))
-        logger.debug('[check_initiator_legacy_confirm] Expected CONFIRM=%s' % hexlify(self.state.responder.confirm))
+        logger.debug("[check_initiator_legacy_confirm] Computed CONFIRM=%s", expected_confirm.hex())
+        logger.debug("[check_initiator_legacy_confirm] Expected CONFIRM=%s", self.state.responder.confirm.hex())
 
         # Compare with confirm value
         return (expected_confirm == self.state.responder.confirm)
@@ -1027,9 +1005,7 @@ class SMPLayer(Layer):
             random_number,
             r
         )
-        logger.info('Computed LESC CONFIRM: %s' % (
-            hexlify(_confirm)
-        ))
+        logger.info("Computed LESC CONFIRM: %s", _confirm.hex())
         return _confirm
 
     def compute_legacy_confirm_value(self, tk, rand, preq, pres, initiator, responder):
@@ -1048,16 +1024,17 @@ class SMPLayer(Layer):
         :return: Confirm value
         :rtype: bytes
         """
-        logger.debug('TK=%s RAND=%s, PRES=%s PREQ=%s INITA_TYPE=%02x INITA=%s RESPA_TYPE=%02x RESPA=%s' % (
-            hexlify(tk),
-            hexlify(rand),
-            hexlify(bytes(SM_Hdr()/pres)[::-1]),
-            hexlify(bytes(SM_Hdr()/preq)[::-1]),
+        logger.debug(
+            "TK=%s RAND=%s, PRES=%s PREQ=%s INITA_TYPE=%02x INITA=%s RESPA_TYPE=%02x RESPA=%s",
+            tk.hex(),
+            rand.hex(),
+            bytes(SM_Hdr()/pres)[::-1].hex(),
+            bytes(SM_Hdr()/preq)[::-1].hex(),
             initiator.address_type,
-            hexlify(initiator.address[::-1]),
+            initiator.address[::-1].hex(),
             responder.address_type,
-            hexlify(responder.address[::-1])
-        ))
+            responder.address[::-1].hex(),
+        )
 
         # Compute the confirm value for the provided parameters
         # We need to:
@@ -1230,16 +1207,6 @@ class SMPLayer(Layer):
                             BDAddress.RANDOM
             )
 
-            remote_peer_addr = local_conn['remote_peer_addr']
-            remote_peer_addr_type = local_conn['remote_peer_addr_type']
-
-            remote_addr_object = BDAddress.from_bytes(
-                remote_peer_addr,
-                addr_type = BDAddress.PUBLIC if
-                            remote_peer_addr_type == 0 else
-                            BDAddress.RANDOM
-            )
-
             # We are the initiator
             self.state.enc_initiator = True
 
@@ -1329,7 +1296,7 @@ class SMPLayer(Layer):
                     b"\x00" # r equals 0 in JustWorks and NumComp
                 )
 
-                logger.debug('[send_pairing_confirm] Computed CONFIRM=%s' % hexlify(self.state.responder.confirm))
+                logger.debug("[send_pairing_confirm] Computed CONFIRM=%s", self.state.responder.confirm.hex())
 
                 # Update current state
                 self.state.state = SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT
@@ -1567,7 +1534,7 @@ class SMPLayer(Layer):
     def on_pairing_failed(self, pairing_failed):
         """Method called when a pairing failed is received.
         """
-        logger.info("Pairing failed (reason=%d)" % pairing_failed.reason)
+        logger.info("Pairing failed (reason=%d)", pairing_failed.reason)
         # Return to IDLE mode
         self.reset_state()
         self.state.last_failure = pairing_failed.reason
@@ -1616,8 +1583,8 @@ class SMPLayer(Layer):
                     ]
                 )
             )
-            logger.info("Computed EA: %s" % ea.hex())
-            logger.info("Received EA: %s" % dhkey_check.dhkey_check[::-1].hex())
+            logger.info("Computed EA: %s", ea.hex())
+            logger.info("Received EA: %s", dhkey_check.dhkey_check[::-1].hex())
             # If we received a valid EA, generate EB and transmit it
             if ea == dhkey_check.dhkey_check[::-1]:
                 eb = self.get_custom_function("compute_exchange_value")(
@@ -1646,10 +1613,9 @@ class SMPLayer(Layer):
                 # Get the current connection handle
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
-                # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk[::-1])
-            # otherwise, fail.
-            else:
+                self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk[::-1])
+
+            else:  # otherwise, fail.
                 logger.info('Invalid exchange value received, report error and return to idle.')
 
                 # Notify error
@@ -1684,17 +1650,16 @@ class SMPLayer(Layer):
                 )
             )
             # Compare it with the received data
-            logger.info("Computed EB: %s" % eb.hex())
-            logger.info("Received EB: %s" % dhkey_check.dhkey_check[::-1].hex())
+            logger.info("Computed EB: %s", eb.hex())
+            logger.info("Received EB: %s", dhkey_check.dhkey_check[::-1].hex())
 
             if eb == dhkey_check.dhkey_check[::-1]:
 
                 # Get the current connection handle
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
-                # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk[::-1])
                 # Start encryption
+                self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.ltk[::-1])
                 self.get_layer('ll').start_encryption(conn_handle, 0, 0)
 
                 self.state.state = SecurityManagerState.STATE_LESC_DHK_CHECK_RECVD
@@ -1803,7 +1768,7 @@ class SMPLayer(Layer):
                     self.state.initiator,
                     self.state.responder
                 )
-                logger.debug('[send_pairing_confirm] Computed CONFIRM=%s' % hexlify(self.state.initiator.confirm))
+                logger.debug("[send_pairing_confirm] Computed CONFIRM=%s", self.state.initiator.confirm.hex())
 
                 # Send CONFIRM value (again, we need to reverse its bytes)
                 confirm_value = SM_Confirm(
@@ -1863,7 +1828,7 @@ class SMPLayer(Layer):
                 self.state.initiator,
                 self.state.responder
             )
-            logger.debug('[on_pairing_confirm] Computed CONFIRM=%s' % hexlify(self.state.responder.confirm))
+            logger.debug("[on_pairing_confirm] Computed CONFIRM=%s", self.state.responder.confirm.hex())
 
             # Send CONFIRM value (again, we need to reverse its bytes)
             confirm_value = SM_Confirm(
@@ -1910,7 +1875,7 @@ class SMPLayer(Layer):
             SecurityManagerState.STATE_LESC_PUBKEY_RECVD_STAGEN,
             SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT_STAGEN
         ):
-            logger.info('Pairing Confirm value is expected, processing ... [iteration=%d]' % self.state.passkey_counter)
+            logger.info("Pairing Confirm value is expected, processing ... [iteration=%d]", self.state.passkey_counter)
 
             if self.state.passkey_counter == 1:
                 # Collect passkey entry
@@ -1938,7 +1903,7 @@ class SMPLayer(Layer):
             )
 
         elif self.state.state == SecurityManagerState.STATE_LESC_PAIRING_CONFIRM_SENT_STAGEN:
-            logger.info('Pairing Confirm value is expected, processing ... [iteration=%d]' % self.state.passkey_counter)
+            logger.info("Pairing Confirm value is expected, processing ... [iteration=%d]", self.state.passkey_counter)
 
             # Extract confirm value
             self.state.responder.confirm = confirm.confirm[::-1]
@@ -1953,7 +1918,7 @@ class SMPLayer(Layer):
             )
 
         else:
-            logger.info('Pairing Confirm dropped because current state is %d' % self.state.state)
+            logger.info("Pairing Confirm dropped because current state is %d", self.state.state)
 
             # Notify error
             error = SM_Failed(
@@ -2011,7 +1976,6 @@ class SMPLayer(Layer):
                     self.state.responder.indicate_ltk_distribution(self.state.ltk)
                     self.state.responder.indicate_rand_ediv_distribution(self.state.rand, self.state.ediv)
 
-                    rb = 0
                     # Let's compute EA
                     ea = self.get_custom_function("compute_exchange_value")(
                         self.state.mackey,
@@ -2035,9 +1999,7 @@ class SMPLayer(Layer):
                     )
 
                 else:
-                    logger.info('Invalid Numeric comparison (expected %s)' % (
-                        str(value),
-                    ))
+                    logger.info("Invalid Numeric comparison (expected %s)", str(value))
 
                     # Send error
                     error = SM_Failed(
@@ -2087,9 +2049,7 @@ class SMPLayer(Layer):
                 logger.info("Accepted numeric comparison, continuing...")
                 self.state.state = SecurityManagerState.STATE_LESC_PAIRING_RANDOM_SENT
             else:
-                logger.info('Invalid Numeric comparison (expected %s)' % (
-                    str(value),
-                ))
+                logger.info("Invalid Numeric comparison (expected %s)", str(value))
 
                 # Send error
                 error = SM_Failed(
@@ -2126,7 +2086,7 @@ class SMPLayer(Layer):
                     self.state.initiator.rand
                 )
 
-                logger.debug('[on_pairing_random] STK=%s' % hexlify(self.state.stk))
+                logger.debug("[on_pairing_random] STK=%s", self.state.stk.hex())
 
                 # Notify connection that we successfully negociated STK and that
                 # the corresponding material is available.
@@ -2134,15 +2094,15 @@ class SMPLayer(Layer):
                 # Get the current connection handle
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
-                # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.stk)
+                self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.stk)
 
                 #self.__l2cap.connection.set_stk(self.state.stk)
 
             else:
-                logger.info('Invalid Initiator CONFIRM value (expected %s)' % (
-                    hexlify(self.state.initiator.confirm),
-                ))
+                logger.info(
+                    "Invalid Initiator CONFIRM value (expected %s)",
+                    self.state.initiator.confirm.hex(),
+                )
 
                 # Send error
                 error = SM_Failed(
@@ -2227,10 +2187,10 @@ class SMPLayer(Layer):
                     )
 
             else:
-
-                logger.info('Invalid responder CONFIRM value (expected %s)' % (
-                    hexlify(self.state.responder.confirm),
-                ))
+                logger.info(
+                    "Invalid responder CONFIRM value (expected %s)",
+                    self.state.responder.confirm.hex(),
+                )
 
                 # Send error
                 error = SM_Failed(
@@ -2270,10 +2230,10 @@ class SMPLayer(Layer):
                     )
                 )
             else:
-
-                logger.info('Invalid Initiator CONFIRM value (expected %s)' % (
-                    hexlify(self.state.initiator.confirm),
-                ))
+                logger.info(
+                    "Invalid Initiator CONFIRM value (expected %s)",
+                    self.state.initiator.confirm.hex(),
+                )
 
                 # Send error
                 error = SM_Failed(
@@ -2310,7 +2270,7 @@ class SMPLayer(Layer):
                 )
 
 
-                logger.debug('[on_pairing_random] STK=%s' % hexlify(self.state.stk))
+                logger.debug("[on_pairing_random] STK=%s", self.state.stk.hex())
 
                 # Next state
                 self.state.state = SecurityManagerState.STATE_LEGACY_PAIRING_RANDOM_RECVD
@@ -2321,15 +2281,14 @@ class SMPLayer(Layer):
                 # Get the current connection handle
                 conn_handle = self.get_layer('l2cap').state.conn_handle
 
-                # Get the current link layer state
-                local_conn = self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.stk)
-
+                self.get_layer('ll').state.register_encryption_key(conn_handle, self.state.stk)
                 self.get_layer('ll').start_encryption(conn_handle, 0, 0)
 
             else:
-                logger.info('Invalid Responder CONFIRM value (expected %s)' % (
-                    hexlify(self.state.responder.confirm),
-                ))
+                logger.info(
+                    "Invalid Responder CONFIRM value (expected %s)",
+                    self.state.responder.confirm.hex(),
+                )
 
                 # Send error
                 error = SM_Failed(
@@ -2342,7 +2301,7 @@ class SMPLayer(Layer):
                 self.state.last_failure = SM_ERROR_CONFIRM_VALUE_FAILED
 
         else:
-            logger.info('Pairing Random dropped because current state is %d' % self.state.state)
+            logger.info("Pairing Random dropped because current state is %d", self.state.state)
 
             # Notify error
             error = SM_Failed(
@@ -2536,26 +2495,26 @@ class SMPLayer(Layer):
         logger.info("Pairing done.")
         if self.is_initiator():
             if self.state.ltk is not None:
-                logger.info("Distributed LTK: %s" % self.state.ltk.hex())
+                logger.info("Distributed LTK: %s", self.state.ltk.hex())
             if self.state.rand is not None:
-                logger.info("Distributed RAND: %s" % self.state.rand.hex())
+                logger.info("Distributed RAND: %s", self.state.rand.hex())
             if self.state.ediv is not None:
-                logger.info("Distributed EDIV: %s" % hex(self.state.ediv))
+                logger.info("Distributed EDIV: %s", hex(self.state.ediv))
             if self.state.irk is not None:
-                logger.info("Distributed IRK: %s" % self.state.irk.hex())
+                logger.info("Distributed IRK: %s", self.state.irk.hex())
             if self.state.csrk is not None:
-                logger.info("Distributed CSRK: %s" % self.state.csrk.hex())
+                logger.info("Distributed CSRK: %s", self.state.csrk.hex())
 
             if self.state.responder.ltk is not None:
-                logger.info("Received LTK: %s" %  self.state.responder.ltk.hex())
+                logger.info("Received LTK: %s",  self.state.responder.ltk.hex())
             if self.state.responder.random is not None:
-                logger.info("Received RAND: %s" % self.state.responder.random.hex())
+                logger.info("Received RAND: %s", self.state.responder.random.hex())
             if self.state.responder.ediv is not None:
-                logger.info("Received EDIV: %s" % hex(self.state.responder.ediv))
+                logger.info("Received EDIV: %s", hex(self.state.responder.ediv))
             if self.state.responder.irk is not None:
-                logger.info("Received IRK: %s" % self.state.responder.irk.hex())
+                logger.info("Received IRK: %s", self.state.responder.irk.hex())
             if self.state.responder.csrk is not None:
-                logger.info("Received CSRK: %s" % self.state.responder.csrk.hex())
+                logger.info("Received CSRK: %s", self.state.responder.csrk.hex())
 
             # If bonding is enabled, we register in the security DB
             # both our own and the peer cryptographic material
@@ -2614,26 +2573,26 @@ class SMPLayer(Layer):
 
         else:
             if self.state.ltk is not None:
-                logger.info("Distributed LTK: %s" % self.state.ltk.hex())
+                logger.info("Distributed LTK: %s", self.state.ltk.hex())
             if self.state.rand is not None:
-                logger.info("Distributed RAND: %s" % self.state.rand.hex())
+                logger.info("Distributed RAND: %s", self.state.rand.hex())
             if self.state.ediv is not None:
-                logger.info("Distributed EDIV: %s" % hex(self.state.ediv))
+                logger.info("Distributed EDIV: %s", hex(self.state.ediv))
             if self.state.irk is not None:
-                logger.info("Distributed IRK: %s" % self.state.irk.hex())
+                logger.info("Distributed IRK: %s", self.state.irk.hex())
             if self.state.csrk is not None:
-                logger.info("Distributed CSRK: %s" % self.state.csrk.hex())
+                logger.info("Distributed CSRK: %s", self.state.csrk.hex())
 
             if self.state.initiator.ltk is not None:
-                logger.info("Received LTK: %s" % self.state.initiator.ltk.hex())
+                logger.info("Received LTK: %s", self.state.initiator.ltk.hex())
             if self.state.initiator.random is not None:
-                logger.info("Received RAND: %s" % self.state.initiator.random.hex())
+                logger.info("Received RAND: %s", self.state.initiator.random.hex())
             if self.state.initiator.ediv is not None:
-                logger.info("Received EDIV: %s" % hex(self.state.initiator.ediv))
+                logger.info("Received EDIV: %s", hex(self.state.initiator.ediv))
             if self.state.initiator.irk is not None:
-                logger.info("Received IRK: %s" % self.state.initiator.irk.hex())
+                logger.info("Received IRK: %s", self.state.initiator.irk.hex())
             if self.state.initiator.csrk is not None:
-                logger.info("Received CSRK: %s" % self.state.initiator.csrk.hex())
+                logger.info("Received CSRK: %s", self.state.initiator.csrk.hex())
 
             # If bonding is enabled, we register in the security DB
             # both our own and the peer cryptographic material

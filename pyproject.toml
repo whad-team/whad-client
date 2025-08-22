@@ -12,7 +12,7 @@ testpaths = [
 name = "whad"
 
 # Attention: the following version number must match the one in whad/version.py !
-version = "1.2.6"
+version = "1.2.9"
 
 authors = [
     { name="Damien CAUQUIL" },
@@ -26,28 +26,27 @@ description = "Wireless protocols hacking framework"
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.7",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Operating System :: POSIX :: Linux",
 ]
 dependencies = [
-    "protobuf==3.20.*",
-    "scapy==2.5.0rc3",
-    "elementpath==2.4.0",
-    "pyserial==3.5.0",
-    "pycryptodomex==3.11.0",
+    "protobuf>=6.30",
+    "scapy~=2.6.1",
+    "pyserial~=3.5.0",
+    "pycryptodomex>=3.11.0",
     "pyusb==1.2.1",
-    "cryptography==36.0.0",
-    "prompt_toolkit==3.0.43",
-    "hexdump==3.3",
-    "pynput==1.7.7",
-    "Sphinx>=5.3.0",
-    "sphinx-rtd-theme==2.0.0",
-    "sphinxcontrib-mermaid==0.9.2",
-    "requests==2.27.1",
-    "distro==1.6.0"
+    "cryptography>=36",
+    "prompt_toolkit~=3.0.48",
+    "hexdump~=3.3",
+    "pynput~=1.8.1",
+    "requests>=2.28.0",
+    "distro~=1.9",
+    "websockets>=11.0.3",
+    "packaging~=25.0",
 ]
 
 [project.scripts]
@@ -100,6 +99,6 @@ whad = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/whad-team/whad-client"
+Homepage = "https://whad.io/"
 Documentation = "https://whad.readthedocs.io/en/stable/"
 Issues = "https://github.com/whad-team/whad-client/issues"
