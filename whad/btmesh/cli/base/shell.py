@@ -16,6 +16,10 @@ from whad.btmesh.attacker.seqnum_desynch import (
     SeqNumDesynchConfiguration,
     SeqNumDesynchAttacker,
 )
+from whad.btmesh.attacker.path_poison_hijack import (
+    PathPoisonHijackConfiguration,
+    PathPoisonHijackAttacker,
+)
 from whad.btmesh.stack.constants import (
     MANAGED_FLOODING_CREDS,
     DIRECTED_FORWARDING_CREDS,
@@ -75,6 +79,10 @@ class BTMeshBaseShell(InteractiveShell):
         PathPoisonSolicitationAttacker.name: (
             PathPoisonSolicitationAttacker,
             PathPoisonSolicitationConfiguration,
+        ),
+        PathPoisonHijackAttacker.name: (
+            PathPoisonHijackAttacker,
+            PathPoisonHijackConfiguration,
         ),
     }
 

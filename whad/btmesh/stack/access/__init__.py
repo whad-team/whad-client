@@ -152,7 +152,7 @@ class AccessLayer(Layer):
         """
         packet, ctx = message
 
-        if self.state.is_layer_active:
+        if not self.state.is_layer_active:
             return
 
         # if custom handler, use it
