@@ -108,4 +108,5 @@ class GenericOnOffClient(ModelClient):
         Custom handler when waiting to receive an expected BTMesh_Model_Generic_OnOff_Status message
         Useless, but to show custom handlers creation for Rx in ModelClient.
         """
+        pkt, ctx = message
         return None

@@ -36,6 +36,7 @@ from scapy.fields import (
     PacketListField,
     LEFieldLenField,
     Field,
+    MayEnd,
 )
 
 
@@ -204,7 +205,7 @@ class UnicastAddr(Packet):
     name = "Bluetooth Mesh Unicast Addr"
     fields_desc = [
         BitField("length_present", 0, 1),
-        XBitField("range_start", 0, 15),
+        MayEnd(XBitField("range_start", 0, 15)),
         ConditionalField(
             ByteField("range_length", None),
             lambda pkt: pkt.length_present == 1,
@@ -227,7 +228,7 @@ class LEUnicastAddr(Packet):
     name = "Bluetooth Mesh Unicast Addr"
     fields_desc = [
         XBitField("range_start", 0, 15, tot_size=-2),
-        BitField("length_present", 0, 1, end_tot_size=-2),
+        MayEnd(BitField("length_present", 0, 1, end_tot_size=-2)),
         ConditionalField(
             ByteField("range_length", None),
             lambda pkt: pkt.length_present == 1,
@@ -344,26 +345,28 @@ class ForwardingTableEntry(Packet):
             XLEShortField("multicast_destination", None),
             lambda pkt: pkt.forwarding_table_entry_header.unicast_destination_flag == 0,
         ),
-        ConditionalField(
-            MultipleTypeField(
-                [
-                    (
-                        ByteField("dependent_target_list_size", 0),
-                        lambda pkt: pkt.forwarding_table_entry_header.dependent_target_list_size_indicator
-                        == 0b01,
-                    ),
-                    (
-                        XLEShortField("dependent_target_list_size", 0),
-                        lambda pkt: pkt.forwarding_table_entry_header.dependent_target_list_size_indicator
-                        == 0b10,
-                    ),
-                ],
-                ByteField("dependent_target_list_size", 0),  # never used
-            ),
-            lambda pkt: pkt.forwarding_table_entry_header.dependent_target_list_size_indicator
-            != 0b00
-            and pkt.forwarding_table_entry_header.dependent_target_list_size_indicator
-            != 0b11,
+        MayEnd(
+            ConditionalField(
+                MultipleTypeField(
+                    [
+                        (
+                            ByteField("dependent_target_list_size", 0),
+                            lambda pkt: pkt.forwarding_table_entry_header.dependent_target_list_size_indicator
+                            == 0b01,
+                        ),
+                        (
+                            XLEShortField("dependent_target_list_size", 0),
+                            lambda pkt: pkt.forwarding_table_entry_header.dependent_target_list_size_indicator
+                            == 0b10,
+                        ),
+                    ],
+                    ByteField("dependent_target_list_size", 0),  # never used
+                ),
+                lambda pkt: pkt.forwarding_table_entry_header.dependent_target_list_size_indicator
+                != 0b00
+                and pkt.forwarding_table_entry_header.dependent_target_list_size_indicator
+                != 0b11,
+            )
         ),
         ConditionalField(
             XLEShortField("bearer_toward_path_target", None),
@@ -471,7 +474,6 @@ _provisioning_pdu_types = {
 class BTMesh_Provisioning_Invite(Packet):
     name = "Bluetooth Mesh Provisioning Invite"
     fields_desc = [ByteField("attention_duration", 0x00)]
-
 
 
 class BTMesh_Provisioning_Capabilities(Packet):
@@ -1131,7 +1133,7 @@ class BTMesh_Model_Generic_OnOff_Set(Packet):
     name = "Bluetooth Mesh Model Generic OnOff Set"
     fields_desc = [
         ByteEnumField("onoff", None, {0: "off", 1: "on"}),
-        ByteField("transaction_id", None),
+        MayEnd(ByteField("transaction_id", None)),
         ByteField("transition_time", None),
         ConditionalField(
             ByteField("delay", None),
@@ -1153,7 +1155,7 @@ class BTMesh_Model_Generic_OnOff_Set_Unacknowledged(Packet):
     name = "Bluetooth Mesh Model Generic OnOff Set Unacknowledged"
     fields_desc = [
         ByteEnumField("onoff", None, {0: "off", 1: "on"}),
-        ByteField("transaction_id", None),
+        MayEnd(ByteField("transaction_id", None)),
         ByteField("transition_time", None),
         ConditionalField(
             ByteField("delay", None),
@@ -1176,7 +1178,7 @@ bind_layers(
 class BTMesh_Model_Generic_OnOff_Status(Packet):
     name = "Bluetooth Mesh Model Generic OnOff Status"
     fields_desc = [
-        ByteEnumField("present_onoff", None, {0: "off", 1: "on"}),
+        MayEnd(ByteEnumField("present_onoff", None, {0: "off", 1: "on"})),
         ByteEnumField("target_onoff", None, {0: "off", 1: "on"}),
         ConditionalField(
             ByteField("remaining_time", None),
@@ -1198,10 +1200,10 @@ class BTMesh_Model_Generic_Level_Set(Packet):
     name = "Bluetooth Mesh Model Generic Level Set"
     fields_desc = [
         ShortField("level", None),
-        ByteField("transaction_id", None),
+        MayEnd(ByteField("transaction_id", None)),
         ByteField("transition_time", None),
         ConditionalField(
-            ByteField("delay", 0), lambda pkt: pkt.transition_time is not None
+            ByteField("delay", None), lambda pkt: pkt.transition_time is not None
         ),
     ]
 
@@ -1213,10 +1215,11 @@ class BTMesh_Model_Generic_Level_Set_Unacknowledged(Packet):
     name = "Bluetooth Mesh Model Generic Level Set Unacknowledged"
     fields_desc = [
         ShortField("level", None),
-        ByteField("transaction_id", None),
+        MayEnd(ByteField("transaction_id", None)),
         ByteField("transition_time", None),
         ConditionalField(
-            ByteField("delay", 0), lambda pkt: pkt.transition_time is not None
+            ByteField("delay", None),
+            lambda pkt: print(pkt.transition_time) and pkt.transition_time is not None,
         ),
     ]
 
@@ -1228,10 +1231,10 @@ class BTMesh_Model_Generic_Delta_Set(Packet):
     name = "Bluetooth Mesh Model Generic Delta Set"
     fields_desc = [
         IntField("delta", None),
-        ByteField("transaction_id", None),
+        MayEnd(ByteField("transaction_id", None)),
         ByteField("transition_time", None),
         ConditionalField(
-            ByteField("delay", 0), lambda pkt: pkt.transition_time is not None
+            ByteField("delay", None), lambda pkt: pkt.transition_time is not None
         ),
     ]
 
@@ -1243,10 +1246,10 @@ class BTMesh_Model_Generic_Delta_Set_Unacknowledged(Packet):
     name = "Bluetooth Mesh Model Generic Delta Set Unacknowledged"
     fields_desc = [
         IntField("delta", None),
-        ByteField("transaction_id", None),
+        MayEnd(ByteField("transaction_id", None)),
         ByteField("transition_time", None),
         ConditionalField(
-            ByteField("delay", 0), lambda pkt: pkt.transition_time is not None
+            ByteField("delay", None), lambda pkt: pkt.transition_time is not None
         ),
     ]
 
@@ -1258,10 +1261,10 @@ class BTMesh_Model_Generic_Move_Set(Packet):
     name = "Bluetooth Mesh Model Generic Delta Move"
     fields_desc = [
         ShortField("delta_level", None),
-        ByteField("transaction_id", None),
+        MayEnd(ByteField("transaction_id", None)),
         ByteField("transition_time", None),
         ConditionalField(
-            ByteField("delay", 0), lambda pkt: pkt.transition_time is not None
+            ByteField("delay", None), lambda pkt: pkt.transition_time is not None
         ),
     ]
 
@@ -2973,17 +2976,23 @@ class BTMesh_Model_Directed_Forwarding_Table_Entries_Status(Packet):
         BitField("filter_mask", 0, 4, tot_size=-2),
         XBitField("net_key_index", 0, 12, end_tot_size=-2),
         XLEShortField("start_index", None),
-        ConditionalField(
-            XLEShortField("path_origin", None),
-            lambda pkt: pkt.filter_mask & 0b0100 == 0b0100,
+        MayEnd(
+            ConditionalField(
+                XLEShortField("path_origin", None),
+                lambda pkt: pkt.filter_mask & 0b0100 == 0b0100,
+            )
         ),
-        ConditionalField(
-            XLEShortField("destination", None),
-            lambda pkt: pkt.filter_mask & 0b1000 == 0b1000,
+        MayEnd(
+            ConditionalField(
+                XLEShortField("destination", None),
+                lambda pkt: pkt.filter_mask & 0b1000 == 0b1000,
+            )
         ),
-        ConditionalField(
-            XLEShortField("forwarding_table_update_identifier", None),
-            lambda pkt: pkt.status == 0x00 or pkt.status == 0x14,
+        MayEnd(
+            ConditionalField(
+                XLEShortField("forwarding_table_update_identifier", None),
+                lambda pkt: pkt.status == 0x00 or pkt.status == 0x14,
+            )
         ),
         PacketListField(
             "forwarding_table_entry_list", [], pkt_cls=ForwardingTableEntry
@@ -3029,38 +3038,46 @@ class BTMesh_Model_Directed_Forwarding_Table_Dependents_Get_Status(Packet):
         XBitField("net_key_index", 0, 12, end_tot_size=-2),
         XLEShortField("start_index", None),
         XLEShortField("path_origin", None),
-        XLEShortField("destination", None),
-        ConditionalField(
-            XLEShortField("forwarding_table_update_identifier", None),
-            lambda pkt: pkt.status == 0x00 or pkt.status == 0x14,
+        MayEnd(XLEShortField("destination", None)),
+        MayEnd(
+            ConditionalField(
+                XLEShortField("forwarding_table_update_identifier", None),
+                lambda pkt: pkt.status == 0x00 or pkt.status == 0x14,
+            )
         ),
         ConditionalField(
             ByteField("dependent_origin_unicast_addr_range_list_size", 0),
             lambda pkt: pkt.status == 0x00,
         ),  # set manually !
-        ConditionalField(
-            ByteField("dependent_target_unicast_addr_range_list_size", 0),
-            lambda pkt: pkt.status == 0x00,
+        MayEnd(
+            ConditionalField(
+                ByteField("dependent_target_unicast_addr_range_list_size", 0),
+                lambda pkt: pkt.status == 0x00,
+            )
         ),  # set manually !
-        ConditionalField(
-            PacketListField(
-                "dependent_origin_unicast_addr_range_list",
-                [],
-                pkt_cls=LEUnicastAddr,
-                count_from=lambda pkt: pkt.dependent_origin_unicast_addr_range_list_size,
-            ),
-            lambda pkt: pkt.status == 0x00
-            and pkt.dependent_origin_unicast_addr_range_list_size > 0,
+        MayEnd(
+            ConditionalField(
+                PacketListField(
+                    "dependent_origin_unicast_addr_range_list",
+                    [],
+                    pkt_cls=LEUnicastAddr,
+                    count_from=lambda pkt: pkt.dependent_origin_unicast_addr_range_list_size,
+                ),
+                lambda pkt: pkt.status == 0x00
+                and pkt.dependent_origin_unicast_addr_range_list_size > 0,
+            )
         ),
-        ConditionalField(
-            PacketListField(
-                "dependent_target_unicast_addr_range_list",
-                [],
-                pkt_cls=LEUnicastAddr,
-                count_from=lambda pkt: pkt.dependent_target_unicast_addr_range_list_size,
-            ),
-            lambda pkt: pkt.status == 0x00
-            and pkt.dependent_target_unicast_addr_range_list_size > 0,
+        MayEnd(
+            ConditionalField(
+                PacketListField(
+                    "dependent_target_unicast_addr_range_list",
+                    [],
+                    pkt_cls=LEUnicastAddr,
+                    count_from=lambda pkt: pkt.dependent_target_unicast_addr_range_list_size,
+                ),
+                lambda pkt: pkt.status == 0x00
+                and pkt.dependent_target_unicast_addr_range_list_size > 0,
+            )
         ),
     ]
 
@@ -4272,10 +4289,12 @@ class BTMesh_Upper_Transport_Control_Path_Request(Packet):
         ByteField("path_origin_forwarding_number", None),
         ByteField("path_origin_path_metric", None),
         XShortField("destination", None),
-        PacketField(
-            "path_origin_unicast_addr_range",
-            None,
-            pkt_cls=UnicastAddr,
+        MayEnd(
+            PacketField(
+                "path_origin_unicast_addr_range",
+                None,
+                pkt_cls=UnicastAddr,
+            )
         ),
         ConditionalField(
             PacketField(
@@ -4296,14 +4315,16 @@ class BTMesh_Upper_Transport_Control_Path_Reply(Packet):
         BitField("confirmation_request", None, 1),
         BitField("prohibited", 0, 5),
         XShortField("path_origin", None),
-        ByteField("path_origin_forwarding_number", None),
-        ConditionalField(
-            PacketField(
-                "path_target_unicast_addr_range",
-                None,
-                pkt_cls=UnicastAddr,
-            ),
-            lambda pkt: pkt.unicast_destination == 1,
+        MayEnd(ByteField("path_origin_forwarding_number", None)),
+        MayEnd(
+            ConditionalField(
+                PacketField(
+                    "path_target_unicast_addr_range",
+                    None,
+                    pkt_cls=UnicastAddr,
+                ),
+                lambda pkt: pkt.unicast_destination == 1,
+            )
         ),
         ConditionalField(
             PacketField(
@@ -4421,7 +4442,7 @@ class BTMesh_Lower_Transport_Access_Message(Packet):
     fields_desc = [
         BitField("seg", 0, 1),
         BitField("application_key_flag", 0, 1),
-        BitField("application_key_id", 0, 6),
+        MayEnd(BitField("application_key_id", 0, 6)),
         ConditionalField(
             PacketField(
                 "payload_field", None, BTMesh_Lower_Transport_Segmented_Access_Message
@@ -4436,7 +4457,7 @@ class BTMesh_Lower_Transport_Control_Message(Packet):
     name = "Bluetooth Mesh Lower Transport Control Message"
     fields_desc = [
         BitField("seg", 0, 1),
-        BitField("opcode", 0, 7),
+        MayEnd(BitField("opcode", 0, 7)),
         ConditionalField(
             PacketField(
                 "payload_field",

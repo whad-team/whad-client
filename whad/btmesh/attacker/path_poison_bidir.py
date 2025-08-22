@@ -192,6 +192,7 @@ class PathPoisonBidirAttacker(Attacker):
             resp_ctx.net_key_id = self._configuration.net_key_index
             sleep(0.2)
 
+            
             upper_transport = self._connector.main_stack.get_layer("upper_transport")
             upper_transport.send_control_message((resp_pkt, resp_ctx))
 
