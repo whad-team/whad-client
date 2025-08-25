@@ -19,7 +19,7 @@ class LinkExplorer():
         self._running = True
         self._lock = threading.Lock()
         self._thread = threading.Thread(target=self._monitor_communications, daemon=True)
-        self._thread.start()
+        #self._thread.start()
 
     def stop(self):
         self._running = False
@@ -44,7 +44,8 @@ class LinkExplorer():
         link = Link(src, slot, offset, dst, type=Link.TYPE_DISCOVERY)
 
         with self._lock:
-            
+            if slot > len(self._discovered_communication):
+                return
             #adding the link to the discovered communication
             existing_com = self._discovered_communication[slot]
             existing_link = existing_com[0]

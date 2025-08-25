@@ -73,6 +73,13 @@ class SendRawPdu(PbMessageWrapper):
 
         return msg
 
+@pb_bind(Dot15d4Domain, 'send_in_slot', 3)
+class SendInSlot(PbMessageWrapper):
+    """Send command to program the sending of a pdu
+    """
+    slot = PbFieldInt('dot15d4.send_in_slot.slot')
+    pdu = PbFieldBytes('dot15d4.send_in_slot.pdu')
+
 @pb_bind(Dot15d4Domain, 'pdu', 1)
 class PduReceived(PbMessageWrapper):
     """Dot15d4 PDU received message class

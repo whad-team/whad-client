@@ -429,7 +429,21 @@ class Dot15d4Domain(Registry):
             pdu=pdu,
             fcs=fcs
         )
+    def send_packet_in_slot(self, pdu:bytes, slot:int) -> HubMessage:
+        """Create a SendInSlot message
 
+        :param pdu: PDU to send
+        :type pdu: bytes
+        :param slot: Slot on which the PDU has to be sent
+        :type channel: int
+        :return: instance of `SendPdu`
+        """
+        msg =  Dot15d4Domain.bound('send_in_slot', self.proto_version)(
+            slot=slot,
+            pdu=pdu
+        )
+        
+        return msg
     def create_jammed(self, timestamp: int) -> HubMessage:
         """Create a jammed notification.
 

@@ -47,4 +47,4 @@ class Link:
         ])
         
     def __repr__(self):
-        return f"Link(src={self.src}, slot={self.join_slot}, offset={self.offset})"
+        return f"Link(src={self.src}, neighbor={self.neighbor}, slot={self.join_slot},type={self.type}, offset={self.offset}, options={self.options})"

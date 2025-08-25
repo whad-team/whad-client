@@ -460,6 +460,24 @@ class WirelessHart_Write_Neighbor_Property_Flag_Response(WirelessHart_Command_Pa
         BitEnumField("time_source", 0, 1, {0 : "no", 1 : "yes"}), 
 
     ]
+    
+class WirelessHart_Suspend_Devices_Request(WirelessHart_Command_Payload):
+    name = "Suspend Devices Request"
+    fields_desc = [
+        
+        FiveBytesField("asn_suspend", 0),
+        FiveBytesField("asn_resume", 0),
+    ]
+    
+    
+class WirelessHart_Suspend_Devices_Response(WirelessHart_Command_Payload):
+    name = "Suspend Devices Response"
+    fields_desc = [
+        ByteField("status", None), 
+        
+        FiveBytesField("asn_suspend", 0),
+        FiveBytesField("asn_resume", 0),
+    ]
 
 
 
@@ -823,6 +841,9 @@ bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Add_Link_Response, c
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Write_Neighbor_Property_Flag_Request, command_number=0x3cb)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Write_Neighbor_Property_Flag_Response, command_number=0x3cb)
 
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Suspend_Devices_Request, command_number=0x3cc) # 972 : Suspend devices 
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Suspend_Devices_Response, command_number=0x3cc) # 972 : Suspend devices 
+
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Read_Wireless_Device_Capabilities_Request, command_number=0x309)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Read_Wireless_Device_Capabilities_Response, command_number=0x309)
 
@@ -869,13 +890,10 @@ from copy import copy
 
 conf.dot15d4_protocol = "wirelesshart"
 
-def compute_dlmic(pkt, key):
+def compute_dlmic(pkt, key, asn):
     data = bytes(pkt)[:-6]
-    nonce  = pack('>Q', pkt.asn if hasattr(pkt, "asn") else pkt.asn_snippet)[-5:] + pack('>Q', pkt.src_addr)
+    nonce  = pack('>Q', asn)[-5:] + pack('>Q', pkt.src_addr)
 
-    print("data:", bytes(pkt).hex())
-    print("data:", data.hex())
-    print("nonce:", nonce.hex())
     cipher = AES.new(key, AES.MODE_CCM, nonce=nonce, mac_len=4)
     cipher.update(data) # not encrypted but authenticated : full DLPDU (from 0x41 to the end of payload - just before MIC and empty encryption data)
     X1= cipher.encrypt(b"")

@@ -270,7 +270,6 @@ class Dot15d4(WhadDeviceConnector):
         """
         nb_links:int = len(links)//10 #each link is a 10 length byte array
         msg = self.hub.dot15d4.create_add_links_cmd(nb_links, links)
-        print("add link msg=", msg)
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
         
@@ -335,7 +334,46 @@ class Dot15d4(WhadDeviceConnector):
         else:
             return False
 
+    def send_in_slot(self, pdu, slot) -> bool:
+        """
+        Send 802.15.4 packets (in the specified slot).
 
+        :param pdu: 802.15.4 packet to send
+        :type pdu: scapy.layers.dot15d4.Dot15d4, scapy.layers.dot15d4.Dot15d4FCS
+        :param slot: timing Slot at which the packet has to be sent
+        :param delay: timing to wait for before sending the packet in us
+        :return: `True` if packet has been correctly sent, `False` otherwise.
+        :rtype: bool
+        """
+        if self.can_send():
+            metadata = Dot15d4Metadata()
+            metadata.raw = False
+            if self.support_raw_pdu():
+                metadata.raw = True
+
+                if Dot15d4FCS not in pdu:
+                    packet = Dot15d4FCS(raw(pdu) + Dot15d4FCS().compute_fcs(raw(pdu)))
+                else:
+                    packet = pdu
+
+            elif Dot15d4FCS in pdu:
+                packet = Dot15d4NoFCS(raw(pdu)[:-2])
+            else:
+                packet = pdu
+            
+            if hasattr(packet, "reserved"):
+                packet.reserved = packet.reserved
+
+            # Set metadata
+            packet.metadata = metadata
+            # Send packet
+            packet = bytes(packet)
+            msg = self.hub.dot15d4.send_packet_in_slot(packet, slot)
+            resp = self.send_command(msg, message_filter(CommandResult))
+            return isinstance(resp, Success)
+        else:
+            return False
+        
     def send_mac(self, pdu, channel=11, add_fcs=False):
         if self.can_send():
             if add_fcs:
