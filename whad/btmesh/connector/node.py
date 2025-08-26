@@ -98,9 +98,7 @@ class BTMeshNode(BTMesh):
         self._main_stack = NetworkLayer(connector=self, options=self.options)
 
         # Provisionning stack, (probably reinstancd by Provisioner/Provisionee)
-        self._prov_stack = PBAdvBearerLayer(
-            connector=self, options={}
-        )
+        self._prov_stack = PBAdvBearerLayer(connector=self, options={})
         # used to communicate with Shell/terminal to prompt user to type authentication value (provisioning)
         self.prov_event = None
 
@@ -113,9 +111,7 @@ class BTMeshNode(BTMesh):
         # Channel we listen on (regularly changed by thread change_sniffing_channel)
         self.channel = 37
 
-        self.sniffer_channel_switch_thread = Thread(
-            target=self.change_sniffing_channel
-        ).start()
+        self.sniffer_channel_switch_thread = None
 
     @property
     def main_stack(self):
@@ -149,15 +145,21 @@ class BTMeshNode(BTMesh):
         self.__queue.put(packet)
 
     def start(self):
-        super().start()
-        self.is_listening = True
-        self.sniff_advertisements(channel=self.channel)
-        self.polling_rx_packets_thread = Thread(target=self.polling_rx_packets)
-        self.polling_rx_packets_thread.start()
+        if not self.is_listening:
+            super().start()
+            self.is_listening = True
+            self.sniff_advertisements(channel=self.channel)
+            self.polling_rx_packets_thread = Thread(target=self.polling_rx_packets)
+            self.polling_rx_packets_thread.start()
+            self.sniffer_channel_switch_thread = Thread(
+                target=self.change_sniffing_channel
+            )
+            self.sniffer_channel_switch_thread.start()
 
     def stop(self):
-        self.is_listening = False
-        super().stop()
+        if self.is_listening:
+            self.is_listening = False
+            super().stop()
 
     def polling_rx_packets(self):
         while self.is_listening:
@@ -240,12 +242,11 @@ class BTMeshNode(BTMesh):
     def change_sniffing_channel(self):
         channels = [37, 38, 39]
         i = 0
-        while True:
-            if self.is_listening:
-                self.stop()
-                self.channel = channels[i]
-                self.start()
-                i = (i + 1) % 3
+        while self.is_listening:
+            self.stop()
+            self.channel = channels[i]
+            self.start()
+            i = (i + 1) % 3
             sleep(0.03)
 
     def do_secure_network_beacon(self, key_refresh, iv_update):
@@ -258,9 +259,10 @@ class BTMeshNode(BTMesh):
         :type iv_update: int
         """
 
-        self._main_stack.get_layer("network").send_secure_network_beacon(
-            key_refresh, iv_update
-        )
+        if self.profile.is_provisioned:
+            self._main_stack.get_layer("network").send_secure_network_beacon(
+                key_refresh, iv_update
+            )
 
     def reset_whitelist(self):
         """
@@ -299,13 +301,16 @@ class BTMeshNode(BTMesh):
         :param onoff: Set the relay on or off
         :type onoff: boolean
         """
-        self._main_stack.get_layer("network").state.is_relay_enabled = onoff
+        if self.profile.is_provisioned:
+            self._main_stack.get_layer("network").state.is_relay_enabled = onoff
 
     def get_relaying_status(self):
         """
         Returns whether the relaying is enabled or not
         """
-        return self._main_stack.get_layer("network").state.is_relay_enabled
+        if self.profile.is_provisioned:
+            return self._main_stack.get_layer("network").state.is_relay_enabled
+        return False
 
     def send_raw_access(self, message):
         """
@@ -314,7 +319,8 @@ class BTMeshNode(BTMesh):
         :param message: Message and its context
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
-        self._main_stack.get_layer("access").process_new_message(message)
+        if self.profile.is_provisioned:
+            self._main_stack.get_layer("access").process_new_message(message)
 
     def on_provisioning_complete(self, prov_data):
         """
@@ -367,6 +373,8 @@ class BTMeshNode(BTMesh):
             raise InvalidModelToSend(
                 "This model is not a ModelClient, cannot send messages from it."
             )
+        if not self.profile.is_provisioned:
+            return None
 
         try:
             pkt, ctx = message
@@ -397,21 +405,23 @@ class BTMeshNode(BTMesh):
         :param delay: Delay between 2 Path Requests, defaults to 3.5
         :type delay: float, optional
         """
-        thread = Thread(
-            target=self._main_stack.get_layer(
-                "upper_transport"
-            ).discover_topology_thread,
-            args=[addr_low, addr_high, delay],
-        )
-        thread.start()
+        if self.profile.is_provisioned:
+            thread = Thread(
+                target=self._main_stack.get_layer(
+                    "upper_transport"
+                ).discover_topology_thread,
+                args=[addr_low, addr_high, delay],
+            )
+            thread.start()
 
     def do_get_hops(self):
         """
         Get the distance between attacker to discovred nodes via network discovery attack
         """
-        thread = Thread(
-            target=self._main_stack.get_layer(
-                "upper_transport"
-            ).discovery_get_hops_thread
-        )
-        thread.start()
+        if self.profile.is_provisioned:
+            thread = Thread(
+                target=self._main_stack.get_layer(
+                    "upper_transport"
+                ).discovery_get_hops_thread
+            )
+            thread.start()
