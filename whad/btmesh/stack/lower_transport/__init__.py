@@ -349,6 +349,10 @@ class LowerTransportLayer(Layer):
         :param message: PDU and its context
         :type message: (Packet, MeshMessageContext)
         """
+        pkt, ctx = message
+        print(raw(pkt))
+        pkt.show()
+        ctx.print()
         self.send("upper_transport", message)
 
     @source("network")
