@@ -1305,7 +1305,7 @@ class ConfigurationModelServer(ModelServer):
     # DOESNT CHECK ELEMENT ADDR (still dont see the point tho)
     def on_model_to_app_key_bind(self, message):
         pkt, ctx = message
-        model_id = int.from_bytes(pkt.model_identifier, "big")
+        model_id = pkt.model_identifier
         app_key_index = pkt.app_key_index
         stored_app_key = self.get_state("app_key_list").get_value(app_key_index)
         if stored_app_key is None:
@@ -1332,7 +1332,7 @@ class ConfigurationModelServer(ModelServer):
     # DOESNT CHECK ELEMENT ADDR (still dont see the point tho)
     def on_model_to_app_key_unbind(self, message):
         pkt, ctx = message
-        model_id = int.from_bytes(pkt.model_identifier, "big")
+        model_id = pkt.model_identifier
         app_key_index = pkt.app_key_index
         stored_app_key = self.get_state("app_key_list").get_value(app_key_index)
         if stored_app_key is None:

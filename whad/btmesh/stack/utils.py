@@ -91,6 +91,14 @@ class MeshMessageContext:
         for attribute, value in self.__dict__.items():
             print(attribute, "=", value)
 
+    def __eq__(self, other):
+        if not isinstance(other, MeshMessageContext):
+            return NotImplemented
+
+        return all(
+            getattr(self, attr) == getattr(other, attr) for attr in self.__dict__
+        )
+
 
 class Subnet(StatesManager):
     """
