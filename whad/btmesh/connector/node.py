@@ -5,6 +5,7 @@ Bluetooth Mesh Base connector for nodes (Provisionee or Provisioner).
 Manages basic Tx/Rx. (Based on BLE sniffer because it works)
 """
 
+from tarfile import TarError
 from scapy.layers.bluetooth4LE import BTLE_ADV, BTLE_ADV_NONCONN_IND, EIR_Hdr
 from whad.scapy.layers.btmesh import (
     BTMesh_Unprovisioned_Device_Beacon,
@@ -16,7 +17,11 @@ from whad.scapy.layers.btmesh import (
 )
 from whad.ble import Peripheral
 from whad.hub.ble import Direction as BleDirection
-from whad.exceptions import UnsupportedCapability
+from whad.exceptions import (
+    UnsupportedCapability,
+    WhadDeviceAccessDenied,
+    WhadDeviceError,
+)
 from whad.exceptions import WhadDeviceDisconnected
 from whad.btmesh.stack.exceptions import InvalidModelToSend
 from queue import Queue, Empty
@@ -151,10 +156,11 @@ class BTMeshNode(BTMesh):
             self.sniff_advertisements(channel=self.channel)
             self.polling_rx_packets_thread = Thread(target=self.polling_rx_packets)
             self.polling_rx_packets_thread.start()
-            self.sniffer_channel_switch_thread = Thread(
-                target=self.change_sniffing_channel
-            )
-            self.sniffer_channel_switch_thread.start()
+            if self.sniffer_channel_switch_thread is None:
+                self.sniffer_channel_switch_thread = Thread(
+                    target=self.change_sniffing_channel
+                )
+                self.sniffer_channel_switch_thread.start()
 
     def stop(self):
         if self.is_listening:
@@ -242,12 +248,15 @@ class BTMeshNode(BTMesh):
     def change_sniffing_channel(self):
         channels = [37, 38, 39]
         i = 0
-        while self.is_listening:
-            self.stop()
-            self.channel = channels[i]
-            self.start()
-            i = (i + 1) % 3
-            sleep(0.03)
+        while True:
+            try:
+                self.stop()
+                self.channel = channels[i]
+                self.start()
+                i = (i + 1) % 3
+                sleep(0.03)
+            except:
+                return
 
     def do_secure_network_beacon(self, key_refresh, iv_update):
         """

@@ -7,7 +7,7 @@ to conduct attacks.
 
 import logging
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from threading import Thread, Event
 
 from whad.btmesh.stack.exceptions import UnprovisionedNodeForAttack

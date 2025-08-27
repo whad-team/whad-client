@@ -26,7 +26,8 @@ from whad.btmesh.stack.network import NetworkLayer
 from whad.btmesh.profile import BaseMeshProfile
 from whad.btmesh.stack.constants import INPUT_OOB_AUTH, OUTPUT_OOB_AUTH
 
-from scapy.layers.bluetooth4LE import BTLE_ADV_NONCONN_IND, BTLE_ADV
+from scapy.layers.bluetooth4LE import BTLE_ADV_NONCONN_IND, BTLE_ADV, EIR_Hdr
+from whad.scapy.layers.btmesh import BTMesh_Unprovisioned_Device_Beacon,EIR_BTMesh_Beacon
 
 
 from threading import Event, Thread

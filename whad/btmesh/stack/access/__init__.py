@@ -179,7 +179,7 @@ class AccessLayer(Layer):
 
         # if all nodes address, send to all elements
         if dst_addr == 0xFFFF:
-            target_elements = self.state.profile.get_all_elements()
+            target_elements = self.state.profile.local_node.get_all_elements()
 
         # if dst addr is unicast, only need to use the relevent element
         elif dst_addr_type == UNICAST_ADDR_TYPE:
@@ -232,7 +232,7 @@ class AccessLayer(Layer):
                     .get_value(model.model_id)
                 )
 
-                if ctx.application_key_index not in app_key_indexes:
+                if app_key_indexes is not None and ctx.application_key_index not in app_key_indexes:
                     continue
 
             response = model.handle_message(message)
