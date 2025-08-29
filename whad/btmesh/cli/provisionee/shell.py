@@ -118,6 +118,7 @@ class BTMeshProvisioneeShell(BTMeshBaseShell):
             elif res:
                 self.success("Node is provisioned")
                 self._current_mode = self.MODE_STARTED
+                self.update_prompt()
             else:
                 self.error("Provisioning failed")
 
@@ -157,6 +158,7 @@ class BTMeshProvisioneeShell(BTMeshBaseShell):
             if res:
                 self.success("Node is provisioned")
                 self._current_mode = self.MODE_STARTED
+                self.update_prompt()
             else:
                 self.error("Provisioning failed")
         else:

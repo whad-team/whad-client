@@ -95,9 +95,10 @@ class MeshMessageContext:
         if not isinstance(other, MeshMessageContext):
             return NotImplemented
 
-        return all(
-            getattr(self, attr) == getattr(other, attr) for attr in self.__dict__
-        )
+        d = self.__dict__.copy()
+        d.pop("rssi")
+
+        return all(getattr(self, attr) == getattr(other, attr) for attr in d)
 
 
 class Subnet(StatesManager):
@@ -305,6 +306,7 @@ class Node:
         self.is_friend = bool(data.features & 0b10)
         self.is_lpn = bool(data.features & 0b1)
 
+        self.__elements = {}
         for element in data.elements:
             new_element = self.add_element()
             for model_id in element.sig_models:

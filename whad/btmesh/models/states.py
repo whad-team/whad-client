@@ -303,9 +303,7 @@ Hearbeat Subscription COMPOSITE STATE
 
 class HeartbeatSubscriptionSourceState(ModelState):
     def __init__(self):
-        super().__init__(
-            name="heartbeat_subscription_source", default_value=0x0000
-        )
+        super().__init__(name="heartbeat_subscription_source", default_value=0x0000)
 
 
 class HeartbeatSubscriptionDestinationState(ModelState):
@@ -1218,7 +1216,7 @@ class SATUnicastRetransmissionsWithoutProgressCountState(ModelState):
 class SARUnicastRetransmissionsIntervalStepState(ModelState):
     def __init__(self):
         super().__init__(
-            name="sar_unicast_restransmissions_intreval_step", default_value=0b0111
+            name="sar_unicast_retransmissions_interval_step", default_value=0b0111
         )
 
     def get_unicast_retransmission_interval_step(self):
@@ -1301,6 +1299,9 @@ class SARAcknowledgmentRetransmissionsCountState(ModelState):
         super().__init__(
             name="sar_acknowledgment_retransmissions_count", default_value=0b00
         )
+
+    def get_acknowledgment_retransmissions_count(self):
+        return self.get_value() + 1
 
 
 class SARDiscardTimeoutState(ModelState):

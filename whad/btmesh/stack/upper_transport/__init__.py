@@ -425,6 +425,11 @@ class UpperTransportLayer(Layer):
             pkt.path_origin_forwarding_number = (
                 self.state.profile.get_next_forwarding_number()
             )
+
+        iv_index = self.state.profile.iv_index
+        ctx.seq_auth = int.from_bytes(
+            iv_index + ctx.seq_number.to_bytes(3, "big"), "big"
+        )
         self.send_to_lower_transport((pkt, ctx))
 
     """Functions and callbacks for the Network discovery method using Directed Forwarding, not protocol compliant"""
