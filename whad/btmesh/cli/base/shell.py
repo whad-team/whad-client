@@ -1111,6 +1111,7 @@ class BTMeshBaseShell(InteractiveShell):
             ctx.src_addr = self.profile.get_primary_element_addr()
             ctx.dev_key_address = address
             ctx.application_key_index = -1
+            ctx.ttl = 127
 
             self.warning("Fetching CompositionData page 0...")
             response = self._connector.send_model_message(
@@ -1205,6 +1206,7 @@ class BTMeshBaseShell(InteractiveShell):
         ctx.dest_addr = address
         ctx.dev_key_address = address
         ctx.application_key_index = -1
+        ctx.ttl = 127
 
         response = self._connector.send_model_message(
             model=configuration_model_client, message=(pkt, ctx), is_acked=True
@@ -1462,6 +1464,7 @@ class BTMeshBaseShell(InteractiveShell):
             ctx.src_addr = self.profile.get_primary_element_addr()
             ctx.dev_key_address = address
             ctx.application_key_index = -1
+            ctx.ttl = 127
 
             self.warning("Sending appkey to distant node...")
             response = self._connector.send_model_message(
