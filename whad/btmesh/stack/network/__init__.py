@@ -37,17 +37,18 @@ logger = logging.getLogger(__name__)
 
 @alias("network")
 class NetworkLayer(Layer):
-    def __init__(self, connector, options={}):
+    def __init__(self, connector, parent=None, options={}):
         """
         NetworkLayer. One for all the networks (does the filtering)
 
         :param connector: Connector handling the advertising bearer (or GATT later ?)
         :type connector: Connector
+        :param parent: Parent layer. Used for tests only, defaults to None
+        :type parent: Layer
         :param options: Options passed to the layer. defaults to {}. Need to pass the "profile" object
         :type options: [TODO:type], optional
         """
-        super().__init__(options=options)
-
+        super().__init__(options=options, parent=parent)
 
         # Custom handler for packets received from parent layer
         # Should take the message as argument (with context)
@@ -375,7 +376,7 @@ class NetworkLayer(Layer):
         :type message: (BTMesh_Lower_Transport_Access_Message|BTMesh_Lower_Transport_Control_Message, MeshMessageContext)
         """
         pkt, ctx = message
-        
+
         # if custom handler, use and return
         if type(pkt) in self._custom_handlers:
             continue_processing = self._custom_handlers[type(pkt)](message)
