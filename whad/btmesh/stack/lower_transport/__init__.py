@@ -1,5 +1,4 @@
 """
-        network_layer.send("lower_transport", (seg2, ctx2))
 Lower Transport Layer
 
 Handles Segmentation/Reassembly of Upper Transport PDU
