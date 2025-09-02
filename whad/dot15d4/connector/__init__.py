@@ -374,6 +374,16 @@ class Dot15d4(WhadDeviceConnector):
         else:
             return False
         
+    def jam(self, channel=0) -> bool:
+        """
+        :param int: channel to join on / 0: to jamm on all communications
+        :return: `True` jamming cmd was received, `False` otherwise.
+        :rtype: bool
+        """
+        msg = self.hub.dot15d4.create_jam_mode(channel)
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+        
     def send_mac(self, pdu, channel=11, add_fcs=False):
         if self.can_send():
             if add_fcs:
