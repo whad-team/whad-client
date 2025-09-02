@@ -23,6 +23,7 @@ from whad.scapy.layers.btmesh import (
 )
 
 from whad.btmesh.models import ModelServer
+from threading import Thread
 
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class AccessLayer(Layer):
         # Rx message queue from UpperTransportLayer
         self.__queue = Queue()
 
-        # Set to True when a handler for an Access Message is executed
+        # Set to True when a handler for an Access Message is executed (from upper transport)
         self.state.__is_processing_message = False
 
         # If this layer is not active, ignore all messages comming in.
@@ -83,10 +84,17 @@ class AccessLayer(Layer):
 
     def check_queue(self):
         """
-        If the queue is not empty, process the next Access Message
+        If the queue is not empty, process the next Access Message received from upper transport layer
         """
         if not self.__queue.empty():
-            self.process_access_message(self.__queue.get_nowait())
+            try:
+                thread = Thread(
+                    target=self.process_access_message,
+                    args=(self.__queue.get_nowait(),),
+                )
+                thread.start()
+            except Exception:
+                return
 
     def set_layer_active(self):
         """
@@ -150,9 +158,12 @@ class AccessLayer(Layer):
         :param message: Message received with context
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
+        self.state.__is_processing_message = True
         packet, ctx = message
 
+
         if not self.state.is_layer_active:
+            self.state.__is_processing_message = False
             return
 
         # if custom handler, use it
@@ -160,6 +171,7 @@ class AccessLayer(Layer):
             continue_processing = self._custom_handlers[type(packet)](message)
             # if custom handler says to return after itself
             if not continue_processing:
+                self.state.__is_processing_message = False
                 return
 
         # If waiting for a particular message, check and set event if needed
@@ -168,11 +180,12 @@ class AccessLayer(Layer):
                 self.state.expected_class = None
                 self.state.received_message = (packet[1], ctx)
                 self.state.event.set()
+
+            self.state.__is_processing_message = False
             return
 
             # Elements that will process the message
         target_elements = []
-
 
         dst_addr = ctx.dest_addr
         dst_addr_type = get_address_type(dst_addr)
@@ -232,7 +245,10 @@ class AccessLayer(Layer):
                     .get_value(model.model_id)
                 )
 
-                if app_key_indexes is not None and ctx.application_key_index not in app_key_indexes:
+                if (
+                    app_key_indexes is not None
+                    and ctx.application_key_index not in app_key_indexes
+                ):
                     continue
 
             response = model.handle_message(message)
@@ -249,7 +265,7 @@ class AccessLayer(Layer):
                 new_ctx.dest_addr = ctx.src_addr
                 new_ctx.net_key_id = ctx.net_key_id
                 new_ctx.is_ctl = False
-                new_ctx.azsmic = 0
+                new_ctx.aszmic = 0
                 if ctx.ttl == 0:
                     new_ctx.ttl = 0
                 else:
@@ -259,6 +275,8 @@ class AccessLayer(Layer):
                         .get_value()
                     )
                 self.send_to_upper_transport((response, new_ctx))
+
+        self.state.__is_processing_message = False
 
     def send_access_message(
         self, model, message, is_acked=False, expected_response_clazz=None, timeout=3
@@ -288,7 +306,7 @@ class AccessLayer(Layer):
         # Send the message
         pkt, ctx = message
         ctx.is_ctl = False
-        ctx.azsmic = 0
+        ctx.aszmic = 0
 
         # Setup the model to send the message (may modify the message, and sets the expected response if any)
         model.expected_response_clazz = expected_response_clazz

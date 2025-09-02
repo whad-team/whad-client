@@ -47,7 +47,12 @@ class BTMesh(BLE):
         if BTLE_ADV in packet:
             if hasattr(packet, "data"):
                 if EIR_Hdr in packet and (
-                    any([i.type in (0x29, 0x2A, 0x2B) for i in packet.data])
+                    any(
+                        [
+                            isinstance(i, EIR_Hdr) and i.type in (0x29, 0x2A, 0x2B)
+                            for i in packet.data
+                        ]
+                    )
                     or any(
                         h in [[0x1827], [0x1828]]
                         for h in [

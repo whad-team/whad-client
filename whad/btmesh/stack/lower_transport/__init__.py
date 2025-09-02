@@ -510,7 +510,7 @@ class LowerTransportLayer(Layer):
                 self.state.profile.iv_index, ctx.seq_number, pkt.seq_zero
             )
             ctx.seq_zero = pkt.seq_zero
-            ctx.azsmic = pkt.aszmic
+            ctx.aszmic = pkt.aszmic
             if ctx.src_addr in self.state.seq_auth_values.keys():
                 # if segmented packet and lower seq_auth value, disacrd
                 if ctx.seq_auth < self.state.seq_auth_values[ctx.src_addr]:
@@ -601,6 +601,10 @@ class LowerTransportLayer(Layer):
             if pkt.seg_offset not in transaction.fragments.keys():
                 transaction.fragments[pkt.seg_offset] = pkt.getlayer(Raw).load
 
+            # if this is segment 0, we store its sequence number for deciphering later
+            if pkt.seg_offset == 0:
+                transaction.ctx.seq_number = ctx.seq_number
+
             # if all segments received, send ack and send to upper_transport
             if len(transaction.fragments.keys()) == transaction.seg_n + 1:
                 if transaction.time_last_ack is not None:
@@ -655,23 +659,35 @@ class LowerTransportLayer(Layer):
         """
         pkt, ctx = message
 
-        # if one active Tx transaction is already here for the dest_addr, we store the message in in the queue
-        if (
-            ctx.dest_addr in self.state.tx_transactions.keys()
-            and not self.state.tx_transactions[ctx.dest_addr].is_transaction_finished
-        ):
-            if ctx.dest_addr in self.__queues.keys():
-                self.__queues[ctx.dest_addr].put_nowait(message)
-            else:
-                self.__queues[ctx.dest_addr] = Queue()
-                self.__queues[ctx.dest_addr].put_nowait(message)
+        if ctx.dest_addr in self.__queues.keys():
+            self.__queues[ctx.dest_addr].put_nowait(message)
+        else:
+            self.__queues[ctx.dest_addr] = Queue()
+            self.__queues[ctx.dest_addr].put_nowait(message)
 
-        else:  # create transaction to send it
+        self.check_tx_queue(ctx.dest_addr)
+
+    def check_tx_queue(self, dst_addr):
+        """
+        Checks if Tx messages are pending in the queue after the previous transaction to that destination is finished
+
+        :param dst_addr: The destination address to check
+        :typr dst_addr: int
+        """
+        if (
+            not dst_addr in self.state.tx_transactions.keys()
+            or self.state.tx_transactions[dst_addr].is_transaction_finished
+        ):
+            try:
+                message = self.__queues[dst_addr].get_nowait()
+            except Exception:
+                return
+
             sar_state = self.state.profile.get_configuration_server_model().get_state(
                 "sar_transmitter"
             )
             transaction = TxTransaction(message, sar_state)
-            self.state.tx_transactions[ctx.dest_addr] = transaction
+            self.state.tx_transactions[dst_addr] = transaction
             self.start_sending_thread(transaction)
 
     def start_sending_thread(self, transaction):
@@ -775,6 +791,8 @@ class LowerTransportLayer(Layer):
                     )
                     / 1000
                 )
+        transaction.is_transaction_finished = True
+        self.check_tx_queue(transaction.ctx.dest_addr)
 
     def sending_thread_access_unicast_segmented(self, transaction, event):
         """
@@ -796,7 +814,7 @@ class LowerTransportLayer(Layer):
 
             transaction.acked_received = False
             transaction.unicast_retrans_count -= 1
-            for fragment_index in range(len(transaction.fragments)):
+            for fragment_index in reversed(range(len(transaction.fragments))):
                 if fragment_index not in transaction.acked_segments:
                     payload = (
                         BTMesh_Lower_Transport_Segmented_Access_Message(
@@ -840,6 +858,9 @@ class LowerTransportLayer(Layer):
                     )
                     / 1000
                 )
+
+        transaction.is_transaction_finished = True
+        self.check_tx_queue(transaction.ctx.dest_addr)
 
     def sending_thread_access_multicast_segmented(self, transaction, event):
         """
@@ -896,6 +917,9 @@ class LowerTransportLayer(Layer):
                     sleep(transaction.interval_step / 1000)
             sleep(transaction.multicast_retrans_interval_step / 1000)
 
+        transaction.is_transaction_finished = True
+        self.check_tx_queue(transaction.ctx.dest_addr)
+
     def sending_thread_ctl_multicast_segmented(self, transaction, event):
         """
         Function running in the sending thread to send a segmented PDU to a multicast destination
@@ -942,6 +966,9 @@ class LowerTransportLayer(Layer):
                     sleep(transaction.interval_step / 1000)
             sleep(transaction.multicast_retrans_interval_step / 1000)
 
+        transaction.is_transaction_finished = True
+        self.check_tx_queue(transaction.ctx.dest_addr)
+
     def sending_thread_access_unsegmented(self, transaction, event):
         """
         Function running in a thread to send a unsegmented PDU
@@ -973,6 +1000,8 @@ class LowerTransportLayer(Layer):
         )
         transaction.is_transaction_finished = True
 
+        self.check_tx_queue(transaction.ctx.dest_addr)
+
     def sending_thread_ctl_unsegmented(self, transaction, event):
         """
         Function running in a thread to send a unsegmented PDU
@@ -992,6 +1021,8 @@ class LowerTransportLayer(Layer):
             )
         )
         transaction.is_transaction_finished = True
+
+        self.check_tx_queue(transaction.ctx.dest_addr)
 
     def sending_ack_thread(self, transaction, resend=True, event=None):
         """
