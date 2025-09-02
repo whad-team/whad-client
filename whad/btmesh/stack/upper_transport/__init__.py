@@ -127,7 +127,10 @@ class UpperTransportLayer(Layer):
         If the queue is not empty, process the next UpperTransportLayer Message
         """
         if not self.__queue.empty():
-            self.process_lower_transport_message(self.__queue.get_nowait())
+            try:
+                self.process_lower_transport_message(self.__queue.get_nowait())
+            except Exception:
+                return
 
     def send_to_lower_transport(self, message):
         """
@@ -136,6 +139,7 @@ class UpperTransportLayer(Layer):
         :param message: The PDU and its context
         :type message: (BTMesh_Upper_Transport_Access_PDU, MeshMessageContext)
         """
+        pkt, ctx = message
         self.send("lower_transport", message)
 
     def send_to_access_layer(self, message):
@@ -145,6 +149,7 @@ class UpperTransportLayer(Layer):
         :param message: The PDU and its context
         :type message: (BTMesh_Model_Message, MeshMessageContext)
         """
+        pkt, ctx = message
         self.send("access", message)
 
     def wait_for_message(self, clazz):
@@ -321,7 +326,7 @@ class UpperTransportLayer(Layer):
         # Only if the seq_num is None, otherwise means we hardcoded it (in shell for ex)
         if ctx.seq_number is None:
             ctx.seq_number = self.state.profile.get_next_seq_number(inc=4)
-
+        
         if get_address_type(ctx.dest_addr) == VIRTUAL_ADDR_TYPE:
             encrypted_message, ctx.seq_auth = key.encrypt(
                 access_message=raw(pkt),
@@ -365,13 +370,15 @@ class UpperTransportLayer(Layer):
         :param message: Message and its context
         :type message: (Packet, MeshMessageContext)
         """
+        self.state.__is_processing_message = True
         pkt, ctx = message
-
         # if custom handler, use it
         if type(pkt) in self._custom_handlers:
             continue_processing = self._custom_handlers[type(pkt)](message)
             # if custom handler says to return after itself
             if not continue_processing:
+                self.state.__is_processing_message = False
+                self.check_queue()
                 return
 
         # if control message, get handler for message and run it
@@ -386,16 +393,23 @@ class UpperTransportLayer(Layer):
                 self.state.event.set()
 
             self._handlers[type(pkt)](message)
+            self.state.__is_processing_message = False
+            self.check_queue()
             return
 
         plaintext = self.__try_decrypt(pkt, ctx)
 
         if plaintext is None:
             logger.debug("Decryption failed in UpperTransportlayer")
+            self.state.__is_processing_message = False
+            self.check_queue()
             return
 
         pkt = BTMesh_Model_Message(plaintext)
         self.send_to_access_layer((pkt, ctx))
+
+        self.state.__is_processing_message = False
+        self.check_queue()
 
     def default_ctl_handler(self, message):
         """

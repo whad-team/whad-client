@@ -117,6 +117,7 @@ class BTMeshNode(BTMesh):
         self.channel = 37
 
         self.sniffer_channel_switch_thread = None
+        self.sniffing_event = None
 
     @property
     def main_stack(self):
@@ -154,25 +155,35 @@ class BTMeshNode(BTMesh):
             super().start()
             self.is_listening = True
             self.sniff_advertisements(channel=self.channel)
-            self.polling_rx_packets_thread = Thread(target=self.polling_rx_packets)
+            if self.sniffing_event is not None:
+                self.sniffing_event.set()
+                self.sniffing_event = None
+
+            self.sniffing_event = Event()
+            self.polling_rx_packets_thread = Thread(
+                target=self.polling_rx_packets, args=(self.sniffing_event,)
+            )
             self.polling_rx_packets_thread.start()
-            if self.sniffer_channel_switch_thread is None:
-                self.sniffer_channel_switch_thread = Thread(
-                    target=self.change_sniffing_channel
-                )
-                self.sniffer_channel_switch_thread.start()
+
+            self.sniffer_channel_switch_thread = Thread(
+                target=self.change_sniffing_channel, args=(self.sniffing_event,)
+            )
+            self.sniffer_channel_switch_thread.start()
 
     def stop(self):
         if self.is_listening:
             self.is_listening = False
+            if self.sniffing_event is not None:
+                self.sniffing_event.set()
+
             super().stop()
 
-    def polling_rx_packets(self):
-        while self.is_listening:
+    def polling_rx_packets(self, sniffing_event):
+        while not sniffing_event.is_set():
             try:
-                self.process_rx_packets(self.__queue.get())
+                self.process_rx_packets(self.__queue.get(timeout=0.01))
             except Empty:
-                sleep(0.001)
+                pass
             # Handle device disconnection
             except WhadDeviceDisconnected:
                 return
@@ -230,31 +241,33 @@ class BTMeshNode(BTMesh):
                 conn_handle=39,
                 direction=BleDirection.UNKNOWN,
             )
+            sleep(0.005)
             self.send_pdu(
                 adv_pkt,
                 access_address=0x8E89BED6,
                 conn_handle=37,
                 direction=BleDirection.UNKNOWN,
             )
+            sleep(0.002)
             res = self.send_pdu(
                 adv_pkt,
                 access_address=0x8E89BED6,
                 conn_handle=38,
                 direction=BleDirection.UNKNOWN,
             )
-            sleep(0.02)
+            sleep(0.007)
         return res
 
-    def change_sniffing_channel(self):
+    def change_sniffing_channel(self, sniffing_event):
         channels = [37, 38, 39]
         i = 0
-        while True:
+        while not sniffing_event.is_set():
             try:
                 self.stop()
                 self.channel = channels[i]
                 self.start()
                 i = (i + 1) % 3
-                sleep(0.03)
+                sleep(0.1)
             except:
                 return
 
