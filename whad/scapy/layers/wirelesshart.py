@@ -349,6 +349,19 @@ class WirelessHart_Write_Network_Key_Response(WirelessHart_Command_Payload):
         StrFixedLenField("key_value", None, length=16),
         #FiveBytesField("execution_time", None)
     ]
+    
+class WirelessHart_Disconnect_Device_Request(WirelessHart_Command_Payload):
+    name = "Disconnect Device Request"
+    fields_desc = [
+        ByteEnumField("reason", None, {0: "User-initialized", 1: "Communication failure"})
+    ]
+    
+class WirelessHart_Disconnect_Device_Response(WirelessHart_Command_Payload):
+    name = "Disconnect Device Response"
+    fields_desc = [
+        ByteField("status", None),
+        ByteEnumField("reason", None, {0: "User-initialized", 1: "Communication failure"})
+    ]
 
 
 class WirelessHart_Write_Device_Nickname_Request(WirelessHart_Command_Payload):
@@ -786,6 +799,36 @@ class WirelessHart_Report_Device_Health_Response(WirelessHart_Command_Payload):
 
 
     ]
+    
+class Neighbor_Health(WirelessHart_Command_Response_Hdr):
+    name = "Neighbor Health"
+    fields_desc = [
+        XShortField("neighbor_nickname", None),
+        ByteEnumField("flags", None, { 0x1: "time-source", 0x80:"no links"}),
+        SignedByteField("mean_rsl", None),
+        ShortField("counter_packets_transmitted", None),
+        ShortField("counter_failed_transmissions", None),
+        ShortField("counter_packets_received_from_this_neighbor", None)
+    ]
+    
+class WirelessHart_Report_Neighbor_Health_List_Request(WirelessHart_Command_Payload):
+    name = "Report Neighbor Health List Request"
+    fields_desc = [
+        ByteField("neighbor_table_index", None),
+        ByteField("number_of_neighbors_to_read", None)
+    ]
+    
+class WirelessHart_Report_Neighbor_Health_List_Response(WirelessHart_Command_Payload):
+    name = "Report Neighbor Health List Response"
+    fields_desc = [
+        ByteField("status", None), 
+        ByteField("number_of_entries", None),
+        ByteField("total_number_of_neighbors", None),
+        FieldListField("neighbors",
+               [],
+               PacketField("neighbor", Neighbor_Health(), Neighbor_Health),
+               count_from=lambda p:p.number_of_entries)    
+    ]
 
 
 class WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request(WirelessHart_Command_Payload):
@@ -817,11 +860,16 @@ bind_layers(WirelessHart_Network_Security_SubLayer_Hdr, WirelessHart_Transport_L
 
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Report_Device_Health_Request, command_number=0x30b)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Report_Device_Health_Response, command_number=0x30b)
-#bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Read_Unique_Identifier_Request, command_number=0x0)
-#bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Read_Unique_Identifier_Response, command_number=0x0)
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Report_Neighbor_Health_List_Request, command_number=0x30c)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Report_Neighbor_Health_List_Response, command_number=0x30c)
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Read_Unique_Identifier_Request, command_number=0x0)
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Read_Unique_Identifier_Response, command_number=0x0)
 
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Report_Neighbor_Signal_Level_Command_Request, command_number=0x313)
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Report_Neighbor_Signal_Level_Command_Response, command_number=0x313)
+
+bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Disconnect_Device_Request, command_number=0x3c0) # 960: Disconnect a mote
+bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Disconnect_Device_Response, command_number=0x3c0) # 960: Disconnect a mote
 
 bind_layers(WirelessHart_Command_Request_Hdr, WirelessHart_Write_Network_Key_Request, command_number=0x3c1) # 961: broadcast network key
 bind_layers(WirelessHart_Command_Response_Hdr, WirelessHart_Write_Network_Key_Response, command_number=0x3c1) # 961: broadcast network key
