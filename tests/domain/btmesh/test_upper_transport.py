@@ -101,7 +101,7 @@ class TestBTMeshStackUpperTransportControl(BTMeshUpperTransportTest):
 # test handling of access messages
 class TestBTMeshStackUpperTransportAccess(BTMeshUpperTransportTest):
 
-    # test the receiving of a valid access message for which we have the app key
+    # test the sending of a valid access message for which we have the app key
     def test_tx_access_app_key_success(self, lower_transport):
         access_pkt = BTMesh_Model_Message(
             opcode=33282
@@ -219,34 +219,75 @@ class TestBTMeshStackUpperTransportAccess(BTMeshUpperTransportTest):
             )
         )
 
-    """
     # test the receiving of a valid access message for which we have the dev key
     def test_rx_access_dev_key_success(self, lower_transport):
         lower_pkt = BTMesh_Upper_Transport_Access_PDU(
             enc_access_message_and_mic=bytes.fromhex("9785dbc321c5f6")
         )
-        access_pkt = BTMesh_Model_Message(
-            opcode=32776
-        ) / BTMesh_Model_Config_Composition_Data_Get(page=0)
-        access_ctx = MeshMessageContext()
-        access_ctx.src_addr = 4
-        access_ctx.dest_addr = 2
-        access_ctx.application_key_index = -1
-        access_ctx.net_key_id = 0
-        access_ctx.dev_key_address = 2
-        access_ctx.ttl = 127
-        access_ctx.aszmic = 0
+        lower_ctx = MeshMessageContext()
+        lower_ctx.src_addr = 4
+        lower_ctx.dest_addr = 2
+        lower_ctx.application_key_index = -1
+        lower_ctx.net_key_id = 0
+        lower_ctx.dev_key_address = 2
+        lower_ctx.ttl = 127
+        lower_ctx.aszmic = 0
+        lower_ctx.seq_number = 0
+        lower_ctx.aid = -1
 
-        lower_transport.send_from("access", "upper_transport", (access_pkt, access_ctx))
+        lower_transport.send("upper_transport", (lower_pkt, lower_ctx))
         sleep(0.05)
 
-        expected_ctx = copy(access_ctx)
-        expected_ctx.seq_number = 0
-        expected_ctx.aid = -1
+        expected_pkt = BTMesh_Model_Message(
+            opcode=32776
+        ) / BTMesh_Model_Config_Composition_Data_Get(page=0)
+
+        expected_ctx = copy(lower_ctx)
+        print("expected")
+        expected_ctx.print()
 
         assert lower_transport.expect(
-            LayerMessage(
-                "upper_transport", "lower_transport", (expected_pkt, expected_ctx)
-            )
+            LayerMessage("upper_transport", "access", (expected_pkt, expected_ctx))
         )
-    """
+
+    # test the receiving of a valid access message for which we do not have the dev key
+    def test_rx_access_no_dev_key(self, lower_transport):
+        lower_pkt = BTMesh_Upper_Transport_Access_PDU(
+            enc_access_message_and_mic=bytes.fromhex("2146654c96f55a")
+        )
+        lower_ctx = MeshMessageContext()
+        lower_ctx.src_addr = 6
+        lower_ctx.dest_addr = 8
+        lower_ctx.application_key_index = -1
+        lower_ctx.net_key_id = 0
+        lower_ctx.dev_key_address = 6
+        lower_ctx.ttl = 127
+        lower_ctx.aszmic = 0
+        lower_ctx.seq_number = 0
+        lower_ctx.aid = -1
+
+        lower_transport.send("upper_transport", (lower_pkt, lower_ctx))
+        sleep(0.05)
+
+        assert lower_transport.expect([])
+
+    # test the receiving of an invalid access message for which we have the dev key
+    def test_rx_access_dev_key_invalid(self, lower_transport):
+        lower_pkt = BTMesh_Upper_Transport_Access_PDU(
+            enc_access_message_and_mic=bytes.fromhex("2146654c96f55a")
+        )
+        lower_ctx = MeshMessageContext()
+        lower_ctx.src_addr = 2
+        lower_ctx.dest_addr = 4
+        lower_ctx.application_key_index = -1
+        lower_ctx.net_key_id = 0
+        lower_ctx.dev_key_address = 2
+        lower_ctx.ttl = 127
+        lower_ctx.aszmic = 0
+        lower_ctx.seq_number = 0
+        lower_ctx.aid = -1
+
+        lower_transport.send("upper_transport", (lower_pkt, lower_ctx))
+        sleep(0.05)
+
+        assert lower_transport.expect([])
