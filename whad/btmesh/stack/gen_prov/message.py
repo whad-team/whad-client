@@ -9,3 +9,10 @@ class GenericProvisioningMessage(object):
         super().__init__()
         self.gen_prov_pkt = gen_prov_pkt
         self.transaction_number = transaction_number
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, GenericProvisioningMessage)
+            and self.gen_prov_pkt == other.gen_prov_pkt
+            and self.transaction_number == other.transaction_number
+        )

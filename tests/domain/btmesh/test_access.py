@@ -1,10 +1,8 @@
-"""BTMesh stack Upper Transport Layer unit testing
+"""BTMesh stack Access Layer unit testing
 
-This module provides 2 sets of test (so far):
+This module provides a single set of test (so far):
 
-TO CHANGE
-- TestBTMeshStackLowerTransportAccess: check that Access messages are correcly forwarded and processed
-- TestBTMeshStackLowerTransportControl: check that Control messages are correcly processed
+- TestBTMeshStackAccess: check that Access messages are correcly forwarded and processed
 
 """
 
