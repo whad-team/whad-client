@@ -161,7 +161,6 @@ class AccessLayer(Layer):
         self.state.__is_processing_message = True
         packet, ctx = message
 
-
         if not self.state.is_layer_active:
             self.state.__is_processing_message = False
             return
@@ -266,14 +265,7 @@ class AccessLayer(Layer):
                 new_ctx.net_key_id = ctx.net_key_id
                 new_ctx.is_ctl = False
                 new_ctx.aszmic = 0
-                if ctx.ttl == 0:
-                    new_ctx.ttl = 0
-                else:
-                    new_ctx.ttl = (
-                        self.state.profile.get_configuration_server_model()
-                        .get_state("default_ttl")
-                        .get_value()
-                    )
+                new_ctx.ttl = ctx.ttl
                 self.send_to_upper_transport((response, new_ctx))
 
         self.state.__is_processing_message = False
