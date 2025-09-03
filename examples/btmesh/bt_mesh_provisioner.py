@@ -26,19 +26,46 @@ interface = sys.argv[1]
 try:
     dev = WhadDevice.create(interface)
 
-    # event to get signals from callback on adv msg receieved
+    # Auto provision node
     provisioner = Provisioner(dev)
     provisioner.profile.auto_provision()
     provisioner.start()
-    print("PROVISIONER STARTED")
+    print("Provisionner started\n")
 
     provisioner.start_listening_beacons()
 
     while True:
-        i = input("Press any key to see unprovisioned devices :")
-        devices = provisioner.get_unprovisioned_devices()
-        for device in d
+        i = input(
+            "Press enter key to see unprovisioned devices, or enter index of node to provision ... :"
+        )
+        print("\n")
 
+        devices = provisioner.get_unprovisioned_devices()
+        try:
+            i = int(i, 0)
+        except ValueError:
+            # If no index in input, print received unprovisioned beacons
+            if len(devices) == 0:
+                print("No Unprovisioned beacons received....\n")
+
+            else:
+                print("Index | Device UUID")
+                for index in range(len(devices)):
+                    print(
+                        "|─ %d : %s" % (index, str(devices[index])),
+                    )
+                print("\n")
+            continue
+
+        # if we have an index, try to provision it
+        if len(devices) <= i:
+            print("This index is not present in our list of unprovsioned devices\n")
+        else:
+            res = provisioner.provision_distant_node(devices[i])
+            if res:
+                print("Successfully provisionned device\n")
+            else:
+                print("Failed to provision deviced...\n")
 
 
 except ConnectionLostException as e:

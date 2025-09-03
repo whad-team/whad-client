@@ -34,6 +34,7 @@ from whad.btmesh.models import ModelClient
 from whad.btmesh.stack.utils import MeshMessageContext
 
 from whad.btmesh.profile import BaseMeshProfile
+from copy import copy
 
 
 # lock for sending to not skip packets ?
@@ -400,10 +401,16 @@ class BTMeshNode(BTMesh):
 
         try:
             pkt, ctx = message
+            # Copy the context so that the user can resuse the same one without having some values overwritten by the stack...
+            ctx = copy(ctx)
         except TypeError:
             pkt = message
             ctx = MeshMessageContext()
             ctx.src_addr = self.profile.get_primary_element_addr() + model.element_index
+            ctx.dest_addr = 0xFFFF
+            ctx.application_key_index = 0
+            ctx.net_key_id = 0
+            ctx.ttl = 127
 
         if not pkt.haslayer(BTMesh_Model_Message):
             pkt = BTMesh_Model_Message() / pkt
