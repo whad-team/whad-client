@@ -814,7 +814,7 @@ class LowerTransportLayer(Layer):
 
             transaction.acked_received = False
             transaction.unicast_retrans_count -= 1
-            for fragment_index in reversed(range(len(transaction.fragments))):
+            for fragment_index in range(len(transaction.fragments)):
                 if fragment_index not in transaction.acked_segments:
                     payload = (
                         BTMesh_Lower_Transport_Segmented_Access_Message(
