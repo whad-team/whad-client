@@ -129,6 +129,9 @@ class GenericProvisioningLayer(ContextualLayer):
         # Transaction number of last received provsioning PDU
         self.state.last_received_transaction_number = -100000000
 
+        # number of retries before we receive an ack for a tx packet (100% arbitrary)
+        self.state.tx_packet_attempts = 10
+
         # Simple FIFO queue for Provisioning messages. Since Provisioning Layer can send  2 packets back to back, need to make sure that all fragments/acks of first packet get there before seinding next one.
         self._queue = Queue()
 
@@ -137,7 +140,7 @@ class GenericProvisioningLayer(ContextualLayer):
         Sets the handler function of the Message with class (Scapy packet) specified
 
         :param clazz: The class of the scapy packet we handle
-        :param handler: The handler function, taking (Packet | MeshMessageContext) as arguments and returning nothing
+        :param handler: The handler function, taking Packet as arguments and returning nothing
         """
         self._custom_handlers[clazz] = handler
 
@@ -169,8 +172,7 @@ class GenericProvisioningLayer(ContextualLayer):
         Resends the whole transaction if ack not received in 1sec, resends all.
         Starts Ack timer of 30 seconds from the first sending. If no Ack after timer expires, closes the connexion
         """
-        # 15 tries per packet, totally arbitrary
-        i = 15
+        i = self.state.tx_packet_attempts
         while i > 0:
             if self.state.is_thread_running:
                 transaction_number = self.state.current_transaction.transaction_number
@@ -355,6 +357,7 @@ class GenericProvisioningLayer(ContextualLayer):
             )
             self.state.in_transaction = False
             self.send_to_upper_layer(prov_packet)
+            self.send_ack(transaction_number=transaction_number)
 
         # if more fragmentx expected, add the first one to the list
         else:
