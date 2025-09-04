@@ -143,7 +143,7 @@ class Sniffer(WirelessHart, EventsManager):
         """
         global first_adv
         if WirelessHart_Network_Security_SubLayer_Hdr in packet and self.__configuration.decrypt:
-            self.__asn = (self.__asn & (0xffffff0000)) | packet.asn_snippet
+            self.__asn = (self.__asn & (0xffffff0000)) | (packet.asn_snippet%256) | packet.seqnum
             decrypted, success = self.__decryptor.attempt_to_decrypt(packet)
             if success:
                 packet = decrypted 
@@ -242,7 +242,7 @@ class Sniffer(WirelessHart, EventsManager):
             raise MissingLink("0xf980", hex(dst), "TYPE_BROADCAST")
         
         #planify the asn to send : next broadcast link receive in the next superframe
-        asn_to_send = ((self.__asn // sf.nb_slots) + 1) * sf.nb_slots + link.join_slot
+        asn_to_send = (((self.__asn + 200) // sf.nb_slots) + 1) * sf.nb_slots + link.join_slot
         # start the suspend after 10s = 1000 slots of 10ms
         asn_suspend = asn_to_send + 1000
         #resume after the specified duration
@@ -298,7 +298,7 @@ class Sniffer(WirelessHart, EventsManager):
                 second_src_route_segment = 0,
                 first_src_route_segment = 1,
                 ttl = 0,
-                asn_snippet = asn_to_send%0xffff,
+                asn_snippet = (asn_to_send%0xffff) - 1,
                 graph_id = 0x1,
                 nwk_dest_addr = 0xffff,
                 nwk_src_addr = 0xf980,
@@ -385,7 +385,7 @@ class Sniffer(WirelessHart, EventsManager):
         """Prepare and encrypt ping request paquet and sends on the given link"""
         
         #calculate asn to send : next slot of the link communication in the next superframe
-        asn_to_send = ((self.__asn // superframe.nb_slots) + 1) * superframe.nb_slots + link.join_slot
+        asn_to_send = (((self.__asn + 200) // superframe.nb_slots) + 1) * superframe.nb_slots + link.join_slot
 
         #prepare layers
         ping_request = WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request(
@@ -437,7 +437,7 @@ class Sniffer(WirelessHart, EventsManager):
                 second_src_route_segment = 0,
                 first_src_route_segment = 1,
                 ttl = 0,
-                asn_snippet = asn_to_send%0xffff,
+                asn_snippet = (asn_to_send%0xffff) - 1,
                 graph_id = 0x1,
                 nwk_dest_addr = dst,
                 nwk_src_addr = 0xf980,
