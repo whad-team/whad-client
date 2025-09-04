@@ -127,7 +127,6 @@ class Sandbox(Layer):
         """Layer message monitoring."""
         self.messages.append(LayerMessage(source, destination, data, tag=tag, **kwargs))
 
-
     def flush_messages(self):
         """Flushes the logged messages (empty the messages buffer)"""
         self.messages = []

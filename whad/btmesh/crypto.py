@@ -351,11 +351,20 @@ class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoM
         self.public_key_provisioner = None
         self.received_confirmation_provisionee = None
 
-    def generate_keypair(self):
-        """Generate the P256 private key / public key"""
-        self.private_key_provisioner, self.public_key_provisioner = (
-            generate_p256_keypair()
-        )
+    def generate_keypair(self, test_mode=False):
+        """Generate the P256 private key / public key
+
+        If test mode, harcoded values
+        """
+        if test_mode:
+            self.private_key_provisioner, self.public_key_provisioner = (
+                generate_p256_keypair(private_number=1)
+            )
+        else:
+            self.private_key_provisioner, self.public_key_provisioner = (
+                generate_p256_keypair()
+            )
+
         public_key_numbers = self.public_key_provisioner.public_numbers()
         self.public_key_coord_provisioner = (
             public_key_numbers.x.to_bytes(32, "big"),
@@ -378,15 +387,23 @@ class ProvisioningBearerAdvCryptoManagerProvisioner(ProvisioningBearerAdvCryptoM
 
         self.public_key_coord_provisionee = (public_key_x, public_key_y)
 
-    def generate_random(self):
+    def generate_random(self, test_mode=False):
         """
         Generates the random values used in Confirmation Process
         NOT SAFE
+
+        If in test_mode, hardocoded value
         """
         if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
-            self.rand_provisioner = urandom(16)
+            if test_mode:
+                self.rand_provisioner = b"\xff" * 16
+            else:
+                self.rand_provisioner = urandom(16)
         elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
-            self.rand_provisioner = urandom(32)
+            if test_mode:
+                self.rand_provisioner = b"\xff" * 32
+            else:
+                self.rand_provisioner = urandom(32)
 
 
 class ProvisioningBearerAdvCryptoManagerProvisionee(ProvisioningBearerAdvCryptoManager):
@@ -396,11 +413,21 @@ class ProvisioningBearerAdvCryptoManagerProvisionee(ProvisioningBearerAdvCryptoM
         self.public_key_provisioner = None
         self.received_confirmation_provisioner = None
 
-    def generate_keypair(self):
-        """Generate the P256 private key / public key"""
-        self.private_key_provisionee, self.public_key_provisionee = (
-            generate_p256_keypair()
-        )
+    def generate_keypair(self, test_mode=False):
+        """Generate the P256 private key / public key
+
+        If in test mode, hardcode values
+        """
+        if test_mode:
+            self.private_key_provisionee, self.public_key_provisionee = (
+                generate_p256_keypair(private_number=1)
+            )
+            print(self.private_key_provisionee)
+            print(self.public_key_provisionee)
+        else:
+            self.private_key_provisionee, self.public_key_provisionee = (
+                generate_p256_keypair()
+            )
 
         # Get coordinates format for the Provisioning Packets
         public_key_numbers = self.public_key_provisionee.public_numbers()
@@ -424,15 +451,23 @@ class ProvisioningBearerAdvCryptoManagerProvisionee(ProvisioningBearerAdvCryptoM
 
         self.public_key_coord_provisioner = (public_key_x, public_key_y)
 
-    def generate_random(self):
+    def generate_random(self, test_mode=False):
         """
         Generates the random values used in Confirmation Process
         NOT SAFE
+
+        If in test_mode, hardocoded value
         """
         if self.alg == "BTM_ECDH_P256_CMAC_AES128_AES_CCM":
-            self.rand_provisionee = urandom(16)
+            if test_mode:
+                self.rand_provisionee = b"\xff" * 16
+            else:
+                self.rand_provisionee = urandom(16)
         elif self.alg == "BTM_ECDH_P256_HMAC_SHA256_AES_CCM":
-            self.rand_provisionee = urandom(32)
+            if test_mode:
+                self.rand_provisionee = b"\xff" * 32
+            else:
+                self.rand_provisionee = urandom(32)
 
 
 """
