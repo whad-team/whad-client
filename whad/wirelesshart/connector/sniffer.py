@@ -10,7 +10,7 @@ from whad.wirelesshart.connector.channelmap import ChannelMap
 from whad.wirelesshart.connector.link import Link
 from whad.wirelesshart.exceptions import MissingEncryptionKey, MissingLink
 from whad.wirelesshart.sniffing import SnifferConfiguration
-from whad.scapy.layers.wirelesshart import Superframe, WirelessHart_Add_Link_Request, WirelessHart_Add_Link_Response, WirelessHart_Command_Request_Hdr, WirelessHart_DataLink_Acknowledgement, WirelessHart_DataLink_Advertisement, WirelessHart_DataLink_Hdr, WirelessHart_Network_Hdr, WirelessHart_Network_Security_SubLayer_Hdr, WirelessHart_Suspend_Devices_Request, WirelessHart_Suspend_Devices_Response, WirelessHart_Transport_Layer_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request, WirelessHart_Write_Modify_Session_Command_Request, compute_dlmic
+from whad.scapy.layers.wirelesshart import Superframe, WirelessHart_Add_Link_Request, WirelessHart_Add_Link_Response, WirelessHart_Command_Request_Hdr, WirelessHart_DataLink_Acknowledgement, WirelessHart_DataLink_Advertisement, WirelessHart_DataLink_Hdr, WirelessHart_Disconnect_Device_Request, WirelessHart_Network_Hdr, WirelessHart_Network_Security_SubLayer_Hdr, WirelessHart_Suspend_Devices_Request, WirelessHart_Suspend_Devices_Response, WirelessHart_Transport_Layer_Hdr, WirelessHart_Vendor_Specific_Dust_Networks_Ping_Request, WirelessHart_Write_Modify_Session_Command_Request, compute_dlmic
 from scapy.layers.dot15d4 import Dot15d4Data, Dot15d4FCS
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter
@@ -505,6 +505,142 @@ class Sniffer(WirelessHart, EventsManager):
             return final_packet
         
         raise MissingEncryptionKey(dst)
-    def print_brute(self, pkt):
-        print(bytes(pkt).hex())
+    
+    def disconnect_device(self, dst):
+        """Sends a packet containing a disconnect request from the network manager"""
+        
+        #get the superframe and the link corresponding to this send
+        ans = self.superframes.get_link(dst, 0x1, Link.TYPE_BROADCAST, Link.OPTIONS_RECEIVE)
+        if ans:
+            (sf, link) = ans
+        else:
+            #Missing link raise exception and print existing links
+            self.superframes.print_table()
+            raise MissingLink("0xf980", hex(dst), "TYPE_BROADCAST")
+        
+        #planify the asn to send : next broadcast link receive in the next superframe
+        asn_to_send = ((self.__asn // sf.nb_slots) + 1) * sf.nb_slots + link.join_slot
+        
+        #prepare layers
+        disconnect_cmd = WirelessHart_Disconnect_Device_Request(
+            reason = "User-initialized"
+        )
+        
+        request = WirelessHart_Command_Request_Hdr(
+            command_number=960,
+            len=1
+        ) 
+        
+        transport_layer = WirelessHart_Transport_Layer_Hdr(
+            acknowledged=1,
+            response=0,
+            broadcast=0,
+            tr_seq_num=31,
+            
+            device_malfunction=0,
+            configuration_changed=0,
+            cold_start=0,
+            more_status_available=0,
+            loop_current_fixed=0,
+            loop_current_saturated=0,
+            non_primary_variable_out_of_limit=0,
+            primary_variable_out_of_limit=0,
+            
+            reserved=0,
+            function_check=0,
+            out_of_specification=0,
+            failure=0,
+            critical_power_failure=0,
+            device_variable_alert=0,
+            maintenance_required=0,
+            
+            commands = [request / disconnect_cmd]
+        )
+        
+        #get the encryption key and the peer (nonce)
+        key = self.__decryptor.get_unicast_session_key(0xf980, dst)
+        peer = self.__decryptor.get_unicast_peer(0xf980, dst)
+        
+        if key and peer:
+            #prepare network layer
+            network_layer = WirelessHart_Network_Hdr(
+                nwk_dest_addr_length = 0,
+                nwk_src_addr_length = 0,
+                proxy_route = 0,
+                second_src_route_segment = 0,
+                first_src_route_segment = 0,
+                ttl = 0,
+                asn_snippet = ((asn_to_send%0x10000)-1)%256,
+                graph_id = 0x1,
+                nwk_dest_addr = dst,
+                nwk_src_addr = 0xf980
+            )
+            
+            #prepare security sublayer
+            peer.incremenet_nonce()
+            security_sub_layer = WirelessHart_Network_Security_SubLayer_Hdr(
+                security_types=0,
+                counter=peer.get_nonce_counter()%256,
+                nwk_mic = 0
+            )
+            
+            #prepare data link header
+            data_link_layer = WirelessHart_DataLink_Hdr(
+                reserved = 0,
+                priority = 3,
+                network_key_use = 1,
+                pdu_type = 7,
+                mic = 0x0
+            )
+            
+            dot15d4_data = Dot15d4Data(
+                dest_panid = self.__panid,
+                dest_addr = dst,
+                src_addr = 0x1
+            )
+            dot15d4_fcs = Dot15d4FCS(
+                fcf_panidcompress = True,
+                fcf_ackreq = False,
+                fcf_pending = False,
+                fcf_security = False,
+                fcf_frametype = 1,
+                fcf_srcaddrmode = 2,
+                fcf_framever = 0,
+                fcf_destaddrmode = 2,
+                fcf_reserved_2 = 0,
+                seqnum = asn_to_send%256
+            )
+            #put layers together
+            packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  transport_layer
+            
+            #generate nonce for encryption
+            manager = WirelessHartNetworkLayerCryptoManager(key)
+            manager.nonce = manager.generateNonce(packet)
+            #put nonce, ttln nwkk_mic and counter to zero in the packet (WirelessHART encryption specification)
+            security_sub_layer.nonce = 0x0
+            
+            #Reassemble pkt
+            packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  transport_layer
+            #encrypt
+            enciphered, nwk_mic = manager.encrypt(bytes(transport_layer), manager.generateAuth(packet))
+            #update pkt values
+            security_sub_layer.nwk_mic = int.from_bytes(nwk_mic)
+            security_sub_layer.counter = peer.get_nonce_counter()%256
+            network_layer.ttl = 126
+            #Put together
+            packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  enciphered
+            
+            #Compute the message integrity code and update its value in the pkt
+            dl_mic = compute_dlmic(packet, self.__decryptor.get_network_key(), asn_to_send)
+            data_link_layer.mic = int.from_bytes(dl_mic)
+            final_packet = dot15d4_fcs / dot15d4_data / data_link_layer / network_layer / security_sub_layer /  enciphered
+
+            print(f"sending will occur in {(asn_to_send-self.__asn)/100}s")
+            #send command 
+            self.send_in_slot(final_packet, asn_to_send)
+            return final_packet
+        
+        raise MissingEncryptionKey(dst)
+        
+
 first_adv = True
