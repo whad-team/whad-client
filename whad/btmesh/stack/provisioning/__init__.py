@@ -90,6 +90,8 @@ class ProvisioningState(LayerState):
 
         self.prov_data = ProvisioningData()
 
+        self.test_mode = False
+
 
 @state(ProvisioningState)
 @alias("provisioning")
@@ -220,11 +222,12 @@ class ProvisioningLayer(Layer):
         # compute ECDH secret
         self.state.crypto_manager.compute_ecdh_secret()
 
-        # compute Confirm0b01000ation Salt, and confirmation key, and generate random value
+        # compute Confirmation Salt, and confirmation key, and generate random value
         self.state.crypto_manager.compute_confirmation_salt(
             self.state.invite_pdu, self.state.capabilities_pdu, self.state.start_pdu
         )
-        self.state.crypto_manager.generate_random()
+
+        self.state.crypto_manager.generate_random(test_mode=self.state.test_mode)
 
     def on_input_complete(self, packet):
         self.send_error_response(0x07)
@@ -342,8 +345,8 @@ class ProvisioningLayerProvisioner(ProvisioningLayer):
         )
         self.state.prov_data.provisioning_crypto_manager = self.state.crypto_manager
 
-        # generate keys
-        self.state.crypto_manager.generate_keypair()
+        # generate keys (or hardcoded if test mode)
+        self.state.crypto_manager.generate_keypair(test_mode=self.state.test_mode)
 
         # Send our public key to provisionee
         self.send_to_gen_prov(
@@ -601,7 +604,7 @@ class ProvisioningLayerProvisionee(ProvisioningLayer):
         :type packet: [TODO:type]
         """
 
-        self.state.crypto_manager.generate_keypair()
+        self.state.crypto_manager.generate_keypair(test_mode=self.state.test_mode)
 
         super().on_public_key(packet)
 
