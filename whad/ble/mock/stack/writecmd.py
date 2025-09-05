@@ -7,13 +7,15 @@ from time import sleep
 from scapy.packet import Packet
 from scapy.layers.bluetooth import ATT_Write_Command, ATT_Error_Response
 
-from .attribute import CharacteristicValue, find_attr_by_handle
-from .procedure import Procedure, UnexpectedProcError
+from whad.ble.stack.att.constants import BleAttOpcode
 
-class ServerWriteCommandProcedure(Procedure):
+from .attribute import CharacteristicValue, find_attr_by_handle
+from .procedure import BleClientProcedure, BleServerProcedure, UnexpectedProcError
+
+class ServerWriteCommandProcedure(BleServerProcedure):
     """ATT server WriteCommand procedure."""
 
-    OPCODE = 0x52
+    OPCODE = BleAttOpcode.WRITE_COMMAND
 
     def __init__(self, attributes: list, mtu: int):
         """Initialize our ServerWriteCommand procedure."""
@@ -27,7 +29,7 @@ class ServerWriteCommandProcedure(Procedure):
     def process_request(self, request: Packet) -> list[Packet]:
         """React only on WriteRequest."""
         if ATT_Write_Command not in request:
-            self.set_state(Procedure.STATE_ERROR)
+            self.set_state(self.states.ERROR)
             raise UnexpectedProcError()
 
         request = request[ATT_Write_Command]
@@ -44,40 +46,34 @@ class ServerWriteCommandProcedure(Procedure):
             pass
 
         # We don't send anything in return
-        self.set_state(Procedure.STATE_DONE)
+        self.set_state(self.states.DONE)
         return []
 
-class ClientWriteCommandProcedure(Procedure):
+class ClientWriteCommandProcedure(BleClientProcedure):
     """GATT Client WriteCommand procedure"""
 
     def __init__(self, handle: int, value: bytes):
         """Initialize a client WriteCommand procedure."""
-        self.__handle = handle
-        self.__value = value
-        super().__init__([], 23)
-
-
-    def initiate(self) -> List[Packet]:
-        """Initiate WriteCommand procedure."""
-        self.set_result(None)
-        return [
+        super().__init__([
             ATT_Write_Command(
-                gatt_handle=self.__handle,
-                data=self.__value
+                gatt_handle=handle,
+                data=value
             )
-        ]
+        ])
+        # Set result to None
+        self.set_result(None)
 
     def wait(self, timeout: Optional[float] = None) -> Optional[Any]:
         sleep(.3)
-        if self.get_state() == Procedure.STATE_INITIAL:
+        if self.get_state() == self.states.INITIAL:
             self.set_result(None)
-            self.set_state(Procedure.STATE_DONE)
+            self.set_state(self.states.DONE)
         return super().wait(timeout=timeout)
 
     def process_request(self, request: Packet) -> List[Packet]:
         """Process incoming PDUs."""
         if ATT_Error_Response in request:
             self.set_result(request[ATT_Error_Response])
-            self.set_state(Procedure.STATE_ERROR)
+            self.set_state(self.states.ERROR)
         return []
 

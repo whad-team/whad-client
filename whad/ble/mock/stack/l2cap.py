@@ -13,7 +13,7 @@ from .server import GattServer
 class Llcap:
     """L2CAP layer"""
 
-    def __init__(self, gatt_cls, conn_handle: int):
+    def __init__(self, gatt, conn_handle: int):
         """Initialize state."""
         self.__mtu = 23
         self.__conn_handle = conn_handle
@@ -23,12 +23,9 @@ class Llcap:
         self.__tx_fifo:List[Packet] = []
         self.__exp_length = 0
 
-        # GATT
-        self.__gatt = gatt_cls(self)
-
-    def get_gatt(self) -> Union[GattServer, GattClient]:
-        """ Retrieve the associated GATT client or server."""
-        return self.__gatt
+        # Configure GATT
+        self.__gatt = gatt
+        self.__gatt.set_l2cap(self)
 
     def on_pdu(self, packet: Packet, fragment: bool = False) -> List[Packet]:
         """Process an L2CAP packet."""
@@ -94,4 +91,26 @@ class Llcap:
             return packets
         else:
             return [BTLE_DATA(LLID=0x02)/l2cap_pkt]
+
+class LlcapClient(Llcap):
+    """L2CAP layer with a GATT client sub-layer."""
+
+    def __init__(self, conn_handle: int):
+        """Initialize state."""
+        self.__gatt_client = GattClient()
+        super().__init__(self.__gatt_client, conn_handle)
+
+    def get_gatt(self):
+        return self.__gatt_client
+
+class LlcapServer(Llcap):
+    """L2CAP layer with a GATT server sub-layer."""
+
+    def __init__(self, conn_handle: int):
+        """Initialize state."""
+        self.__gatt_server = GattServer()
+        super().__init__(self.__gatt_server, conn_handle)
+
+    def get_gatt(self):
+        return self.__gatt_server
 

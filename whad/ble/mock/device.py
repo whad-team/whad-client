@@ -1,19 +1,15 @@
 """Bluetooth Low Energy emulated device.
 """
 import logging
-from queue import Queue, Empty
-from typing import List, Optional
+from queue import Queue
+from typing import Optional
 
 from scapy.packet import Packet
 from scapy.layers.bluetooth import L2CAP_Hdr
-from scapy.layers.bluetooth4LE import BTLE_DATA
 
-from whad.hub.ble import BDAddress, AddressType
-from whad.hub.ble.pdu import BlePduReceived
-from whad.hub.ble.pdu import AdvType, Direction
+from whad.hub.ble import BDAddress, AddressType, AdvType
 
-from .stack.l2cap import Llcap
-from .stack.server import GattServer
+from .stack.l2cap import LlcapServer
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +46,6 @@ class EmulatedDevice:
 
         # Set connection state
         self.__handle = None
-        self.__tx_pdus = Queue()
 
         # Set default state as advertising
         self.__state = EmulatedDevice.STATE_ADVERTISING
@@ -83,7 +78,7 @@ class EmulatedDevice:
         self.__state = EmulatedDevice.STATE_CONNECTED
 
         # Create an instance of L2CAP
-        self.__l2cap = Llcap(GattServer,self.__handle)
+        self.__l2cap = LlcapServer(self.__handle)
 
     def set_disconnected(self):
         """Switch back to advertising mode.
@@ -120,6 +115,8 @@ class EmulatedDevice:
         elif self.__next_adv_type == "scan" and self.__scan_data is not None:
             self.__next_adv_type = "adv"
             return (AdvType.ADV_SCAN_RSP, self.__scan_data)
+        # Failure
+        return None
 
     ##
     # Connected mode

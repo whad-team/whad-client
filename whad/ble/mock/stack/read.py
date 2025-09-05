@@ -9,18 +9,20 @@ from typing import List
 from scapy.packet import Packet
 from scapy.layers.bluetooth import ATT_Error_Response, ATT_Read_Request, ATT_Read_Response
 
+from whad.ble.stack.att.constants import BleAttErrorCode, BleAttOpcode
+
 from .attribute import find_attr_by_handle
-from .procedure import Procedure, UnexpectedProcError, BleClientProcedure, BleServerProcedure
+from .procedure import UnexpectedProcError, BleClientProcedure, BleServerProcedure
 
 class ServerReadProcedure(BleServerProcedure):
     """ATT server Read procedure."""
 
     # Read operation code
-    OPCODE = 0x0A
+    OPCODE = BleAttOpcode.READ_REQUEST
 
     def __init__(self, attributes: list, mtu: int):
         """Initialize our server Read procedure."""
-        super().__init__(attributes, mtu)
+        super().__init__( attributes, mtu)
 
     @classmethod
     def trigger(cls, request) -> bool:
@@ -32,7 +34,7 @@ class ServerReadProcedure(BleServerProcedure):
 
         # Sanity check
         if ATT_Read_Request not in request:
-            self.set_state(Procedure.STATE_ERROR)
+            self.set_state(self.states.ERROR)
             raise UnexpectedProcError()
 
         # Extract Read request
@@ -47,18 +49,20 @@ class ServerReadProcedure(BleServerProcedure):
             if attrib.readable():
                 # Attribute is found, return a ReadResponse and mark procedure
                 # as done.
-                self.set_state(Procedure.STATE_DONE)
+                self.set_state(self.states.DONE)
                 return [ ATT_Read_Response(value=attrib.value[:self.mtu]) ]
             else:
                 # Read not allowed
-                self.set_state(Procedure.STATE_DONE)
-                return self.att_error_response(request.gatt_handle, Procedure.ERR_READ_NOT_PERMITTED)
+                self.set_state(self.states.DONE)
+                return self.att_error_response(request.gatt_handle, BleAttErrorCode.READ_NOT_PERMITTED)
         except IndexError:
-            self.set_state(Procedure.STATE_DONE)
-            return self.att_error_response(request.gatt_handle, Procedure.ERR_ATTR_NOT_FOUND)
+            self.set_state(self.states.DONE)
+            return self.att_error_response(request.gatt_handle, BleAttErrorCode.ATTRIBUTE_NOT_FOUND)
 
 class ClientReadProcedure(BleClientProcedure):
     """GATT Client Read procedure."""
+
+    OPCODE = BleAttOpcode.READ_RESPONSE
 
     def __init__(self, handle: int):
         """Initialize a GATT client Read procedure.
@@ -75,10 +79,10 @@ class ClientReadProcedure(BleClientProcedure):
         """Process incoming packet."""
         if ATT_Error_Response in request:
             self.set_result(request[ATT_Error_Response])
-            self.set_state(Procedure.STATE_ERROR)
+            self.set_state(self.states.ERROR)
         elif ATT_Read_Response in request:
             response = request[ATT_Read_Response]
             self.set_result(response.value)
-            self.set_state(Procedure.STATE_DONE)
+            self.set_state(self.states.DONE)
         return []
 

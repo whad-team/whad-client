@@ -3,7 +3,10 @@
 import pytest
 from typing import Type
 
-from scapy.layers.bluetooth import ATT_Error_Response, ATT_Find_By_Type_Value_Response, ATT_Handle_Value_Notification, ATT_Read_By_Type_Response
+from scapy.layers.bluetooth import (
+    ATT_Error_Response, ATT_Find_By_Type_Value_Response, ATT_Handle_Value_Indication, ATT_Handle_Value_Notification,
+    ATT_Read_By_Type_Response, ATT_Hdr
+)
 
 from whad.ble.mock.peripheral import PeripheralMock
 from whad.ble import BDAddress, Peripheral
@@ -50,8 +53,8 @@ def profile() -> Type[GenericProfile]:
             ),
             rx=Characteristic(
                 uuid=UUID("6d02b602-1b51-4ef9-b753-1399e05debfd"),
-                permissions=['notify', 'indicate'],
-                notify=True,
+                permissions=['indicate'],
+                indicate=True,
                 value=b"\x00\x00\x00\x00",
             )
         )
@@ -256,7 +259,7 @@ def test_read(connected_peripheral):
     mock:PeripheralMock = connected_peripheral.device
 
     # Send a valid Read request
-    result = mock.read(3)
+    result = mock.read_attr(3)
     assert result == b"EmulatedDevice"
 
 def test_read_invalid_handle(connected_peripheral):
@@ -265,7 +268,7 @@ def test_read_invalid_handle(connected_peripheral):
     mock:PeripheralMock = connected_peripheral.device
 
     # Send a Read request with an invalid handle (0)
-    result = mock.read(0)
+    result = mock.read_attr(0)
     assert isinstance(result, ATT_Error_Response)
     assert result.request == BleAttOpcode.READ_REQUEST
     assert result.ecode == BleAttErrorCode.INVALID_HANDLE
@@ -277,7 +280,7 @@ def test_read_not_permitted(connected_peripheral):
     mock:PeripheralMock = connected_peripheral.device
 
     # Send a Read request on an attribute without read permission
-    result = mock.read(10)
+    result = mock.read_attr(10)
     assert isinstance(result, ATT_Error_Response)
     assert result.request == BleAttOpcode.READ_REQUEST
     assert result.ecode == BleAttErrorCode.READ_NOT_PERMITTED
@@ -417,7 +420,7 @@ def test_write(connected_peripheral):
     mock:PeripheralMock = connected_peripheral.device
 
     # Send a valid Write request
-    result = mock.write(3, b"Foobar")
+    result = mock.write_attr(3, b"Foobar")
     assert result
     # Read profile characteristic value
     charval = connected_peripheral.profile.find_object_by_handle(3)
@@ -429,7 +432,7 @@ def test_write_invalid_handle(connected_peripheral):
     mock:PeripheralMock = connected_peripheral.device
 
     # Send a Write request with invalide handle (0)
-    result = mock.write(0, b"Foobar")
+    result = mock.write_attr(0, b"Foobar")
     assert isinstance(result, ATT_Error_Response)
     assert result.request == BleAttOpcode.WRITE_REQUEST
     assert result.ecode == BleAttErrorCode.INVALID_HANDLE
@@ -441,7 +444,7 @@ def test_write_unknown_handle(connected_peripheral):
     mock:PeripheralMock = connected_peripheral.device
 
     # Send a Write request with an unknown handle
-    result = mock.write(120, b"Foobar")
+    result = mock.write_attr(120, b"Foobar")
     assert isinstance(result, ATT_Error_Response)
     assert result.request == BleAttOpcode.WRITE_REQUEST
     assert result.ecode == BleAttErrorCode.ATTRIBUTE_NOT_FOUND
@@ -453,7 +456,7 @@ def test_write_cmd(connected_peripheral):
     mock:PeripheralMock = connected_peripheral.device
 
     # Send a valid WriteCommand request
-    result = mock.write_cmd(3, b"Foobar")
+    mock.write_cmd(3, b"Foobar")
     # Read profile characteristic value
     charval = connected_peripheral.profile.find_object_by_handle(3)
     assert charval.value == b"Foobar"
@@ -500,7 +503,19 @@ def test_notification_sub(connected_peripheral):
 
 
 def test_indication_sub(connected_peripheral):
-    """Test indication subscription."""
+    """Test indication subscription.
+    1. Central subscribes to a characteristic with indicate permission
+    2. peripheral updates this characteristic value and send indication to central
+    3. central must answers with a confirmation
+    """
+    # Retrieve mock from current peripheral
+    mock: PeripheralMock = connected_peripheral.device
+
+    # Start our dedicated indication check procedure from central
+    charac = connected_peripheral.profile.find_object_by_handle(11)
+    result = mock.sub_ind(13, charac)
+
+    assert isinstance(result, ATT_Handle_Value_Indication)
 
 def test_remote_profile_discovery(connected_peripheral):
     """Test remote GATT profile discovery."""
@@ -531,7 +546,7 @@ def test_remote_profile_discovery(connected_peripheral):
 
     # Discovery characteristics for each service
     for serv_handle, serv_params  in services.items():
-        serv_uuid, end_handle = serv_params
+        _, end_handle = serv_params
 
         # Discover characteristics
         services_chars[serv_handle] = []

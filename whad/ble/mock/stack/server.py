@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 class GattServer:
     """Tiny GATT server"""
 
-    def __init__(self, l2cap: 'Llcap'):
+    def __init__(self, l2cap: 'Llcap' = None):
         """Initialize a GATT server."""
         ###
         # Initialize GATT attributes
@@ -75,7 +75,7 @@ class GattServer:
 
             # RX Characteristic
             Characteristic(11, UUID("6d02b602-1b51-4ef9-b753-1399e05debfd"), value_handle=12, properties=(
-                Characteristic.PROP_READ | Characteristic.PROP_NOTIFY | Characteristic.PROP_INDICATE
+                Characteristic.PROP_READ |  Characteristic.PROP_NOTIFY | Characteristic.PROP_INDICATE
             )),
             CharacteristicValue(12, UUID("6d02b602-1b51-4ef9-b753-1399e05debfd"), b"\x00\x00\x00\x00"),
             ClientCharacteristicConfigurationDescriptor(13),
@@ -108,6 +108,10 @@ class GattServer:
         """Server Attributes."""
         return self.__attributes
 
+    def set_l2cap(self, obj):
+        """Set L2CAP layer for this GattClient."""
+        self.__l2cap = obj
+
     def on_pdu(self, request: Packet) -> list[Packet]:
         """Process incoming request."""
         # Find a suitable procedure if none in progress
@@ -135,3 +139,4 @@ class GattServer:
         else:
             logger.warning("[ble::mock::stack::gatt_server] No procedure to handle packet ! (%s)", request)
             return []
+

@@ -26,14 +26,14 @@ from .read import ClientReadProcedure
 from .write import ClientWriteProcedure
 from .writecmd import ClientWriteCommandProcedure
 from .find_info import ClientFindInformationProcedure, ClientFindByTypeValueProcedure
-from .notif import ClientNotificationCheckProcedure
+from .notif import ClientNotificationCheckProcedure, ClientIndicationCheckProcedure
 
 logger = logging.getLogger(__name__)
 
 class GattClient:
     """Tiny GATT client"""
 
-    def __init__(self, l2cap: 'Llcap'):
+    def __init__(self, l2cap: 'Llcap' = None):
         """Initialize a GATT client."""
 
         self.__l2cap = l2cap
@@ -54,12 +54,17 @@ class GattClient:
             ClientFindInformationProcedure,
             ClientFindByTypeValueProcedure,
             ClientNotificationCheckProcedure,
+            ClientIndicationCheckProcedure,
         ]
 
     @property
     def attributes(self) -> List[Attribute]:
         """Remote server attributes."""
         return self.__attributes
+
+    def set_l2cap(self, obj):
+        """Set L2CAP layer for this GattClient."""
+        self.__l2cap = obj
 
     def on_pdu(self, request: Packet) -> List[Packet]:
         """Process incoming response/error."""
@@ -75,7 +80,7 @@ class GattClient:
 
             # Automatically add ATT_Hdr()
             if isinstance(answers, list):
-                return [ ATT_Hdr()/ans for ans in answers ]
+                return [ ATT_Hdr()/ans if ATT_Hdr not in ans else ans for ans in answers]
             else:
                 # Should not happen so raise an exception
                 raise UnexpectedProcError()
@@ -202,6 +207,16 @@ class GattClient:
         """Subscribe to notification for the specified handler."""
         # Initiate a ClientNotificationCheckProcedure
         self.__cur_procedure = ClientNotificationCheckProcedure(handle)
+
+        # Generate ATT packets to send when this procedure is initiated
+        # and forward them to the underlying link-layer
+        for req in self.__cur_procedure.initiate():
+            self.__l2cap.send_pdu(ATT_Hdr()/req)
+
+    def sub_ind(self, handle: int):
+        """Subscribe to notification for the specified handler."""
+        # Initiate a ClientNotificationCheckProcedure
+        self.__cur_procedure = ClientIndicationCheckProcedure(handle)
 
         # Generate ATT packets to send when this procedure is initiated
         # and forward them to the underlying link-layer

@@ -16,15 +16,14 @@ from whad.exceptions import WhadDeviceDisconnected, WhadDeviceNotReady
 from whad.hub.ble.address import SetBdAddress
 from whad.hub.ble.mode import PeriphMode, BleStart, BleStop
 from whad.hub.ble.connect import Connected
-from whad.hub.ble import AddressType, BDAddress, Commands, Direction
+from whad.hub.ble import BDAddress, Commands, Direction
 from whad.hub.ble.pdu import BlePduReceived, SetAdvData, SendBlePdu, BlePduReceived
 from whad.hub.generic.cmdresult import Success, Error, WrongMode
 from whad.hub.discovery import Capability, Domain, DeviceType
 from whad.ble.profile.attribute import UUID
 from whad.ble.profile.characteristic import Characteristic
 
-from .stack.client import GattClient
-from .stack.l2cap import Llcap
+from .stack.l2cap import LlcapClient
 
 # Create logger for this module.
 logger = logging.getLogger(__name__)
@@ -127,7 +126,7 @@ class PeripheralMock(MockDevice):
             self.put_message(msg)
 
             # Initialize an emulated L2CAP connection
-            self.__l2cap = Llcap(GattClient, self.__conn_handle)
+            self.__l2cap = LlcapClient(self.__conn_handle)
             self.__client = self.__l2cap.get_gatt()
 
             # Success
@@ -149,6 +148,22 @@ class PeripheralMock(MockDevice):
             ))
         return messages
 
+    def wait_procedure(self, timeout: float = 1.0):
+        """Retrieve waiting PDUs from L2CAP layer and convert them to messages and send them to the
+        attached connector, then wait for the current procedure to complete."""
+        if self.__l2cap is None:
+            logger.warning("[PeripheralMock] wait_procedure(): L2CAP layer has not been instantiated.")
+            return None
+        elif self.__client is None:
+            logger.warning("[PeripheralMock] wait_procedure(): GATT client object not instantiated.")
+        else:
+            messages = self.to_messages(self.__l2cap.get_pdus())
+            for msg in messages:
+                self.put_message(msg)
+
+            # Wait for the client procedure to terminate
+            return self.__client.wait_procedure(timeout=timeout)
+
     def read_by_group_type(self, group_uuid: UUID, start_handle: int, end_handle: int):
         """Emulate a ReadGroupByType procedure initiated by a remote central.
 
@@ -157,98 +172,74 @@ class PeripheralMock(MockDevice):
         """
         # Start a ReadGroupByType procedure from an emulated central device."""
         self.__client.read_by_group_type(group_uuid, start_handle, end_handle)
-
-        # Retrieve waiting packets from L2CAP layer and convert them to messages,
-        # and send them to the attached connector (if any)
-        messages = self.to_messages(self.__l2cap.get_pdus())
-        for msg in messages:
-            self.put_message(msg)
-
-        # Wait for the client procedure to terminate
-        return self.__client.wait_procedure(timeout=1.0)
+        return self.wait_procedure()
 
     def read_by_type(self, start_handle: int, end_handle: int, type_uuid: UUID):
         """Emulate a ReadByType procedure initiated by a remote central."""
         # Start a ReadByType procedure from an emulated central device.
         self.__client.read_by_type(start_handle, end_handle, type_uuid)
+        return self.wait_procedure()
 
-        # Retrieve waiting packets from L2CAP layer and convert them to messages,
-        # and send them to the attached connector (if any)
-        messages = self.to_messages(self.__l2cap.get_pdus())
-        for msg in messages:
-            self.put_message(msg)
-
-        # Wait for the client procedure to terminate
-        return self.__client.wait_procedure(timeout=1.0)
-
-    def read(self, handle: int):
+    def read_attr(self, handle: int):
         """Emulate a Read procedure initiated by a remote central."""
         # Start a Read procedure from an emulated central device.
         self.__client.read(handle)
-
-        # Retrieve waiting packets from L2CAP layer and convert them to messages,
-        # and send them to the attached connector (if any)
-        messages = self.to_messages(self.__l2cap.get_pdus())
-        for msg in messages:
-            self.put_message(msg)
-
-        # Wait for the client procedure to terminate
-        return self.__client.wait_procedure(timeout=1.0)
+        return self.wait_procedure()
 
     def read_blob(self, handle: int, offset: int):
         """Emulate a ReadBlob procedure initiated by a remote central."""
         # Start a ReadBlob procedure from an emulated central device.
         self.__client.read_blob(handle, offset)
+        return self.wait_procedure()
 
-        # Retrieve waiting packets from L2CAP layer and convert them to messages,
-        # and send them to the attached connector (if any)
-        messages = self.to_messages(self.__l2cap.get_pdus())
-        for msg in messages:
-            self.put_message(msg)
-
-        # Wait for the client procedure to terminate
-        return self.__client.wait_procedure(timeout=1.0)
-
-    def write(self, handle: int, value: bytes):
+    def write_attr(self, handle: int, value: bytes):
         """Emulate a Write procedure initiated by a remote central."""
         # Start a Write procedure from an emulated central device.
         self.__client.write(handle, value)
-
-        # Retrieve waiting packets from L2CAP layer and convert them to messages,
-        # and send them to the attached connector (if any)
-        messages = self.to_messages(self.__l2cap.get_pdus())
-        for msg in messages:
-            self.put_message(msg)
-
-        # Wait for the client procedure to terminate
-        return self.__client.wait_procedure(timeout=1.0)
+        return self.wait_procedure()
 
     def write_cmd(self, handle: int, value: bytes):
         """Emulate a WriteCommand procedure initiated by a remote central."""
         # Start a Write procedure from an emulated central device.
         self.__client.write_cmd(handle, value)
-
-        # Retrieve waiting packets from L2CAP layer and convert them to messages,
-        # and send them to the attached connector (if any)
-        messages = self.to_messages(self.__l2cap.get_pdus())
-        for msg in messages:
-            self.put_message(msg)
-
-        # Wait for the client procedure to terminate
-        return self.__client.wait_procedure(timeout=1.0)
+        return self.wait_procedure()
 
     def sub_notif(self, handle: int, charac: Characteristic):
         """Subscribe for notification by writing into the specified attribute (descriptor)."""
         # Start a NotificationCheck procedure
         self.__client.sub_notif(handle)
 
-        # Retrieve waiting packets from L2CAP layer and convert them to messages,
-        # and send them to the attached connector (if any)
-        messages = self.to_messages(self.__l2cap.get_pdus())
-        for msg in messages:
-            self.put_message(msg)
+        if self.__l2cap is None:
+            logger.warning("[PeripheralMock] wait_procedure(): L2CAP layer has not been instantiated.")
+            return None
+        elif self.__client is None:
+            logger.warning("[PeripheralMock] wait_procedure(): GATT client object not instantiated.")
+        else:
+            messages = self.to_messages(self.__l2cap.get_pdus())
+            for msg in messages:
+                self.put_message(msg)
 
-        # Update characteristic value (supposed to trigger a notification)
+        sleep(1)
+        charac.value = b"FOOBAR"
+
+        # Wait for the client procedure to terminate
+        return self.__client.wait_procedure(timeout=2.0)
+
+    def sub_ind(self, handle: int, charac: Characteristic):
+        """Subscribe for notification by writing into the specified attribute (descriptor)."""
+        # Start a NotificationCheck procedure
+        self.__client.sub_ind(handle)
+
+        if self.__l2cap is None:
+            logger.warning("[PeripheralMock] wait_procedure(): L2CAP layer has not been instantiated.")
+            return None
+        elif self.__client is None:
+            logger.warning("[PeripheralMock] wait_procedure(): GATT client object not instantiated.")
+        else:
+            messages = self.to_messages(self.__l2cap.get_pdus())
+            for msg in messages:
+                self.put_message(msg)
+
         sleep(1)
         charac.value = b"FOOBAR"
 
@@ -263,29 +254,13 @@ class PeripheralMock(MockDevice):
         """
         # Start a FindInformation procedure from an emulated central device.
         self.__client.find_information(start_handle, end_handle)
-
-        # Retrieve waiting packets from L2CAP layer and convert them to messages,
-        # and send them to the attached connector (if any)
-        messages = self.to_messages(self.__l2cap.get_pdus())
-        for msg in messages:
-            self.put_message(msg)
-
-        # Wait for the client procedure to terminate
-        return self.__client.wait_procedure(timeout=1.0)
+        return self.wait_procedure()
 
     def find_by_type_value(self, start_handle: int, end_handle: int, attr_type: UUID, attr_value: bytes):
         """Emulate a FindByType procedure initiated by a remote central."""
         # Start a FindInformation procedure from an emulated central device.
         self.__client.find_by_type_value(start_handle, end_handle, attr_type, attr_value)
-
-        # Retrieve waiting packets from L2CAP layer and convert them to messages,
-        # and send them to the attached connector (if any)
-        messages = self.to_messages(self.__l2cap.get_pdus())
-        for msg in messages:
-            self.put_message(msg)
-
-        # Wait for the client procedure to terminate
-        return self.__client.wait_procedure(timeout=1.0)
+        return self.wait_procedure()
 
     @MockDevice.route(PeriphMode)
     def on_periph_mode(self, message: PeriphMode):
@@ -320,12 +295,12 @@ class PeripheralMock(MockDevice):
             return Error()
 
     @MockDevice.route(SetAdvData)
-    def on_set_adv_data(self, adv_data: SetAdvData):
+    def on_set_adv_data(self, _: SetAdvData):
         """Handle SetAdvData message."""
         return Success()
 
     @MockDevice.route(SetBdAddress)
-    def on_set_bd_address(self, set_bd_address: SetBdAddress):
+    def on_set_bd_address(self, _: SetBdAddress):
         """Handle SetBdAddress."""
         return Success()
 
