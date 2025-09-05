@@ -18,10 +18,9 @@ states:
 
 """
 import logging
-from re import I
-from typing import Optional, Any, Callable, Self, List
+
+from typing import Optional, Any, Callable, Self, List, Type
 from threading import Event
-from enum import IntEnum
 
 from scapy.packet import Packet
 
@@ -37,6 +36,10 @@ def proc_state(state: int):
         setattr(f, "__state_handler", state)
         return f
     return _wrapper
+
+
+class UnexpectedProcError(Exception):
+    """Unexpected error occurred while executing a test procedure."""
 
 class ProcTimeoutError(Exception):
     """Procedure has not completed in due time."""
@@ -57,6 +60,8 @@ class ProcedureState:
     ERROR = 2
     CANCELED = 3
     USER = 4
+
+
 
 class ProcedureMetaclass(type):
     """Procedure metaclass used to automatically register handlers
@@ -102,6 +107,10 @@ class Procedure(metaclass=ProcedureMetaclass):
     Procedure is considered completed when its state is one of the terminal states:
     `ProcedureState.DONE`, `ProcedureState.ERROR` or `ProcedureState.CANCELED`.
     Waiting for procedure completion can be achieved by calling its `wait()` method.
+
+    States associated with the procedure class are defined in a pseudo-enum class
+    deriving from `ProcedureState` and set in the procedure class's `StatesEnum`
+    property.
     """
     # Handlers for various states
     STATE_HANDLERS = {}
@@ -119,6 +128,15 @@ class Procedure(metaclass=ProcedureMetaclass):
         self.__state = ProcedureState.UNDEFINED
         self.__result = None
         self.__completed = Event()
+
+    @classmethod
+    def get_states_enum(cls) -> Type[ProcedureState]:
+        return ProcedureState
+
+    @property
+    def states(self) -> Type[ProcedureState]:
+        """Associated procedure state enum."""
+        return self.get_states_enum()
 
     @classmethod
     def get_handler(cls, state: int) -> Optional[Callable[[Self, int, int], None]]:

@@ -35,154 +35,16 @@ be processed as soon as possible.
 
 """
 import logging
-from typing import List, Optional, Any
-from threading import Event
+from typing import List
 
 from scapy.packet import Packet
 from scapy.layers.bluetooth import ATT_Error_Response
 
-from whad.device.mock.procedure import StackProcedure
+from whad.device.mock.procedure import StackProcedure, ProcedureState, UnexpectedProcError
 
 from .attribute import Attribute
 
 logger = logging.getLogger(__name__)
-
-class UnexpectedProcError(Exception):
-    """Unexpected procedure error."""
-
-class Procedure:
-    """Generic procedure state machine."""
-
-    # Main states
-    STATE_INITIAL = 0
-    STATE_DONE = 1
-    STATE_ERROR = 2
-
-    # User states
-    STATE_USER = 3
-
-    # ATT Operation code (0 is invalid)
-    OPCODE = 0
-
-    # ATT Error codes
-    ERR_INVALID_HANDLE = 0x01
-    ERR_READ_NOT_PERMITTED = 0x02
-    ERR_WRITE_NOT_PERMITTED = 0x03
-    ERR_INVALID_PDU = 0x04
-    ERR_INSU_AUTHENT = 0x05
-    ERR_REQ_NOT_SUPP = 0x06
-    ERR_INVALID_OFFSET = 0x07
-    ERR_INSU_AUTHOR = 0x08
-    ERR_PREP_QUEUE_FULL = 0x09
-    ERR_ATTR_NOT_FOUND = 0x0A
-    ERR_ATTR_NOT_LONG = 0x0B
-    ERR_ENC_KEY_TOO_SHORT = 0x0C
-    ERR_INVALID_ATTR_LEN = 0x0D
-    ERR_UNLIKELY_ERROR = 0x0E
-    ERR_INSU_ENCRYPT = 0x0F
-    ERR_UNSUPP_GROUP_TYPE = 0x10
-    ERR_INSU_RESOURCES = 0x11
-    ERR_DB_OUT_OF_SYNC = 0x12
-    ERR_VALUE_NOT_ALLOWED = 0x13
-    ERR_APP_ERROR_BASE = 0x80
-    ERR_COMMON_PROF_BASE = 0xE0
-    ERR_TIMEOUT = 0xFF
-
-    def __init__(self, attributes: list, mtu: int):
-        """Initialization."""
-        # Initialize state to STATE_INITIAL
-        self.__state = Procedure.STATE_INITIAL
-
-        # Save attribute list
-        self.__attributes = attributes
-
-        # Save ATT MTU
-        self.__mtu = mtu
-
-        # Procedure terminated event
-        self.__terminated = Event()
-
-        # Procedure result
-        self.__result = None
-
-    @classmethod
-    def trigger(cls, request) -> bool:
-        """Trigger or not the procedure."""
-        logger.warning("[ble::stack::mock::Procedure] trigger method must be overriden")
-        logger.debug("[ble::stack::mock::Procedure] trigger() called with packet %s", bytes(request).hex())
-        return False
-
-    @property
-    def attributes(self) -> list[Attribute]:
-        """GATT attributes dictionary."""
-        return self.__attributes
-
-    @property
-    def mtu(self) -> int:
-        """ATT MTU."""
-        return self.__mtu
-
-    def get_state(self) -> int:
-        """Return current state."""
-        return self.__state
-
-    def set_state(self, state: int):
-        """Set procedure state."""
-        self.__state = state
-
-        # If procedure state is STATE_DONE or SATE_ERROR, procedure
-        # is considered as terminated.
-        if state in (self.STATE_DONE, self.STATE_ERROR):
-            self.__terminated.set()
-
-    def set_result(self, result: Any):
-        """Set procedure result. This result will be returned when the
-        procedure has terminated to the caller."""
-        self.__result = result
-
-    def att_error_response(self, handle: int, ecode: int) -> list[Packet]:
-        """
-        Generate an ATT error response.
-
-        :param handle: Attribute handle
-        :type handle: int
-        :param ecode: ATT error code as defined in Vol 3, Part F, section 3.3.3, Table 3.3
-        :type ecode: int
-        """
-        return [ATT_Error_Response(request=self.OPCODE, handle=handle, ecode=ecode)]
-
-    def error(self) -> bool:
-        """Determine if procedure is in error state."""
-        return self.__state == Procedure.STATE_ERROR
-
-    def done(self) -> bool:
-        """Determine if procedure is done."""
-        return self.__state == Procedure.STATE_DONE
-
-    def initiate(self) -> List[Packet]:
-        """Generate a list of ATT packets to send when this procedure
-        is initiated.
-
-        :return: List of packets (PDUs) to send following the procedure initiation.
-        :rtype: List
-        """
-        return []
-
-    def process_request(self, request: Packet) -> List[Packet]:
-        """Process a received ATT request/response.
-
-        :return: List of packets (PDUs) to send once the received PDUs processed.
-        :rtype: List
-        :raise UnexpectedProcError: An unexpected error occurred while processing incoming packets.
-        """
-        raise UnexpectedProcError(request)
-
-    def wait(self, timeout: Optional[float] = None) -> Optional[Any]:
-        """Wait for this procedure to terminate."""
-        if self.__terminated.wait(timeout=timeout):
-            return self.__result
-        else:
-            raise UnexpectedProcError(Procedure.ERR_TIMEOUT)
 
 class BleClientProcedure(StackProcedure):
     """Bluetooth Low Energy ATT Client procedure."""
@@ -190,8 +52,16 @@ class BleClientProcedure(StackProcedure):
     # ATT Operation code (0 is invalid)
     OPCODE = 0
 
+    class States(ProcedureState):
+        """BLE ATT Client states."""
+        SUB_DONE = ProcedureState.USER
+
     def __init__(self, packets: List[Packet]):
         super().__init__(packets)
+
+    @property
+    def states(self):
+        return BleClientProcedure.States
 
     def done(self) -> bool:
         """
@@ -220,52 +90,15 @@ class BleClientProcedure(StackProcedure):
         """
         raise UnexpectedProcError(request)
 
-class BleServerProcedure:
+class BleServerProcedureState(ProcedureState):
+    """States specific to BLE server write procedure. """
+    INDICATION_SENT = ProcedureState.USER
+
+class BleServerProcedure(StackProcedure):
     """Bluetooth Low Energy ATT Server procedure."""
 
     # ATT Operation code (0 is invalid)
     OPCODE = 0
-
-    # ATT Error codes
-    ERR_INVALID_HANDLE = 0x01
-    ERR_READ_NOT_PERMITTED = 0x02
-    ERR_WRITE_NOT_PERMITTED = 0x03
-    ERR_INVALID_PDU = 0x04
-    ERR_INSU_AUTHENT = 0x05
-    ERR_REQ_NOT_SUPP = 0x06
-    ERR_INVALID_OFFSET = 0x07
-    ERR_INSU_AUTHOR = 0x08
-    ERR_PREP_QUEUE_FULL = 0x09
-    ERR_ATTR_NOT_FOUND = 0x0A
-    ERR_ATTR_NOT_LONG = 0x0B
-    ERR_ENC_KEY_TOO_SHORT = 0x0C
-    ERR_INVALID_ATTR_LEN = 0x0D
-    ERR_UNLIKELY_ERROR = 0x0E
-    ERR_INSU_ENCRYPT = 0x0F
-    ERR_UNSUPP_GROUP_TYPE = 0x10
-    ERR_INSU_RESOURCES = 0x11
-    ERR_DB_OUT_OF_SYNC = 0x12
-    ERR_VALUE_NOT_ALLOWED = 0x13
-    ERR_APP_ERROR_BASE = 0x80
-    ERR_COMMON_PROF_BASE = 0xE0
-    ERR_TIMEOUT = 0xFF
-
-    def __init__(self, attributes: list, mtu: int):
-        """Initialization."""
-        # Initialize state to STATE_INITIAL
-        self.__state = Procedure.STATE_INITIAL
-
-        # Save attribute list
-        self.__attributes = attributes
-
-        # Save ATT MTU
-        self.__mtu = mtu
-
-        # Procedure terminated event
-        self.__terminated = Event()
-
-        # Procedure result
-        self.__result = None
 
     @classmethod
     def trigger(cls, request) -> bool:
@@ -273,6 +106,24 @@ class BleServerProcedure:
         logger.warning("[ble::stack::mock::Procedure] trigger method must be overriden")
         logger.debug("[ble::stack::mock::Procedure] trigger() called with packet %s", bytes(request).hex())
         return False
+
+
+    def __init__(self, attributes: list, mtu: int = 23):
+        """Initialization.
+
+        :param  attributes: GATT server attributes
+        :param  attributes: dict
+        :param  mtu: Maximum transmission unit
+        :type   mtu: int, optional
+        """
+        # Call parent init method.
+        super().__init__([])
+
+        # Save attribute list
+        self.__attributes = attributes
+
+        # Save ATT MTU
+        self.__mtu = mtu
 
     @property
     def attributes(self) -> list[Attribute]:
@@ -283,6 +134,18 @@ class BleServerProcedure:
     def mtu(self) -> int:
         """ATT MTU."""
         return self.__mtu
+
+    @property
+    def states(self):
+        """Specify the states enum for this procedure."""
+        return BleServerProcedureState
+
+    def done(self) -> bool:
+        """
+        Determine if the procedure has completed.
+
+        TODO: replace with call to success() in other dependencies."""
+        return self.success()
 
     def att_error_response(self, handle: int, ecode: int) -> list[Packet]:
         """
