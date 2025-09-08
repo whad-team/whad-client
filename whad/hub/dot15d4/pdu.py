@@ -2,6 +2,7 @@
 """
 from struct import pack
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
+from whad.hub.dot15d4.events import DiscoveryEvt
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool
 from whad.hub.dot15d4 import Dot15d4Domain, Dot15d4Metadata
@@ -205,3 +206,21 @@ class RawPduReceived(PbMessageWrapper):
 
         # Return metadata
         return msg
+    
+@pb_bind(Dot15d4Domain, 'discovered_communication', 3)
+class DiscoveredCommunication(PbMessageWrapper):
+    """
+    Dot15d4 Discovery of a communication on an undefined channel notification
+    """
+    pdu = PbFieldBytes('dot15d4.discovered_communication.pdu')
+    slot= PbFieldInt("dot15d4.discovered_communication.slot")
+    offset= PbFieldInt("dot15d4.discovered_communication.offset")
+
+    def to_event(self) -> DiscoveryEvt:
+        """Convert this message into a WHAD event.
+        """
+        return DiscoveryEvt(
+            pdu=self.pdu,
+            slot=self.slot,
+            offset=self.offset
+        )

@@ -1,6 +1,7 @@
 from collections import defaultdict
 import threading
 from time import sleep
+from whad.dot15d4.connector import Dot15d4FCS
 from whad.wirelesshart.connector.link import Link
 from whad.wirelesshart.connector.superframes import Superframe
 
@@ -19,7 +20,7 @@ class LinkExplorer():
         self._running = True
         self._lock = threading.Lock()
         self._thread = threading.Thread(target=self._monitor_communications, daemon=True)
-        #self._thread.start()
+        self._thread.start()
 
     def stop(self):
         self._running = False
@@ -35,13 +36,14 @@ class LinkExplorer():
     def delete_superframe(self, sf_id):
        self._superframes_info = [item for item in self._superframes_info if item[1] != sf_id]
        
-    def discovered_communication(self, src, dst, slot, offset):
+    def discovered_communication(self, pdu:bytes, slot, offset):
         """
         Called when the sniffer receives an unexpected communication between two nodes.
         """
+        pkt = Dot15d4FCS(pdu)
                 
         #create link
-        link = Link(src, slot, offset, dst, type=Link.TYPE_DISCOVERY)
+        link = Link(pkt.src, slot, offset, pkt.dest, type=Link.TYPE_DISCOVERY)
 
         with self._lock:
             if slot > len(self._discovered_communication):
