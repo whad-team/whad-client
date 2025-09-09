@@ -1,3 +1,8 @@
+"""
+Logitech Unifying packets's definition classes for Scapy.
+"""
+import logging
+
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ByteField, XByteField, X3BytesField, IntField, \
     StrFixedLenField, ShortField, ByteEnumField, XShortField, XShortEnumField, \
@@ -6,6 +11,8 @@ from struct import pack
 
 from whad.scapy.layers.esb import ESB_Payload_Hdr, SBAddressField, ESB_Ping_Request, \
     guess_payload_class_esb
+
+logger = logging.getLogger(__name__)
 
 class Logitech_Unifying_Hdr(Packet):
     name = "Logitech Unifying Payload"
@@ -220,7 +227,16 @@ bind_layers(Logitech_Unifying_Hdr, Logitech_Pairing_Complete_Payload,         fr
 
 
 def bind():
-    ESB_Payload_Hdr.guess_payload_class = guess_payload_class_unifying
+    """Override the ESB_Payload_Hdr payload guessing function with ours.
+    This will allow ESB PDU parsing to detect the Unifying payloads."""
+    # Check if current payload class guessing function is already set to ours,
+    # and update it if it is not the case.
+    if ESB_Payload_Hdr.guess_payload_class != guess_payload_class_unifying:
+        ESB_Payload_Hdr.guess_payload_class = guess_payload_class_unifying
+        logger.debug("ESB_Payload_Hdr's payload guessing function has been updated to detect Unifying packets.")
 
 def unbind():
+    """Restore the original payload class guessing function for ESB_Payload_Hdr."""
     ESB_Payload_Hdr.guess_payload_class = guess_payload_class_esb
+    logger.debug("ESB_Payload_Hdr's payload class guessing function has been restored to detect only ESB packets.")
+
