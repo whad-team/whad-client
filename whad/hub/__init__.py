@@ -9,11 +9,27 @@ to protobuf messages fields.
 """
 import logging
 from typing import Union
-from whad.protocol.whad_pb2 import Message
+from enum import StrEnum
+
+
 from google.protobuf.message import DecodeError
+from scapy.config import conf
+
+from whad.protocol.whad_pb2 import Message
 from .registry import Registry
 
 logger = logging.getLogger(__name__)
+
+class Domain(StrEnum):
+    """Supported protocols."""
+
+    BLE = 'ble'
+    DOT15D4 = 'dot15d4'
+    ESB = 'esb'
+    PHY = 'phy'
+    RF4CE = 'rf4ce'
+    UNIFYING = 'unifying'
+    ZIGBEE = 'zigbee'
 
 class ProtocolHub(Registry):
     """WHAD Protocol Hub class
@@ -26,6 +42,22 @@ class ProtocolHub(Registry):
     NAME = 'hub'
     LAST_VERSION = 2
     VERSIONS = {}
+
+    @staticmethod
+    def set_domain(domain: Domain):
+        """Configure the hub for a specific domain.
+
+        This is where we can handle any specific configuration of Scapy
+        layers if required.
+
+        :param  domain: Domain to use
+        :type   domain: Domain
+        """
+        # Specify the chosen dot15d4 protocol, if specified
+        if domain == Domain.RF4CE:
+            conf.dot15d4_protocol = 'rf4ce'
+        elif domain == Domain.ZIGBEE:
+            conf.dot15d4_protocol = 'zigbee'
 
     def __init__(self, proto_version: int = LAST_VERSION):
         """Instantiate a WHAD protocol hub for a specific version.
