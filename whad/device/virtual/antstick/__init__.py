@@ -264,12 +264,13 @@ class ANTStickDevice(VirtualDevice):
             if self.__opened_stream:
                 while not self.__event_queue.empty():
                     event = ANTStick_Message(self.__event_queue.get())
-                    if event.message_code in (3, 5,6,10):
+                    if event.message_code in (2,3,5,6,10):
                         self._send_whad_ant_channel_event(event.channel_number, event.message_code)
                     #print("Event:", repr(event))
                     if event.message_code == 7 and self.__channels[event.channel_number].opened: # event_channel_closed
                         self.__reload_channel = event.channel_number
                     elif event.message_code in (5,6) + (4,10,17):
+
                         self.__ack_queue.put(bytes(event))
                     # acked: event_transfer_tx_completed or event_transfer_tx_failed  
                 while not self.__pdu_queue.empty():
@@ -515,12 +516,13 @@ class ANTStickDevice(VirtualDevice):
 
         if self.__channels[channel_number].opened:
             self._close_channel(channel_number)
-
+        
         response = self._antstick_send_command(ANTStick_Command_Assign_Channel(
                 channel_number=channel_number, 
                 network_number=network_number, 
                 channel_type=channel_type
-            ) / 
+            )
+             / 
             ANTStick_Extended_Assignment_Extension(
                 extended_assignment = 0x20 # | (0x01 if background_scanning else 0x00)
             ) # for some reason transmission doesn't work without async mode so let's hardcode it
@@ -696,8 +698,8 @@ class ANTStickDevice(VirtualDevice):
 
     def _antstick_send_command(self, command, rsp_filter=lambda p:True, force_reset=False, timeout=200, no_response=False):
         data = bytes(ANTStick_Message() / command)
-        #print(">", bytes(data))
-        #print(repr(ANTStick_Message(data)))
+        print(">", bytes(data))
+        print(repr(ANTStick_Message(data)))
 
         while True:
             try:
@@ -739,8 +741,8 @@ class ANTStickDevice(VirtualDevice):
                 self.__response_queue.put(msg)
                 msg = self.__response_queue.get()
 
-            #print("<", msg.hex())
-            #print(repr(ANTStick_Message(msg)))
+            print("<", msg.hex())
+            print(repr(ANTStick_Message(msg)))
             return ANTStick_Message(msg)
 
     def _antstick_read_message(self, timeout=200):
@@ -879,6 +881,7 @@ class ANTStickDevice(VirtualDevice):
         ):
             self._send_whad_command_result(CommandResult.ERROR)
 
+        print("success")
         self._send_whad_command_result(CommandResult.SUCCESS)
 
 
@@ -900,7 +903,7 @@ class ANTStickDevice(VirtualDevice):
         if len(message.network_key) != 8 and not is_valid_network_key(message.network_key):
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
-        if self._set_network_key(
+        if not self._set_network_key(
             network_number = message.network_number, 
             network_key = message.network_key
         ):
@@ -915,7 +918,7 @@ class ANTStickDevice(VirtualDevice):
         if message.rf_channel < 0 or message.rf_channel > 125:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
-        if self._set_channel_rf_channel(
+        if not self._set_channel_rf_channel(
             channel_number = message.channel_number, 
             rf_channel = message.rf_channel
         ):
@@ -931,7 +934,7 @@ class ANTStickDevice(VirtualDevice):
         if message.device_number < 0 or message.device_number > 0xFFFF:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
-        if self._set_channel_id(
+        if not self._set_channel_id(
             channel_number = message.channel_number, 
             device_number = message.device_number
         ):
@@ -947,7 +950,7 @@ class ANTStickDevice(VirtualDevice):
         if message.device_type < 0 or message.device_type > 0xFF:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
-        if self._set_channel_id(
+        if not self._set_channel_id(
             channel_number = message.channel_number, 
             device_type = message.device_type
         ):
@@ -963,7 +966,7 @@ class ANTStickDevice(VirtualDevice):
         if message.transmission_type < 0 or message.transmission_type > 0xFF:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
-        if self._set_channel_id(
+        if not self._set_channel_id(
             channel_number = message.channel_number, 
             transmission_type = message.transmission_type
         ):
@@ -980,7 +983,7 @@ class ANTStickDevice(VirtualDevice):
         if message.channel_period < 0 or message.channel_period > 0xFFFF:
             self._send_whad_command_result(CommandResult.PARAMETER_ERROR)
 
-        if self._set_channel_period(
+        if not self._set_channel_period(
             channel_number = message.channel_number, 
             period = message.channel_period
         ):
@@ -1029,15 +1032,14 @@ class ANTStickDevice(VirtualDevice):
                     
                     while self.__ack_queue.empty():
                         sleep(0.001)
-                        ack_event = ANTStick_Message(self.__ack_queue.get())
-                        if ack_event.message_code == 6:
-                            self._send_whad_command_result(CommandResult.ERROR)
-                            return
-                        elif ack_event.message_code == 5:
-                            self._send_whad_command_result(CommandResult.SUCCESS)
-                            return
-                        else:
-                            pass
+                    ack_event = ANTStick_Message(self.__ack_queue.get())
+                    print("ACKEVENT", ack_event)
+                    if ack_event.message_code == 6:
+                        self._send_whad_command_result(CommandResult.ERROR)
+                        return
+                    else:
+                        self._send_whad_command_result(CommandResult.SUCCESS)
+                        return
                 else:        
                     self._antstick_send_command(
                         ANTStick_Data_Acknowledged_Data(

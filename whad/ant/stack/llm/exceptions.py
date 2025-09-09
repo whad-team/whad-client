@@ -3,3 +3,6 @@ class NoAvailableChannels(Exception):
 
 class NoAvailableNetworks(Exception):
     pass
+
+class InvalidChannel(Exception):
+    pass

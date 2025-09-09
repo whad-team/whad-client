@@ -1,6 +1,6 @@
 import logging
 from typing import Generator
-from time import time
+from time import time, sleep
 
 from scapy.packet import Packet
 
@@ -15,9 +15,9 @@ from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
 
 logger = logging.getLogger(__name__)
 
-class Master(ANT):
+class Slave(ANT):
     """
-    ANT connector to emulate an ANT Master node.
+    ANT connector to emulate an ANT Slave node.
     """
 
     def __init__(self, device):
@@ -54,7 +54,7 @@ class Master(ANT):
         if self.__started:
             super().start()
 
-    def create_channel(
+    def search_channel(
         self,
         device_number,
         device_type,
@@ -66,7 +66,7 @@ class Master(ANT):
         shared = False,
         background = False
     ):
-        channel = self.stack.get_layer('ll').create_channel(
+        channel = self.stack.get_layer('ll').search_channel(
             device_number = device_number, 
             device_type = device_type,
             transmission_type = transmission_type,
@@ -79,16 +79,20 @@ class Master(ANT):
         )
         if channel is not None:
             self._enable_role()
+
+            while not channel.is_opened():
+                sleep(0.1)
+
         return channel 
                
 
     def start(self):
-        """Start Master mode.
+        """Start Slave  mode.
         """
         self.__started = True
 
     def stop(self):
-        """Stop Master mode.
+        """Stop Slave mode.
         """
         self.__started = False
 

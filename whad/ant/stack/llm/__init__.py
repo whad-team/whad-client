@@ -16,9 +16,10 @@ from whad.scapy.layers.ant import ANT_Hdr
 from whad.ant.channel import ChannelDirection
 from whad.hub.ant import ChannelEventCode
 from whad.common.stack import Layer, alias, source, state, LayerState, instance
-from whad.ant.stack.llm.exceptions import NoAvailableChannels, NoAvailableNetworks
+from whad.ant.stack.llm.exceptions import NoAvailableChannels, NoAvailableNetworks, \
+    InvalidChannel
 from whad.ant.channel import ChannelDirection
-
+from queue import Queue
 from whad.ant.stack.app import AppLayer
 
 
@@ -56,6 +57,29 @@ class ANTChannel:
         self.__unidirectional = unidirectional
         self.__shared = shared
         self.__background = background
+
+        self.__transfer_events = Queue()
+        self.__opened = False
+
+    def mark_as_opened(self):
+        """Mark the channel as opened.
+        """
+        self.__opened = True
+
+    def is_opened(self):
+        """Indicates if the channel is open or not.
+        """
+        return self.__opened
+
+    def add_transfer_event(self, event):
+        """Add a transfer channel event to the related queue.
+        """
+        self.__transfer_events.put(event)
+
+    def get_pending_transfer_event(self):
+        """Return the next pending transfer channel event.
+        """
+        return self.__transfer_events.get()
 
     @property
     def app(self) -> AppLayer:
@@ -248,8 +272,64 @@ class LinkLayer(Layer):
         else:
             return None
 
-    # def search_channel(self, dev_number, dev_type, transmission_type):
-        # ...
+
+    def search_channel(
+        self,
+        device_number,
+        device_type,
+        transmission_type,
+        channel_period = 32768,
+        rf_channel = 57,
+        network_key = ANT_PLUS_NETWORK_KEY,
+        unidirectional = False,
+        shared = False,
+        background = False
+    ):
+        channel_number = self._next_available_channel_number()
+        if channel_number is None:
+            raise NoAvailableChannels()
+        
+        network_number = self.state.register_network(network_key)
+        if network_number >= self.get_layer('phy').max_networks:
+            raise NoAvailableNetworks()
+        
+        self.get_layer('phy').set_network_key(network_number, network_key)
+        self.get_layer('phy').set_device_number(channel_number, device_number)
+        self.get_layer('phy').set_device_type(channel_number, device_type)
+        self.get_layer('phy').set_transmission_type(channel_number, transmission_type)
+        
+        self.get_layer('phy').assign_channel(
+            channel_number,
+            network_number,
+            shared=shared,
+            direction=ChannelDirection.RX,
+            unidirectional=unidirectional
+        )
+        
+        self.get_layer('phy').set_rf_channel(channel_number, rf_channel)
+        self.get_layer('phy').set_channel_period(channel_number, channel_period)
+        self.get_layer('phy').open_channel(channel_number)
+    
+        # Instantiate a Applicative layer (contextual) to handle the channel
+        app_instance = self.instantiate(AppLayer)
+        app_instance.set_channel_number(channel_number)
+        print(app_instance)
+
+        channel = self.state.register_channel(
+            app_instance,
+            channel_number,
+            ChannelDirection.RX,
+            rf_channel,
+            device_number,
+            device_type,
+            transmission_type,
+            channel_period,
+            network_key,
+            unidirectional,
+            shared,
+            background
+        )
+        return channel
 
     def create_channel(
         self,
@@ -270,45 +350,174 @@ class LinkLayer(Layer):
         network_number = self.state.register_network(network_key)
         if network_number >= self.get_layer('phy').max_networks:
             raise NoAvailableNetworks()
+        
+        self.get_layer('phy').set_network_key(network_number, network_key)
+        self.get_layer('phy').set_device_number(channel_number, device_number)
+        self.get_layer('phy').set_device_type(channel_number, device_type)
+        self.get_layer('phy').set_transmission_type(channel_number, transmission_type)
+        
+        self.get_layer('phy').assign_channel(
+            channel_number,
+            network_number,
+            shared=shared,
+            direction=ChannelDirection.TX,
+            unidirectional=unidirectional)
+        
+        self.get_layer('phy').set_rf_channel(channel_number, rf_channel)
+        self.get_layer('phy').set_channel_period(channel_number, channel_period)
+        self.get_layer('phy').open_channel(channel_number)
+    
+        # Instantiate a Applicative layer (contextual) to handle the channel
+        app_instance = self.instantiate(AppLayer)
+        app_instance.set_channel_number(channel_number)
+        print(app_instance)
 
-        if ( 
-            self.get_layer('phy').set_network_key(network_number, network_key) and 
-            self.get_layer('phy').set_device_number(channel_number, device_number) and 
-            self.get_layer('phy').set_device_type(channel_number, device_type) and 
-            self.get_layer('phy').set_transmission_type(channel_number, transmission_type) and 
-            
-            self.get_layer('phy').assign_channel(
-                channel_number,
-                network_number,
-                shared=shared,
-                direction=ChannelDirection.TX,
-                unidirectional=unidirectional)  and 
-            
-            self.get_layer('phy').set_rf_channel(channel_number, rf_channel) and 
-            self.get_layer('phy').set_channel_period(channel_number, channel_period) and 
-            self.get_layer('phy').open_channel(channel_number)
-        ):
+        channel = self.state.register_channel(
+            app_instance,
+            channel_number,
+            ChannelDirection.TX,
+            rf_channel,
+            device_number,
+            device_type,
+            transmission_type,
+            channel_period,
+            network_key,
+            unidirectional,
+            shared,
+            background
+        )
+        channel.mark_as_opened()
+        return channel
 
-            # Instantiate a Applicative layer (contextual) to handle the channel
-            app_instance = self.instantiate(AppLayer)
-            app_instance.set_channel_number(channel_number)
-            print(app_instance)
+    @instance('app', tag='broadcast')
+    def _send_broadcast(self, l2cap_inst: Layer, channel_number:int, payload : bytes):
+        print(payload, channel_number, l2cap_inst)
+        return self.broadcast(channel_number, payload)
 
-            return self.state.register_channel(
-                app_instance,
-                channel_number,
-                ChannelDirection.TX,
-                rf_channel,
-                device_number,
-                device_type,
-                transmission_type,
-                channel_period,
-                network_key,
-                unidirectional,
-                shared,
-                background
+    def broadcast(self,channel_number, payload):
+        if channel_number not in self.state.channels:
+            raise InvalidChannel()
+
+        channel = self.state.channels[channel_number]
+        
+        payload = bytes(payload)
+        if len(payload) < 8:
+            payload = payload  + b"\x00" * (8 - len(payload))
+        elif len(payload) > 8:
+            payload = payload[:8]
+        
+        packet = (
+            ANT_Hdr(
+                device_number = channel.device_number, 
+                device_type = channel.device_type, 
+                transmission_type = channel.transmission_type, 
+                broadcast = 0,
+                ack = 0, 
+                end = 0,
+                count = 0, 
+                slot = True, 
+                unknown = 2
+
+            ) / payload
+        )
+        
+        return self.send('phy',
+            packet, 
+            channel_number = channel_number
+        )
+
+
+    @instance('app', tag='ack')
+    def _send_ack(self,l2cap_inst: Layer, channel_number:int, payload : bytes):
+        return self.ack(channel_number, payload)
+
+    def ack(self, channel_number, payload):
+        if channel_number not in self.state.channels:
+            raise InvalidChannel()
+
+
+        payload = bytes(payload)
+        if len(payload) < 8:
+            payload = payload  + b"\x00" * (8 - len(payload))
+        elif len(payload) > 8:
+            payload = payload[:8]
+
+        channel = self.state.channels[channel_number]
+
+        packet = (
+            ANT_Hdr(
+                device_number = channel.device_number, 
+                device_type = channel.device_type, 
+                transmission_type = channel.transmission_type, 
+                broadcast = "ack/burst", 
+                ack = 0, 
+                end = 1,
+                count = 0, 
+                slot = 1,
+                unknown = 2
+
+            ) / payload
+        )
+        
+        success = self.send('phy',
+            packet, 
+            channel_number = channel_number
+        )
+        event = channel.get_pending_transfer_event()
+        if event == ChannelEventCode.EVENT_TRANSFER_TX_COMPLETED:
+            return True
+        else:
+            return False
+
+
+
+    @instance('app', tag='burst')
+    def _send_burst(self, l2cap_inst: Layer, channel_number:int, payloads:tuple):
+        return self.burst(channel_number, *payloads)
+
+    def burst(self, channel_number, *payloads):
+        if channel_number not in self.state.channels:
+            raise InvalidChannel()
+
+        channel = self.state.channels[channel_number]
+
+        burst_payload = b""
+        for payload in payloads:
+            burst_payload += bytes(payload)
+        
+        packets = []
+        count = 0
+        for i in range(0, len(burst_payload), 8):
+            packets.append(
+                ANT_Hdr(
+                    device_number = channel.device_number, 
+                    device_type = channel.device_type, 
+                    transmission_type = channel.transmission_type, 
+                    broadcast = "ack/burst", 
+                    ack = 0, 
+                    end = 0,
+                    count = count, 
+                    slot = 0,
+                    unknown = 2
+                ) / burst_payload[i:i+8]
             )
-            
+            count = 1 - count
+        
+        if channel == ChannelDirection.TX:
+            packets[0].slot = 1
+
+        packets[-1].end = 1
+
+        for packet in packets:        
+            success = self.send('phy',
+                packet,
+                channel_number = channel_number
+            )
+        event = channel.get_pending_transfer_event()
+        if event == ChannelEventCode.EVENT_TRANSFER_TX_COMPLETED:
+            return True
+        else:
+            return False
 
     @property
     def app(self):
@@ -328,6 +537,12 @@ class LinkLayer(Layer):
         correct callbacks depending on the current mode.
         """
         print("[event] #%d, %s" % (channel_number, str(event)))
+        if channel_number in self.state.channels:
+            if event in (
+                ChannelEventCode.EVENT_TRANSFER_TX_COMPLETED, 
+                ChannelEventCode.EVENT_TRANSFER_TX_FAILED
+            ):
+                self.state.channels[channel_number].add_transfer_event(event)
 
     @source('phy')
     def on_pdu(self, pdu: ANT_Hdr, channel_number : int):
@@ -337,8 +552,10 @@ class LinkLayer(Layer):
         correct callbacks depending on the current mode.
         """
         if channel_number in self.state.channels:
+            if not self.state.channels[channel_number].is_opened():
+                self.state.channels[channel_number].mark_as_opened()
+
             app_instance = self.state.channels[channel_number].app
-            print(app_instance.name)
             self.send(app_instance.name, pdu)
 
 

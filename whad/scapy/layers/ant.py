@@ -300,7 +300,7 @@ class ANT_Hdr(Packet):
 
 		# Build the final frame
 		if self.crc_present == 1:
-			return p[:7] + p[9:] +pay  + pack("<H", self.crc)
+			return p[:7]  +pay  + pack("<H", self.crc)
 		else:
 			self.crc_present = 0x41
 			return p[:-1] + pay
