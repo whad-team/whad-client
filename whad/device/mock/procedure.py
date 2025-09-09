@@ -19,7 +19,7 @@ states:
 """
 import logging
 
-from typing import Optional, Any, Callable, Self, List, Type
+from typing import Optional, Any, Callable, List, Type
 from threading import Event
 
 from scapy.packet import Packet
@@ -139,7 +139,7 @@ class Procedure(metaclass=ProcedureMetaclass):
         return self.get_states_enum()
 
     @classmethod
-    def get_handler(cls, state: int) -> Optional[Callable[[Self, int, int], None]]:
+    def get_handler(cls, state: int) -> Optional[Callable[[int, int], None]]:
         """Retrieve the handler associated with a given state, if any."""
         if state in cls.STATE_HANDLERS:
             return cls.STATE_HANDLERS[state]
