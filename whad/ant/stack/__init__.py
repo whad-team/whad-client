@@ -216,6 +216,7 @@ class ANTStack(Layer):
         logger.debug('received a channel event for channel #%d: %d.', channel_number, str(event))
         self.get_layer('ll').on_channel_event(channel_number, event)
 
+
     @source('ll')
     def send_pdu(self,  packet: bytes, channel_number: int = 0, rf_channel: Optional[int] = None):
         """Send an ANT PDU
@@ -230,11 +231,10 @@ class ANTStack(Layer):
         logger.debug('transmitted a PDU (%d bytes).', len(packet))
 
         return self.__connector.send(
-                                        pdu,
+                                        packet,
                                         channel_number=channel_number,
                                         rf_channel=rf_channel,
                                         add_crc = True
         )
 
 ANTStack.add(LinkLayer)
-print(ANTStack.export())

@@ -4,9 +4,12 @@ from whad.ant.channel import ChannelDirection
 from whad.ant.crypto import ANT_PLUS_NETWORK_KEY
 from whad.device import WhadDevice
 from whad.exceptions import WhadDeviceNotFound
+from whad.ant.stack.app.profiles.antplus.hrm import HeartRateMonitor
+from whad.scapy.layers.ant import *
 import sys
 
 from time import sleep
+from random import randint
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
@@ -18,17 +21,32 @@ if __name__ == '__main__':
             dev = WhadDevice.create(interface)
 
             # Create the  ANT master
-            master = Master(dev)
             
-            channel = master.stack.get_layer('ll').create_channel(7912, 120, 1)
-            master.start()
-            input()
+            # Create the slave ANT connector
+            profile = HeartRateMonitor()
 
-            p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"MASTER")
-            p.broadcast = 0
-            print(master.send(p))
-            input()
+            master = Master(dev)#, profile=hrmprofile)
+            channel = master.create_channel(1234, 120, 1)
+            channel.app.set_profile(profile)
 
+            print("Chann: ", channel)
+            profile.start()
+            while True:
+                profile.computed_heart_rate = randint(120,130)
+                sleep(0.5)
+            #p = ANT_Hdr(bytes.fromhex("a6c5e81e78010aFFFF")+ b"MASTER")
+            #p.broadcast = 0
+            #print(master.send(p))
+            print(channel.app.broadcast(
+                b"\xAA\xBB\xCC\xDD\xAA\xBB\xCC"
+            ))
+
+            input()
+            while True:
+                print(channel.app.burst(
+                    b"\xAA\xBB\xCC\xDD\xAA\xBB\xCC\xDD\xCC\xDD\x11\x22\x33\x44"
+                ))
+                input()
             channel.close()
             
 
