@@ -329,7 +329,7 @@ class PbMessageWrapper(HubMessage):
             if value is not None:
                 fields.append((prop_name, value))
 
-        return f"<{self.__class__.__name__} " + ', '.join(
+        return f"<{self.__class__.__module__}.{self.__class__.__name__} " + ', '.join(
             [f'{name}={value}' for name, value in fields]
         ) + ">"
 
