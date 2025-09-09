@@ -14,7 +14,7 @@ from whad.cli.ui import wait, success
 from whad.hub import ProtocolHub
 from whad.device import Bridge
 from whad.device.connector import WhadDeviceConnector
-from whad.device.unix import UnixConnector, UnixSocketServerDevice
+from whad.device.unix import UnixConnector, UnixSocketServer
 from whad.common.monitors import WiresharkMonitor
 from whad.cli.app import CommandLineApp, run_app
 
@@ -72,7 +72,7 @@ class WhadWiresharkApp(CommandLineApp):
                 self.monitor.start()
 
                 if self.is_stdout_piped():
-                    proxy = UnixConnector(UnixSocketServerDevice(parameters=self.args.__dict__))
+                    proxy = UnixConnector(UnixSocketServer(parameters=self.args.__dict__))
 
                     while not proxy.device.opened:
                         if proxy.device.timedout:

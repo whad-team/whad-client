@@ -13,15 +13,7 @@ from serial.tools.list_ports import comports
 from scapy.layers.dot15d4 import Dot15d4FCS
 from scapy.compat import raw
 
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
-from whad.device.virtual.apimote.constants import APIMoteId, APIMoteRegisters, \
-    APIMoteRegistersMasks, APIMoteInternalStates
-from whad.device import VirtualDevice
-from whad.hub.discovery import Domain, Capability
-from whad.zigbee.utils.phy import channel_to_frequency, frequency_to_channel
-from whad.hub.generic.cmdresult import CommandResult
-from whad.hub.dot15d4 import Commands
-from whad.device.uart import get_port_info
+
 from whad.scapy.layers.apimote import GoodFET_Command_Hdr, GoodFET_Reply_Hdr, GoodFET_Init_Reply, \
     GoodFET_Peek_Command, GoodFET_Monitor_Connected_Command, GoodFET_Peek_Reply, \
     GoodFET_Setup_CCSPI_Command, GoodFET_Setup_CCSPI_Reply,GoodFET_Transfer_Command, \
@@ -30,9 +22,21 @@ from whad.scapy.layers.apimote import GoodFET_Command_Hdr, GoodFET_Reply_Hdr, Go
     GoodFET_Read_RF_Packet_Command, GoodFET_Read_RF_Packet_Reply, GoodFET_Send_RF_Packet_Command, \
     GoodFET_Send_RF_Packet_Reply, CC_VERSIONS
 
+from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady
+from whad.hub.discovery import Domain, Capability
+from whad.hub.generic.cmdresult import CommandResult
+from whad.hub.dot15d4 import Commands
 
-class APIMoteDevice(VirtualDevice):
-    """APIMote virtual device implementation.
+from whad.zigbee.utils.phy import channel_to_frequency, frequency_to_channel
+from whad.device.uart import get_port_info
+
+from ..device import VirtualDevice
+from .constants import APIMoteId, APIMoteRegisters, \
+    APIMoteRegistersMasks, APIMoteInternalStates
+
+
+class Apimote(VirtualDevice):
+    """Apimote virtual device implementation.
     """
 
     INTERFACE_NAME = "apimote"
@@ -50,7 +54,7 @@ class APIMoteDevice(VirtualDevice):
                             uart_dev.pid == APIMoteId.APIMOTE_ID_PRODUCT
                             )
                         ]:
-            available_devices.append(APIMoteDevice(apimote.device))
+            available_devices.append(Apimote(apimote.device))
         return available_devices
 
     @property

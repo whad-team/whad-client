@@ -7,20 +7,21 @@ from time import sleep, time
 from scapy.packet import Packet
 from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE
 
-from whad.ble.connector.base import BLE
-from whad.ble.connector.injector import Injector
-from whad.ble.connector.hijacker import Hijacker
-from whad.ble.sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress, \
-    SynchronizationEvent, DesynchronizationEvent, KeyExtractedEvent
-from whad.ble.crypto import EncryptedSessionInitialization, LinkLayerDecryptor, \
-    LegacyPairingCracking
 from whad.hub.ble import AccessAddressDiscovered, Synchronized, BleRawPduReceived, \
     BlePduReceived, BleAdvPduReceived
-from whad.ble.exceptions import MissingCryptographicMaterial
-from whad.exceptions import WhadDeviceDisconnected
-from whad.exceptions import UnsupportedCapability
+
+from whad.exceptions import WhadDeviceDisconnected, UnsupportedCapability
 from whad.helpers import message_filter
 from whad.common.sniffing import EventsManager
+
+from .base import BLE
+from .injector import Injector
+from .hijacker import Hijacker
+from ..exceptions import MissingCryptographicMaterial
+from ..sniffing import SynchronizedConnection, SnifferConfiguration, AccessAddress, \
+    SynchronizationEvent, DesynchronizationEvent, KeyExtractedEvent
+from ..crypto import EncryptedSessionInitialization, LinkLayerDecryptor, \
+    LegacyPairingCracking
 
 logger = logging.getLogger(__name__)
 
@@ -313,9 +314,8 @@ class Sniffer(BLE, EventsManager):
         """
         start = time()
         try:
-            while True:
-                if self.__configuration.access_addresses_discovery:
-                    message = self.wait_for_message(filter=AccessAddressDiscovered, timeout=0.1)
+            if self.__configuration.access_addresses_discovery:
+                for message in super().sniff(messages=(AccessAddressDiscovered), timeout=timeout):
                     if message is not None:
                         rssi = None
                         timestamp = None
@@ -334,37 +334,35 @@ class Sniffer(BLE, EventsManager):
                             self.__access_addresses[aa].update(timestamp=timestamp, rssi=rssi)
                         yield self.__access_addresses[aa]
 
-                elif self.__configuration.active_connection is not None:
-                    message = self.wait_for_message(filter=message_filter(Synchronized),
-                                                    timeout=0.1)
+            elif self.__configuration.active_connection is not None:
+                message = self.wait_for_message(keep=message_filter(Synchronized),
+                                                timeout=0.1)
 
-                    if message is not None:
-                        if message.hop_increment > 0:
-                            if self.support_raw_pdu():
-                                message_type = BleRawPduReceived
-                            elif self.__synchronized:
-                                message_type = BlePduReceived
-                            else:
-                                message_type = BleAdvPduReceived
+                if message is not None:
+                    if message.hop_increment > 0:
+                        if self.support_raw_pdu():
+                            message_type = BleRawPduReceived
+                        elif self.__synchronized:
+                            message_type = BlePduReceived
+                        else:
+                            message_type = BleAdvPduReceived
 
-                            message = self.wait_for_message(filter=message_filter(message_type),
-                                                            timeout=0.1)
+                        for message in super().sniff(messages=(message_type), timeout=timeout):
                             if message is not None:
                                 packet = message.to_packet()
                                 if packet is not None:
                                     self.monitor_packet_rx(packet)
                                     yield packet
 
+            else:
+                if self.support_raw_pdu():
+                    message_type = BleRawPduReceived
+                elif self.__synchronized:
+                    message_type = BlePduReceived
                 else:
-                    if self.support_raw_pdu():
-                        message_type = BleRawPduReceived
-                    elif self.__synchronized:
-                        message_type = BlePduReceived
-                    else:
-                        message_type = BleAdvPduReceived
+                    message_type = BleAdvPduReceived
 
-                    message = self.wait_for_message(filter=message_filter(message_type),
-                                                    timeout=0.1)
+                for message in super().sniff(messages=(message_type), timeout=timeout):
                     if message is not None:
                         packet = message.to_packet()
                         if packet is not None:
@@ -372,10 +370,6 @@ class Sniffer(BLE, EventsManager):
                             self.monitor_packet_rx(packet)
                             yield packet
 
-                # Check if timeout has been reached
-                if timeout is not None:
-                    if time() - start >= timeout:
-                        break
 
         # Handle device disconnection
         except WhadDeviceDisconnected:

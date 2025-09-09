@@ -46,7 +46,7 @@ class Synchronized(PbMessageWrapper):
             hop_increment=self.hop_increment,
             channel_map=self.channel_map
         )
-    
+
     @staticmethod
     def from_event(event):
         return Synchronized(
@@ -82,7 +82,7 @@ class Connected(PbMessageWrapper):
             adv_addr_type=self.adv_addr_type,
             init_addr_type=self.init_addr_type
         )
-    
+
     @staticmethod
     def from_event(event):
         return Connected(

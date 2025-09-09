@@ -18,12 +18,13 @@ from whad.ble.utils.phy import channel_to_frequency, frequency_to_channel, crc,\
 from whad.hub.ble import Direction, ChannelMap
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.ble import Commands
-from whad.device.virtual.ubertooth.constants import UbertoothId, \
-    UbertoothTransfers, UbertoothModulations, UbertoothCommands, \
-    UbertoothInternalState, UbertoothModes, UbertoothJammingModes
 from whad.scapy.layers.ubertooth import Ubertooth_Hdr,UBERTOOTH_PACKET_TYPES, \
     BTLE_Promiscuous_Access_Address, BTLE_Promiscuous_CRCInit, BTLE_Promiscuous_Hop_Interval, \
     BTLE_Promiscuous_Hop_Increment
+
+from .constants import UbertoothId, \
+    UbertoothTransfers, UbertoothModulations, UbertoothCommands, \
+    UbertoothInternalState, UbertoothModes, UbertoothJammingModes
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ def get_ubertooth(index: int = 0, serial: str = None):
     except IndexError:
         return None
 
-class UbertoothDevice(VirtualDevice):
+class Ubertooth(VirtualDevice):
     """Ubertooth virtual device implementation.
     """
 
@@ -64,7 +65,7 @@ class UbertoothDevice(VirtualDevice):
                                   idProduct=UbertoothId.UBERTOOTH_ID_PRODUCT,
                                   find_all=True):
                 available_devices.append(
-                    UbertoothDevice(serial=get_string(ubertooth, ubertooth.iSerialNumber)
+                    Ubertooth(serial=get_string(ubertooth, ubertooth.iSerialNumber)
                 ))
         except ValueError:
             logger.warning("Cannot access Ubertooth, root privileges may be required.")

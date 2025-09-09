@@ -2,7 +2,7 @@
 """
 import re
 
-from whad.lorawan.exceptions import BadEuiFormat
+from .exceptions import BadEuiFormat
 
 class EUI(object):
     """Extended Unique Identifier

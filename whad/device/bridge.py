@@ -5,12 +5,15 @@ This module provides multiple classes to implement a transparent bridge between
 two connectors.
 """
 import logging
-from whad.device.connector import WhadDeviceConnector
-from whad.hub.message import AbstractPacket
+from threading import Event
+
+from whad.hub.message import AbstractPacket, HubMessage
+
+from .connector import Connector
 
 logger = logging.getLogger(__name__)
 
-class BridgeIfaceWrapper(WhadDeviceConnector):
+class BridgeIfaceWrapper(Connector):
     """Interface bridging wrapper used by our default `Bridge` class
     to wrap an existing and initialized WHAD device.
     """
@@ -19,14 +22,28 @@ class BridgeIfaceWrapper(WhadDeviceConnector):
         super().__init__(device)
         self.__processor = processor
 
-    def send_message(self, message, filter=None):
+    def send_message(self, message, keep=None):
+        """Forward message to the underlying interface.
+        """
+        logger.debug("[PacketProcIfaceWrapper][%s] prepare callback for message %s",
+                     self.device.interface, message)
+        message.callback(self.on_message_sent)
         logger.debug("[PacketProcIfaceWrapper] send_message: %s", message)
-        super().send_message(message, filter=filter)
+        super().send_message(message, keep=keep)
+
+    def on_message_sent(self, message, status):
+        """Called when a message has been sent to the target interface.
+        """
+        if status == 0:
+            self.__processor.on_message_sent(self, message)
+        else:
+            # TODO: implement or remove on_message_error()
+            self.__processor.on_message_error(self, message, status)
+
 
     def on_disconnection(self):
         """Notify bridge on disconnection.
         """
-        logger.debug("[PacketProcIfaceWrapper] on_disconnection")
         self.__processor.on_disconnect(self)
 
     def unlock(self, dispatch_callback=None):
@@ -76,13 +93,18 @@ class Bridge:
     def __init__(self, input_connector, output_connector):
         """Initialize our packet processor.
         """
+        # Stopped event
+        self.__stopped = Event()
+
         # Save our input connector and its device
         self.__in = input_connector
         self.__in_device = self.__in.device
+        self.__in_disconnected = False
 
         # Save our output cnnector and its device
         self.__out = output_connector
         self.__out_device =self.__out.device
+        self.__out_disconnected = False
 
         # Disable message queue filters
         self.__in_device.set_queue_filter(None)
@@ -105,40 +127,81 @@ class Bridge:
 
 
     @property
-    def input(self) -> WhadDeviceConnector:
+    def input(self) -> Connector:
         """Get the input connector
 
         :return: Input connector
-        :rtype: WhadDeviceConnector
+        :rtype: Connector
         """
         return self.__in
 
     @property
-    def output(self) -> WhadDeviceConnector:
+    def output(self) -> Connector:
         """Get the output connector
 
         :return: Output connector
-        :rtype: WhadDeviceConnector
+        :rtype: Connector
         """
         return self.__out
 
     @property
-    def input_wrapper(self) -> WhadDeviceConnector:
+    def input_wrapper(self) -> Connector:
         """Get the internal connector for input
         """
         return self.__in_wrapper
     
     @property
-    def output_wrapper(self) -> WhadDeviceConnector:
+    def output_wrapper(self) -> Connector:
         """Get the internal connector for output
         """
         return self.__out_wrapper
 
-    def on_disconnect(self, wrapper):
-        """When a wrapper disconnects, stop bridge.
+    def on_message_sent(self, _, __):
+        """Called whenever a wrapped interface has successfully sent a message
+        to the hardware device.
         """
 
-    def on_any_msg(self, wrapper, message):
+        # Is the output interface disconnected and input interface done ?
+        if self.__out_disconnected and not self.__in_wrapper.busy():
+            logger.debug("[bridge::msg_sent] We are done with packets !")
+            # We are done processing packets, bridge stops.
+            self.__stopped.set()
+
+        # Is the input interface disconnected and output interface done ?
+        elif self.__in_disconnected and not self.__out_wrapper.busy():
+            logger.debug("[bridge::msg_sent] We are done with packets !")
+            # We are done processing packets, bridge stops.
+            self.__stopped.set()
+
+    def on_disconnect(self, wrapper: BridgeIfaceWrapper):
+        """When a wrapper disconnects, stop bridge.
+        """
+        if wrapper == self.__in_wrapper:
+            # Input interface has disconnected, we won't receive messages from
+            # this interface anymore. We still need to make sure the output
+            # interface has processed and sent all the messages we sent to it
+            # before closing the bridge.
+            logger.debug("[bridge][%s] interface has just disconnected",
+                         self.__in_device.interface)
+            self.__in_disconnected = True
+
+            # If the output wrapper is not busy, we are done processing packets.
+            if not self.__out_wrapper.busy():
+                logger.debug("[bridge] We are done with packets !")
+                self.__stopped.set()
+
+        elif wrapper == self.__out_wrapper:
+            logger.debug("[bridge][%s] interface has just disconnected",
+                self.__out_device.interface)
+            self.__out_disconnected = True
+
+            # If the input wrapper is not busy, we are done processing packets.
+            if not self.__in_wrapper.busy():
+                logger.debug("[bridge] We are done with packets !")
+                self.__stopped.set()
+
+
+    def on_any_msg(self, wrapper, message: HubMessage):
         """Callback method for any message.
 
         :param wrapper: Calling wrapper object
@@ -154,7 +217,7 @@ class Bridge:
         else:
             logger.error("on_any_msg() called by an unknown wrapper (%s)", wrapper)
 
-    def on_inbound(self, message):
+    def on_inbound(self, message: HubMessage):
         """Inbound message hook
 
         This hook is called whenever a message is received on the input
@@ -172,9 +235,10 @@ class Bridge:
                     self.__out.monitor_packet_tx(packet)
 
             # Forward message
+            message.callback(self.on_message_sent)
             self.__in.send_message(message)
 
-    def on_outbound(self, message):
+    def on_outbound(self, message: HubMessage):
         """Outbound message hook.
 
         This hook is called whenever a message is received on the output
@@ -191,18 +255,21 @@ class Bridge:
                     self.__out.monitor_packet_tx(packet)
                     self.__in.monitor_packet_rx(packet)
 
+            message.callback(self.on_message_sent)
             self.__out.send_message(message)
 
     def unlock(self):
-        """Unlock bridge interfaces.
+        """Unlock bridge's interfaces.
         """
         # Unlock connector, causing packets to be sent to the output connector
         if self.__in.is_locked():
+            logger.debug("[bridge] %s is locked, unlocking it", self.__in.device.interface)
             self.__in.unlock(dispatch_callback=self.dispatch_pending_input)
         if self.__out.is_locked():
+            logger.debug("[bridge] %s is locked, unlocking it", self.__out.device.interface)
             self.__out.unlock(dispatch_callback=self.dispatch_pending_output)
 
-    def dispatch_pending_output(self, message):
+    def dispatch_pending_output(self, message: HubMessage):
         """Forward pending output messages to input.
         """
         packet = message.to_packet()
@@ -211,7 +278,7 @@ class Bridge:
             self.input.monitor_packet_tx(packet)
         self.input.send_message(message)
 
-    def dispatch_pending_input(self, message):
+    def dispatch_pending_input(self, message: HubMessage):
         """Forward pending input messages to output.
         """
         packet = message.to_packet()
@@ -219,3 +286,10 @@ class Bridge:
             self.output.monitor_packet_tx(packet)
             self.input.monitor_packet_rx(packet)
         self.output.send_message(message)
+
+    def join(self):
+        """Wait for bridge termination. Bridge termination is triggered when
+        at least one of the bridge's interface is disconnected and every pending
+        messages forwarded.
+        """
+        return self.__stopped.wait()

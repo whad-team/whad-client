@@ -1,5 +1,5 @@
 import logging
-from whad.device import WhadDeviceConnector
+from whad.device import WhadDeviceConnector, Connector
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class WhadMonitor:
         :return: boolean indicating the success of attach operation
         """
         success = False
-        if isinstance(connector, WhadDeviceConnector):
+        if isinstance(connector, (WhadDeviceConnector, Connector)):
             self._connector = connector
             if self.__monitor_reception:
                 self._connector.attach_callback(self.process_packet, on_reception = True)

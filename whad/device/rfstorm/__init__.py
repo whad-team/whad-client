@@ -8,9 +8,7 @@ from time import sleep, time
 from usb.core import find, USBError, USBTimeoutError
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied
-from whad.device import VirtualDevice
-from whad.device.virtual.rfstorm.constants import RFStormId, RFStormCommands, \
-    RFStormDataRate, RFStormEndPoints, RFStormInternalStates, RFStormDomains
+
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.esb import Commands as EsbCommands
 from whad.hub.phy import Commands as PhyCommands
@@ -19,6 +17,10 @@ from whad.hub.unifying import Commands as UniCommands
 from whad.hub.discovery import Capability, Domain
 from whad.phy import Endianness
 from whad.helpers import swap_bits
+
+from ..device import VirtualDevice
+from .constants import RFStormId, RFStormCommands, \
+    RFStormDataRate, RFStormEndPoints, RFStormInternalStates, RFStormDomains
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,7 @@ def get_rfstorm(index=0,bus=None, address=None):
         return None
 
 
-class RFStormDevice(VirtualDevice):
+class RfStorm(VirtualDevice):
     """RFStorm virtual device implementation.
     """
 
@@ -57,7 +59,7 @@ class RFStormDevice(VirtualDevice):
         try:
             for rfstorm in find(idVendor=RFStormId.RFSTORM_ID_VENDOR,
                                 idProduct=RFStormId.RFSTORM_ID_PRODUCT,find_all=True):
-                available_devices.append(RFStormDevice(bus=rfstorm.bus, address=rfstorm.address))
+                available_devices.append(RfStorm(bus=rfstorm.bus, address=rfstorm.address))
         except ValueError:
             logger.warning("Cannot access RFStorm, root privileges may be required.")
 

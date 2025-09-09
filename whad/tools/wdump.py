@@ -14,7 +14,7 @@ from whad.cli.ui import wait, success, error
 from whad.cli.app import CommandLineApp, run_app
 from whad.device import Bridge
 from whad.hub import ProtocolHub
-from whad.device.unix import UnixConnector, UnixSocketServerDevice
+from whad.device.unix import UnixConnector, UnixSocketServer
 from whad.common.monitors import PcapWriterMonitor
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ class WhadDumpApp(CommandLineApp):
                     self.monitor.start()
 
                     if self.is_stdout_piped():
-                        unix_server = UnixConnector(UnixSocketServerDevice(
+                        unix_server = UnixConnector(UnixSocketServer(
                             parameters=self.args.__dict__
                         ))
 
@@ -122,9 +122,8 @@ class WhadDumpApp(CommandLineApp):
 
                         # Create our packet bridge
                         logger.info("[wdump] Starting our output pipe")
-                        _ = Bridge(connector, unix_server)
-                        while interface.opened:
-                            sleep(.1)
+                        bridge = Bridge(connector, unix_server)
+                        bridge.join()
                     else:
                         # Unlock Unix connector first
                         connector.unlock()
@@ -134,7 +133,7 @@ class WhadDumpApp(CommandLineApp):
                             wait(f"Dumping {self.monitor.packets_written} packets into pcap file: ",
                                 suffix = self.args.pcap
                             )
-                            sleep(.2)
+                            sleep(.5)
             else:
                 error("You must provide a pcap file.")
         except KeyboardInterrupt:

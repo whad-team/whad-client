@@ -17,7 +17,7 @@ from whad.hub.dot15d4 import Dot15d4Metadata
 from whad.scapy.layers.dot15d4tap import Dot15d4Raw
 from whad.hub.discovery import Domain, Capability
 from whad.cli.app import CommandLineApp
-from whad.device import WhadDeviceConnector
+from whad.device.connector import Connector
 from whad.helpers import message_filter, is_message_type
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
@@ -30,7 +30,7 @@ from whad.hub.events import JammedEvt
 
 logger = logging.getLogger(__name__)
 
-class Dot15d4(WhadDeviceConnector):
+class Dot15d4(Connector):
     """
     802.15.4 protocol connector.
 

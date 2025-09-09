@@ -91,7 +91,7 @@ class Sniffer(Dot15d4, EventsManager):
                     message_type = PduReceived
 
                 # Wait for a message to be received
-                message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
+                message = self.wait_for_message(keep=message_filter(message_type), timeout=1)
                 if message is not None:
                     packet = message.to_packet()
                     if packet is not None:

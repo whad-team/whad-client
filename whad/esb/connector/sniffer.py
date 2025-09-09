@@ -17,22 +17,24 @@ from typing import Generator
 
 from scapy.packet import Packet
 
-from whad.device import WhadDevice
-from whad.exceptions import WhadDeviceDisconnected
-from whad.esb.connector.base import ESB
-from whad.esb.sniffing import SnifferConfiguration
-from whad.exceptions import UnsupportedCapability
+from whad.device import Device
 from whad.helpers import message_filter
+from whad.exceptions import WhadDeviceDisconnected, UnsupportedCapability
 from whad.common.sniffing import EventsManager
+
 from whad.hub.esb import PduReceived, RawPduReceived
 from whad.hub.message import AbstractPacket
+
+from .base import ESB
+from ..sniffing import SnifferConfiguration
+
 
 class Sniffer(ESB, EventsManager):
     """
     Enhanced ShockBurst Sniffer interface for compatible WHAD device.
     """
 
-    def __init__(self, device: WhadDevice):
+    def __init__(self, device: Device):
         ESB.__init__(self, device)
         EventsManager.__init__(self)
 
@@ -133,23 +135,8 @@ class Sniffer(ESB, EventsManager):
         else:
             message_type = PduReceived
 
-        # Sniff packets
-        start = time()
-
         try:
-            while True:
-
-                # Exit if timeout is set and reached
-                if timeout is not None and (time() - start >= timeout):
-                    break
-
-                if self.support_raw_pdu():
-                    message_type = RawPduReceived
-                else:
-                    message_type = PduReceived
-
-                message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
-
+            for message in super().sniff(message=(message_type), timeout=timeout):
                 if message is not None and issubclass(message, AbstractPacket):
                     packet = message.to_packet()
                     if packet is not None:

@@ -7,13 +7,15 @@ from time import sleep
 
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA
 
-from whad.ble.connector.base import BLE
-from whad.ble.exceptions import NotSynchronized
 from whad.exceptions import UnsupportedCapability
 from whad.helpers import message_filter
 from whad.hub.ble import Injected, Direction as BleDirection
 from whad.ble.sniffing import SynchronizedConnection
 from whad.ble.injecting import InjectionConfiguration
+
+from ..exceptions import NotSynchronized
+from .base import BLE
+
 
 class Injector(BLE):
     """BLE injecion connector.
@@ -136,7 +138,7 @@ class Injector(BLE):
         if self.__connection is not None:
             self.send_pdu(packet, access_address=self.__connection.access_address,
                           direction=BleDirection.INJECTION_TO_SLAVE)
-            message = self.wait_for_message(filter=message_filter(Injected))
+            message = self.wait_for_message(keep=message_filter(Injected))
             return (message.success, message.injection_attempts)
 
         # Not synchronized
@@ -148,7 +150,7 @@ class Injector(BLE):
         if self.__connection is not None:
             self.send_pdu(packet, access_address=self.__connection.access_address,
                           direction=BleDirection.INJECTION_TO_MASTER)
-            message = self.wait_for_message(filter=message_filter(Injected))
+            message = self.wait_for_message(keep=message_filter(Injected))
             return (message.success, message.injection_attempts)
 
         # Not synchronized

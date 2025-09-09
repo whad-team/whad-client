@@ -14,10 +14,11 @@ from scapy.layers.bluetooth import L2CAP_Connection_Parameter_Update_Request, \
 
 from whad.device import WhadDevice
 from whad.exceptions import UnsupportedCapability
-from whad.ble.connector import Central
-from whad.ble.exceptions import PeripheralNotFound
 from whad.scapy.layers import NordicBLE
 from whad.common.replay import ReplayInterface
+
+from .central import Central
+from ..exceptions import PeripheralNotFound
 
 @dataclass
 class ReplayConfiguration:

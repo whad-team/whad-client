@@ -1,3 +1,13 @@
+"""Bluetooth Low Energy advertisements sniffing
+
+This example code shows how to use WHAD to sniff BLE advertisements broadcasted
+by devices in range, using a BLE sniffer (HCI not supported in this case).
+
+As an example, to sniff advertisements using a WHAD compatible hardware identified
+by `uart0`:
+
+$ python3 ble_advertisements_sniffer.py uart0
+"""
 import sys
 
 from whad.ble import Sniffer
@@ -22,7 +32,7 @@ if __name__ == '__main__':
             # Start the sniffer and iterate on received packets to display them
             sniffer.start()
             for pkt in sniffer.sniff(timeout=30.0):
-                print(repr(pkt))
+                print(f"{repr(pkt)}")
 
         except (KeyboardInterrupt, SystemExit):
             dev.close()

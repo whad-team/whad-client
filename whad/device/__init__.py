@@ -1,44 +1,62 @@
+"""WHAD hardware module
+
+This module provides various classes to interact with WHAD-enabled hardware:
+
+- :py:class:`whad.hw.Interface`
+- :py:class:`whad.hw.VirtInterface`
+
+This module replaces the previous `whad.device` module and its ambiguous class
+names and features. The `whad.device` module is still available but will be
+considered deprecated in a future release.
 """
-WHAD Device module
 
-This module provides a set of classes used to interact with devices
-running compatible firmwares, as well as the default connector class used
-to handle messages coming from or sent to the device.
-"""
-# Logging
-import warnings
+# Load interface base classes
+from .device import Device, VirtualDevice, DeviceEvt, Disconnected, MessageReceived, \
+    WhadDevice, WhadVirtualDevice
+from .connector import Connector, Event, LockedConnector, WhadDeviceConnector
+from .bridge import Bridge
 
-from cryptography.utils import CryptographyDeprecationWarning
+# Load supported hardware interfaces
+from .unix import UnixSocket
+from .uart import Uart
+from .tcp import TcpSocket
 
-# Whad device-related classes
-from whad.device.info import WhadDeviceInfo
-from whad.device.connector import WhadDeviceConnector
-from whad.device.bridge import Bridge
-from whad.device.device import WhadDevice, VirtualDevice
-
-# Import derived classes
-from whad.device.uart import UartDevice
-from whad.device.tcp import TCPSocketDevice
-from whad.device.unix import UnixSocketDevice
-from whad.device.virtual import HCIDevice, APIMoteDevice, RFStormDevice, RZUSBStickDevice, \
-    UbertoothDevice, YardStickOneDevice
-
-# Remove scapy deprecation warnings
-warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
+# Load supported virtual interfaces
+from .hci import Hci
+from .pcap import Pcap
+from .apimote import Apimote
+from .rfstorm import RfStorm
+from .rzusbstick import RzUsbStick
+from .ubertooth import Ubertooth
+from .yard import YardStickOne
 
 __all__ = [
-    "Bridge",
-    "WhadDeviceConnector",
-    "WhadDeviceInfo",
-    "WhadDevice",
-    "UartDevice",
+    # Base classes
+    "Device",
     "VirtualDevice",
-    "TCPSocketDevice",
-    "UnixSocketDevice",
-    "HCIDevice",
-    "APIMoteDevice",
-    "RFStormDevice",
-    "RZUSBStickDevice",
-    "UbertoothDevice",
-    "YardStickOneDevice"
+    "Connector",
+    "WhadDeviceConnector",
+    "Bridge",
+    "DeviceEvt",
+    "Disconnected",
+    "MessageReceived",
+    "Event",
+
+    # Kept for compatibility
+    "WhadDevice",
+    "WhadVirtualDevice",
+    "WhadDeviceConnector",
+    "LockedConnector",
+    
+    # Virtual devices
+    "Hci",
+    "Pcap",
+    "Uart",
+    "TcpSocket",
+    "UnixSocket",
+    "Apimote",
+    "RfStorm",
+    "RzUsbStick",
+    "Ubertooth",
+    "YardStickOne",
 ]

@@ -17,8 +17,7 @@ from scapy.utils import PcapReader
 
 from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
     WhadDeviceDisconnected, WhadDeviceError
-from whad.device import VirtualDevice
-from whad.device.virtual.pcap.capabilities import CAPABILITIES
+
 from whad.hub.generic.cmdresult import CommandResult
 from whad.scapy.layers.phy import Phy_Packet
 from whad.hub.dot15d4 import Dot15d4Metadata
@@ -29,9 +28,12 @@ from whad.hub.unifying import UnifyingMetadata
 from whad.hub.discovery import Domain
 from whad.ble.utils.phy import FieldsSize
 
+from ..device import VirtualDevice
+from .capabilities import CAPABILITIES
+
 logger = logging.getLogger(__name__)
 
-class PCAPDevice(VirtualDevice):
+class Pcap(VirtualDevice):
     """PCAP replay virtual device implementation.
     """
 
@@ -138,24 +140,31 @@ class PCAPDevice(VirtualDevice):
         # Ask parent class to run a background I/O thread
         super().open()
 
-    def write(self, data):
+    def write(self, payload):
         if not self.__opened:
             raise WhadDeviceNotReady()
 
-    def read(self):
+    def read(self) -> bytes:
         """Read packets from PCAP file and replay them
         """
         if not self.__opened:
+            logger.error("Device not ready")
             raise WhadDeviceNotReady()
         while self.__started:
             try:
                 if self._is_reader():
                     pkt = self.__pcap_reader.read_packet()
-                    self._send_packet(pkt)
+                    return self.__to_raw_message(pkt)
             except EOFError as eof:
-                # TODO: add an event to indicate end of stream ?
+                # End of PCAP reached, we are no more open and notify the
+                # calling thread that we are now disconnected.
                 logger.debug("[PCAPDevice] EOF reached")
+                self.__opened = False
                 raise WhadDeviceDisconnected() from eof
+
+    @property
+    def opened(self) -> bool:
+        return self.__opened
 
     def reset(self):
         pass
@@ -185,39 +194,57 @@ class PCAPDevice(VirtualDevice):
                 self.__last_timestamp = 0
             sleep((timestamp - self.__last_timestamp)/100000)
 
-    def _send_packet(self, pkt):
+    def __to_raw_message(self, pkt) -> bytes:
+        msg = None
         if self.__domain == Domain.Dot15d4:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
-            self._send_whad_zigbee_raw_pdu(bytes(pkt[Dot15d4]), channel=metadata.channel,
+            msg = self.__to_whad_zigbee_raw_pdu(bytes(pkt[Dot15d4]), channel=metadata.channel,
                                            lqi=metadata.lqi, rssi=metadata.rssi,
                                            timestamp=metadata.timestamp)
         elif self.__domain == Domain.BtLE:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
-            self._send_whad_ble_raw_pdu(pkt, metadata)
+            msg = self.__to_whad_ble_raw_pdu(pkt, metadata)
+
         elif self.__domain == Domain.Esb:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
-            self._send_whad_esb_raw_pdu(pkt, metadata)
+            msg = self.__to_whad_esb_raw_pdu(pkt, metadata)
+
         elif self.__domain == Domain.LogitechUnifying:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
-            self._send_whad_unifying_raw_pdu(pkt, metadata)
+            msg = self.__to_whad_unifying_raw_pdu(pkt, metadata)
+
         elif self.__domain == Domain.Phy:
             metadata = self._generate_metadata(pkt)
             self._interframe_delay(metadata.timestamp)
             self.__last_timestamp = metadata.timestamp
-            self._send_whad_phy_pdu(pkt, metadata)
+            msg = self.__to_whad_phy_pdu(pkt, metadata)
 
+        if msg is not None:
+            # Serialize protobuf message
+            raw_msg = msg.serialize()
 
-    def _send_whad_phy_pdu(self, packet, metadata):
-        #packet.show()
-        msg = self.hub.phy.create_packet_received(
+            # Define header
+            header = [
+                0xAC, 0xBE,
+                len(raw_msg) & 0xff,
+                (len(raw_msg) >> 8) & 0xff
+            ]
+
+            # Build the final payload
+            return bytes(header) + raw_msg
+        else:
+            return b""
+
+    def __to_whad_phy_pdu(self, packet, metadata):
+        return self.hub.phy.create_packet_received(
             metadata.frequency, # TODO: frequency,
             bytes(packet[Phy_Packet]),
             metadata.rssi, # TODO: rssi
@@ -228,12 +255,10 @@ class PCAPDevice(VirtualDevice):
             Modulation(metadata.modulation),
             Endianness(metadata.endianness)
         )
-        # Send message
-        self._send_whad_message(msg)
 
-    def _send_whad_unifying_raw_pdu(self, packet, metadata):
+    def __to_whad_unifying_raw_pdu(self, packet, metadata):
         # Create a RawPduReceived message
-        msg = self.hub.unifying.create_raw_pdu_received(
+        return self.hub.unifying.create_raw_pdu_received(
             metadata.channel,
             bytes(packet),
             metadata.rssi,
@@ -242,13 +267,10 @@ class PCAPDevice(VirtualDevice):
             metadata.address
         )
 
-        # Send message
-        self._send_whad_message(msg)
-
-    def _send_whad_esb_raw_pdu(self, packet, metadata):
+    def __to_whad_esb_raw_pdu(self, packet, metadata):
 
         # Create a RawPduReceived message
-        msg = self.hub.esb.create_raw_pdu_received(
+        return self.hub.esb.create_raw_pdu_received(
             metadata.channel,
             bytes(packet),
             metadata.rssi,
@@ -257,16 +279,13 @@ class PCAPDevice(VirtualDevice):
             metadata.address
         )
 
-        # Send message
-        self._send_whad_message(msg)
-
-    def _send_whad_ble_raw_pdu(self, packet, metadata):
+    def __to_whad_ble_raw_pdu(self, packet, metadata):
         packet = packet[BTLE:]
         access_address = packet.access_addr
         pdu = bytes(packet)[FieldsSize.ACCESS_ADDRESS_SIZE:-FieldsSize.CRC_SIZE]
 
         # Create a RawPduReceived message
-        msg = self.hub.ble.create_raw_pdu_received(
+        return self.hub.ble.create_raw_pdu_received(
             metadata.direction,
             pdu,
             access_address,
@@ -278,13 +297,8 @@ class PCAPDevice(VirtualDevice):
             rssi=metadata.rssi
         )
 
-        # Send message
-        self._send_whad_message(msg)
-
-
-
     # Virtual device whad message builder
-    def _send_whad_zigbee_raw_pdu(self, packet, channel=None, rssi=None, lqi=None,
+    def __to_whad_zigbee_raw_pdu(self, packet, channel=None, rssi=None, lqi=None,
                                   is_fcs_valid=True, timestamp=None):
         pdu = packet[:-2]
         fcs = unpack("<H",packet[-2:])[0]
@@ -304,8 +318,7 @@ class PCAPDevice(VirtualDevice):
         if timestamp is not None:
             msg.timestamp = timestamp
 
-        # Send message
-        self._send_whad_message(msg)
+        return msg
 
 
     # Virtual device whad message callbacks

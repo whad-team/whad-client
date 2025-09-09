@@ -69,6 +69,8 @@ class BleAttErrorCode:
     INSUFFICIENT_ENCRYPTION = 0x0F
     UNSUPPORTED_GROUP_TYPE = 0x10
     INSUFFICIENT_RESOURCES = 0x11
+    DB_OUT_OF_SYNC = 0x12
+    VALUE_NOT_ALLOWED = 0x13
 
 class SecurityMode:
     """SMP Security mode

@@ -68,7 +68,7 @@ class Sniffer(Unifying, EventsManager):
         if self.__configuration.pairing:
             self.sniff_pairing()
         else:
-            super().sniff(channel=channel, show_acknowledgements=ack, address=address)
+            super().start_sniff(channel=channel, show_acknowledgements=ack, address=address)
 
     @property
     def configuration(self):
@@ -220,22 +220,16 @@ class Sniffer(Unifying, EventsManager):
         else:
             message_type = PduReceived
 
+        # Make sure we are s
+        self._enable_sniffing()
+
         # Sniff packets
         start = time()
 
-        try:
-            while True:
-
-                # Exit if timeout is set and reached
-                if timeout is not None and (time() - start >= timeout):
-                    break
-
-                message = self.wait_for_message(filter=message_filter(message_type), timeout=.1)
-                if message is not None and issubclass(message, AbstractPacket):
-                    packet = message.to_packet()
-                    if packet is not None:
-                        packet = self.process_packet(packet)
-                        self.monitor_packet_rx(packet)
-                        yield packet
-        except WhadDeviceDisconnected:
-            return
+        for message in super().sniff(messages=(message_type), timeout=timeout):
+            if message is not None and issubclass(message, AbstractPacket):
+                packet = message.to_packet()
+                if packet is not None:
+                    packet = self.process_packet(packet)
+                    self.monitor_packet_rx(packet)
+                    yield packet

@@ -8,12 +8,13 @@ This module provides a set of tools upon the basic LoRa PHY:
 - A hackable LoRaWAN gateway stack using WHAD stack model
 """
 from whad.phy.connector.lora import LoRa
-from whad.lorawan.helpers import EUI
-from whad.lorawan.channel import ChannelPlan, Uplink, Downlink, DataRate
-from whad.lorawan.connector.gateway import LWGateway
-from whad.lorawan.app import LWApplication
-from whad.lorawan.stack import LWGatewayStack
-from whad.lorawan.exceptions import ChannelNotFound, InvalidDataRate, InvalidNodeRegistryError, \
+
+from .helpers import EUI
+from .channel import ChannelPlan, Uplink, Downlink, DataRate
+from .connector.gateway import LWGateway
+from .app import LWApplication
+from .stack import LWGatewayStack
+from .exceptions import ChannelNotFound, InvalidDataRate, InvalidNodeRegistryError, \
     BadEuiFormat, BadMICError, NotStartedException, MissingKeyError
 
 __all__ = [

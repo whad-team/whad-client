@@ -34,17 +34,9 @@ from whad.ble.stack.gatt.message import GattExecuteWriteRequest, GattExecuteWrit
     GattReadMultipleResponse, GattWriteCommand, GattWriteRequest, GattWriteResponse, \
     GattReadByGroupTypeRequest, GattReadByTypeRequest, GattReadByTypeRequest128, \
     GattExchangeMtuResponse, GattExchangeMtuRequest
+from whad.scapy.layers.bluetooth import ATT_Handle_Value_Confirmation
 
 logger = logging.getLogger(__name__)
-
-# Add missing ATT_Handle_Value_Confirmation class
-class AttHandleValueConfirmation(Packet):
-    """ATT Handle value confirmation packet, missing from Scapy BLE definitions
-    """
-    name = "Handle Value Confirmation"
-
-# Bind ATT_Handle_Value_Confirmation with ATT_Hdr
-bind_layers(ATT_Hdr, AttHandleValueConfirmation, opcode=BleAttOpcode.HANDLE_VALUE_CONFIRMATION)
 
 
 @alias('att')
@@ -798,4 +790,4 @@ class ATTLayer(Layer):
 
         Not supported yet
         """
-        self.send_data(AttHandleValueConfirmation())
+        self.send_data(ATT_Handle_Value_Confirmation())

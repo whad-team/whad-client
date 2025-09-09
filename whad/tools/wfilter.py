@@ -17,7 +17,7 @@ from scapy.themes import BrightTheme
 from scapy.config import conf
 
 from whad.cli.app import CommandLineApp, run_app
-from whad.device.unix import UnixSocketServerDevice, UnixConnector
+from whad.device.unix import UnixSocketServer, UnixConnector
 from whad.device import Bridge
 from whad.hub import ProtocolHub
 from whad.cli.ui import display_packet, error
@@ -363,10 +363,10 @@ class WhadFilterApp(CommandLineApp):
                 parameters = self.args.__dict__
                 connector = UnixConnector(interface)
                 connector.domain = self.args.domain
-                hub = ProtocolHub(2)
+                hub = ProtocolHub()
 
                 if self.is_stdout_piped():
-                    unix_server = UnixConnector(UnixSocketServerDevice(parameters=parameters))
+                    unix_server = UnixConnector(UnixSocketServer(parameters=parameters))
 
 
                     while not unix_server.device.opened:
@@ -376,24 +376,27 @@ class WhadFilterApp(CommandLineApp):
 
                     # Create our packet bridge
                     logger.info("[wfilter] Starting our output pipe")
-                    _ = WhadFilterPipe(connector, unix_server, self.on_rx_packet,
-                                                 self.on_tx_packet)
+                    WhadFilterPipe(connector, unix_server, self.on_rx_packet, 
+                                   self.on_tx_packet).wait()
 
                 else:
+                    print("unlock")
                     # Unlock Unix connector
                     connector.unlock()
 
                     # Take format and metadata settings from input tool,
                     # if provided.
-                    if "format" in parameters and parameters["format"] in ('repr', 'show', 'raw', 'hexdump', 'tshark'):
+                    if "format" in parameters and parameters["format"] in ('repr', 'show',
+                                                                           'raw', 'hexdump',
+                                                                           'tshark'):
                         self.args.format = parameters["format"]
 
                     # Overwrite its packet rx method
                     connector.on_packet = self.on_rx_packet
 
-                # Keep running while interface is active
-                while interface.opened:
-                    sleep(.1)
+                    # Keep running while interface is active
+                    connector.join()
+                
             else:
                 sys.exit(1)
         except KeyboardInterrupt:

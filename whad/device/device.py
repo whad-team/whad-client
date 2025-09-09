@@ -1,219 +1,236 @@
+"""WHAD new hardware interface
 """
-WHAD main device interface module.
-
-This module provides multiple classes to handle WHAD device communication,
-including background threads.
-"""
+import re
 import logging
-import struct
-from time import time, sleep
-from queue import Queue, Empty
+import contextlib
+from time import time
+from typing import Generator, Callable, Union
 from threading import Thread, Lock
+from queue import Queue, Empty
 
-# Whad imports
-from whad.exceptions import UnsupportedDomain, WhadDeviceNotReady, \
-    WhadDeviceNotFound, WhadDeviceDisconnected, WhadDeviceTimeout, \
-    WhadDeviceError
 from whad.helpers import message_filter
+from whad.exceptions import WhadDeviceNotReady, WhadDeviceError, \
+    WhadDeviceTimeout, WhadDeviceDisconnected, WhadDeviceNotFound
 
-# WHAD protocol hub
 from whad.hub import ProtocolHub
-from whad.hub.message import AbstractPacket, AbstractEvent
-from whad.hub.generic.cmdresult import CommandResult
+from whad.hub.message import HubMessage
+from whad.hub.generic.cmdresult import CommandResult, ResultCode
 from whad.hub.discovery import InfoQueryResp, DomainInfoQueryResp, DeviceReady
 from whad.hub.discovery import DeviceType
-from whad.hub.generic.cmdresult import ResultCode
 
-from whad.device.info import WhadDeviceInfo
+
+from .info import DeviceInfo
 
 logger = logging.getLogger(__name__)
 
-class WhadDeviceInputThread(Thread):
+class DeviceEvt:
+    """Device event.
+    """
+    def __init__(self, device = None):
+        self.__device = device
 
-    """WhadDevice I/O cancellable Thread.
+    @property
+    def device(self) -> 'Device':
+        """Related device"""
+        return self.__device
 
-    This thread runs in background and regularly calls the
-    device read() method to fetch any incoming data.
+    def __repr__(self) -> str:
+        """Printable representation of this event
+        """
+        return f"DeviceEvt(iface='{self.device.interface}')"
+
+class Disconnected(DeviceEvt):
+    """Interface has disconnected.
+    """
+    def __repr__(self) -> str:
+        """Printable representation of this event.
+        """
+        return f"Disconnected(device='{self.device.interface}')"
+
+class MessageReceived(DeviceEvt):
+    """Message has been received.
+    """
+    def __init__(self, device = None, message = None):
+        super().__init__(device)
+        self.__message = message
+
+    @property
+    def message(self) -> HubMessage:
+        """Received message."""
+        return self.__message
+
+    def __repr__(self) -> str:
+        """Printable representation of this event.
+        """
+        return f"MessageReceived(device='{self.device.interface}')"
+
+class DevInThread(Thread):
+    """Internal thread processing data sent by the connector to the
+    hardware interface.
     """
 
-    def __init__(self, device, io_thread):
+    def __init__(self, device = None):
         super().__init__()
-        self.__device = device
-        self.__io_thread = io_thread
-        self.__canceled = False
         self.daemon = True
+        self.__iface = device
+        self.__canceled = False
 
     def cancel(self):
-        """
-        Cancel current I/O task.
+        """Cancel thread
         """
         self.__canceled = True
 
-    def run(self):
+    def serialize(self, message) -> bytes:
+        """Serialize a WHAD message.
         """
-        Main task, call device process() method until thread
-        is canceled.
+        # Serialize protobuf message
+        raw_msg = message.serialize()
+
+        # Define header
+        header = [
+            0xAC, 0xBE,
+            len(raw_msg) & 0xff,
+            (len(raw_msg) >> 8) & 0xff
+        ]
+
+        # Build the final payload
+        return bytes(header) + raw_msg
+
+    def run(self):
+        """Out thread main task.
         """
         while not self.__canceled:
+            # Read data from device (may block)
             try:
-                self.__device.read()
-                #logger.debug("[WhadDeviceInputThread::run()] Read data from device")
+                # Wait for a message to send to interface (blocking)
+                logger.debug("[%s][in_thread] waiting for message to send", self.__iface.interface)
+                with self.__iface.get_pending_message(timeout=1.0) as message:
+                    logger.debug("[%s][in_thread] sending message %s",
+                                 self.__iface.interface, message)
+
+                    # Serialize message and send it.
+                    payload = self.serialize(message)
+
+                    # Send serialized message to interface
+                    logger.debug("[%s][in_thread] acquiring lock on interface ...",
+                                 self.__iface.interface)
+
+                    self.__iface.lock()
+
+                    logger.debug("[%s][in_thread] sending payload %s ...",
+                                 self.__iface.interface, payload)
+                    self.__iface.write(payload)
+                    logger.debug("[%s][in_thread] releasing lock ...", self.__iface.interface)
+                    self.__iface.unlock()
+
+                    # Notify message has correctly been sent, from a dedicated
+                    # thread.
+                    if message.has_callback():
+                        Thread(target=message.sent).start()
+            except Empty:
+                pass
             except WhadDeviceNotReady:
-                logger.debug("Device %s has just disconnected (device not ready)",
-                              self.__device.interface)
+                if message.has_callback():
+                    Thread(target=message.error, args=[1]).start()
                 break
             except WhadDeviceDisconnected:
-                logger.debug("Device %s has just disconnected (read returned None)",
-                             self.__device.interface)
+                if message.has_callback():
+                    Thread(target=message.error, args=[2]).start()
                 break
-        logger.info("Device IO thread canceled and stopped.")
-        self.__io_thread.on_disconnection()
-        logger.info("on_disconnection done.")
-        logger.info("Input thread for interface %s has stopped.", self.__device.interface)
 
-class WhadDeviceMessageThread(Thread):
-    """Main device incoming message processing thread.
-
-    This thread runs in background, retrieves every message
-    sent by the WHAD device to the host and forwards them to the
-    `process_messages()` callback.
+class DevOutThread(Thread):
+    """Internal thread processing data sent by the hardware interface
+    to the device object.
     """
-
-    def __init__(self, device):
+    def __init__(self, device = None):
         super().__init__()
-        self.__device = device
-        self.__canceled = False
         self.daemon = True
+        self.__iface = device
+        self.__canceled = False
+
+
+        # Data processing
+        self.__data = bytearray()
 
     def cancel(self):
-        """
-        Cancel current I/O task.
+        """Cancel thread
         """
         self.__canceled = True
 
-    def run(self):
+    def ingest(self, data: bytes):
+        """Ingest incoming bytes.
         """
-        Main task, call device process_messages() method until thread
-        is canceled.
+        self.__data.extend(data)
+        while len(self.__data) > 2:
+            # Is the magic correct ?
+            if self.__data[0] == 0xAC and self.__data[1] == 0xBE:
+                # Have we received a complete message ?
+                if len(self.__data) > 4:
+                    msg_size = self.__data[2] | (self.__data[3] << 8)
+                    if len(self.__data) >= (msg_size+4):
+                        raw_message = self.__data[4:4+msg_size]
+
+                        # Parse received message with our Protocol Hub
+                        msg = self.__iface.hub.parse(bytes(raw_message))
+
+                        # Forward message if successfully parsed
+                        if msg is not None:
+                            self.__iface.put_message(msg)
+
+                        # Chomp
+                        self.__data = self.__data[msg_size + 4:]
+                    else:
+                        break
+                else:
+                    break
+            else:
+                # Nope, that's not a header
+                while len(self.__data) >= 2:
+                    if (self.__data[0] != 0xAC) or (self.__data[1] != 0xBE):
+                        self.__data = self.__data[1:]
+                    else:
+                        break
+
+    def run(self):
+        """Out thread main task.
         """
         while not self.__canceled:
-            self.__device.process_messages()
-
-        # Finish processing remaining messages
-        logger.debug("[WhadDeviceMessageThread] processing remaining messages ...")
-        while self.__device.process_messages(timeout=.1):
-            pass
-
-        logger.info("Device message thread canceled and stopped, closing device %s.",
-                    self.__device)
-        self.__device.close()
-        logger.info("Message processing thread for interface %s has stopped.", self.__device.interface)
-
-
-class WhadDeviceIOThread:
-    """Main device IO thread.
-
-    This thread runs in background and is in charge of collecting
-    incoming messages from a WHAD interface and sending pending messages
-    to the WHAD interface.
-    """
-
-    def __init__(self, device):
-        self.__device = device
-        self.__input = WhadDeviceInputThread(device, self)
-        self.__input.daemon = True
-        self.__processing = WhadDeviceMessageThread(device)
-        self.__processing.daemon = True
-        self.__disconnected = False
-        self.__alive = False
-
-    def is_alive(self) -> bool:
-        """Check if IO thread is still alive.
-        """
-        return self.__alive
-
-    def cancel(self):
-        """Cancel device IO management thread.
-        """
-        self.__input.cancel()
-        self.__processing.cancel()
-
-    def start(self):
-        """Start device IO management thread.
-        """
-        logger.info("starting WhadDevice IO management thread ...")
-        self.__input.start()
-        self.__processing.start()
-        logger.info("WhadDevice IO management thread up and running.")
-        self.__alive = True
-
-    def join(self):
-        """Wait for device IO management thread to complete.
-        """
-        logger.info("waiting for WhadDevice IO management thread to finish ...")
-        while not self.__disconnected:
+            # Read data from device (may block)
             try:
-                logger.info("Waiting for io thread ...")
-                self.__input.join(1.0)
-            except RuntimeError:
-                logger.debug((
-                    "RuntimeError raised while joining input thread, we may try"
-                    " to wait for our thread to finish :/"))
-
-            try:
-                logger.info("Waiting for processing thread ...")
-                self.__processing.join(1.0)
-            except RuntimeError:
-                logger.debug(("RuntimeError raised while joining processing thread,"
-                              " we may try to wait for our thread to finish :/"))
-
-        logger.info("WhadDevice IO management thread finished.")
-        self.__alive = False
-        if self.__device.opened:
-            logger.info("Closing device due to IO termination.")
-            self.__device.close()
-
-    def on_disconnection(self):
-        """Handle underlying device disconnection
-        """
-        logger.debug("[device::io_thread] Adapter has disconnected")
-        self.__disconnected = True
-        self.__input.cancel()
-        #self.__device.close()
-        self.__processing.cancel()
+                data = self.__iface.read()
+                if data is not None:
+                    self.ingest(data)
+            except WhadDeviceNotReady:
+                break
+            except WhadDeviceDisconnected:
+                # Device has disconnected, notify interface by injecting a
+                # `Disconnected` event message in its output message queue.
+                # This event message will be filtered out by the Interface class
+                # when called from our connector thread, and it will exit
+                # gracefully
+                logger.debug("[iface][%s] Device disconnected, sending event to connector.",
+                             self.__iface.interface)
+                self.__iface.put_message(Disconnected(self.__iface))
+                return
 
 
-class WhadDevice:
-    """
-    WHAD Device interface class.
 
-    This device class handles the device discovery process, every possible
-    discovery and generic messages related to the device discovery. It MUST be
-    inherited by device handling classes (such as the UartDevice class) in order
-    to provide read/write capabilities.
-
-    Inherited classes MUST only implement the following methods:
-
-      * open(): will handle device opening/access
-      * close(): will handle device closing
-      * read() to read data from the device and send them to on_data_received()
-      * write() to send data to the device
-
-    All the message re-assembling, parsing, dispatching and background data reading
-    will be performed in this class.
+class Device:
+    """WHAD hardware interface
     """
 
+    # Should be lowercase.
     INTERFACE_NAME = None
 
     @classmethod
     def _get_sub_classes(cls):
         """
-        Helper allowing to get every subclass of WhadDevice.
+        Helper allowing to get every subclass of Device.
         """
         # List every available device class
         device_classes = set()
         for device_class in cls.__subclasses__():
-            if device_class.__name__ == "VirtualDevice":
+            if device_class.__name__ in ("WhadVirtualDevice", "VirtualDevice"):
                 for virtual_device_class in device_class.__subclasses__():
                     device_classes.add(virtual_device_class)
             else:
@@ -230,64 +247,57 @@ class WhadDevice:
             - a class method list, returning the available devices
             - a property identifier, allowing to identify the device in a unique way
 
-        This method should NOT be used outside of this class. Use WhadDevice.create instead.
+        This method should NOT be used outside of this class. Use Device.create instead.
         """
+        if cls.INTERFACE_NAME is None:
+            raise WhadDeviceNotFound()
 
-        if interface_string.startswith(cls.INTERFACE_NAME):
-            identifier = None
-            index = None
-            if len(interface_string) == len(cls.INTERFACE_NAME):
-                index = 0
-            elif interface_string[len(cls.INTERFACE_NAME)] == ":":
-                index = None
-                try:
-                    _, identifier = interface_string.split(":")
-                except ValueError:
-                    identifier = None
-            else:
-                try:
-                    index = int(interface_string[len(cls.INTERFACE_NAME):])
-                except ValueError:
-                    index = None
+        logger.debug("Creating an instance of %s", interface_string)
+        # Parses interface string, raise execption if format is incorrect
+        pattern = r'^' + cls.INTERFACE_NAME + r'(:(?P<identifier>.*))?(?P<index>\d+)?$'
+        result = re.match(pattern, interface_string)
+        if result is None:
+            raise WhadDeviceNotFound()
 
-            # Retrieve the list of available devices
-            # (could be a list or a dict)
-            available_devices = cls.list()
-
-            # If the list of device is built statically, check before instantiation
-            if available_devices is not None:
-                if index is not None:
-                    try:
-                        # Try to retrieve a device based on the provided index
-                        return available_devices[index]
-                    except KeyError as exc:
-                        raise WhadDeviceNotFound from exc
-                    except IndexError as exc:
-                        raise WhadDeviceNotFound from exc
-                elif identifier is not None:
-                    if isinstance(available_devices, list):
-                        for dev in available_devices:
-                            if dev.identifier == identifier:
-                                return dev
-                    elif isinstance(available_devices, dict):
-                        for dev_id, dev in available_devices.items():
-                            if dev.identifier == identifier:
-                                return dev
-                    raise WhadDeviceNotFound
-                else:
-                    raise WhadDeviceNotFound
-            # Otherwise, check dynamically using check_interface
-            else:
-                formatted_interface_string = interface_string.replace(
-                    cls.INTERFACE_NAME + ":",
-                    ""
-                )
-                if cls.check_interface(formatted_interface_string):
-                    return cls(formatted_interface_string)
-                raise WhadDeviceNotFound
-
+        # Extract interface identifier, if specified
+        iface = result.groupdict()
+        if iface['index'] is not None:
+            iface_id = int(iface['index'])
+        elif iface['identifier'] is not None:
+            iface_id = iface['identifier']
         else:
-            raise WhadDeviceNotFound
+            iface_id = None
+
+        # Retrieve the list of available devices
+        # and build a lookup dict
+        interfaces = {}
+        ifaces = cls.list()
+        if isinstance(ifaces, list):
+            for index, dev in enumerate(ifaces):
+                interfaces[index] = dev
+                interfaces[dev.identifier] = dev
+        elif isinstance(ifaces, dict):
+            for dev_id, dev in ifaces.items():
+                interfaces[dev_id] = dev
+                interfaces[dev.identifier] = dev
+        else:
+            interfaces = None
+
+        # Some child classes may return None, in this case we need to use the
+        # `check_interface()` to find the specified interface.
+        if interfaces is None and iface_id is not None and cls.check_interface(iface_id):
+            # Found, return an instance of this interface
+            return cls(iface_id)
+
+        if interfaces is not None and iface_id in interfaces:
+            return interfaces[iface_id]
+
+        if interfaces is not None and iface_id is None and 0 in interfaces:
+            return interfaces[0]
+
+        # Return interface or raise an exception
+        raise WhadDeviceNotFound()
+
 
     @classmethod
     def create(cls, interface_string):
@@ -300,14 +310,16 @@ class WhadDevice:
         Examples:
             - `uart` or `uart0`: defines the first compatible UART device available
             - `uart1`: defines the second compatible UART device available
-            - `uart:/dev/ttyACMO`: defines a compatible UART device identified by `/dev/tty/ACMO`
+            - `uart:/dev/ttyACMO`: defines a compatible UART device identified
+              by `/dev/tty/ACMO`
             - `ubertooth` or `ubertooth0`: defines the first available Ubertooth device
-            - `ubertooth:11223344556677881122334455667788`: defines a Ubertooth device with serial number *11223344556677881122334455667788*
+            - `ubertooth:11223344556677881122334455667788`: defines a Ubertooth
+              device with serial number *11223344556677881122334455667788*
         '''
         device_classes = cls._get_sub_classes()
-
         device = None
         for device_class in device_classes:
+            logger.debug("trying class %s", device_class)
             try:
                 device = device_class.create_inst(interface_string)
                 return device
@@ -317,7 +329,7 @@ class WhadDevice:
         raise WhadDeviceNotFound
 
     @classmethod
-    def list(cls):
+    def list(cls) -> Union[list,dict]:
         '''
         Returns every available compatible devices.
         '''
@@ -331,7 +343,7 @@ class WhadDevice:
                     for device in device_class_list:
                         available_devices.append(device)
                 elif isinstance(device_class_list, dict):
-                    for dev_id, device in device_class_list.items():
+                    for _, device in device_class_list.items():
                         available_devices.append(device)
         return available_devices
 
@@ -362,64 +374,67 @@ class WhadDevice:
         '''
         return self.__class__.__name__
 
-
-    @property
-    def opened(self) -> bool:
-        """Determine if the interface has already been opened
-
-        :return: `True` if interface is already open, `False` otherwise
-        :rtype: bool
-        """
-        return self.__opened
-
     def __init__(self, index: int = None):
-        """Initialize a device
-
-        Device index can be specified through the `index` argument, but keep
-        in mind that this `index` argument, if used, must be passed for all
-        devices of the same class in order not to mess up with numbering.
-        Calling code will be in charge of keeping device indexes unique.
-
-        :param index: Specifies the index of this device
-        :type index: int
+        """Initialize an interface
         """
-        # Device information
+        # Interface state
         self.__info = None
-        self.__discovered = False
         self.__opened = False
-        self.__closing = False
+        self.__discovered = False
 
         # Generate device index if not provided
         if index is None:
             self.inc_dev_index()
             self.__index = self.__class__.CURRENT_DEVICE_INDEX
-        else:
+        elif isinstance(index, int):
             # Used by HCI devices to force index to match system names
             self.__index = index
+        else:
+            raise WhadDeviceNotFound()
 
-        # Device connectors
+        # IO Threads
+        self.__iface_in = None
+        self.__iface_out = None
+
+        # Queue holding messages from connector, waiting to be sent to
+        # the interface.
+        self.__in_messages = Queue()
+
+        # Queue holding messages from interface, waiting to be sent to
+        # an attached connector
+        self.__out_messages = Queue()
+
+        # Connector bound to this device
         self.__connector = None
 
-        # Device IO thread
-        self.__io_thread = None
-
-        # Default timeout for messages (5 seconds)
-        self.__timeout = 5.0
-
-        # Message queues
-        self.__messages = Queue()
-        self.__msg_queue = Queue()
-        self.__mq_filter = None
-
-        # Input pipes
-        self.__inpipe = bytearray()
-
-        # Create locks
+        # Interface lock
         self.__lock = Lock()
-        self.__tx_lock = Lock()
+        # Connector lock
+        self.__msg_filter: Callable[..., bool] = None
 
         # Protocol hub
-        self.__hub = ProtocolHub(2)
+        self.__hub = ProtocolHub()
+
+        # Communication timeout
+        self.__timeout = 5.0
+
+    @contextlib.contextmanager
+    def get_pending_message(self, timeout: float = None) -> Generator[HubMessage, None, None]:
+        """Get message waiting to be sent to the interface.
+        """
+        try:
+            yield self.__in_messages.get(timeout=timeout)
+        except Empty as err:
+            raise err
+
+        # Mark task done
+        self.__in_messages.task_done()
+
+    @property
+    def connector(self):
+        """Connector bound to the interface
+        """
+        return self.__connector
 
     @property
     def hub(self):
@@ -436,6 +451,32 @@ class WhadDevice:
         """
         return self.__index
 
+    @property
+    def device_id(self):
+        """Return device ID
+        """
+        return self.__info.device_id
+
+    @property
+    def info(self) -> DeviceInfo:
+        """Get device info object
+
+        :return: Device information object
+        :rtype: DeviceInfo
+        """
+        return self.__info
+
+    @property
+    def opened(self) -> bool:
+        """Device is open ?
+        """
+        return self.is_open()
+
+    def is_open(self) -> bool:
+        """Determine if interface is opened.
+        """
+        return self.__opened
+
     @classmethod
     def inc_dev_index(cls):
         """Inject and maintain device index.
@@ -445,143 +486,173 @@ class WhadDevice:
         else:
             cls.CURRENT_DEVICE_INDEX = 0
 
-    def lock(self):
-        """Locks the pending output data buffer."""
-        self.__lock.acquire()
-
-    def unlock(self):
-        """Unlocks the pending output data buffer."""
-        self.__lock.release()
-
     def set_connector(self, connector):
-        """
-        Set this device connector.
-
-        :param WhadDeviceConnector connector: connector to be used with this device.
+        """Set interface connector.
         """
         self.__connector = connector
 
-    ######################################
-    # Device I/O operations
-    ######################################
+    def lock(self):
+        """Lock interface for read/write operation.
+        """
+        self.__lock.acquire()
+        logger.debug("Lock acquired !")
+
+    def unlock(self):
+        """Unlock interface for read/write operation.
+        """
+        logger.debug("Releasing lock ...")
+        self.__lock.release()
+
+    def __start_io_threads(self):
+        """Start background IO threads
+        """
+        self.__iface_in = DevInThread(self)
+        self.__iface_in.start()
+        self.__iface_out= DevOutThread(self)
+        self.__iface_out.start()
+
+    def __stop_io_threads(self):
+        """Stop background IO threads
+        """
+        if self.__iface_in is not None:
+            self.__iface_in.cancel()
+            self.__iface_in.join()
+        if self.__iface_out is not None:
+            self.__iface_out.cancel()
+            self.__iface_out.join()
+
+    ##
+    # Device specific methods
+    ##
 
     def open(self):
+        """Handle device open
         """
-        Open device method. By default, creates a simple thread
-        that will handle I/O in background. This requires the object
-        to be ready for I/O operations when this method is called.
+        # Create interface I/O threads and start them.
+        self.__start_io_threads()
 
-        This method MUST be overriden by inherited classes.
-        """
-        self.__io_thread = WhadDeviceIOThread(self)
-        self.__io_thread.start()
-
-        # Ask firmware for a reset
+        # Ask interface for a reset
         try:
-            logger.info("resetting device (if possible)")
+            logger.info("resetting interface (if possible)")
             self.__opened = True
             self.reset()
         except Empty as err:
-            # Device is unresponsive, does not seem compatible
-            # Shutdown IO thread
-            self.__io_thread.cancel()
-            self.__io_thread.join()
+            # Device is unresponsive, shutdown IO threads
+            self.__stop_io_threads()
 
-            # Notify device not found
             raise WhadDeviceNotReady() from err
 
+    def read(self) -> bytes:
+        """Read bytes from interface (blocking).
+        """
+        return b''
+
+    def write(self, payload: bytes) -> int:
+        """Write payload to interface.
+        """
+        return len(payload)
+
     def close(self):
+        """Close device
         """
-        Close device.
-
-        This method MUST be overriden by inherited classes.
-        """
-        # Avoid recursion when closing
-        if not self.__opened or self.__closing:
-            logger.debug("exiting close() to avoid recursion")
-            return
-
-        logger.info("closing WHAD device")
-        self.__closing = True
+        logger.info("closing WHAD interface")
 
         # Cancel I/O thread if required
-        if self.__io_thread is not None:
-            if self.__io_thread.is_alive():
-                self.__io_thread.cancel()
-
-        # Send a NOP message to unlock process_messages()
-        logger.debug("send NOP message")
-        msg = self.hub.generic.create_verbose(b'')
-        self.on_message_received(msg)
-        logger.debug("NOP message sent")
-
-        # Wait for the thread to terminate nicely.
-        if self.__io_thread is not None:
-            self.__io_thread.join()
-
+        self.__stop_io_threads()
         self.__opened = False
-        self.__closing = False
 
-        # Notify connector device has closed
+        # Notify connector that device has closed
         if self.__connector is not None:
-            self.__connector.on_disconnection()
+            logger.debug("Send disconnection event to connector %s", self.__connector)
+            self.__connector.send_event(Disconnected(self))
+            logger.debug("Disconnection event sent !")
 
-    def wait(self):
-        """Wait for device IO management thread to stop.
+    def change_transport_speed(self, speed):
+        """Set device transport speed.
+
+        Optional.
         """
-        logger.debug("[WhadDevice] waiting for background thread to gracefully stop")
-        self.__io_thread.join()
-        logger.debug("[WhadDevice] background threads stopped")
 
-    def is_open(self):
-        """Determine if the device has been opened or not.
+    ##
+    # Message processing
+    ##
+
+    def busy(self) -> bool:
+        """Check if the interface is busy.
+
+        We consider an interface as busy if there is at least one message in its
+        output messages or in its input messages.
         """
-        return self.__opened
+        return not (self.__out_messages.empty() and self.__in_messages.empty())
 
-    def __write(self, data):
+    def set_queue_filter(self, keep: Callable[..., bool] = None):
+        """Set message queue filter.
         """
-        Sends data to the device.
+        self.__msg_filter = keep
 
-        This is an internal method that SHALL NOT be used from inherited classes.
+    def put_message(self, message: Union[HubMessage, DeviceEvt]):
+        """Process incoming message.
         """
-        self.lock()
-        logger.debug("sending %s to WHAD device %s", bytes(data), self.interface)
-        self.write(bytes(data))
-        self.unlock()
+        # If no connector is attached to the interface, redirect to a dedicated
+        # message queue. Same if the message is an interface event (this type of
+        # messages MUST be handled by the interface itself).
+        logger.debug("[%s] putting message %s", self.interface, message)
+        if self.__connector is None:
+            logger.debug("[%s] connector is None, sending to pending messages", self.interface)
+            self.__out_messages.put(message)
 
-    def write(self, data: bytes) -> int:
-        """Default write method. This implementation emulates a successful write,
-        but classes inheriting from WhadDevice must subclass this method to provide
-        their own implementation.
+        # If a connector is attached to the interface but a message filter
+        # is set, redirect matching messages to a dedicated message queue
+        # and notify the connector about the other messages, except if we
+        # receive critical events from interface.
+        elif isinstance(message, DeviceEvt):
+            logger.debug("Sending event %s to connector %s", message, self.connector)
+            self.connector.send_event(message)
+        elif isinstance(message, HubMessage):
+            # If a filter is set and message does not match, save it in our
+            # pending messages queue.
+            if self.__msg_filter is not None and self.__msg_filter(message):
+                self.__out_messages.put(message)
+            else:
+                logger.debug("[%s] forwarding message to connector %s",
+                             self.interface, self.connector)
 
-        :param data: Data to write to the WHAD interface
-        :type data: bytes
-        :return: Number of bytes effectively written to the interface
-        :rtype: int
-        """
-        return len(data)
+                # Otherwise, wrap hub message into a `MessageReceived` event
+                self.connector.send_event(MessageReceived(self, message))
+        else:
+            # Unknown message type, log it.
+            logger.debug("[%s] put_message() called with an invalid parameter of type %s",
+                         self.interface, type(message))
 
-    def set_queue_filter(self, queue_filter=None):
-        """Sets the message queue filter.
-
-        :param filter: filtering function/lambda to be used by our message queue filter.
-        """
-        logger.debug("set queue filter: %s", queue_filter)
-        self.__mq_filter = queue_filter
-
-    def wait_for_single_message(self, timeout, msg_filter=None):
+    def wait_for_single_message(self, timeout: float = None ,
+                                keep: Callable[..., bool] = None):
         """Configures the device message queue filter to automatically move messages
         that matches the filter into the queue, and then waits for the first message
         that matches this filter and returns it.
         """
-        if filter is not None:
-            self.set_queue_filter(msg_filter)
+        unexpected_messages = []
+        if keep is not None:
+            self.set_queue_filter(keep)
 
         # Wait for a matching message to be caught (blocking)
-        return self.__msg_queue.get(block=True, timeout=timeout)
+        msg = self.__out_messages.get(block=True, timeout=timeout)
+
+        # If message filter is set and message does not match, wait until an
+        # expected message matches
+        if keep is not None:
+            # Wait for a matching message
+            while not keep(msg):
+                unexpected_messages.append(msg)
+                msg = self.__out_messages.get(block=True, timeout=timeout)
+
+            # Re-enqueue non-matching messages
+            for m in unexpected_messages:
+                self.__out_messages.put(m)
+        return msg
 
 
-    def wait_for_message(self, timeout=None, filter=None, command=False):
+    def wait_for_message(self, timeout: float = None, keep: Callable[..., bool] = None,
+                         command: bool = False):
         """
         Configures the device message queue filter to automatically move messages
         that matches the filter into the queue, and then waits for the first message
@@ -593,27 +664,35 @@ class WhadDevice:
         :param filter: Message queue filtering function (optional)
         """
 
-        # Check if device is still opem
-        if not self.__opened and self.__msg_queue.empty():
+        # Raise a WhadDeviceDisconnected exception when the interface is still
+        # considered opened but no messages to read in its output message queue.
+        #
+        # (This specific condition is met when a Unix client socket has closed
+        # following a connection to a server, after the server sent a set of
+        # messages that are still to process by the client).
+        if not self.opened and self.__out_messages.empty():
+            logger.debug("[%s] wait_for_message() cannot succeed because device is closed.")
             raise WhadDeviceDisconnected()
 
-        logger.debug("entering wait_for_message ...")
-        if filter is not None:
-            self.set_queue_filter(filter)
+        if keep is not None:
+            self.set_queue_filter(keep)
 
         start_time = time()
 
         while True:
             try:
                 # Wait for a matching message to be caught (blocking)
-                msg = self.__msg_queue.get(block=True, timeout=timeout)
+                msg = self.__out_messages.get(block=True, timeout=timeout)
 
-                # If message does not match, dispatch.
-                if not self.__mq_filter(msg):
-                    self.dispatch_message(msg)
-                    logger.debug("exiting wait_for_message ...")
+                # If we receive a disconnection event, raise an exception
+                if isinstance(msg, Disconnected):
+                    raise WhadDeviceDisconnected()
+
+                # If message does not match, re-enqueue for late processing
+                if not self.__msg_filter(msg):
+                    self.put_message(msg)
                 else:
-                    logger.debug("exiting wait_for_message ...")
+                    # If it does match, return it
                     return msg
             except Empty as err:
                 # Queue is empty, wait for a message to show up.
@@ -621,46 +700,31 @@ class WhadDevice:
                     if command:
                         raise WhadDeviceTimeout("WHAD device did not answer to a command") from err
 
-                    logger.debug("exiting wait_for_message ...")
+                    logger.debug("exiting wait_for_message (timeout: %s)...", timeout)
                     return None
 
-                sleep(0.001)
-
-
-
-    def send_message(self, message, keep=None):
+    def send_message(self, message: HubMessage, keep: Callable[..., bool] = None):
         """
-        Serializes a message and sends it to the device, without waiting for an answer.
-        Optionally, you can update the message queue filter if you need to wait for
-        specific messages after the message sent.
+        Serializes a message and sends it to the interface, without waiting
+        for an answer. Optionally, you can update the message queue filter
+        if you need to wait for specific messages after the message is sent.
 
         :param Message message: Message to send
         :param keep: Message queue filter function
         """
-        logger.info("sending message %s to device <%s>", message, self.interface)
+        if not self.opened and self.__out_messages.empty():
+            logger.debug("[%s] Cannot send message: device closed.", self.interface)
+            raise WhadDeviceDisconnected()
 
-        # if `keep` is set, configure queue filter
+        # Set message queue filter
         if keep is not None:
-            logger.debug("send_message:set_queue_filter")
             self.set_queue_filter(keep)
 
-        # Convert message into bytes
-        raw_message = message.serialize()
+        # Enqueue message to transmit to the interface
+        self.__in_messages.put(message)
 
 
-        # Define header
-        header = [
-            0xAC, 0xBE,
-            len(raw_message) & 0xff,
-            (len(raw_message) >> 8) & 0xff
-        ]
-
-        # Send header followed by serialized message
-        self.__write(header)
-        self.__write(raw_message)
-
-
-    def send_command(self, command, keep=None):
+    def send_command(self, command: HubMessage, keep: Callable[..., bool] = None):
         """
         Sends a command and awaits a specific response from the device.
         WHAD commands usualy expect a CmdResult message, if `keep` is not
@@ -671,201 +735,35 @@ class WhadDevice:
         :returns: Response message from the device
         :rtype: Message
         """
-        with self.__tx_lock:
+        # If a queue filter is not provided, expect a default CmdResult
+        try:
+            if keep is None:
+                self.send_message(command, message_filter(CommandResult))
+            else:
+                self.send_message(command, keep)
+        except WhadDeviceError as error:
+            # Device error has been triggered, it looks like our device is in
+            # an unspecified state, notify user.
+            logger.debug("WHAD device in error while sending message: %s", error)
+            raise error
 
-            # If a queue filter is not provided, expect a default CmdResult
-            try:
-                if keep is None:
-                    self.send_message(command, message_filter(CommandResult))
-                else:
-                    self.send_message(command, keep)
-            except WhadDeviceError as error:
-                # Device error has been triggered, it looks like our device is in
-                # an unspecified state, notify user.
-                logger.debug("WHAD device in error while sending message: %s", error)
-                raise error
-
-            try:
-                # Retrieve the first message matching our filter.
-                result = self.wait_for_message(self.__timeout, command=True)
-            except WhadDeviceTimeout as timedout:
-                # Forward exception
-                raise timedout
+        try:
+            # Retrieve the first message that matches our filter
+            result = self.wait_for_message(self.__timeout, command=True)
+        except WhadDeviceTimeout as timedout:
+            # Forward exception
+            raise timedout
 
         # Log message
         logger.debug("Command result: %s", result)
 
+        # Return command result
         return result
 
 
-    def on_data_received(self, data):
-        """
-        Data received callback.
-
-        This callback will process incoming messages, parse them
-        and then forward to the message processing callback.
-
-        :param bytes data: Data received from the device.
-        """
-        #logger.info("[WhadDevice] entering on_data_received()")
-        logger.debug("[WhadDevice] received raw data from device <%s>: %s", self.interface, data.hex())
-        self.__inpipe.extend(data)
-        while len(self.__inpipe) > 2:
-            # Is the magic correct ?
-            if self.__inpipe[0] == 0xAC and self.__inpipe[1] == 0xBE:
-                # Have we received a complete message ?
-                if len(self.__inpipe) > 4:
-                    msg_size = self.__inpipe[2] | (self.__inpipe[3] << 8)
-                    if len(self.__inpipe) >= (msg_size+4):
-                        raw_message = self.__inpipe[4:4+msg_size]
-
-                        # Parse received message with our Protocol Hub
-                        msg = self.__hub.parse(bytes(raw_message))
-
-                        # Forward message if successfully parsed
-                        if msg is not None:
-                            self.on_message_received(msg)
-
-                        # Chomp
-                        self.__inpipe = self.__inpipe[msg_size + 4:]
-                    else:
-                        break
-                else:
-                    break
-            else:
-                # Nope, that's not a header
-                while len(self.__inpipe) >= 2:
-                    if (self.__inpipe[0] != 0xAC) or (self.__inpipe[1] != 0xBE):
-                        self.__inpipe = self.__inpipe[1:]
-                    else:
-                        break
-
-
-    def dispatch_message(self, message):
-        """Dispatches an incoming message to the corresponding callbacks depending on its
-        type and content.
-
-        :param Message message: Message to dispatch
-        """
-        logger.info("dispatching WHAD message ...")
-
-        # Allows a connector to catch any message
-        self.on_any_msg(message)
-
-        # Forward to dedicated callbacks
-        if message.message_type == "discovery":
-            logger.info("message is about device discovery, forwarding to discovery handler")
-            self.on_discovery_msg(message)
-        elif message.message_type == "generic":
-            logger.info("message is generic, forwarding to default handler")
-            self.on_generic_msg(message)
-            logger.info("on_generic_message called")
-        else:
-            domain = message.message_type
-            if domain is not None:
-                logger.info("message concerns domain `%s`, forward to domain-specific handler",
-                            domain)
-                self.on_domain_msg(domain, message)
-
-    def on_message_received(self, message):
-        """
-        Method called when a WHAD message is received, dispatching.
-
-        :param Message message: Message received
-        """
-        if self.__closing:
-            return
-
-        logger.debug(("[WhadDevice::on_message_received()][%s] "
-                      "message received: %s"), self.interface, message)
-        logger.debug(("[WhadDevice::on_message_received()][%s] "
-                     "message queue filter: %s"), self.interface, self.__mq_filter)
-
-        # If message queue filter is defined and message matches this filter,
-        # move it into our message queue.
-        if self.__mq_filter is not None and self.__mq_filter(message):
-            logger.info("message does match current filter, save it for processing")
-            self.__msg_queue.put(message, block=True)
-            logger.info("message added to message queue")
-        else:
-            # Save message for background dispatch
-            logger.info(("message does not match filter or no filter set, "
-                         "save in default message queue"))
-            self.__messages.put(message, block=True)
-            logger.info("message added to default message queue")
-
-    def has_pending_messages(self) -> bool:
-        """Determine if the device has sent some messages.
-
-        :return: True if there are some messages awaiting for processing, False otherwise
-        :rtype: bool
-        """
-        return not self.__messages.empty()
-
-    def process_messages(self, timeout=1.0) -> bool:
-        """Process pending messages
-        """
-        result = False
-
-        #if self.__closing:
-        #    return
-
-        # If no connector set, we cannot process messages, we keep them in
-        # memory instead.
-        if self.__connector is None:
-            return False
-
-        try:
-            message = self.__messages.get(block=True, timeout=timeout)
-            if message is not None:
-                logger.debug("[process_messages] retrieved message %s", message)
-                self.dispatch_message(message)
-                result = True
-
-            return result
-        except Empty:
-            return False
-
-    ######################################
-    # Any messages
-    ######################################
-
-    def on_any_msg(self, message):
-        """This callback method is called when any message is received
-
-        :param Message message: WHAD message received
-        """
-        logger.debug("on_any_msg")
-        # Forward message to the connector, if any
-        if self.__connector is not None:
-            logger.debug("Forward message %s to connector %s",
-                         message, self.__connector)
-            self.__connector.on_any_msg(message)
-
-    ######################################
-    # Generic messages handling
-    ######################################
-
-    def on_generic_msg(self, message):
-        """
-        This callback method is called whenever a Generic message is received.
-
-        :param Message message: Generic message received
-        """
-        # Handle generic result message
-        if isinstance(message, CommandResult):
-            if message.result_code == CommandResult.UNSUPPORTED_DOMAIN:
-                logger.error("domain not supported by this device")
-                raise UnsupportedDomain("")
-
-        # Forward everything to the connector, if any
-        if self.__connector is not None:
-            logger.debug("Forward generic message %s to connector %s",
-                         message, self.__connector)
-            self.__connector.on_generic_msg(message)
-        else:
-            logger.debug("No connector registered, message lost")
-
+    ##
+    # Interface management
+    ##
 
     ######################################
     # Generic discovery
@@ -980,7 +878,7 @@ class WhadDevice:
                 assert isinstance(resp, InfoQueryResp)
 
                 # Save device information
-                self.__info = WhadDeviceInfo(
+                self.__info = DeviceInfo(
                     resp
                 )
 
@@ -1016,93 +914,20 @@ class WhadDevice:
         """Reset device
         """
         logger.info("preparing a DeviceResetQuery message")
-        msg = self.hub.discovery.create_reset_query()
+        msg = self.__hub.discovery.create_reset_query()
         return self.send_command(
             msg,
             message_filter(DeviceReady)
         )
 
-    def change_transport_speed(self, speed):
-        """Set device transport speed.
-
-        Optional.
-        """
-
-    @property
-    def device_id(self):
-        """Return device ID
-        """
-        return self.__info.device_id
-
-    @property
-    def info(self) -> WhadDeviceInfo:
-        """Get device info object
-
-        :return: Device information object
-        :rtype: WhadDeviceInfo
-        """
-        return self.__info
-
-    ######################################
-    # Upper layers (domains) handling
-    ######################################
-
-    def on_domain_msg(self, domain, message):
-        """
-        Callback method handling domain-related messages. Since this layer is not
-        managed by the root WhadDevice class, forward it to the upper layer, the
-        associated connector (if any).
-
-        :param Domain domain: Target domain
-        :param Message message: Domain-related message received
-        """
-
-        # Forward everything to the connector, if any
-        if self.__connector is not None:
-
-            # Check if message is a received packet
-            if issubclass(message, AbstractPacket):
-                # If connector is locked, save message into locked pdus
-                if self.__connector.is_locked():
-                    self.__connector.add_locked_pdu(message)
-                else:
-                    self.on_packet_message(message)
-            elif issubclass(message, AbstractEvent):
-                # Convert message into event
-                event = message.to_event()
-                if event is not None:
-                    # Forward to our connector
-                    self.__connector.on_event(event)
-            else:
-                # Forward other messages to on_domain_msg() callback
-                self.__connector.on_domain_msg(domain, message)
-        return False
-
-    def on_packet_message(self, message):
-        """Process packet message
-        """
-        # Convert message into packet
-        try:
-            packet = message.to_packet()
-            if packet is not None:
-
-                # Report packet to monitors
-                self.__connector.monitor_packet_rx(packet)
-
-                # Forward to our connector
-                if self.__connector.is_synchronous():
-                    # If we are in synchronous mode, add packet as pending
-                    self.__connector.add_pending_packet(packet)
-                else:
-                    #logger.debug("[WhadDevice] on_domain_msg() for device %s: %s",
-                    #             self.interface, message)
-                    self.__connector.on_packet(packet)
-        except struct.error:
-            logger.debug("received malformed packet !")
-
-class VirtualDevice(WhadDevice):
+class VirtualDevice(Device):
     """
-    AdapterDevice device class.
+    Virtual interface implementation.
+    
+    This variant of the base Interface class provides a way to emulate an interface
+    compatible with WHAD. This emulated compatible interface is used as an adaptation
+    layer between WHAD's core and third-party hardware that does not run a WHAD-enabled
+    firmware.
     """
     def __init__(self, index: int = None):
         self._dev_type = None
@@ -1117,6 +942,7 @@ class VirtualDevice(WhadDevice):
     def send_message(self, message, keep=None):
         """Send message to host.
         """
+        logger.debug("[virtual_iface][%s] send_message(%s)", self.interface, message)
         with self.__lock:
             super().set_queue_filter(keep)
             self._on_whad_message(message)
@@ -1124,6 +950,7 @@ class VirtualDevice(WhadDevice):
     def _on_whad_message(self, message):
         """TODO: associate callbacks with classes ?
         """
+        logger.debug("on_whad_message: %s", message)
         category = message.message_type
         message_type = message.message_name
 
@@ -1134,7 +961,7 @@ class VirtualDevice(WhadDevice):
             logger.info("unhandled message: %s", message)
             self._send_whad_command_result(ResultCode.ERROR)
 
-    def _on_whad_discovery_info_query(self, message):
+    def _on_whad_discovery_info_query(self, _):
         major, minor, revision = self._fw_version
         msg = self.hub.discovery.create_info_resp(
             DeviceType.VirtualDevice,
@@ -1144,7 +971,7 @@ class VirtualDevice(WhadDevice):
             self._fw_author,
             self._fw_url,
             major, minor, revision,
-            [domain | (capabilities[0] & 0xFFFFFF) for domain, capabilities in self._dev_capabilities.items()]
+            [dom | (cap[0] & 0xFFFFFF) for dom, cap in self._dev_capabilities.items()]
         )
         self._send_whad_message(msg)
 
@@ -1164,8 +991,46 @@ class VirtualDevice(WhadDevice):
 
 
     def _send_whad_message(self, message):
-        self.on_message_received(message)
+        self.put_message(message)
 
     def _send_whad_command_result(self, code):
         msg = self.hub.generic.create_command_result(code)
         self._send_whad_message(msg)
+
+
+class WhadDevice(Device):
+    """Renamed to `Device` for clarity, will be deprecated later."""
+
+    @classmethod
+    def create_inst(cls, interface_string):
+        """Create an instance of interface from its name, using Device."""
+        return Device.create_inst(interface_string)
+
+    @classmethod
+    def create(cls, interface_string):
+        """Create an instance of interface from its name, using Device."""
+        return Device.create(interface_string)        
+
+    @classmethod
+    def check_interface(cls, interface):
+        """Check if Device supports the requested interface."""
+        return Device.check_interface(interface)
+
+class WhadVirtualDevice(VirtualDevice):
+    """Renamed to `VirtualDevice` for clarity, will be deprecated later."""
+
+    @classmethod
+    def create_inst(cls, interface_string):
+        """Create an instance of interface from its name, using VirtualDevice."""
+        return VirtualDevice.create_inst(interface_string)
+
+    @classmethod
+    def create(cls, interface_string):
+        """Create an instance of interface from its name, using VirtualDevice."""
+        return VirtualDevice.create(interface_string)        
+
+    @classmethod
+    def check_interface(cls, interface):
+        """Check if VirtualDevice supports the requested interface."""
+        return VirtualDevice.check_interface(interface)
+

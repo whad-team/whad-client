@@ -11,7 +11,7 @@ from time import sleep
 from whad.cli.app import CommandLineDevicePipe, run_app
 from whad.device import Bridge
 from whad.device.connector import LockedConnector
-from whad.device.unix import UnixSocketServerDevice, UnixConnector
+from whad.device.unix import UnixSocketServer, UnixConnector
 from whad.hub.ble import Connected, Disconnected, BlePduReceived, BleRawPduReceived, \
     BDAddress
 from whad.ble.connector import Peripheral
@@ -449,7 +449,7 @@ class BleSpawnApp(CommandLineDevicePipe):
         peripheral.wait_connection()
 
         # Create our unix socket server
-        unix_server = UnixConnector(UnixSocketServerDevice(parameters={
+        unix_server = UnixConnector(UnixSocketServer(parameters={
             'domain': 'ble'
         }))
 

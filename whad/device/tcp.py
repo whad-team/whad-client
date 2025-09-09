@@ -11,10 +11,15 @@ import logging
 import socket
 import select
 import re
+
 from ipaddress import ip_address
 
-from whad.device import WhadDevice, WhadDeviceConnector
 from whad.exceptions import WhadDeviceNotReady, WhadDeviceDisconnected, WhadDeviceNotFound
+from whad.hub.message import HubMessage
+
+from .device import Device
+from .connector import Connector
+
 logger = logging.getLogger(__name__)
 
 def is_valid_hostname(hostname: str) -> bool:
@@ -40,9 +45,9 @@ def is_valid_hostname(hostname: str) -> bool:
     allowed = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
     return all(allowed.match(label) for label in labels)
 
-class TCPSocketDevice(WhadDevice):
+class TcpSocket(Device):
     """
-    UnixSocketDevice device class.
+    TCP client class.
     """
 
     INTERFACE_NAME = "tcp"
@@ -161,12 +166,12 @@ class TCPSocketDevice(WhadDevice):
         super().close()
 
 
-    def write(self, data):
+    def write(self, payload):
         """Writes data to the device. It relies on select() in order to make sure
         we are allowed to write to the device and wait without eating too much CPU
         if the device is not ready to be written to.
 
-        :param bytes data: Data to write
+        :param bytes payload: Data to write
         :returns: number of bytes written to the device
         """
         logger.debug("sending data to TCP socket: %s", data.hex())
@@ -183,10 +188,10 @@ class TCPSocketDevice(WhadDevice):
         )
 
         if len(writers) > 0:
-            nb_bytes_written = self.__socket.send(data)
+            nb_bytes_written = self.__socket.send(payload)
         return nb_bytes_written
 
-    def read(self):
+    def read(self) -> bytes:
         """Fetches data from the device, if there is any data to read. We call select()
         to make sure data is waiting to be read before reading it. Data is then sent to
         our parsing method through on_data_received() that will handle data reassembling
@@ -204,14 +209,14 @@ class TCPSocketDevice(WhadDevice):
                 rlist,
                 wlist,
                 elist,
-                .01
+                1
             )
 
             # Handle incoming messages if any
             if len(readers) > 0:
                 data = self.__socket.recv(1024)
                 if len(data) > 0:
-                    self.on_data_received(data)
+                    return data
                 else:
                     #logger.error('No data received from device')
                     raise WhadDeviceDisconnected()
@@ -225,7 +230,7 @@ class TCPSocketDevice(WhadDevice):
         """
 
 
-class TCPSocketConnector(WhadDeviceConnector):
+class TCPSocketConnector(Connector):
     """TCP socket server connector.
 
     This connector will create a TCP socket and accept a single connection
@@ -259,7 +264,6 @@ class TCPSocketConnector(WhadDeviceConnector):
         logger.debug("TCP socket address and port: %s (%s)", str(self.__address),
                      str(self.__port))
 
-
     def on_data_received(self, data: bytes):
         """Handle incoming data and parse it.
 
@@ -276,10 +280,6 @@ class TCPSocketConnector(WhadDeviceConnector):
                     msg_size = self.__inpipe[2] | (self.__inpipe[3] << 8)
                     if len(self.__inpipe) >= (msg_size+4):
                         raw_message = self.__inpipe[4:4+msg_size]
-
-                        # Old parsing code
-                        #_msg = Message()
-                        #_msg.ParseFromString(bytes(raw_message))
 
                         # Parse our message with our Protocol Hub
                         _msg = self.hub.parse(bytes(raw_message))
@@ -343,7 +343,7 @@ class TCPSocketConnector(WhadDeviceConnector):
                             # Is socket closed ?
                             if len(data) == 0:
                                 # Exit serve loop
-                                break
+                                raise WhadDeviceDisconnected()
 
                             # Process received data
                             self.on_data_received(data)
@@ -360,8 +360,7 @@ class TCPSocketConnector(WhadDeviceConnector):
         except BrokenPipeError:
             logger.error('Broken pipe.')
             self.__client = None
-        except Exception:
-            pass
+
 
     # Message callbacks
     def on_any_msg(self, message):
@@ -403,7 +402,7 @@ class TCPSocketConnector(WhadDeviceConnector):
         """Called when a message has successfully been sent.
         """
 
-    def on_generic_msg(self, message):
+    def on_generic_msg(self, message: HubMessage):
         """Callback function to process incoming generic messages.
 
         This method MUST be overriden by inherited classes.
@@ -412,14 +411,14 @@ class TCPSocketConnector(WhadDeviceConnector):
         :type message: HubMessage
         """
 
-    def on_discovery_msg(self, message):
+    def on_discovery_msg(self, message: HubMessage):
         """Callback method to process incoming discovery messages.
 
         :param message: Discovery message
         :type message: HubMessage
         """
 
-    def on_domain_msg(self, domain, message):
+    def on_domain_msg(self, domain, message: HubMessage):
         """Callback function to process incoming domain-related messages.
 
         This method MUST be overriden by inherited classes.

@@ -4,15 +4,41 @@ WHAD device information module.
 This module provides the `WhadDeviceInfo` class that stores all the information
 about a compatible WHAD device.
 """
-from whad.helpers import asciiz
+from typing import List
+from packaging.version import parse
 
-class WhadDeviceInfo:
+from whad.helpers import asciiz
+from whad.hub import ProtocolHub
+
+class DeviceInfo:
     """This class caches a device information related to its firmware, type,
     and supported domains and capabilities.
 
     :param DeviceInfoResp info_resp:  Whad message containing the device basic information.
     """
+
+    @staticmethod
+    def create(proto_ver: int = 2, max_speed: int = 115200, author: str = '', url: str = '',
+               version: str = '0.0', dev_type: int = 0, dev_id: bytes = '',
+               capabilities: List[int] = None) -> 'DeviceInfo':
+        # Parse version string
+        ver = parse(version)
+
+        # Build an InfoQueryResp message
+        msg = ProtocolHub().discovery.create_info_resp(
+            type=dev_type, device_id=dev_id, proto_min_ver=proto_ver, max_speed=max_speed,
+            fw_author=author.encode('utf-8'), fw_url=url.encode('utf-8'),
+            fw_version_major=ver.major, fw_version_minor=ver.minor, fw_version_rev=ver.micro,
+            capabilities=capabilities
+        )
+        return DeviceInfo(msg)
+
     def __init__(self, info_resp):
+        """Populate device information object from WHAD's InfoQueryResp message.
+        
+        :param info_resp: WHAD InfoQueryResp message
+        :type info_resp: whad.hub.discovery.InfoQueryResp
+        """
         # Store device information
         self.__whad_version = info_resp.proto_min_ver
         self.__max_speed = info_resp.max_speed
@@ -143,4 +169,4 @@ class WhadDeviceInfo:
     def domains(self):
         """Return the list of supported domains.
         """
-        return self.__domains.keys()
+        return list(self.__domains.keys())
