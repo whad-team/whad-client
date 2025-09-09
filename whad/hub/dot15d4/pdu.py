@@ -3,7 +3,9 @@
 import logging
 
 from struct import pack, unpack, error as StructError
+
 from scapy.layers.dot15d4 import Dot15d4, Dot15d4FCS
+
 from whad.scapy.layers.dot15d4tap import Dot15d4Raw
 from whad.hub.message import pb_bind, PbFieldInt, PbFieldBytes, PbMessageWrapper, \
     PbFieldBool, dissect_failsafe
@@ -54,7 +56,7 @@ class SendRawPdu(PbMessageWrapper):
         """Convert message to the corresponding scapy packet
         """
         return Dot15d4FCS(self.pdu + bytes(pack('<H', self.fcs)))
-        
+
     @staticmethod
     def from_packet(packet, channel: int = 11):
         """Convert a scapy packet to a SendPdu message

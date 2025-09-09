@@ -12,6 +12,9 @@ from time import sleep
 from scapy.layers.all import *
 from scapy.packet import Packet
 
+# We also need our custom layers
+from whad.scapy.layers import *
+
 # Required to configure scapy theme.
 from scapy.themes import BrightTheme
 from scapy.config import conf
@@ -362,8 +365,10 @@ class WhadFilterApp(CommandLineApp):
                 # Load parameters from input tool
                 parameters = self.args.__dict__
                 connector = UnixConnector(interface)
+
+                # Set the current domain in the hub and inject into connector.
+                ProtocolHub.set_domain(self.args.domain)
                 connector.domain = self.args.domain
-                hub = ProtocolHub()
 
                 if self.is_stdout_piped():
                     unix_server = UnixConnector(UnixSocketServer(parameters=parameters))
@@ -376,11 +381,10 @@ class WhadFilterApp(CommandLineApp):
 
                     # Create our packet bridge
                     logger.info("[wfilter] Starting our output pipe")
-                    WhadFilterPipe(connector, unix_server, self.on_rx_packet, 
-                                   self.on_tx_packet).wait()
+                    WhadFilterPipe(connector, unix_server, self.on_rx_packet,
+                                   self.on_tx_packet).join()
 
                 else:
-                    print("unlock")
                     # Unlock Unix connector
                     connector.unlock()
 
@@ -396,7 +400,6 @@ class WhadFilterApp(CommandLineApp):
 
                     # Keep running while interface is active
                     connector.join()
-                
             else:
                 sys.exit(1)
         except KeyboardInterrupt:

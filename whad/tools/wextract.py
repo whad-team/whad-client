@@ -4,7 +4,6 @@ This utility implements a server module, allowing to create a TCP proxy
 which can be used to access a device remotely.
 """
 import sys
-import time
 import logging
 from typing import List, Tuple
 
@@ -13,6 +12,7 @@ from scapy.packet import Packet
 from scapy.config import conf
 from scapy.themes import BrightTheme
 
+from whad.scapy.layers import *
 from whad.cli.app import CommandLineApp, run_app
 from whad.device.unix import  UnixConnector
 from whad.hub import ProtocolHub
@@ -28,7 +28,7 @@ class WhadExtractApp(CommandLineApp):
         """Application uses an interface and has commands.
         """
         super().__init__(
-            description='WHAD filter tool',
+            description='WHAD extraction tool',
             interface=True,
             commands=False,
             input=CommandLineApp.INPUT_WHAD,
@@ -141,9 +141,12 @@ class WhadExtractApp(CommandLineApp):
                 # Create a Unix socket connector
                 connector = UnixConnector(interface)
 
+                # Enable the specified domain in the hub
+                ProtocolHub.set_domain(self.args.domain)
+
                 # Set the connector domain
                 connector.domain = self.args.domain
-                hub = ProtocolHub(2)
+                hub = ProtocolHub()
                 connector.format = hub.get(self.args.domain).format
                 connector.on_packet = self.on_packet
 

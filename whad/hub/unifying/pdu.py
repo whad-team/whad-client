@@ -4,6 +4,7 @@ from whad.protocol.whad_pb2 import Message
 from whad.scapy.layers.esb import ESB_Hdr, ESB_Payload_Hdr, ESB_Ack_Response, ESB_Pseudo_Packet
 from ..message import pb_bind, PbFieldBytes, PbFieldBool, PbFieldInt, PbMessageWrapper, \
     dissect_failsafe
+from whad.scapy.layers.unifying import bind
 from whad.hub.message import AbstractPacket
 from . import UnifyingDomain, UnifyingMetadata
 
@@ -77,6 +78,10 @@ class PduReceived(PbMessageWrapper):
     def to_packet(self):
         """Convert message to the corresponding scapy packet
         """
+        # Ensure our Unifying layers for scapy are correctly bound
+        bind()
+
+        # Build the Unifying packet (payload will be interpreted as Unifying header)
         packet = ESB_Payload_Hdr(bytes(self.pdu))
         packet.metadata = UnifyingMetadata()
         packet.metadata.channel = self.channel
@@ -132,6 +137,10 @@ class RawPduReceived(PbMessageWrapper):
     def to_packet(self):
         """Convert message to the corresponding scapy packet
         """
+        # Ensure our Unifying layers for scapy are correctly bound
+        bind()
+
+        # Build the Unifying packet (payload will be interpreted as Unifying header)
         packet = ESB_Hdr(bytes(self.pdu))
         packet.metadata = UnifyingMetadata()
         packet.metadata.channel = self.channel
