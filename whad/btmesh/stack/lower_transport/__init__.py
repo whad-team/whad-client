@@ -317,7 +317,7 @@ class LowerTransportLayer(Layer):
         """
         self._custom_handlers[clazz] = handler
 
-    def unregister_custom_hanlder(self, clazz):
+    def unregister_custom_handler(self, clazz):
         """
         Unregisters a previously registerd custom callback for an Access message received
 

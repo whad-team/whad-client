@@ -1,21 +1,28 @@
 Getting started
 ===============
 
-Sniff BM traffic
-~~~~~~~~~~~~~~~~
+Sniff unciphered BM traffic
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Use the :class:`whad.btmesh.connector.sniffer.BTMeshSniffer` class to instantiate a sniffer device
-and listen to all traffic sent using the given NetKey (if given) and unciphered beacons.
+and listen to all traffic. By default unciphered.
+
+Use the :class:`whad.btmesh.sniffing.SnifferConfiguration` to configure the sniffer (and add deciphering options).
+
 
 .. code-block:: python
 
     from whad.device import WhadDevice
-    from whad.btmesh.connector.sniffer import BTMeshSniffer
+    from whad.btmesh.connector.sniffer import Sniffer
 
-    device = WhadDevice("uart0")
-    sniffer = BTMeshSniffer(dev, net_key = bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"))
-    sniffer.configure(advertisements=True, connection=False)
+    sniffer = Sniffer(dev)
+    sniffer.configure()
     sniffer.start()
+
+    for pkt in sniffer.sniff(timeout=30):
+        pkt.show()
+        print(pkt.metadata)
+
 
 
 Create a provisionee node ("normal" node) with preset keys (auto-provisioned)
@@ -34,7 +41,7 @@ It will be automacally provisioned with a preset of given keys and default profi
         dev,
         net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
         dev_app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
-        unicast_addr=b"\x00\xff",
+        unicast_addr=0x0002,
     )
 
     profile = provisionee.profile
@@ -61,250 +68,107 @@ We send Unprovisioned Device Beacons until the node is provisioned by a Provisio
     dev = WhadDevice.create(interface)
 
     provisionee = Provisionee(dev)
-    provisionee.start()
-    provisionee.start_unprovisioned_beacons_sending()
-
-    print("Sending Unprovisioned Device Beacons, waiting for provisioning ....")
+    provisionee.start_provisioning()
 
     while not provisionee.profile.is_provisioned:
-        sleep(1)
+        sleep(0.5)
 
     print("Node is provisioned !")
 
 
-Create a provisionee node ("normal" node) and wait for provisioning
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Create a provisioner node and provision nodes that send beacons
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Use the :class:`whad.btmesh.connector.provisioner.Provisioner` class to create a BM provisioner node.
 It needs to be auto provisioned, and then waits for Unprovisioned Device Beacons to arrive in ordrer to provision them.
+This code will provision any node sending beacons directly. OOB Authentication is supported but needs to be handled in code.
 
 
 .. code-block:: python
 
+    from whad.device import UartDevice
+    from whad.btmesh.connector.provisioner import Provisioner
+
+
+    dev = WhadDevice.create(interface)
+
+    # Auto provision node
+    provisioner = Provisioner(dev)
+    provisioner.profile.auto_provision()
+    provisioner.start()
+    print("Provisionner started\n")
+
+    provisioner.start_listening_beacons()
+
+    while True:
+        devices = provisioner.get_unprovisioned_devices() 
+        if len(devices) > 0:
+            print("Provisioning node ...")
+            res = provisioner.provision_distant_node(devices[0])
+        if res:
+                print("Successfully provisioned device\n")
+            else:
+                print("Failed to provision deviced...\n")
 
 
 
-Initiate a connection to a BLE device
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Send a PDU from a client Model
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Use the :class:`whad.ble.connector.central.Central` class to create a
-BLE central device and initiate a connection to a BLE peripheral device.
-
-.. code-block:: python
-
-    from whad import UartDevice
-    from whad.ble import Central
-
-    # Create a central device
-    central = Central(UartDevice('/dev/ttyUSB0'))
-
-    # Connect to our target device
-    target = central.connect('0C:B8:15:C4:88:8E')
-
-The `connect()` method returns a :class:`whad.ble.profile.device.PeripheralDevice` object
-that represents the remote device.
-
-Enumerate services and characteristics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Once connected, it is possible to discover all the services and characteristics
-and display them.
-
-.. code-block:: python
-
-    # Discover services and characteristics
-    target.discover()
-
-    # Display target profile
-    print(target)
-
-The :class:`whad.ble.profile.device.PeripheralDevice` also provides some methods
-to iterate over services and characteristics:
+Using a provisioned connector (Provisionee/Provisioner), use the `send_model_message()` function to send a message from a client model.
+Here, we send a Generic OnOff set message to the broadcast address.
 
 .. code-block:: python
 
-    for service in target.services():
-        print('-- Service %s' % service.uuid)
-        for charac in service.characteristics():
-            print(' + Characteristic %s' % charac.uuid)
+    from whad.exceptions import WhadDeviceNotFound
 
-Read a characteristic
-~~~~~~~~~~~~~~~~~~~~~
-
-To read a characteristic from an device, just get the corresponding characteristic object
-and read its value:
-
-.. code-block:: python
-
-    charac = device.get_characteristic(UUID('1800'), UUID('2A00'))
-    if charac is not None:
-        print('Value: %s' % charac.value)
-
-Write to characteristic
-~~~~~~~~~~~~~~~~~~~~~~~
-
-To write a value into a characteristic, this is as simple as reading one:
-
-.. code-block:: python
-
-    charac = device.get_characteristic(UUID('1800'), UUID('2A00'))
-    if charac is not None:
-        charac.value = b'Something'
-
-Subscribe for notification/indication
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Sometimes it is needed to subscribe to notifications or indications for a given
-characteristic. This is done through the `subscribe()` method of :class:`whad.ble.profile.device.PeripheralDevice`, as shown below:
-
-.. code-block:: python
-
-    def on_charac_updated(characteristic, value, indication=False):
-        if indication:
-            print('[indication] characteristic updated with value: %s' % value)
-        else:
-            print('[notification] characteristic updated with value: %s' % value)
-
-    charac = device.get_characteristic(UUID('1800'), UUID('2A00'))
-    if charac is not None:
-        charac.subscribe(
-            notification=True,
-            callback=on_charac_updated
-        )
-
-Close connection
-~~~~~~~~~~~~~~~~
-
-To close an existing connection, simply call the `disconnect()` method of the :class:`whad.ble.profile.device.PeripheralDevice` class:
-
-.. code-block:: python
-
-    target.disconnect()
-
-
-Create a peripheral device
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Creating a BLE peripheral device requires to define a custom profile that determines
-the device services and characteristics:
-
-.. code-block:: python
-
-    from whad import UartDevice
-    from whad.ble import Peripheral
-    from whad.ble.profile import GattProfile
-    from whad.ble.profile.advdata import AdvCompleteLocalName, AdvDataFieldList, AdvFlagsField
-
-    class MyPeripheral(GenericProfile):
-
-        device = PrimaryService(
-            uuid=UUID(0x1800),
-
-            device_name = Characteristic(
-                uuid=UUID(0x2A00),
-                permissions = ['read', 'write'],
-                notify=True,
-                value=b'TestDevice'
-            ),
-
-            null_char = Characteristic(
-                uuid=UUID(0x2A01),
-                permissions = ['read', 'write'],
-                notify=True,
-                value=b''
-            ),
-        )
-
-Once this profile defined, instantiate a :class:`whad.ble.connector.Peripheral` object
-using this profile:
-
-.. code-block:: python
-
-    # Instantiate our peripheral
-    my_profile = MyPeripheral()
-
-    # Create a periphal device based on this profile
-    periph = Peripheral(UartDevice('/dev/ttyUSB0', 115200), profile=my_profile)
-
-    # Enable peripheral mode with advertisement data:
-    # * default flags (general discovery mode, connectable, BR/EDR not supported)
-    # * Complete local name
-    periph.enable_peripheral_mode(adv_data=AdvDataFieldList(
-        AdvCompleteLocalName(b'TestMe!'),
-        AdvFlagsField()
-    ))
-
-    # Start advertising
-    periph.start()
-
-It is also possible to trigger specific actions when a characteristic is read or written,
-through the dedicated callbacks provided by :class:`whad.ble.profile.GenericProfile`.
-
-Advanced features
------------------
-
-Sending and receiving PDU
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-It is sometimes useful to send a PDU to a device as well as processing any
-incoming PDU without having to use a protocol stack. The BLE :py:class:`whad.ble.connector.Peripheral`
-and :py:class:`whad.ble.connector.Central` connector provides a nifty way to do it:
-
-.. code:: python
-
-    from whad.ble import Central
     from whad.device import WhadDevice
-    from scapy.layers.bluetooth4LE import *
+    from whad.btmesh.connector.provisionee import Provisionee
+    from time import sleep
+    from whad.btmesh.stack.utils import MeshMessageContext
+    from whad.scapy.layers.btmesh import BTMesh_Model_Generic_OnOff_Set
 
-    # Connect to target
-    print('Connecting to remote device ...')
-    central = Central(WhadDevice.create('uart0'))
-    device = central.connect('00:11:22:33:44:55', random=False)
 
-    # Make sure connection has succeeded
-    if device is not None:
-        
-        # Enable synchronous mode: we must process any incoming BLE packet.
-        central.enable_synchronous(True)
+    dev = WhadDevice.create(interface)
 
-        # Send a LL_VERSION_PDU
-        central.send_pdu(BTLE_DATA()/BTLE_CTRL()/LL_VERSION_IND(
-            version = 0x08,
-            company = 0x0101,
-            subversion = 0x0001
-        ))
+    provisionee = Provisionee(dev)
+    provisionee.start()
 
-        # Wait for a packet
-        while central.is_connected():
-            pdu = central.wait_packet()
-            if pdu.haslayer(LL_VERSION_IND):
-                pdu[LL_VERSION_IND].show()
-                break
+    profile = provisionee.profile
+    profile.auto_provision()
 
-        # Disconnect
-        device.disconnect()
+    # retrieve generic onoff client of the local node of primary element
+    model = provisionee.profile.local_node.get_element(0).get_model_by_id(0x1001)
 
-The above example connects to a target device, sends an `LL_VERSION_IND`
-PDU and waits for an `LL_VERSION_IND` PDU from the remote device.
+    if model is None:
+        print(
+            "this profile does not implement the generic onoff client in primary element, fail."
+        )
+        dev.close()
+        exit(1)
 
-Normally, when a :class:`whad.device.connector.WhadDeviceConnector`
-(or any of its inherited classes) is used it may rely on a protocol stack to process
-outgoing and ingoing PDUs. By doing so, there is no way to get access to the received
-PDUs and avoid them to be forwarded to the connector's protocol stack.
+    # Create context of message to send
+    ctx = MeshMessageContext()
+    ctx.src_addr = provisionee.profile.get_primary_element_addr()
+    ctx.dest_addr = 0xFFFF
+    ctx.application_key_index = 0
+    ctx.net_key_id = 0
+    ctx.ttl = 127
 
-However, all connectors expose a method called :meth:`whad.device.connector.WhadDeviceConnector.enable_synchronous`
-that can enable or disable this automatic processing of PDUs. By default,
-PDUs are passed to the underlying protocol stack but we can force the connector
-to keep them in a queue and to wait for us to retrieve them:
+    onoff = 0
 
-.. code:: python
+    while True:
+        # the packet to send (we switch between 0 and 1)
+        pkt = BTMesh_Model_Generic_OnOff_Set(onoff=onoff)
 
-    # Disable automatic PDU processing
-    central.enable_synchronous(True)
+        print("\nSending message to 0x%x...\n" % ctx.dest_addr)
 
-With the connector set in synchronous mode, every received PDU is then stored by
-the connector in a dedicated queue and can be retrieved using 
-:py:meth:`whad.device.connector.WhadDeviceConnector.wait_packet`.
-This method requires the connector to be in synchronous mode and will return
-a PDU from the connector's queue, or `None` if the queue is empty once the
-specified timeout period expired.
+        response = provisionee.send_model_message(
+            model=model, message=(pkt, ctx), is_acked=False
+        )
+
+        onoff = int(not onoff)
+        sleep(5)
+
+
+Optionally, you can expect the Status response with the `response` variable. In that case you can specify a timeout for the delay to wait for the Status response.

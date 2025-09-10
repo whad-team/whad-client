@@ -66,7 +66,8 @@ class BTMeshNode(BTMesh):
 
         :param device: Whad device handle
         :type device: WhadDeviceConnector
-        :param prov_stack: Provisionning Stack to use, defaults to PBAdvBearerLayer
+        :param profile: The profile instance to use 
+        :type profile: BaseMeshProfile, optional
         :type prov_stack: Layer, optional
         :raises UnsupportedCapability: Device Cannot inject
         """

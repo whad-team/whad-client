@@ -84,6 +84,7 @@ Welcome to WHAD's documentation!
     :caption: Bluetooth Mesh
 
     btmesh/started
+    btmesh/profile
 
 .. toctree::
     :maxdepth: 1

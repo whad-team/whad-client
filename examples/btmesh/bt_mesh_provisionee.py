@@ -34,11 +34,11 @@ try:
 
     print("Node is provisioned !")
 
-    # retrieve Generic OnOff Client of the local node of primary element
+    # retrieve generic onoff client of the local node of primary element
     model = provisionee.profile.local_node.get_element(0).get_model_by_id(0x1001)
     if model is None:
         print(
-            "This profile does not implement the Generic OnOff Client in primary element, fail."
+            "this profile does not implement the generic onoff client in primary element, fail."
         )
         dev.close()
         exit(1)

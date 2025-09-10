@@ -38,6 +38,11 @@ from whad.scapy.layers.btmesh import (
 )
 from whad.zigbee.profile.network import Network
 from whad.btmesh.profile import BaseMeshProfile
+from whad.btmesh.models.configuration import (
+    ConfigurationModelClient,
+    ConfigurationModelServer,
+)
+from whad.btmesh.models.generic_on_off import GenericOnOffClient, GenericOnOffServer
 from scapy.packet import Raw
 from uuid import UUID
 
@@ -52,6 +57,24 @@ class GenProvProvisioneeMock(Sandbox, ContextualLayer):
     pass
 
 
+class CustomProfile(BaseMeshProfile):
+    def _populate_elements_and_models(self):
+        """
+        Populate elements and models for the node (except the ConfigurationModelServer, HealthModelServer and primary element creation, by default)
+        """
+
+        # We add a second element, and add a Generic OnOffServer to it
+        new_element = self.local_node.add_element()
+        new_element.register_model(GenericOnOffServer())
+
+        # Add a GenericOnOff Server and Client
+        primary_element = self.local_node.get_element(0)
+        primary_element.register_model(GenericOnOffServer())
+        primary_element.register_model(GenericOnOffClient())
+        # for convenience, we add a ConfigurationModelClient to all nodes for testing.
+        primary_element.register_model(ConfigurationModelClient())
+
+
 # Create our sandboxed pb_adv layer instantiating the gen_prov layer (needed since Provisioning layer accesses this layer...)
 @alias("pb_adv")
 class PBAdvMock(Sandbox):
@@ -64,7 +87,7 @@ class PBAdvMock(Sandbox):
         self.target = self.gen_prov.name
 
         self.gen_prov.get_layer("provisioning").state.test_mode = True
-        profile = BaseMeshProfile(
+        profile = CustomProfile(
             auto_prov_net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
             auto_prov_dev_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),
             auto_prov_app_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48"),

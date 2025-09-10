@@ -78,7 +78,7 @@ class PathPoisonSolicitationAttacker(Attacker):
         if self._is_setup:
             self._connector.stop()
             upper_transport = self._connector.main_stack.get_layer("upper_transport")
-            upper_transport.unregister_custom_hanlder(
+            upper_transport.unregister_custom_handler(
                 BTMesh_Upper_Transport_Control_Path_Request
             )
             self._connector.start()

@@ -74,7 +74,7 @@ class LinkCloserAttacker(Attacker):
         if self._is_setup:
             self._connector.stop()
             pb_adv = self._connector.prov_stack.get_layer("pb_adv")
-            pb_adv.unregister_custom_hanlder(EIR_PB_ADV_PDU)
+            pb_adv.unregister_custom_handler(EIR_PB_ADV_PDU)
             self._connector.start()
             self._is_setup = False
 

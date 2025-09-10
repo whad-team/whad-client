@@ -155,11 +155,9 @@ class BaseMeshProfile(object):
     def _populate_elements_and_models(self):
         """
         Populate elements and models for the node (except the ConfigurationModelServer, HealthModelServer and primary element creation, by default)
+
+        TODO : Add a json like profile import/export
         """
-
-        new_element = self.__local_node.add_element()
-        new_element.register_model(GenericOnOffServer())
-
         primary_element = self.__local_node.get_element(0)
         primary_element.register_model(GenericOnOffServer())
         primary_element.register_model(GenericOnOffClient())
