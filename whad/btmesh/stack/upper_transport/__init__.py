@@ -111,7 +111,7 @@ class UpperTransportLayer(Layer):
         """
         self._custom_handlers[clazz] = handler
 
-    def unregister_custom_hanlder(self, clazz):
+    def unregister_custom_handler(self, clazz):
         """
         Unregisters a previously registerd custom callback for a message received
 
@@ -326,7 +326,7 @@ class UpperTransportLayer(Layer):
         # Only if the seq_num is None, otherwise means we hardcoded it (in shell for ex)
         if ctx.seq_number is None:
             ctx.seq_number = self.state.profile.get_next_seq_number(inc=4)
-        
+
         if get_address_type(ctx.dest_addr) == VIRTUAL_ADDR_TYPE:
             encrypted_message, ctx.seq_auth = key.encrypt(
                 access_message=raw(pkt),
@@ -521,11 +521,7 @@ class UpperTransportLayer(Layer):
         base_ctx.is_ctl = True
         base_ctx.net_key_id = 0
 
-        try:
-            old_callback = self._handlers[BTMesh_Upper_Transport_Control_Path_Reply]
-        except KeyError:
-            old_callback = lambda message: None
-        self.register_callback_ctl_message(
+        self.register_custom_handler(
             BTMesh_Upper_Transport_Control_Path_Reply,
             self.on_path_reply_network_discovery,
         )
@@ -543,9 +539,7 @@ class UpperTransportLayer(Layer):
 
         # Wait a little to be sure we receive all resonponses before resetting the Path_Reply callback
         sleep(3)
-        self.register_callback_ctl_message(
-            BTMesh_Upper_Transport_Control_Path_Reply, old_callback
-        )
+        self.unregister_custom_handler(BTMesh_Upper_Transport_Control_Path_Reply)
 
     def discovery_get_hops_thread(self):
         """
@@ -560,14 +554,7 @@ class UpperTransportLayer(Layer):
         ctx.is_ctl = True
         ctx.net_key_id = 0
 
-        try:
-            old_callback = self._handlers[
-                BTMesh_Upper_Transport_Control_Path_Echo_Reply
-            ]
-        except KeyError:
-            old_callback = lambda message: None
-
-        self.register_callback_ctl_message(
+        self.register_custom_handler(
             BTMesh_Upper_Transport_Control_Path_Echo_Reply,
             self.on_path_echo_reply_network_discovery,
         )
@@ -582,9 +569,7 @@ class UpperTransportLayer(Layer):
 
         # Wait a little to be sure we receive all resonponses before resetting the Path_Reply callback
         sleep(1)
-        self.register_callback_ctl_message(
-            BTMesh_Upper_Transport_Control_Path_Echo_Reply, old_callback
-        )
+        self.unregister_custom_handler(BTMesh_Upper_Transport_Control_Path_Echo_Reply)
 
     def on_path_echo_reply_network_discovery(self, message):
         pkt, ctx = message

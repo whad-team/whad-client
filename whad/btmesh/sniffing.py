@@ -11,9 +11,12 @@ class SnifferConfiguration:
     :param whitelist_addresses: filter on AdVA addresses (w)
     :param net_keys: provide decryption keys for the network layer (n)
     :param app_keys: provide decryption keys for the application layer (a)
-    :param iv_indexes: list of iv_index for each net_key, in the same order (i)
+    :param iv_indexes: list of iv_index for each net_key, in the same order (x)
     :param channel: select the channel to sniff (c)
     :param use_rpl: indicate if cache on network layer activated (r)
+
+
+    TODO : network cache fix
 
     """
 

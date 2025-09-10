@@ -75,7 +75,8 @@ class Provisioner(BTMeshNode):
 
         :param device: Device object
         :type device: Device
-        :param profile: Profile class used, defaults to BaseMeshProfile
+        :param profile: Profile to use, defaults to BaseMeshProfile
+        :type profile: BaseMeshProfile
         """
         super().__init__(device, profile)
 

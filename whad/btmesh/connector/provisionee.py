@@ -51,7 +51,8 @@ class Provisionee(BTMeshNode):
 
         :param device: Device object
         :type device: Device
-        :param profile: Profile class used for the node (elements and models layout), defaults to None
+        :param profile: Profile used for the node (elements and models layout), defaults to None
+        :type profile: BaseMeshProfile, optional
         :param net_key: If auto provisioned : primary NetKey , defaults to bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00")
         :type net_key: Bytes, optional
         :param dev_app_key: If auto provisioned : primary app key and dev key (both the same value), defaults to bytes.fromhex("63964771734fbd76e3b40519d1d94a48")

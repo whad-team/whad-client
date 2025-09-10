@@ -74,7 +74,9 @@ class GenericOnOffClient(ModelClient):
     def __init__(self):
         super().__init__(model_id=0x1001)
 
-        self.rx_handlers[0x8204] = self.rx_on_on_onff_status # BTMesh_Model_Generic_OnOff_Status
+        self.rx_handlers[0x8204] = (
+            self.rx_on_on_onff_status
+        )  # BTMesh_Model_Generic_OnOff_Status
 
         self.tx_handlers[0x8202] = self.tx_on_off_acked
         self.tx_handlers[0x8203] = self.tx_on_off_unacked

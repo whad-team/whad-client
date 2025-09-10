@@ -1,12 +1,19 @@
-from whad.scapy.layers.btmesh import *
+from whad.scapy.layers.btmesh import BTMesh_Model_Generic_OnOff_Set
 from whad.exceptions import WhadDeviceNotFound
 
 from whad.device import WhadDevice
 from whad.ble.exceptions import ConnectionLostException
 import sys
-from whad.btmesh.connecto.provisionee import Provisionee
+from whad.btmesh.connector.provisionee import Provisionee
+from whad.btmesh.profile import BaseMeshProfile
 
-from whad.btmesh.stack.utils import MeshMessageContext
+from whad.btmesh.stack.utils import (
+    MeshMessageContext,
+    get_address_type,
+    UNICAST_ADDR_TYPE,
+)
+from whad.btmesh.models.generic_on_off import GenericOnOffClient, GenericOnOffServer
+from whad.btmesh.models.configuration import ConfigurationModelClient
 
 from whad.scapy.layers.btmesh import *
 
@@ -17,32 +24,86 @@ if len(sys.argv) != 2:
     exit(1)
 
 
+class CustomProfile(BaseMeshProfile):
+    def _populate_elements_and_models(self):
+        """
+        Populate elements and models for the node (except the ConfigurationModelServer, HealthModelServer and primary element creation, by default)
+        """
+
+        # We add a second element, and add a Generic OnOffServer to it
+        new_element = self.local_node.add_element()
+        new_element.register_model(GenericOnOffServer())
+
+        # Add a GenericOnOff Server and Client
+        primary_element = self.local_node.get_element(0)
+        primary_element.register_model(GenericOnOffServer())
+        primary_element.register_model(GenericOnOffClient())
+        # for convenience, we add a ConfigurationModelClient to all nodes for testing.
+        primary_element.register_model(ConfigurationModelClient())
+
+
 interface = sys.argv[1]
 
 try:
     dev = WhadDevice.create(interface)
 
-    provisionee = Provisionee(dev)
-    profile = provisionee.profile
-    profile.auto_provision()
+    # instantiate of custom profile
+    profile = CustomProfile()
+    provisionee = Provisionee(dev, profile=profile)
     provisionee.start()
 
+    profile.auto_provision()
+
+    # retrieve generic onoff client of the local node of primary element
+    model = provisionee.profile.local_node.get_element(0).get_model_by_id(0x1001)
+    if model is None:
+        print(
+            "this profile does not implement the generic onoff client in primary element, fail."
+        )
+        dev.close()
+        exit(1)
+
+    # Create context of message to send
+    ctx = MeshMessageContext()
+    ctx.src_addr = provisionee.profile.get_primary_element_addr()
+    ctx.dest_addr = 0xFFFF
+    ctx.application_key_index = 0
+    ctx.net_key_id = 0
+    ctx.ttl = 127
+
     onoff = 0
-    transaction_id = 1
 
     while True:
-        # create context in loop! (otherwise values get overwritten when sending ...)
-        ctx = MeshMessageContext()
-        ctx.src_addr = profile.primary_element_addr.to_bytes(2, "big")
-        ctx.dest_addr = b"\xff\xff"
-        ctx.application_key_index = 0
-        ctx.net_key_id = 0
-        ctx.ttl = 127
+        # the packet to send (we switch between 0 and 1)
+        pkt = BTMesh_Model_Generic_OnOff_Set(onoff=onoff)
 
-        i = input("Press a key to send a Generic On/Off to the broadcast address ...")
-        provisionee.do_onoff(onoff, ctx, transaction_id)
+        addr = input(
+            "\nPress a key to send a Generic On/Off to the broadcast address with app-key 0 and net-key 0 (make sure to have them ...)\n"
+            "Enter an address of destination to send to a specific destination and wait for ackowlegement :  "
+        )
+        try:
+            ctx.dest_addr = int(addr, 0) & 0xFFFF
+        except ValueError:
+            ctx.dest_addr = 0xFFFF
+
+        # Only wait for ack with status if destination is a unicast adress
+        is_acked = get_address_type(ctx.dest_addr) == UNICAST_ADDR_TYPE
+
+        print("\nSending message to 0x%x...\n" % ctx.dest_addr)
+        response = provisionee.send_model_message(
+            model=model, message=(pkt, ctx), is_acked=is_acked
+        )
+
+        if is_acked:
+            if response is None:
+                print("Did not receive any response from 0x%x\n\n" % ctx.dest_addr)
+            else:
+                print("Received status packet from 0x%x\n\n" % ctx.dest_addr)
+                resp_pkt, resp_ctx = response
+                resp_pkt.show()
+
         onoff = int(not onoff)
-        transaction_id += 1
+
 
 except ConnectionLostException as e:
     print("Connection lost", e)
