@@ -8,19 +8,18 @@ from time import sleep
 import logging
 from typing import List, Union, Tuple
 
-
 from prompt_toolkit import print_formatted_text, HTML
 from scapy.packet import Packet
 from scapy.config import conf
 from scapy.themes import BrightTheme
 
+from whad.scapy.layers import *
 from whad.cli.app import CommandLineApp, run_app
 from whad.device.unix import UnixConnector, UnixSocketServer
 from whad.device import Bridge
 from whad.hub import ProtocolHub
 from whad.cli.ui import error, success, info, display_packet, format_analyzer_output
 from whad.tools.utils import get_analyzers
-
 
 logger = logging.getLogger(__name__)
 #logging.basicConfig(level=logging.DEBUG)
@@ -296,6 +295,8 @@ class WhadAnalyzeApp(CommandLineApp):
                 if not self.args.nocolor:
                     conf.color_theme = BrightTheme()
 
+                # Configure the current domain
+                ProtocolHub.set_domain(self.args.domain)
 
                 #parameters = self.args.__dict__
                 connector = UnixConnector(interface)
@@ -348,3 +349,4 @@ def wanalyze_main():
     """
     app = WhadAnalyzeApp()
     run_app(app)
+
