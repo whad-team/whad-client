@@ -177,12 +177,12 @@ class CompositionDataState(object):
 
 
 class ConfigurationModelServer(ModelServer):
-    def __init__(self, profile):
+    def __init__(self, profile=None):
         """
         Initialization of the ConfigurationModelServer. Needed on all nodes (all profiles)
 
-        :param profile: Profile of the node (specific to this Model constructor)
-        :type profile: BaseMeshProfile
+        :param profile: Profile of the node (specific to this Model constructor), defaults to None
+        :type profile: BaseMeshProfile, optional
         """
         super().__init__(model_id=0x0000, allows_dev_keys=True)
 

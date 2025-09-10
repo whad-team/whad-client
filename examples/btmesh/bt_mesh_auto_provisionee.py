@@ -5,15 +5,20 @@ from whad.device import WhadDevice
 from whad.ble.exceptions import ConnectionLostException
 import sys
 from whad.btmesh.connector.provisionee import Provisionee
-from whad.btmesh.profile import BaseMeshProfile
 
 from whad.btmesh.stack.utils import (
     MeshMessageContext,
     get_address_type,
     UNICAST_ADDR_TYPE,
 )
+
+from whad.btmesh.profile import BaseMeshProfile
 from whad.btmesh.models.generic_on_off import GenericOnOffClient, GenericOnOffServer
-from whad.btmesh.models.configuration import ConfigurationModelClient
+from whad.btmesh.models.configuration import (
+    ConfigurationModelServer,
+    ConfigurationModelClient,
+)
+from whad.btmesh.models import Element
 
 from whad.scapy.layers.btmesh import *
 
@@ -25,22 +30,23 @@ if len(sys.argv) != 2:
 
 
 class CustomProfile(BaseMeshProfile):
-    def _populate_elements_and_models(self):
-        """
-        Populate elements and models for the node (except the ConfigurationModelServer, HealthModelServer and primary element creation, by default)
-        """
-
-        # We add a second element, and add a Generic OnOffServer to it
-        new_element = self.local_node.add_element()
-        new_element.register_model(GenericOnOffServer())
-
-        # Add a GenericOnOff Server and Client
-        primary_element = self.local_node.get_element(0)
-        primary_element.register_model(GenericOnOffServer())
-        primary_element.register_model(GenericOnOffClient())
-        # for convenience, we add a ConfigurationModelClient to all nodes for testing.
-        primary_element.register_model(ConfigurationModelClient())
-
+    elements = [
+        Element(
+            index=0,
+            is_primary=True,
+            models=[
+                GenericOnOffClient(),
+                GenericOnOffServer(),
+                ConfigurationModelClient(),
+                ConfigurationModelServer(),
+            ],
+        ),
+        Element(
+            index=1,
+            is_primary=False,
+            models=[GenericOnOffClient(), GenericOnOffServer()],
+        ),
+    ]
 
 interface = sys.argv[1]
 

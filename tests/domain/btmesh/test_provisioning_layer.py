@@ -43,6 +43,7 @@ from whad.btmesh.models.configuration import (
     ConfigurationModelServer,
 )
 from whad.btmesh.models.generic_on_off import GenericOnOffClient, GenericOnOffServer
+from whad.btmesh.models import Element
 from scapy.packet import Raw
 from uuid import UUID
 
@@ -58,21 +59,23 @@ class GenProvProvisioneeMock(Sandbox, ContextualLayer):
 
 
 class CustomProfile(BaseMeshProfile):
-    def _populate_elements_and_models(self):
-        """
-        Populate elements and models for the node (except the ConfigurationModelServer, HealthModelServer and primary element creation, by default)
-        """
-
-        # We add a second element, and add a Generic OnOffServer to it
-        new_element = self.local_node.add_element()
-        new_element.register_model(GenericOnOffServer())
-
-        # Add a GenericOnOff Server and Client
-        primary_element = self.local_node.get_element(0)
-        primary_element.register_model(GenericOnOffServer())
-        primary_element.register_model(GenericOnOffClient())
-        # for convenience, we add a ConfigurationModelClient to all nodes for testing.
-        primary_element.register_model(ConfigurationModelClient())
+    elements = [
+        Element(
+            index=0,
+            is_primary=True,
+            models=[
+                GenericOnOffClient(),
+                GenericOnOffServer(),
+                ConfigurationModelClient(),
+                ConfigurationModelServer(),
+            ],
+        ),
+        Element(
+            index=1,
+            is_primary=False,
+            models=[GenericOnOffClient(), GenericOnOffServer()],
+        ),
+    ]
 
 
 # Create our sandboxed pb_adv layer instantiating the gen_prov layer (needed since Provisioning layer accesses this layer...)

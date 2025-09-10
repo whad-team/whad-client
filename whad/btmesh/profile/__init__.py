@@ -65,6 +65,21 @@ class BaseMeshProfile(object):
     When creating a new profile, the only function that the subclass should overwrite is the _populate_elements_and_models function
     """
 
+    # Elements of the local nodes with the models used
+    elements = [
+        Element(
+            0,
+            is_primary=True,
+            models=[
+                ConfigurationModelServer(),
+                GenericOnOffServer(),
+                GenericOnOffClient(),
+                ConfigurationModelClient(),  # added for convenicency in tests
+                HealthModelServer(),
+            ],
+        )
+    ]
+
     def __init__(
         self,
         auto_prov_net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
@@ -88,7 +103,7 @@ class BaseMeshProfile(object):
 
         # Is the local node provisioned ? (should be True on start if Provisioner)
         self.is_provisioned = False
- 
+
         # Is the local node a provisioner node ?
         self.is_provisioner = False
 
@@ -122,18 +137,16 @@ class BaseMeshProfile(object):
         # Key is primary address of node. Automatically filled by provisioners when provisioning other nodes
         self.__distant_nodes = {}
 
-        # Create and register primary element
-        primary_element = self.__local_node.add_element(index=0, is_primary=True)
+        # Fills the elements of the local node with the ones defined in the profile
+        self.__local_node.set_elements(self.elements)
 
-        self._populate_elements_and_models()
-
-        # Configure and add HealthModelServer
-        health_server = HealthModelServer()
-        primary_element.register_model(health_server)
-
-        # Configuration Model Server mandatory (should be LAST to be created)
-        conf_model = ConfigurationModelServer(profile=self)
-        primary_element.register_model(conf_model)
+        # Set the profile attribute of the ConfigurationModelServer
+        conf_model_server = self.get_configuration_server_model()
+        if conf_model_server is None:
+            print(
+                "There is no ConfigurationModelServer in your profile configuration in primary Element, this cannot function (it will crash)"
+            )
+        conf_model_server.profile = self
 
         # Default values used when auto_provisioning
         self._auto_prov_net_key = auto_prov_net_key
@@ -151,18 +164,6 @@ class BaseMeshProfile(object):
             input_oob_size=0x00,
             input_oob_action=0b0000,  # default no input OOB a available. For test, 0b1100
         )
-
-    def _populate_elements_and_models(self):
-        """
-        Populate elements and models for the node (except the ConfigurationModelServer, HealthModelServer and primary element creation, by default)
-
-        TODO : Add a json like profile import/export
-        """
-        primary_element = self.__local_node.get_element(0)
-        primary_element.register_model(GenericOnOffServer())
-        primary_element.register_model(GenericOnOffClient())
-        # for convenience, we add a ConfigurationModelClient to all nodes for testing.
-        primary_element.register_model(ConfigurationModelClient())
 
     def lock_seq(self):
         self.__seq_lock.acquire()

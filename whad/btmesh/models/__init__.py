@@ -266,7 +266,9 @@ class Model(object):
     Use this class directly to stored distant node models (for information only).
     """
 
-    def __init__(self, model_id, name="No Name", allows_dev_keys=False):
+    def __init__(
+        self, model_id, name="No Name", allows_dev_keys=False, is_vendor_model=False
+    ):
         """
         Creates the Model Object
 
@@ -276,6 +278,8 @@ class Model(object):
         :type name: str
         :param allows_dev_keys: Does the model allow messages to be received via a devkey, defaults to False
         :param allows_dev_keys: bool, optional
+        :param is_vendor_model: Is this model a vendore specific model (not supported yet), default to False
+        :type is_vendor_model: False
         """
         self.model_id = model_id
 
@@ -295,6 +299,8 @@ class Model(object):
         # If this attribute if True, Model will allows sending/receiving with DevKey
         # If Server model, only with our own DevKey. If Client Model, with any DevKey we have
         self.allows_dev_keys = allows_dev_keys
+
+        self.is_vendor_model = is_vendor_model
 
     def handle_message(self, message):
         """
@@ -489,7 +495,7 @@ class Element(object):
     This class represents one element of the device. Each element is assigned an address (254 max per device, sub-addr of the Unicast addr of the device).
     """
 
-    def __init__(self, index=None, is_primary=False):
+    def __init__(self, index=None, is_primary=False, models=[]):
         """
         Element init. Creates an element and assigns it an address.
 
@@ -497,6 +503,8 @@ class Element(object):
         :type addr: int | None, optional
         :param is_primary: Is this element primary (only one per device). True if yes., optional defaults to False
         :type is_primary: bool
+        :param models: List of model objects registered to this model if provided, defaults to []
+        :type models: List[Models]
         """
 
         self.is_primary = is_primary
@@ -522,7 +530,10 @@ class Element(object):
         # Dictionary of opcode to model index (in self.models) that refers to the model that handle this message.
         self.opcode_to_model_index = {}
 
-    def register_model(self, model, is_vendor_model=False):
+        for model in models:
+            self.register_model(model)
+
+    def register_model(self, model):
         """
         Adds a model to this element. Associate the opcodes allowed in Rx to this model instance.
 
@@ -530,15 +541,12 @@ class Element(object):
 
         :param model: The Model object to add
         :type model: Model
-        :param is_vendor_model: Is the model a vendor model, defaults to False
-        :type is_vendor_model: bool, optional
-        :param is_keypress_model: True if the model is the one registered to send messages on key_press
         """
 
         # Set the element_index of the model
         model.element_index = self.index
 
-        if is_vendor_model:
+        if model.is_vendor_model:
             self.vnd_models.append(model)
             self.vnd_model_count += 1
         else:
