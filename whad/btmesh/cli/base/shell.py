@@ -491,7 +491,7 @@ class BTMeshBaseShell(InteractiveShell):
                     self.error("Cannot add elements after provisioning")
                     return
 
-                element = self.profile.local_node.add_element()
+                element = self.profile.local_node.create_element()
 
                 self._fill_elements_completion()
                 self.success("Element %d successfully added." % element.index)

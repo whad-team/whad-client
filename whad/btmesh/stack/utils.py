@@ -237,9 +237,25 @@ class Node:
     def distance(self, value):
         self.__distance = value
 
-    def add_element(self, index=None, is_primary=False):
+    def set_elements(self, elements=[]):
         """
-        Adds an element to the list of elements of the node at index given.
+        Sets the nodes element with the list of elements given in argument
+        Please note that elements should have subsequence indexes and no gaps
+
+        Ex : Elements with indexes 0, 1, 2 : ok
+        Elements with indexes 0,2, 3 : not ok
+
+        Element 0 should always be present with a ConfigurationServerModel
+
+        :param elements: List of elements to set for the node, defaults to []
+        ;type elements: List[Elements]
+        """
+        for element in elements:
+            self.__elements[element.index] = element
+
+    def create_element(self, index=None, is_primary=False):
+        """
+        Create and Adds an element to the list of elements of the node at index given.
         Ideally, no index should be passed (can raise error if not subsequent, elements added in order, index + 1 each time)
 
         :param index: index of the element to add (should not be used ideally), defaults to None
@@ -308,12 +324,12 @@ class Node:
 
         self.__elements = {}
         for element in data.elements:
-            new_element = self.add_element()
+            new_element = self.create_element()
             for model_id in element.sig_models:
                 new_element.register_model(Model(model_id=model_id))
             for model_id in element.vendor_models:
                 new_element.register_model(
-                    Model(model_id=model_id), is_vendor_model=True
+                    Model(model_id=model_id, is_vendor_model=True)
                 )
 
 
