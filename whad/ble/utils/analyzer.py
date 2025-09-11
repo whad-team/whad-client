@@ -506,7 +506,7 @@ class GATTServerDiscovery(TrafficAnalyzer):
             super().__init__()
             self.devinfo = None
 
-        def export_json(self):
+        def export_json(self) -> str:
             """Export inferred profile to JSON file.
             """
             json_value = super().export_json()
