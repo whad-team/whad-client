@@ -1,7 +1,6 @@
 from whad.device import WhadDeviceConnector
 from whad.dot15d4.connector import Dot15d4
-from whad.hub.dot15d4.mode import DiscoveredCommunication
-from whad.scapy.layers.wirelesshart import WirelessHart_DataLink_Hdr
+from whad.hub.dot15d4.pdu import DiscoveredCommunication
 
 class WirelessHart(Dot15d4):
     """

@@ -56,6 +56,12 @@ class Sniffer(WirelessHart, EventsManager):
         for key in self.__configuration.keys:
             self.__decryptor.add_key(key)
         self.sniff_wirelesshart(channel=self.__configuration.channel)
+        
+    def enable_exploring_links(self):
+        self.linkexplorer.start()
+        
+    def disable_exploring_links(self):
+        self.linkexplorer.stop()
 
     def on_event(self, event):
         if isinstance(event, DiscoveryEvt):
@@ -199,12 +205,14 @@ class Sniffer(WirelessHart, EventsManager):
     def on_discovery_evt(self, evt: DiscoveryEvt):
         """Calls linkexplorer to take into account the discovery of the new communication"""
         params = getattr(evt, '_WhadEvent__parameters', {})
-        src = params.get("src")
-        dst = params.get("dst")
+        pdu = params.get("pdu")
         slot = params.get("slot")
         offset = params.get("offset")
-        if all(p is not None for p in [src, dst, slot, offset]):
-            self.linkexplorer.discovered_communication(src, dst, slot, offset)
+        if all(p is not None for p in [pdu, slot, offset]):
+            if (pdu[1]==0x41):
+                self.linkexplorer.discovered_communication(pdu[1:], slot, offset)
+            else:
+                print("heard a non wihart pkt:", pdu.hex())
         else:
             print("[Warning] DiscoveryEvt missing parameters.")
             
