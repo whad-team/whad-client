@@ -222,6 +222,8 @@ class WhadAnalyzeApp(CommandLineApp):
                         success("[✓] " + analyzer_name + " → " + "completed")
                         for output_name, output_value in analyzer.output.items():
                             value=format_analyzer_output(output_value, mode="human_readable")
+                            if value == "&":
+                                value = "&amp;"
                             print_formatted_text(HTML(f"  - <b>{output_name}: </b> {value}"))
                         if self.args.packets:
                             print()
