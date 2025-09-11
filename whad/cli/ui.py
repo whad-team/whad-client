@@ -2,6 +2,8 @@
 """
 import sys
 import json
+from typing import Optional
+
 from hexdump import hexdump
 from prompt_toolkit import print_formatted_text, HTML
 from scapy.all import Packet, tcpdump , conf
@@ -137,7 +139,7 @@ def display_event(event):
         )
     )
 
-def format_analyzer_output(output, mode : str = "human_readable") -> str:
+def format_analyzer_output(output, mode : str = "human_readable") -> Optional[str]:
     """Format given output depending on the provided mode.
     """
     if mode == "human_readable":
