@@ -39,7 +39,7 @@ class Commands:
     ChannelMap = 0x0f
     WriteModifySuperframe = 0x10
     DeleteSuperframe = 0x11
-    #Sync = 0x0c
+    Sync = 0x12
 
 class MitmRole:
     """Dot15d4 Mitm role
@@ -587,7 +587,7 @@ from .address import SetNodeAddress
 from .mode import SniffMode, RouterMode, EndDeviceMode, CoordMode, EnergyDetectionMode, \
     JamMode, MitmMode, Start, Stop, Jammed, EnableHop, AddLinks, DeleteLink, ChannelMap, WriteModifySuperframe, DeleteSuperframe, EnergyDetectionSample
 from .pdu import SendPdu, SendRawPdu, PduReceived, RawPduReceived
-#from .tsch import Sync
+from .tsch import Sync
 
 __all__ = [
     'SetNodeAddress',
@@ -617,6 +617,6 @@ __all__ = [
     'DeleteLink',
     'ChannelMap',
     'WriteModifySuperframe',
-    'DeleteSuperframe'
-    #, 'Sync'
+    'DeleteSuperframe',
+    'Sync'
 ]
