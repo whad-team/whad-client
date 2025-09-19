@@ -1,9 +1,22 @@
+import locale
 from whad.common.analyzer import TrafficAnalyzer
 from whad.unifying.stack.constants import ClickType
 from whad.unifying.hid import LogitechUnifyingMouseMovementConverter
 from whad.scapy.layers.unifying import Logitech_Mouse_Payload, Logitech_Unencrypted_Keystroke_Payload, Logitech_Encrypted_Keystroke_Payload
 from whad.unifying.hid import LogitechUnifyingKeystrokeConverter, HIDCodeNotFound, InvalidHIDData
 from whad.unifying.crypto import LogitechUnifyingKeyDerivation
+
+def get_default_kb_locale() -> str:
+    """ Retrieve the current keyboard locale. """
+    # Identify current locale based on system config.
+    cur_locale = locale.getlocale()
+    if cur_locale is not None:
+        sys_locale, _ = cur_locale
+        if sys_locale is not None:
+            return sys_locale.split('_')[1].lower()
+
+    # Return French locale if locale cannot be identified
+    return "fr"
 
 class UnifyingMouseMovement(TrafficAnalyzer):
         def reset(self):
@@ -44,7 +57,7 @@ class UnifyingKeystroke(TrafficAnalyzer):
     the corresponding key based on the configured locale.
     """
     PARAMETERS = {
-        "locale": "fr",
+        "locale": get_default_kb_locale(),
     }
 
     def set_locale(self, locale: str):
