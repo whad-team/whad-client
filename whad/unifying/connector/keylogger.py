@@ -14,10 +14,12 @@ class Keylogger(Sniffer):
 
     @property
     def locale(self):
+        """ Current locale """
         return self.__locale
 
     @locale.setter
     def locale(self, locale):
+        """Update locale."""
         self.__locale = locale
 
     def stream(self):
