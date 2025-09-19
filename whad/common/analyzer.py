@@ -2,7 +2,7 @@
 """
 WHAD traffic analyzer base module.
 """
-from typing import List
+from typing import List, Any
 from scapy.packet import Packet
 
 
@@ -15,8 +15,45 @@ class TrafficAnalyzer:
     data.
     """
 
-    def __init__(self):
+    # Traffic analyzer parameters (no parameters by default),
+    # override this class property to define custom parameters.
+    PARAMETERS = {}
+
+    @classmethod
+    def has_parameter(cls, parameter: str) -> bool:
+        """ Check if a given parameter is expected, based on its name. """
+        return parameter in cls.PARAMETERS
+
+    @classmethod
+    def get_default_parameters(cls) -> dict:
+        """ Return the class default parameters. """
+        default_params = {}
+        for parameter, value in cls.PARAMETERS.items():
+            default_params[parameter] = value
+        return default_params
+
+    def __init__(self, **kwargs):
+        """ Initialize a traffic analyzer and set its associated
+        configuration parameters, if provided.
+        """
+        # Filter parameters to only keep those we expect
+        self.__parameters = self.get_default_parameters()
+        for parameter,value in kwargs.items():
+            if parameter in self.__parameters:
+                self.__parameters[parameter] = value
+
+        # Reset this traffic analyzer
         self.reset()
+
+    def get_param(self, param: str) -> Any:
+        """ Retrieve a provided parameter value. """
+        if param in self.__parameters:
+            return self.__parameters[param]
+
+    def set_param(self, param: str, value: Any):
+        """ Set traffic analyzer parameter value. """
+        if param in self.__parameters:
+            self.__parameters[param] = value
 
     def process_packet(self, packet):
         """Process a packet.

@@ -4,6 +4,7 @@ WHAD analyzer
 This utility processes incoming packets and feed one or more traffic analyzers
 with them, extracting and interpreting data based on various supported protocols.
 """
+from inspect import Parameter
 import sys
 from time import sleep
 import logging
@@ -64,10 +65,18 @@ def display_analyzers(analyzers: dict):
             f"<b><ansicyan>Available analyzers: </ansicyan> {domain}</b>"
         ))
         for analyzer_name, analyzer_class in analyzers_list.items():
+            # Retrieve parameters for analyzer class and format them if some are defined.
+            analyzer_params = analyzer_class.PARAMETERS
             output=", ".join(analyzer_class().output.keys())
             print_formatted_text(HTML(
                 f"  <b>- {analyzer_name}</b> : {output}"
             ))
+            parameters = []
+            if len(analyzer_params.keys()) > 0:
+                for pname, pvalue in analyzer_params.items():
+                    print_formatted_text(HTML(
+                        f"      <ansiblue>parameter</ansiblue> {pname} <i>(default: \"{pvalue}\")</i>"
+                    ))
 
         print()
 
@@ -150,6 +159,16 @@ class WhadAnalyzeApp(CommandLineApp):
             '--list',
             action="store_true",
             help='List of available analyzers'
+        )
+
+        self.add_argument(
+            '-s',
+            '--set',
+            dest='ta_params',
+            nargs=1,
+            action='append',
+            metavar='param=value',
+            help="set analyzer parameter to value"
         )
 
         # Initialize analyzers and parameters.
@@ -284,6 +303,15 @@ class WhadAnalyzeApp(CommandLineApp):
         # Launch pre-run tasks
         self.pre_run()
 
+        # Parse analyzer parameters passed by the user (--set param=value)
+        config_params = {}
+        if self.args.ta_params is not None:
+            for param in self.args.ta_params:
+                if '=' in param[0]:
+                    pname, pvalue = param[0].split('=')[:2]
+                    if pname != '':
+                        config_params[pname] = pvalue
+
         if self.args.list:
             analyzers = get_analyzers()
             display_analyzers(analyzers)
@@ -310,7 +338,7 @@ class WhadAnalyzeApp(CommandLineApp):
                 self.selected_analyzers = {}
                 for name, clazz in get_analyzers(self.args.domain).items():
                     if name in self.provided_analyzers or len(self.provided_analyzers) == 0:
-                        self.selected_analyzers[name] = clazz()
+                        self.selected_analyzers[name] = clazz(**config_params)
                         self.selected_analyzers[name]._displayed = False
 
                 connector.domain = self.args.domain
