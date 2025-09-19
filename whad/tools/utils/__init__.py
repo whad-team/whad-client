@@ -1,10 +1,16 @@
-import whad
+"""
+WHAD various utilities for transversal automation.
+"""
 
-from pkgutil import iter_modules
+from typing import Optional
 from importlib import import_module
 from inspect import getdoc
 from dataclasses import fields, is_dataclass
+
+from pkgutil import iter_modules
 from scapy.config import conf
+
+import whad
 
 def gen_option_name(config_param_name: str) -> str:
     """Generate an option name from a parameter name.
@@ -145,7 +151,7 @@ def build_configuration_from_args(environment, args):
     return configuration
 
 
-def list_implemented_injectors():
+def list_implemented_injectors() -> dict:
     """Build a dictionnary of injectors connector and configuration, by domain.
     """
     environment = {}
@@ -225,7 +231,7 @@ def get_injector_parameters(configuration_class):
     return parameters
 
 
-def get_analyzers(protocol: str = None) -> dict:
+def get_analyzers(protocol: Optional[str] = None) -> dict:
     """Retrieve every protocol analyzer available or a subset if a specific
     protocol name is provided.
 

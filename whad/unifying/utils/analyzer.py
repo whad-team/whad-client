@@ -36,46 +36,66 @@ class UnifyingMouseMovement(TrafficAnalyzer):
 
 
 class UnifyingKeystroke(TrafficAnalyzer):
+    """
+    Logitech Unifying keystroke analyzer.
 
-        @property
-        def output(self):
-            return {
-                "key" :self.key
-            }
+    This specific traffic analyzer parses captured Logitech Unifying
+    PDUs, identifies unencrypted or decrypted keystrokes and extract
+    the corresponding key based on the configured locale.
+    """
+    PARAMETERS = {
+        "locale": "fr",
+    }
 
-        def process_packet(self, packet):
-            hid_data = None
-            if Logitech_Unencrypted_Keystroke_Payload in packet:
-                self.trigger()
-                self.mark_packet(packet)
+    def set_locale(self, locale: str):
+        """
+        Change locale to the specified `locale`.
+
+        :param locale: New locale to use.
+        :type  locale: str
+        """
+        self.set_param("locale", locale)
+        self.__locale = locale
+
+    @property
+    def output(self):
+        return {
+            "key" :self.key
+        }
+
+    def process_packet(self, packet):
+        hid_data = None
+        if Logitech_Unencrypted_Keystroke_Payload in packet:
+            self.trigger()
+            self.mark_packet(packet)
+            hid_data = packet.hid_data
+
+        if Logitech_Encrypted_Keystroke_Payload in packet:
+            self.trigger()
+            self.mark_packet(packet)
+            if hasattr(packet, "decrypted") and packet.decrypted is not None:
+                hid_data = packet.decrypted.hid_data
+            else:
                 hid_data = packet.hid_data
 
-            if Logitech_Encrypted_Keystroke_Payload in packet:
-                self.trigger()
-                self.mark_packet(packet)
-                if hasattr(packet, "decrypted") and packet.decrypted is not None:
-                    hid_data = packet.decrypted.hid_data
-                else:
-                    hid_data = packet.hid_data
+        if hid_data is not None:
+            if hid_data == b"\x00" * 7:
+                self.key = None
+            else:
+                try:
+                    key = LogitechUnifyingKeystrokeConverter.get_key_from_hid_data(hid_data, locale=self.__locale)
+                    if key != self.key:
+                        self.key = key
+                        if len(self.key) > 1:
+                            self.key = " [{}] ".format(self.key)
+                        self.complete()
+                except (HIDCodeNotFound, InvalidHIDData):
+                    pass
 
-            if hid_data is not None:
-                if hid_data == b"\x00" * 7:
-                    self.key = None
-                else:
-                    try:
-                        key = LogitechUnifyingKeystrokeConverter.get_key_from_hid_data(hid_data, locale=self.__locale)
-                        if key != self.key:
-                            self.key = key
-                            if len(self.key) > 1:
-                                self.key = " [{}] ".format(self.key)
-                            self.complete()
-                    except (HIDCodeNotFound, InvalidHIDData):
-                        pass
-
-        def reset(self):
-            super().reset()
-            self.__locale = "fr"
-            self.key = None
+    def reset(self):
+        super().reset()
+        self.__locale = self.get_param("locale")
+        self.key = None
 
 
 analyzers = {
