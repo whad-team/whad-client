@@ -47,6 +47,7 @@ dependencies = [
     "distro~=1.9",
     "websockets>=11.0.3",
     "packaging~=25.0",
+    "strenum~=0.4.15",
 ]
 
 [project.scripts]

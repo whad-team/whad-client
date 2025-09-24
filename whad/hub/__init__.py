@@ -9,7 +9,14 @@ to protobuf messages fields.
 """
 import logging
 from typing import Union
-from enum import StrEnum
+
+# Load default Python's `StrEnum` class for Python >= 3.11
+# and rely on `StrEnum` package to provide this class for
+# previous Python versions.
+try:
+    from enum import StrEnum
+except ImportError:
+    from strenum import StrEnum
 
 
 from google.protobuf.message import DecodeError
