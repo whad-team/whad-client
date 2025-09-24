@@ -1,7 +1,8 @@
-"""WHAD server tool
+"""
+WHAD analyzer
 
-This utility implements a server module, allowing to create a TCP proxy
-which can be used to access a device remotely.
+This utility processes incoming packets and feed one or more traffic analyzers
+with them, extracting and interpreting data based on various supported protocols.
 """
 import sys
 from time import sleep
