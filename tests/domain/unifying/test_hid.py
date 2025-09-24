@@ -47,6 +47,7 @@ def test_unifying_unenc_keystroke_processing():
     )
 
     analyzer = UnifyingKeystroke()
+    analyzer.set_locale("fr")
     analyzer.process_packet(pkt)
     assert analyzer.triggered
     assert analyzer.completed
