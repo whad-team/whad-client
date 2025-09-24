@@ -338,7 +338,14 @@ class WhadAnalyzeApp(CommandLineApp):
                 self.selected_analyzers = {}
                 for name, clazz in get_analyzers(self.args.domain).items():
                     if name in self.provided_analyzers or len(self.provided_analyzers) == 0:
-                        self.selected_analyzers[name] = clazz(**config_params)
+                        # Pick parameters required by the analyzer from our current configured params
+                        params = {}
+                        for pname, pvalue in config_params.items():
+                            if pname in clazz.PARAMETERS:
+                                params[pname] = pvalue
+
+                        # Instantiate the requested traffic analyzer with its optional params
+                        self.selected_analyzers[name] = clazz(**params)
                         self.selected_analyzers[name]._displayed = False
 
                 connector.domain = self.args.domain
