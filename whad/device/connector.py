@@ -422,8 +422,13 @@ class Connector:
                     logger.debug("[connector][%s] Unlocked message for processing: %s",
                                 self.device.interface, message)
                     if dispatch_callback is None:
-                        logger.debug("[connector][%s] forward to __process_pkt_message()")
-                        self.__process_pkt_message(message)
+                        # If we are in synchronous mode, add unlocked PDU to synchronous messages
+                        if self.__sync_mode != self.SYNC_MODE_OFF:
+                            self.add_sync_event(MessageReceived(self.device,message))
+                        else:
+                            # If not in synchronous mode, then process message directly
+                            logger.debug("[connector][%s] forward to __process_pkt_message()")
+                            self.__process_pkt_message(message)
                     else:
                         # Call the provided dispatch callback
                         dispatch_callback(message)
@@ -736,7 +741,7 @@ class Connector:
                     self.process_message(event.message)
 
     # pylint: disable=C0301
-    def sniff(self, messages: List = None, timeout: float = None) -> Generator[HubMessage, None, None]:
+    def sniff(self, messages: List = None, timeout: float = None, count: int = None) -> Generator[HubMessage, None, None]:
         """Enable sniffing mode and report any received messages, optionally
         filtered by their type/classes if `messages` is provided.
 
@@ -744,11 +749,19 @@ class Connector:
         :param messages: List, optional
         :param timeout: If specified, set a sniffing timeout in seconds
         :type timeout: float, optional
+        :param count: If specified, stop sniffing once `count` packets have been sniffed
+        :type count: int, optional
         """
         # Enable sniffing mode (and disable message processing)
         self.enable_synchronous(True, events=True)
 
+        # Unlock connector if locked, this will cause all pending PDUs to be
+        # moved into our synchronous events queue and processed hereafter.
+        if self.is_locked():
+            self.unlock()
+
         # Listen for messages
+        msg_count = 0
         initial_to = timeout
         start_mark = time()
         while True:
@@ -770,6 +783,9 @@ class Connector:
                 if isinstance(event, MessageReceived):
                     logger.debug("[sniffer][%s] received message, processing",
                                      self.device.interface)
+                    # Increment message count
+                    msg_count += 1
+
                     # Retrieve message
                     message = event.message
 

@@ -5,8 +5,8 @@ special devices intended to be used for unit testing, and should not be made
 available to users.
 """
 import logging
-from threading import Thread, Event
-from queue import Empty
+from threading import Thread
+from queue import Queue, Empty
 
 from typing import Optional
 
@@ -178,7 +178,7 @@ class MockDevice(Device):
         self.__opened = False
 
         # Waiting event
-        self.__blocking_event = Event()
+        self.__pending_msg = Queue()
 
     @property
     def info(self) -> DeviceInfo:
@@ -288,7 +288,6 @@ class MockDevice(Device):
 
             # Call message handler
             resp = self.__handlers[type(message)](message)
-
             # If handler returned a single message or a list of messages,
             # send them to the connector
             if isinstance(resp, HubMessage):
@@ -298,6 +297,13 @@ class MockDevice(Device):
                     if isinstance(m, HubMessage):
                         self.put_message(m)
 
+    def report_message(self, msg: HubMessage):
+        """Report a specific message to the connector, as soon as possible.
+
+        :param  msg: Message to send
+        :type   msg: HubMessage
+        """
+        self.__pending_msg.put(msg)
 
 
     def on_interface_message(self) -> Optional[HubMessage]:
@@ -309,8 +315,7 @@ class MockDevice(Device):
         However, it could be used to send notifications at a custom pace, if
         needed, depending on the subclass.
         """
-        self.__blocking_event.wait()
-        return None
+        return self.__pending_msg.get(block=True)
 
     ##
     # Discovery management

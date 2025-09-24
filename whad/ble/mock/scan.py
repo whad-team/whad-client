@@ -45,9 +45,9 @@ class DeviceScan(MockDevice):
         self.__nowait = nowait
 
         # By default, no mode enabled and not running
-        self.__current_mode = None
+        self.__current_mode = self.MODE_SCAN
         self.__active_scan = False
-        self.__bd_filter = None
+        self.__bd_filter  = b"\xff\xff\xff\xff\xff\xff" 
         self.__running = False
         self.__next_delay = 0
 
@@ -113,6 +113,7 @@ class DeviceScan(MockDevice):
             # Switch to scanning mode
             self.__current_mode = self.MODE_SCAN
             self.__active_scan = message.active
+
             return Success()
         else:
             return Error()
@@ -134,6 +135,36 @@ class DeviceScan(MockDevice):
             # Generate a random timestamp (in ms) after which we will report
             # one of our emulated devices
             self.set_next_delay()
+            for advertiser in self.__devices:
+                report = None
+                if self.__current_mode == self.MODE_SNIFF:
+                    if self.accept(advertiser.address):
+                        # Get advertiser data
+                        adv_type, adv_data = advertiser.get_adv_data()
+
+                        # Generate notification message
+                        report = BleAdvPduReceived(
+                            adv_type=adv_type,
+                            rssi=randint(-80, -30),
+                            bd_address=advertiser.address.value,
+                            adv_data=adv_data,
+                            addr_type=advertiser.addr_type
+                        )
+                        self.report_message(report)
+                else:
+                    for i in range(2):
+                        # Generate an advertising notification
+                        adv_type, adv_data = advertiser.get_adv_data()
+                        if adv_type!=AdvType.ADV_SCAN_RSP or self.__active_scan:
+                            report = BleAdvPduReceived(
+                                adv_type=adv_type,
+                                rssi=randint(-80, -30),
+                                bd_address=advertiser.address.value,
+                                adv_data=adv_data,
+                                addr_type=advertiser.addr_type
+                            )
+                            self.report_message(report)
+
             # If not running, mark as running and send a success response
             self.__running = True
             return Success()
@@ -149,42 +180,3 @@ class DeviceScan(MockDevice):
             self.__running = False
         return Success()
 
-    def on_interface_message(self):
-        # Wait for next delay slot
-        sleep(self.__next_delay)
-
-        if self.__running:
-            report = None
-
-            # Pick a random device from our list
-            advertiser = choice(self.__devices)
-            if self.__current_mode == self.MODE_SNIFF:
-                if self.accept(advertiser.address):
-                    # Get advertiser data
-                    adv_type, adv_data = advertiser.get_adv_data()
-
-                    # Generate notification message
-                    report = BleAdvPduReceived(
-                        adv_type=adv_type,
-                        rssi=randint(-80, -30),
-                        bd_address=advertiser.address.value,
-                        adv_data=adv_data,
-                        addr_type=advertiser.addr_type
-                    )
-            else:
-                # Generate an advertising notification
-                adv_type, adv_data = advertiser.get_adv_data()
-                if adv_type!=AdvType.ADV_SCAN_RSP or self.__active_scan:
-                    report = BleAdvPduReceived(
-                        adv_type=adv_type,
-                        rssi=randint(-80, -30),
-                        bd_address=advertiser.address.value,
-                        adv_data=adv_data,
-                        addr_type=advertiser.addr_type
-                    )
-
-            if report is not None:
-                self.put_message(report)
-
-        # Compute the next delay
-        self.set_next_delay()

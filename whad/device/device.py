@@ -490,6 +490,8 @@ class Device:
         """Set interface connector.
         """
         self.__connector = connector
+        while not self.__out_messages.empty():
+            self.put_message(self.__out_messages.get())
 
     def lock(self):
         """Lock interface for read/write operation.
@@ -746,7 +748,6 @@ class Device:
             # an unspecified state, notify user.
             logger.debug("WHAD device in error while sending message: %s", error)
             raise error
-
         try:
             # Retrieve the first message that matches our filter
             result = self.wait_for_message(self.__timeout, command=True)

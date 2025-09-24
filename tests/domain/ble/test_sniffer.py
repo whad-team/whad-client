@@ -1,13 +1,13 @@
 """Test Bluetooth Low Energy Sniffer class.
 """
 import pytest
-
+import time
+import logging
 from scapy.layers.bluetooth4LE import BTLE_ADV_IND, BTLE_SCAN_RSP
 
 from whad.ble.mock import DeviceScan, EmulatedDevice
 from whad.ble import BDAddress
 from whad.ble.connector.sniffer import Sniffer, SnifferConfiguration
-
 
 @pytest.fixture
 def mock_devices():
@@ -19,28 +19,30 @@ def mock_devices():
     ]
 
 @pytest.fixture
-def sniff_mock(mock_devices):
+def sniffer(mock_devices):
     """Create a BLE DeviceScan mock.
     """
-    return DeviceScan(devices=mock_devices, sniffing=True, nowait=True)
+    return Sniffer(
+        DeviceScan(devices=mock_devices, sniffing=True, nowait=True)
+    )
 
-def test_sniffer_create(sniff_mock):
+def test_sniffer_create(sniffer):
     """Test creating a Bluetooth sniffer.
     """
-    sniffer = Sniffer(sniff_mock)
+    #sniffer = Sniffer(sniff_mock)
     sniffer.start()
     packets = []
-    for packet in sniffer.sniff(timeout=2.0):
+    for packet in sniffer.sniff(count=1):
         packets.append(packet)
         break
     sniffer.stop()
     assert packets[0][BTLE_ADV_IND].AdvA == "00:11:22:33:44:55"
 
-def test_sniffer_channel_set(sniff_mock):
+def test_sniffer_channel_set(sniffer):
     """Test sniffing on different channels
     """
     # Create sniffer
-    sniffer = Sniffer(sniff_mock)
+    #sniffer = Sniffer(sniff_mock)
 
     # Create a specific configuration to sniff on channel 38
     sniffer_cfg = SnifferConfiguration()
@@ -48,19 +50,20 @@ def test_sniffer_channel_set(sniff_mock):
     sniffer.configuration = sniffer_cfg
 
     # Sniff for advertisement data
+    a = time.time()
     sniffer.start()
     packets = []
-    for packet in sniffer.sniff(timeout=2.0):
+    for packet in sniffer.sniff(count=1):
         packets.append(packet)
         break
     sniffer.stop()
     assert packets[0].metadata.channel is None
 
-def test_sniffer_channel_default(sniff_mock):
+def test_sniffer_channel_default(sniffer):
     """Test sniffing on different channels
     """
     # Create sniffer
-    sniffer = Sniffer(sniff_mock)
+    #sniffer = Sniffer(sniff_mock)
 
     # Create a specific configuration to sniff on channel 38
     sniffer_cfg = SnifferConfiguration()
@@ -69,17 +72,17 @@ def test_sniffer_channel_default(sniff_mock):
     # Sniff for advertisement data
     sniffer.start()
     packets = []
-    for packet in sniffer.sniff(timeout=2.0):
+    for packet in sniffer.sniff(count=1):
         packets.append(packet)
         break
     sniffer.stop()
     assert packets[0].metadata.channel is None
 
-def test_sniffer_address_filter_match(sniff_mock):
+def test_sniffer_address_filter_match(sniffer):
     """Test sniffing advertisements sent by a specific device
     """
     # Create sniffer
-    sniffer = Sniffer(sniff_mock)
+    #sniffer = Sniffer(sniff_mock)
 
     # Create a specific configuration to sniff on channel 38
     sniffer_cfg = SnifferConfiguration()
@@ -89,7 +92,7 @@ def test_sniffer_address_filter_match(sniff_mock):
     # Sniff for advertisement data
     sniffer.start()
     packets = []
-    for packet in sniffer.sniff(timeout=2.0):
+    for packet in sniffer.sniff(count=1):
         packets.append(packet)
         break
     sniffer.stop()
@@ -104,11 +107,11 @@ def test_sniffer_address_filter_match(sniff_mock):
     else:
         assert False
 
-def test_sniffer_address_filter_nomatch(sniff_mock):
+def test_sniffer_address_filter_nomatch(sniffer):
     """Test sniffing advertisements sent by a specific device
     """
     # Create sniffer
-    sniffer = Sniffer(sniff_mock)
+    # sniffer = Sniffer(sniff_mock)
 
     # Create a specific configuration to sniff on channel 38
     sniffer_cfg = SnifferConfiguration()
@@ -118,7 +121,7 @@ def test_sniffer_address_filter_nomatch(sniff_mock):
     # Sniff for advertisement data
     sniffer.start()
     packets = []
-    for packet in sniffer.sniff(timeout=0.5):
+    for packet in sniffer.sniff(timeout=1.0):
         packets.append(packet)
         break
     sniffer.stop()

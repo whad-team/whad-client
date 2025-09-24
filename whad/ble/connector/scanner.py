@@ -54,6 +54,8 @@ class Scanner(BLE):
         super().__init__(device)
         self.__db = AdvertisingDevicesDB()
 
+        self.lock()
+ 
         # Check device accept scanning mode
         if not self.can_scan():
             # Does our device accept sniffing mode and is able of sniffing advertising reports ?

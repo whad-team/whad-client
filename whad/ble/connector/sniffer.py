@@ -45,6 +45,9 @@ class Sniffer(BLE, EventsManager):
         if not self.can_sniff_advertisements() and not self.can_sniff_new_connection():
             raise UnsupportedCapability("Sniff")
 
+        # Lock sniffer to avoid packet lost due to timing issues
+        self.lock()
+
     @property
     def synchronized(self):
         """Synchromization state
@@ -305,7 +308,7 @@ class Sniffer(BLE, EventsManager):
 
         return packet
 
-    def sniff(self, timeout: float = None) -> Generator[Packet, None, None]:
+    def sniff(self, timeout: float = None, count: int = None) -> Generator[Packet, None, None]:
         """Main sniffing function
 
         :param timeout: Number of seconds after which sniffing is stopped.
@@ -362,7 +365,7 @@ class Sniffer(BLE, EventsManager):
                 else:
                     message_type = BleAdvPduReceived
 
-                for message in super().sniff(messages=(message_type), timeout=timeout):
+                for message in super().sniff(messages=(message_type), timeout=timeout, count=count):
                     if message is not None:
                         packet = message.to_packet()
                         if packet is not None:
