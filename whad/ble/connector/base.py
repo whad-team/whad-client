@@ -641,7 +641,7 @@ class BLE(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def connect_to(self, bd_addr: BDAddress, random: Optional[bool] = False, access_address: Optional[int] = None,
+    def connect_to(self, bd_addr: BDAddress, random: bool = False, access_address: Optional[int] = None,
                    channel_map: Optional[ChannelMap] = None, crc_init: Optional[int] = None, hop_interval: Optional[int] = None,
                    hop_increment: Optional[int] = None):
         """
@@ -694,9 +694,6 @@ class BLE(Connector):
                 self.__started = False
 
             return self.__started
-        else:
-            logger.debug("starting current BLE mode, ignoring (already started)")
-            return True
 
     def disconnect(self, conn_handle):
         """Terminate a specific connection.
