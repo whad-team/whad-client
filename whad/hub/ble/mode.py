@@ -4,7 +4,7 @@ from typing import Optional
 from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
 from whad.hub.message import pb_bind, PbFieldBytes, PbMessageWrapper, PbFieldBool, PbFieldInt
-from whad.hub.ble import BleDomain
+from whad.hub.ble import BleDomain, BleAdvType, ChannelMap
 
 @pb_bind(BleDomain, 'scan_mode', 1)
 class ScanMode(PbMessageWrapper):
@@ -16,8 +16,34 @@ class ScanMode(PbMessageWrapper):
 class AdvMode(PbMessageWrapper):
     """BLE advertising mode message class
     """
-    scan_data = PbFieldBytes('ble.adv_mode.scan_data')
+    adv_data = PbFieldBytes('ble.adv_mode.adv_data')
     scanrsp_data = PbFieldBytes('ble.adv_mode.scanrsp_data')
+
+    # Protocol version 2 use 0x20 for both min and max values, we reflect this here.
+    adv_type = BleAdvType.ADV_IND
+    channel_map = ChannelMap([37, 38, 39]).value
+    inter_min = 0x20
+    inter_max = 0x20
+
+@pb_bind(BleDomain, 'adv_mode', version=3)
+class AdvModeV3(PbMessageWrapper):
+    """
+    Ble advertising mode message class with more control over
+    advertising parameters:
+      - advertising type
+      - channel map
+      - minimal and maximal advertising interval values
+
+    Important note:
+      - `scan_data` field has been renamed to `adv_data`
+
+    """
+    adv_data = PbFieldBytes('ble.adv_mode.adv_data')
+    scanrsp_data = PbFieldBytes('ble.adv_mode.scanrsp_data')
+    adv_type = PbFieldInt('ble.adv_mode.adv_type')
+    channel_map = PbFieldBytes('ble.adv_mode.channel_map')
+    inter_min = PbFieldInt('ble.adv_mode.inter_min')
+    inter_max = PbFieldInt('ble.adv_mode.inter_max')
 
 @pb_bind(BleDomain, 'central_mode', 1)
 class CentralMode(PbMessageWrapper):

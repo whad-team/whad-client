@@ -50,7 +50,7 @@ class ChannelMap(object):
         # Loop over channels and add them to our map
         if channels is not None:
             for channel in channels:
-                
+
                 # Add channel to our channel map
                 self.add(channel)
 
@@ -61,9 +61,9 @@ class ChannelMap(object):
         :param channel: int
         """
         # Check channel number validity
-        if channel < 0 or channel > 37:
+        if channel < 0 or channel > 40:
             raise ValueError()
-        
+
         # Add channel to our map
         self.__map |= (1 << channel)
 
@@ -74,9 +74,9 @@ class ChannelMap(object):
         :param channel: int
         """
         # Check channel number validity
-        if channel < 0 or channel > 37:
+        if channel < 0 or channel > 40:
             raise ValueError()
-        
+
         # Remove channel from map
         if self.has(channel):
             self.__map = self.__map & ((1 << channel) ^ 0xFFFFFFFFFF)
@@ -90,7 +90,7 @@ class ChannelMap(object):
         :rtype: bool
         """
         return (self.__map & (1 << channel)) != 0
-        
+
     def channels(self) -> Generator:
         """Iterate over channels
         """
@@ -105,4 +105,5 @@ class ChannelMap(object):
         return self.__map.to_bytes(5, 'little', signed=False)
 
 # Default channel map
-DefaultChannelMap = ChannelMap(channels=range(38))
+DefaultChannelMap = ChannelMap(channels=[38])
+
