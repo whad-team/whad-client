@@ -59,7 +59,7 @@ class ChannelMap(object):
         :param channel: int
         """
         # Check channel number validity
-        if channel < 0 or channel > 37:
+        if channel < 0 or channel > 40:
             raise ValueError()
 
         # Add channel to our map
@@ -72,7 +72,7 @@ class ChannelMap(object):
         :param channel: int
         """
         # Check channel number validity
-        if channel < 0 or channel > 37:
+        if channel < 0 or channel > 40:
             raise ValueError()
 
         # Remove channel from map
