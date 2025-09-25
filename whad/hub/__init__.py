@@ -47,7 +47,7 @@ class ProtocolHub(Registry):
     """
 
     NAME = 'hub'
-    LAST_VERSION = 2
+    LAST_VERSION = 3
     VERSIONS = {}
 
     @staticmethod

@@ -6,12 +6,13 @@ from whad.protocol.whad_pb2 import Message
 from whad.protocol.ble.ble_pb2 import JamAdvCmd, CentralModeCmd, StartCmd as BleStartCmd, StopCmd as BleStopCmd
 from whad.hub.ble import BleDomain, SetBdAddress, SniffAdv, SniffConnReq, \
     SniffAccessAddress, SniffActiveConn, AccessAddressDiscovered, JamAdv, \
-    JamAdvChan,JamConn, ScanMode, AdvMode, CentralMode, PeriphMode, SetAdvData, \
+    JamAdvChan,JamConn, ScanMode, AdvMode, AdvModeV3, CentralMode, PeriphMode, SetAdvData, \
     SendBleRawPdu, SendBlePdu, BleAdvPduReceived,AddressType, \
     BlePduReceived, BleRawPduReceived, ConnectTo, Disconnect, Connected, Disconnected, \
     BleStart, BleStop, HijackMaster, HijackSlave, HijackBoth, Hijacked, ReactiveJam, \
     Synchronized, Desynchronized, PrepareSequenceManual, PrepareSequenceConnEvt, \
-    PrepareSequencePattern, Injected, Trigger, Triggered, DeleteSequence, SetEncryption
+    PrepareSequencePattern, Injected, Trigger, Triggered, DeleteSequence, SetEncryption, \
+    ChannelMap, BleAdvType
 
 from .test_ble_hijack import hijack_master, hijack_slave, hijack_both, hijacked
 from .test_ble_pdu import send_ble_pdu, send_ble_raw_pdu, raw_pdu, ble_pdu, ble_adv_pdu, set_adv_data
@@ -347,7 +348,7 @@ class TestScanMode(object):
 @pytest.fixture
 def adv_mode():
     msg = Message()
-    msg.ble.adv_mode.scan_data = b'TEST'
+    msg.ble.adv_mode.adv_data = b'TEST'
     msg.ble.adv_mode.scanrsp_data = b'RESPONSE'
     return msg
 
@@ -360,18 +361,68 @@ class TestAdvMode(object):
         """
         parsed_obj = AdvMode.parse(1, adv_mode)
         assert isinstance(parsed_obj, AdvMode)
-        assert parsed_obj.scan_data == b'TEST'
+        assert parsed_obj.adv_data == b'TEST'
         assert parsed_obj.scanrsp_data == b'RESPONSE'
+        assert parsed_obj.inter_min == 0x20
+        assert parsed_obj.inter_max == 0x20
+        assert parsed_obj.channel_map == ChannelMap([37, 38, 39]).value
 
     def test_crafting(self):
         """Check AdvMode crafting
         """
         msg = AdvMode(
-            scan_data=b'HELLOWORLD',
+            adv_data=b'HELLOWORLD',
             scanrsp_data=b'FOOBAR'
         )
-        assert msg.scan_data == b'HELLOWORLD'
+        assert msg.adv_data == b'HELLOWORLD'
         assert msg.scanrsp_data == b'FOOBAR'
+        assert msg.inter_min == 0x20
+        assert msg.inter_max == 0x20
+        assert msg.channel_map == ChannelMap([37, 38, 39]).value
+
+@pytest.fixture
+def adv_mode_v3():
+    msg = Message()
+    msg.ble.adv_mode.adv_data = b'TEST'
+    msg.ble.adv_mode.scanrsp_data = b'RESPONSE'
+    msg.ble.adv_mode.adv_type = BleAdvType.ADV_NONCONN_IND
+    msg.ble.adv_mode.channel_map = ChannelMap([37, 38, 39]).value
+    msg.ble.adv_mode.inter_min = 0x42
+    msg.ble.adv_mode.inter_max = 0x1000
+    return msg
+
+class TestAdvModeV3(object):
+    """Test AdvMode message parsing/crafting defined from protocol v3
+    """
+
+    def test_parsing(self, adv_mode_v3):
+        """Check AdvMode parsing
+        """
+        parsed_obj = AdvModeV3.parse(1, adv_mode_v3)
+        assert isinstance(parsed_obj, AdvModeV3)
+        assert parsed_obj.adv_data == b'TEST'
+        assert parsed_obj.scanrsp_data == b'RESPONSE'
+        assert parsed_obj.adv_type == BleAdvType.ADV_NONCONN_IND
+        assert parsed_obj.inter_min == 0x42
+        assert parsed_obj.inter_max == 0x1000
+        assert parsed_obj.channel_map == ChannelMap([37, 38, 39]).value
+
+    def test_crafting(self):
+        """Check AdvMode crafting
+        """
+        msg = AdvModeV3(
+            adv_data=b'HELLOWORLD',
+            scanrsp_data=b'FOOBAR',
+            adv_type=BleAdvType.ADV_IND,
+            channel_map=ChannelMap([37]).value,
+            inter_min=0x50,
+            inter_max=0x60,
+        )
+        assert msg.adv_data == b'HELLOWORLD'
+        assert msg.scanrsp_data == b'FOOBAR'
+        assert msg.inter_min == 0x50
+        assert msg.inter_max == 0x60
+        assert msg.channel_map == ChannelMap([37]).value
 
 @pytest.fixture
 def central_mode():
