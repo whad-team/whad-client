@@ -547,20 +547,32 @@ class BLE(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def enable_adv_mode(self, adv_data=None, scan_data=None):
+    def enable_adv_mode(self, adv_data=None, scan_data=None, adv_type: AdvType = AdvType.ADV_IND,
+                        channel_map: ChannelMap = None, inter_min: int = 0x20, inter_max: int = 0x4000):
         """
         Enable BLE advertising mode (acts as a broadcaster)
         """
+        logger.debug("Enable advertising mode")
+        # Build advertising data if required
+        if isinstance(adv_data, AdvDataFieldList):
+            adv_data = adv_data.to_bytes()
+        if isinstance(scan_data, AdvDataFieldList):
+            scanrsp_data = scan_data.to_bytes()
+
         # Create a AdvMode message
         msg = self.hub.ble.create_adv_mode(
             adv_data,
-            scan_rsp=scan_data
+            scanrsp_data=scan_data,
+            adv_type=adv_type,
+            channel_map=channel_map,
+            inter_min=inter_min,
+            inter_max=inter_max,
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def enable_peripheral_mode(self, adv_data: bytes = None, scan_data: bytes = None):
+    def enable_peripheral_mode(self, adv_data: Optional[bytes] = None, scan_data: Optional[bytes] = None):
         """
         Enable Bluetooth Low Energy peripheral mode (acts as slave).
         """
@@ -579,7 +591,7 @@ class BLE(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def connect_to(self, bd_addr: BDAddress, random: Optional[bool] = False, access_address: Optional[int] = None,
+    def connect_to(self, bd_addr: BDAddress, random: bool = False, access_address: Optional[int] = None,
                    channel_map: Optional[ChannelMap] = None, crc_init: Optional[int] = None, hop_interval: Optional[int] = None,
                    hop_increment: Optional[int] = None):
         """
@@ -617,9 +629,6 @@ class BLE(Connector):
                 self.__started = False
 
             return self.__started
-        else:
-            logger.debug("starting current BLE mode, ignoring (already started)")
-            return True
 
     def disconnect(self, conn_handle):
         """Terminate a specific connection.
