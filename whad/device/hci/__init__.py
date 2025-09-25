@@ -1732,4 +1732,3 @@ class Hci(VirtualDevice):
             self._send_whad_command_result(CommandResult.SUCCESS)
         else:
             self._send_whad_command_result(CommandResult.WRONG_MODE)
-
