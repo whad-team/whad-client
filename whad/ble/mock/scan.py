@@ -139,18 +139,19 @@ class DeviceScan(MockDevice):
                 report = None
                 if self.__current_mode == self.MODE_SNIFF:
                     if self.accept(advertiser.address):
-                        # Get advertiser data
-                        adv_type, adv_data = advertiser.get_adv_data()
+                        for i in range(2 if self.__sniffing else 1):
+                            # Get advertiser data
+                            adv_type, adv_data = advertiser.get_adv_data()
 
-                        # Generate notification message
-                        report = BleAdvPduReceived(
-                            adv_type=adv_type,
-                            rssi=randint(-80, -30),
-                            bd_address=advertiser.address.value,
-                            adv_data=adv_data,
-                            addr_type=advertiser.addr_type
-                        )
-                        self.report_message(report)
+                            # Generate notification message
+                            report = BleAdvPduReceived(
+                                adv_type=adv_type,
+                                rssi=randint(-80, -30),
+                                bd_address=advertiser.address.value,
+                                adv_data=adv_data,
+                                addr_type=advertiser.addr_type
+                            )
+                            self.report_message(report)
                 else:
                     for i in range(2):
                         # Generate an advertising notification
