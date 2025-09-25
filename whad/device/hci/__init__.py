@@ -6,6 +6,7 @@ from time import sleep
 from queue import Queue, Empty
 from struct import unpack
 from threading import Lock
+from whad.hub.ble.chanmap import ChannelMap
 
 # Scapy layers for HCI
 from scapy.layers.bluetooth import BluetoothSocketError, BluetoothUserSocket, \
@@ -49,13 +50,13 @@ from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAc
 from whad.hub.discovery import Domain
 from whad.hub.generic.cmdresult import CommandResult
 from whad.hub.discovery import Capability
-from whad.hub.ble import Direction as BleDirection, Commands, AddressType, BDAddress
+from whad.hub.ble import Direction as BleDirection, Commands, AddressType, BDAddress, AdvType
 
 from ..device import VirtualDevice
 from .converter import HCIConverter
 from .hciconfig import HCIConfig
 from .constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState, \
-    HCIConnectionState
+    HCIConnectionState, SCAPY_ADV_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -250,8 +251,6 @@ class Hci(VirtualDevice):
         self._fw_author = None
         self._dev_id = None
         self._manufacturer = None
-        self._cached_scan_data = None
-        self._cached_scan_response_data = None
         self.__timeout = 1.0
         self._connected = False
         self.__closing = False
@@ -270,6 +269,14 @@ class Hci(VirtualDevice):
         self.__supported_max_rx_octets = 27
         self.__supported_max_rx_time = 0x148
         self._active_handles = []
+
+        # Advertising parameters
+        self.__adv_type = AdvType.ADV_IND
+        self.__adv_channel_map = 0x7
+        self.__adv_inter_min = 0x0020
+        self.__adv_inter_max = 0x4000
+        self._cached_adv_data = None
+        self._cached_scan_response_data = None
 
         # Classic Features
         self.__features = None
@@ -405,10 +412,10 @@ class Hci(VirtualDevice):
                             logger.error("[%s] Cannot read advertising physical channel Tx power", self.interface)
 
                         # if data are cached, configure them
-                        if self._cached_scan_data is not None:
+                        if self._cached_adv_data is not None:
                             # We can't wait for response because we are in the
                             # reception loop context
-                            success = self._set_advertising_data(self._cached_scan_data,
+                            success = self._set_advertising_data(self._cached_adv_data,
                                                                  from_queue=False)
 
                             # Raise an error if we cannot set the advertising data.
@@ -1218,7 +1225,7 @@ class Hci(VirtualDevice):
 
     @req_cmd("le_set_advertising_parameters")
     def set_advertising_parameters(self, interval_min: int = 0x0020, interval_max: int = 0x0020,
-                                   adv_type="ADV_IND", oatype: int = 0, datype: int = 0,
+                                   adv_type=0, oatype: int = 0, datype: int = 0,
                                    daddr:str = "00:00:00:00:00:00", channel_map: int = 0x7,
                                    filter_policy: str = "all:all", from_queue: bool = True) -> bool:
         """Configure the HCI LE advertising parameters.
@@ -1227,15 +1234,21 @@ class Hci(VirtualDevice):
         logger.debug("[%s] Setting HCI LE Advertising Parameters (blocking:%s) ...",
                     self.interface, from_queue)
         response = self._write_command(HCI_Cmd_LE_Set_Advertising_Parameters(
-            interval_min = 0x0020,
-            interval_max = 0x0020,
-            adv_type="ADV_IND",
+            interval_min = interval_min,
+            interval_max = interval_max,
+            adv_type=adv_type,
             oatype=0 if self._bd_address_type == AddressType.PUBLIC else 1,
             datype=0,
             daddr="00:00:00:00:00:00",
-            channel_map=0x7,
+            channel_map=channel_map,
             filter_policy="all:all"
         ), from_queue=from_queue)
+
+        # Cache parameters
+        self.__adv_inter_min = interval_min
+        self.__adv_inter_max = interval_max
+        self.__adv_channel_map = channel_map
+        self.__adv_type = adv_type
 
         # Process response if required
         if from_queue:
@@ -1257,13 +1270,13 @@ class Hci(VirtualDevice):
         # parameters.
         if not self._advertising and enable:
             result = self.set_advertising_parameters(
-                    interval_min = 0x0020,
-                    interval_max = 0x0020,
-                    adv_type="ADV_IND",
+                    interval_min = self.__adv_inter_min,
+                    interval_max = self.__adv_inter_max,
+                    adv_type=self.__adv_type,
                     oatype=0 if self._bd_address_type == AddressType.PUBLIC else 1,
                     datype=0,
                     daddr="00:00:00:00:00:00",
-                    channel_map=0x7,
+                    channel_map=self.__adv_channel_map,
                     filter_policy="all:all",
                     from_queue=from_queue
                 )
@@ -1403,9 +1416,9 @@ class Hci(VirtualDevice):
         logger.debug("whad ble periph mode message")
         if Commands.PeripheralMode in self._dev_capabilities[Domain.BtLE][1]:
             success = self._read_advertising_physical_channel_tx_power()
-            if len(message.scan_data) > 0:
-                success = success and self._set_advertising_data(message.scan_data)
-                self._cached_scan_data = message.scan_data
+            if len(message.adv_data) > 0:
+                success = success and self._set_advertising_data(message.adv_data)
+                self._cached_adv_data = message.scan_data
             if len(message.scanrsp_data) > 0:
                 success = success and self._set_scan_response_data(message.scanrsp_data)
                 self._cached_scan_response_data = message.scanrsp_data
@@ -1463,6 +1476,12 @@ class Hci(VirtualDevice):
         if self.__internal_state == HCIInternalState.SCANNING:
             self._set_scan_mode(True)
             self._send_whad_command_result(CommandResult.SUCCESS)
+        elif self.__internal_state == HCIInternalState.ADVERTISING:
+            if not self._advertising:
+                self._set_advertising_mode(True)
+                self._send_whad_command_result(CommandResult.SUCCESS)
+            else:
+                self._send_whad_command_result(CommandResult.ERROR)
         elif self.__internal_state == HCIInternalState.PERIPHERAL:
             if not self._advertising:
                 if self._set_advertising_mode(True):
@@ -1493,7 +1512,7 @@ class Hci(VirtualDevice):
             # Update mode and return success
             self.__internal_state = HCIInternalState.NONE
             self._send_whad_command_result(CommandResult.SUCCESS)
-        elif self.__internal_state == HCIInternalState.PERIPHERAL:
+        elif self.__internal_state in (HCIInternalState.PERIPHERAL, HCIInternalState.ADVERTISING):
             # We are not advertising anymore
             self._set_advertising_mode(False)
             self._send_whad_command_result(CommandResult.SUCCESS)
@@ -1551,3 +1570,40 @@ class Hci(VirtualDevice):
         else:
             logger.debug("HCI adapter does not support BD address spoofing")
             self._send_whad_command_result(CommandResult.ERROR)
+
+
+    def _on_whad_ble_adv_mode(self, message):
+        """ Called to put the device in advertising mode only,
+        with the provided advertising parameters.
+        """
+        success = True
+
+        # Convert channel map into the corresponding integer.
+        channels = ChannelMap.from_bytes(message.channel_map)
+        chanmap = 0
+        if channels.has(37):
+            chanmap |= 1
+        if channels.has(38):
+            chanmap |= 2
+        if channels.has(39):
+            chanmap |= 4
+
+        logger.debug("Received WHAD BLE set_adv_mode message")
+        if self.__internal_state in (HCIInternalState.NONE, HCIInternalState.ADVERTISING):
+            if len(message.adv_data) > 0:
+                success = success and self._set_advertising_data(message.adv_data)
+                self._cached_adv_data = message.adv_data
+            if len(message.scanrsp_data) > 0:
+                success = success and self._set_scan_response_data(message.scanrsp_data)
+                self._cached_scan_response_data = message.scanrsp_data
+            if not self._advertising:
+                success = success and self.set_advertising_parameters(message.inter_min, message.inter_max,
+                                           message.adv_type, channel_map=chanmap)
+            if success:
+                self.__internal_state = HCIInternalState.ADVERTISING
+                self._send_whad_command_result(CommandResult.SUCCESS)
+            else:
+                self._send_whad_command_result(CommandResult.ERROR)
+        else:
+            self._send_whad_command_result(CommandResult.WRONG_MODE)
+

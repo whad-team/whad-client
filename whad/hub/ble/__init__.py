@@ -1,6 +1,6 @@
 """WHAD Protocol Bluetooth Low Energy domain message abstraction layer.
 """
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass, field, fields
 
 from .bdaddr import BDAddress
@@ -66,7 +66,7 @@ class AdvType:
 class AddressType:
     PUBLIC = BleAddrType.PUBLIC
     RANDOM = BleAddrType.RANDOM
-    
+
 @dataclass(repr=False)
 class BLEMetadata(Metadata):
     direction : BleDirection = None
@@ -428,7 +428,10 @@ class BleDomain(Registry):
             active=active
         )
 
-    def create_adv_mode(self, adv_data: bytes, scan_rsp: bytes = None) -> HubMessage:
+    def create_adv_mode(self, adv_data: bytes, scanrsp_data: Optional[bytes] = None,
+                        adv_type: BleAdvType = BleAdvType.ADV_IND,
+                        channel_map: Optional[ChannelMap] =  None,
+                        inter_min: int = 0x20, inter_max: int = 0x4000) -> HubMessage:
         """Create an AdvMode message.
 
         :param adv_data: Advertisement data (31 bytes max)
@@ -439,10 +442,16 @@ class BleDomain(Registry):
         :rtype: AdvMode
         """
         message = BleDomain.bound('adv_mode', self.proto_version)(
-            scan_data=adv_data
+            adv_data=adv_data,
+            adv_type=adv_type,
+            inter_min=inter_min,
+            inter_max=inter_max,
+            channel_map=channel_map.value if channel_map is not None else ChannelMap([37, 38, 39]).value
         )
-        if scan_rsp is not None:
-            message.scanrsp_data = scan_rsp
+
+        # Set scan response if provided
+        if scanrsp_data is not None:
+            message.scanrsp_data = scanrsp_data
         return message
 
     def create_central_mode(self) -> HubMessage:
@@ -1041,7 +1050,7 @@ from .address import SetBdAddress
 from .sniffing import SniffAdv, SniffConnReq, SniffAccessAddress, SniffActiveConn, \
     AccessAddressDiscovered
 from .jamming import JamAdv, JamAdvChan, JamConn, ReactiveJam
-from .mode import ScanMode, AdvMode, CentralMode, PeriphMode, BleStart, BleStop, \
+from .mode import ScanMode, AdvMode, AdvModeV3, CentralMode, PeriphMode, BleStart, BleStop, \
     SetEncryption
 from .pdu import SetAdvData, SendBleRawPdu, SendBlePdu, BleAdvPduReceived, BlePduReceived, \
     BleRawPduReceived, Injected

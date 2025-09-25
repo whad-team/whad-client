@@ -923,7 +923,7 @@ class Device:
 class VirtualDevice(Device):
     """
     Virtual interface implementation.
-    
+
     This variant of the base Interface class provides a way to emulate an interface
     compatible with WHAD. This emulated compatible interface is used as an adaptation
     layer between WHAD's core and third-party hardware that does not run a WHAD-enabled
@@ -953,7 +953,6 @@ class VirtualDevice(Device):
         logger.debug("on_whad_message: %s", message)
         category = message.message_type
         message_type = message.message_name
-
         callback_name = f"_on_whad_{category}_{message_type}"
         if hasattr(self, callback_name) and callable(getattr(self, callback_name)):
             getattr(self, callback_name)(message)
@@ -966,7 +965,7 @@ class VirtualDevice(Device):
         msg = self.hub.discovery.create_info_resp(
             DeviceType.VirtualDevice,
             self._dev_id,
-            0x0100,
+            0x0300,
             0,
             self._fw_author,
             self._fw_url,
@@ -1009,7 +1008,7 @@ class WhadDevice(Device):
     @classmethod
     def create(cls, interface_string):
         """Create an instance of interface from its name, using Device."""
-        return Device.create(interface_string)        
+        return Device.create(interface_string) 
 
     @classmethod
     def check_interface(cls, interface):

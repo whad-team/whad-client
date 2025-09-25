@@ -12,8 +12,9 @@ class HCIInternalState(IntEnum):
     """
     NONE = 0
     SCANNING = 1
-    CENTRAL = 2
-    PERIPHERAL = 3
+    ADVERTISING=2
+    CENTRAL = 3
+    PERIPHERAL = 4
 
 class HCIConnectionState(IntEnum):
     """Host/controller interface connection state
