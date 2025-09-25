@@ -421,6 +421,8 @@ class Connector:
                     message = self.__locked_pdus.get(block=True, timeout=0.2)
                     logger.debug("[connector][%s] Unlocked message for processing: %s",
                                 self.device.interface, message)
+
+                    # Forward to internal packet processing methods if no callback is given
                     if dispatch_callback is None:
                         # If we are in synchronous mode, add unlocked PDU to synchronous messages
                         if self.__sync_mode != self.SYNC_MODE_OFF:
@@ -430,7 +432,7 @@ class Connector:
                             logger.debug("[connector][%s] forward to __process_pkt_message()")
                             self.__process_pkt_message(message)
                     else:
-                        # Call the provided dispatch callback
+                        # Or call the provided dispatch callback if provided
                         dispatch_callback(message)
 
                     # Mark locked PDU as processed
