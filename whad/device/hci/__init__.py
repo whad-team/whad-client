@@ -1240,7 +1240,7 @@ class Hci(VirtualDevice):
         return result
 
     @req_cmd("le_set_advertising_parameters")
-    def set_advertising_parameters(self, interval_min: int = 0x0020, interval_max: int = 0x0020,
+    def set_advertising_parameters(self, interval_min: int = 0x0020, interval_max: int = 0x4000,
                                    adv_type=0, oatype: int = 0, datype: int = 0,
                                    daddr:str = "00:00:00:00:00:00", channel_map: int = 0x7,
                                    filter_policy: str = "all:all", from_queue: bool = True) -> bool:
@@ -1431,10 +1431,26 @@ class Hci(VirtualDevice):
     def _on_whad_ble_periph_mode(self, message):
         logger.debug("whad ble periph mode message")
         if Commands.PeripheralMode in self._dev_capabilities[Domain.BtLE][1]:
+            # Convert channel map into the corresponding integer.
+            channels = ChannelMap.from_bytes(message.channel_map)
+            chanmap = 0
+            if channels.has(37):
+                chanmap |= 1
+            if channels.has(38):
+                chanmap |= 2
+            if channels.has(39):
+                chanmap |= 4
+
+            # Save advertising parameters
+            self.__adv_inter_min = message.inter_min
+            self.__adv_inter_max = message.inter_max
+            self.__adv_channel_map = chanmap
+            self.__adv_type = message.adv_type
+
             success = self._read_advertising_physical_channel_tx_power()
             if len(message.adv_data) > 0:
                 success = success and self._set_advertising_data(message.adv_data)
-                self._cached_adv_data = message.scanrsp_data
+                self._cached_adv_data = message.adv_data
             if len(message.scanrsp_data) > 0:
                 success = success and self._set_scan_response_data(message.scanrsp_data)
                 self._cached_scan_response_data = message.scanrsp_data
