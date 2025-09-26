@@ -133,7 +133,12 @@ class MockDevice(Device):
 
         def __call__(self, callback):
             """Called to decorate a specific callback"""
-            setattr(callback, "_MESSAGE_TYPE", self.__msg_type)
+            if hasattr(callback, "_MESSAGE_TYPE"):
+                msg_types = getattr(callback, "_MESSAGE_TYPE")
+                if msg_types is not None and isinstance(msg_types, list):
+                    msg_types.append(self.__msg_type)
+            else:
+                setattr(callback, "_MESSAGE_TYPE", [self.__msg_type])
             return callback
 
 
@@ -152,7 +157,8 @@ class MockDevice(Device):
                 prop_obj = getattr(self, prop_name)
                 # If property is a method
                 if callable(prop_obj) and hasattr(prop_obj, "_MESSAGE_TYPE"):
-                    self.__handlers[getattr(prop_obj, "_MESSAGE_TYPE")] = prop_obj
+                    for msg_type in getattr(prop_obj, "_MESSAGE_TYPE"):
+                        self.__handlers[msg_type] = prop_obj
             except AttributeError:
                 pass
 
