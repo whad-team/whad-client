@@ -7,7 +7,7 @@ class that implements the *Advertiser* role as defined in the Bluetooth
 specification.
 """
 import logging
-from typing import Optional
+from typing import Optional, List, Tuple
 
 from whad.ble.profile.advdata import AdvDataFieldList
 from whad.exceptions import UnsupportedCapability
@@ -44,6 +44,36 @@ class Advertiser(BLE):
         # Configure the device advertising parameters
         self.__configure()
 
+    @property
+    def adv_type(self) -> AdvType:
+        """Advertisement type"""
+        return self.__adv_type
+
+    @property
+    def adv_data(self) -> AdvDataFieldList:
+        """Advertisement data"""
+        return self.__adv_data
+
+    @property
+    def scanrsp_data(self) -> Optional[AdvDataFieldList]:
+        """Scan response data"""
+        return self.__scanrsp_data
+
+    @property
+    def channels(self) -> List[int]:
+        """List of enabled advertising channels"""
+        return self.__channels
+
+    @property
+    def channel_map(self) -> ChannelMap:
+        """Advertising channel map"""
+        return ChannelMap(self.__channels)
+
+    @property
+    def interval(self) -> Tuple[int, int]:
+        """Advertising interval"""
+        return (self.__inter_min, self.__inter_max)
+
     def __configure(self) -> bool:
         """Configure the main advertising parameters.
 
@@ -51,11 +81,14 @@ class Advertiser(BLE):
         advertising channel map, interval min and max values) into the associated device. Advertising data and scan response
         data can be updated at any time, other parameters require the device to stop advertising to be changed.
         """
+        inter_min, inter_max = self.interval
         # Configure the device advertising parameters
-        return self.enable_adv_mode(adv_data=self.__adv_data.to_bytes(), scan_data=self.__scanrsp_data.to_bytes(),
-                                    adv_type=self.__adv_type, channel_map=ChannelMap(self.__channels),
-                                    inter_min=self.__inter_min, inter_max=self.__inter_max)
-
+        return self.enable_adv_mode(
+            adv_data=self.adv_data.to_bytes(),
+            scan_data=self.scanrsp_data.to_bytes() if self.scanrsp_data is not None else None,
+            adv_type=self.adv_type,
+            channel_map=self.channel_map,
+            inter_min=inter_min, inter_max=inter_max)
 
     def update(self, adv_data: Optional[AdvDataFieldList] = None, scanrsp_data: Optional[AdvDataFieldList] = None) -> bool:
         """Update advertising data.
