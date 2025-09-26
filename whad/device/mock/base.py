@@ -127,7 +127,7 @@ class MockDevice(Device):
         specific message type.
         """
 
-        def __init__(self, message_type):
+        def __init__(self, *message_type):
             """Initialize decorator."""
             self.__msg_type = message_type
 
@@ -136,9 +136,9 @@ class MockDevice(Device):
             if hasattr(callback, "_MESSAGE_TYPE"):
                 msg_types = getattr(callback, "_MESSAGE_TYPE")
                 if msg_types is not None and isinstance(msg_types, list):
-                    msg_types.append(self.__msg_type)
+                    msg_types.extend(self.__msg_type)
             else:
-                setattr(callback, "_MESSAGE_TYPE", [self.__msg_type])
+                setattr(callback, "_MESSAGE_TYPE", self.__msg_type)
             return callback
 
 
