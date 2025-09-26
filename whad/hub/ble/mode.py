@@ -78,7 +78,7 @@ class PeriphMode(PbMessageWrapper):
 
     def get_adv_data(self) -> Optional[bytes]:
         """Retrieve advertising data."""
-        return self.get_field_value(PeriphModeV3.adv_data)
+        return self.get_field_value(PeriphMode.adv_data)
 
     def get_scan_data(self) -> Optional[bytes]:
         """Retrieve scan response data, if set."""
@@ -116,6 +116,46 @@ class PeriphModeV3(PeriphMode):
     inter_min = PbFieldInt('ble.periph_mode.inter_min')
     inter_max = PbFieldInt('ble.periph_mode.inter_max')
 
+
+@pb_bind(BleDomain, 'periph_mode', version=3)
+class PeriphModeV3(PeriphMode):
+    """BLE advertising mode message class, improved starting from version 3
+    """
+    adv_data = PbFieldBytes('ble.periph_mode.adv_data')
+    scanrsp_data = PbFieldBytes('ble.periph_mode.scanrsp_data')
+    adv_type = PbFieldInt('ble.periph_mode.adv_type')
+    channel_map = PbFieldBytes('ble.periph_mode.channel_map')
+    inter_min = PbFieldInt('ble.periph_mode.inter_min')
+    inter_max = PbFieldInt('ble.periph_mode.inter_max')
+
+    def get_adv_data(self) -> Optional[bytes]:
+        """Retrieve advertising data."""
+        return self.get_field_value(PeriphModeV3.adv_data)
+
+    def get_scan_data(self) -> Optional[bytes]:
+        """Retrieve scan response data, if set."""
+        return self.get_field_value(PeriphModeV3.scanrsp_data)
+
+    def get_adv_type(self) -> Optional[BleAdvType]:
+        """Retrieve the advertisement type."""
+        return self.get_field_value(PeriphModeV3.adv_type)
+
+    def get_channel_map(self) -> Optional[ChannelMap]:
+        """Retrieve channel map."""
+        # Read value from message
+        value = self.get_field_value(PeriphModeV3.channel_map)
+        if value is not None and isinstance(value, bytes):
+            return ChannelMap.from_bytes(value)
+        return None
+
+    def get_interval(self) -> Optional[Tuple[int, int]]:
+        """Retrieve advertising interval min/max values."""
+        inter_min = self.get_field_value(PeriphModeV3.inter_min)
+        inter_max = self.get_field_value(PeriphModeV3.inter_max)
+        if inter_min is not None and inter_max is not None:
+            if inter_min in range(0x20, 0x4001) and inter_max in range(0x20, 0x4001):
+                return (inter_min, inter_max)
+        return None
 
 @pb_bind(BleDomain, 'start', 1)
 class BleStart(PbMessageWrapper):
