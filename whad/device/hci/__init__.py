@@ -9,42 +9,47 @@ from threading import Lock
 from whad.hub.ble.chanmap import ChannelMap
 
 # Scapy layers for HCI
-from scapy.layers.bluetooth import BluetoothSocketError, BluetoothUserSocket, \
-    HCI_Hdr, HCI_Command_Hdr, HCI_Cmd_Reset, HCI_Cmd_Set_Event_Filter, \
-    HCI_Cmd_Set_Event_Mask, HCI_Cmd_Write_LE_Host_Support, \
-    HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable, \
-    HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect, \
-    HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data, \
-    HCI_Event_Disconnection_Complete, HCI_Cmd_LE_Set_Scan_Response_Data, \
-    HCI_Cmd_LE_Set_Random_Address, HCI_Cmd_LE_Long_Term_Key_Request_Reply, \
-    HCI_Cmd_LE_Enable_Encryption, HCI_Cmd_LE_Set_Advertising_Parameters, \
-    HCI_Cmd_LE_Read_Buffer_Size_V1, HCI_Cmd_Read_Local_Name, HCI_Cmd_Complete_Read_Local_Name, \
-    HCI_Cmd_Complete_Read_Local_Version_Information, HCI_Cmd_Read_Local_Version_Information, \
-    HCI_Cmd_Write_Connect_Accept_Timeout, HCI_Cmd_LE_Read_Local_Supported_Features, \
-    HCI_Cmd_LE_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Clear_Filter_Accept_List, \
+from scapy.layers.bluetooth import (
+    BluetoothSocketError, BluetoothUserSocket,
+    HCI_Hdr, HCI_Command_Hdr, HCI_Cmd_Reset, HCI_Cmd_Set_Event_Filter,
+    HCI_Cmd_Set_Event_Mask, HCI_Cmd_Write_LE_Host_Support,
+    HCI_Cmd_Read_BD_Addr, HCI_Cmd_Complete_Read_BD_Addr, HCI_Cmd_LE_Set_Scan_Enable,
+    HCI_Cmd_LE_Set_Scan_Parameters, HCI_Cmd_LE_Create_Connection, HCI_Cmd_Disconnect,
+    HCI_Cmd_LE_Set_Advertise_Enable, HCI_Cmd_LE_Set_Advertising_Data,
+    HCI_Event_Disconnection_Complete, HCI_Cmd_LE_Set_Scan_Response_Data,
+    HCI_Cmd_LE_Set_Random_Address, HCI_Cmd_LE_Long_Term_Key_Request_Reply,
+    HCI_Cmd_LE_Enable_Encryption, HCI_Cmd_LE_Set_Advertising_Parameters,
+    HCI_Cmd_LE_Read_Buffer_Size_V1, HCI_Cmd_Read_Local_Name, HCI_Cmd_Complete_Read_Local_Name,
+    HCI_Cmd_Complete_Read_Local_Version_Information, HCI_Cmd_Read_Local_Version_Information,
+    HCI_Cmd_Write_Connect_Accept_Timeout, HCI_Cmd_LE_Read_Local_Supported_Features,
+    HCI_Cmd_LE_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Clear_Filter_Accept_List,
     EIR_Hdr, HCI_Cmd_LE_Create_Connection_Cancel
+)
 
-from whad.scapy.layers.bluetooth import HCI_Cmd_LE_Complete_Read_Buffer_Size, \
-    HCI_Cmd_Read_Buffer_Size, HCI_Cmd_Complete_Read_Buffer_Size, HCI_Cmd_LE_Set_Event_Mask, \
-    HCI_Cmd_Read_Local_Supported_Commands, HCI_Cmd_Complete_Supported_Commands, \
-    HCI_Cmd_Read_Local_Supported_Features, HCI_Cmd_Complete_Supported_Features, \
-    HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Complete_Supported_Features, \
-    HCI_Cmd_LE_Write_Suggested_Default_Data_Length, HCI_Cmd_LE_Read_Suggested_Default_Data_Length, \
-    HCI_Cmd_LE_Complete_Suggested_Default_Data_Length, HCI_Cmd_Write_Simple_Pairing_Mode, \
-    HCI_Cmd_Write_Default_Link_Policy_Settings, HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power, \
+# Whad custom Scapy layers for Bluetooth
+from whad.scapy.layers.bluetooth import (
+    HCI_Cmd_LE_Complete_Read_Buffer_Size, HCI_Cmd_Read_Buffer_Size,
+    HCI_Cmd_Complete_Read_Buffer_Size, HCI_Cmd_LE_Set_Event_Mask,
+    HCI_Cmd_Read_Local_Supported_Commands, HCI_Cmd_Complete_Supported_Commands,
+    HCI_Cmd_Read_Local_Supported_Features, HCI_Cmd_Complete_Supported_Features,
+    HCI_Cmd_LE_Complete_Read_Filter_Accept_List_Size, HCI_Cmd_LE_Complete_Supported_Features,
+    HCI_Cmd_LE_Write_Suggested_Default_Data_Length, HCI_Cmd_LE_Read_Suggested_Default_Data_Length,
+    HCI_Cmd_LE_Complete_Suggested_Default_Data_Length, HCI_Cmd_Write_Simple_Pairing_Mode,
+    HCI_Cmd_Write_Default_Link_Policy_Settings, HCI_Cmd_LE_Read_Advertising_Physical_Channel_Tx_Power,
     HCI_Cmd_Complete_LE_Advertising_Tx_Power_Level, HCI_Cmd_Write_Class_Of_Device
+)
 
 # Whad custom layers
-from whad.scapy.layers.hci import HCI_VERSIONS, BT_MANUFACTURERS, \
-    HCI_Cmd_LE_Read_Supported_States, \
-    HCI_Cmd_Complete_LE_Read_Supported_States, HCI_Cmd_CSR_Write_BD_Address, HCI_Cmd_CSR_Reset, \
-    HCI_Cmd_TI_Write_BD_Address, HCI_Cmd_BCM_Write_BD_Address, HCI_Cmd_Zeevo_Write_BD_Address, \
-    HCI_Cmd_Ericsson_Write_BD_Address, HCI_Cmd_ST_Write_BD_Address, \
+from whad.scapy.layers.hci import (
+    HCI_VERSIONS, BT_MANUFACTURERS, HCI_Cmd_LE_Read_Supported_States,
+    HCI_Cmd_Complete_LE_Read_Supported_States, HCI_Cmd_CSR_Write_BD_Address, HCI_Cmd_CSR_Reset,
+    HCI_Cmd_TI_Write_BD_Address, HCI_Cmd_BCM_Write_BD_Address, HCI_Cmd_Zeevo_Write_BD_Address,
+    HCI_Cmd_Ericsson_Write_BD_Address, HCI_Cmd_ST_Write_BD_Address,
     HCI_Cmd_LE_Set_Host_Channel_Classification
+)
 
 # Whad
-from whad.exceptions import WhadDeviceNotFound, WhadDeviceNotReady, WhadDeviceAccessDenied, \
-    WhadDeviceUnsupportedOperation, WhadDeviceError
+from whad.exceptions import WhadDeviceNotReady, WhadDeviceAccessDenied, WhadDeviceUnsupportedOperation
 
 # Whad hub
 from whad.hub.discovery import Domain
@@ -185,7 +190,7 @@ class req_feature:
 
             # If all requirements are met, forward
             return method(self, *args, **kwargs)
-        return _wrap   
+        return _wrap
 
 class le_only(req_feature):
     """Requires a LE-enabled controller
@@ -209,7 +214,7 @@ class le_only(req_feature):
             return method(self, *args, **kwargs)
 
         # Wrap with LE-enabled controller check (tested first)
-        return super().__init__(_wrap)
+        return super().__call__(_wrap)
 
 class Hci(VirtualDevice):
     """Host/controller interface virtual device implementation.
@@ -371,9 +376,9 @@ class Hci(VirtualDevice):
         :param bytes data: Data to write
         :return: number of bytes written to the device
         """
-        if not self.__opened:
+        if not self.__opened or self.__socket is None:
             raise WhadDeviceNotReady()
-        self.__socket.send(payload)
+        return self.__socket.send(payload)
 
     def read(self):
         """
@@ -516,7 +521,7 @@ class Hci(VirtualDevice):
                 logger.debug("[%s][write_command] Received response with opcode %d", self.interface, response.opcode)
                 response = self._wait_response()
             logger.debug("[%s][write_command] Response received.", self.interface)
-            
+
             if response is not None:
                 logger.debug("[%s] HCI write command returned status %d",
                             self.interface, response.status)
@@ -532,7 +537,7 @@ class Hci(VirtualDevice):
                 if event.type == 0x4 and event.code in (0xf, 0x13):
                     self.__hci_responses.put(event)
                 event = self.__socket.recv()
-            
+
             # We got our response: we release our socket lock and set the
             # captured event as the reponse to return to caller.
             self.__lock.release()
@@ -603,7 +608,7 @@ class Hci(VirtualDevice):
         if feature in self.__features.lmp_features.names:
             return getattr(self.__features.lmp_features, feature)
         return False
-    
+
     def is_le_feature_supported(self, feature: str) -> bool:
         """Determine if a specific feature is supported by the HCI interface.
 
@@ -659,10 +664,10 @@ class Hci(VirtualDevice):
                 else:
                     logger.debug("[%s] LE ACL buffer is 0, fallback to default ACL buffer")
                     return self._read_buffer_size()
-        
+
         logger.debug("[%s] Failed reading LE ACL buffer size v1 !", self.interface)
         return False
-    
+
     def read_local_supported_commands(self):
         """Read local adapter supported commands.
         """
@@ -673,9 +678,9 @@ class Hci(VirtualDevice):
                 logger.debug("[%s] Local supported commands cached.", self.interface)
                 self.__local_supp_cmds = response[HCI_Cmd_Complete_Supported_Commands]
                 return True
-            
+
         logger.debug("[%s] Failed reading supported commands !", self.interface)
-        return False   
+        return False
 
     @req_cmd("read_local_supported_features")
     def read_local_supported_features(self):
@@ -687,7 +692,7 @@ class Hci(VirtualDevice):
             logger.debug("[%s] Local supported features cached.", self.interface)
             self.__features = response[HCI_Cmd_Complete_Supported_Features]
             return True
-        
+
         logger.debug("[%s] Failed reading supported features !", self.interface)
         return False
 
@@ -1181,7 +1186,7 @@ class Hci(VirtualDevice):
 
         # Return result
         return result
-    
+
     @req_cmd("le_read_advertising_physical_channel_tx_power")
     def _read_advertising_physical_channel_tx_power(self, from_queue: bool = True) -> bool:
         """Read Advertising Physical Channel Tx Power level
