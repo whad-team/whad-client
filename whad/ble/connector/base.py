@@ -1437,25 +1437,6 @@ class BLENew(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def enable_peripheral_mode(self, adv_data: bytes = None, scan_data: bytes = None):
-        """
-        Enable Bluetooth Low Energy peripheral mode (acts as slave).
-        """
-        # Build advertising data if required
-        if isinstance(adv_data, AdvDataFieldList):
-            adv_data = adv_data.to_bytes()
-        if isinstance(scan_data, AdvDataFieldList):
-            scan_data = scan_data.to_bytes()
-
-        # Create a PeriphMode message
-        msg = self.hub.ble.create_periph_mode(
-            adv_data=adv_data,
-            scan_rsp=scan_data
-        )
-
-        resp = self.send_command(msg, message_filter(CommandResult))
-        return isinstance(resp, Success)
-
     def connect_to(self, bd_addr: BDAddress, random: bool = False, access_address: int = None, \
                    channel_map: ChannelMap = None, crc_init: int = None, hop_interval: int = None, \
                    hop_increment: int = None):
