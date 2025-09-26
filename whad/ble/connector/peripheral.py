@@ -13,7 +13,7 @@ from threading import Thread, Event
 from typing import Optional
 
 from whad.hub.ble.bdaddr import BDAddress
-from whad.hub.ble import Direction as BleDirection
+from whad.hub.ble import Direction as BleDirection, AdvType, ChannelMap
 from whad.exceptions import UnsupportedCapability
 
 from .base import BLE
@@ -138,7 +138,8 @@ class Peripheral(BLE):
 
     def __init__(self, device, existing_connection = None, profile=None, adv_data=None,
                  scan_data=None, bd_address=None, public=True, stack=BleStack, gatt=GattServer,
-                 pairing=Pairing(), security_database=None):
+                 pairing=Pairing(), security_database=None, adv_type: AdvType = AdvType.ADV_IND,
+                 channels: Optional[list] = None, interval_min: int = 0x20, interval_max: int = 0x4000):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -220,9 +221,17 @@ class Peripheral(BLE):
             if adv_data is None:
                 adv_data = AdvDataFieldList(AdvFlagsField())
 
+            # Generate the advertising channel map based on the provided channels, use default if not set
+            if channels is None:
+                channel_map = ChannelMap([37, 38, 39])
+            else:
+                channel_map = ChannelMap(channels)
+                channel_map.filter(lambda x: x in (37, 38, 39))
+
             # Enable peripheral mode
+            print("init peripheral mode")
             logger.info("Enable peripheral mode with advertising data: %s", adv_data)
-            self.enable_peripheral_mode(adv_data, scan_data)
+            self.enable_peripheral_mode(adv_data, scan_data, adv_type, channel_map, interval_min, interval_max)
 
     @property
     def listener(self):
