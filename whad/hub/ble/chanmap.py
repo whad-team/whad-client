@@ -1,7 +1,7 @@
 """BLE Channel Map helper
 """
 
-from typing import List, Generator
+from typing import List, Generator, Callable
 from struct import unpack
 
 class ChannelMap(object):
@@ -37,7 +37,15 @@ class ChannelMap(object):
         chanmap_int += channel_map[4] << 32
         return ChannelMap.from_int(chanmap_int)
 
+    def __eq__(self, other):
+        """Check if two ChannelMap objects are identical."""
+        if isinstance(other, ChannelMap):
+            return self.value == other.value
+        return False
 
+    def __len__(self) -> int:
+        """Compute the number of channels active in the channel map."""
+        return len(list(self.channels()))
 
     def __init__(self, channels: List[int] = None):
         """Initialize our channel map
@@ -91,12 +99,23 @@ class ChannelMap(object):
         """
         return (self.__map & (1 << channel)) != 0
 
-    def channels(self) -> Generator:
+    def channels(self) -> Generator[int, None, None]:
         """Iterate over channels
         """
-        for channel in range(38):
+        for channel in range(40):
             if self.has(channel):
                 yield channel
+
+    def filter(self, func: Callable):
+        """ Filter the channel map by applying the specified filter function.
+
+        :param func: Filtering function used to filter channels
+        :type  func: Callable
+        :return: ChannelMap
+        """
+        for channel in self.channels():
+            if not func(channel):
+                self.remove(channel)
 
     @property
     def value(self):
