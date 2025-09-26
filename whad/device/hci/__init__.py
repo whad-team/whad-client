@@ -1472,7 +1472,7 @@ class Hci(VirtualDevice):
             success = self._read_advertising_physical_channel_tx_power()
             if len(message.adv_data) > 0:
                 success = success and self._set_advertising_data(message.adv_data)
-                self._cached_adv_data = message.adv_data
+                self._cached_adv_data = message.scanrsp_data
             if len(message.scanrsp_data) > 0:
                 success = success and self._set_scan_response_data(message.scanrsp_data)
                 self._cached_scan_response_data = message.scanrsp_data
