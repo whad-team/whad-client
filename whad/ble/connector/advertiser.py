@@ -129,6 +129,7 @@ class Advertiser(BLE):
         advertising channel map, interval min and max values) into the associated device. Advertising data and scan response
         data can be updated at any time, other parameters require the device to stop advertising to be changed.
         """
+        inter_min, inter_max = self.interval
         # Configure the device advertising parameters
         adv_data = self.adv_data if isinstance(self.adv_data, bytes) else self.adv_data.to_bytes()
         if isinstance(self.scanrsp_data, bytes):
