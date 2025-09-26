@@ -14,7 +14,7 @@ from whad.device.mock import MockDevice
 from whad.exceptions import WhadDeviceDisconnected, WhadDeviceNotReady
 
 from whad.hub.ble.address import SetBdAddress
-from whad.hub.ble.mode import PeriphMode, BleStart, BleStop
+from whad.hub.ble.mode import PeriphMode, PeriphModeV3, BleStart, BleStop
 from whad.hub.ble.connect import Connected
 from whad.hub.ble import BDAddress, Commands, Direction
 from whad.hub.ble.pdu import BlePduReceived, SetAdvData, SendBlePdu, BlePduReceived
@@ -38,7 +38,7 @@ class PeripheralMock(MockDevice):
     STATE_STARTED = 1
     STATE_CONNECTED = 2
 
-    def __init__(self, bd_address: str = "aa:bb:cc:dd:ee:ff"):
+    def __init__(self, bd_address: str = "aa:bb:cc:dd:ee:ff", protocol_version: int = ProtocolHub.LAST_VERSION):
         """Initialization."""
 
         # Set state
@@ -59,7 +59,7 @@ class PeripheralMock(MockDevice):
         super().__init__(
             author="Whad Team",
             url="https://whad.io",
-            proto_minver=ProtocolHub.LAST_VERSION,
+            proto_minver=protocol_version,
             version="1.0.0",
             dev_type=DeviceType.VirtualDevice,
             dev_id=b"PeripheralMock",
@@ -262,9 +262,9 @@ class PeripheralMock(MockDevice):
         self.__client.find_by_type_value(start_handle, end_handle, attr_type, attr_value)
         return self.wait_procedure()
 
-    @MockDevice.route(PeriphMode)
+    @MockDevice.route(PeriphMode,PeriphModeV3)
     def on_periph_mode(self, message: PeriphMode):
-        """BLE Peripheral node handler.
+        """BLE Peripheral mode handler, supports all versions of PeriphMode.
 
         If a mode is already selected and running, return a WrongMode
         error. If in stopped state, return success.
