@@ -796,7 +796,7 @@ class ANTStickDevice(VirtualDevice):
         )
         self._set_channel_rf_channel(
             channel_number = 0, 
-            rf_channel = 57
+            rf_channel = message.rf_channel
         )
         self._open_rx_scan_mode()
         # self._open_channel(channel_number=0)
