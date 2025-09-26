@@ -693,7 +693,7 @@ class BLE(Connector):
                 logger.info('an error occurred while starting !')
                 self.__started = False
 
-            return self.__started
+        return self.__started
 
     def disconnect(self, conn_handle):
         """Terminate a specific connection.
