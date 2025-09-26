@@ -55,8 +55,9 @@ from whad.hub.ble import Direction as BleDirection, Commands, AddressType, BDAdd
 from ..device import VirtualDevice
 from .converter import HCIConverter
 from .hciconfig import HCIConfig
-from .constants import LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState, \
-    HCIConnectionState, SCAPY_ADV_TYPES
+from .constants import (
+    LE_STATES, ADDRESS_MODIFICATION_VENDORS, HCIInternalState, HCIConnectionState
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1418,7 +1419,7 @@ class Hci(VirtualDevice):
             success = self._read_advertising_physical_channel_tx_power()
             if len(message.adv_data) > 0:
                 success = success and self._set_advertising_data(message.adv_data)
-                self._cached_adv_data = message.scan_data
+                self._cached_adv_data = message.scanrsp_data
             if len(message.scanrsp_data) > 0:
                 success = success and self._set_scan_response_data(message.scanrsp_data)
                 self._cached_scan_response_data = message.scanrsp_data
