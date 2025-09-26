@@ -46,14 +46,26 @@ class Advertiser(BLE):
 
     def __configure(self) -> bool:
         """Configure the main advertising parameters.
+
+        This method will set the specified advertising parameters (advertising data, scan response data, advertisement type,
+        advertising channel map, interval min and max values) into the associated device. Advertising data and scan response
+        data can be updated at any time, other parameters require the device to stop advertising to be changed.
         """
         # Configure the device advertising parameters
-        return self.enable_adv_mode(adv_data=self.__adv_data, scan_data=self.__scanrsp_data, adv_type=self.__adv_type,
-                             channel_map=ChannelMap(self.__channels), inter_min=self.__inter_min, inter_max=self.__inter_max)
+        return self.enable_adv_mode(adv_data=self.__adv_data.to_bytes(), scan_data=self.__scanrsp_data.to_bytes(),
+                                    adv_type=self.__adv_type, channel_map=ChannelMap(self.__channels),
+                                    inter_min=self.__inter_min, inter_max=self.__inter_max)
 
 
     def update(self, adv_data: Optional[AdvDataFieldList] = None, scanrsp_data: Optional[AdvDataFieldList] = None) -> bool:
-        """Update advertising data. """
+        """Update advertising data.
+
+        :param adv_data: Advertising data
+        :type  adv_data: AdvDataFieldList, optional
+        :param scanrsp_data: Scan response data
+        :type  scanrsp_data: AdvDataFieldList, optional
+        :return: `True` if parameters have been successfully update, `False` otherwise.
+        """
         # Save advertising info
         if adv_data is not None:
             self.__adv_data = adv_data
