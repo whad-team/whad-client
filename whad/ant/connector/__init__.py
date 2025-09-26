@@ -214,7 +214,6 @@ class ANT(WhadDeviceConnector):
             device_type = device_type, 
             transmission_type = transmission_type
         )
-
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
