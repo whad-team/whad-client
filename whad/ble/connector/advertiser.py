@@ -201,4 +201,3 @@ class Advertiser(BLE):
 
         # Reconfigure
         return self.set_adv_data(self.__adv_data, self.__scanrsp_data)
-
