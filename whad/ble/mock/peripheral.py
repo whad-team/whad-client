@@ -2,7 +2,7 @@
 """
 
 import logging
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Tuple
 from random import randint
 from time import sleep
 
@@ -16,7 +16,7 @@ from whad.exceptions import WhadDeviceDisconnected, WhadDeviceNotReady
 from whad.hub.ble.address import SetBdAddress
 from whad.hub.ble.mode import PeriphMode, PeriphModeV3, BleStart, BleStop
 from whad.hub.ble.connect import Connected
-from whad.hub.ble import BDAddress, Commands, Direction
+from whad.hub.ble import BDAddress, Commands, Direction, AdvType, ChannelMap
 from whad.hub.ble.pdu import BlePduReceived, SetAdvData, SendBlePdu, BlePduReceived
 from whad.hub.generic.cmdresult import Success, Error, WrongMode
 from whad.hub.discovery import Capability, Domain, DeviceType
@@ -50,6 +50,10 @@ class PeripheralMock(MockDevice):
         # Advertising data
         self.__adv_data = None
         self.__scan_data = None
+        self.__adv_type = None
+        self.__adv_channel_map = None
+        self.__adv_inter_min = None
+        self.__adv_inter_max = None
 
         # L2CAP
         self.__l2cap = None
@@ -94,6 +98,20 @@ class PeripheralMock(MockDevice):
     def get_scan_resp(self) -> Optional[bytes]:
         """Scan response data."""
         return self.__scan_data
+
+    def get_adv_type(self) -> Optional[AdvType]:
+        """Advertisement type"""
+        return self.__adv_type
+
+    def get_adv_channel_map(self) -> Optional[ChannelMap]:
+        """Advertising channel map"""
+        return self.__adv_channel_map
+
+    def get_adv_interval(self) -> Optional[Tuple[int, int]]:
+        """Advertising interval"""
+        if self.__adv_inter_min is not None and self.__adv_inter_max is not None:
+            return (self.__adv_inter_min, self.__adv_inter_max)
+        return None
 
     def is_started(self) -> bool:
         """Check if peripheral is started."""
@@ -275,6 +293,9 @@ class PeripheralMock(MockDevice):
         # Save advertising parameters
         self.__adv_data = message.get_adv_data()
         self.__scan_data = message.get_scan_data()
+        self.__adv_type = message.get_adv_type()
+        self.__adv_channel_map = message.get_channel_map()
+        self.__adv_inter_min, self.__adv_inter_max = message.get_interval()
 
         # Success
         return  Success()
