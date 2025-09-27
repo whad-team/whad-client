@@ -1588,8 +1588,6 @@ class Hci(VirtualDevice):
     def _on_whad_ble_send_pdu(self, message):
         """Send a given PDU into the active connection
         """
-        # debug: 
-        #print("hci::send_pdu", message)        
         # Make sure we have an active connection
         if self.__conn_state == HCIConnectionState.ESTABLISHED:
             logger.debug("[%s] Received WHAD BLE send_pdu message", self.interface)
