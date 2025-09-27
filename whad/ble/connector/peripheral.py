@@ -228,9 +228,9 @@ class Peripheral(BLE):
                 channel_map = ChannelMap(channels)
                 channel_map.filter(lambda x: x in (37, 38, 39))
 
+
             # Enable peripheral mode
-            print("init peripheral mode")
-            logger.info("Enable peripheral mode with advertising data: %s", adv_data)
+            logger.info("Enable peripheral mode with advertising data: %s and type %d", adv_data, adv_type)
             self.enable_peripheral_mode(adv_data, scan_data, adv_type, channel_map, interval_min, interval_max)
 
     @property
