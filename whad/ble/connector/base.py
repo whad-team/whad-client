@@ -15,6 +15,7 @@ from scapy.packet import Packet
 
 # Device interface
 from whad.device import Connector
+from whad.hub.ble.pdu import SetAdvData
 from whad.hub.discovery import Domain, Capability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
@@ -158,6 +159,16 @@ class BLE(Connector):
         # Retrieve supported commands
         commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.JamAdvOnChannel))>0
+
+    def can_be_advertiser(self) -> bool:
+        """
+        Determine if the device implements an advertiser mode.
+        """
+        commands = self.device.get_domain_commands(Domain.BtLE)
+        return (
+            (commands & (1 << Commands.AdvMode))>0 and
+            (commands & (1 << Commands.SetAdvData))>0
+        )
 
     def can_be_central(self):
         """
@@ -566,6 +577,21 @@ class BLE(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
+    def set_adv_data(self, adv_data: AdvDataFieldList, scan_data: Optional[AdvDataFieldList] = None):
+        """Update advertising data, even if the device is already advertising.
+
+        :param adv_data:  Advertising data
+        :type  adv_data:  AdvDataFieldList
+        :param scan_data: Scan response data
+        :type  scan_data: AdvDataFieldList, optional
+        """
+        msg = self.hub.ble.create_set_adv_data(
+            adv_data.to_bytes(),
+            scan_data.to_bytes() if scan_data is not None else None
+        )
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+
     def enable_peripheral_mode(self, adv_data: Union[AdvDataFieldList, bytes],
                                scan_data: Optional[Union[AdvDataFieldList, bytes]] = None,
                                adv_type: AdvType = AdvType.ADV_IND, channel_map: Optional[ChannelMap] = None,
@@ -578,6 +604,7 @@ class BLE(Connector):
             adv_data = adv_data.to_bytes()
         if isinstance(scan_data, AdvDataFieldList):
             scan_data = scan_data.to_bytes()
+
 
         # Create a PeriphMode message
         msg = self.hub.ble.create_periph_mode(
@@ -849,7 +876,7 @@ class BLE(Connector):
                         "use another interface that supports sending raw PDUs."
                     ), self.device.interface)
                     raise UnsupportedCapability("RawInject")
-                
+
                 # PDU is not raw
                 packet = pdu
                 send_raw = False

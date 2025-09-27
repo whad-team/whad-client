@@ -7,6 +7,7 @@ from whad.ble.connector.injector import Injector
 from whad.ble.connector.hijacker import Hijacker
 from whad.ble.connector.sniffer import Sniffer
 from whad.ble.connector.scanner import Scanner
+from whad.ble.connector.advertiser import Advertiser
 
 __all__ = [
     "BLE",
@@ -16,5 +17,6 @@ __all__ = [
     "Injector",
     "Hijacker",
     "Sniffer",
-    "Scanner"
+    "Scanner",
+    "Advertiser",
 ]

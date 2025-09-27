@@ -261,6 +261,7 @@ class Hci(VirtualDevice):
         self._connected = False
         self.__closing = False
         self.__local_supp_cmds = None
+        self.__started: bool = False
 
         # Data PDU Length management
         self.__datarate = Hci.PHY_1M
@@ -1431,11 +1432,20 @@ class Hci(VirtualDevice):
             if channels.has(39):
                 chanmap |= 4
 
+            # Determine advertising type based on selected adv_type
+            hci_adv_type = 0
+            if message.adv_type == AdvType.ADV_NONCONN_IND:
+                hci_adv_type = 3
+            elif message.adv_type == AdvType.ADV_SCAN_IND:
+                hci_adv_type = 2
+            elif message.adv_type == AdvType.ADV_DIRECT_IND:
+                hci_adv_type = 1
+
             # Save advertising parameters
             self.__adv_inter_min = message.inter_min
             self.__adv_inter_max = message.inter_max
             self.__adv_channel_map = chanmap
-            self.__adv_type = message.adv_type
+            self.__adv_type = hci_adv_type
 
             success = self._read_advertising_physical_channel_tx_power()
             if len(message.adv_data) > 0:
@@ -1497,10 +1507,12 @@ class Hci(VirtualDevice):
         logger.info("whad internal state: %d", self.__internal_state)
         if self.__internal_state == HCIInternalState.SCANNING:
             self._set_scan_mode(True)
+            self.__started = True
             self._send_whad_command_result(CommandResult.SUCCESS)
         elif self.__internal_state == HCIInternalState.ADVERTISING:
             if not self._advertising:
                 self._set_advertising_mode(True)
+                self.__started = True
                 self._send_whad_command_result(CommandResult.SUCCESS)
             else:
                 self._send_whad_command_result(CommandResult.ERROR)
@@ -1508,6 +1520,7 @@ class Hci(VirtualDevice):
             if not self._advertising:
                 if self._set_advertising_mode(True):
                     self._advertising = True
+                    self.__started = True
                     self._send_whad_command_result(CommandResult.SUCCESS)
                 else:
                     self._send_whad_command_result(CommandResult.ERROR)
@@ -1515,6 +1528,7 @@ class Hci(VirtualDevice):
                 self._send_whad_command_result(CommandResult.SUCCESS)
 
         elif self.__internal_state == HCIInternalState.CENTRAL:
+            self.__started = True
             self._send_whad_command_result(CommandResult.SUCCESS)
         else:
             self._send_whad_command_result(CommandResult.ERROR)
@@ -1529,14 +1543,17 @@ class Hci(VirtualDevice):
         if self.__internal_state == HCIInternalState.SCANNING:
             self._set_scan_mode(False)
             self.__internal_state = HCIInternalState.NONE
+            self.__started = False
             self._send_whad_command_result(CommandResult.SUCCESS)
         elif self.__internal_state == HCIInternalState.CENTRAL:
             # Update mode and return success
             self.__internal_state = HCIInternalState.NONE
+            self.__started = False
             self._send_whad_command_result(CommandResult.SUCCESS)
         elif self.__internal_state in (HCIInternalState.PERIPHERAL, HCIInternalState.ADVERTISING):
             # We are not advertising anymore
             self._set_advertising_mode(False)
+            self.__started = False
             self._send_whad_command_result(CommandResult.SUCCESS)
         else:
             self._send_whad_command_result(CommandResult.ERROR)
@@ -1544,6 +1561,7 @@ class Hci(VirtualDevice):
     def _on_whad_ble_send_pdu(self, message):
         """Send a given PDU into the active connection
         """
+        print("hci::send_pdu")
         # Make sure we have an active connection
         if self.__conn_state == HCIConnectionState.ESTABLISHED:
             logger.debug("[%s] Received WHAD BLE send_pdu message", self.interface)
@@ -1610,8 +1628,18 @@ class Hci(VirtualDevice):
         if channels.has(39):
             chanmap |= 4
 
+        # Determine advertising type based on selected adv_type
+        hci_adv_type = 0
+        if message.adv_type == AdvType.ADV_NONCONN_IND:
+            hci_adv_type = 3
+        elif message.adv_type == AdvType.ADV_SCAN_IND:
+            hci_adv_type = 2
+        elif message.adv_type == AdvType.ADV_DIRECT_IND:
+            hci_adv_type = 1
+
+        # Accept an AdvMode message only if we are idling (not started)
         logger.debug("Received WHAD BLE set_adv_mode message")
-        if self.__internal_state in (HCIInternalState.NONE, HCIInternalState.ADVERTISING):
+        if not self.__started:
             if len(message.adv_data) > 0:
                 success = success and self._set_advertising_data(message.adv_data)
                 self._cached_adv_data = message.adv_data
@@ -1620,12 +1648,25 @@ class Hci(VirtualDevice):
                 self._cached_scan_response_data = message.scanrsp_data
             if not self._advertising:
                 success = success and self.set_advertising_parameters(message.inter_min, message.inter_max,
-                                           message.adv_type, channel_map=chanmap)
+                                           hci_adv_type, channel_map=chanmap)
+            else:
+                success = False
+
             if success:
                 self.__internal_state = HCIInternalState.ADVERTISING
                 self._send_whad_command_result(CommandResult.SUCCESS)
             else:
                 self._send_whad_command_result(CommandResult.ERROR)
+        else:
+            self._send_whad_command_result(CommandResult.WRONG_MODE)
+
+    def _on_whad_ble_set_adv_data(self, message):
+        """Handle advertising data update. """
+        if self.__internal_state in (HCIInternalState.ADVERTISING, HCIInternalState.PERIPHERAL):
+            self._set_advertising_data(message.adv_data)
+            if message.scanrsp_data is not None and len(message.scanrsp_data) > 0:
+                self._set_scan_response_data(message.scanrsp_data)
+            self._send_whad_command_result(CommandResult.SUCCESS)
         else:
             self._send_whad_command_result(CommandResult.WRONG_MODE)
 
