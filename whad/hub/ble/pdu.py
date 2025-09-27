@@ -50,7 +50,7 @@ SCAPY_CORR_ADV_INV = {
 class SetAdvData(PbMessageWrapper):
     """BLE set advertising data message class
     """
-    scan_data = PbFieldBytes("ble.set_adv_data.scan_data")
+    adv_data = PbFieldBytes("ble.set_adv_data.adv_data")
     scanrsp_data = PbFieldBytes("ble.set_adv_data.scanrsp_data")
 
 @pb_bind(BleDomain, "send_raw_pdu", 1)

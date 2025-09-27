@@ -704,7 +704,7 @@ class BleDomain(Registry):
         :rtype: SetAdvData
         """
         message = BleDomain.bound("set_adv_data", self.proto_version)(
-            scan_data=adv_data
+            adv_data=adv_data
         )
 
         # Set scan response data if provided
