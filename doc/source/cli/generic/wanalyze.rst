@@ -47,6 +47,7 @@ Command-line options
 * ``--delimiter`` (``-d`` / ``-D``): provide a delimiter inserted between outputs
 * ``--raw`` (``-r``): dump output directly to stdout buffer (e.g., to process raw bytes)
 * ``--list`` (``-l``): display a list of available analyzers
+* ``--set`` (``-s``): set a configuration parameter that will be used by the selected analyzers 
 
 .. include:: debug-options.rst
 
@@ -76,11 +77,21 @@ To display the list of available analyzers by domain, just use the ``--list`` (o
     - pairing_cracking : key
     - mouse : x, y, wheel_x, wheel_y, button
     - keystroke : key
+        parameter locale (default: "fr")
 
     Available analyzers:  zigbee
     - touchlink_key_cracking : key_index, encrypted_key, decrypted_key
     - transport_key_cracking : transport_key
 
+Setting configuration parameters
+--------------------------------
+
+Analyzers can expose one or more configuration options to allow users to change the way
+they process traffic. The Unifying `keystroke` analyzer for instance exposes a `locale`
+configuration parameter that can be set to specify a locale different from the one
+defined for the current terminal.
+
+To set a specific configuration option, use ``--set OPTION=VALUE``, or its short form ``-s OPTION=VALUE``.  
 
 Breaking encryption keys
 -------------------------
@@ -661,6 +672,20 @@ Output can be formatted easily, by selecting the key field of the *"keystroke"* 
     g
     h
 
+By default, the selected locale is the one configured for the current terminal but it is possible to
+select a different one by setting the `locale` configuration parameter:
+
+.. code-block:: text
+
+    $ wplay --flush logitech_encrypted_traffic.pcap -d -k 02bea8b5ef61037e87882e4daebf403b | wanalyze --set locale=us keystroke.key
+    q
+    b
+    c
+    d
+    e
+    f
+    g
+    h
 
 Similarly to mouse traffic, you can extract this output in a file:
 
