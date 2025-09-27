@@ -25,6 +25,9 @@ class Advertiser(BLE):
                  adv_type: AdvType = AdvType.ADV_IND, channels: Optional[list] = None, interval: Optional[Tuple[int, int]] = None):
         """Advertiser initialization"""
         super().__init__(device)
+        # Ensure advertiser mode is supported
+        if not self.can_be_advertiser():
+            raise UnsupportedCapability("Advertiser")
 
         # Ensure advertiser mode is supported
         if not self.can_be_advertiser():
@@ -140,6 +143,11 @@ class Advertiser(BLE):
             adv_type=self.adv_type,
             channel_map=self.channel_map,
             inter_min=self.__inter_min, inter_max=self.__inter_max)
+
+        # Display a warning if an error occurred
+        if not result:
+            logger.warning("[Advertiser] an error occurred while trying to reconfigure the advertiser's core parameters.")
+        return result
 
         # Display a warning if an error occurred
         if not result:
