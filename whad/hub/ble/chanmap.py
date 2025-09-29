@@ -1,7 +1,7 @@
 """BLE Channel Map helper
 """
 
-from typing import List, Generator
+from typing import List, Generator, Callable
 from struct import unpack
 
 class ChannelMap(object):
@@ -37,7 +37,15 @@ class ChannelMap(object):
         chanmap_int += channel_map[4] << 32
         return ChannelMap.from_int(chanmap_int)
 
+    def __eq__(self, other):
+        """Check if two ChannelMap objects are identical."""
+        if isinstance(other, ChannelMap):
+            return self.value == other.value
+        return False
 
+    def __len__(self) -> int:
+        """Compute the number of channels active in the channel map."""
+        return len(list(self.channels()))
 
     def __init__(self, channels: List[int] = None):
         """Initialize our channel map
@@ -50,7 +58,7 @@ class ChannelMap(object):
         # Loop over channels and add them to our map
         if channels is not None:
             for channel in channels:
-                
+
                 # Add channel to our channel map
                 self.add(channel)
 
@@ -61,9 +69,9 @@ class ChannelMap(object):
         :param channel: int
         """
         # Check channel number validity
-        if channel < 0 or channel > 37:
+        if channel < 0 or channel > 40:
             raise ValueError()
-        
+
         # Add channel to our map
         self.__map |= (1 << channel)
 
@@ -74,9 +82,9 @@ class ChannelMap(object):
         :param channel: int
         """
         # Check channel number validity
-        if channel < 0 or channel > 37:
+        if channel < 0 or channel > 40:
             raise ValueError()
-        
+
         # Remove channel from map
         if self.has(channel):
             self.__map = self.__map & ((1 << channel) ^ 0xFFFFFFFFFF)
@@ -90,13 +98,24 @@ class ChannelMap(object):
         :rtype: bool
         """
         return (self.__map & (1 << channel)) != 0
-        
-    def channels(self) -> Generator:
+
+    def channels(self) -> Generator[int, None, None]:
         """Iterate over channels
         """
-        for channel in range(38):
+        for channel in range(40):
             if self.has(channel):
                 yield channel
+
+    def filter(self, func: Callable):
+        """ Filter the channel map by applying the specified filter function.
+
+        :param func: Filtering function used to filter channels
+        :type  func: Callable
+        :return: ChannelMap
+        """
+        for channel in self.channels():
+            if not func(channel):
+                self.remove(channel)
 
     @property
     def value(self):
@@ -105,4 +124,5 @@ class ChannelMap(object):
         return self.__map.to_bytes(5, 'little', signed=False)
 
 # Default channel map
-DefaultChannelMap = ChannelMap(channels=range(38))
+DefaultChannelMap = ChannelMap(channels=[38])
+

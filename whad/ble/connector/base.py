@@ -5,6 +5,7 @@ basic BLE-related methods for the attached interface.
 """
 import struct
 import logging
+from typing import Optional, Union
 
 # Scapy
 from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
@@ -14,6 +15,7 @@ from scapy.packet import Packet
 
 # Device interface
 from whad.device import Connector
+from whad.hub.ble.pdu import SetAdvData
 from whad.hub.discovery import Domain, Capability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
@@ -157,6 +159,16 @@ class BLE(Connector):
         # Retrieve supported commands
         commands = self.device.get_domain_commands(Domain.BtLE)
         return (commands & (1 << Commands.JamAdvOnChannel))>0
+
+    def can_be_advertiser(self) -> bool:
+        """
+        Determine if the device implements an advertiser mode.
+        """
+        commands = self.device.get_domain_commands(Domain.BtLE)
+        return (
+            (commands & (1 << Commands.AdvMode))>0 and
+            (commands & (1 << Commands.SetAdvData))>0
+        )
 
     def can_be_central(self):
         """
@@ -540,22 +552,69 @@ class BLE(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def enable_adv_mode(self, adv_data=None, scan_data=None):
+    def enable_adv_mode(self, adv_data=None, scan_data=None, adv_type: AdvType = AdvType.ADV_IND,
+                        channel_map: ChannelMap = None, inter_min: int = 0x20, inter_max: int = 0x4000):
         """
         Enable BLE advertising mode (acts as a broadcaster)
         """
+        logger.debug("Enable advertising mode")
+        # Build advertising data if required
+        if isinstance(adv_data, AdvDataFieldList):
+            adv_data = adv_data.to_bytes()
+        if isinstance(scan_data, AdvDataFieldList):
+            scan_data = scan_data.to_bytes()
+
         # Create a AdvMode message
         msg = self.hub.ble.create_adv_mode(
             adv_data,
-            scan_rsp=scan_data
+            scanrsp_data=scan_data,
+            adv_type=adv_type,
+            channel_map=channel_map,
+            inter_min=inter_min,
+            inter_max=inter_max,
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def enable_peripheral_mode(self, adv_data: bytes = None, scan_data: bytes = None):
+    def set_adv_data(self, adv_data: Union[AdvDataFieldList, bytes], scan_data: Optional[Union[AdvDataFieldList, bytes]] = None):
+        """Update advertising data, even if the device is already advertising.
+
+        :param adv_data:  Advertising data
+        :type  adv_data:  AdvDataFieldList, bytes
+        :param scan_data: Scan response data
+        :type  scan_data: AdvDataFieldList, bytes, optional
+        """
+
+        # Convert advertising data and scan response data to bytes
+        adv_data = adv_data if isinstance(adv_data, bytes) else adv_data.to_bytes()
+        if isinstance(scan_data, AdvDataFieldList):
+            scan_data = scan_data.to_bytes()
+        else:
+            scan_data = None
+        msg = self.hub.ble.create_set_adv_data(adv_data, scan_data)
+        resp = self.send_command(msg, message_filter(CommandResult))
+        return isinstance(resp, Success)
+
+    def enable_peripheral_mode(self, adv_data: Union[AdvDataFieldList, bytes],
+                               scan_data: Optional[Union[AdvDataFieldList, bytes]] = None,
+                               adv_type: AdvType = AdvType.ADV_IND, channel_map: Optional[ChannelMap] = None,
+                               inter_min: int = 0x20, inter_max: int = 0x4000):
         """
         Enable Bluetooth Low Energy peripheral mode (acts as slave).
+
+        :param adv_data: Advertising data
+        :type  adv_data: AdvDataFieldList, bytes
+        :param scan_data: Scan response data
+        :type  scan_data: AdvDataFieldList, bytes, optional
+        :param adv_type: Advertisement type
+        :type  adv_type: AdvType
+        :param channel_map: Advertising channel map
+        :type  channel_map: ChannelMap, optional
+        :param inter_min: Minimum advertising interval
+        :type  inter_min: int
+        :param inter_max: Maximum advertisin interval
+        :type  inter_max: int
         """
         # Build advertising data if required
         if isinstance(adv_data, AdvDataFieldList):
@@ -566,17 +625,36 @@ class BLE(Connector):
         # Create a PeriphMode message
         msg = self.hub.ble.create_periph_mode(
             adv_data=adv_data,
-            scan_rsp=scan_data
+            scan_rsp=scan_data,
+            adv_type=adv_type,
+            channel_map=channel_map,
+            inter_min=inter_min,
+            inter_max=inter_max
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def connect_to(self, bd_addr: BDAddress, random: bool = False, access_address: int = None, \
-                   channel_map: ChannelMap = None, crc_init: int = None, hop_interval: int = None, \
-                   hop_increment: int = None):
+    def connect_to(self, bd_addr: BDAddress, random: bool = False, access_address: Optional[int] = None,
+                   channel_map: Optional[ChannelMap] = None, crc_init: Optional[int] = None, hop_interval: Optional[int] = None,
+                   hop_increment: Optional[int] = None):
         """
         Initiate a Bluetooth Low Energy connection.
+
+        :param bd_addr: Target BD address
+        :type  bd_addr: whad.ble.address.BDaddress
+        :param random: Set to `True` if target BD address is random
+        :type  random: bool, optional
+        :param access_address: BLE connection access address to use
+        :type  access_address: int, optional
+        :param channel_map: Channel map to use for this connection
+        :type  channel_map: ChannelMap, optional
+        :param crc_init: CRC Init value (seed) to use
+        :type  crc_init: int
+        :param hop_interval: Hop interval value
+        :type  hop_interval: int, optional
+        :param hop_increment: Hop increment value
+        :type  hop_increment: int, optional
         """
         # Create a ConnectTo message
         msg = self.hub.ble.create_connect_to(
@@ -829,7 +907,7 @@ class BLE(Connector):
                         "use another interface that supports sending raw PDUs."
                     ), self.device.interface)
                     raise UnsupportedCapability("RawInject")
-                
+
                 # PDU is not raw
                 packet = pdu
                 send_raw = False
@@ -1399,33 +1477,19 @@ class BLENew(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def enable_adv_mode(self, adv_data=None, scan_data=None):
+    def enable_adv_mode(self, adv_data=None, scan_data=None, adv_type: AdvType = AdvType.ADV_IND, channel_map:
+                        Optional[ChannelMap] = None, inter_min: int = 0x20, inter_max: int = 0x4000):
         """
         Enable BLE advertising mode (acts as a broadcaster)
         """
         # Create a AdvMode message
         msg = self.hub.ble.create_adv_mode(
             adv_data,
-            scan_rsp=scan_data
-        )
-
-        resp = self.send_command(msg, message_filter(CommandResult))
-        return isinstance(resp, Success)
-
-    def enable_peripheral_mode(self, adv_data: bytes = None, scan_data: bytes = None):
-        """
-        Enable Bluetooth Low Energy peripheral mode (acts as slave).
-        """
-        # Build advertising data if required
-        if isinstance(adv_data, AdvDataFieldList):
-            adv_data = adv_data.to_bytes()
-        if isinstance(scan_data, AdvDataFieldList):
-            scan_data = scan_data.to_bytes()
-
-        # Create a PeriphMode message
-        msg = self.hub.ble.create_periph_mode(
-            adv_data=adv_data,
-            scan_rsp=scan_data
+            scan_data,
+            adv_type,
+            channel_map,
+            inter_min,
+            inter_max
         )
 
         resp = self.send_command(msg, message_filter(CommandResult))
@@ -1749,3 +1813,4 @@ class BLENew(Connector):
     def on_mtu_changed(self, conn_handle, mtu: int):
         """Connection MTU has been updated.
         """
+
