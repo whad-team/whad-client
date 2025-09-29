@@ -4,10 +4,79 @@ Getting started
 .. contents::
    :local:
 
+WHAD provides a set of classes and features related to Bluetooth Low Energy allowing
+to advertise, scan, connect, interact and even emulate BLE devices. This section
+introduces these different classes with minimal examples to get you started.
+
+Send advertisements with no connection
+--------------------------------------
+
+Use the :class:`~whad.ble.connector.advertiser.Advertiser` class to instantiate
+a BLE advertiser and send advertisements on Bluetooth Low Energy's advertising
+channels (*i.e. channels 37, 38, 39*).
+
+.. code-block:: python
+
+    from whad.device import Device
+    from whad.ble import Advertiser, AdvDataFieldList, AdvFlagsField, AdvCompleteLocalName
+    from whad.hub.ble import AdvType
+
+    advert = Advertiser(
+        # Use device 'hci0' (Bluetooth HCI adapter)
+        Device.create("hci0"),
+
+        # Set advertising data
+        AdvDataFieldList(
+            # Add a default flags AD record
+            AdvFlagsField(),
+            # Add a complete local name AD record
+            AdvCompleteLocalName(b"AdvertiserDemo")
+        ),
+
+        # No scan response data
+        None,
+
+        # Use a non-connectable undirected advertisement type
+        AdvType.ADV_NONCONN_IND,
+
+        # Advertise on all channels
+        channels=[37,38,39]
+    )
+
+    # Start advertising
+    advert.start()
+
+    # Wait for a keypress to stop
+    input('Press a key to stop advertising device ...')
+    advert.stop()
+    advert.close()
+
+This example advertises a device named `AdvertiserDemo` that is announced as non-connectable.
+Nordic's *NRF Connect* application can be used to check the advertised device exposes the
+specified advertisement record and is non-connectable, as shown below.
+
+
+.. image:: /images/ble/advertiser_nrfconnect.png
+   :alt: NRF Connect application showing a non-connectable device named "AdvertiserDemo"
+   :width: 400px
+   :align: center
+
+
+The device's advertising data and scan response data can be updated at any moment by accessing
+the instance's ``adv_data`` and ``scan_data`` properties:
+
+.. code-block:: python
+
+    advert.adv_data = AdvDataFieldList(AdvFlagsField(), AdvCompleteLocalName(b"ChangedName"))
+
+Advertisement core parameters like the advertisement type used, channel map or even
+advertising interval can be updated by using their associated properties but only when the
+advertiser is stopped.
+
 Enumerating available devices (scanning)
 ----------------------------------------
 
-Use the :class:`whad.ble.connector.scanner.Scanner` class to instantiate
+Use the :class:`~whad.ble.connector.scanner.Scanner` class to instantiate
 a BLE device scanner and detect all the available devices.
 
 .. code-block:: python
@@ -39,16 +108,16 @@ BLE central device and initiate a connection to a BLE peripheral device.
 
 .. code-block:: python
 
-    from whad import UartDevice
+    from whad.device import Device
     from whad.ble import Central
 
     # Create a central device
-    central = Central(UartDevice('/dev/ttyUSB0'))
+    central = Central(Device.create("hci0"))
 
     # Connect to our target device
     target = central.connect('0C:B8:15:C4:88:8E')
 
-The `connect()` method returns a :class:`whad.ble.profile.device.PeripheralDevice` object
+The `connect()` method returns a :class:`~whad.ble.profile.device.PeripheralDevice` object
 that represents the remote device.
 
 Enumerating services and characteristics
@@ -203,14 +272,14 @@ It is also possible to trigger specific actions when a characteristic is read or
 through the dedicated callbacks provided by :class:`whad.ble.profile.Profile`.
 
 Advanced features
------------------
+~~~~~~~~~~~~~~~~~
 
-Sending and receiving PDU
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Sending and receiving PDUs
+--------------------------
 
 It is sometimes useful to send a PDU to a device as well as processing any
-incoming PDU without having to use a protocol stack. The BLE :py:class:`whad.ble.connector.Peripheral`
-and :py:class:`whad.ble.connector.Central` connector provides a nifty way to do it:
+incoming PDU without having to use a protocol stack. The BLE :py:class:`~whad.ble.connector.Peripheral`
+and :py:class:`~whad.ble.connector.Central` connector provides a nifty way to do it:
 
 .. code:: python
 
@@ -259,6 +328,7 @@ that can enable or disable this automatic processing of PDUs. By default,
 PDUs are passed to the underlying protocol stack but we can force the connector
 to keep them in a queue and to wait for us to retrieve them:
 
+
 .. code:: python
 
     # Disable automatic PDU processing
@@ -270,3 +340,10 @@ the connector in a dedicated queue and can be retrieved using
 This method requires the connector to be in synchronous mode and will return
 a PDU from the connector's queue, or `None` if the queue is empty once the
 specified timeout period expired.
+
+.. warning:: 
+
+    Sending BLE control PDUs can only be performed with WHAD devices supporting *raw PDUs*, like
+    a nRF52840 dongle running *ButteRFly*. Bluetooth USB dongles exposing an HCI interface cannot
+    send or receive raw PDUs.
+
