@@ -1,4 +1,4 @@
-Device Scanning
+Device scanning
 ===============
 
 .. py:currentmodule:: whad.ble.connector.scanner
