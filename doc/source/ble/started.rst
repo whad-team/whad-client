@@ -9,7 +9,7 @@ to advertise, scan, connect, interact and even emulate BLE devices. This section
 introduces these different classes with minimal examples to get you started.
 
 Send advertisements with no connection
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------------------
 
 Use the :class:`~whad.ble.connector.advertiser.Advertiser` class to instantiate
 a BLE advertiser and send advertisements on Bluetooth Low Energy's advertising
@@ -273,10 +273,10 @@ It is also possible to trigger specific actions when a characteristic is read or
 through the dedicated callbacks provided by :class:`whad.ble.profile.Profile`.
 
 Advanced features
-~~~~~~~~~~~~~~~~~
+-----------------
 
 Sending and receiving PDUs
---------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 It is sometimes useful to send a PDU to a device as well as processing any
 incoming PDU without having to use a protocol stack. The BLE :py:class:`~whad.ble.connector.Peripheral`
