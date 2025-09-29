@@ -7,7 +7,7 @@ class that implements the *Advertiser* role as defined in the Bluetooth
 specification.
 """
 import logging
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Union
 
 from whad.ble.profile.advdata import AdvDataFieldList
 from whad.exceptions import UnsupportedCapability
@@ -21,28 +21,46 @@ logger = logging.getLogger(__name__)
 class Advertiser(BLE):
     """This connector provides a BLE advertiser role."""
 
-    def __init__(self, device, adv_data: AdvDataFieldList, scanrsp_data: Optional[AdvDataFieldList] = None,
-                 adv_type: AdvType = AdvType.ADV_IND, channels: Optional[list] = None, inter_min: int = 0x20,
-                 inter_max: int = 0x4000):
+    def __init__(self, device, adv_data: Union[AdvDataFieldList, bytes], scanrsp_data: Optional[Union[AdvDataFieldList, bytes]] = None,
+                 adv_type: AdvType = AdvType.ADV_IND, channels: Optional[list] = None, interval: Optional[Tuple[int, int]] = None):
         """Advertiser initialization"""
         super().__init__(device)
+
         # Ensure advertiser mode is supported
         if not self.can_be_advertiser():
             raise UnsupportedCapability("Advertiser")
 
+        # Set advertising type
+        if adv_type in (AdvType.ADV_IND, AdvType.ADV_DIRECT_IND, AdvType.ADV_SCAN_IND, AdvType.ADV_NONCONN_IND):
+            self.__adv_type = adv_type
+        else:
+            raise ValueError()
+
         # Set default channels if not set 
         if channels is None:
-            channels = [37, 38, 39]
+            self.__channels = [37, 38, 39]
         else:
-            channels = list(filter(lambda x: x in (37, 38, 39), channels))
+            self.__channels = list(filter(lambda x: x in (37, 38, 39), channels))
+        # Ensure interval is a tuple of two ints
+        if interval is None:
+            self.__inter_min = 0x20
+            self.__inter_max = 0x4000
+        else:
+            try:
+                if not isinstance(interval, tuple):
+                    raise ValueError()
+                if not len(interval) == 2:
+                    raise ValueError()
+                if not isinstance(interval[0], int) and not isinstance(interval[1], int):
+                    raise ValueError()
+                self.__inter_min, self.__inter_max = interval
+            except ValueError as interval_error:
+                logger.error("advertising interval must be a tuple of two integers.")
+                raise ValueError() from interval_error
 
         # Save parameters
-        self.__adv_type = adv_type
         self.__adv_data = adv_data
         self.__scanrsp_data = scanrsp_data
-        self.__channels = channels
-        self.__inter_min = inter_min
-        self.__inter_max = inter_max
 
         # Configure the device advertising parameters
         self.__configure()
@@ -61,12 +79,12 @@ class Advertiser(BLE):
             self.__configure()
 
     @property
-    def adv_data(self) -> AdvDataFieldList:
+    def adv_data(self) -> Union[AdvDataFieldList, bytes]:
         """Advertisement data"""
         return self.__adv_data
 
     @property
-    def scanrsp_data(self) -> Optional[AdvDataFieldList]:
+    def scanrsp_data(self) -> Optional[Union[AdvDataFieldList, bytes]]:
         """Scan response data"""
         return self.__scanrsp_data
 
@@ -107,14 +125,20 @@ class Advertiser(BLE):
         advertising channel map, interval min and max values) into the associated device. Advertising data and scan response
         data can be updated at any time, other parameters require the device to stop advertising to be changed.
         """
-        inter_min, inter_max = self.interval
         # Configure the device advertising parameters
+        adv_data = self.adv_data if isinstance(self.adv_data, bytes) else self.adv_data.to_bytes()
+        if isinstance(self.scanrsp_data, bytes):
+            scanrsp_data = self.scanrsp_data
+        elif isinstance(self.scanrsp_data, AdvDataFieldList):
+            scanrsp_data = self.scanrsp_data.to_bytes()
+        else:
+            scanrsp_data = None
         result = self.enable_adv_mode(
-            adv_data=self.adv_data.to_bytes(),
-            scan_data=self.scanrsp_data.to_bytes() if self.scanrsp_data is not None else None,
+            adv_data=adv_data,
+            scan_data=scanrsp_data,
             adv_type=self.adv_type,
             channel_map=self.channel_map,
-            inter_min=inter_min, inter_max=inter_max)
+            inter_min=self.__inter_min, inter_max=self.__inter_max)
 
         # Display a warning if an error occurred
         if not result:

@@ -10,7 +10,7 @@ import logging
 from time import sleep
 from queue import Queue, Empty
 from threading import Thread, Event
-from typing import Optional
+from typing import Optional, Tuple
 
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble import Direction as BleDirection, AdvType, ChannelMap
@@ -139,7 +139,7 @@ class Peripheral(BLE):
     def __init__(self, device, existing_connection = None, profile=None, adv_data=None,
                  scan_data=None, bd_address=None, public=True, stack=BleStack, gatt=GattServer,
                  pairing=Pairing(), security_database=None, adv_type: AdvType = AdvType.ADV_IND,
-                 channels: Optional[list] = None, interval_min: int = 0x20, interval_max: int = 0x4000):
+                 channels: Optional[list] = None, interval: Tuple[int,int] = (0x20, 0x4000)):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
@@ -158,6 +158,17 @@ class Peripheral(BLE):
         :param  stack:      Bluetooth Low Energy stack to use,
                             :class:`whad.ble.stack.BleStack` by default
         :param  gatt:       Bluetooth Low Energy GATT
+        :type   gatt:       GattServer
+        :param  pairing     Pairing information, use default if not provided
+        :type   pairing     Pairing, optional
+        :param  security_database: Security database to use, provide long-term key information
+        :type   security_database: CryptographicDatabase
+        :param  adv_type:  Advertisement type used for advertising the peripheral (default is ADV_IND)
+        :type   adv_type:  AdvType
+        :param  channels:  List of advertising channels to use for advertising
+        :type   channels:  list, optional
+        :param  interval:  Advertising interval
+        :type   interval:  tuple, optional
         """
         super().__init__(device)
 
@@ -228,6 +239,8 @@ class Peripheral(BLE):
                 channel_map = ChannelMap(channels)
                 channel_map.filter(lambda x: x in (37, 38, 39))
 
+            # Check advertising interval
+            interval_min, interval_max = interval
 
             # Enable peripheral mode
             logger.info("Enable peripheral mode with advertising data: %s and type %d", adv_data, adv_type)

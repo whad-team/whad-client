@@ -108,7 +108,7 @@ def test_advertising(periph_mock):
         AdvShortenedLocalName(b"TestPeriph")
     )
     _ = Peripheral(periph_mock, adv_data=periph_adv, adv_type=AdvType.ADV_NONCONN_IND, channels=[37,39],
-                   interval_min=0x42, interval_max=0x2000)
+                   interval=(0x42, 0x2000))
     adv_data = AdvDataFieldList.from_bytes(periph_mock.get_adv_data())
     assert adv_data.get(AdvFlagsField) is not None
     assert adv_data.get(AdvShortenedLocalName) is not None
