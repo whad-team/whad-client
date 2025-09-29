@@ -76,7 +76,7 @@ class PeriphMode(PbMessageWrapper):
         """Retrieve scan response data, if set."""
         return self.get_field_value(PeriphModeV3.scanrsp_data)
 
-    def get_adv_type(self) -> Optional[BleAdvType]:
+    def get_adv_type(self) -> Optional[int]:
         """Retrieve the advertisement type."""
         return self.get_field_value(PeriphModeV3.adv_type)
 
