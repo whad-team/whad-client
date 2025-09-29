@@ -15,7 +15,7 @@ if len(sys.argv) >= 2:
         ),
         None,
         adv_type=AdvType.ADV_NONCONN_IND,
-        inter_min=0x20, inter_max=0x40
+        interval=(0x20, 0x40)
     )
     advertiser.start()
     print("Device is now advertising ...")
@@ -30,6 +30,7 @@ if len(sys.argv) >= 2:
                 AdvFlagsField()
             ),
         )
+        print("Device name has been changed to 'Updated'.\nPress enter to stop advertising.")
         input()
         advertiser.close()
     except KeyboardInterrupt:
