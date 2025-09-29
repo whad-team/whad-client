@@ -577,18 +577,22 @@ class BLE(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def set_adv_data(self, adv_data: AdvDataFieldList, scan_data: Optional[AdvDataFieldList] = None):
+    def set_adv_data(self, adv_data: Union[AdvDataFieldList, bytes], scan_data: Optional[Union[AdvDataFieldList, bytes]] = None):
         """Update advertising data, even if the device is already advertising.
 
         :param adv_data:  Advertising data
-        :type  adv_data:  AdvDataFieldList
+        :type  adv_data:  AdvDataFieldList, bytes
         :param scan_data: Scan response data
-        :type  scan_data: AdvDataFieldList, optional
+        :type  scan_data: AdvDataFieldList, bytes, optional
         """
-        msg = self.hub.ble.create_set_adv_data(
-            adv_data.to_bytes(),
-            scan_data.to_bytes() if scan_data is not None else None
-        )
+
+        # Convert advertising data and scan response data to bytes
+        adv_data = adv_data if isinstance(adv_data, bytes) else adv_data.to_bytes()
+        if isinstance(scan_data, AdvDataFieldList):
+            scan_data = scan_data.to_bytes()
+        else:
+            scan_data = None
+        msg = self.hub.ble.create_set_adv_data(adv_data, scan_data)
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
@@ -598,13 +602,25 @@ class BLE(Connector):
                                inter_min: int = 0x20, inter_max: int = 0x4000):
         """
         Enable Bluetooth Low Energy peripheral mode (acts as slave).
+
+        :param adv_data: Advertising data
+        :type  adv_data: AdvDataFieldList, bytes
+        :param scan_data: Scan response data
+        :type  scan_data: AdvDataFieldList, bytes, optional
+        :param adv_type: Advertisement type
+        :type  adv_type: AdvType
+        :param channel_map: Advertising channel map
+        :type  channel_map: ChannelMap, optional
+        :param inter_min: Minimum advertising interval
+        :type  inter_min: int
+        :param inter_max: Maximum advertisin interval
+        :type  inter_max: int
         """
         # Build advertising data if required
         if isinstance(adv_data, AdvDataFieldList):
             adv_data = adv_data.to_bytes()
         if isinstance(scan_data, AdvDataFieldList):
             scan_data = scan_data.to_bytes()
-
 
         # Create a PeriphMode message
         msg = self.hub.ble.create_periph_mode(
@@ -619,11 +635,26 @@ class BLE(Connector):
         resp = self.send_command(msg, message_filter(CommandResult))
         return isinstance(resp, Success)
 
-    def connect_to(self, bd_addr: BDAddress, random: bool = False, access_address: int = None, \
-                   channel_map: ChannelMap = None, crc_init: int = None, hop_interval: int = None, \
-                   hop_increment: int = None):
+    def connect_to(self, bd_addr: BDAddress, random: bool = False, access_address: Optional[int] = None,
+                   channel_map: Optional[ChannelMap] = None, crc_init: Optional[int] = None, hop_interval: Optional[int] = None,
+                   hop_increment: Optional[int] = None):
         """
         Initiate a Bluetooth Low Energy connection.
+
+        :param bd_addr: Target BD address
+        :type  bd_addr: whad.ble.address.BDaddress
+        :param random: Set to `True` if target BD address is random
+        :type  random: bool, optional
+        :param access_address: BLE connection access address to use
+        :type  access_address: int, optional
+        :param channel_map: Channel map to use for this connection
+        :type  channel_map: ChannelMap, optional
+        :param crc_init: CRC Init value (seed) to use
+        :type  crc_init: int
+        :param hop_interval: Hop interval value
+        :type  hop_interval: int, optional
+        :param hop_increment: Hop increment value
+        :type  hop_increment: int, optional
         """
         # Create a ConnectTo message
         msg = self.hub.ble.create_connect_to(
