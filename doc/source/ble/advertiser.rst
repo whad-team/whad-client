@@ -39,17 +39,17 @@ This parameter accepts a list of channels amongst the ones used for primary adve
 At least one channel must be specified, and any channel that does not belong to these advertising channels
 will be ignored.
 
-Advertising interval can be specified through the ``inter_min`` and ``inter_max`` parameters, with the
-following constraints:
+Advertising interval can be specified through the ``interval`` parameter, a tuple of two integers specifying
+the minimum and maximum values of the advertising interval to use (e.g. ``(<min value>, <max value>)``, with the following constraints:
 
-- ``inter_min`` must be greater than 0x20 and lower than ``inter_max``
-- ``inter_max`` must not exceed 0x4000 and be greater than ``inter_min``
+- the minimum interval value must be greater than 0x20 and lower than the maximum interval value
+- the maximum interval value must not exceed 0x4000 and be greater than minimum value
 
-:class:`~whad.ble.connector.Advertiser` will raise an :class:`ValueError` exception whenever an invalid
+:class:`~whad.ble.connector.Advertiser` will raise a :class:`ValueError` exception whenever an invalid
 parameter is passed to its constructor.
 
 Here is a valid example of the creation of an advertiser sending non-connectable undirected
-advertisements on channel 37 only, with an advertising interval between 0x20 and 0x4000:
+advertisements on channel 37 only, with an advertising interval comprised between 0x20 and 0x4000:
 
 .. code-block:: python
 
@@ -63,9 +63,22 @@ advertisements on channel 37 only, with an advertising interval between 0x20 and
         scan_data = None,
         adv_type = AdvType.ADV_NONCONN_IND,
         channels = [37],
-        inter_min = 0x20,
-        inter_max = 0x4000
+        interval = (0x20, 0x4000)
     )
+    adv.start()
+
+    # Wait for user input
+    input("Press enter to stop advertising.")
+
+If the advertising interval must be updated, the connector must be stopped before and restarted once the
+parameters updated:
+
+.. code-block:: python
+
+    adv.stop()
+    adv.interval = (0x1000, 0x2000)
+    adv.start()
+
 
 Advertising data
 ~~~~~~~~~~~~~~~~
@@ -76,6 +89,14 @@ or directly a ``bytes`` object. In the first case, the advertiser will convert t
 into a byte sequence while in the other it will directly use the provided byte sequence without checking its
 completeness.
 
+
+.. code-block:: python
+
+    adv.adv_data = AdvDataFieldList(AdvDataFlagsField(), AdvDataCompleteLocalName(b"Foobar"))
+
+.. note::
+
+    Advertising and scan response data can be updated at any time, no matter the advertiser status.
 
 Bluetooth Low Energy Advertiser connector
 -----------------------------------------

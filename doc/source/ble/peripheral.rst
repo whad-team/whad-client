@@ -264,10 +264,10 @@ is *mandatory*:
 
         def on_characteristic_read(self, service: Service, characteristic: Characteristic, offset: int = 0, length: int = 0):
             """Hook for GATT read operation"""
-            
+
             # Call parent method
             super().on_characteristic_read(service, characteristic, offset=offset, length=length)
-            
+
             # Continue with custom processing (Forcing characteristic value)
             raise HookReturnValue(b"Oops")
 
