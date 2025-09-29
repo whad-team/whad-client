@@ -31,7 +31,7 @@ def def_adv(adv_mock):
         scan_data,
         AdvType.ADV_NONCONN_IND,
         [37, 38, 39],
-        0x20, 0x4000
+        (0x20, 0x4000)
     )
 
 
@@ -52,7 +52,7 @@ def test_advertiser_create(adv_mock):
         scan_data,
         AdvType.ADV_NONCONN_IND,
         [37, 38, 39],
-        0x20, 0x4000
+        (0x20, 0x4000)
     )
     assert adv_mock.adv_data == adv_data.to_bytes()
     assert adv_mock.scan_resp == scan_data.to_bytes()
@@ -69,7 +69,7 @@ def test_advertiser_bad_interval(adv_mock):
     """Create an advertiser with a bad advertisement type value."""
     with pytest.raises(ValueError):
         _ = Advertiser(adv_mock, AdvDataFieldList(), None, AdvType.ADV_IND,
-                       [37, 38, 39], 0x1000, 0x0042)
+                       [37, 38, 39], (0x1000, 0x0042))
 
 def test_advertiser_start_stop(def_adv):
     """Test starting the advertiser."""
