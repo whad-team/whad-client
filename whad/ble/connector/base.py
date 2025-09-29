@@ -721,7 +721,6 @@ class BLE(Connector):
         if isinstance(scan_data, AdvDataFieldList):
             scan_data = scan_data.to_bytes()
 
-
         # Create a PeriphMode message
         msg = self.hub.ble.create_periph_mode(
             adv_data=adv_data,
