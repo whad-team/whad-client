@@ -10,7 +10,7 @@ from scapy.layers.bluetooth4LE import BTLE_DATA, BTLE
 from whad.hub.ble import AccessAddressDiscovered, Synchronized, BleRawPduReceived, \
     BlePduReceived, BleAdvPduReceived
 
-from whad.exceptions import WhadDeviceDisconnected, UnsupportedCapability
+from whad.exceptions import WhadDeviceDisconnected, UnsupportedCapability, WhadDeviceNotReady
 from whad.helpers import message_filter
 from whad.common.sniffing import EventsManager
 
@@ -44,6 +44,19 @@ class Sniffer(BLE, EventsManager):
         # Check if device accepts advertisements or connection sniffing
         if not self.can_sniff_advertisements() and not self.can_sniff_new_connection():
             raise UnsupportedCapability("Sniff")
+
+    def __enter__(self) -> 'Sniffer':
+        """Special method used for context management."""
+        if not self.started:
+            if not self.start():
+                raise WhadDeviceNotReady()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_traceback):
+        """Special method used for context management."""
+        if self.started:
+            if not self.stop():
+                raise WhadDeviceNotReady()
 
     @property
     def synchronized(self):
@@ -312,6 +325,11 @@ class Sniffer(BLE, EventsManager):
                         Wait forever if set to `None`.
         :type timeout: float
         """
+        # Start hardware interface if not started
+        if not self.started:
+            if not self.start():
+                raise WhadDeviceNotReady()
+
         start = time()
         try:
             if self.__configuration.access_addresses_discovery:
