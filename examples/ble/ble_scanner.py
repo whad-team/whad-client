@@ -1,31 +1,32 @@
 from whad.ble import Scanner
-from whad.device import WhadDevice
+from whad.device import Device
 from whad.exceptions import WhadDeviceNotFound
-from time import time,sleep
 import sys
 
 if __name__ == '__main__':
     if len(sys.argv) >= 2:
         # Retrieve target interface
         interface = sys.argv[1]
+        dev = None
 
         try:
-            # Create the device
-            dev = WhadDevice.create(interface)
+            # Access our interface
+            dev = Device.create(interface)
 
-            # Create the Scanner connector
-            scanner = Scanner(dev)
+            # Attach a scanner role and scan devices
+            with Scanner(dev) as scanner:
+                for remote_dev in scanner.discover_devices():
+                    print(remote_dev)
 
-            # Start the scanner and iterate over devices
-            scanner.start()
-            for i in scanner.discover_devices():
-                print(i)
-
+        # Handle interruptions (user or system)
         except (KeyboardInterrupt, SystemExit):
-            dev.close()
+            if dev is not None:
+                dev.close()
 
+        # Device not found ?
         except WhadDeviceNotFound:
             print('[e] Device not found')
             exit(1)
     else:
         print('Usage: %s [device]' % sys.argv[0])
+
