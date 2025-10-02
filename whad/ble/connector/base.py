@@ -14,7 +14,7 @@ from scapy.layers.bluetooth4LE import BTLE, BTLE_ADV, BTLE_DATA, BTLE_ADV_IND, \
 from scapy.packet import Packet
 
 # Device interface
-from whad.device import Connector
+from whad.device import Connector, Device
 from whad.hub.discovery import Domain, Capability
 from whad.exceptions import UnsupportedDomain, UnsupportedCapability
 
@@ -921,7 +921,7 @@ class BLENew(Connector):
             packet = BTLE(packet)
         return self.hub.ble.format(packet)
 
-    def __init__(self, device: Optional[WhadDevice] = None, synchronous=False):
+    def __init__(self, device: Optional[Device] = None, synchronous=False):
         """
         Initialize the connector, open the device (if not already opened), discover
         the services (if not already discovered).

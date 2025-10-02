@@ -9,9 +9,11 @@ weird reasons).
 
 """
 import logging
+from typing import Optional
 from time import sleep
 from threading import Event
 
+from whad.device import Device
 from whad.device.connector import Event as CentralEvent
 from whad.common.stack import Layer
 from whad.exceptions import UnsupportedCapability
@@ -80,7 +82,7 @@ class Central(BLE):
 
     def __init__(
         self,
-        device: WhadDevice,
+        device: Device,
         existing_connection = None,
         from_json=None,
         stack: type[Layer] = BleStack,
@@ -90,7 +92,7 @@ class Central(BLE):
         """BLE Central connector initialization
 
         :param  device:                 Hardware device to use
-        :type   device:                 WhadDevice
+        :type   device:                 Device
 
         :param  existing_connection:    Connection information if this connector is
                                         instantiated from an hijacked connection
@@ -113,6 +115,7 @@ class Central(BLE):
 
         # Configure stack layers
         self.__stack = stack(self, flavor=flavor)
+
         self.__gatt_client = None
         self.__connected = False
         self.__peripheral = None
@@ -246,9 +249,6 @@ class Central(BLE):
         """
         # Clear connection event
         self.__connected_evt.clear()
-
-        # Make sure our BLE stack is correctly configured
-        self.__configure_stack()
 
         if self.can_connect():
             self.connect_to(

@@ -1,4 +1,4 @@
-"""
+Commands."""
 Host/controller interface adaptation layer.
 """
 import logging
@@ -1739,7 +1739,7 @@ class Hci(VirtualDevice):
             self.__internal_state = HCIInternalState.CENTRAL
             self._send_whad_command_result(CommandResult.SUCCESS)
 
-    def _on_whad_ble_scan_mode(self, message: ScanMode):
+    def _on_whad_ble_scan_mode(self, message: Commands.ScanMode):
         # Make sure this command is valid
         if not self.is_valid_cmd(Commands.ScanMode):
             logger.debug("[%s] Received an unsupported message (BLE::ScanMode) !",

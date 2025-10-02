@@ -12,6 +12,7 @@ from queue import Queue, Empty
 from threading import Thread, Event
 from typing import Optional
 
+from whad.device import Device
 from whad.hub.ble.bdaddr import BDAddress
 from whad.hub.ble import Direction as BleDirection
 from whad.exceptions import UnsupportedCapability
@@ -138,7 +139,7 @@ class Peripheral(BLE):
 
     def __init__(
         self,
-        device: WhadDevice,
+        device: Device,
         existing_connection = None,
         profile: (GenericProfile | None) = None,
         adv_data: (AdvDataFieldList | None) = None,
@@ -153,7 +154,7 @@ class Peripheral(BLE):
         """Create a peripheral device.
 
         :param  device:     WHAD device to use as a peripheral
-        :type   device:     :class:`whad.device.WhadDevice`
+        :type   device:     :class:`whad.device.Device`
         :param  profile:    Device profile to use
         :type   profile:    :class:`whad.ble.profile.GenericProfile`
         :param  adv_data:   Advertisement data
@@ -263,23 +264,6 @@ class Peripheral(BLE):
     def profile(self) -> Optional[GenericProfile]:
         """GATT Profile"""
         return self.__profile
-
-    def __configure_stack(self, phy_layer=None, gatt_layer=None):
-        """
-        """
-        # Save GATT and PHY layers
-        if gatt_layer is not None:
-            self.__gatt_layer = gatt_layer
-        if phy_layer is not None:
-            self.__phy_layer = phy_layer
-
-            # Configure BLE stack to use our PHY class
-            self.__stack = phy_layer(self)
-
-        # Configure ATT layer to use our GATT class
-        if self.__gatt_layer is not None:
-            if issubclass(self.__gatt_layer, Layer) and self.__gatt_layer.alias == 'gatt':
-                ATTLayer.add(self.__gatt_layer)
 
     def attach_event_listener(self, listener: PeripheralEventListener):
         """Attach an event queue to receive asynchronous notifications.

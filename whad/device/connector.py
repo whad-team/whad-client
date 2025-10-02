@@ -1,7 +1,7 @@
 """
 WHAD default device connector module.
 
-This module provides a default connector class `WhadDeviceConnector` that
+This module provides a default connector class `Connector` that
 implements all the basic features of a device connector:
 
 - Sending and receiving messages
@@ -25,8 +25,7 @@ from whad.helpers import message_filter
 from whad.hub import ProtocolHub
 from whad.hub.message import AbstractPacket, AbstractEvent, HubMessage
 from whad.hub.generic.cmdresult import CommandResult, Success
-from whad.exceptions import WhadDeviceError, WhadDeviceDisconnected, \
-    RequiredImplementation, UnsupportedDomain
+from whad.exceptions import RequiredImplementation, UnsupportedDomain
 
 from .device import Device, DeviceEvt, Disconnected, MessageReceived
 
@@ -110,7 +109,7 @@ class Connector:
         :param device: Device to be used with this connector.
         :type device: Device
         """
-        self.__device: Optional[WhadDevice] = None
+        self.__device: Optional[Device] = None
         self.set_device(device)
         if self.__device is not None:
             self.__device.set_connector(self)
@@ -284,11 +283,11 @@ class Connector:
                 if packet_filter(packet):
                     callback(packet)
 
-    def set_device(self, device: Optional[WhadDevice] = None):
+    def set_device(self, device: Optional[Device] = None):
         """
         Set device linked to this connector.
 
-        :param WhadDevice device: Device to be used with this connector.
+        :param Device device: Device to be used with this connector.
         """
         if device is not None:
             self.__device = device
@@ -309,7 +308,7 @@ class Connector:
         return self.__stalled
 
     @property
-    def device(self) -> Optional[WhadDevice]:
+    def device(self) -> Optional[Device]:
         """Get the connector associated device instance
         """
         return self.__device
@@ -478,7 +477,7 @@ class Connector:
         try:
             logger.debug("sending WHAD message to device: %s", message)
             self.__device.send_message(message, keep)
-        except WhadDeviceError as device_error:
+        except DeviceError as device_error:
             logger.debug("an error occured while communicating with the WHAD device !")
             self.on_error(device_error)
 
@@ -494,7 +493,7 @@ class Connector:
         """
         try:
             return self.__device.send_command(message, keep=keep)
-        except WhadDeviceError as device_error:
+        except DeviceError as device_error:
             logger.debug("an error occured while communicating with the WHAD device !")
             self.on_error(device_error)
             return None
@@ -529,7 +528,7 @@ class Connector:
             # Do we have an error while sending this command ?
             if resp is None:
                 # Report WHAD device as disconnected
-                raise WhadDeviceDisconnected()
+                raise DeviceDisconnected()
 
             # Check if command was successful
             return isinstance(resp, Success)
@@ -885,7 +884,7 @@ class LockedConnector(Connector):
     """Provides a lockable connector.
     """
 
-    def __init__(self, device: WhadDevice):
+    def __init__(self, device: Device):
         # We set the connector with no interface for now
         super().__init__(None)
 
