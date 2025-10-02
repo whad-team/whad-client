@@ -1,4 +1,4 @@
-Commands."""
+"""
 Host/controller interface adaptation layer.
 """
 import logging
