@@ -149,6 +149,7 @@ class Node:
         dev_key=UpperTransportLayerDevKeyCryptoManager(
             device_key=bytes.fromhex("63964771734fbd76e3b40519d1d94a48")
         ),
+        is_local_node=False,
     ):
         """
         Creates a node object.
@@ -159,6 +160,8 @@ class Node:
         :type addr_range: int, optional
         :param dev_key: Dev key of the node, defaults to UpperTransportLayerDevKeyCryptoManager(bytes.fromhex("63964771734fbd76e3b40519d1d94a48"))
         :type dev_key: UpperTransportLayerDevKeyCryptoManager, optional
+        :type is_local_node: Is the Node the local WHAD node created by the user ? defaults to False
+        :type is_local_node: bool, optional
         """
 
         self.__address = address & 0xFFFF
@@ -166,6 +169,7 @@ class Node:
         self.__dev_key = dev_key
         self.__elements = {}
         self.__distance = None  # Distance between local node and distant node (via network discovery DF)
+        self.__is_local_node = is_local_node
 
         # Features
         self.__is_relay = False
@@ -236,6 +240,14 @@ class Node:
     @distance.setter
     def distance(self, value):
         self.__distance = value
+
+    @property
+    def is_local_node(self):
+        return self.__is_local_node
+
+    @is_local_node.setter
+    def is_local_node(self, value):
+        self.__is_local_node = value
 
     def set_elements(self, elements=[]):
         """

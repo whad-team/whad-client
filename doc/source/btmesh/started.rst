@@ -15,6 +15,7 @@ Use the :class:`whad.btmesh.sniffing.SnifferConfiguration` to configure the snif
     from whad.device import WhadDevice
     from whad.btmesh.connector.sniffer import Sniffer
 
+    dev = WhadDevice.create("uart0")
     sniffer = Sniffer(dev)
     sniffer.configure()
     sniffer.start()
@@ -33,10 +34,10 @@ It will be automacally provisioned with a preset of given keys and default profi
 
 .. code-block:: python
 
-    from whad.device import UartDevice
+    from whad.device import WhadDevice
     from whad.btmesh.connector.provisionee import Provisionee
 
-    device = WhadDevice("uart0")
+    dev = WhadDevice.create("uart0")
     provisionee = Provisionee(
         dev,
         net_key=bytes.fromhex("f7a2a44f8e8a8029064f173ddc1e2b00"),
@@ -61,17 +62,21 @@ We send Unprovisioned Device Beacons until the node is provisioned by a Provisio
 
 .. code-block:: python
 
-    from whad.device import UartDevice
+    from whad.device import WhadDevice
     from whad.btmesh.connector.provisionee import Provisionee
     from time import sleep
 
-    dev = WhadDevice.create(interface)
+    dev = WhadDevice.create("uart0")
 
     provisionee = Provisionee(dev)
     provisionee.start_provisioning()
 
-    while not provisionee.profile.is_provisioned:
-        sleep(0.5)
+    if provisionee.profile.is_provisioned:
+        print("Node is provisioned !")
+    else:
+        print("Node has not been provisioned")
+        dev.close()
+        exit(1)
 
     print("Node is provisioned !")
 
@@ -86,11 +91,12 @@ This code will provision any node sending beacons directly. OOB Authentication i
 
 .. code-block:: python
 
-    from whad.device import UartDevice
+    from whad.device import WhadDevice
     from whad.btmesh.connector.provisioner import Provisioner
+    from time import sleep
 
 
-    dev = WhadDevice.create(interface)
+    dev = WhadDevice.create("uart0")
 
     # Auto provision node
     provisioner = Provisioner(dev)
@@ -105,10 +111,11 @@ This code will provision any node sending beacons directly. OOB Authentication i
         if len(devices) > 0:
             print("Provisioning node ...")
             res = provisioner.provision_distant_node(devices[0])
-        if res:
+            if res:
                 print("Successfully provisioned device\n")
             else:
                 print("Failed to provision deviced...\n")
+        sleep(0.5)
 
 
 
@@ -129,7 +136,7 @@ Here, we send a Generic OnOff set message to the broadcast address.
     from whad.scapy.layers.btmesh import BTMesh_Model_Generic_OnOff_Set
 
 
-    dev = WhadDevice.create(interface)
+    dev = WhadDevice.create("uart0")
 
     provisionee = Provisionee(dev)
     provisionee.start()
@@ -160,13 +167,10 @@ Here, we send a Generic OnOff set message to the broadcast address.
     while True:
         # the packet to send (we switch between 0 and 1)
         pkt = BTMesh_Model_Generic_OnOff_Set(onoff=onoff)
-
         print("\nSending message to 0x%x...\n" % ctx.dest_addr)
-
         response = provisionee.send_model_message(
             model=model, message=(pkt, ctx), is_acked=False
         )
-
         onoff = int(not onoff)
         sleep(5)
 

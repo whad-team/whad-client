@@ -109,15 +109,16 @@ class PBAdvBearerLayer(Layer):
         :param peer_uuid: The uuid of the peer node, defaults to None
         :type peer_uuid: str, optional
         """
-        new_gen_prov = self.instantiate(self.state.generic_prov_layer_class)
-        new_gen_prov.state.peer_uuid = peer_uuid
-
         if self.state.gen_prov_layer is not None:
             self.destroy(self.state.gen_prov_layer)
 
-        self.state.gen_prov_layer = new_gen_prov
+        self.state.gen_prov_layer = self.instantiate(
+            self.state.generic_prov_layer_class
+        )
+        self.state.gen_prov_layer.state.peer_uuid = peer_uuid
         self.state.current_link_id = link_id
-        return new_gen_prov
+    
+        return self.state.gen_prov_layer
 
     def on_provisioning_pdu(self, packet):
         """

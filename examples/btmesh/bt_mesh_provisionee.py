@@ -29,10 +29,13 @@ try:
     print("Sending Unprovisioned Device Beacons, waiting for provisioning ....\n\n")
     provisionee.start_provisioning()
 
-    while not provisionee.profile.is_provisioned:
-        sleep(0.5)
+    if provisionee.profile.is_provisioned:
+        print("Node is provisioned !")
+    else:
+        print("Node has not been provisioned")
+        dev.close()
+        exit(1)
 
-    print("Node is provisioned !")
 
     # retrieve generic onoff client of the local node of primary element
     model = provisionee.profile.local_node.get_element(0).get_model_by_id(0x1001)

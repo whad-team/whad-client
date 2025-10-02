@@ -977,11 +977,16 @@ class BTMeshBaseShell(InteractiveShell):
             nodes = self.profile.get_all_nodes()
             for node in nodes.values():
 
+                local_node_annotation = (
+                    "<ansigreen>Local Node</ansigreen> " if node.is_local_node else ""
+                )
+
                 if node.distance is None:
                     print_formatted_text(
                         HTML(
-                            "<ansimagenta><b>Address: 0x%x -> 0x%x</b></ansimagenta>"
+                            "%s<ansimagenta><b>Address: 0x%x -> 0x%x</b></ansimagenta>"
                             % (
+                                local_node_annotation,
                                 node.address,
                                 (node.address + node.addr_range - 1),
                             )
@@ -990,8 +995,9 @@ class BTMeshBaseShell(InteractiveShell):
                 else:
                     print_formatted_text(
                         HTML(
-                            "<ansimagenta><b>Address: 0x%x -> 0x%x</b></ansimagenta> | <ansicyan>%d hops away</ansicyan>"
+                            "%s<ansimagenta><b>Address: 0x%x -> 0x%x</b></ansimagenta> | <ansicyan>%d hops away</ansicyan>"
                             % (
+                                local_node_annotation,
                                 node.address,
                                 (node.address + node.addr_range - 1),
                                 node.distance,
@@ -1007,6 +1013,7 @@ class BTMeshBaseShell(InteractiveShell):
                 self._show_elements(
                     elements=node.get_all_elements(), indentation_level=1
                 )
+                print("")
             return
 
         elif action == "dev_key":
