@@ -147,6 +147,9 @@ class Scanner(BLE):
         if not self.started:
             if not self.start():
                 raise WhadDeviceNotReady()
+            stop_on_exit = True
+        else:
+            stop_on_exit = False
 
         # Determine the type of message we are expecting to receive
         if self.support_raw_pdu():
@@ -155,6 +158,7 @@ class Scanner(BLE):
             message_type = BleAdvPduReceived
 
         # Loop until timeout reached or stopped
+        start_anchor = time()
         while True:
             # Switch to sniffing mode
             for message in super().sniff(messages=(message_type), timeout=timeout):
@@ -167,6 +171,17 @@ class Scanner(BLE):
                         if message.addr_type > 0:
                             packet.getlayer(BTLE_ADV).TxAdd = 1
                     yield packet
+
+                # Make sure we did not run over a configured timeout, if so
+                # exit the main while loop
+                if timeout is not None:
+                    if (time() - start_anchor) >= timeout:
+                        break
+
+        # Stop current mode if we enabled it
+        if stop_on_exit:
+            if not self.stop():
+                raise WhadDeviceNotReady()
 
     def clear(self):
         """
