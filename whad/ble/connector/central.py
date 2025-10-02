@@ -11,6 +11,7 @@ weird reasons).
 import logging
 from time import sleep
 from threading import Event
+from typing import Optional
 
 from whad.device.connector import Event as CentralEvent
 from whad.common.stack import Layer
@@ -267,7 +268,7 @@ class Central(BLE):
         # Raise error
         raise PeripheralNotFound()
 
-    def peripheral(self) -> PeripheralDevice:
+    def peripheral(self) -> Optional[PeripheralDevice]:
         """Connected BLE peripheral.
         """
         return self.__peripheral
