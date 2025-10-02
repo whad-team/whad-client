@@ -4,6 +4,7 @@ import pytest
 
 from whad.ble.mock import DeviceScan, EmulatedDevice
 from whad.ble import BDAddress, Scanner
+from whad.exceptions import WhadDeviceNotReady
 
 @pytest.fixture
 def mock_devices():
@@ -49,6 +50,9 @@ def test_scanner_scan_devices(scan_mock):
 
 def test_scanner_scan_devices_with_forced_start(scan_mock):
     """Test scanner scan-based device discovery
+
+    `Scanner` instance must stay started if already started
+    before calling `discover_devices()`.
     """
     scanner = Scanner(scan_mock)
     scanner.start()
@@ -57,6 +61,7 @@ def test_scanner_scan_devices_with_forced_start(scan_mock):
         devices.append(device.address)
         break
     assert "00:11:22:33:44:55" in devices
+    assert scanner.started
 
 def test_scanner_scan_devices_with_context(scan_mock):
     """Test scanner device discovery when used in a `with` statement."""
@@ -68,6 +73,12 @@ def test_scanner_scan_devices_with_context(scan_mock):
             break
     assert "00:11:22:33:44:55" in devices
     assert scan_mock.stopped
+
+def test_scanner_exception_within_context(scan_mock):
+    """Test scanner device discovery when used in a `with` statement."""
+    with pytest.raises(WhadDeviceNotReady):
+        with Scanner(scan_mock):
+            raise WhadDeviceNotReady()
 
 def test_scanner_sniffing(sniff_mock):
     """Test scanner instantiation with hardware only supporting sniffing
