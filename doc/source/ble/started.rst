@@ -9,19 +9,29 @@ a BLE device scanner and detect all the available devices.
 
 .. code-block:: python
 
-    from whad import UartDevice
+    from whad.device import Device
     from whad.ble import Scanner
 
-    scanner = Scanner(UartDevice('/dev/ttyUSB0'))
-    scanner.start()
-    for rssi, advertisement in scanner.discover_devices():
-        advertisement.show()
+    scanner = Scanner(Device.create("hci0"))
+    for device in scanner.discover_devices():
+        print(device)
 
+:class:`~whad.ble.connector.scanner.Scanner` can also be used within a
+`with` statement, as shown below:
+
+.. code-block:: python
+
+    from whad.device import Device
+    from whad.ble import Scanner
+
+    with Scanner(Device.create("hci0")) as scanner:
+        for device in scanner.discover_devices():
+            print(device)
 
 Initiate a connection to a BLE device
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Use the :class:`whad.ble.connector.central.Central` class to create a
+Use the :class:`~whad.ble.connector.central.Central` class to create a
 BLE central device and initiate a connection to a BLE peripheral device.
 
 .. code-block:: python
@@ -197,7 +207,7 @@ and :py:class:`whad.ble.connector.Central` connector provides a nifty way to do 
 
     # Make sure connection has succeeded
     if device is not None:
-        
+
         # Enable synchronous mode: we must process any incoming BLE packet.
         central.enable_synchronous(True)
 
