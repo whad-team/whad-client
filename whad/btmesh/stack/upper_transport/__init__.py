@@ -436,9 +436,6 @@ class UpperTransportLayer(Layer):
             or ctx.seq_number is None
         ):
             ctx.seq_number = self.state.profile.get_next_seq_number(inc=5)
-            pkt.path_origin_forwarding_number = (
-                self.state.profile.get_next_forwarding_number()
-            )
 
         iv_index = self.state.profile.iv_index
         ctx.seq_auth = int.from_bytes(
@@ -491,18 +488,22 @@ class UpperTransportLayer(Layer):
 
             return
 
-    def discover_topology_thread(self, addr_low, addr_high, delay=3.5):
+    def discover_topology_thread(
+        self, addr_low, addr_high, delay=3.5, forwarding_number=None
+    ):
         """
         "Attack" to discover all the nodes that support DF (they all should ...) and the distance to them
 
-        We send PATH_REQUEST with a PATH_ORIGIN that doesnt exist (very high address) for all the addrs in the range specified
+        We send PATH_REQUEST with a PATH_ORIGIN that doesnt (probably) exist (very high address) for all the addrs in the range specified
 
-        :param addr_low: [TODO:description]
-        :type addr_low: [TODO:type]
-        :param addr_high: [TODO:description]
-        :type addr_high: [TODO:type]
-        :param delay: Delay between 2 Path Request sent, defaults to 3.5
+        :param addr_low: Lowest address of the interval to ping
+        :type addr_low:  int
+        :param addr_high: Highest address of the interval to ping
+        :type addr_high: int
+        :param delay: Delay between 2 Path Request sent (seconds), defaults to 3.5
         :type: float, optional
+        :param forwarding_number: The fowarding number to use for the first Path Request (incremented for each packet). If None, uses the local node auto managed fwn defaults to None
+        :type forwarding_number: int | None, optional
         """
         base_pkt = BTMesh_Upper_Transport_Control_Path_Request(
             on_behalf_of_dependent_origin=0,
@@ -528,6 +529,15 @@ class UpperTransportLayer(Layer):
         for dest in range(addr_low, addr_high + 1):
             if self.state.profile.is_unicast_addr_ours(dest):
                 continue
+
+            if forwarding_number is None:
+                base_pkt.path_origin_forwarding_number = (
+                    self.state.profile.get_next_forwarding_number()
+                )
+            else:
+                base_pkt.path_origin_forwarding_number = forwarding_number
+                forwarding_number = (forwarding_number + 1) % 0xFF
+
             base_pkt.destination = dest
             self.send_control_message(
                 (

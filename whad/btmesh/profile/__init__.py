@@ -65,7 +65,12 @@ class BaseMeshProfile(object):
     When creating a new profile, the only function that the subclass should overwrite is the _populate_elements_and_models function
     """
 
-    # Elements of the local nodes with the models used
+    """Elements of the local nodes with the models used
+
+    Organized in a list of Element objects, containing Model objects.
+    Be aware that at the minimum, a primary element is needed (at index 0) with a ConfigurationModelServer
+    This is the only variable a user needs to change when creating a new Profile (by inheriting this class and overriding the elements attribute)
+    """
     elements = [
         Element(
             0,
@@ -131,7 +136,7 @@ class BaseMeshProfile(object):
         self.__subnets = []
 
         # Represents our own Node (unprovisioned for now, arbitrary address)
-        self.__local_node = Node(address=0x0001)
+        self.__local_node = Node(address=0x0001, is_local_node=True)
 
         # List of Nodes object reprensenting the nodes within the network.
         # Key is primary address of node. Automatically filled by provisioners when provisioning other nodes
