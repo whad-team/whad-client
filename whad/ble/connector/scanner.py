@@ -27,13 +27,13 @@ an :class:`UnsupportedCapability` exception.
 
 """
 from time import time
-from typing import Iterator, List
+from typing import Iterator, List, Optional
 
 from scapy.packet import Packet
 from scapy.layers.bluetooth4LE import BTLE_ADV
 
 from whad.hub.ble import BleAdvPduReceived, BleRawPduReceived
-from whad.exceptions import UnsupportedCapability
+from whad.exceptions import UnsupportedCapability, WhadDeviceNotReady
 
 from .base import BLE
 from ..scanning import AdvertisingDevicesDB, AdvertisingDevice
@@ -71,29 +71,47 @@ class Scanner(BLE):
             # Enable active scanning
             self.enable_scan_mode(True)
 
-    def start(self):
+    def start(self) -> bool:
         """Start the BLE scanner.
 
         Calling this method resets the discovered devices database and put
         the WHAD device into BLE scanning mode.
         """
         self.__db.reset()
-        super().start()
+        return super().start()
 
-    def stop(self):
+    def stop(self) -> bool:
         """Stop scanning.
 
         Stop scanning for devices, disable scan mode if used.
         """
         # Stop scanning
-        super().stop()
+        result = super().stop()
 
         # Disable active scan mode (passive mode by default)
         if self.can_scan():
             self.enable_scan_mode(False)
 
+        # Send result
+        return result
+
+    def __enter__(self) -> 'Scanner':
+        """Special method used to use this connector as a context manager."""
+        # Make sure we are started
+        if not self.started:
+            if not self.start():
+                raise WhadDeviceNotReady()
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        """Special method used to close the connector when a
+        context manager is done with it."""
+        if self.started:
+            if not self.stop():
+                raise WhadDeviceNotReady()
+
     def discover_devices(self, minimal_rssi = None, filter_address = None,
-                         timeout: float = None) -> Iterator[AdvertisingDevice]:
+                         timeout: Optional[float] = None) -> Iterator[AdvertisingDevice]:
         """
         Parse incoming advertisements and yield discovered devices.
 
@@ -104,6 +122,8 @@ class Scanner(BLE):
         :param  timeout:            Timeout in seconds
         :type   timeout:            float, optional
         """
+
+        # Start sniffing
         start_time = time()
         for advertisement in self.sniff(timeout=timeout):
             if minimal_rssi is None or advertisement.metadata.rssi > minimal_rssi:
@@ -119,10 +139,16 @@ class Scanner(BLE):
             if (timeout is not None) and (time() - start_time > timeout):
                 break
 
-    def sniff(self, messages: List = None, timeout: float = None) -> Iterator[Packet]:
+    def sniff(self, messages: Optional[List] = None, timeout: Optional[float] = None) -> Iterator[Packet]:
         """
         Listen and yield incoming advertising PDUs.
         """
+        # Make sure the hardware interface is started
+        if not self.started:
+            if not self.start():
+                raise WhadDeviceNotReady()
+
+        # Determine the type of message we are expecting to receive
         if self.support_raw_pdu():
             message_type = BleRawPduReceived
         else:
@@ -147,3 +173,4 @@ class Scanner(BLE):
         Clear device database.
         """
         self.__db.reset()
+

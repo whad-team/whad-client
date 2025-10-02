@@ -91,6 +91,16 @@ class DeviceScan(MockDevice):
             )
         }
 
+    @property
+    def started(self) -> bool:
+        """Check if mock device is started."""
+        return self.__running
+
+    @property
+    def stopped(self) -> bool:
+        """Check if mock device is stopped."""
+        return not self.__running
+
     def accept(self, bdaddr: BDAddress) -> bool:
         """Apply BD filter if required.
         """

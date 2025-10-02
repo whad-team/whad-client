@@ -41,12 +41,33 @@ def test_scanner_scan_devices(scan_mock):
     """Test scanner scan-based device discovery
     """
     scanner = Scanner(scan_mock)
+    devices = []
+    for device in scanner.discover_devices(timeout=2.0):
+        devices.append(device.address)
+        break
+    assert "00:11:22:33:44:55" in devices
+
+def test_scanner_scan_devices_with_forced_start(scan_mock):
+    """Test scanner scan-based device discovery
+    """
+    scanner = Scanner(scan_mock)
     scanner.start()
     devices = []
     for device in scanner.discover_devices(timeout=2.0):
         devices.append(device.address)
         break
     assert "00:11:22:33:44:55" in devices
+
+def test_scanner_scan_devices_with_context(scan_mock):
+    """Test scanner device discovery when used in a `with` statement."""
+    devices = []
+    with Scanner(scan_mock) as scanner:
+        assert isinstance(scanner, Scanner)
+        for device in scanner.discover_devices():
+            devices.append(device.address)
+            break
+    assert "00:11:22:33:44:55" in devices
+    assert scan_mock.stopped
 
 def test_scanner_sniffing(sniff_mock):
     """Test scanner instantiation with hardware only supporting sniffing
